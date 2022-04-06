@@ -4,11 +4,13 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
     <title>Changelog &#8212; heyoka 0.18.0 documentation</title>
     
-  <link href="_static/css/theme.css" rel="stylesheet">
-  <link href="_static/css/index.ff1ffe594081f20da1ef19478df9384b.css" rel="stylesheet">
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+<link href="_static/styles/pydata-sphinx-theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
 
     
   <link rel="stylesheet"
@@ -18,20 +20,17 @@
   <link rel="preload" as="font" type="font/woff2" crossorigin
     href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
 
-    
-      
-
-    
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/sphinx-book-theme.css?digest=84ace793992934648b4de8eed757e5a2" />
+    <link rel="stylesheet" href="_static/styles/sphinx-book-theme.css?digest=62ba249389abaaa9ffc34bf36a076bdc1d65ee18" type="text/css" />
     
-  <link rel="preload" as="script" href="_static/js/index.be7d3bbb2ef33a8344ce.js">
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf">
 
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
     <script src="_static/jquery.js"></script>
     <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx-book-theme.9d8b4a8b9bb19db25eeaddc40d639ba2.js"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?digest=f31d14ad54b65d19161ba51d4ffff3a77ae00456"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -44,7 +43,21 @@
     <!-- Google Analytics -->
     
   </head>
-  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="60">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay overlay-navbar" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<!-- Checkboxes to toggle the in-page toc -->
+<input type="checkbox" class="sidebar-toggle" name="__page-toc" id="__page-toc" aria-label="Toggle in-page Table of Contents">
+<label class="overlay overlay-pagetoc" for="__page-toc">
+    <div class="visually-hidden">Toggle in-page Table of Contents</div>
+</label>
+<!-- Headers at the top -->
+<div class="announcement header-item noprint"></div>
+<div class="header header-item noprint"></div>
+
     
     <div class="container-fluid" id="banner"></div>
 
@@ -53,14 +66,10 @@
     <div class="container-xl">
       <div class="row">
           
-<!-- Checkboxes to toggle the left sidebar -->
-<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
-<label class="overlay" for="__navigation">
-    <div class="visually-hidden">Toggle navigation sidebar</div>
-</label>
-<div class="col-12 col-md-3 bd-sidebar site-navigation " id="site-navigation">
-    
-        <div class="navbar-brand-box">
+<!-- Sidebar -->
+<div class="bd-sidebar noprint" id="site-navigation">
+    <div class="bd-sidebar__content">
+        <div class="bd-sidebar__top"><div class="navbar-brand-box">
     <a class="navbar-brand text-wrap" href="index.html">
       
         <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
@@ -201,90 +210,180 @@
 </ul>
 
     </div>
-</nav> <!-- To handle the deprecated key -->
-
-<div class="navbar_extra_footer">
-  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
-</div>
-
-</div>
-
-
-          
-
-
-          
-<!-- This is an invisible pixel that we watch to see if we've scrolled. -->
-<div class="sbt-scroll-pixel-helper"></div>
-<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
-    
-    <div class="topbar container-xl fixed-top">
-    <div class="topbar-contents row">
-        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
-        <div class="col pl-md-4 topbar-main">
-            <div class="topbar-left">
-                
-                <label class="nav-toggle-button" for="__navigation">
-                    <div class="visually-hidden">Toggle navigation</div>
-                    <i class="fas fa-bars"></i>
-                </label>
-                
+</nav></div>
+        <div class="bd-sidebar__bottom">
+             <!-- To handle the deprecated key -->
+            
+            <div class="navbar_extra_footer">
+            Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
             </div>
             
-<div class="dropdown-buttons-trigger">
-    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
-            class="fas fa-download"></i></button>
-
-    <div class="dropdown-buttons">
-        <!-- ipynb file if we had a myst markdown file -->
-        
-        <!-- Download raw file -->
-        <a class="dropdown-buttons" href="_sources/changelog.rst.txt"><button type="button"
-                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
-                data-placement="left">.rst</button></a>
-        <!-- Download PDF via print -->
-        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
-                onclick="printPdf(this)" data-toggle="tooltip" data-placement="left">.pdf</button>
-    </div>
-</div>
-
-            <!-- Source interaction buttons -->
-
-<div class="dropdown-buttons-trigger">
-    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn"
-        aria-label="Connect with source repository"><i class="fab fa-github"></i></button>
-    <div class="dropdown-buttons sourcebuttons">
-        <a class="repository-button"
-            href="https://github.com/bluescarni/heyoka"><button type="button" class="btn btn-secondary topbarbtn"
-                data-toggle="tooltip" data-placement="left" title="Source repository"><i
-                    class="fab fa-github"></i>repository</button></a>
-        <a class="issues-button"
-            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fchangelog.html&body=Your%20issue%20content%20here."><button
-                type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
-                title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
-        
-    </div>
-</div>
-
-            <!-- Full screen (wrap in <a> to have style consistency -->
-
-<a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
-        data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
-        title="Fullscreen mode"><i
-            class="fas fa-expand"></i></button></a>
-
-            <!-- Launch buttons -->
-
         </div>
+    </div>
+    <div id="rtd-footer-container"></div>
+</div>
 
-        <!-- Table of contents -->
-        <div class="d-none d-md-block col-md-2 bd-toc show noprint">
-            
-            <div class="tocsection onthispage pt-5 pb-3">
-                <i class="fas fa-list"></i> Contents
-            </div>
-            <nav id="bd-toc-nav" aria-label="Page">
-                <ul class="visible nav section-nav flex-column">
+
+          
+
+
+          
+<!-- A tiny helper pixel to detect if we've scrolled -->
+<div class="sbt-scroll-pixel-helper"></div>
+<!-- Main content -->
+<div class="col py-0 content-container">
+    
+    <div class="header-article row sticky-top noprint">
+        
+
+
+
+<div class="col py-1 d-flex header-article-main">
+    <div class="header-article__left">
+        
+        <label for="__navigation"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="right"
+title="Toggle navigation"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-bars"></i>
+  </span>
+
+</label>
+
+        
+    </div>
+    <div class="header-article__right">
+<button onclick="toggleFullScreen()"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="bottom"
+title="Fullscreen mode"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+<div class="menu-dropdown menu-dropdown-repository-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Source repositories">
+      <i class="fab fa-github"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="https://github.com/bluescarni/heyoka"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Source repository"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="headerbtn__text-container">repository</span>
+</a>
+
+      </li>
+      
+      <li>
+        <a href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fchangelog.html&body=Your%20issue%20content%20here."
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Open an issue"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="headerbtn__text-container">open issue</span>
+</a>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+
+<div class="menu-dropdown menu-dropdown-download-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Download this page">
+      <i class="fas fa-download"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="_sources/changelog.rst.txt"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Download source file"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="headerbtn__text-container">.rst</span>
+</a>
+
+      </li>
+      
+      <li>
+        
+<button onclick="printPdf(this)"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="left"
+title="Print to PDF"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="headerbtn__text-container">.pdf</span>
+</button>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+<label for="__page-toc"
+  class="headerbtn headerbtn-page-toc"
+  
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-list"></i>
+  </span>
+
+</label>
+
+    </div>
+</div>
+
+<!-- Table of contents -->
+<div class="col-md-3 bd-toc show noprint">
+    <div class="tocsection onthispage pt-5 pb-3">
+        <i class="fas fa-list"></i> Contents
+    </div>
+    <nav id="bd-toc-nav" aria-label="Page">
+        <ul class="visible nav section-nav flex-column">
  <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#unreleased">
    0.18.0 (unreleased)
@@ -655,12 +754,11 @@
  </li>
 </ul>
 
-            </nav>
-        </div>
-    </div>
+    </nav>
 </div>
-    <div id="main-content" class="row">
-        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+    </div>
+    <div class="article row">
+        <div class="col pl-md-3 pl-lg-5 content-container">
             <!-- Table of contents that is only displayed when printing the page -->
             <div id="jb-print-docs-body" class="onlyprint">
                 <h1>Changelog</h1>
@@ -1047,25 +1145,28 @@
                     </div>
                 </div>
             </div>
-            
+            <main id="main-content" role="main">
+                
               <div>
                 
-  <div class="section" id="changelog">
-<h1>Changelog<a class="headerlink" href="#changelog" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="unreleased">
-<h2>0.18.0 (unreleased)<a class="headerlink" href="#unreleased" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="new">
-<h3>New<a class="headerlink" href="#new" title="Permalink to this headline">¶</a></h3>
+  <section id="changelog">
+<h1>Changelog<a class="headerlink" href="#changelog" title="Permalink to this headline">#</a></h1>
+<section id="unreleased">
+<h2>0.18.0 (unreleased)<a class="headerlink" href="#unreleased" title="Permalink to this headline">#</a></h2>
+<section id="new">
+<h3>New<a class="headerlink" href="#new" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
+<li><p>Add a function to build (N+1)-body problems
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/251">#251</a>).</p></li>
 <li><p>Support LLVM 14
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/247">#247</a>).</p></li>
 <li><p>Implement <a class="reference internal" href="tut_parallel_mode.html#tut-parallel-mode"><span class="std std-ref">parallel mode</span></a>
 for the automatic parallelisation of an individual integration step
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/237">#237</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="changes">
-<h3>Changes<a class="headerlink" href="#changes" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="changes">
+<h3>Changes<a class="headerlink" href="#changes" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>heyoka now builds against LLVM 13/14 without deprecation warnings
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/242">#242</a>).</p></li>
@@ -1076,9 +1177,9 @@ process all available grid points before the interruption time before exiting
 is interrupted by a stopping terminal event
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/235">#235</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="fix">
-<h3>Fix<a class="headerlink" href="#fix" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="fix">
+<h3>Fix<a class="headerlink" href="#fix" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Fix a potential accuracy issue when setting the time coordinate
 in double-length format
@@ -1087,30 +1188,30 @@ in double-length format
 that could lead to invalid results in certain corner cases
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/234">#234</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id1">
-<h2>0.17.1 (2022-02-13)<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id2">
-<h3>Changes<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id1">
+<h2>0.17.1 (2022-02-13)<a class="headerlink" href="#id1" title="Permalink to this headline">#</a></h2>
+<section id="id2">
+<h3>Changes<a class="headerlink" href="#id2" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>The <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code> callbacks are now invoked also if the integration
 is interrupted by a stopping terminal event
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/231">#231</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id3">
-<h3>Fix<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id3">
+<h3>Fix<a class="headerlink" href="#id3" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Fix two test failures on FreeBSD
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/231">#231</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id4">
-<h2>0.17.0 (2022-01-20)<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id5">
-<h3>New<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id4">
+<h2>0.17.0 (2022-01-20)<a class="headerlink" href="#id4" title="Permalink to this headline">#</a></h2>
+<section id="id5">
+<h3>New<a class="headerlink" href="#id5" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>The LLVM version number against which heyoka was built
 is now exported in the CMake config-file package
@@ -1130,16 +1231,16 @@ of the appropriate size
 the CPU in use
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/220">#220</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id6">
-<h3>Changes<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id6">
+<h3>Changes<a class="headerlink" href="#id6" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Avoid unnecessary copies of the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> callbacks
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/222">#222</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id7">
-<h3>Fix<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id7">
+<h3>Fix<a class="headerlink" href="#id7" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Fix compilation in debug mode when using recent versions
 of <code class="docutils literal notranslate"><span class="pre">fmt</span></code>
@@ -1150,12 +1251,12 @@ related to event detection are destroyed in the wrong order
 <li><p>Fix build failures in the benchmark suite
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/220">#220</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id8">
-<h2>0.16.0 (2021-11-20)<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id9">
-<h3>New<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id8">
+<h2>0.16.0 (2021-11-20)<a class="headerlink" href="#id8" title="Permalink to this headline">#</a></h2>
+<section id="id9">
+<h3>New<a class="headerlink" href="#id9" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p><strong>BREAKING</strong>: add support for <a class="reference internal" href="tut_d_output.html#tut-c-output"><span class="std std-ref">continuous output</span></a>
 to the <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code> functions
@@ -1170,9 +1271,9 @@ This is a <a class="reference internal" href="breaking_changes.html#bchanges-0-1
 <li><p>Support LLVM 13
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/201">#201</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id10">
-<h3>Changes<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id10">
+<h3>Changes<a class="headerlink" href="#id10" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>If <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> exits early in batch mode,
 the missing values are now set to NaN instead of zero
@@ -1194,9 +1295,9 @@ by a new function called <code class="docutils literal notranslate"><span class=
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/203">#203</a>).
 This is a <a class="reference internal" href="breaking_changes.html#bchanges-0-16-0"><span class="std std-ref">breaking change</span></a>.</p></li>
 </ul>
-</div>
-<div class="section" id="id11">
-<h3>Fix<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id11">
+<h3>Fix<a class="headerlink" href="#id11" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Fix various corner-case issues in the integrator classes
 related to data aliasing
@@ -1205,12 +1306,12 @@ related to data aliasing
 integration is interrupted by a terminal event
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/216">#216</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id12">
-<h2>0.15.0 (2021-09-28)<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id13">
-<h3>New<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id12">
+<h2>0.15.0 (2021-09-28)<a class="headerlink" href="#id12" title="Permalink to this headline">#</a></h2>
+<section id="id13">
+<h3>New<a class="headerlink" href="#id13" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Implement derivatives with respect to the parameters
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/196">#196</a>).</p></li>
@@ -1236,9 +1337,9 @@ to the expression system
 <li><p>Implement additional automatic simplifications for sin/cos
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/180">#180</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id14">
-<h3>Changes<a class="headerlink" href="#id14" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id14">
+<h3>Changes<a class="headerlink" href="#id14" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Implement a fast exclusion check for event detection which
 improves performance when no event triggers in a timestep
@@ -1251,9 +1352,9 @@ not deep copies. This is a <a class="reference internal" href="breaking_changes.
 <li><p>heyoka now depends on the <a class="reference external" href="https://github.com/oneapi-src/oneTBB">TBB</a> library
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/186">#186</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id15">
-<h3>Fix<a class="headerlink" href="#id15" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id15">
+<h3>Fix<a class="headerlink" href="#id15" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Don’t force the use of static MSVC runtime when
 compiling heyoka as a static library
@@ -1267,38 +1368,38 @@ compiling heyoka as a static library
 that would lead to an invalid decomposition for zero eccentricity
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/185">#185</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id16">
-<h2>0.14.0 (2021-08-03)<a class="headerlink" href="#id16" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id17">
-<h3>New<a class="headerlink" href="#id17" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id16">
+<h2>0.14.0 (2021-08-03)<a class="headerlink" href="#id16" title="Permalink to this headline">#</a></h2>
+<section id="id17">
+<h3>New<a class="headerlink" href="#id17" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>The tolerance value is now stored in the integrator objects
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/175">#175</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id18">
-<h3>Changes<a class="headerlink" href="#id18" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id18">
+<h3>Changes<a class="headerlink" href="#id18" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Improve the heuristic for the automatic deduction
 of the cooldown value for terminal events
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/178">#178</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id19">
-<h3>Fix<a class="headerlink" href="#id19" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id19">
+<h3>Fix<a class="headerlink" href="#id19" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Ensure that code generation in compact mode is platform-agnostic
 and deterministic across executions
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/176">#176</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id20">
-<h2>0.12.0 (2021-07-21)<a class="headerlink" href="#id20" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id21">
-<h3>New<a class="headerlink" href="#id21" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id20">
+<h2>0.12.0 (2021-07-21)<a class="headerlink" href="#id20" title="Permalink to this headline">#</a></h2>
+<section id="id21">
+<h3>New<a class="headerlink" href="#id21" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Add support for 64-bit PowerPC processors
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/171">#171</a>).</p></li>
@@ -1308,49 +1409,49 @@ and deterministic across executions
 Boost.Serialization
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/163">#163</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id22">
-<h3>Fix<a class="headerlink" href="#id22" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id22">
+<h3>Fix<a class="headerlink" href="#id22" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Fix a bug in the move assignment operator of <code class="docutils literal notranslate"><span class="pre">llvm_state</span></code>
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/163">#163</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id23">
-<h2>0.11.0 (2021-07-06)<a class="headerlink" href="#id23" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id24">
-<h3>New<a class="headerlink" href="#id24" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id23">
+<h2>0.11.0 (2021-07-06)<a class="headerlink" href="#id23" title="Permalink to this headline">#</a></h2>
+<section id="id24">
+<h3>New<a class="headerlink" href="#id24" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>The <code class="docutils literal notranslate"><span class="pre">time</span></code> expression now supports symbolic
 differentiation
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/160">#160</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id25">
-<h3>Changes<a class="headerlink" href="#id25" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id25">
+<h3>Changes<a class="headerlink" href="#id25" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Various performance optimisations for the creation
 of large ODE systems
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/152">#152</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id26">
-<h2>0.10.1 (2021-07-02)<a class="headerlink" href="#id26" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id27">
-<h3>Fix<a class="headerlink" href="#id27" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id26">
+<h2>0.10.1 (2021-07-02)<a class="headerlink" href="#id26" title="Permalink to this headline">#</a></h2>
+<section id="id27">
+<h3>Fix<a class="headerlink" href="#id27" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Parameters in event equations are now correctly counted
 when inferring the total number of parameters in an ODE system
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/154">#154</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id28">
-<h2>0.10.0 (2021-06-09)<a class="headerlink" href="#id28" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id29">
-<h3>New<a class="headerlink" href="#id29" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id28">
+<h2>0.10.0 (2021-06-09)<a class="headerlink" href="#id28" title="Permalink to this headline">#</a></h2>
+<section id="id29">
+<h3>New<a class="headerlink" href="#id29" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>The callback that can be passed to the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions
 can now be used to stop the integration
@@ -1358,9 +1459,9 @@ can now be used to stop the integration
 <li><p>Add a pairwise product primitive
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/147">#147</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id30">
-<h3>Changes<a class="headerlink" href="#id30" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id30">
+<h3>Changes<a class="headerlink" href="#id30" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p><strong>BREAKING</strong>: a <a class="reference internal" href="breaking_changes.html#bchanges-0-10-0"><span class="std std-ref">breaking change</span></a>
 in the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> callback API
@@ -1370,12 +1471,12 @@ in the <code class="docutils literal notranslate"><span class="pre">propagate_*(
 <li><p>Division by zero in the expression system now raises an error
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/148">#148</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id31">
-<h2>0.9.0 (2021-05-25)<a class="headerlink" href="#id31" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id32">
-<h3>New<a class="headerlink" href="#id32" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id31">
+<h2>0.9.0 (2021-05-25)<a class="headerlink" href="#id31" title="Permalink to this headline">#</a></h2>
+<section id="id32">
+<h3>New<a class="headerlink" href="#id32" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Add time polynomials to the expression system
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/144">#144</a>).</p></li>
@@ -1387,9 +1488,9 @@ system
 <li><p>Add an LLVM <code class="docutils literal notranslate"><span class="pre">while</span></code> loop function
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/135">#135</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id33">
-<h3>Changes<a class="headerlink" href="#id33" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id33">
+<h3>Changes<a class="headerlink" href="#id33" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Performance improvements for event detection in the linear
 and quadratic cases
@@ -1408,20 +1509,20 @@ type instead
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/132">#132</a>). This
 is an internal change that does not affect the integrators’ API.</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id34">
-<h2>0.8.0 (2021-04-28)<a class="headerlink" href="#id34" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id35">
-<h3>New<a class="headerlink" href="#id35" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id34">
+<h2>0.8.0 (2021-04-28)<a class="headerlink" href="#id34" title="Permalink to this headline">#</a></h2>
+<section id="id35">
+<h3>New<a class="headerlink" href="#id35" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>The <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code> functions now support writing
 the Taylor coefficients at the end of each timestep
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/131">#131</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id36">
-<h3>Changes<a class="headerlink" href="#id36" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id36">
+<h3>Changes<a class="headerlink" href="#id36" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p><strong>BREAKING</strong>: various <a class="reference internal" href="breaking_changes.html#bchanges-0-8-0"><span class="std std-ref">breaking changes</span></a>
 in the event detection API
@@ -1429,20 +1530,20 @@ in the event detection API
 <li><p>Improvements to the stream operator of <code class="docutils literal notranslate"><span class="pre">taylor_outcome</span></code>
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/131">#131</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id37">
-<h3>Fix<a class="headerlink" href="#id37" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id37">
+<h3>Fix<a class="headerlink" href="#id37" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Don’t set the multiroot <code class="docutils literal notranslate"><span class="pre">mr</span></code> flag to <code class="docutils literal notranslate"><span class="pre">true</span></code> if
 a terminal event has a cooldown of zero
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/131">#131</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id38">
-<h2>0.7.0 (2021-04-21)<a class="headerlink" href="#id38" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id39">
-<h3>New<a class="headerlink" href="#id39" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id38">
+<h2>0.7.0 (2021-04-21)<a class="headerlink" href="#id38" title="Permalink to this headline">#</a></h2>
+<section id="id39">
+<h3>New<a class="headerlink" href="#id39" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Support LLVM 12
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/128">#128</a>).</p></li>
@@ -1461,9 +1562,9 @@ of the predicted state
 (rather than absolute) time argument
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/126">#126</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id40">
-<h3>Changes<a class="headerlink" href="#id40" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id40">
+<h3>Changes<a class="headerlink" href="#id40" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Performance improvements for the event detection system
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/129">#129</a>).</p></li>
@@ -1472,40 +1573,40 @@ cannot be directly modified any more, and the new
 <code class="docutils literal notranslate"><span class="pre">set_time()</span></code> function must be used instead
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/126">#126</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id41">
-<h3>Fix<a class="headerlink" href="#id41" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id41">
+<h3>Fix<a class="headerlink" href="#id41" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Fix an issue in the automatic deduction of the cooldown time
 for terminal events
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/126">#126</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id42">
-<h2>0.6.1 (2021-04-08)<a class="headerlink" href="#id42" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id43">
-<h3>Changes<a class="headerlink" href="#id43" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id42">
+<h2>0.6.1 (2021-04-08)<a class="headerlink" href="#id42" title="Permalink to this headline">#</a></h2>
+<section id="id43">
+<h3>Changes<a class="headerlink" href="#id43" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>The event equations are now taken into account in the
 determination of the adaptive timestep
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/124">#124</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id44">
-<h3>Fix<a class="headerlink" href="#id44" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id44">
+<h3>Fix<a class="headerlink" href="#id44" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Fix an initialisation order issue in the event detection code
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/124">#124</a>).</p></li>
 <li><p>Fix an assertion misfiring in the event detection function
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/123">#123</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id45">
-<h2>0.6.0 (2021-04-06)<a class="headerlink" href="#id45" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id46">
-<h3>New<a class="headerlink" href="#id46" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id45">
+<h2>0.6.0 (2021-04-06)<a class="headerlink" href="#id45" title="Permalink to this headline">#</a></h2>
+<section id="id46">
+<h3>New<a class="headerlink" href="#id46" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Implement <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> for the batch integrator
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/119">#119</a>).</p></li>
@@ -1525,9 +1626,9 @@ of arbitrary functions of the state variables
 objects such as <code class="docutils literal notranslate"><span class="pre">llvm_state</span></code> and <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/102">#102</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id47">
-<h3>Changes<a class="headerlink" href="#id47" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id47">
+<h3>Changes<a class="headerlink" href="#id47" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p><strong>BREAKING</strong>: the <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> function now requires
 monotonically-ordered grid points
@@ -1535,21 +1636,21 @@ monotonically-ordered grid points
 <li><p>Change the screen output format for <code class="docutils literal notranslate"><span class="pre">taylor_outcome</span></code>
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/106">#106</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id48">
-<h3>Fix<a class="headerlink" href="#id48" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id48">
+<h3>Fix<a class="headerlink" href="#id48" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>In the batch integrator class, the outcomes in the result vectors
 are now initialised to <code class="docutils literal notranslate"><span class="pre">taylor_outcome::success</span></code> instead of
 meaningless values
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/102">#102</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id49">
-<h2>0.5.0 (2021-02-25)<a class="headerlink" href="#id49" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id50">
-<h3>New<a class="headerlink" href="#id50" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id49">
+<h2>0.5.0 (2021-02-25)<a class="headerlink" href="#id49" title="Permalink to this headline">#</a></h2>
+<section id="id50">
+<h3>New<a class="headerlink" href="#id50" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Implement various missing symbolic derivatives
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/101">#101</a>,
@@ -1561,12 +1662,12 @@ in the expression system
 to retrieve a pointer to the type-erased inner object
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/100">#100</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id51">
-<h2>0.4.0 (2021-02-20)<a class="headerlink" href="#id51" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id52">
-<h3>New<a class="headerlink" href="#id52" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id51">
+<h2>0.4.0 (2021-02-20)<a class="headerlink" href="#id51" title="Permalink to this headline">#</a></h2>
+<section id="id52">
+<h3>New<a class="headerlink" href="#id52" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Introduce a dedicated negation operator in the
 expression system
@@ -1584,20 +1685,20 @@ when invoking the single-step functions in the
 integrator classes
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/91">#91</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id53">
-<h3>Fix<a class="headerlink" href="#id53" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id53">
+<h3>Fix<a class="headerlink" href="#id53" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Avoid division by zero in certain corner cases
 when using <code class="docutils literal notranslate"><span class="pre">pow()</span></code> with small natural exponents
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/98">#98</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id54">
-<h2>0.3.0 (2021-02-11)<a class="headerlink" href="#id54" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id55">
-<h3>New<a class="headerlink" href="#id55" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id54">
+<h2>0.3.0 (2021-02-11)<a class="headerlink" href="#id54" title="Permalink to this headline">#</a></h2>
+<section id="id55">
+<h3>New<a class="headerlink" href="#id55" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Implement the error function
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/89">#89</a>).</p></li>
@@ -1616,9 +1717,9 @@ more extensively
 <li><p>heyoka now has a logo
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/73">#73</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id56">
-<h3>Changes<a class="headerlink" href="#id56" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id56">
+<h3>Changes<a class="headerlink" href="#id56" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Small optimisations in the automatic differentiation
 formulae
@@ -1632,9 +1733,9 @@ constants of different types
 object code of a module
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/79">#79</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id57">
-<h3>Fix<a class="headerlink" href="#id57" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id57">
+<h3>Fix<a class="headerlink" href="#id57" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Ensure that <code class="docutils literal notranslate"><span class="pre">pow(x</span> <span class="pre">,0)</span></code> always simplifies to 1,
 rather than producing an expression with null exponent
@@ -1650,12 +1751,12 @@ rather than producing an expression with null exponent
 <a class="reference external" href="https://github.com/bluescarni/heyoka/pull/76">#76</a>,
 <a class="reference external" href="https://github.com/bluescarni/heyoka/pull/74">#74</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id58">
-<h2>0.2.0 (2021-01-13)<a class="headerlink" href="#id58" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id59">
-<h3>New<a class="headerlink" href="#id59" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="id58">
+<h2>0.2.0 (2021-01-13)<a class="headerlink" href="#id58" title="Permalink to this headline">#</a></h2>
+<section id="id59">
+<h3>New<a class="headerlink" href="#id59" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Extend the Taylor decomposition machinery to work
 on more general classes of functions, and add
@@ -1668,34 +1769,36 @@ on more general classes of functions, and add
 <li><p>Add a stream operator for the <code class="docutils literal notranslate"><span class="pre">taylor_outcome</span></code> enum
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/63">#63</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id60">
-<h3>Changes<a class="headerlink" href="#id60" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id60">
+<h3>Changes<a class="headerlink" href="#id60" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>heyoka now depends publicly on the Boost headers
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/68">#68</a>).</p></li>
 </ul>
-</div>
-<div class="section" id="id61">
-<h3>Fix<a class="headerlink" href="#id61" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="id61">
+<h3>Fix<a class="headerlink" href="#id61" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
 <li><p>Fix potential name mangling issues in compact mode
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/68">#68</a>).</p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="id62">
-<h2>0.1.0 (2020-12-18)<a class="headerlink" href="#id62" title="Permalink to this headline">¶</a></h2>
+</section>
+</section>
+<section id="id62">
+<h2>0.1.0 (2020-12-18)<a class="headerlink" href="#id62" title="Permalink to this headline">#</a></h2>
 <p>Initial release.</p>
-</div>
-</div>
+</section>
+</section>
 
 
               </div>
               
-            
-                <!-- Previous / next buttons -->
-<div class='prev-next-area'> 
+            </main>
+            <footer class="footer-article noprint">
+                
+    <!-- Previous / next buttons -->
+<div class='prev-next-area'>
     <a class='left-prev' id="prev-link" href="ad_notes.html" title="previous page">
         <i class="fas fa-angle-left"></i>
         <div class="prev-next-info">
@@ -1711,24 +1814,28 @@ on more general classes of functions, and add
     <i class="fas fa-angle-right"></i>
     </a>
 </div>
-            
+            </footer>
         </div>
     </div>
-    <footer class="footer">
-  <p>
+    <div class="footer-content row">
+        <footer class="col footer"><p>
+  
+    By Francesco Biscani, Dario Izzo<br/>
+  
+      &copy; Copyright 2020, 2021, 2022 Francesco Biscani, Dario Izzo.<br/>
+</p>
+        </footer>
+    </div>
     
-      By Francesco Biscani, Dario Izzo<br/>
-    
-        &copy; Copyright 2020, 2021, 2022 Francesco Biscani, Dario Izzo.<br/>
-  </p>
-</footer>
-</main>
+</div>
 
 
       </div>
     </div>
   
-  <script src="_static/js/index.be7d3bbb2ef33a8344ce.js"></script>
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf"></script>
+
 
   </body>
 </html>

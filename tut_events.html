@@ -4,11 +4,13 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
     <title>Event detection &#8212; heyoka 0.18.0 documentation</title>
     
-  <link href="_static/css/theme.css" rel="stylesheet">
-  <link href="_static/css/index.ff1ffe594081f20da1ef19478df9384b.css" rel="stylesheet">
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+<link href="_static/styles/pydata-sphinx-theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
 
     
   <link rel="stylesheet"
@@ -18,20 +20,17 @@
   <link rel="preload" as="font" type="font/woff2" crossorigin
     href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
 
-    
-      
-
-    
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/sphinx-book-theme.css?digest=84ace793992934648b4de8eed757e5a2" />
+    <link rel="stylesheet" href="_static/styles/sphinx-book-theme.css?digest=62ba249389abaaa9ffc34bf36a076bdc1d65ee18" type="text/css" />
     
-  <link rel="preload" as="script" href="_static/js/index.be7d3bbb2ef33a8344ce.js">
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf">
 
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
     <script src="_static/jquery.js"></script>
     <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx-book-theme.9d8b4a8b9bb19db25eeaddc40d639ba2.js"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?digest=f31d14ad54b65d19161ba51d4ffff3a77ae00456"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -44,7 +43,21 @@
     <!-- Google Analytics -->
     
   </head>
-  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="60">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay overlay-navbar" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<!-- Checkboxes to toggle the in-page toc -->
+<input type="checkbox" class="sidebar-toggle" name="__page-toc" id="__page-toc" aria-label="Toggle in-page Table of Contents">
+<label class="overlay overlay-pagetoc" for="__page-toc">
+    <div class="visually-hidden">Toggle in-page Table of Contents</div>
+</label>
+<!-- Headers at the top -->
+<div class="announcement header-item noprint"></div>
+<div class="header header-item noprint"></div>
+
     
     <div class="container-fluid" id="banner"></div>
 
@@ -53,14 +66,10 @@
     <div class="container-xl">
       <div class="row">
           
-<!-- Checkboxes to toggle the left sidebar -->
-<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
-<label class="overlay" for="__navigation">
-    <div class="visually-hidden">Toggle navigation sidebar</div>
-</label>
-<div class="col-12 col-md-3 bd-sidebar site-navigation " id="site-navigation">
-    
-        <div class="navbar-brand-box">
+<!-- Sidebar -->
+<div class="bd-sidebar noprint" id="site-navigation">
+    <div class="bd-sidebar__content">
+        <div class="bd-sidebar__top"><div class="navbar-brand-box">
     <a class="navbar-brand text-wrap" href="index.html">
       
         <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
@@ -201,90 +210,180 @@
 </ul>
 
     </div>
-</nav> <!-- To handle the deprecated key -->
-
-<div class="navbar_extra_footer">
-  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
-</div>
-
-</div>
-
-
-          
-
-
-          
-<!-- This is an invisible pixel that we watch to see if we've scrolled. -->
-<div class="sbt-scroll-pixel-helper"></div>
-<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
-    
-    <div class="topbar container-xl fixed-top">
-    <div class="topbar-contents row">
-        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
-        <div class="col pl-md-4 topbar-main">
-            <div class="topbar-left">
-                
-                <label class="nav-toggle-button" for="__navigation">
-                    <div class="visually-hidden">Toggle navigation</div>
-                    <i class="fas fa-bars"></i>
-                </label>
-                
+</nav></div>
+        <div class="bd-sidebar__bottom">
+             <!-- To handle the deprecated key -->
+            
+            <div class="navbar_extra_footer">
+            Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
             </div>
             
-<div class="dropdown-buttons-trigger">
-    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
-            class="fas fa-download"></i></button>
-
-    <div class="dropdown-buttons">
-        <!-- ipynb file if we had a myst markdown file -->
-        
-        <!-- Download raw file -->
-        <a class="dropdown-buttons" href="_sources/tut_events.rst.txt"><button type="button"
-                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
-                data-placement="left">.rst</button></a>
-        <!-- Download PDF via print -->
-        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
-                onclick="printPdf(this)" data-toggle="tooltip" data-placement="left">.pdf</button>
-    </div>
-</div>
-
-            <!-- Source interaction buttons -->
-
-<div class="dropdown-buttons-trigger">
-    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn"
-        aria-label="Connect with source repository"><i class="fab fa-github"></i></button>
-    <div class="dropdown-buttons sourcebuttons">
-        <a class="repository-button"
-            href="https://github.com/bluescarni/heyoka"><button type="button" class="btn btn-secondary topbarbtn"
-                data-toggle="tooltip" data-placement="left" title="Source repository"><i
-                    class="fab fa-github"></i>repository</button></a>
-        <a class="issues-button"
-            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Ftut_events.html&body=Your%20issue%20content%20here."><button
-                type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
-                title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
-        
-    </div>
-</div>
-
-            <!-- Full screen (wrap in <a> to have style consistency -->
-
-<a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
-        data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
-        title="Fullscreen mode"><i
-            class="fas fa-expand"></i></button></a>
-
-            <!-- Launch buttons -->
-
         </div>
+    </div>
+    <div id="rtd-footer-container"></div>
+</div>
 
-        <!-- Table of contents -->
-        <div class="d-none d-md-block col-md-2 bd-toc show noprint">
-            
-            <div class="tocsection onthispage pt-5 pb-3">
-                <i class="fas fa-list"></i> Contents
-            </div>
-            <nav id="bd-toc-nav" aria-label="Page">
-                <ul class="visible nav section-nav flex-column">
+
+          
+
+
+          
+<!-- A tiny helper pixel to detect if we've scrolled -->
+<div class="sbt-scroll-pixel-helper"></div>
+<!-- Main content -->
+<div class="col py-0 content-container">
+    
+    <div class="header-article row sticky-top noprint">
+        
+
+
+
+<div class="col py-1 d-flex header-article-main">
+    <div class="header-article__left">
+        
+        <label for="__navigation"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="right"
+title="Toggle navigation"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-bars"></i>
+  </span>
+
+</label>
+
+        
+    </div>
+    <div class="header-article__right">
+<button onclick="toggleFullScreen()"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="bottom"
+title="Fullscreen mode"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+<div class="menu-dropdown menu-dropdown-repository-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Source repositories">
+      <i class="fab fa-github"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="https://github.com/bluescarni/heyoka"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Source repository"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="headerbtn__text-container">repository</span>
+</a>
+
+      </li>
+      
+      <li>
+        <a href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Ftut_events.html&body=Your%20issue%20content%20here."
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Open an issue"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="headerbtn__text-container">open issue</span>
+</a>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+
+<div class="menu-dropdown menu-dropdown-download-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Download this page">
+      <i class="fas fa-download"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="_sources/tut_events.rst.txt"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Download source file"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="headerbtn__text-container">.rst</span>
+</a>
+
+      </li>
+      
+      <li>
+        
+<button onclick="printPdf(this)"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="left"
+title="Print to PDF"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="headerbtn__text-container">.pdf</span>
+</button>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+<label for="__page-toc"
+  class="headerbtn headerbtn-page-toc"
+  
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-list"></i>
+  </span>
+
+</label>
+
+    </div>
+</div>
+
+<!-- Table of contents -->
+<div class="col-md-3 bd-toc show noprint">
+    <div class="tocsection onthispage pt-5 pb-3">
+        <i class="fas fa-list"></i> Contents
+    </div>
+    <nav id="bd-toc-nav" aria-label="Page">
+        <ul class="visible nav section-nav flex-column">
  <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#non-terminal-events">
    Non-terminal events
@@ -338,12 +437,11 @@
  </li>
 </ul>
 
-            </nav>
-        </div>
-    </div>
+    </nav>
 </div>
-    <div id="main-content" class="row">
-        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+    </div>
+    <div class="article row">
+        <div class="col pl-md-3 pl-lg-5 content-container">
             <!-- Table of contents that is only displayed when printing the page -->
             <div id="jb-print-docs-body" class="onlyprint">
                 <h1>Event detection</h1>
@@ -413,11 +511,12 @@
                     </div>
                 </div>
             </div>
-            
+            <main id="main-content" role="main">
+                
               <div>
                 
-  <div class="section" id="event-detection">
-<span id="tut-events"></span><h1>Event detection<a class="headerlink" href="#event-detection" title="Permalink to this headline">¶</a></h1>
+  <section id="event-detection">
+<span id="tut-events"></span><h1>Event detection<a class="headerlink" href="#event-detection" title="Permalink to this headline">#</a></h1>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 0.6.0.</span></p>
 </div>
@@ -445,8 +544,8 @@ in powers of time is available. Polynomial root finding techniques <span id="id1
 on the Taylor series of the event equations to accurately locate the time of occurrence of an event within the timestep.</p>
 <p>Like many other ODE integration libraries, heyoka makes a fundamental distinction between two types of events, <em>terminal</em> and <em>non-terminal</em>.
 We will begin with non-terminal events, as they are conceptually simpler.</p>
-<div class="section" id="non-terminal-events">
-<h2>Non-terminal events<a class="headerlink" href="#non-terminal-events" title="Permalink to this headline">¶</a></h2>
+<section id="non-terminal-events">
+<h2>Non-terminal events<a class="headerlink" href="#non-terminal-events" title="Permalink to this headline">#</a></h2>
 <p>Non-terminal events are events that do not modify the state of an ODE system. That is, the occurrence of a non-terminal event does not
 change the system’s dynamics and it does not alter the state vector of the system. A typical use of non-terminal events is to detect and log
 when the system reaches a particular state of interest (e.g., flagging close encounters between celestial bodies, detecting when
@@ -576,8 +675,8 @@ which can be computed exactly via elliptic functions. With the specific
 initial conditions of this example, <span class="math notranslate nohighlight">\(T = 2.0074035758801299\ldots\)</span>, and
 we can see from the event times printed to screen
 how the event detection system was accurate to machine precision.</p>
-<div class="section" id="event-direction">
-<h3>Event direction<a class="headerlink" href="#event-direction" title="Permalink to this headline">¶</a></h3>
+<section id="event-direction">
+<h3>Event direction<a class="headerlink" href="#event-direction" title="Permalink to this headline">#</a></h3>
 <p>By default, heyoka will detect all zeroes of the event equations regardless
 of the <em>direction</em> of the zero crossing (i.e., the value of the time derivative
 of the event equation at the zero). However, it is sometimes useful to trigger the detection
@@ -621,9 +720,9 @@ Let us take a look at the event times:</p>
 <p>Indeed, the event now triggers only 3 times (instead of 5), and the times confirm
 that the event is detected only when <span class="math notranslate nohighlight">\(v\)</span> switches from negative to positive, i.e.,
 at <span class="math notranslate nohighlight">\(t=0\)</span>, <span class="math notranslate nohighlight">\(t=T\)</span> and <span class="math notranslate nohighlight">\(t=2T\)</span>.</p>
-</div>
-<div class="section" id="multiple-events">
-<h3>Multiple events<a class="headerlink" href="#multiple-events" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="multiple-events">
+<h3>Multiple events<a class="headerlink" href="#multiple-events" title="Permalink to this headline">#</a></h3>
 <p>When multiple events trigger within the same timestep (or if the same event triggers
 multiple times), heyoka will process the events in chronological order
 (or reverse chronological order when integrating backwards in time).</p>
@@ -676,10 +775,10 @@ modifying the <code class="docutils literal notranslate"><span class="pre">zero_
 </div>
 <p>Note how the events are indeed processed in chronological order, and how the event detection system is able to
 successfully recognize the second event triggering twice in close succession.</p>
-</div>
-</div>
-<div class="section" id="terminal-events">
-<h2>Terminal events<a class="headerlink" href="#terminal-events" title="Permalink to this headline">¶</a></h2>
+</section>
+</section>
+<section id="terminal-events">
+<h2>Terminal events<a class="headerlink" href="#terminal-events" title="Permalink to this headline">#</a></h2>
 <p>The fundamental characteristic of terminal events is that, in contrast to non-terminal events,
 they alter the dynamics and/or the state of the system. A typical example of a terminal event is the
 <a class="reference external" href="https://en.wikipedia.org/wiki/Elastic_collision">elastic collision</a> of
@@ -835,8 +934,8 @@ execution of the callback:</p>
 <p>The screen output confirms that indeed the integration continued up to the final time <span class="math notranslate nohighlight">\(t = 10\)</span>. The values
 of the angle and angular velocity throughout the integration show how the drag coefficient (which was on roughly
 for half of the total integration time) progressively slowed the bob down.</p>
-<div class="section" id="cooldown">
-<span id="tut-t-event-cooldown"></span><h3>Cooldown<a class="headerlink" href="#cooldown" title="Permalink to this headline">¶</a></h3>
+<section id="cooldown">
+<span id="tut-t-event-cooldown"></span><h3>Cooldown<a class="headerlink" href="#cooldown" title="Permalink to this headline">#</a></h3>
 <p>One notable complication when restarting an integration that was stopped in correspondence of a terminal event
 is the risk of immediately re-triggering the same event, which would lead to an endless loop without any progress
 being made in the integration. This phenomenon is sometimes called <em>discontinuity sticking</em> in the literature.</p>
@@ -863,12 +962,12 @@ that multiple roots do not exist, just that they were not detected.</p>
 for terminal events. This could in principle lead to missing terminal events when the integration restarts.
 For this reason, a member function called <code class="docutils literal notranslate"><span class="pre">reset_cooldowns()</span></code> is available to clear the cooldown timers of
 all terminal events.</p>
-</div>
-</div>
-<div class="section" id="limitations-and-caveats">
-<h2>Limitations and caveats<a class="headerlink" href="#limitations-and-caveats" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="badly-conditioned-event-equations">
-<h3>Badly-conditioned event equations<a class="headerlink" href="#badly-conditioned-event-equations" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="limitations-and-caveats">
+<h2>Limitations and caveats<a class="headerlink" href="#limitations-and-caveats" title="Permalink to this headline">#</a></h2>
+<section id="badly-conditioned-event-equations">
+<h3>Badly-conditioned event equations<a class="headerlink" href="#badly-conditioned-event-equations" title="Permalink to this headline">#</a></h3>
 <p>Because heyoka’s event detection system is based on polynomial root finding techniques, it will experience
 issues when the Taylor series of the event equations have roots of multiplicity greater than 1. This is usually
 not a problem in practice, unless the event equations are written in such a way to always generate polynomials
@@ -885,9 +984,9 @@ a double root will tend to infinity.</p>
 <p>As a general rule, users should then avoid defining event equations in which the event trigger times
 are stationary points.</p>
 <p>Note that missed events due to badly-conditioned polynomials will likely be flagged by heyoka’s logging system.</p>
-</div>
-<div class="section" id="event-equations-and-timestepping">
-<h3>Event equations and timestepping<a class="headerlink" href="#event-equations-and-timestepping" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="event-equations-and-timestepping">
+<h3>Event equations and timestepping<a class="headerlink" href="#event-equations-and-timestepping" title="Permalink to this headline">#</a></h3>
 <p>As explained earlier, the differential equations of the events are added to the ODE system and
 integrated together with the original equations. Because of this, event equations influence the
 selection of the adaptive timestep, even if no event is ever detected throughout the integration.</p>
@@ -898,10 +997,10 @@ magnitude of the state variables, the integration error for the state variables 
 to an integration without event detection.</p>
 <p>As another example, an event equation which requires small timesteps for accurate numerical propagation
 will inevitably slow down also the propagation of the ODEs.</p>
-</div>
-</div>
-<div class="section" id="full-code-listing">
-<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
+</section>
+</section>
+<section id="full-code-listing">
+<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">#</a></h2>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
 
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span><span class="cp"></span>
@@ -1042,15 +1141,17 @@ will inevitably slow down also the propagation of the ODEs.</p>
 <span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
-</div>
-</div>
+</section>
+</section>
 
 
               </div>
               
-            
-                <!-- Previous / next buttons -->
-<div class='prev-next-area'> 
+            </main>
+            <footer class="footer-article noprint">
+                
+    <!-- Previous / next buttons -->
+<div class='prev-next-area'>
     <a class='left-prev' id="prev-link" href="tut_d_output.html" title="previous page">
         <i class="fas fa-angle-left"></i>
         <div class="prev-next-info">
@@ -1066,24 +1167,28 @@ will inevitably slow down also the propagation of the ODEs.</p>
     <i class="fas fa-angle-right"></i>
     </a>
 </div>
-            
+            </footer>
         </div>
     </div>
-    <footer class="footer">
-  <p>
+    <div class="footer-content row">
+        <footer class="col footer"><p>
+  
+    By Francesco Biscani, Dario Izzo<br/>
+  
+      &copy; Copyright 2020, 2021, 2022 Francesco Biscani, Dario Izzo.<br/>
+</p>
+        </footer>
+    </div>
     
-      By Francesco Biscani, Dario Izzo<br/>
-    
-        &copy; Copyright 2020, 2021, 2022 Francesco Biscani, Dario Izzo.<br/>
-  </p>
-</footer>
-</main>
+</div>
 
 
       </div>
     </div>
   
-  <script src="_static/js/index.be7d3bbb2ef33a8344ce.js"></script>
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf"></script>
+
 
   </body>
 </html>
