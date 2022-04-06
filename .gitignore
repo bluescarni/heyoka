@@ -1,5 +1,6 @@
 # Editor stuff.
 .vscode*
+.cache/
 
 # Build dirs.
 build*

@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cstdint>
 #include <initializer_list>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -86,22 +87,24 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
     // problem, the first n particles have mass, the remaining ones do not.
     std::uint32_t n_fc_massive = 0, n_fc_massless = 0;
 
-    // Determine the number of massive particles at the beginning
-    // of the masses vector.
-    auto it = masses.begin();
-    while (it != masses.end() && !is_zero(*it)) {
-        ++n_fc_massive;
-        ++it;
-    }
+    {
+        // Determine the number of massive particles at the beginning
+        // of the masses vector.
+        auto it = masses.begin();
+        while (it != masses.end() && !is_zero(*it)) {
+            ++n_fc_massive;
+            ++it;
+        }
 
-    // Determine the number of massless particles following
-    // the first group of massive particles at the beginning
-    // of the masses vector.
-    while (it != masses.end() && is_zero(*it)) {
-        ++n_fc_massless;
-        ++it;
+        // Determine the number of massless particles following
+        // the first group of massive particles at the beginning
+        // of the masses vector.
+        while (it != masses.end() && is_zero(*it)) {
+            ++n_fc_massless;
+            ++it;
+        }
+        assert(n_fc_massive + n_fc_massless <= n);
     }
-    assert(n_fc_massive + n_fc_massless <= n);
 
     if (n_fc_massless != 0u && n_fc_massive + n_fc_massless == n) {
         // We have some massless particles, and the vector of masses
@@ -164,7 +167,7 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
 
         // All the accelerations on the massless particles
         // have already been accumulated in the loop above.
-        // We just need to perform the pairwise sums on x/y/z_acc.
+        // We just need to perform the sums on x/y/z_acc.
         for (std::uint32_t i = n_fc_massive; i < n; ++i) {
             retval.push_back(prime(x_vars[i]) = vx_vars[i]);
             retval.push_back(prime(y_vars[i]) = vy_vars[i]);
@@ -225,6 +228,105 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
             retval.push_back(prime(vy_vars[i]) = sum(y_acc[i]));
             retval.push_back(prime(vz_vars[i]) = sum(z_acc[i]));
         }
+    }
+
+    return retval;
+}
+
+std::vector<std::pair<expression, expression>> make_np1body_sys_fixed_masses(std::uint32_t n, number Gconst,
+                                                                             std::vector<number> masses)
+{
+    // LCOV_EXCL_START
+    assert(n >= 1u);
+
+    if (n == std::numeric_limits<std::uint32_t>::max()) {
+        throw std::overflow_error("The number of bodies specified for the creation of an (N+1)-body problem is too "
+                                  "large, resulting in an overflow condition");
+    }
+    // LCOV_EXCL_STOP
+
+    if (masses.size() != n + 1u) {
+        throw std::invalid_argument(fmt::format(
+            "Inconsistent sizes detected while creating an (N+1)-body system: the vector of masses has a size of "
+            "{}, while the number of bodies is {} (the number of masses must be one more than the number of bodies)",
+            masses.size(), n));
+    }
+
+    // Create the state variables.
+    // NOTE: the body indices will be in the [1, n] range.
+    std::vector<expression> x_vars, y_vars, z_vars, vx_vars, vy_vars, vz_vars;
+
+    for (std::uint32_t i = 0; i < n; ++i) {
+        x_vars.emplace_back(variable(fmt::format("x_{}", i + 1u)));
+        y_vars.emplace_back(variable(fmt::format("y_{}", i + 1u)));
+        z_vars.emplace_back(variable(fmt::format("z_{}", i + 1u)));
+
+        vx_vars.emplace_back(variable(fmt::format("vx_{}", i + 1u)));
+        vy_vars.emplace_back(variable(fmt::format("vy_{}", i + 1u)));
+        vz_vars.emplace_back(variable(fmt::format("vz_{}", i + 1u)));
+    }
+
+    // Create vectors containing r_i/(r_i)**3 for each body.
+    std::vector<expression> x_r3, y_r3, z_r3;
+    for (std::uint32_t i = 0; i < n; ++i) {
+        auto rm3 = pow(sum_sq({x_vars[i], y_vars[i], z_vars[i]}), expression{-3. / 2});
+
+        x_r3.push_back(x_vars[i] * rm3);
+        y_r3.push_back(y_vars[i] * rm3);
+        z_r3.push_back(z_vars[i] * rm3);
+    }
+
+    // Create the return value.
+    std::vector<std::pair<expression, expression>> retval;
+
+    // Accumulators for the accelerations on the bodies.
+    std::vector<expression> x_acc, y_acc, z_acc;
+
+    for (std::uint32_t i = 0; i < n; ++i) {
+        x_acc.clear();
+        y_acc.clear();
+        z_acc.clear();
+
+        // r' = v.
+        retval.push_back(prime(x_vars[i]) = vx_vars[i]);
+        retval.push_back(prime(y_vars[i]) = vy_vars[i]);
+        retval.push_back(prime(z_vars[i]) = vz_vars[i]);
+
+        // Add the acceleration due to the zero-th body.
+        x_acc.push_back(expression(-Gconst * (masses[0] + masses[i + 1u])) * x_r3[i]);
+        y_acc.push_back(expression(-Gconst * (masses[0] + masses[i + 1u])) * y_r3[i]);
+        z_acc.push_back(expression(-Gconst * (masses[0] + masses[i + 1u])) * z_r3[i]);
+
+        // Add the accelerations due to the other bodies and the non-intertial
+        // reference frame.
+        for (std::uint32_t j = 0; j < n; ++j) {
+            if (j == i) {
+                continue;
+            }
+
+            const auto j_gt_i = j > i;
+
+            auto diff_x = j_gt_i ? x_vars[j] - x_vars[i] : x_vars[i] - x_vars[j];
+            auto diff_y = j_gt_i ? y_vars[j] - y_vars[i] : y_vars[i] - y_vars[j];
+            auto diff_z = j_gt_i ? z_vars[j] - z_vars[i] : z_vars[i] - z_vars[j];
+
+            auto diff_rm3 = pow(sum_sq({diff_x, diff_y, diff_z}), expression{-3. / 2});
+
+            auto tmp_acc_x = j_gt_i ? x_r3[j] - diff_x * diff_rm3 : x_r3[j] + diff_x * diff_rm3;
+            auto tmp_acc_y = j_gt_i ? y_r3[j] - diff_y * diff_rm3 : y_r3[j] + diff_y * diff_rm3;
+            auto tmp_acc_z = j_gt_i ? z_r3[j] - diff_z * diff_rm3 : z_r3[j] + diff_z * diff_rm3;
+
+            auto cur_mu = expression(-Gconst * masses[j + 1u]);
+
+            x_acc.push_back(cur_mu * tmp_acc_x);
+            y_acc.push_back(cur_mu * tmp_acc_y);
+            z_acc.push_back(cur_mu * tmp_acc_z);
+        }
+
+        // Add the expressions of the accelerations to the system.
+        retval.push_back(prime(vx_vars[i]) = sum(x_acc));
+        retval.push_back(prime(vy_vars[i]) = sum(y_acc));
+        retval.push_back(prime(vz_vars[i]) = sum(z_acc));
     }
 
     return retval;
@@ -322,7 +424,7 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::ui
 
     // All the accelerations on the massless particles
     // have already been accumulated in the loop above.
-    // We just need to perform the pairwise sums on x/y/z_acc.
+    // We just need to perform the sums on x/y/z_acc.
     for (std::uint32_t i = n_massive; i < n; ++i) {
         retval.push_back(prime(x_vars[i]) = vx_vars[i]);
         retval.push_back(prime(y_vars[i]) = vy_vars[i]);
