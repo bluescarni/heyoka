@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add a function to build (N+1)-body problems
+  (`#251 <https://github.com/bluescarni/heyoka/pull/251>`__).
 - Support LLVM 14
   (`#247 <https://github.com/bluescarni/heyoka/pull/247>`__).
 - Implement :ref:`parallel mode <tut_parallel_mode>`

@@ -280,26 +280,22 @@ std::vector<std::pair<expression, expression>> make_np1body_sys_fixed_masses(std
     std::vector<std::pair<expression, expression>> retval;
 
     // Accumulators for the accelerations on the bodies.
-    // The i-th element of x/y/z_acc contains the list of
-    // accelerations on body i due to:
-    // - the zero-th body,
-    // - the apparent forces,
-    // - all the other bodies.
-    std::vector<std::vector<expression>> x_acc;
-    x_acc.resize(boost::numeric_cast<decltype(x_acc.size())>(n));
-    auto y_acc = x_acc;
-    auto z_acc = x_acc;
+    std::vector<expression> x_acc, y_acc, z_acc;
 
     for (std::uint32_t i = 0; i < n; ++i) {
+        x_acc.clear();
+        y_acc.clear();
+        z_acc.clear();
+
         // r' = v.
         retval.push_back(prime(x_vars[i]) = vx_vars[i]);
         retval.push_back(prime(y_vars[i]) = vy_vars[i]);
         retval.push_back(prime(z_vars[i]) = vz_vars[i]);
 
         // Add the acceleration due to the zero-th body.
-        x_acc[i].push_back(expression(-Gconst * (masses[0] + masses[i + 1u])) * x_r3[i]);
-        y_acc[i].push_back(expression(-Gconst * (masses[0] + masses[i + 1u])) * y_r3[i]);
-        z_acc[i].push_back(expression(-Gconst * (masses[0] + masses[i + 1u])) * z_r3[i]);
+        x_acc.push_back(expression(-Gconst * (masses[0] + masses[i + 1u])) * x_r3[i]);
+        y_acc.push_back(expression(-Gconst * (masses[0] + masses[i + 1u])) * y_r3[i]);
+        z_acc.push_back(expression(-Gconst * (masses[0] + masses[i + 1u])) * z_r3[i]);
 
         // Add the accelerations due to the other bodies and the non-intertial
         // reference frame.
@@ -322,15 +318,15 @@ std::vector<std::pair<expression, expression>> make_np1body_sys_fixed_masses(std
 
             auto cur_mu = expression(-Gconst * masses[j + 1u]);
 
-            x_acc[i].push_back(cur_mu * tmp_acc_x);
-            y_acc[i].push_back(cur_mu * tmp_acc_y);
-            z_acc[i].push_back(cur_mu * tmp_acc_z);
+            x_acc.push_back(cur_mu * tmp_acc_x);
+            y_acc.push_back(cur_mu * tmp_acc_y);
+            z_acc.push_back(cur_mu * tmp_acc_z);
         }
 
         // Add the expressions of the accelerations to the system.
-        retval.push_back(prime(vx_vars[i]) = sum(x_acc[i]));
-        retval.push_back(prime(vy_vars[i]) = sum(y_acc[i]));
-        retval.push_back(prime(vz_vars[i]) = sum(z_acc[i]));
+        retval.push_back(prime(vx_vars[i]) = sum(x_acc));
+        retval.push_back(prime(vy_vars[i]) = sum(y_acc));
+        retval.push_back(prime(vz_vars[i]) = sum(z_acc));
     }
 
     return retval;
