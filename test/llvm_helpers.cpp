@@ -513,6 +513,17 @@ TEST_CASE("inv_kep_E_scalar")
                 REQUIRE(fp_t(M) == approximately(E - e * sin(E), fp_t(10000)));
             }
 
+            // Try a very high eccentricity.
+            {
+                fp_t M = 0;
+                fp_t e = 1 - std::numeric_limits<fp_t>::epsilon() * 4;
+                fp_t E;
+
+                f_ptr(&E, &e, &M);
+
+                REQUIRE(M == approximately(E - e * sin(E), fp_t(10000)));
+            }
+
             // Test invalid inputs.
             {
                 fp_t M = 1.23;
