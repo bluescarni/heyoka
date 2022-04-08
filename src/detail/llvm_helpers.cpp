@@ -1563,7 +1563,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is tp.
         auto *ft = llvm::FunctionType::get(tp, fargs, false);
@@ -1572,11 +1572,27 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
-        auto ecc = f->args().begin();
+        auto ecc_arg = f->args().begin();
         auto M_arg = f->args().begin() + 1;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Is the eccentricity a quiet NaN or less than 0?
+        auto *ecc_is_nan_or_neg = builder.CreateFCmpULT(ecc_arg, llvm::Constant::getNullValue(ecc_arg->getType()));
+        // Is the eccentricity >= 1?
+        auto *ecc_is_gte1
+            = builder.CreateFCmpOGE(ecc_arg, vector_splat(builder, codegen<T>(s, number{1.}), batch_size));
+
+        // Is the eccentricity NaN or out of range?
+        // NOTE: this is a logical OR.
+        auto *ecc_invalid = builder.CreateSelect(
+            ecc_is_nan_or_neg, llvm::ConstantInt::getAllOnesValue(ecc_is_nan_or_neg->getType()), ecc_is_gte1);
+
+        // Replace invalid eccentricity values with quiet NaNs.
+        auto *ecc = builder.CreateSelect(
+            ecc_invalid, vector_splat(builder, codegen<T>(s, number{std::numeric_limits<T>::quiet_NaN()}), batch_size),
+            ecc_arg);
 
         // Create the return value.
         auto retval = builder.CreateAlloca(tp);
@@ -1608,8 +1624,8 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         auto cos_M_2 = builder.CreateFMul(cos_M, cos_M);
 
         // 3/2 and 1/2 constants.
-        auto c_3_2 = vector_splat(builder, codegen<T>(s, number{T(3) / 2}), batch_size);
-        auto c_1_2 = vector_splat(builder, codegen<T>(s, number{T(1) / 2}), batch_size);
+        auto c_3_2 = vector_splat(builder, codegen<T>(s, number{static_cast<T>(3) / 2}), batch_size);
+        auto c_1_2 = vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / 2}), batch_size);
 
         // M + e*sin(M).
         auto tmp1 = builder.CreateFAdd(M, e_sin_M);
@@ -1627,7 +1643,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
 
         // Make extra sure the initial guess is in the [0, 2*pi) range.
         auto lb = llvm::ConstantFP::get(tp, 0.);
-        auto ub = vector_splat(builder, codegen<T>(s, number{nextafter(dl_twopi_hi, T(0))}), batch_size);
+        auto ub = vector_splat(builder, codegen<T>(s, number{nextafter(dl_twopi_hi, static_cast<T>(0))}), batch_size);
         ig = llvm_max(s, ig, lb);
         ig = llvm_min(s, ig, ub);
 
@@ -1658,19 +1674,31 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Compute and store the initial value of f(E).
         builder.CreateStore(fE_compute(), fE);
 
+        // Create a variable to hold the result of the tolerance check
+        // computed at the beginning of each iteration of the main loop.
+        // This is "true" if the loop needs to continue, or "false" if the
+        // loop can stop because we achieved the desired tolerance.
+        // NOTE: this is only allocated, it will be immediately written to
+        // the first time loop_cond is evaluated.
+        auto *vec_bool_t = make_vector_type(builder.getInt1Ty(), batch_size);
+        auto *tol_check_ptr = builder.CreateAlloca(vec_bool_t);
+
         // Define the stopping condition functor.
         // NOTE: hard-code this for the time being.
-        auto max_iter = builder.getInt32(50);
+        auto *max_iter = builder.getInt32(50);
         auto loop_cond = [&,
                           // NOTE: tolerance is 4 * eps.
                           tol = vector_splat(builder, codegen<T>(s, number{std::numeric_limits<T>::epsilon() * 4}),
                                              batch_size)]() -> llvm::Value * {
-            auto c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
+            auto *c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
 
             // Keep on iterating as long as abs(f(E)) > tol.
             // NOTE: need reduction only in batch mode.
             auto tol_check = builder.CreateFCmpOGT(llvm_abs(s, builder.CreateLoad(tp, fE)), tol);
             auto tol_cond = (batch_size == 1u) ? tol_check : builder.CreateOrReduce(tol_check);
+
+            // Store the result of the tolerance check.
+            builder.CreateStore(tol_check, tol_check_ptr);
 
             // NOTE: this is a way of creating a logical AND.
             return builder.CreateSelect(c_cond, tol_cond, llvm::Constant::getNullValue(tol_cond->getType()));
@@ -1690,7 +1718,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
             auto bcheck = builder.CreateFCmpOGT(new_val, ub);
             new_val = builder.CreateSelect(
                 bcheck,
-                builder.CreateFMul(vector_splat(builder, codegen<T>(s, number{T(1) / 2}), batch_size),
+                builder.CreateFMul(vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / 2}), batch_size),
                                    builder.CreateFAdd(old_val, ub)),
                 new_val);
 
@@ -1698,7 +1726,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
             bcheck = builder.CreateFCmpOLT(new_val, lb);
             new_val = builder.CreateSelect(
                 bcheck,
-                builder.CreateFMul(vector_splat(builder, codegen<T>(s, number{T(1) / 2}), batch_size),
+                builder.CreateFMul(vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / 2}), batch_size),
                                    builder.CreateFAdd(old_val, lb)),
                 new_val);
 
@@ -1722,6 +1750,17 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         llvm_if_then_else(
             s, builder.CreateICmpEQ(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter),
             [&]() {
+                // Load the tol_check variable.
+                auto *tol_check = builder.CreateLoad(vec_bool_t, tol_check_ptr);
+
+                // Set to quiet NaN in the return value all the lanes for which tol_check is 1.
+                auto *old_val = builder.CreateLoad(tp, retval);
+                auto *new_val = builder.CreateSelect(
+                    tol_check,
+                    vector_splat(builder, codegen<T>(s, number{std::numeric_limits<T>::quiet_NaN()}), batch_size),
+                    old_val);
+                builder.CreateStore(new_val, retval);
+
                 llvm_invoke_external(s, "heyoka_inv_kep_E_max_iter", builder.getVoidTy(), {},
                                      {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
             },
