@@ -18,6 +18,9 @@ New
 Changes
 ~~~~~~~
 
+- The Kepler solver now returns NaN in case of invalid input arguments
+  or if the max number of iterations is exceeded
+  (`#252 <https://github.com/bluescarni/heyoka/pull/252>`__).
 - heyoka now builds against LLVM 13/14 without deprecation warnings
   (`#242 <https://github.com/bluescarni/heyoka/pull/242>`__).
 - In case of an early interruption, the ``propagate_grid()`` function will now

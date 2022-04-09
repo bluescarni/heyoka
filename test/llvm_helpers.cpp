@@ -468,6 +468,7 @@ TEST_CASE("inv_kep_E_scalar")
     using detail::llvm_add_inv_kep_E_wrapper;
     namespace bmt = boost::math::tools;
     using std::cos;
+    using std::isnan;
     using std::sin;
 
     auto tester = [](auto fp_x) {
@@ -511,6 +512,98 @@ TEST_CASE("inv_kep_E_scalar")
 
                 REQUIRE(fp_t(M) == approximately(E - e * sin(E), fp_t(10000)));
             }
+
+            // Try a very high eccentricity.
+            {
+                fp_t M = 0;
+                fp_t e = 1 - std::numeric_limits<fp_t>::epsilon() * 4;
+                fp_t E;
+
+                f_ptr(&E, &e, &M);
+
+                REQUIRE(M == approximately(E - e * sin(E), fp_t(10000)));
+            }
+
+            // Test invalid inputs.
+            {
+                fp_t M = 1.23;
+                fp_t e = -.1;
+                fp_t E;
+
+                f_ptr(&E, &e, &M);
+
+                REQUIRE(isnan(E));
+            }
+
+            {
+                fp_t M = 1.23;
+                fp_t e = 1.;
+                fp_t E;
+
+                f_ptr(&E, &e, &M);
+
+                REQUIRE(isnan(E));
+            }
+
+            {
+                fp_t M = 1.23;
+                fp_t e = std::numeric_limits<fp_t>::infinity();
+                fp_t E;
+
+                f_ptr(&E, &e, &M);
+
+                REQUIRE(isnan(E));
+            }
+
+            {
+                fp_t M = 1.23;
+                fp_t e = -std::numeric_limits<fp_t>::infinity();
+                fp_t E;
+
+                f_ptr(&E, &e, &M);
+
+                REQUIRE(isnan(E));
+            }
+
+            {
+                fp_t M = 1.23;
+                fp_t e = std::numeric_limits<fp_t>::quiet_NaN();
+                fp_t E;
+
+                f_ptr(&E, &e, &M);
+
+                REQUIRE(isnan(E));
+            }
+
+            {
+                fp_t M = std::numeric_limits<fp_t>::infinity();
+                fp_t e = .1;
+                fp_t E;
+
+                f_ptr(&E, &e, &M);
+
+                REQUIRE(isnan(E));
+            }
+
+            {
+                fp_t M = -std::numeric_limits<fp_t>::infinity();
+                fp_t e = .2;
+                fp_t E;
+
+                f_ptr(&E, &e, &M);
+
+                REQUIRE(isnan(E));
+            }
+
+            {
+                fp_t M = std::numeric_limits<fp_t>::quiet_NaN();
+                fp_t e = .1;
+                fp_t E;
+
+                f_ptr(&E, &e, &M);
+
+                REQUIRE(isnan(E));
+            }
         }
     };
 
@@ -522,6 +615,7 @@ TEST_CASE("inv_kep_E_batch")
     using detail::llvm_add_inv_kep_E_wrapper;
     namespace bmt = boost::math::tools;
     using std::cos;
+    using std::isnan;
     using std::sin;
 
     auto tester = [](auto fp_x) {
@@ -570,6 +664,183 @@ TEST_CASE("inv_kep_E_batch")
 
                     for (auto j = 0u; j < batch_size; ++j) {
                         REQUIRE(M_vec[j] == approximately(ret_vec[j] - e_vec[j] * sin(ret_vec[j]), fp_t(10000)));
+                    }
+                }
+
+                // Test invalid inputs.
+                {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        M_vec[j] = M_dist(rng);
+
+                        if (j == 1u) {
+                            e_vec[j] = -.1;
+                        } else {
+                            e_vec[j] = e_dist(rng);
+                        }
+                    }
+
+                    f_ptr(ret_vec.data(), e_vec.data(), M_vec.data());
+
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        if (j == 1u) {
+                            REQUIRE(isnan(ret_vec[j]));
+                        } else {
+                            REQUIRE(M_vec[j] == approximately(ret_vec[j] - e_vec[j] * sin(ret_vec[j]), fp_t(10000)));
+                        }
+                    }
+                }
+
+                {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        M_vec[j] = M_dist(rng);
+
+                        if (j == 1u) {
+                            e_vec[j] = 1;
+                        } else {
+                            e_vec[j] = e_dist(rng);
+                        }
+                    }
+
+                    f_ptr(ret_vec.data(), e_vec.data(), M_vec.data());
+
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        if (j == 1u) {
+                            REQUIRE(isnan(ret_vec[j]));
+                        } else {
+                            REQUIRE(M_vec[j] == approximately(ret_vec[j] - e_vec[j] * sin(ret_vec[j]), fp_t(10000)));
+                        }
+                    }
+                }
+
+                {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        M_vec[j] = M_dist(rng);
+
+                        if (j == 1u) {
+                            e_vec[j] = std::numeric_limits<fp_t>::infinity();
+                        } else {
+                            e_vec[j] = e_dist(rng);
+                        }
+                    }
+
+                    f_ptr(ret_vec.data(), e_vec.data(), M_vec.data());
+
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        if (j == 1u) {
+                            REQUIRE(isnan(ret_vec[j]));
+                        } else {
+                            REQUIRE(M_vec[j] == approximately(ret_vec[j] - e_vec[j] * sin(ret_vec[j]), fp_t(10000)));
+                        }
+                    }
+                }
+
+                {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        M_vec[j] = M_dist(rng);
+
+                        if (j == 1u) {
+                            e_vec[j] = -std::numeric_limits<fp_t>::infinity();
+                        } else {
+                            e_vec[j] = e_dist(rng);
+                        }
+                    }
+
+                    f_ptr(ret_vec.data(), e_vec.data(), M_vec.data());
+
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        if (j == 1u) {
+                            REQUIRE(isnan(ret_vec[j]));
+                        } else {
+                            REQUIRE(M_vec[j] == approximately(ret_vec[j] - e_vec[j] * sin(ret_vec[j]), fp_t(10000)));
+                        }
+                    }
+                }
+
+                {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        M_vec[j] = M_dist(rng);
+
+                        if (j == 1u) {
+                            e_vec[j] = std::numeric_limits<fp_t>::quiet_NaN();
+                        } else {
+                            e_vec[j] = e_dist(rng);
+                        }
+                    }
+
+                    f_ptr(ret_vec.data(), e_vec.data(), M_vec.data());
+
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        if (j == 1u) {
+                            REQUIRE(isnan(ret_vec[j]));
+                        } else {
+                            REQUIRE(M_vec[j] == approximately(ret_vec[j] - e_vec[j] * sin(ret_vec[j]), fp_t(10000)));
+                        }
+                    }
+                }
+
+                {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        e_vec[j] = e_dist(rng);
+
+                        if (j == 1u) {
+                            M_vec[j] = std::numeric_limits<fp_t>::infinity();
+                        } else {
+                            M_vec[j] = M_dist(rng);
+                        }
+                    }
+
+                    f_ptr(ret_vec.data(), e_vec.data(), M_vec.data());
+
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        if (j == 1u) {
+                            REQUIRE(isnan(ret_vec[j]));
+                        } else {
+                            REQUIRE(M_vec[j] == approximately(ret_vec[j] - e_vec[j] * sin(ret_vec[j]), fp_t(10000)));
+                        }
+                    }
+                }
+
+                {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        e_vec[j] = e_dist(rng);
+
+                        if (j == 1u) {
+                            M_vec[j] = -std::numeric_limits<fp_t>::infinity();
+                        } else {
+                            M_vec[j] = M_dist(rng);
+                        }
+                    }
+
+                    f_ptr(ret_vec.data(), e_vec.data(), M_vec.data());
+
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        if (j == 1u) {
+                            REQUIRE(isnan(ret_vec[j]));
+                        } else {
+                            REQUIRE(M_vec[j] == approximately(ret_vec[j] - e_vec[j] * sin(ret_vec[j]), fp_t(10000)));
+                        }
+                    }
+                }
+
+                {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        e_vec[j] = e_dist(rng);
+
+                        if (j == 1u) {
+                            M_vec[j] = std::numeric_limits<fp_t>::quiet_NaN();
+                        } else {
+                            M_vec[j] = M_dist(rng);
+                        }
+                    }
+
+                    f_ptr(ret_vec.data(), e_vec.data(), M_vec.data());
+
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        if (j == 1u) {
+                            REQUIRE(isnan(ret_vec[j]));
+                        } else {
+                            REQUIRE(M_vec[j] == approximately(ret_vec[j] - e_vec[j] * sin(ret_vec[j]), fp_t(10000)));
+                        }
                     }
                 }
             }
