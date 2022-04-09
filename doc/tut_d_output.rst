@@ -23,7 +23,7 @@ within a timestep, or from a higher-level
 API, which facilitates the common use case of using the coefficients
 of the Taylor polynomials to compute the continuous extension
 of the solution. If you are interested only in the latter,
-you can skip the next section and jump directly to the
+you can skip the next sections and jump directly to the
 :ref:`continuous output section <tut_c_output>`.
 
 Dense output for the ``step()`` functions
