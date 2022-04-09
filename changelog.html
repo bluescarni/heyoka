@@ -1168,6 +1168,9 @@ for the automatic parallelisation of an individual integration step
 <section id="changes">
 <h3>Changes<a class="headerlink" href="#changes" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
+<li><p>The Kepler solver now returns NaN in case of invalid input arguments
+or if the max number of iterations is exceeded
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/252">#252</a>).</p></li>
 <li><p>heyoka now builds against LLVM 13/14 without deprecation warnings
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/242">#242</a>).</p></li>
 <li><p>In case of an early interruption, the <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> function will now
