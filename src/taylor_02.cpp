@@ -1204,13 +1204,13 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 
 // Helper to create a global zero-inited array variable in the module m
 // with type t. The array is mutable and with internal linkage.
-llvm::Value *make_global_zero_array(llvm::Module &m, llvm::ArrayType *t)
+llvm::GlobalVariable *make_global_zero_array(llvm::Module &m, llvm::ArrayType *t)
 {
     assert(t != nullptr); // LCOV_EXCL_LINE
 
     // Make the global array.
-    auto gl_arr = new llvm::GlobalVariable(m, t, false, llvm::GlobalVariable::InternalLinkage,
-                                           llvm::ConstantAggregateZero::get(t));
+    auto *gl_arr = new llvm::GlobalVariable(m, t, false, llvm::GlobalVariable::InternalLinkage,
+                                            llvm::ConstantAggregateZero::get(t));
 
     // Return it.
     return gl_arr;
@@ -1229,6 +1229,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 {
     auto &builder = s.builder();
     auto &context = s.context();
+    auto &md = s.module();
 
     // Split dc into segments.
     const auto s_dc = taylor_segment_dc(dc, n_eq);
@@ -1245,8 +1246,8 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
     // Determine the maximum u variable index appearing in sv_funcs_dc, or zero
     // if sv_funcs_dc is empty.
-    const auto max_svf_idx
-        = sv_funcs_dc.empty() ? std::uint32_t(0) : *std::max_element(sv_funcs_dc.begin(), sv_funcs_dc.end());
+    const auto max_svf_idx = sv_funcs_dc.empty() ? static_cast<std::uint32_t>(0)
+                                                 : *std::max_element(sv_funcs_dc.begin(), sv_funcs_dc.end());
 
     // Prepare the array that will contain the jet of derivatives.
     // We will be storing all the derivatives of the u variables
@@ -1273,7 +1274,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // its size can grow quite large, which can lead to stack overflow issues.
     // This has of course consequences in terms of thread safety, which
     // we will have to document.
-    auto diff_arr_gvar = make_global_zero_array(s.module(), array_type);
+    auto diff_arr_gvar = make_global_zero_array(md, array_type);
     assert(llvm_depr_GEP_type_check(diff_arr_gvar, array_type)); // LCOV_EXCL_LINE
     auto *diff_arr = builder.CreateInBoundsGEP(array_type, diff_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
 
@@ -1298,8 +1299,6 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     llvm::Type *par_data_t = nullptr;
 
     if (parallel_mode) {
-        auto &md = s.module();
-
         // Fetch the LLVM version of T *.
         auto *scal_ptr_t = llvm::PointerType::getUnqual(to_llvm_type<T>(context));
 
@@ -1359,7 +1358,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", worker));
 
                 // Load the order and par/time pointers from the global variable.
-                auto cur_order = builder.CreateLoad(
+                auto *cur_order = builder.CreateLoad(
                     builder.getInt32Ty(),
                     builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(0)}));
                 auto par_arg = builder.CreateLoad(
@@ -1421,7 +1420,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                 builder.SetInsertPoint(orig_bb);
 
                 // Add a pointer to the wrapper to par_funcs_ptrs.
-                auto f_ptr = builder.CreateAlloca(wrapper->getType());
+                auto *f_ptr = builder.CreateAlloca(wrapper->getType());
                 builder.CreateStore(wrapper, f_ptr);
                 par_funcs_ptrs.back().push_back(f_ptr);
             }
