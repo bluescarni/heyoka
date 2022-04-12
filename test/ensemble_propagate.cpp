@@ -32,6 +32,7 @@ using namespace heyoka;
 using namespace heyoka_test;
 
 const auto fp_types = std::tuple<double
+#if !defined(__FreeBSD__)
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -39,6 +40,7 @@ const auto fp_types = std::tuple<double
 #if defined(HEYOKA_HAVE_REAL128)
                                  ,
                                  mppp::real128
+#endif
 #endif
                                  >{};
 
