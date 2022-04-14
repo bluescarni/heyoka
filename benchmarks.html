@@ -399,6 +399,11 @@ title="Print to PDF"
    Event detection
   </a>
  </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#back-forth">
+   Back &amp; forth
+  </a>
+ </li>
 </ul>
 
     </nav>
@@ -431,6 +436,11 @@ title="Print to PDF"
  <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#event-detection">
    Event detection
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#back-forth">
+   Back &amp; forth
   </a>
  </li>
 </ul>
@@ -483,7 +493,7 @@ with the result of a numerical integration in quadruple precision with a toleran
 <img alt="3BP benchmark 1e-15" class="align-center" src="_images/ss_3bp_15.png" />
 <p>We can see how, without dense output, heyoka is at least 3 times faster than any other tested integrator. When dense output is requested (gray bars),
 heyoka’s runtime increases by <span class="math notranslate nohighlight">\(\sim 50\%\)</span>, whereas for the other integrators the performance hit is substantially larger. Performance-wise,
-Boost.ODEint is comparable to <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> (note that the RKF78 integrator from Boost.ODEInt does not support dense output).</p>
+Boost.ODEint is comparable to <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> (note that the <code class="docutils literal notranslate"><span class="pre">RKF78</span></code> integrator from Boost.ODEInt does not support dense output).</p>
 <p>From the point of view of the integration accuracy, we can see how heyoka has the lowest relative error (with respect to the quadruple-precision integration)
 among the tested integrators.</p>
 <p>Note that, even if the error tolerance for the integration is set to <span class="math notranslate nohighlight">\(10^{-15}\)</span>, the error at the end of the integration
@@ -554,6 +564,31 @@ of checking for sign changes in the event equation using the interpolant of the 
 within a timestep at discrete points. Note that
 this approach is not rigorous, in the sense that if the event equation has two zeroes between the interpolation
 points the event will be missed. By contrast, heyoka’s approach does not suffer from this issue.</p>
+</section>
+<section id="back-forth">
+<h2>Back &amp; forth<a class="headerlink" href="#back-forth" title="Permalink to this headline">#</a></h2>
+<p>In this benchmark, we will first integrate an ODE system forward in time from
+<span class="math notranslate nohighlight">\(t_0\)</span> to <span class="math notranslate nohighlight">\(t_1\)</span>. We will then invert the time direction to return back
+to the initial time <span class="math notranslate nohighlight">\(t_0\)</span>. The state vector at the end of this process
+should closely match the initial conditions.</p>
+<p>In order to keep things simple, we will be using the equations of the simple pendulum in SI units,
+and we choose <span class="math notranslate nohighlight">\(t_0 = 0\,\mathrm{s}\)</span> and <span class="math notranslate nohighlight">\(t_1 = 1000\,\mathrm{s}\)</span>. Our goal is to
+quantify the integration error, measured as the magnitude of the difference between the initial conditions
+and the state vector at the end of the integration. Let us see the results for heyoka,
+<code class="docutils literal notranslate"><span class="pre">Vern9</span></code> from DifferentialEquations.jl and the <code class="docutils literal notranslate"><span class="pre">RKF78</span></code> integrator from Boost.ODEInt:</p>
+<img alt="Back and forth benchmark" class="align-center" src="_images/bandf.png" />
+<p>We can see how heyoka is able to return to the initial conditions much more accurately than the other
+two integrators.</p>
+<p>heyoka’s superior accuracy in this test is due in large part to the fact that heyoka adopts internally an extended
+precision representation for the time coordinate based on
+<a class="reference external" href="https://en.wikipedia.org/wiki/Quadruple-precision_floating-point_format#Double-double_arithmetic">double-length arithmetic</a>.
+This approach allows to drastically reduce the loss of precision occurring when
+the time coordinate is updated at the end of a timestep:
+while the time coordinate grows larger throughout the integration,
+the (adaptive) step size remains roughly constant in magnitude, thus resulting
+in a gradual accumulation of roundoff error.
+Representing the time coordinate in extended precision allows to drastically
+curb this phenomenon, which is particularly visible in long-running numerical integrations.</p>
 </section>
 </section>
 
