@@ -50,7 +50,7 @@ Let us see first the results for an error tolerance of :math:`10^{-15}`:
 
 We can see how, without dense output, heyoka is at least 3 times faster than any other tested integrator. When dense output is requested (gray bars),
 heyoka's runtime increases by :math:`\sim 50\%`, whereas for the other integrators the performance hit is substantially larger. Performance-wise,
-Boost.ODEint is comparable to ``Vern9`` (note that the RKF78 integrator from Boost.ODEInt does not support dense output).
+Boost.ODEint is comparable to ``Vern9`` (note that the ``RKF78`` integrator from Boost.ODEInt does not support dense output).
 
 From the point of view of the integration accuracy, we can see how heyoka has the lowest relative error (with respect to the quadruple-precision integration)
 among the tested integrators.
@@ -157,3 +157,35 @@ of checking for sign changes in the event equation using the interpolant of the 
 within a timestep at discrete points. Note that
 this approach is not rigorous, in the sense that if the event equation has two zeroes between the interpolation
 points the event will be missed. By contrast, heyoka's approach does not suffer from this issue.
+
+Back & forth
+------------
+
+In this benchmark, we will first integrate an ODE system forward in time from
+:math:`t_0` to :math:`t_1`. We will then invert the time direction to return back
+to the initial time :math:`t_0`. The state vector at the end of this process
+should closely match the initial conditions.
+
+In order to keep things simple, we will be using the equations of the simple pendulum in SI units,
+and we choose :math:`t_0 = 0\,\mathrm{s}` and :math:`t_1 = 1000\,\mathrm{s}`. Our goal is to
+quantify the integration error, measured as the magnitude of the difference between the initial conditions
+and the state vector at the end of the integration. Let us see the results for heyoka,
+``Vern9`` from DifferentialEquations.jl and the ``RKF78`` integrator from Boost.ODEInt:
+
+.. image:: images/bandf.png
+  :align: center
+  :alt: Back and forth benchmark
+
+We can see how heyoka is able to return to the initial conditions much more accurately than the other
+two integrators.
+
+heyoka's superior accuracy in this test is due in large part to the fact that heyoka adopts internally an extended
+precision representation for the time coordinate based on
+`double-length arithmetic <https://en.wikipedia.org/wiki/Quadruple-precision_floating-point_format#Double-double_arithmetic>`__.
+This approach allows to drastically reduce the loss of precision occurring when
+the time coordinate is updated at the end of a timestep:
+while the time coordinate grows larger throughout the integration,
+the (adaptive) step size remains roughly constant in magnitude, thus resulting
+in a gradual accumulation of roundoff error.
+Representing the time coordinate in extended precision allows to drastically
+curb this phenomenon, which is particularly visible in long-running numerical integrations.

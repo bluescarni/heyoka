@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add a timekeeping accuracy benchmark
+  (`#254 <https://github.com/bluescarni/heyoka/pull/254>`__).
 - Add a function to build (N+1)-body problems
   (`#251 <https://github.com/bluescarni/heyoka/pull/251>`__).
 - Support LLVM 14
