@@ -10,7 +10,10 @@
 #include <cmath>
 #include <initializer_list>
 #include <iostream>
+#include <random>
 #include <vector>
+
+#include <boost/program_options.hpp>
 
 #include <xtensor/xadapt.hpp>
 #include <xtensor/xview.hpp>
@@ -23,24 +26,47 @@
 using namespace heyoka;
 using namespace heyoka_benchmark;
 
-int main(int, char *[])
+int main(int argc, char *argv[])
 {
+    namespace po = boost::program_options;
+
     using std::abs;
     using std::sqrt;
 
-    std::vector masses = {5., 4., 3.};
+    std::mt19937 rng(std::random_device{}());
+
+    double tol = 0.;
+    unsigned ntrials = 0;
+    bool high_accuracy = false;
+
+    po::options_description desc("Options");
+
+    desc.add_options()("help", "produce help message")("tol", po::value<double>(&tol)->default_value(1e-12),
+                                                       "tolerance")("high_accuracy", "enable high accuracy mode")(
+        "ntrials", po::value<unsigned>(&ntrials)->default_value(100u), "number of trials");
+
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, desc), vm);
+    po::notify(vm);
+
+    if (vm.count("help") != 0u) {
+        std::cout << desc << "\n";
+        return 0;
+    }
+
+    if (vm.count("high_accuracy") != 0u) {
+        high_accuracy = true;
+    }
+
+    const std::vector masses = {5., 4., 3.},
+                      ic = {1., -1., 0., 0., 0., 0., -2., -1., 0., 0., 0., 0., 1., 3., 0., 0., 0., 0.};
 
     auto sys = make_nbody_sys(3, kw::masses = masses);
 
-    auto ta = taylor_adaptive<double>{sys,
-                                      {1., -1., 0., 0., 0., 0., -2., -1., 0., 0., 0., 0., 1., 3., 0., 0., 0., 0.},
-                                      kw::tol = 1e-12,
-                                      kw::high_accuracy = true};
+    auto ta = taylor_adaptive<double>{sys, ic, kw::tol = tol, kw::high_accuracy = high_accuracy};
 
     auto s_array = xt::adapt(ta.get_state_data(), {3, 6});
     auto m_array = xt::adapt(masses.data(), {3});
-
-    auto start = std::chrono::high_resolution_clock::now();
 
     auto get_energy = [&s_array, &m_array, G = 1.]() {
         // Kinetic energy.
@@ -82,17 +108,39 @@ int main(int, char *[])
         return kin + pot;
     };
 
-    const auto init_energy = get_energy();
-    std::cout << "Initial energy: " << init_energy << '\n';
+    auto start = std::chrono::high_resolution_clock::now();
 
     auto res = ta.propagate_for(63.);
 
-    auto elapsed = static_cast<double>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
-            .count());
+    auto elapsed = static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                           std::chrono::high_resolution_clock::now() - start)
+                                           .count())
+                   / 1e6;
 
     std::cout << "Outcome: " << std::get<0>(res) << '\n';
     std::cout << "Number of steps: " << std::get<3>(res) << '\n';
     std::cout << "Integration time: " << elapsed << "ms\n";
-    std::cout << "Final energy error: " << abs((init_energy - get_energy()) / init_energy) << '\n';
+
+    auto err_acc = 0.;
+
+    for (auto _ = 0u; _ < ntrials; ++_) {
+        // Reset time.
+        ta.set_time(0.);
+
+        // Generate new state.
+        std::uniform_real_distribution<double> rdist(1e-13, 1e-12);
+        std::uniform_int_distribution<int> idist(0, 1);
+        for (auto i = 0u; i < 18u; ++i) {
+            const auto pert = rdist(rng);
+            s_array[i] = ic[i] + ic[i] * (idist(rng) == 0 ? pert : -pert);
+        }
+
+        const auto init_energy = get_energy();
+
+        ta.propagate_for(63.);
+
+        err_acc += abs((init_energy - get_energy()) / init_energy);
+    }
+
+    std::cout << "Average relative energy error: " << err_acc / ntrials << '\n';
 }
