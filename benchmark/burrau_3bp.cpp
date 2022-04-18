@@ -11,6 +11,7 @@
 #include <initializer_list>
 #include <iostream>
 #include <random>
+#include <string>
 #include <vector>
 
 #include <boost/program_options.hpp>
@@ -26,51 +27,27 @@
 using namespace heyoka;
 using namespace heyoka_benchmark;
 
-int main(int argc, char *argv[])
+template <typename T>
+void run_benchmark(double tol, bool high_accuracy, unsigned ntrials)
 {
-    namespace po = boost::program_options;
-
     using std::abs;
     using std::sqrt;
 
     std::mt19937 rng(std::random_device{}());
 
-    double tol = 0.;
-    unsigned ntrials = 0;
-    bool high_accuracy = false;
-
-    po::options_description desc("Options");
-
-    desc.add_options()("help", "produce help message")("tol", po::value<double>(&tol)->default_value(1e-12),
-                                                       "tolerance")("high_accuracy", "enable high accuracy mode")(
-        "ntrials", po::value<unsigned>(&ntrials)->default_value(100u), "number of trials");
-
-    po::variables_map vm;
-    po::store(po::parse_command_line(argc, argv, desc), vm);
-    po::notify(vm);
-
-    if (vm.count("help") != 0u) {
-        std::cout << desc << "\n";
-        return 0;
-    }
-
-    if (vm.count("high_accuracy") != 0u) {
-        high_accuracy = true;
-    }
-
-    const std::vector masses = {5., 4., 3.},
-                      ic = {1., -1., 0., 0., 0., 0., -2., -1., 0., 0., 0., 0., 1., 3., 0., 0., 0., 0.};
+    const std::vector<T> masses = {5., 4., 3.},
+                         ic = {1., -1., 0., 0., 0., 0., -2., -1., 0., 0., 0., 0., 1., 3., 0., 0., 0., 0.};
 
     auto sys = make_nbody_sys(3, kw::masses = masses);
 
-    auto ta = taylor_adaptive<double>{sys, ic, kw::tol = tol, kw::high_accuracy = high_accuracy};
+    auto ta = taylor_adaptive<T>{sys, ic, kw::tol = tol, kw::high_accuracy = high_accuracy};
 
     auto s_array = xt::adapt(ta.get_state_data(), {3, 6});
     auto m_array = xt::adapt(masses.data(), {3});
 
-    auto get_energy = [&s_array, &m_array, G = 1.]() {
+    auto get_energy = [&s_array, &m_array, G = static_cast<T>(1)]() {
         // Kinetic energy.
-        double kin(0), c(0);
+        T kin(0), c(0);
         for (auto i = 0u; i < 3u; ++i) {
             auto vx = xt::view(s_array, i, 3)[0];
             auto vy = xt::view(s_array, i, 4)[0];
@@ -84,7 +61,7 @@ int main(int argc, char *argv[])
         }
 
         // Potential energy.
-        double pot(0);
+        T pot(0);
         c = 0;
         for (auto i = 0u; i < 3u; ++i) {
             auto xi = xt::view(s_array, i, 0)[0];
@@ -110,7 +87,7 @@ int main(int argc, char *argv[])
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    auto res = ta.propagate_for(63.);
+    auto res = ta.propagate_for(63);
 
     auto elapsed = static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(
                                            std::chrono::high_resolution_clock::now() - start)
@@ -121,11 +98,11 @@ int main(int argc, char *argv[])
     std::cout << "Number of steps: " << std::get<3>(res) << '\n';
     std::cout << "Integration time: " << elapsed << "ms\n";
 
-    auto err_acc = 0.;
+    T err_acc = 0.;
 
     for (auto _ = 0u; _ < ntrials; ++_) {
         // Reset time.
-        ta.set_time(0.);
+        ta.set_time(0);
 
         // Generate new state.
         std::uniform_real_distribution<double> rdist(1e-13, 1e-12);
@@ -137,10 +114,46 @@ int main(int argc, char *argv[])
 
         const auto init_energy = get_energy();
 
-        ta.propagate_for(63.);
+        ta.propagate_for(63);
 
         err_acc += abs((init_energy - get_energy()) / init_energy);
     }
 
     std::cout << "Average relative energy error: " << err_acc / ntrials << '\n';
+}
+
+int main(int argc, char *argv[])
+{
+    namespace po = boost::program_options;
+
+    double tol = 0.;
+    unsigned ntrials = 0;
+    bool high_accuracy = false;
+    std::string fp_type;
+
+    po::options_description desc("Options");
+
+    desc.add_options()("help", "produce help message")("tol", po::value<double>(&tol)->default_value(1e-12),
+                                                       "tolerance")("high_accuracy", "enable high accuracy mode")(
+        "ntrials", po::value<unsigned>(&ntrials)->default_value(100u), "number of trials")(
+        "fp_type", po::value<std::string>(&fp_type)->default_value("double"), "floating-point type");
+
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, desc), vm);
+    po::notify(vm);
+
+    if (vm.count("help") != 0u) {
+        std::cout << desc << "\n";
+        return 0;
+    }
+
+    if (vm.count("high_accuracy") != 0u) {
+        high_accuracy = true;
+    }
+
+    if (fp_type == "double") {
+        run_benchmark<double>(tol, high_accuracy, ntrials);
+    } else {
+        run_benchmark<long double>(tol, high_accuracy, ntrials);
+    }
 }
