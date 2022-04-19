@@ -350,7 +350,7 @@ llvm::Value *taylor_determine_h(llvm_state &s,
                 [&](llvm::Value *arr_idx) {
                     // Fetch the index value from the array.
                     assert(llvm_depr_GEP_type_check(svf_ptr, builder.getInt32Ty())); // LCOV_EXCL_LINE
-                    auto cur_idx = builder.CreateLoad(
+                    auto *cur_idx = builder.CreateLoad(
                         builder.getInt32Ty(), builder.CreateInBoundsGEP(builder.getInt32Ty(), svf_ptr, arr_idx));
 
                     builder.CreateStore(
@@ -413,15 +413,17 @@ llvm::Value *taylor_determine_h(llvm_state &s,
     // Estimate rho at orders order - 1 and order.
     auto num_rho = builder.CreateSelect(abs_or_rel, llvm::ConstantFP::get(vec_t, 1.), max_abs_state);
     auto rho_o = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_o),
-                                 vector_splat(builder, codegen<T>(s, number{T(1) / order}), batch_size));
-    auto rho_om1 = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
-                                   vector_splat(builder, codegen<T>(s, number{T(1) / (order - 1u)}), batch_size));
+                                 vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / order}), batch_size));
+    auto rho_om1
+        = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
+                          vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / (order - 1u)}), batch_size));
 
     // Take the minimum.
     auto rho_m = llvm_min(s, rho_o, rho_om1);
 
     // Compute the scaling + safety factor.
-    const auto rhofac = exp((T(-7) / T(10)) / (order - 1u)) / (exp(T(1)) * exp(T(1)));
+    const auto rhofac = exp((static_cast<T>(-7) / static_cast<T>(10)) / (order - 1u))
+                        / (exp(static_cast<T>(1)) * exp(static_cast<T>(1)));
 
     // Determine the step size in absolute value.
     auto h = builder.CreateFMul(rho_m, vector_splat(builder, codegen<T>(s, number{rhofac}), batch_size));
@@ -1750,8 +1752,8 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         // If there are sv funcs, we need to compute their last-order derivatives too:
         // we will need to compute the derivatives of the u variables up to
         // the maximum index in sv_funcs_dc.
-        const auto max_svf_idx
-            = sv_funcs_dc.empty() ? std::uint32_t(0) : *std::max_element(sv_funcs_dc.begin(), sv_funcs_dc.end());
+        const auto max_svf_idx = sv_funcs_dc.empty() ? static_cast<std::uint32_t>(0)
+                                                     : *std::max_element(sv_funcs_dc.begin(), sv_funcs_dc.end());
 
         // NOTE: if there are no sv_funcs, max_svf_idx is set to zero
         // above, thus we never enter the loop.

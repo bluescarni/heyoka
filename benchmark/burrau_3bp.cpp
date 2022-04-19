@@ -11,6 +11,7 @@
 #include <initializer_list>
 #include <iostream>
 #include <random>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -154,6 +155,10 @@ int main(int argc, char *argv[])
     if (fp_type == "double") {
         run_benchmark<double>(tol, high_accuracy, ntrials);
     } else {
+        if (fp_type != "long double") {
+            throw std::invalid_argument(R"(Only the "double" and "long double" floating-point types are supported)");
+        }
+
         run_benchmark<long double>(tol, high_accuracy, ntrials);
     }
 }
