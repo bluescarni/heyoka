@@ -42,6 +42,7 @@
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstrTypes.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
@@ -450,8 +451,8 @@ llvm::Value *pairwise_sum(ir_builder &builder, std::vector<llvm::Value *> &sum)
 
 // Helper to invoke an intrinsic function with arguments 'args'. 'types' are the argument type(s) for
 // overloaded intrinsics.
-llvm::Value *llvm_invoke_intrinsic(ir_builder &builder, const std::string &name, const std::vector<llvm::Type *> &types,
-                                   const std::vector<llvm::Value *> &args)
+llvm::CallInst *llvm_invoke_intrinsic(ir_builder &builder, const std::string &name,
+                                      const std::vector<llvm::Type *> &types, const std::vector<llvm::Value *> &args)
 {
     // Fetch the intrinsic ID from the name.
     const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(name);
@@ -465,7 +466,7 @@ llvm::Value *llvm_invoke_intrinsic(ir_builder &builder, const std::string &name,
     // https://stackoverflow.com/questions/11985247/llvm-insert-intrinsic-function-cos
     // And the docs of the getDeclaration() function.
     assert(builder.GetInsertBlock() != nullptr); // LCOV_EXCL_LINE
-    auto callee_f = llvm::Intrinsic::getDeclaration(builder.GetInsertBlock()->getModule(), intrinsic_ID, types);
+    auto *callee_f = llvm::Intrinsic::getDeclaration(builder.GetInsertBlock()->getModule(), intrinsic_ID, types);
     if (callee_f == nullptr) {
         throw std::invalid_argument("Error getting the declaration of the intrinsic '{}'"_format(name));
     }
@@ -482,23 +483,23 @@ llvm::Value *llvm_invoke_intrinsic(ir_builder &builder, const std::string &name,
     }
 
     // Create the function call.
-    auto r = builder.CreateCall(callee_f, args);
+    auto *r = builder.CreateCall(callee_f, args);
     assert(r != nullptr);
 
     return r;
 }
 
 // Helper to invoke an external function called 'name' with arguments args and return type ret_type.
-llvm::Value *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::Type *ret_type,
-                                  const std::vector<llvm::Value *> &args, const std::vector<int> &attrs)
+llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::Type *ret_type,
+                                     const std::vector<llvm::Value *> &args, const std::vector<int> &attrs)
 {
     // Look up the name in the global module table.
-    auto callee_f = s.module().getFunction(name);
+    auto *callee_f = s.module().getFunction(name);
 
     if (callee_f == nullptr) {
         // The function does not exist yet, make the prototype.
         std::vector<llvm::Type *> arg_types;
-        for (auto a : args) {
+        for (auto *a : args) {
             arg_types.push_back(a->getType());
         }
         auto *ft = llvm::FunctionType::get(ret_type, arg_types, false);
@@ -530,7 +531,7 @@ llvm::Value *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::
     }
 
     // Create the function call.
-    auto r = s.builder().CreateCall(callee_f, args);
+    auto *r = s.builder().CreateCall(callee_f, args);
     assert(r != nullptr);
     // NOTE: we used to have r->setTailCall(true) here, but:
     // - when optimising, the tail call attribute is automatically
@@ -542,9 +543,9 @@ llvm::Value *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::
 }
 
 // Helper to invoke an internal module function called 'name' with arguments 'args'.
-llvm::Value *llvm_invoke_internal(llvm_state &s, const std::string &name, const std::vector<llvm::Value *> &args)
+llvm::CallInst *llvm_invoke_internal(llvm_state &s, const std::string &name, const std::vector<llvm::Value *> &args)
 {
-    auto callee_f = s.module().getFunction(name);
+    auto *callee_f = s.module().getFunction(name);
 
     if (callee_f == nullptr) {
         throw std::invalid_argument("Unknown internal function: '{}'"_format(name));
@@ -565,7 +566,7 @@ llvm::Value *llvm_invoke_internal(llvm_state &s, const std::string &name, const 
     // (e.g., argument types).
 
     // Create the function call.
-    auto r = s.builder().CreateCall(callee_f, args);
+    auto *r = s.builder().CreateCall(callee_f, args);
     assert(r != nullptr);
     // NOTE: we used to have r->setTailCall(true) here, but:
     // - when optimising, the tail call attribute is automatically
