@@ -80,9 +80,6 @@ HEYOKA_DLL_PUBLIC llvm::CallInst *llvm_invoke_external(llvm_state &, const std::
                                                        // as an enum) in the implementation.
                                                        const std::vector<int> & = {});
 
-HEYOKA_DLL_PUBLIC llvm::CallInst *llvm_invoke_internal(llvm_state &, const std::string &,
-                                                       const std::vector<llvm::Value *> &);
-
 HEYOKA_DLL_PUBLIC void llvm_loop_u32(llvm_state &, llvm::Value *, llvm::Value *,
                                      const std::function<void(llvm::Value *)> &,
                                      const std::function<llvm::Value *(llvm::Value *)> & = {});

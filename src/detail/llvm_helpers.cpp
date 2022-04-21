@@ -542,41 +542,6 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
     return r;
 }
 
-// Helper to invoke an internal module function called 'name' with arguments 'args'.
-llvm::CallInst *llvm_invoke_internal(llvm_state &s, const std::string &name, const std::vector<llvm::Value *> &args)
-{
-    auto *callee_f = s.module().getFunction(name);
-
-    if (callee_f == nullptr) {
-        throw std::invalid_argument("Unknown internal function: '{}'"_format(name));
-    }
-
-    if (callee_f->isDeclaration()) {
-        throw std::invalid_argument("The internal function '{}' cannot be just a "
-                                    "declaration, a definition is needed"_format(name));
-    }
-
-    // Check the number of arguments.
-    if (callee_f->arg_size() != args.size()) {
-        throw std::invalid_argument(
-            "Incorrect # of arguments passed while calling the internal function '{}': {} are "
-            "expected, but {} were provided instead"_format(name, callee_f->arg_size(), args.size()));
-    }
-    // NOTE: perhaps in the future we should consider adding more checks here
-    // (e.g., argument types).
-
-    // Create the function call.
-    auto *r = s.builder().CreateCall(callee_f, args);
-    assert(r != nullptr);
-    // NOTE: we used to have r->setTailCall(true) here, but:
-    // - when optimising, the tail call attribute is automatically
-    //   added,
-    // - it is not 100% clear to me whether it is always safe to enable it:
-    // https://llvm.org/docs/CodeGenerator.html#tail-calls
-
-    return r;
-}
-
 // Create an LLVM for loop in the form:
 //
 // for (auto i = begin; i < end; i = next_cur(i)) {
