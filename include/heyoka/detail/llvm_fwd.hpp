@@ -17,6 +17,7 @@ class Function;
 class Module;
 class LLVMContext;
 class Type;
+class CallInst;
 
 // NOTE: IRBuilder is a template with default
 // parameters, hence we declare the default parameters
@@ -34,6 +35,6 @@ namespace heyoka
 
 using ir_builder = llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>;
 
-}
+} // namespace heyoka
 
 #endif
