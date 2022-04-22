@@ -23,6 +23,7 @@
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
@@ -186,7 +187,7 @@ namespace
 
 template <typename T>
 llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+                                            std::uint32_t batch_size, std::uint32_t vector_size)
 {
     // NOTE: this is prevented in the implementation
     // of the sum() function.
@@ -196,8 +197,8 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the return type.
+    auto val_t = to_llvm_vector_type<T>(context, vector_size > 1u ? vector_size : batch_size);
 
     // Build the vector of arguments needed to determine the function name.
     std::vector<std::variant<variable, number, param>> nm_args;
@@ -220,7 +221,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
     }
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "sum", n_uvars, batch_size, nm_args);
+    const auto na_pair = taylor_c_diff_vfunc_name_args<T>(context, "sum", n_uvars, batch_size, vector_size, nm_args);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -270,12 +271,12 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
                             [&]() {
                                 // If the order is zero, run the codegen.
                                 builder.CreateStore(
-                                    taylor_c_diff_numparam_codegen(s, v, terms + i, par_ptr, batch_size), retval);
+                                    taylor_c_diff_numparam_codegen(s, v, terms + i, par_ptr, batch_size, vector_size),
+                                    retval);
                             },
                             [&]() {
                                 // Otherwise, return zero.
-                                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size),
-                                                    retval);
+                                builder.CreateStore(llvm::ConstantFP::get(val_t, 0.), retval);
                             });
 
                         return builder.CreateLoad(val_t, retval);
@@ -315,24 +316,24 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
 
 } // namespace
 
-llvm::Function *sum_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                 bool) const
+llvm::Function *sum_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size, bool,
+                                                 std::uint32_t vector_size) const
 {
-    return sum_taylor_c_diff_func_impl<double>(s, *this, n_uvars, batch_size);
+    return sum_taylor_c_diff_func_impl<double>(s, *this, n_uvars, batch_size, vector_size);
 }
 
-llvm::Function *sum_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
+llvm::Function *sum_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size, bool,
+                                                  std::uint32_t vector_size) const
 {
-    return sum_taylor_c_diff_func_impl<long double>(s, *this, n_uvars, batch_size);
+    return sum_taylor_c_diff_func_impl<long double>(s, *this, n_uvars, batch_size, vector_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *sum_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
+llvm::Function *sum_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size, bool,
+                                                  std::uint32_t vector_size) const
 {
-    return sum_taylor_c_diff_func_impl<mppp::real128>(s, *this, n_uvars, batch_size);
+    return sum_taylor_c_diff_func_impl<mppp::real128>(s, *this, n_uvars, batch_size, vector_size);
 }
 
 #endif

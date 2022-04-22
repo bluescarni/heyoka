@@ -316,6 +316,40 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
     }
 }
 
+// Scatter val to ptrs. If val is a vector, then ptrs must be a vector of pointers
+// and a vector scatter takes place. Otherwise, ptrs must be a single scalar pointer
+// and a scalar store takes place.
+void scatter_vector_to_memory(ir_builder &builder, llvm::Value *val, llvm::Value *ptrs)
+{
+    if (llvm::isa<llvm_vector_type>(ptrs->getType())) {
+        // LCOV_EXCL_START
+        assert(llvm::isa<llvm_vector_type>(val->getType()));
+        assert(llvm::cast<llvm_vector_type>(val->getType())->getNumElements()
+               == llvm::cast<llvm_vector_type>(ptrs->getType())->getNumElements());
+        assert(val->getType()->getScalarType() == ptrs->getType()->getScalarType()->getPointerElementType());
+        // LCOV_EXCL_STOP
+
+        // Fetch the alignment of the scalar type.
+        const auto align = get_alignment(*builder.GetInsertBlock()->getModule(), val->getType()->getScalarType());
+
+        builder.CreateMaskedScatter(val, ptrs,
+#if LLVM_VERSION_MAJOR == 10
+                                    boost::numeric_cast<unsigned>(align)
+#else
+                                    llvm::Align(align)
+#endif
+        );
+    } else {
+        // LCOV_EXCL_START
+        assert(!llvm::isa<llvm_vector_type>(val->getType()));
+        assert(ptrs->getType()->getPointerElementType() == val->getType());
+        // LCOV_EXCL_STOP
+
+        // Not a vector, store val directly.
+        builder.CreateStore(val, ptrs);
+    }
+}
+
 // Create a SIMD vector of size vector_size filled with the value c. If vector_size is 1,
 // c will be returned.
 llvm::Value *vector_splat(ir_builder &builder, llvm::Value *c, std::uint32_t vector_size)

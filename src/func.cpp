@@ -603,7 +603,7 @@ llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32
 #endif
 
 llvm::Function *func::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                             bool high_accuracy) const
+                                             bool high_accuracy, std::uint32_t vector_size) const
 {
     if (batch_size == 0u) {
         throw std::invalid_argument(
@@ -616,7 +616,12 @@ llvm::Function *func::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvar
                 get_name()));
     }
 
-    auto retval = ptr()->taylor_c_diff_func_dbl(s, n_uvars, batch_size, high_accuracy);
+    if (vector_size == 0u || (vector_size > 1u && batch_size > 1u)) {
+        throw std::invalid_argument(fmt::format(
+            "Invalid vector_size detected in func::taylor_c_diff_func_dbl() for the function '{}'", get_name()));
+    }
+
+    auto retval = ptr()->taylor_c_diff_func_dbl(s, n_uvars, batch_size, high_accuracy, vector_size);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
@@ -627,7 +632,7 @@ llvm::Function *func::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvar
 }
 
 llvm::Function *func::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                              bool high_accuracy) const
+                                              bool high_accuracy, std::uint32_t vector_size) const
 {
     if (batch_size == 0u) {
         throw std::invalid_argument(
@@ -640,7 +645,12 @@ llvm::Function *func::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uva
                 get_name()));
     }
 
-    auto retval = ptr()->taylor_c_diff_func_ldbl(s, n_uvars, batch_size, high_accuracy);
+    if (vector_size == 0u || (vector_size > 1u && batch_size > 1u)) {
+        throw std::invalid_argument(fmt::format(
+            "Invalid vector_size detected in func::taylor_c_diff_func_ldbl() for the function '{}'", get_name()));
+    }
+
+    auto retval = ptr()->taylor_c_diff_func_ldbl(s, n_uvars, batch_size, high_accuracy, vector_size);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
@@ -653,7 +663,7 @@ llvm::Function *func::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uva
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Function *func::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                              bool high_accuracy) const
+                                              bool high_accuracy, std::uint32_t vector_size) const
 {
     if (batch_size == 0u) {
         throw std::invalid_argument(
@@ -666,7 +676,12 @@ llvm::Function *func::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uva
                 get_name()));
     }
 
-    auto retval = ptr()->taylor_c_diff_func_f128(s, n_uvars, batch_size, high_accuracy);
+    if (vector_size == 0u || (vector_size > 1u && batch_size > 1u)) {
+        throw std::invalid_argument(fmt::format(
+            "Invalid vector_size detected in func::taylor_c_diff_func_f128() for the function '{}'", get_name()));
+    }
+
+    auto retval = ptr()->taylor_c_diff_func_f128(s, n_uvars, batch_size, high_accuracy, vector_size);
 
     if (retval == nullptr) {
         throw std::invalid_argument(

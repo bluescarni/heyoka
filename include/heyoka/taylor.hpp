@@ -103,10 +103,15 @@ llvm::Value *taylor_codegen_numparam(llvm_state &s, const U &n, llvm::Value *par
     }
 }
 
+// TODO remove old overloads.
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &, const number &, llvm::Value *,
                                                               llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &, const number &, llvm::Value *,
+                                                              llvm::Value *, std::uint32_t, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &, const param &, llvm::Value *, llvm::Value *,
                                                               std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &, const param &, llvm::Value *, llvm::Value *,
+                                                              std::uint32_t, std::uint32_t);
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
                                                  std::uint32_t);
@@ -171,6 +176,12 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &c, const std::string &name, std:
 
     return taylor_c_diff_func_name_args_impl(c, name, val_t, n_uvars, args, n_hidden_deps);
 }
+
+// TODO remove the other version, then rename?
+template <typename T>
+HEYOKA_DLL_PUBLIC std::pair<std::string, std::vector<llvm::Type *>>
+taylor_c_diff_vfunc_name_args(llvm::LLVMContext &, const std::string &, std::uint32_t, std::uint32_t, std::uint32_t,
+                              const std::vector<std::variant<variable, number, param>> &, std::uint32_t = 0);
 
 // Add a function for computing the dense output
 // via polynomial evaluation.

@@ -40,6 +40,7 @@
 
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -1336,24 +1337,18 @@ llvm::Value *taylor_diff_f128(llvm_state &s, const expression &ex, const std::ve
 
 #endif
 
-namespace detail
-{
-
-namespace
-{
-
 template <typename T>
-llvm::Function *taylor_c_diff_func_impl(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
-                                        std::uint32_t batch_size, bool high_accuracy)
+llvm::Function *taylor_c_diff_func(llvm_state &s, const expression &ex, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                   bool high_accuracy, std::uint32_t vector_size)
 {
     if (auto fptr = std::get_if<func>(&ex.value())) {
         if constexpr (std::is_same_v<T, double>) {
-            return fptr->taylor_c_diff_func_dbl(s, n_uvars, batch_size, high_accuracy);
+            return fptr->taylor_c_diff_func_dbl(s, n_uvars, batch_size, high_accuracy, vector_size);
         } else if constexpr (std::is_same_v<T, long double>) {
-            return fptr->taylor_c_diff_func_ldbl(s, n_uvars, batch_size, high_accuracy);
+            return fptr->taylor_c_diff_func_ldbl(s, n_uvars, batch_size, high_accuracy, vector_size);
 #if defined(HEYOKA_HAVE_REAL128)
         } else if constexpr (std::is_same_v<T, mppp::real128>) {
-            return fptr->taylor_c_diff_func_f128(s, n_uvars, batch_size, high_accuracy);
+            return fptr->taylor_c_diff_func_f128(s, n_uvars, batch_size, high_accuracy, vector_size);
 #endif
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
@@ -1365,29 +1360,16 @@ llvm::Function *taylor_c_diff_func_impl(llvm_state &s, const expression &ex, std
     }
 }
 
-} // namespace
+template HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func<double>(llvm_state &, const expression &, std::uint32_t,
+                                                                      std::uint32_t, bool, std::uint32_t);
 
-} // namespace detail
-
-llvm::Function *taylor_c_diff_func_dbl(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
-                                       std::uint32_t batch_size, bool high_accuracy)
-{
-    return detail::taylor_c_diff_func_impl<double>(s, ex, n_uvars, batch_size, high_accuracy);
-}
-
-llvm::Function *taylor_c_diff_func_ldbl(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
-                                        std::uint32_t batch_size, bool high_accuracy)
-{
-    return detail::taylor_c_diff_func_impl<long double>(s, ex, n_uvars, batch_size, high_accuracy);
-}
+template HEYOKA_DLL_PUBLIC llvm::Function *
+taylor_c_diff_func<long double>(llvm_state &, const expression &, std::uint32_t, std::uint32_t, bool, std::uint32_t);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *taylor_c_diff_func_f128(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
-                                        std::uint32_t batch_size, bool high_accuracy)
-{
-    return detail::taylor_c_diff_func_impl<mppp::real128>(s, ex, n_uvars, batch_size, high_accuracy);
-}
+template HEYOKA_DLL_PUBLIC llvm::Function *
+taylor_c_diff_func<mppp::real128>(llvm_state &, const expression &, std::uint32_t, std::uint32_t, bool, std::uint32_t);
 
 #endif
 
