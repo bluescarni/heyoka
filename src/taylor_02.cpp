@@ -68,18 +68,6 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 // NOTE: GCC warns about use of mismatched new/delete
 // when creating global variables. I am not sure this is
 // a real issue, as it looks like we are adopting the "canonical"
@@ -1102,9 +1090,9 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 
             if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
                 throw std::invalid_argument(
-                    "Inconsistent arity detected in a Taylor derivative function in compact "
-                    "mode: the same function is being called with both {} and {} arguments"_format(
-                        it->second.back().size() - 1u, cdiff_args.size()));
+                    fmt::format("Inconsistent arity detected in a Taylor derivative function in compact "
+                                "mode: the same function is being called with both {} and {} arguments",
+                                it->second.back().size() - 1u, cdiff_args.size()));
             }
 
             // Add the new set of arguments.
@@ -2185,9 +2173,8 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
     if (f == nullptr) {
-        throw std::invalid_argument(
-            "Unable to create a function for the computation of the jet of Taylor derivatives with name '{}'"_format(
-                name));
+        throw std::invalid_argument(fmt::format(
+            "Unable to create a function for the computation of the jet of Taylor derivatives with name '{}'", name));
     }
 
     // Set the names/attributes of the function arguments.
