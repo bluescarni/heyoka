@@ -499,25 +499,25 @@ llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uin
     // LCOV_EXCL_STOP
 
     // Set the names/attributes of the function arguments.
-    auto cf_ptr = f->args().begin();
+    auto *cf_ptr = f->args().begin();
     cf_ptr->setName("cf_ptr");
     cf_ptr->addAttr(llvm::Attribute::NoCapture);
     cf_ptr->addAttr(llvm::Attribute::NoAlias);
     cf_ptr->addAttr(llvm::Attribute::ReadOnly);
 
-    auto h_ptr = f->args().begin() + 1;
+    auto *h_ptr = f->args().begin() + 1;
     h_ptr->setName("h_ptr");
     h_ptr->addAttr(llvm::Attribute::NoCapture);
     h_ptr->addAttr(llvm::Attribute::NoAlias);
     h_ptr->addAttr(llvm::Attribute::ReadOnly);
 
-    auto back_flag_ptr = f->args().begin() + 2;
+    auto *back_flag_ptr = f->args().begin() + 2;
     back_flag_ptr->setName("back_flag_ptr");
     back_flag_ptr->addAttr(llvm::Attribute::NoCapture);
     back_flag_ptr->addAttr(llvm::Attribute::NoAlias);
     back_flag_ptr->addAttr(llvm::Attribute::ReadOnly);
 
-    auto out_ptr = f->args().begin() + 3;
+    auto *out_ptr = f->args().begin() + 3;
     out_ptr->setName("out_ptr");
     out_ptr->addAttr(llvm::Attribute::NoCapture);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
@@ -528,94 +528,33 @@ llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uin
     assert(bb != nullptr); // LCOV_EXCL_LINE
     builder.SetInsertPoint(bb);
 
-    // Helper to implement the sum of two intervals.
-    // NOTE: see https://en.wikipedia.org/wiki/Interval_arithmetic.
-    auto ival_sum = [&builder](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
-        return std::make_pair(builder.CreateFAdd(a_lo, b_lo), builder.CreateFAdd(a_hi, b_hi));
-    };
-
-    // Helper to implement the product of two intervals.
-    auto ival_prod = [&s, &builder](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
-        auto tmp1 = builder.CreateFMul(a_lo, b_lo);
-        auto tmp2 = builder.CreateFMul(a_lo, b_hi);
-        auto tmp3 = builder.CreateFMul(a_hi, b_lo);
-        auto tmp4 = builder.CreateFMul(a_hi, b_hi);
-
-        // NOTE: here we are not correctly propagating NaNs,
-        // for which we would need to use llvm_min/max_nan(),
-        // which however incur in a noticeable performance
-        // penalty. Thus, even in presence of all finite
-        // Taylor coefficients and integration timestep, it could
-        // conceivably happen that NaNs are generated in the
-        // multiplications above and they are not correctly propagated
-        // in these min/max functions, thus ultimately leading to an
-        // incorrect result. This however looks like a very unlikely
-        // occurrence.
-        auto cmp1 = llvm_min(s, tmp1, tmp2);
-        auto cmp2 = llvm_min(s, tmp3, tmp4);
-        auto cmp3 = llvm_max(s, tmp1, tmp2);
-        auto cmp4 = llvm_max(s, tmp3, tmp4);
-
-        return std::make_pair(llvm_min(s, cmp1, cmp2), llvm_max(s, cmp3, cmp4));
-    };
-
     // Load the timestep.
-    auto h = load_vector_from_memory(builder, h_ptr, batch_size);
+    auto *h = load_vector_from_memory(builder, h_ptr, batch_size);
 
     // Load back_flag and convert it to a boolean vector.
-    auto back_flag = builder.CreateTrunc(load_vector_from_memory(builder, back_flag_ptr, batch_size),
-                                         make_vector_type(builder.getInt1Ty(), batch_size));
+    auto *back_flag = builder.CreateTrunc(load_vector_from_memory(builder, back_flag_ptr, batch_size),
+                                          make_vector_type(builder.getInt1Ty(), batch_size));
 
     // Compute the components of the interval version of h. If we are integrating
     // forward, the components are (0, h), otherwise they are (h, 0).
-    auto h_lo = builder.CreateSelect(back_flag, h, llvm::Constant::getNullValue(h->getType()));
-    auto h_hi = builder.CreateSelect(back_flag, llvm::Constant::getNullValue(h->getType()), h);
+    auto *h_lo = builder.CreateSelect(back_flag, h, llvm::Constant::getNullValue(h->getType()));
+    auto *h_hi = builder.CreateSelect(back_flag, llvm::Constant::getNullValue(h->getType()), h);
 
-    // Create the lo/hi components of the accumulator.
-    auto fp_vec_t = to_llvm_vector_type<T>(context, batch_size);
-    auto acc_lo = builder.CreateAlloca(fp_vec_t);
-    auto acc_hi = builder.CreateAlloca(fp_vec_t);
-
-    // Init the accumulator's lo/hi components with the highest-order coefficient.
-    assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
-    auto ho_cf = load_vector_from_memory(
-        builder,
-        builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.CreateMul(builder.getInt32(n), builder.getInt32(batch_size))),
-        batch_size);
-    builder.CreateStore(ho_cf, acc_lo);
-    builder.CreateStore(ho_cf, acc_hi);
-
-    // Run the Horner scheme (starting from 1 because we already consumed the
-    // highest-order coefficient).
-    llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *i) {
-        // Load the current coefficient.
-        assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
-        auto ptr = builder.CreateInBoundsGEP(
-            fp_t, cf_ptr, builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size)));
-        auto cur_cf = load_vector_from_memory(builder, ptr, batch_size);
-
-        // Multiply the accumulator by h.
-        auto [acc_h_lo, acc_h_hi]
-            = ival_prod(builder.CreateLoad(fp_vec_t, acc_lo), builder.CreateLoad(fp_vec_t, acc_hi), h_lo, h_hi);
-
-        // Update the value of the accumulator.
-        auto [new_acc_lo, new_acc_hi] = ival_sum(cur_cf, cur_cf, acc_h_lo, acc_h_hi);
-        builder.CreateStore(new_acc_lo, acc_lo);
-        builder.CreateStore(new_acc_hi, acc_hi);
-    });
+    // Compute the enclosure of the polynomial.
+    auto [enc_lo, enc_hi] = llvm_penc_interval<T>(s, cf_ptr, n, h_lo, h_hi, batch_size);
 
     // Compute the sign of the components of the accumulator.
-    auto s_lo = llvm_sgn(s, builder.CreateLoad(fp_vec_t, acc_lo));
-    auto s_hi = llvm_sgn(s, builder.CreateLoad(fp_vec_t, acc_hi));
+    auto *s_lo = llvm_sgn(s, enc_lo);
+    auto *s_hi = llvm_sgn(s, enc_hi);
 
     // Check if the signs are equal and the low sign is nonzero.
-    auto cmp1 = builder.CreateICmpEQ(s_lo, s_hi);
-    auto cmp2 = builder.CreateICmpNE(s_lo, llvm::Constant::getNullValue(s_lo->getType()));
+    auto *cmp1 = builder.CreateICmpEQ(s_lo, s_hi);
+    auto *cmp2 = builder.CreateICmpNE(s_lo, llvm::Constant::getNullValue(s_lo->getType()));
     // NOTE: this is a way of creating a logical AND between cmp1 and cmp2. LLVM 13 has a specific
     // function for this.
-    auto cmp = builder.CreateSelect(cmp1, cmp2, llvm::Constant::getNullValue(cmp1->getType()));
+    auto *cmp = builder.CreateSelect(cmp1, cmp2, llvm::Constant::getNullValue(cmp1->getType()));
     // Extend cmp to int32_t.
-    auto retval = builder.CreateZExt(cmp, make_vector_type(builder.getInt32Ty(), batch_size));
+    auto *retval = builder.CreateZExt(cmp, make_vector_type(builder.getInt32Ty(), batch_size));
 
     // Store the result in out_ptr.
     store_vector_to_memory(builder, out_ptr, retval);

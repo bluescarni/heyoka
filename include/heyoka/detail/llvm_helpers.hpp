@@ -115,6 +115,10 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_floor(llvm_state &, llvm::Value *);
 template <typename>
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc(llvm_state &, std::uint32_t, std::uint32_t);
 
+template <typename>
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_interval(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *, std::uint32_t);
+
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_dbl(llvm_state &, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_ldbl(llvm_state &, std::uint32_t);
 
@@ -140,7 +144,7 @@ inline llvm::Function *llvm_add_inv_kep_E(llvm_state &s, std::uint32_t batch_siz
     }
 }
 
-template <typename T>
+template <typename>
 HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper(llvm_state &, std::uint32_t, const std::string &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array_dbl(llvm_state &, std::uint32_t);

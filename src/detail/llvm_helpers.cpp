@@ -1422,6 +1422,122 @@ template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<mppp::real128>(llvm_stat
 
 #endif
 
+// Compute the enclosure of the polynomial of order n with coefficients stored in cf_ptr
+// over the interval [h_lo, h_hi] using interval arithmetics. The polynomial coefficients
+// are vectors of size batch_size and scalar type T.
+template <typename T>
+std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::Value *cf_ptr, std::uint32_t n,
+                                                           llvm::Value *h_lo, llvm::Value *h_hi,
+                                                           std::uint32_t batch_size)
+{
+    // LCOV_EXCL_START
+    assert(batch_size > 0u);
+    assert(cf_ptr != nullptr);
+    assert(h_lo != nullptr);
+    assert(h_hi != nullptr);
+    assert(llvm::isa<llvm::PointerType>(cf_ptr->getType()));
+
+    // Overflow check: we need to be able to index
+    // into the array of coefficients.
+    if (n == std::numeric_limits<std::uint32_t>::max()
+        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
+        throw std::overflow_error("Overflow detected while implementing the computation of the enclosure of a "
+                                  "polynomial via interval arithmetic");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Helper to implement the sum of two intervals.
+    // NOTE: see https://en.wikipedia.org/wiki/Interval_arithmetic.
+    auto ival_sum = [&builder](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
+        return std::make_pair(builder.CreateFAdd(a_lo, b_lo), builder.CreateFAdd(a_hi, b_hi));
+    };
+
+    // Helper to implement the product of two intervals.
+    auto ival_prod = [&s, &builder](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
+        auto *tmp1 = builder.CreateFMul(a_lo, b_lo);
+        auto *tmp2 = builder.CreateFMul(a_lo, b_hi);
+        auto *tmp3 = builder.CreateFMul(a_hi, b_lo);
+        auto *tmp4 = builder.CreateFMul(a_hi, b_hi);
+
+        // NOTE: here we are not correctly propagating NaNs,
+        // for which we would need to use llvm_min/max_nan(),
+        // which however incur in a noticeable performance
+        // penalty. Thus, even in presence of all finite
+        // Taylor coefficients and integration timestep, it could
+        // conceivably happen that NaNs are generated in the
+        // multiplications above and they are not correctly propagated
+        // in these min/max functions, thus ultimately leading to an
+        // incorrect result. This however looks like a very unlikely
+        // occurrence.
+        auto *cmp1 = llvm_min(s, tmp1, tmp2);
+        auto *cmp2 = llvm_min(s, tmp3, tmp4);
+        auto *cmp3 = llvm_max(s, tmp1, tmp2);
+        auto *cmp4 = llvm_max(s, tmp3, tmp4);
+
+        return std::make_pair(llvm_min(s, cmp1, cmp2), llvm_max(s, cmp3, cmp4));
+    };
+
+    // Fetch the scalar and vector types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *fp_vec_t = make_vector_type(fp_t, batch_size);
+
+    // Create the lo/hi components of the accumulator.
+    auto *acc_lo = builder.CreateAlloca(fp_vec_t);
+    auto *acc_hi = builder.CreateAlloca(fp_vec_t);
+
+    // Init the accumulator's lo/hi components with the highest-order coefficient.
+    assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
+    auto *ho_cf = load_vector_from_memory(
+        builder,
+        builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.CreateMul(builder.getInt32(n), builder.getInt32(batch_size))),
+        batch_size);
+    builder.CreateStore(ho_cf, acc_lo);
+    builder.CreateStore(ho_cf, acc_hi);
+
+    // Run the Horner scheme (starting from 1 because we already consumed the
+    // highest-order coefficient).
+    llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *i) {
+        // Load the current coefficient.
+        // NOTE: we are iterating backwards from the high-order coefficients
+        // to the low-order ones.
+        assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
+        auto *ptr = builder.CreateInBoundsGEP(
+            fp_t, cf_ptr, builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size)));
+        auto *cur_cf = load_vector_from_memory(builder, ptr, batch_size);
+
+        // Multiply the accumulator by h.
+        auto [acc_h_lo, acc_h_hi]
+            = ival_prod(builder.CreateLoad(fp_vec_t, acc_lo), builder.CreateLoad(fp_vec_t, acc_hi), h_lo, h_hi);
+
+        // Update the value of the accumulator.
+        auto [new_acc_lo, new_acc_hi] = ival_sum(cur_cf, cur_cf, acc_h_lo, acc_h_hi);
+        builder.CreateStore(new_acc_lo, acc_lo);
+        builder.CreateStore(new_acc_hi, acc_hi);
+    });
+
+    // Return the lo/hi components of the accumulator.
+    return {builder.CreateLoad(fp_vec_t, acc_lo), builder.CreateLoad(fp_vec_t, acc_hi)};
+}
+
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_interval<double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *, std::uint32_t);
+
+template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_interval<long double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *,
+                                std::uint32_t);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_interval<mppp::real128>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *,
+                                  std::uint32_t);
+
+#endif
+
 namespace
 {
 
