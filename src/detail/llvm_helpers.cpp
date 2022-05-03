@@ -1239,13 +1239,11 @@ llvm::Value *llvm_floor(llvm_state &s, llvm::Value *x)
 #endif
 }
 
-namespace
-{
-
 // Add a function to count the number of sign changes in the coefficients
 // of a polynomial of degree n. The coefficients are SIMD vectors of size batch_size
-// and scalar type scal_t.
-llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32_t n, std::uint32_t batch_size)
+// and scalar type T.
+template <typename T>
+llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
     assert(batch_size > 0u);
 
@@ -1260,9 +1258,11 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
 
     auto &md = s.module();
     auto &builder = s.builder();
+    auto &context = s.context();
 
     // Fetch the floating-point type.
-    auto tp = make_vector_type(scal_t, batch_size);
+    auto *scal_t = to_llvm_type<T>(context);
+    auto *tp = make_vector_type(scal_t, batch_size);
 
     // Fetch the function name.
     const auto fname = "heyoka_csc_degree_{}_{}"_format(n, llvm_mangle_type(tp));
@@ -1283,7 +1283,7 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is void.
         auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -1305,13 +1305,13 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
         cf_ptr->addAttr(llvm::Attribute::ReadOnly);
 
         // Create a new basic block to start insertion into.
-        builder.SetInsertPoint(llvm::BasicBlock::Create(s.context(), "entry", f));
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Fetch the type for storing the last_nz_idx variable.
-        auto last_nz_idx_t = make_vector_type(builder.getInt32Ty(), batch_size);
+        auto *last_nz_idx_t = make_vector_type(builder.getInt32Ty(), batch_size);
 
         // The initial last nz idx is zero for all batch elements.
-        auto last_nz_idx = builder.CreateAlloca(last_nz_idx_t);
+        auto *last_nz_idx = builder.CreateAlloca(last_nz_idx_t);
         builder.CreateStore(llvm::Constant::getNullValue(last_nz_idx_t), last_nz_idx);
 
         // NOTE: last_nz_idx is an index into the poly coefficient vector. Thus, in batch
@@ -1323,7 +1323,7 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
         // - 1 * 4 + 2 = 6
         // - 2 * 4 + 3 = 11.
         // That is, last_nz_idx * batch_size + offset, where offset is [0, 1, 2, 3].
-        llvm::Value *offset;
+        llvm::Value *offset = nullptr;
         if (batch_size == 1u) {
             // In scalar mode the offset is simply zero.
             offset = builder.getInt32(0);
@@ -1338,7 +1338,7 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
         auto cf_ptr_v = vector_splat(builder, cf_ptr, batch_size);
 
         // Init the return value with zero.
-        auto retval = builder.CreateAlloca(last_nz_idx_t);
+        auto *retval = builder.CreateAlloca(last_nz_idx_t);
         builder.CreateStore(llvm::Constant::getNullValue(last_nz_idx_t), retval);
 
         // The iteration range is [1, n].
@@ -1351,7 +1351,7 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
                 batch_size);
 
             // Load the last nonzero coefficient(s).
-            auto last_nz_ptr_idx = builder.CreateAdd(
+            auto *last_nz_ptr_idx = builder.CreateAdd(
                 offset, builder.CreateMul(builder.CreateLoad(last_nz_idx_t, last_nz_idx),
                                           vector_splat(builder, builder.getInt32(batch_size), batch_size)));
             assert(llvm_depr_GEP_type_check(cf_ptr_v, scal_t)); // LCOV_EXCL_LINE
@@ -1411,24 +1411,14 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
     return f;
 }
 
-} // namespace
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<double>(llvm_state &, std::uint32_t, std::uint32_t);
 
-llvm::Function *llvm_add_csc_dbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    return llvm_add_csc_impl(s, detail::to_llvm_type<double>(s.context()), n, batch_size);
-}
-
-llvm::Function *llvm_add_csc_ldbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    return llvm_add_csc_impl(s, detail::to_llvm_type<long double>(s.context()), n, batch_size);
-}
+template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<long double>(llvm_state &, std::uint32_t, std::uint32_t);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *llvm_add_csc_f128(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    return llvm_add_csc_impl(s, to_llvm_type<mppp::real128>(s.context()), n, batch_size);
-}
+template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<mppp::real128>(llvm_state &, std::uint32_t, std::uint32_t);
 
 #endif
 
