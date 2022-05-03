@@ -193,7 +193,7 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
         counter += s.size();
     }
 
-    assert(counter == dc.size() - n_eq * 2u);
+    assert(counter == dc.size() - static_cast<decltype(dc.size())>(n_eq) * 2u);
 #endif
 
     get_logger()->debug("Taylor N of segments: {}", s_dc.size());
@@ -714,8 +714,8 @@ void taylor_c_compute_sv_diffs(llvm_state &s, const std::pair<std::array<llvm::G
         // nonzero value that can be produced here is the first-order
         // derivative.
         auto *cmp_cond = builder.CreateICmpEQ(order, builder.getInt32(1));
-        auto ret = builder.CreateSelect(cmp_cond, vector_splat(builder, num, batch_size),
-                                        llvm::ConstantFP::get(fp_vec_t, 0.));
+        auto *ret = builder.CreateSelect(cmp_cond, vector_splat(builder, num, batch_size),
+                                         llvm::ConstantFP::get(fp_vec_t, 0.));
 
         // Store the derivative.
         taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx, ret);
