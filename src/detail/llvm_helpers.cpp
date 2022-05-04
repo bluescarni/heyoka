@@ -109,13 +109,23 @@ namespace
 {
 
 // The global type map to associate a C++ type to an LLVM type.
+// NOLINTNEXTLINE(cert-err58-cpp,readability-function-cognitive-complexity)
 const auto type_map = []() {
     std::unordered_map<std::type_index, llvm::Type *(*)(llvm::LLVMContext &)> retval;
+
+    // Try to associate C++ float to LLVM float.
+    if (std::numeric_limits<float>::is_iec559 && std::numeric_limits<float>::digits == 24) {
+        retval[typeid(float)] = [](llvm::LLVMContext &c) {
+            auto *ret = llvm::Type::getFloatTy(c);
+            assert(ret != nullptr);
+            return ret;
+        };
+    }
 
     // Try to associate C++ double to LLVM double.
     if (std::numeric_limits<double>::is_iec559 && std::numeric_limits<double>::digits == 53) {
         retval[typeid(double)] = [](llvm::LLVMContext &c) {
-            auto ret = llvm::Type::getDoubleTy(c);
+            auto *ret = llvm::Type::getDoubleTy(c);
             assert(ret != nullptr);
             return ret;
         };
@@ -126,7 +136,7 @@ const auto type_map = []() {
         if (std::numeric_limits<long double>::digits == 53) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // IEEE double-precision format (this is the case on MSVC for instance).
-                auto ret = llvm::Type::getDoubleTy(c);
+                auto *ret = llvm::Type::getDoubleTy(c);
                 assert(ret != nullptr);
                 return ret;
             };
@@ -134,7 +144,7 @@ const auto type_map = []() {
         } else if (std::numeric_limits<long double>::digits == 64) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // x86 extended precision format.
-                auto ret = llvm::Type::getX86_FP80Ty(c);
+                auto *ret = llvm::Type::getX86_FP80Ty(c);
                 assert(ret != nullptr);
                 return ret;
             };
@@ -142,7 +152,7 @@ const auto type_map = []() {
         } else if (std::numeric_limits<long double>::digits == 113) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // IEEE quadruple-precision format (e.g., ARM 64).
-                auto ret = llvm::Type::getFP128Ty(c);
+                auto *ret = llvm::Type::getFP128Ty(c);
                 assert(ret != nullptr);
                 return ret;
             };
@@ -153,7 +163,7 @@ const auto type_map = []() {
 
     // Associate mppp::real128 to fp128.
     retval[typeid(mppp::real128)] = [](llvm::LLVMContext &c) {
-        auto ret = llvm::Type::getFP128Ty(c);
+        auto *ret = llvm::Type::getFP128Ty(c);
         assert(ret != nullptr);
         return ret;
     };
