@@ -1303,12 +1303,12 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
     // detection being performed.
     // NOTE: use the same max_steps for the initial propagation,
     // and don't pass the callback.
-    const auto oc = std::get<0>(
+    const auto oc_until = std::get<0>(
         propagate_until(grid[0], kw::max_delta_t = max_delta_t, kw::max_steps = max_steps, kw::write_tc = true));
 
-    if (oc != taylor_outcome::time_limit) {
+    if (oc_until != taylor_outcome::time_limit) {
         // The outcome is not time_limit, exit now.
-        return std::tuple{oc, min_h, max_h, step_counter, std::move(retval)};
+        return std::tuple{oc_until, min_h, max_h, step_counter, std::move(retval)};
     }
 
     // Add the first result to retval.
