@@ -1538,6 +1538,101 @@ llvm_penc_interval<mppp::real128>(llvm_state &, llvm::Value *, std::uint32_t, ll
 
 #endif
 
+// Compute the enclosure of the polynomial of order n with coefficients stored in cf_ptr
+// over an interval using the Cargo-Shisha algorithm. The polynomial coefficients
+// are vectors of size batch_size and scalar type T. The interval of the independent variable
+// is [0, h] if h >= 0, [h, 0] otherwise.
+template <typename T>
+std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, llvm::Value *cf_ptr, std::uint32_t n,
+                                                               llvm::Value *h, std::uint32_t batch_size)
+{
+    // LCOV_EXCL_START
+    assert(batch_size > 0u);
+    assert(cf_ptr != nullptr);
+    assert(h != nullptr);
+    assert(llvm::isa<llvm::PointerType>(cf_ptr->getType()));
+
+    // Overflow check: we need to be able to index
+    // into the array of coefficients.
+    if (n == std::numeric_limits<std::uint32_t>::max()
+        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
+        throw std::overflow_error("Overflow detected while implementing the computation of the enclosure of a "
+                                  "polynomial via interval arithmetic");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the scalar type.
+    auto *fp_t = to_llvm_type<T>(context);
+
+    // bj_series will contain the terms of the series
+    // for the computation of bj. old_bj_series will be
+    // used to deal with the fact that the pairwise sum
+    // consumes the input vector.
+    std::vector<llvm::Value *> bj_series, old_bj_series;
+
+    // Init the current power of h with h itself.
+    auto *cur_h_pow = h;
+
+    // Compute the first value, b0, and add it to bj_series.
+    auto *b0 = load_vector_from_memory(builder, cf_ptr, batch_size);
+    bj_series.push_back(b0);
+
+    // Init min/max bj with b0.
+    auto *min_bj = b0, *max_bj = b0;
+
+    // Main iteration.
+    for (std::uint32_t j = 1u; j <= n; ++j) {
+        // Compute the new term of the series.
+        auto *ptr = builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.getInt32(j * batch_size));
+        auto *cur_cf = load_vector_from_memory(builder, ptr, batch_size);
+        auto *new_term = builder.CreateFMul(cur_cf, cur_h_pow);
+        new_term
+            = builder.CreateFDiv(new_term, vector_splat(builder, codegen<T>(s, number{binomial<T>(n, j)}), batch_size));
+
+        // Add it to bj_series.
+        bj_series.push_back(new_term);
+
+        // Update all elements of bj_series (apart from the last one).
+        for (std::uint32_t i = 0; i < j; ++i) {
+            bj_series[i] = builder.CreateFMul(
+                bj_series[i], vector_splat(builder, codegen<T>(s, number{static_cast<T>(j) / (j - i)}), batch_size));
+        }
+
+        // Compute the new bj.
+        old_bj_series = bj_series;
+        auto *cur_bj = pairwise_sum(builder, bj_series);
+        old_bj_series.swap(bj_series);
+
+        // Update min/max_bj.
+        min_bj = llvm_min(s, min_bj, cur_bj);
+        max_bj = llvm_max(s, max_bj, cur_bj);
+
+        // Update cur_h_pow, if we are not at the last iteration.
+        if (j != n) {
+            cur_h_pow = builder.CreateFMul(cur_h_pow, h);
+        }
+    }
+
+    return {min_bj, max_bj};
+}
+
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_cargo_shisha<double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
+
+template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_cargo_shisha<long double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_cargo_shisha<mppp::real128>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
+
+#endif
+
 namespace
 {
 

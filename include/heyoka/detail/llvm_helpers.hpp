@@ -119,6 +119,10 @@ template <typename>
 HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
 llvm_penc_interval(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *, std::uint32_t);
 
+template <typename>
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_cargo_shisha(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
+
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_dbl(llvm_state &, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_ldbl(llvm_state &, std::uint32_t);
 
