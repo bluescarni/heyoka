@@ -1435,6 +1435,14 @@ template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<mppp::real128>(llvm_stat
 // Compute the enclosure of the polynomial of order n with coefficients stored in cf_ptr
 // over the interval [h_lo, h_hi] using interval arithmetics. The polynomial coefficients
 // are vectors of size batch_size and scalar type T.
+// NOTE: the interval arithmetic implementation here is not 100% correct, because
+// we do not account for floating-point truncation. In order to be mathematically
+// correct, we would need to adjust the results of interval arithmetic add/mul via
+// a std::nextafter()-like function. See here for an example:
+// https://stackoverflow.com/questions/10420848/how-do-you-get-the-next-value-in-the-floating-point-sequence
+// http://web.mit.edu/hyperbook/Patrikalakis-Maekawa-Cho/node46.html
+// Perhaps another alternative would be to employ FP primitives with explicit rounding modes,
+// which are available in LLVM.
 template <typename T>
 std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::Value *cf_ptr, std::uint32_t n,
                                                            llvm::Value *h_lo, llvm::Value *h_hi,
@@ -1552,6 +1560,9 @@ llvm_penc_interval<mppp::real128>(llvm_state &, llvm::Value *, std::uint32_t, ll
 // over an interval using the Cargo-Shisha algorithm. The polynomial coefficients
 // are vectors of size batch_size and scalar type T. The interval of the independent variable
 // is [0, h] if h >= 0, [h, 0] otherwise.
+// NOTE: the Cargo-Shisha algorithm produces tighter bounds, but it has quadratic complexity
+// and it seems to be less well-behaved numerically in corner cases. It might still be worth it up to double-precision
+// computations, where the practical slowdown wrt interval arithmetics is smaller.
 template <typename T>
 std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, llvm::Value *cf_ptr, std::uint32_t n,
                                                                llvm::Value *h, std::uint32_t batch_size)
@@ -1567,7 +1578,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
     if (n == std::numeric_limits<std::uint32_t>::max()
         || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
         throw std::overflow_error("Overflow detected while implementing the computation of the enclosure of a "
-                                  "polynomial via interval arithmetic");
+                                  "polynomial via the Cargo-Shisha algorithm");
     }
     // LCOV_EXCL_STOP
 

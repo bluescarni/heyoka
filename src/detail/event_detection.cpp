@@ -54,6 +54,7 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
@@ -445,133 +446,6 @@ llvm::Function *llvm_add_poly_rtscc_impl(llvm_state &s, std::uint32_t n, std::ui
     return f;
 }
 
-// Add a function implementing fast event exclusion check via the computation
-// of the enclosure of the event equation's Taylor polynomial. The enclosure is computed
-// via Horner's scheme using interval arithmetic.
-// NOTE: the interval arithmetic implementation here is not 100% correct, because
-// we do not account for floating-point truncation. In order to be mathematically
-// correct, we would need to adjust the results of interval arithmetic add/mul via
-// a std::nextafter()-like function. See here for an example:
-// https://stackoverflow.com/questions/10420848/how-do-you-get-the-next-value-in-the-floating-point-sequence
-// http://web.mit.edu/hyperbook/Patrikalakis-Maekawa-Cho/node46.html
-// Perhaps another alternative would be to employ FP primitives with explicit rounding modes,
-// which are available in LLVM.
-template <typename T>
-llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    assert(batch_size > 0u); // LCOV_EXCL_LINE
-
-    // Overflow check: we need to be able to index
-    // into the array of coefficients.
-    // LCOV_EXCL_START
-    if (n == std::numeric_limits<std::uint32_t>::max()
-        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
-        throw std::overflow_error("Overflow detected while adding a fex_check function");
-    }
-    // LCOV_EXCL_STOP
-
-    auto &md = s.module();
-    auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the current insertion block.
-    auto orig_bb = builder.GetInsertBlock();
-
-    // The function arguments:
-    // - pointer to the array of poly coefficients (read-only),
-    // - pointer to the timestep value (s) (read-only),
-    // - pointer to the int32 flag(s) to signal integration backwards in time (read-only),
-    // - output pointer (write-only).
-    // No overlap is allowed.
-    auto *fp_t = to_llvm_type<T>(context);
-    auto *fp_ptr_t = llvm::PointerType::getUnqual(fp_t);
-    auto *int32_ptr_t = llvm::PointerType::getUnqual(builder.getInt32Ty());
-    std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, int32_ptr_t, int32_ptr_t};
-    // The function does not return anything.
-    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-    assert(ft != nullptr); // LCOV_EXCL_LINE
-    // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "fex_check", &md);
-    // LCOV_EXCL_START
-    if (f == nullptr) {
-        throw std::invalid_argument("Unable to create an fex_check function");
-    }
-    // LCOV_EXCL_STOP
-
-    // Set the names/attributes of the function arguments.
-    auto *cf_ptr = f->args().begin();
-    cf_ptr->setName("cf_ptr");
-    cf_ptr->addAttr(llvm::Attribute::NoCapture);
-    cf_ptr->addAttr(llvm::Attribute::NoAlias);
-    cf_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-    auto *h_ptr = f->args().begin() + 1;
-    h_ptr->setName("h_ptr");
-    h_ptr->addAttr(llvm::Attribute::NoCapture);
-    h_ptr->addAttr(llvm::Attribute::NoAlias);
-    h_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-    auto *back_flag_ptr = f->args().begin() + 2;
-    back_flag_ptr->setName("back_flag_ptr");
-    back_flag_ptr->addAttr(llvm::Attribute::NoCapture);
-    back_flag_ptr->addAttr(llvm::Attribute::NoAlias);
-    back_flag_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-    auto *out_ptr = f->args().begin() + 3;
-    out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
-    out_ptr->addAttr(llvm::Attribute::NoAlias);
-    out_ptr->addAttr(llvm::Attribute::WriteOnly);
-
-    // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
-    assert(bb != nullptr); // LCOV_EXCL_LINE
-    builder.SetInsertPoint(bb);
-
-    // Load the timestep.
-    auto *h = load_vector_from_memory(builder, h_ptr, batch_size);
-
-    // Load back_flag and convert it to a boolean vector.
-    auto *back_flag = builder.CreateTrunc(load_vector_from_memory(builder, back_flag_ptr, batch_size),
-                                          make_vector_type(builder.getInt1Ty(), batch_size));
-
-    // Compute the components of the interval version of h. If we are integrating
-    // forward, the components are (0, h), otherwise they are (h, 0).
-    auto *h_lo = builder.CreateSelect(back_flag, h, llvm::Constant::getNullValue(h->getType()));
-    auto *h_hi = builder.CreateSelect(back_flag, llvm::Constant::getNullValue(h->getType()), h);
-
-    // Compute the enclosure of the polynomial.
-    auto [enc_lo, enc_hi] = llvm_penc_interval<T>(s, cf_ptr, n, h_lo, h_hi, batch_size);
-
-    // Compute the sign of the components of the accumulator.
-    auto *s_lo = llvm_sgn(s, enc_lo);
-    auto *s_hi = llvm_sgn(s, enc_hi);
-
-    // Check if the signs are equal and the low sign is nonzero.
-    auto *cmp1 = builder.CreateICmpEQ(s_lo, s_hi);
-    auto *cmp2 = builder.CreateICmpNE(s_lo, llvm::Constant::getNullValue(s_lo->getType()));
-    // NOTE: this is a way of creating a logical AND between cmp1 and cmp2. LLVM 13 has a specific
-    // function for this.
-    auto *cmp = builder.CreateSelect(cmp1, cmp2, llvm::Constant::getNullValue(cmp1->getType()));
-    // Extend cmp to int32_t.
-    auto *retval = builder.CreateZExt(cmp, make_vector_type(builder.getInt32Ty(), batch_size));
-
-    // Store the result in out_ptr.
-    store_vector_to_memory(builder, out_ptr, retval);
-
-    // Return.
-    builder.CreateRetVoid();
-
-    // Verify.
-    s.verify_function(f);
-
-    // Restore the original insertion block.
-    builder.SetInsertPoint(orig_bb);
-
-    // NOTE: the optimisation pass will be run outside.
-    return f;
-}
-
 // Helper to automatically deduce the cooldown
 // for a terminal event. g_eps is the maximum
 // absolute error on the Taylor series of the event
@@ -636,22 +510,144 @@ mppp::real128 taylor_deduce_cooldown(mppp::real128 g_eps, mppp::real128 abs_der)
 
 #endif
 
-llvm::Function *llvm_add_fex_check_dbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+// Add a function implementing fast event exclusion check via the computation
+// of the enclosure of the event equation's Taylor polynomial. The enclosure is computed
+// either via the Cargo-Shisha algorithm (use_cs == true) or
+// via Horner's scheme using interval arithmetic (use_cs == false). The default is the
+// interval arithmetics implementation.
+template <typename T>
+llvm::Function *llvm_add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t batch_size, bool use_cs)
 {
-    return llvm_add_fex_check_impl<double>(s, n, batch_size);
+    assert(batch_size > 0u); // LCOV_EXCL_LINE
+
+    // Overflow check: we need to be able to index
+    // into the array of coefficients.
+    // LCOV_EXCL_START
+    if (n == std::numeric_limits<std::uint32_t>::max()
+        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
+        throw std::overflow_error("Overflow detected while adding a fex_check function");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the current insertion block.
+    auto *orig_bb = builder.GetInsertBlock();
+
+    // The function arguments:
+    // - pointer to the array of poly coefficients (read-only),
+    // - pointer to the timestep value (s) (read-only),
+    // - pointer to the int32 flag(s) to signal integration backwards in time (read-only),
+    // - output pointer (write-only).
+    // No overlap is allowed.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *fp_ptr_t = llvm::PointerType::getUnqual(fp_t);
+    auto *int32_ptr_t = llvm::PointerType::getUnqual(builder.getInt32Ty());
+    std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, int32_ptr_t, int32_ptr_t};
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr); // LCOV_EXCL_LINE
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "fex_check", &md);
+    // LCOV_EXCL_START
+    if (f == nullptr) {
+        throw std::invalid_argument("Unable to create an fex_check function");
+    }
+    // LCOV_EXCL_STOP
+
+    // Set the names/attributes of the function arguments.
+    auto *cf_ptr = f->args().begin();
+    cf_ptr->setName("cf_ptr");
+    cf_ptr->addAttr(llvm::Attribute::NoCapture);
+    cf_ptr->addAttr(llvm::Attribute::NoAlias);
+    cf_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto *h_ptr = f->args().begin() + 1;
+    h_ptr->setName("h_ptr");
+    h_ptr->addAttr(llvm::Attribute::NoCapture);
+    h_ptr->addAttr(llvm::Attribute::NoAlias);
+    h_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto *back_flag_ptr = f->args().begin() + 2;
+    back_flag_ptr->setName("back_flag_ptr");
+    back_flag_ptr->addAttr(llvm::Attribute::NoCapture);
+    back_flag_ptr->addAttr(llvm::Attribute::NoAlias);
+    back_flag_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto *out_ptr = f->args().begin() + 3;
+    out_ptr->setName("out_ptr");
+    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    out_ptr->addAttr(llvm::Attribute::NoAlias);
+    out_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+    assert(bb != nullptr); // LCOV_EXCL_LINE
+    builder.SetInsertPoint(bb);
+
+    // Load the timestep.
+    auto *h = load_vector_from_memory(builder, h_ptr, batch_size);
+
+    // Init the extrema of the enclosure.
+    llvm::Value *enc_lo = nullptr, *enc_hi = nullptr;
+
+    if (use_cs) {
+        // Compute the enclosure of the polynomial.
+        std::tie(enc_lo, enc_hi) = llvm_penc_cargo_shisha<T>(s, cf_ptr, n, h, batch_size);
+    } else {
+        // Load back_flag and convert it to a boolean vector.
+        auto *back_flag = builder.CreateTrunc(load_vector_from_memory(builder, back_flag_ptr, batch_size),
+                                              make_vector_type(builder.getInt1Ty(), batch_size));
+
+        // Compute the components of the interval version of h. If we are integrating
+        // forward, the components are (0, h), otherwise they are (h, 0).
+        auto *h_lo = builder.CreateSelect(back_flag, h, llvm::Constant::getNullValue(h->getType()));
+        auto *h_hi = builder.CreateSelect(back_flag, llvm::Constant::getNullValue(h->getType()), h);
+
+        // Compute the enclosure of the polynomial.
+        std::tie(enc_lo, enc_hi) = llvm_penc_interval<T>(s, cf_ptr, n, h_lo, h_hi, batch_size);
+    }
+
+    // Compute the sign of the components of the accumulator.
+    auto *s_lo = llvm_sgn(s, enc_lo);
+    auto *s_hi = llvm_sgn(s, enc_hi);
+
+    // Check if the signs are equal and the low sign is nonzero.
+    auto *cmp1 = builder.CreateICmpEQ(s_lo, s_hi);
+    auto *cmp2 = builder.CreateICmpNE(s_lo, llvm::Constant::getNullValue(s_lo->getType()));
+    // NOTE: this is a way of creating a logical AND between cmp1 and cmp2. LLVM 13 has a specific
+    // function for this.
+    auto *cmp = builder.CreateSelect(cmp1, cmp2, llvm::Constant::getNullValue(cmp1->getType()));
+    // Extend cmp to int32_t.
+    auto *retval = builder.CreateZExt(cmp, make_vector_type(builder.getInt32Ty(), batch_size));
+
+    // Store the result in out_ptr.
+    store_vector_to_memory(builder, out_ptr, retval);
+
+    // Return.
+    builder.CreateRetVoid();
+
+    // Verify.
+    s.verify_function(f);
+
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
+
+    // NOTE: the optimisation pass will be run outside.
+    return f;
 }
 
-llvm::Function *llvm_add_fex_check_ldbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    return llvm_add_fex_check_impl<long double>(s, n, batch_size);
-}
+template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<double>(llvm_state &, std::uint32_t, std::uint32_t, bool);
+
+template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<long double>(llvm_state &, std::uint32_t, std::uint32_t,
+                                                                           bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *llvm_add_fex_check_f128(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    return llvm_add_fex_check_impl<mppp::real128>(s, n, batch_size);
-}
+template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<mppp::real128>(llvm_state &, std::uint32_t, std::uint32_t,
+                                                                             bool);
 
 #endif
 
@@ -931,8 +927,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
             const auto ptr
                 = m_ev_jet.data() + (i + dim + (is_terminal_event_v<ev_type> ? 0u : m_tes.size())) * (order + 1u);
 
-            // Run the fast exclusion check to detect sign changes via
-            // interval arithmetics.
+            // Run the fast exclusion check.
             // NOTE: in case of non-finite values in the Taylor
             // coefficients of the event equation, the worst that
             // can happen here is that we end up skipping event
@@ -1558,8 +1553,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                 = m_ev_jet.data()
                   + (i + dim + (is_terminal_event_v<ev_type> ? 0u : m_tes.size())) * (order + 1u) * batch_size;
 
-            // Run the fast exclusion check to detect sign changes via
-            // interval arithmetics.
+            // Run the fast exclusion check.
             // NOTE: in case of non-finite values in the Taylor
             // coefficients of the event equation, the worst that
             // can happen here is that we end up skipping event
