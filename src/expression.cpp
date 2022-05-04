@@ -303,8 +303,8 @@ void rename_variables(std::unordered_set<const void *> &func_set, expression &e,
                     return;
                 }
 
-                for (auto [b, e] = arg.get_mutable_args_it(); b != e; ++b) {
-                    rename_variables(func_set, *b, repl_map);
+                for (auto [beg, end] = arg.get_mutable_args_it(); beg != end; ++beg) {
+                    rename_variables(func_set, *beg, repl_map);
                 }
 
                 // Add the id of f to the set.
