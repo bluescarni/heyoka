@@ -249,7 +249,7 @@ TEST_CASE("taylor te basic")
                 kw::high_accuracy = high_accuracy,
                 kw::compact_mode = compact_mode,
                 kw::nt_events = {nt_ev_t(v * v - 1e-10,
-                                         [&counter_nt, &cur_time, &direction](taylor_adaptive<fp_t> &ta, fp_t t, int) {
+                                         [&counter_nt, &cur_time, &direction](taylor_adaptive<fp_t> &ta_, fp_t t, int) {
                                              // Make sure the callbacks are called in order.
                                              if (direction) {
                                                  REQUIRE(t > cur_time);
@@ -257,18 +257,18 @@ TEST_CASE("taylor te basic")
                                                  REQUIRE(t < cur_time);
                                              }
 
-                                             ta.update_d_output(t);
+                                             ta_.update_d_output(t);
 
-                                             const auto v = ta.get_d_output()[1];
-                                             REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+                                             const auto vel = ta_.get_d_output()[1];
+                                             REQUIRE(abs(vel * vel - 1e-10) < std::numeric_limits<fp_t>::epsilon());
 
                                              ++counter_nt;
 
                                              cur_time = t;
                                          })},
                 kw::t_events = {t_ev_t(
-                    v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta, bool mr, int) {
-                        const auto t = ta.get_time();
+                    v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta_, bool mr, int) {
+                        const auto t = ta_.get_time();
 
                         REQUIRE(!mr);
 
@@ -278,8 +278,8 @@ TEST_CASE("taylor te basic")
                             REQUIRE(t < cur_time);
                         }
 
-                        const auto v = ta.get_state()[1];
-                        REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon() * 100);
+                        const auto vel = ta_.get_state()[1];
+                        REQUIRE(abs(vel) < std::numeric_limits<fp_t>::epsilon() * 100);
 
                         ++counter_t;
 
@@ -937,8 +937,8 @@ TEST_CASE("taylor te boolean callback")
             kw::high_accuracy = high_accuracy,
             kw::compact_mode = compact_mode,
             kw::t_events = {t_ev_t(
-                v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta, bool mr, int) {
-                    const auto t = ta.get_time();
+                v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta_, bool mr, int) {
+                    const auto t = ta_.get_time();
 
                     REQUIRE(!mr);
 
@@ -948,18 +948,14 @@ TEST_CASE("taylor te boolean callback")
                         REQUIRE(t < cur_time);
                     }
 
-                    const auto v = ta.get_state()[1];
-                    REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon() * 100);
+                    const auto vel = ta_.get_state()[1];
+                    REQUIRE(abs(vel) < std::numeric_limits<fp_t>::epsilon() * 100);
 
                     ++counter_t;
 
                     cur_time = t;
 
-                    if (counter_t == 5u) {
-                        return false;
-                    } else {
-                        return true;
-                    }
+                    return counter_t != 5u;
                 })}};
 
         // First we integrate up to the first
@@ -1043,9 +1039,9 @@ TEST_CASE("step end")
         {prime(x) = v, prime(v) = -9.8 * sin(x)},
         {0., 0.25},
         kw::t_events = {t_ev_t(
-            heyoka::time - 1., kw::callback = [&counter](taylor_adaptive<double> &ta, bool, int) {
+            heyoka::time - 1., kw::callback = [&counter](taylor_adaptive<double> &ta_, bool, int) {
                 ++counter;
-                REQUIRE(ta.get_time() == 1.);
+                REQUIRE(ta_.get_time() == 1.);
                 return true;
             })}};
 

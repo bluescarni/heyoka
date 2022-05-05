@@ -58,10 +58,11 @@ TEST_CASE("e3bp")
           + (pphi * pphi) / (2_dbl * a * a * (xi * xi - 1_dbl) * (1_dbl - eta * eta)) - mu1 / (a * (xi - eta))
           - mu2 / (a * (xi + eta));
 
-    auto h_trace = [a = 1., mu1 = 1., mu2 = 0.05](auto eta, auto peta, auto pphi, auto pxi, auto xi) {
-        return (pxi * pxi * (xi * xi - 1.) + peta * peta * (1. - eta * eta)) / (2. * a * a * (xi * xi - eta * eta))
-               + (pphi * pphi) / (2. * a * a * (xi * xi - 1.) * (1. - eta * eta)) - mu1 / (a * (xi - eta))
-               - mu2 / (a * (xi + eta));
+    auto h_trace = [a = 1., mu1 = 1., mu2 = 0.05](auto eta_, auto peta_, auto pphi_, auto pxi_, auto xi_) {
+        return (pxi_ * pxi_ * (xi_ * xi_ - 1.) + peta_ * peta_ * (1. - eta_ * eta_))
+                   / (2. * a * a * (xi_ * xi_ - eta_ * eta_))
+               + (pphi_ * pphi_) / (2. * a * a * (xi_ * xi_ - 1.) * (1. - eta_ * eta_)) - mu1 / (a * (xi_ - eta_))
+               - mu2 / (a * (xi_ + eta_));
     };
 
     // NOTE: initial conditions for the periodic orbit from the paper.

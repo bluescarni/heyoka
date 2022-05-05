@@ -20,7 +20,7 @@ find_package(xtensor-blas REQUIRED CONFIG)
 function(ADD_HEYOKA_BENCHMARK arg1)
   add_executable(${arg1} ${arg1}.cpp)
   # NOTE: fmt was already located in the main CMakeLists.
-  target_link_libraries(${arg1} PRIVATE heyoka Boost::boost Boost::program_options xtensor xtensor-blas fmt::fmt spdlog::spdlog)
+  target_link_libraries(${arg1} PRIVATE heyoka Boost::boost Boost::program_options xtensor xtensor-blas fmt::fmt spdlog::spdlog heyoka_llvm_internal)
   target_compile_definitions(${arg1} PRIVATE XTENSOR_USE_FLENS_BLAS PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
   target_compile_options(${arg1} PRIVATE
     "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
@@ -68,3 +68,4 @@ ADD_HEYOKA_BENCHMARK(hh_event)
 ADD_HEYOKA_BENCHMARK(burrau_3bp)
 ADD_HEYOKA_BENCHMARK(bandf)
 ADD_HEYOKA_BENCHMARK(bandf_odeint)
+ADD_HEYOKA_BENCHMARK(penc_comparison)

@@ -344,7 +344,7 @@ TEST_CASE("propagate grid")
                                        kw::t_events = {t_event_batch<double>(v - 0.999)}};
     auto out = ta.propagate_grid({10., 10., 10., 10., 100., 100., 100., 100.});
     REQUIRE(out.size() == 16u);
-    REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &v) { return std::isnan(v); }));
+    REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &vel) { return std::isnan(vel); }));
     REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
                         [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
 
@@ -357,7 +357,7 @@ TEST_CASE("propagate grid")
     };
     out = ta.propagate_grid({10., 10., 10., 10., 100., 100., 100., 100.});
     REQUIRE(out.size() == 16u);
-    REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &v) { return std::isnan(v); }));
+    REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &vel) { return std::isnan(vel); }));
     REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
                         [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
 
@@ -630,13 +630,13 @@ TEST_CASE("propagate for_until write_tc")
 
     ta.propagate_until(
         {10., 11.}, kw::callback = [](auto &t) {
-            REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &val) { return val == 0.; }));
             return true;
         });
 
     ta.propagate_until(
         {20., 21.}, kw::write_tc = true, kw::callback = [](auto &t) {
-            REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &val) { return val == 0.; }));
             return true;
         });
 
@@ -644,13 +644,13 @@ TEST_CASE("propagate for_until write_tc")
 
     ta.propagate_for(
         {10., 11.}, kw::callback = [](auto &t) {
-            REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &val) { return val == 0.; }));
             return true;
         });
 
     ta.propagate_for(
         {20., 21.}, kw::write_tc = true, kw::callback = [](auto &t) {
-            REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &val) { return val == 0.; }));
             return true;
         });
 }
@@ -797,7 +797,7 @@ TEST_CASE("cb interrupt")
         auto res = ta.propagate_grid(
             {10., 10.1, 11., 11.1, 12., 12.1}, kw::callback = [](auto &) { return false; });
 
-        REQUIRE(std::all_of(res.begin() + 4, res.end(), [](double x) { return std::isnan(x); }));
+        REQUIRE(std::all_of(res.begin() + 4, res.end(), [](double val) { return std::isnan(val); }));
 
         REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
         REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::cb_stop);
@@ -1384,14 +1384,14 @@ TEST_CASE("reset cooldowns")
 
     ta.propagate_until({100., 100., 100., 100.});
 
-    REQUIRE(std::any_of(ta.get_te_cooldowns().begin(), ta.get_te_cooldowns().end(), [](const auto &v) {
-        return std::any_of(v.begin(), v.end(), [](const auto &x) { return static_cast<bool>(x); });
+    REQUIRE(std::any_of(ta.get_te_cooldowns().begin(), ta.get_te_cooldowns().end(), [](const auto &vec) {
+        return std::any_of(vec.begin(), vec.end(), [](const auto &val) { return static_cast<bool>(val); });
     }));
 
     ta.reset_cooldowns();
 
-    REQUIRE(std::all_of(ta.get_te_cooldowns().begin(), ta.get_te_cooldowns().end(), [](const auto &v) {
-        return std::all_of(v.begin(), v.end(), [](const auto &x) { return !static_cast<bool>(x); });
+    REQUIRE(std::all_of(ta.get_te_cooldowns().begin(), ta.get_te_cooldowns().end(), [](const auto &vec) {
+        return std::all_of(vec.begin(), vec.end(), [](const auto &val) { return !static_cast<bool>(val); });
     }));
 }
 

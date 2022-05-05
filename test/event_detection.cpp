@@ -14,9 +14,12 @@
 #include <initializer_list>
 #include <random>
 #include <tuple>
+#include <utility>
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
+
+#include <boost/math/special_functions/binomial.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -101,50 +104,86 @@ TEST_CASE("fast exclusion check")
 
         for (auto batch_size : {1u, 2u, 4u}) {
             for (auto order : {1u, 2u, 13u, 20u}) {
-                llvm_state s{kw::opt_level = opt_level};
+                for (auto use_cs : {false, true}) {
+                    llvm_state s{kw::opt_level = opt_level};
 
-                // Add the function and fetch it.
-                detail::llvm_add_fex_check<fp_t>(s, order, batch_size);
-                s.optimise();
-                s.compile();
-                auto fex_check
-                    = reinterpret_cast<void (*)(const fp_t *, const fp_t *, const std::uint32_t *, std::uint32_t *)>(
-                        s.jit_lookup("fex_check"));
+                    // Add the function and fetch it.
+                    detail::llvm_add_fex_check<fp_t>(s, order, batch_size, use_cs);
+                    s.optimise();
+                    s.compile();
+                    auto fex_check = reinterpret_cast<void (*)(const fp_t *, const fp_t *, const std::uint32_t *,
+                                                               std::uint32_t *)>(s.jit_lookup("fex_check"));
 
-                // Prepare the buffers.
-                poly.resize((order + 1u) * batch_size);
-                h.resize(batch_size);
-                back_flag.resize(batch_size);
-                res.resize(batch_size);
+                    // Prepare the buffers.
+                    poly.resize((order + 1u) * batch_size);
+                    h.resize(batch_size);
+                    back_flag.resize(batch_size);
+                    res.resize(batch_size);
 
-                // Iterate over a number of trials.
-                for (auto _ = 0; _ < 100; ++_) {
-                    // Generate random polys.
-                    for (auto &cf : poly) {
-                        cf = rdist(rng);
-                    }
-
-                    // Generate random hs.
-                    for (auto i = 0u; i < batch_size; ++i) {
-                        h[i] = rdist(rng);
-                        back_flag[i] = h[i] < 0;
-                    }
-
-                    // Invoke the fast exclusion check.
-                    fex_check(poly.data(), h.data(), back_flag.data(), res.data());
-
-                    // Run the manual check with the ival class.
-                    for (auto i = 0u; i < batch_size; ++i) {
-                        const auto h_int = (h[i] >= 0) ? ival<fp_t>(0, h[i]) : ival<fp_t>(h[i], 0);
-
-                        ival<fp_t> acc(poly[order * batch_size + i]);
-
-                        for (std::uint32_t j = 1; j <= order; ++j) {
-                            acc = ival<fp_t>(poly[(order - j) * batch_size + i]) + acc * h_int;
+                    // Iterate over a number of trials.
+                    for (auto _ = 0; _ < 100; ++_) {
+                        // Generate random polys.
+                        for (auto &cf : poly) {
+                            cf = rdist(rng);
                         }
 
-                        const auto s_lower = sgn(acc.lower), s_upper = sgn(acc.upper);
-                        REQUIRE(res[i] == (s_lower == s_upper && s_lower != 0));
+                        // Generate random hs.
+                        for (auto i = 0u; i < batch_size; ++i) {
+                            h[i] = rdist(rng);
+                            back_flag[i] = h[i] < 0;
+                        }
+
+                        // Invoke the fast exclusion check.
+                        fex_check(poly.data(), h.data(), back_flag.data(), res.data());
+
+                        if (use_cs) {
+                            // Run the manual check with an ad-hoc implementation of
+                            // the CS algorithm.
+                            for (auto i = 0u; i < batch_size; ++i) {
+                                auto cur_bj = poly[i]
+                                              * (boost::math::binomial_coefficient<fp_t>(0, 0)
+                                                 / boost::math::binomial_coefficient<fp_t>(order, 0));
+
+                                std::pair<fp_t, fp_t> bj_minmax{cur_bj, cur_bj};
+
+                                for (std::uint32_t j = 1; j <= order; ++j) {
+                                    cur_bj = 0;
+                                    fp_t cur_h_pow = 1;
+
+                                    for (std::uint32_t k = 0; k <= j; ++k) {
+                                        cur_bj += poly[k * batch_size + i] * cur_h_pow
+                                                  * (boost::math::binomial_coefficient<fp_t>(j, k)
+                                                     / boost::math::binomial_coefficient<fp_t>(order, k));
+
+                                        cur_h_pow *= h[i];
+                                    }
+
+                                    bj_minmax.first = std::min(bj_minmax.first, cur_bj);
+                                    bj_minmax.second = std::max(bj_minmax.second, cur_bj);
+                                }
+
+                                REQUIRE(bj_minmax.second >= bj_minmax.first);
+
+                                const auto s_lower = sgn(bj_minmax.first), s_upper = sgn(bj_minmax.second);
+                                REQUIRE(res[i] == (s_lower == s_upper && s_lower != 0));
+                            }
+                        } else {
+                            // Run the manual check with the ival class.
+                            for (auto i = 0u; i < batch_size; ++i) {
+                                const auto h_int = (h[i] >= 0) ? ival<fp_t>(0, h[i]) : ival<fp_t>(h[i], 0);
+
+                                ival<fp_t> acc(poly[order * batch_size + i]);
+
+                                for (std::uint32_t j = 1; j <= order; ++j) {
+                                    acc = ival<fp_t>(poly[(order - j) * batch_size + i]) + acc * h_int;
+                                }
+
+                                REQUIRE(acc.upper >= acc.lower);
+
+                                const auto s_lower = sgn(acc.lower), s_upper = sgn(acc.upper);
+                                REQUIRE(res[i] == (s_lower == s_upper && s_lower != 0));
+                            }
+                        }
                     }
                 }
             }

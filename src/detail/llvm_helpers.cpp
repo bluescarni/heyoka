@@ -109,13 +109,23 @@ namespace
 {
 
 // The global type map to associate a C++ type to an LLVM type.
+// NOLINTNEXTLINE(cert-err58-cpp,readability-function-cognitive-complexity)
 const auto type_map = []() {
     std::unordered_map<std::type_index, llvm::Type *(*)(llvm::LLVMContext &)> retval;
+
+    // Try to associate C++ float to LLVM float.
+    if (std::numeric_limits<float>::is_iec559 && std::numeric_limits<float>::digits == 24) {
+        retval[typeid(float)] = [](llvm::LLVMContext &c) {
+            auto *ret = llvm::Type::getFloatTy(c);
+            assert(ret != nullptr);
+            return ret;
+        };
+    }
 
     // Try to associate C++ double to LLVM double.
     if (std::numeric_limits<double>::is_iec559 && std::numeric_limits<double>::digits == 53) {
         retval[typeid(double)] = [](llvm::LLVMContext &c) {
-            auto ret = llvm::Type::getDoubleTy(c);
+            auto *ret = llvm::Type::getDoubleTy(c);
             assert(ret != nullptr);
             return ret;
         };
@@ -126,7 +136,7 @@ const auto type_map = []() {
         if (std::numeric_limits<long double>::digits == 53) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // IEEE double-precision format (this is the case on MSVC for instance).
-                auto ret = llvm::Type::getDoubleTy(c);
+                auto *ret = llvm::Type::getDoubleTy(c);
                 assert(ret != nullptr);
                 return ret;
             };
@@ -134,7 +144,7 @@ const auto type_map = []() {
         } else if (std::numeric_limits<long double>::digits == 64) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // x86 extended precision format.
-                auto ret = llvm::Type::getX86_FP80Ty(c);
+                auto *ret = llvm::Type::getX86_FP80Ty(c);
                 assert(ret != nullptr);
                 return ret;
             };
@@ -142,7 +152,7 @@ const auto type_map = []() {
         } else if (std::numeric_limits<long double>::digits == 113) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // IEEE quadruple-precision format (e.g., ARM 64).
-                auto ret = llvm::Type::getFP128Ty(c);
+                auto *ret = llvm::Type::getFP128Ty(c);
                 assert(ret != nullptr);
                 return ret;
             };
@@ -153,7 +163,7 @@ const auto type_map = []() {
 
     // Associate mppp::real128 to fp128.
     retval[typeid(mppp::real128)] = [](llvm::LLVMContext &c) {
-        auto ret = llvm::Type::getFP128Ty(c);
+        auto *ret = llvm::Type::getFP128Ty(c);
         assert(ret != nullptr);
         return ret;
     };
@@ -1239,13 +1249,11 @@ llvm::Value *llvm_floor(llvm_state &s, llvm::Value *x)
 #endif
 }
 
-namespace
-{
-
 // Add a function to count the number of sign changes in the coefficients
 // of a polynomial of degree n. The coefficients are SIMD vectors of size batch_size
-// and scalar type scal_t.
-llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32_t n, std::uint32_t batch_size)
+// and scalar type T.
+template <typename T>
+llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
     assert(batch_size > 0u);
 
@@ -1260,9 +1268,11 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
 
     auto &md = s.module();
     auto &builder = s.builder();
+    auto &context = s.context();
 
     // Fetch the floating-point type.
-    auto tp = make_vector_type(scal_t, batch_size);
+    auto *scal_t = to_llvm_type<T>(context);
+    auto *tp = make_vector_type(scal_t, batch_size);
 
     // Fetch the function name.
     const auto fname = "heyoka_csc_degree_{}_{}"_format(n, llvm_mangle_type(tp));
@@ -1283,7 +1293,7 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is void.
         auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -1305,13 +1315,13 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
         cf_ptr->addAttr(llvm::Attribute::ReadOnly);
 
         // Create a new basic block to start insertion into.
-        builder.SetInsertPoint(llvm::BasicBlock::Create(s.context(), "entry", f));
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Fetch the type for storing the last_nz_idx variable.
-        auto last_nz_idx_t = make_vector_type(builder.getInt32Ty(), batch_size);
+        auto *last_nz_idx_t = make_vector_type(builder.getInt32Ty(), batch_size);
 
         // The initial last nz idx is zero for all batch elements.
-        auto last_nz_idx = builder.CreateAlloca(last_nz_idx_t);
+        auto *last_nz_idx = builder.CreateAlloca(last_nz_idx_t);
         builder.CreateStore(llvm::Constant::getNullValue(last_nz_idx_t), last_nz_idx);
 
         // NOTE: last_nz_idx is an index into the poly coefficient vector. Thus, in batch
@@ -1323,7 +1333,7 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
         // - 1 * 4 + 2 = 6
         // - 2 * 4 + 3 = 11.
         // That is, last_nz_idx * batch_size + offset, where offset is [0, 1, 2, 3].
-        llvm::Value *offset;
+        llvm::Value *offset = nullptr;
         if (batch_size == 1u) {
             // In scalar mode the offset is simply zero.
             offset = builder.getInt32(0);
@@ -1338,7 +1348,7 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
         auto cf_ptr_v = vector_splat(builder, cf_ptr, batch_size);
 
         // Init the return value with zero.
-        auto retval = builder.CreateAlloca(last_nz_idx_t);
+        auto *retval = builder.CreateAlloca(last_nz_idx_t);
         builder.CreateStore(llvm::Constant::getNullValue(last_nz_idx_t), retval);
 
         // The iteration range is [1, n].
@@ -1351,7 +1361,7 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
                 batch_size);
 
             // Load the last nonzero coefficient(s).
-            auto last_nz_ptr_idx = builder.CreateAdd(
+            auto *last_nz_ptr_idx = builder.CreateAdd(
                 offset, builder.CreateMul(builder.CreateLoad(last_nz_idx_t, last_nz_idx),
                                           vector_splat(builder, builder.getInt32(batch_size), batch_size)));
             assert(llvm_depr_GEP_type_check(cf_ptr_v, scal_t)); // LCOV_EXCL_LINE
@@ -1411,24 +1421,236 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
     return f;
 }
 
-} // namespace
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<double>(llvm_state &, std::uint32_t, std::uint32_t);
 
-llvm::Function *llvm_add_csc_dbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    return llvm_add_csc_impl(s, detail::to_llvm_type<double>(s.context()), n, batch_size);
-}
-
-llvm::Function *llvm_add_csc_ldbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    return llvm_add_csc_impl(s, detail::to_llvm_type<long double>(s.context()), n, batch_size);
-}
+template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<long double>(llvm_state &, std::uint32_t, std::uint32_t);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *llvm_add_csc_f128(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<mppp::real128>(llvm_state &, std::uint32_t, std::uint32_t);
+
+#endif
+
+// Compute the enclosure of the polynomial of order n with coefficients stored in cf_ptr
+// over the interval [h_lo, h_hi] using interval arithmetics. The polynomial coefficients
+// are vectors of size batch_size and scalar type T.
+// NOTE: the interval arithmetic implementation here is not 100% correct, because
+// we do not account for floating-point truncation. In order to be mathematically
+// correct, we would need to adjust the results of interval arithmetic add/mul via
+// a std::nextafter()-like function. See here for an example:
+// https://stackoverflow.com/questions/10420848/how-do-you-get-the-next-value-in-the-floating-point-sequence
+// http://web.mit.edu/hyperbook/Patrikalakis-Maekawa-Cho/node46.html
+// Perhaps another alternative would be to employ FP primitives with explicit rounding modes,
+// which are available in LLVM.
+template <typename T>
+std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::Value *cf_ptr, std::uint32_t n,
+                                                           llvm::Value *h_lo, llvm::Value *h_hi,
+                                                           std::uint32_t batch_size)
 {
-    return llvm_add_csc_impl(s, to_llvm_type<mppp::real128>(s.context()), n, batch_size);
+    // LCOV_EXCL_START
+    assert(batch_size > 0u);
+    assert(cf_ptr != nullptr);
+    assert(h_lo != nullptr);
+    assert(h_hi != nullptr);
+    assert(llvm::isa<llvm::PointerType>(cf_ptr->getType()));
+
+    // Overflow check: we need to be able to index
+    // into the array of coefficients.
+    if (n == std::numeric_limits<std::uint32_t>::max()
+        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
+        throw std::overflow_error("Overflow detected while implementing the computation of the enclosure of a "
+                                  "polynomial via interval arithmetic");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Helper to implement the sum of two intervals.
+    // NOTE: see https://en.wikipedia.org/wiki/Interval_arithmetic.
+    auto ival_sum = [&builder](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
+        return std::make_pair(builder.CreateFAdd(a_lo, b_lo), builder.CreateFAdd(a_hi, b_hi));
+    };
+
+    // Helper to implement the product of two intervals.
+    auto ival_prod = [&s, &builder](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
+        auto *tmp1 = builder.CreateFMul(a_lo, b_lo);
+        auto *tmp2 = builder.CreateFMul(a_lo, b_hi);
+        auto *tmp3 = builder.CreateFMul(a_hi, b_lo);
+        auto *tmp4 = builder.CreateFMul(a_hi, b_hi);
+
+        // NOTE: here we are not correctly propagating NaNs,
+        // for which we would need to use llvm_min/max_nan(),
+        // which however incur in a noticeable performance
+        // penalty. Thus, even in presence of all finite
+        // Taylor coefficients and integration timestep, it could
+        // conceivably happen that NaNs are generated in the
+        // multiplications above and they are not correctly propagated
+        // in these min/max functions, thus ultimately leading to an
+        // incorrect result. This however looks like a very unlikely
+        // occurrence.
+        auto *cmp1 = llvm_min(s, tmp1, tmp2);
+        auto *cmp2 = llvm_min(s, tmp3, tmp4);
+        auto *cmp3 = llvm_max(s, tmp1, tmp2);
+        auto *cmp4 = llvm_max(s, tmp3, tmp4);
+
+        return std::make_pair(llvm_min(s, cmp1, cmp2), llvm_max(s, cmp3, cmp4));
+    };
+
+    // Fetch the scalar and vector types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *fp_vec_t = make_vector_type(fp_t, batch_size);
+
+    // Create the lo/hi components of the accumulator.
+    auto *acc_lo = builder.CreateAlloca(fp_vec_t);
+    auto *acc_hi = builder.CreateAlloca(fp_vec_t);
+
+    // Init the accumulator's lo/hi components with the highest-order coefficient.
+    assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
+    auto *ho_cf = load_vector_from_memory(
+        builder,
+        builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.CreateMul(builder.getInt32(n), builder.getInt32(batch_size))),
+        batch_size);
+    builder.CreateStore(ho_cf, acc_lo);
+    builder.CreateStore(ho_cf, acc_hi);
+
+    // Run the Horner scheme (starting from 1 because we already consumed the
+    // highest-order coefficient).
+    llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *i) {
+        // Load the current coefficient.
+        // NOTE: we are iterating backwards from the high-order coefficients
+        // to the low-order ones.
+        assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
+        auto *ptr = builder.CreateInBoundsGEP(
+            fp_t, cf_ptr, builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size)));
+        auto *cur_cf = load_vector_from_memory(builder, ptr, batch_size);
+
+        // Multiply the accumulator by h.
+        auto [acc_h_lo, acc_h_hi]
+            = ival_prod(builder.CreateLoad(fp_vec_t, acc_lo), builder.CreateLoad(fp_vec_t, acc_hi), h_lo, h_hi);
+
+        // Update the value of the accumulator.
+        auto [new_acc_lo, new_acc_hi] = ival_sum(cur_cf, cur_cf, acc_h_lo, acc_h_hi);
+        builder.CreateStore(new_acc_lo, acc_lo);
+        builder.CreateStore(new_acc_hi, acc_hi);
+    });
+
+    // Return the lo/hi components of the accumulator.
+    return {builder.CreateLoad(fp_vec_t, acc_lo), builder.CreateLoad(fp_vec_t, acc_hi)};
 }
+
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_interval<double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *, std::uint32_t);
+
+template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_interval<long double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *,
+                                std::uint32_t);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_interval<mppp::real128>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *,
+                                  std::uint32_t);
+
+#endif
+
+// Compute the enclosure of the polynomial of order n with coefficients stored in cf_ptr
+// over an interval using the Cargo-Shisha algorithm. The polynomial coefficients
+// are vectors of size batch_size and scalar type T. The interval of the independent variable
+// is [0, h] if h >= 0, [h, 0] otherwise.
+// NOTE: the Cargo-Shisha algorithm produces tighter bounds, but it has quadratic complexity
+// and it seems to be less well-behaved numerically in corner cases. It might still be worth it up to double-precision
+// computations, where the practical slowdown wrt interval arithmetics is smaller.
+template <typename T>
+std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, llvm::Value *cf_ptr, std::uint32_t n,
+                                                               llvm::Value *h, std::uint32_t batch_size)
+{
+    // LCOV_EXCL_START
+    assert(batch_size > 0u);
+    assert(cf_ptr != nullptr);
+    assert(h != nullptr);
+    assert(llvm::isa<llvm::PointerType>(cf_ptr->getType()));
+
+    // Overflow check: we need to be able to index
+    // into the array of coefficients.
+    if (n == std::numeric_limits<std::uint32_t>::max()
+        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
+        throw std::overflow_error("Overflow detected while implementing the computation of the enclosure of a "
+                                  "polynomial via the Cargo-Shisha algorithm");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the scalar type.
+    auto *fp_t = to_llvm_type<T>(context);
+
+    // bj_series will contain the terms of the series
+    // for the computation of bj. old_bj_series will be
+    // used to deal with the fact that the pairwise sum
+    // consumes the input vector.
+    std::vector<llvm::Value *> bj_series, old_bj_series;
+
+    // Init the current power of h with h itself.
+    auto *cur_h_pow = h;
+
+    // Compute the first value, b0, and add it to bj_series.
+    auto *b0 = load_vector_from_memory(builder, cf_ptr, batch_size);
+    bj_series.push_back(b0);
+
+    // Init min/max bj with b0.
+    auto *min_bj = b0, *max_bj = b0;
+
+    // Main iteration.
+    for (std::uint32_t j = 1u; j <= n; ++j) {
+        // Compute the new term of the series.
+        auto *ptr = builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.getInt32(j * batch_size));
+        auto *cur_cf = load_vector_from_memory(builder, ptr, batch_size);
+        auto *new_term = builder.CreateFMul(cur_cf, cur_h_pow);
+        new_term
+            = builder.CreateFDiv(new_term, vector_splat(builder, codegen<T>(s, number{binomial<T>(n, j)}), batch_size));
+
+        // Add it to bj_series.
+        bj_series.push_back(new_term);
+
+        // Update all elements of bj_series (apart from the last one).
+        for (std::uint32_t i = 0; i < j; ++i) {
+            bj_series[i] = builder.CreateFMul(
+                bj_series[i], vector_splat(builder, codegen<T>(s, number{static_cast<T>(j) / (j - i)}), batch_size));
+        }
+
+        // Compute the new bj.
+        old_bj_series = bj_series;
+        auto *cur_bj = pairwise_sum(builder, bj_series);
+        old_bj_series.swap(bj_series);
+
+        // Update min/max_bj.
+        min_bj = llvm_min(s, min_bj, cur_bj);
+        max_bj = llvm_max(s, max_bj, cur_bj);
+
+        // Update cur_h_pow, if we are not at the last iteration.
+        if (j != n) {
+            cur_h_pow = builder.CreateFMul(cur_h_pow, h);
+        }
+    }
+
+    return {min_bj, max_bj};
+}
+
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_cargo_shisha<double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
+
+template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_cargo_shisha<long double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_cargo_shisha<mppp::real128>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
 
 #endif
 

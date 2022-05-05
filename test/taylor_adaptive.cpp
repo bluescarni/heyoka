@@ -559,11 +559,11 @@ TEST_CASE("last h")
 
         auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, init_state, batch_size};
 
-        REQUIRE(std::all_of(ta.get_last_h().begin(), ta.get_last_h().end(), [](auto x) { return x == 0.; }));
+        REQUIRE(std::all_of(ta.get_last_h().begin(), ta.get_last_h().end(), [](auto val) { return val == 0.; }));
         auto lh = ta.get_last_h();
 
         ta.step();
-        REQUIRE(std::all_of(ta.get_last_h().begin(), ta.get_last_h().end(), [](auto x) { return x != 0.; }));
+        REQUIRE(std::all_of(ta.get_last_h().begin(), ta.get_last_h().end(), [](auto val) { return val != 0.; }));
         lh = ta.get_last_h();
 
         ta.step(std::vector<double>(batch_size, 1e-4));
@@ -1164,13 +1164,13 @@ TEST_CASE("propagate for_until write_tc")
 
     ta.propagate_until(
         10, kw::callback = [](auto &t) {
-            REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &val) { return val == 0.; }));
             return true;
         });
 
     ta.propagate_until(
         20, kw::write_tc = true, kw::callback = [](auto &t) {
-            REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &val) { return val == 0.; }));
             return true;
         });
 
@@ -1178,13 +1178,13 @@ TEST_CASE("propagate for_until write_tc")
 
     ta.propagate_for(
         10, kw::callback = [](auto &t) {
-            REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &val) { return val == 0.; }));
             return true;
         });
 
     ta.propagate_for(
         20, kw::write_tc = true, kw::callback = [](auto &t) {
-            REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &val) { return val == 0.; }));
             return true;
         });
 }

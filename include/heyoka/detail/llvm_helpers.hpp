@@ -112,30 +112,16 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_exp(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fma(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_floor(llvm_state &, llvm::Value *);
 
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc_dbl(llvm_state &, std::uint32_t, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc_ldbl(llvm_state &, std::uint32_t, std::uint32_t);
+template <typename>
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc(llvm_state &, std::uint32_t, std::uint32_t);
 
-#if defined(HEYOKA_HAVE_REAL128)
+template <typename>
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_interval(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *, std::uint32_t);
 
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc_f128(llvm_state &, std::uint32_t, std::uint32_t);
-
-#endif
-
-template <typename T>
-inline llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return llvm_add_csc_dbl(s, n, batch_size);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return llvm_add_csc_ldbl(s, n, batch_size);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return llvm_add_csc_f128(s, n, batch_size);
-#endif
-    } else {
-        static_assert(always_false_v<T>, "Unhandled type.");
-    }
-}
+template <typename>
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_cargo_shisha(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
 
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_dbl(llvm_state &, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_ldbl(llvm_state &, std::uint32_t);
@@ -162,7 +148,7 @@ inline llvm::Function *llvm_add_inv_kep_E(llvm_state &s, std::uint32_t batch_siz
     }
 }
 
-template <typename T>
+template <typename>
 HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper(llvm_state &, std::uint32_t, const std::string &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array_dbl(llvm_state &, std::uint32_t);
