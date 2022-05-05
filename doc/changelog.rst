@@ -35,6 +35,9 @@ Changes
 Fix
 ~~~
 
+- Fix several warnings related to variable shadowing when
+  compiling in debug mode
+  (`#257 <https://github.com/bluescarni/heyoka/pull/257>`__).
 - Fix a potential accuracy issue when setting the time coordinate
   in double-length format
   (`#246 <https://github.com/bluescarni/heyoka/pull/246>`__).
