@@ -44,26 +44,17 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
-
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
 
 namespace heyoka
 {
 
 number::number() : number(0.) {}
+
+number::number(float x) : m_value(x) {}
 
 number::number(double x) : m_value(x) {}
 
@@ -227,8 +218,9 @@ number operator+(number n1, number n2)
                 return number{std::forward<decltype(arg1)>(arg1) + std::forward<decltype(arg2)>(arg2)};
             } else {
                 // LCOV_EXCL_START
-                throw std::invalid_argument("Cannot add an object of type {} to an object of type {}"_format(
-                    boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
+                throw std::invalid_argument(fmt::format("Cannot add an object of type {} to an object of type {}",
+                                                        boost::core::demangle(typeid(arg1).name()),
+                                                        boost::core::demangle(typeid(arg2).name())));
                 // LCOV_EXCL_STOP
             }
         },
@@ -243,7 +235,8 @@ number operator-(number n1, number n2)
                 return number{std::forward<decltype(arg1)>(arg1) - std::forward<decltype(arg2)>(arg2)};
             } else {
                 // LCOV_EXCL_START
-                throw std::invalid_argument("Cannot subtract an object of type {} from an object of type {}"_format(
+                throw std::invalid_argument(fmt::format(
+                    "Cannot subtract an object of type {} from an object of type {}",
                     boost::core::demangle(typeid(arg2).name()), boost::core::demangle(typeid(arg1).name())));
                 // LCOV_EXCL_STOP
             }
@@ -259,8 +252,9 @@ number operator*(number n1, number n2)
                 return number{std::forward<decltype(arg1)>(arg1) * std::forward<decltype(arg2)>(arg2)};
             } else {
                 // LCOV_EXCL_START
-                throw std::invalid_argument("Cannot multiply an object of type {} by an object of type {}"_format(
-                    boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
+                throw std::invalid_argument(fmt::format("Cannot multiply an object of type {} by an object of type {}",
+                                                        boost::core::demangle(typeid(arg1).name()),
+                                                        boost::core::demangle(typeid(arg2).name())));
                 // LCOV_EXCL_STOP
             }
         },
@@ -275,8 +269,9 @@ number operator/(number n1, number n2)
                 return number{std::forward<decltype(arg1)>(arg1) / std::forward<decltype(arg2)>(arg2)};
             } else {
                 // LCOV_EXCL_START
-                throw std::invalid_argument("Cannot divide an object of type {} by an object of type {}"_format(
-                    boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
+                throw std::invalid_argument(fmt::format("Cannot divide an object of type {} by an object of type {}",
+                                                        boost::core::demangle(typeid(arg1).name()),
+                                                        boost::core::demangle(typeid(arg2).name())));
                 // LCOV_EXCL_STOP
             }
         },
@@ -303,8 +298,9 @@ bool operator==(const number &n1, const number &n2)
                 }
             } else {
                 // LCOV_EXCL_START
-                throw std::invalid_argument("Cannot compare an object of type {} to an object of type {}"_format(
-                    boost::core::demangle(typeid(v1).name()), boost::core::demangle(typeid(v2).name())));
+                throw std::invalid_argument(fmt::format("Cannot compare an object of type {} to an object of type {}",
+                                                        boost::core::demangle(typeid(v1).name()),
+                                                        boost::core::demangle(typeid(v2).name())));
                 // LCOV_EXCL_STOP
             }
         },
@@ -331,8 +327,9 @@ To number_eval_impl(const number &n)
                 return static_cast<To>(v);
             } else {
                 // LCOV_EXCL_START
-                throw std::invalid_argument("Cannot convert an object of type {} to an object of type {}"_format(
-                    boost::core::demangle(typeid(v).name()), boost::core::demangle(typeid(To).name())));
+                throw std::invalid_argument(fmt::format("Cannot convert an object of type {} to an object of type {}",
+                                                        boost::core::demangle(typeid(v).name()),
+                                                        boost::core::demangle(typeid(To).name())));
                 // LCOV_EXCL_STOP
             }
         },
@@ -399,59 +396,71 @@ void update_grad_dbl(std::unordered_map<std::string, double> &, const number &,
     node_counter++;
 }
 
-llvm::Value *codegen_dbl(llvm_state &s, const number &n)
+template <typename T>
+llvm::Value *codegen(llvm_state &s, const number &n)
 {
-    return std::visit(
-        [&s](const auto &v) { return llvm::ConstantFP::get(s.context(), llvm::APFloat(static_cast<double>(v))); },
-        n.value());
+    if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+        return std::visit(
+            [&s](const auto &v) { return llvm::ConstantFP::get(s.context(), llvm::APFloat(static_cast<T>(v))); },
+            n.value());
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return std::visit(
+            [&s](const auto &v) -> llvm::Value * {
+                if constexpr (std::is_constructible_v<long double, decltype(v)>) {
+                    // NOTE: the idea here is that we first fetch the FP
+                    // semantics of the LLVM type long double corresponds
+                    // to. Then we use them to construct a FP constant from
+                    // the string representation of v.
+                    // NOTE: v must be cast to long double so that we ensure
+                    // that fmt produces a string representation
+                    // of v in long double precision accurate to the
+                    // last digit.
+                    // NOTE: regarding the format string: we use the general format
+                    // 'g' and a precision of max_digits10, which should guarantee
+                    // round trip behaviour. Note that when using 'g', the precision
+                    // argument represents the total number of significant digits
+                    // printed (before and after the decimal point).
+                    const auto &sem = detail::to_llvm_type<long double>(s.context())->getFltSemantics();
+                    return llvm::ConstantFP::get(
+                        s.context(), llvm::APFloat(sem, fmt::format("{:.{}g}", static_cast<long double>(v),
+                                                                    std::numeric_limits<long double>::max_digits10)));
+                } else {
+                    // LCOV_EXCL_START
+                    throw std::invalid_argument(
+                        fmt::format("Cannot perform long double codegen for the type {} on this platform",
+                                    boost::core::demangle(typeid(decltype(v)).name())));
+                    // LCOV_EXCL_STOP
+                }
+            },
+            n.value());
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return std::visit(
+            [&s](const auto &v) {
+                const auto &sem = detail::to_llvm_type<mppp::real128>(s.context())->getFltSemantics();
+                // NOTE: for real128 use directly the to_string() member function, which guarantees
+                // round trip behaviour.
+                return llvm::ConstantFP::get(s.context(),
+                                             llvm::APFloat(sem, static_cast<mppp::real128>(v).to_string()));
+            },
+            n.value());
+#endif
+    } else {
+        // LCOV_EXCL_START
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+        // LCOV_EXCL_STOP
+    }
 }
 
-llvm::Value *codegen_ldbl(llvm_state &s, const number &n)
-{
-    return std::visit(
-        [&s](const auto &v) -> llvm::Value * {
-            if constexpr (std::is_constructible_v<long double, decltype(v)>) {
-                // NOTE: the idea here is that we first fetch the FP
-                // semantics of the LLVM type long double corresponds
-                // to. Then we use them to construct a FP constant from
-                // the string representation of v.
-                // NOTE: v must be cast to long double so that we ensure
-                // that fmt produces a string representation
-                // of v in long double precision accurate to the
-                // last digit.
-                // NOTE: regarding the format string: we use the general format
-                // 'g' and a precision of max_digits10, which should guarantee
-                // round trip behaviour. Note that when using 'g', the precision
-                // argument represents the total number of significant digits
-                // printed (before and after the decimal point).
-                const auto &sem = detail::to_llvm_type<long double>(s.context())->getFltSemantics();
-                return llvm::ConstantFP::get(
-                    s.context(), llvm::APFloat(sem, "{:.{}g}"_format(static_cast<long double>(v),
-                                                                     std::numeric_limits<long double>::max_digits10)));
-            } else {
-                // LCOV_EXCL_START
-                throw std::invalid_argument(
-                    "Cannot perform long double codegen for the type {} on this platform"_format(
-                        boost::core::demangle(typeid(decltype(v)).name())));
-                // LCOV_EXCL_STOP
-            }
-        },
-        n.value());
-}
+template HEYOKA_DLL_PUBLIC llvm::Value *codegen<float>(llvm_state &, const number &);
+
+template HEYOKA_DLL_PUBLIC llvm::Value *codegen<double>(llvm_state &, const number &);
+
+template HEYOKA_DLL_PUBLIC llvm::Value *codegen<long double>(llvm_state &, const number &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *codegen_f128(llvm_state &s, const number &n)
-{
-    return std::visit(
-        [&s](const auto &v) {
-            const auto &sem = detail::to_llvm_type<mppp::real128>(s.context())->getFltSemantics();
-            // NOTE: for real128 use directly the to_string() member function, which guarantees
-            // round trip behaviour.
-            return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, static_cast<mppp::real128>(v).to_string()));
-        },
-        n.value());
-}
+template HEYOKA_DLL_PUBLIC llvm::Value *codegen<mppp::real128>(llvm_state &, const number &);
 
 #endif
 

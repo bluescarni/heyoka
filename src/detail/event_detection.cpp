@@ -639,6 +639,9 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t
     return f;
 }
 
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<float>(llvm_state &, std::uint32_t, std::uint32_t, bool);
+
 template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<double>(llvm_state &, std::uint32_t, std::uint32_t, bool);
 
 template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<long double>(llvm_state &, std::uint32_t, std::uint32_t,

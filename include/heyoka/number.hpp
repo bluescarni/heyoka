@@ -28,7 +28,6 @@
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -38,7 +37,7 @@ namespace heyoka
 class HEYOKA_DLL_PUBLIC number
 {
 public:
-    using value_type = std::variant<double, long double
+    using value_type = std::variant<float, double, long double
 #if defined(HEYOKA_HAVE_REAL128)
                                     ,
                                     mppp::real128
@@ -58,6 +57,7 @@ private:
 
 public:
     number();
+    explicit number(float);
     explicit number(double);
     explicit number(long double);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -71,7 +71,7 @@ public:
     number &operator=(number &&) noexcept;
 
     value_type &value();
-    const value_type &value() const;
+    [[nodiscard]] const value_type &value() const;
 };
 
 HEYOKA_DLL_PUBLIC void swap(number &, number &) noexcept;
@@ -116,30 +116,8 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
 
-HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const number &);
-HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const number &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Value *codegen_f128(llvm_state &, const number &);
-
-#endif
-
-template <typename T>
-inline llvm::Value *codegen(llvm_state &s, const number &n)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return codegen_dbl(s, n);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return codegen_ldbl(s, n);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return codegen_f128(s, n);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
+template <typename>
+HEYOKA_DLL_PUBLIC llvm::Value *codegen(llvm_state &, const number &);
 
 } // namespace heyoka
 

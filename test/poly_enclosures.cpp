@@ -40,7 +40,7 @@ static const int ntrials = 100;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -159,16 +159,16 @@ TEST_CASE("polynomial enclosures")
                 for (auto _ = 0; _ < ntrials; ++_) {
                     // Generate the polynomial.
                     for (auto &cf : poly) {
-                        cf = rdist(rng);
+                        cf = static_cast<fp_t>(rdist(rng));
                     }
 
                     // Generate the h values.
                     for (auto i = 0u; i < batch_size; ++i) {
-                        const auto tmp = rdist(rng);
+                        const auto tmp = static_cast<fp_t>(rdist(rng));
 
                         h[i] = tmp;
-                        h_lo[i] = tmp >= 0 ? 0. : tmp;
-                        h_hi[i] = tmp >= 0 ? tmp : 0.;
+                        h_lo[i] = tmp >= 0 ? 0 : tmp;
+                        h_hi[i] = tmp >= 0 ? tmp : 0;
                     }
 
                     penc_int_f(res_lo1.data(), res_hi1.data(), poly.data(), h_lo.data(), h_hi.data());
