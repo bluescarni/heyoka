@@ -425,7 +425,7 @@ TEST_CASE("nte multizero")
         {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
         4,
         kw::nt_events = {ev_t(v * v - 1e-10,
-                              [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                              [&counter, &cur_time](auto &ta_, fp_t t, int, std::uint32_t batch_idx) {
                                   using std::abs;
 
                                   // Make sure the callbacks are called in order.
@@ -434,20 +434,20 @@ TEST_CASE("nte multizero")
                                   // Ensure the state of ta has
                                   // been propagated until after the
                                   // event.
-                                  REQUIRE(ta.get_time()[batch_idx] > t);
+                                  REQUIRE(ta_.get_time()[batch_idx] > t);
 
                                   REQUIRE((counter[batch_idx] % 3u == 0u || counter[batch_idx] % 3u == 2u));
 
-                                  ta.update_d_output({t, t, t, t});
+                                  ta_.update_d_output({t, t, t, t});
 
-                                  const auto v = ta.get_d_output()[4u + batch_idx];
-                                  REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+                                  const auto vel = ta_.get_d_output()[4u + batch_idx];
+                                  REQUIRE(abs(vel * vel - 1e-10) < std::numeric_limits<fp_t>::epsilon());
 
                                   ++counter[batch_idx];
 
                                   cur_time[batch_idx] = t;
                               }),
-                         ev_t(v, [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                         ev_t(v, [&counter, &cur_time](auto &ta_, fp_t t, int, std::uint32_t batch_idx) {
                              using std::abs;
 
                              // Make sure the callbacks are called in order.
@@ -456,14 +456,14 @@ TEST_CASE("nte multizero")
                              // Ensure the state of ta has
                              // been propagated until after the
                              // event.
-                             REQUIRE(ta.get_time()[batch_idx] > t);
+                             REQUIRE(ta_.get_time()[batch_idx] > t);
 
                              REQUIRE((counter[batch_idx] % 3u == 1u));
 
-                             ta.update_d_output({t, t, t, t});
+                             ta_.update_d_output({t, t, t, t});
 
-                             const auto v = ta.get_d_output()[4u + batch_idx];
-                             REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
+                             const auto vel = ta_.get_d_output()[4u + batch_idx];
+                             REQUIRE(abs(vel) <= std::numeric_limits<fp_t>::epsilon() * 100);
 
                              ++counter[batch_idx];
 
@@ -487,7 +487,7 @@ TEST_CASE("nte multizero")
         4,
         kw::tol = std::numeric_limits<fp_t>::epsilon() / 100,
         kw::nt_events = {ev_t(v * v - 1e-10,
-                              [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                              [&counter, &cur_time](auto &ta_, fp_t t, int, std::uint32_t batch_idx) {
                                   using std::abs;
 
                                   // Make sure the callbacks are called in order.
@@ -496,20 +496,20 @@ TEST_CASE("nte multizero")
                                   // Ensure the state of ta has
                                   // been propagated until after the
                                   // event.
-                                  REQUIRE(ta.get_time()[batch_idx] > t);
+                                  REQUIRE(ta_.get_time()[batch_idx] > t);
 
                                   REQUIRE((counter[batch_idx] % 3u == 0u || counter[batch_idx] % 3u == 2u));
 
-                                  ta.update_d_output({t, t, t, t});
+                                  ta_.update_d_output({t, t, t, t});
 
-                                  const auto v = ta.get_d_output()[4u + batch_idx];
-                                  REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+                                  const auto vel = ta_.get_d_output()[4u + batch_idx];
+                                  REQUIRE(abs(vel * vel - 1e-10) < std::numeric_limits<fp_t>::epsilon());
 
                                   ++counter[batch_idx];
 
                                   cur_time[batch_idx] = t;
                               }),
-                         ev_t(v, [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                         ev_t(v, [&counter, &cur_time](auto &ta_, fp_t t, int, std::uint32_t batch_idx) {
                              using std::abs;
 
                              // Make sure the callbacks are called in order.
@@ -518,14 +518,14 @@ TEST_CASE("nte multizero")
                              // Ensure the state of ta has
                              // been propagated until after the
                              // event.
-                             REQUIRE(ta.get_time()[batch_idx] > t);
+                             REQUIRE(ta_.get_time()[batch_idx] > t);
 
                              REQUIRE((counter[batch_idx] % 3u == 1u));
 
-                             ta.update_d_output({t, t, t, t});
+                             ta_.update_d_output({t, t, t, t});
 
-                             const auto v = ta.get_d_output()[4u + batch_idx];
-                             REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
+                             const auto vel = ta_.get_d_output()[4u + batch_idx];
+                             REQUIRE(abs(vel) <= std::numeric_limits<fp_t>::epsilon() * 100);
 
                              ++counter[batch_idx];
 
@@ -555,7 +555,7 @@ TEST_CASE("nte multizero")
                                      4,
                                      kw::nt_events
                                      = {ev_t(v * v - 1e-10,
-                                             [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                                             [&counter, &cur_time](auto &ta_, fp_t t, int, std::uint32_t batch_idx) {
                                                  using std::abs;
 
                                                  // Make sure the callbacks are called in order.
@@ -564,16 +564,16 @@ TEST_CASE("nte multizero")
                                                  // Ensure the state of ta has
                                                  // been propagated until after the
                                                  // event.
-                                                 REQUIRE(ta.get_time()[batch_idx] > t);
+                                                 REQUIRE(ta_.get_time()[batch_idx] > t);
 
                                                  REQUIRE((counter[batch_idx] == 0u
                                                           || (counter[batch_idx] >= 2u && counter[batch_idx] <= 6u)
                                                           || (counter[batch_idx] >= 7u && counter[batch_idx] <= 9u)));
 
-                                                 ta.update_d_output({t, t, t, t});
+                                                 ta_.update_d_output({t, t, t, t});
 
-                                                 const auto v = ta.get_d_output()[4u + batch_idx];
-                                                 REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+                                                 const auto vel = ta_.get_d_output()[4u + batch_idx];
+                                                 REQUIRE(abs(vel * vel - 1e-10) < std::numeric_limits<fp_t>::epsilon());
 
                                                  ++counter[batch_idx];
 
@@ -581,7 +581,7 @@ TEST_CASE("nte multizero")
                                              }),
                                         ev_t(
                                             v,
-                                            [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                                            [&counter, &cur_time](auto &ta_, fp_t t, int, std::uint32_t batch_idx) {
                                                 using std::abs;
 
                                                 // Make sure the callbacks are called in order.
@@ -590,14 +590,14 @@ TEST_CASE("nte multizero")
                                                 // Ensure the state of ta has
                                                 // been propagated until after the
                                                 // event.
-                                                REQUIRE(ta.get_time()[batch_idx] > t);
+                                                REQUIRE(ta_.get_time()[batch_idx] > t);
 
                                                 REQUIRE((counter[batch_idx] == 1u || counter[batch_idx] == 6u));
 
-                                                ta.update_d_output({t, t, t, t});
+                                                ta_.update_d_output({t, t, t, t});
 
-                                                const auto v = ta.get_d_output()[4u + batch_idx];
-                                                REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
+                                                const auto vel = ta_.get_d_output()[4u + batch_idx];
+                                                REQUIRE(abs(vel) <= std::numeric_limits<fp_t>::epsilon() * 100);
 
                                                 ++counter[batch_idx];
 
@@ -622,7 +622,7 @@ TEST_CASE("nte multizero")
                                      kw::tol = std::numeric_limits<fp_t>::epsilon() / 100,
                                      kw::nt_events
                                      = {ev_t(v * v - 1e-10,
-                                             [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                                             [&counter, &cur_time](auto &ta_, fp_t t, int, std::uint32_t batch_idx) {
                                                  using std::abs;
 
                                                  // Make sure the callbacks are called in order.
@@ -631,16 +631,16 @@ TEST_CASE("nte multizero")
                                                  // Ensure the state of ta has
                                                  // been propagated until after the
                                                  // event.
-                                                 REQUIRE(ta.get_time()[batch_idx] > t);
+                                                 REQUIRE(ta_.get_time()[batch_idx] > t);
 
                                                  REQUIRE((counter[batch_idx] == 0u
                                                           || (counter[batch_idx] >= 2u && counter[batch_idx] <= 6u)
                                                           || (counter[batch_idx] >= 7u && counter[batch_idx] <= 9u)));
 
-                                                 ta.update_d_output({t, t, t, t});
+                                                 ta_.update_d_output({t, t, t, t});
 
-                                                 const auto v = ta.get_d_output()[4u + batch_idx];
-                                                 REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+                                                 const auto vel = ta_.get_d_output()[4u + batch_idx];
+                                                 REQUIRE(abs(vel * vel - 1e-10) < std::numeric_limits<fp_t>::epsilon());
 
                                                  ++counter[batch_idx];
 
@@ -648,7 +648,7 @@ TEST_CASE("nte multizero")
                                              }),
                                         ev_t(
                                             v,
-                                            [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                                            [&counter, &cur_time](auto &ta_, fp_t t, int, std::uint32_t batch_idx) {
                                                 using std::abs;
 
                                                 // Make sure the callbacks are called in order.
@@ -657,14 +657,14 @@ TEST_CASE("nte multizero")
                                                 // Ensure the state of ta has
                                                 // been propagated until after the
                                                 // event.
-                                                REQUIRE(ta.get_time()[batch_idx] > t);
+                                                REQUIRE(ta_.get_time()[batch_idx] > t);
 
                                                 REQUIRE((counter[batch_idx] == 1u || counter[batch_idx] == 6u));
 
-                                                ta.update_d_output({t, t, t, t});
+                                                ta_.update_d_output({t, t, t, t});
 
-                                                const auto v = ta.get_d_output()[4u + batch_idx];
-                                                REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
+                                                const auto vel = ta_.get_d_output()[4u + batch_idx];
+                                                REQUIRE(abs(vel) <= std::numeric_limits<fp_t>::epsilon() * 100);
 
                                                 ++counter[batch_idx];
 
@@ -705,7 +705,7 @@ TEST_CASE("nte multizero negative timestep")
         {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
         4,
         kw::nt_events = {ev_t(v * v - 1e-10,
-                              [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                              [&counter, &cur_time](auto &ta_, fp_t t, int, std::uint32_t batch_idx) {
                                   using std::abs;
 
                                   // Make sure the callbacks are called in order.
@@ -714,20 +714,20 @@ TEST_CASE("nte multizero negative timestep")
                                   // Ensure the state of ta has
                                   // been propagated until after the
                                   // event.
-                                  REQUIRE(ta.get_time()[batch_idx] < t);
+                                  REQUIRE(ta_.get_time()[batch_idx] < t);
 
                                   REQUIRE((counter[batch_idx] % 3u == 0u || counter[batch_idx] % 3u == 2u));
 
-                                  ta.update_d_output({t, t, t, t});
+                                  ta_.update_d_output({t, t, t, t});
 
-                                  const auto v = ta.get_d_output()[4u + batch_idx];
-                                  REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+                                  const auto vel = ta_.get_d_output()[4u + batch_idx];
+                                  REQUIRE(abs(vel * vel - 1e-10) < std::numeric_limits<fp_t>::epsilon());
 
                                   ++counter[batch_idx];
 
                                   cur_time[batch_idx] = t;
                               }),
-                         ev_t(v, [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                         ev_t(v, [&counter, &cur_time](auto &ta_, fp_t t, int, std::uint32_t batch_idx) {
                              using std::abs;
 
                              // Make sure the callbacks are called in order.
@@ -736,14 +736,14 @@ TEST_CASE("nte multizero negative timestep")
                              // Ensure the state of ta has
                              // been propagated until after the
                              // event.
-                             REQUIRE(ta.get_time()[batch_idx] < t);
+                             REQUIRE(ta_.get_time()[batch_idx] < t);
 
                              REQUIRE((counter[batch_idx] % 3u == 1u));
 
-                             ta.update_d_output({t, t, t, t});
+                             ta_.update_d_output({t, t, t, t});
 
-                             const auto v = ta.get_d_output()[4u + batch_idx];
-                             REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
+                             const auto vel = ta_.get_d_output()[4u + batch_idx];
+                             REQUIRE(abs(vel) <= std::numeric_limits<fp_t>::epsilon() * 100);
 
                              ++counter[batch_idx];
 
@@ -826,7 +826,7 @@ TEST_CASE("te basic")
             4,
             kw::tol = cur_tol,
             kw::nt_events = {nt_ev_t(v * v - 1e-10,
-                                     [&counter_nt, &cur_time, &direction](auto &ta, fp_t t, int, std::uint32_t idx) {
+                                     [&counter_nt, &cur_time, &direction](auto &ta_, fp_t t, int, std::uint32_t idx) {
                                          // Make sure the callbacks are called in order.
                                          if (direction) {
                                              REQUIRE(t > cur_time[idx]);
@@ -834,18 +834,18 @@ TEST_CASE("te basic")
                                              REQUIRE(t < cur_time[idx]);
                                          }
 
-                                         ta.update_d_output({t, t, t, t});
+                                         ta_.update_d_output({t, t, t, t});
 
-                                         const auto v = ta.get_d_output()[4u + idx];
-                                         REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+                                         const auto vel = ta_.get_d_output()[4u + idx];
+                                         REQUIRE(abs(vel * vel - 1e-10) < std::numeric_limits<fp_t>::epsilon());
 
                                          ++counter_nt[idx];
 
                                          cur_time[idx] = t;
                                      })},
             kw::t_events = {t_ev_t(
-                v, kw::callback = [&counter_t, &cur_time, &direction](auto &ta, bool mr, int, std::uint32_t idx) {
-                    const auto &t = ta.get_time();
+                v, kw::callback = [&counter_t, &cur_time, &direction](auto &ta_, bool mr, int, std::uint32_t idx) {
+                    const auto &t = ta_.get_time();
 
                     REQUIRE(!mr);
 
@@ -855,8 +855,8 @@ TEST_CASE("te basic")
                         REQUIRE(t[idx] < cur_time[idx]);
                     }
 
-                    const auto v = ta.get_state()[4u + idx];
-                    REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon() * 100);
+                    const auto vel = ta_.get_state()[4u + idx];
+                    REQUIRE(abs(vel) < std::numeric_limits<fp_t>::epsilon() * 100);
 
                     ++counter_t[idx];
 
@@ -1512,7 +1512,7 @@ TEST_CASE("te propagate_grid")
     auto out = ta.propagate_grid(grid);
 
     REQUIRE(out.size() == 202u * 4u);
-    REQUIRE(std::all_of(out.begin() + 1, out.end(), [](const auto &v) { return v != 0; }));
+    REQUIRE(std::all_of(out.begin() + 1, out.end(), [](const auto &val) { return val != 0; }));
 
     for (std::uint32_t i = 0; i < 4u; ++i) {
         REQUIRE(counter[i] == 100u);
@@ -1526,7 +1526,7 @@ TEST_CASE("te propagate_grid")
 
     out = ta.propagate_grid(grid);
 
-    REQUIRE(std::all_of(out.begin() + 8, out.end(), [](const auto &v) { return std::isnan(v); }));
+    REQUIRE(std::all_of(out.begin() + 8, out.end(), [](const auto &val) { return std::isnan(val); }));
 
     for (std::uint32_t i = 0; i < 4u; ++i) {
         REQUIRE(static_cast<std::int64_t>(std::get<0>(ta.get_propagate_res()[i])) == -1);
@@ -1564,7 +1564,7 @@ TEST_CASE("te propagate_grid first step bug")
         auto out = ta.propagate_grid(grid);
 
         REQUIRE(out.size() == 200u * 4u);
-        REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &v) { return v != 0; }));
+        REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &val) { return val != 0; }));
     }
 
     {
@@ -1578,7 +1578,7 @@ TEST_CASE("te propagate_grid first step bug")
         auto out = ta.propagate_grid(grid);
 
         REQUIRE(out.size() == 200u * 4u);
-        REQUIRE(std::all_of(out.begin() + 32, out.end(), [](const auto &v) { return std::isnan(v); }));
+        REQUIRE(std::all_of(out.begin() + 32, out.end(), [](const auto &val) { return std::isnan(val); }));
     }
 }
 
@@ -1668,8 +1668,8 @@ TEST_CASE("te boolean callback")
         {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
         4,
         kw::t_events = {t_ev_t(
-            v, kw::callback = [&counter_t, &cur_time, &direction](auto &ta, bool mr, int, std::uint32_t idx) {
-                const auto &t = ta.get_time();
+            v, kw::callback = [&counter_t, &cur_time, &direction](auto &ta_, bool mr, int, std::uint32_t idx) {
+                const auto &t = ta_.get_time();
 
                 REQUIRE(!mr);
 
@@ -1679,18 +1679,14 @@ TEST_CASE("te boolean callback")
                     REQUIRE(t[idx] < cur_time[idx]);
                 }
 
-                const auto v = ta.get_state()[4u + idx];
-                REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon() * 100);
+                const auto vel = ta_.get_state()[4u + idx];
+                REQUIRE(abs(vel) < std::numeric_limits<fp_t>::epsilon() * 100);
 
                 ++counter_t[idx];
 
                 cur_time[idx] = t[idx];
 
-                if (counter_t[idx] == 5u) {
-                    return false;
-                } else {
-                    return true;
-                }
+                return counter_t[idx] != 5u;
             })}};
 
     // First we integrate up to the first
@@ -1744,9 +1740,9 @@ TEST_CASE("te step end")
         {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
         4,
         kw::t_events = {t_ev_t(
-            heyoka::time - 1., kw::callback = [&counter](auto &ta, bool, int, std::uint32_t idx) {
+            heyoka::time - 1., kw::callback = [&counter](auto &ta_, bool, int, std::uint32_t idx) {
                 ++counter[idx];
-                REQUIRE(ta.get_time()[idx] == 1.);
+                REQUIRE(ta_.get_time()[idx] == 1.);
                 return true;
             })}};
 

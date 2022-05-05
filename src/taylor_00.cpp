@@ -779,16 +779,16 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
     } else {
         assert(m_ed_data); // LCOV_EXCL_LINE
 
-        auto &ed_data = *m_ed_data;
+        auto &edd = *m_ed_data;
 
         // Invoke the stepper for event handling. We will record the norm infinity of the state vector +
         // event equations at the beginning of the timestep for later use.
         T max_abs_state;
-        std::get<1>(m_step_f)(ed_data.m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state);
+        std::get<1>(m_step_f)(edd.m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state);
 
         // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
         // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
-        // in ed_data.detect_events() we skip event detection altogether.
+        // in edd.detect_events() we skip event detection altogether.
         T g_eps;
         if (isfinite(max_abs_state)) {
             // Are we in absolute or relative error control mode?
@@ -817,10 +817,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         }
 
         // Write unconditionally the tcs.
-        std::copy(ed_data.m_ev_jet.data(), ed_data.m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
+        std::copy(edd.m_ev_jet.data(), edd.m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
 
         // Do the event detection.
-        ed_data.detect_events(h, m_order, m_dim, g_eps);
+        edd.detect_events(h, m_order, m_dim, g_eps);
 
         // NOTE: before this point, we did not alter
         // any user-visible data in the integrator (just
@@ -834,20 +834,20 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // for backward integration, thus we compare using
         // abs() so that the first events are those which
         // happen closer to the beginning of the timestep.
-        // NOTE: the checks inside ed_data.detect_events() ensure
+        // NOTE: the checks inside edd.detect_events() ensure
         // that we can safely sort the events' times.
         auto cmp = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
-        std::sort(ed_data.m_d_tes.begin(), ed_data.m_d_tes.end(), cmp);
-        std::sort(ed_data.m_d_ntes.begin(), ed_data.m_d_ntes.end(), cmp);
+        std::sort(edd.m_d_tes.begin(), edd.m_d_tes.end(), cmp);
+        std::sort(edd.m_d_ntes.begin(), edd.m_d_ntes.end(), cmp);
 
         // If we have terminal events we need
         // to update the value of h.
-        if (!ed_data.m_d_tes.empty()) {
-            h = std::get<1>(ed_data.m_d_tes[0]);
+        if (!edd.m_d_tes.empty()) {
+            h = std::get<1>(edd.m_d_tes[0]);
         }
 
         // Update the state.
-        m_d_out_f(m_state.data(), ed_data.m_ev_jet.data(), &h);
+        m_d_out_f(m_state.data(), edd.m_ev_jet.data(), &h);
 
         // Update the time.
         m_time += h;
@@ -867,7 +867,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         }
 
         // Update the cooldowns.
-        for (auto &cd : ed_data.m_te_cooldowns) {
+        for (auto &cd : edd.m_te_cooldowns) {
             if (cd) {
                 // Check if the timestep we just took
                 // brought this event outside the cooldown.
@@ -890,16 +890,16 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // out which non-terminal events do not happen because their time
         // coordinate is past the the first terminal event.
         const auto ntes_end_it
-            = ed_data.m_d_tes.empty()
-                  ? ed_data.m_d_ntes.end()
-                  : std::lower_bound(ed_data.m_d_ntes.begin(), ed_data.m_d_ntes.end(), h,
+            = edd.m_d_tes.empty()
+                  ? edd.m_d_ntes.end()
+                  : std::lower_bound(edd.m_d_ntes.begin(), edd.m_d_ntes.end(), h,
                                      [](const auto &ev, const auto &t) { return abs(std::get<1>(ev)) < abs(t); });
 
         // Invoke the callbacks of the non-terminal events, which are guaranteed
         // to happen before the first terminal event.
-        for (auto it = ed_data.m_d_ntes.begin(); it != ntes_end_it; ++it) {
+        for (auto it = edd.m_d_ntes.begin(); it != ntes_end_it; ++it) {
             const auto &t = *it;
-            const auto &cb = ed_data.m_ntes[std::get<0>(t)].get_callback();
+            const auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
             assert(cb); // LCOV_EXCL_LINE
             cb(*this, static_cast<T>(m_time - m_last_h + std::get<1>(t)), std::get<2>(t));
         }
@@ -909,37 +909,36 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // unused if there are no terminal events.
         bool te_cb_ret = false;
 
-        if (!ed_data.m_d_tes.empty()) {
+        if (!edd.m_d_tes.empty()) {
             // Fetch the first terminal event.
-            const auto te_idx = std::get<0>(ed_data.m_d_tes[0]);
-            assert(te_idx < ed_data.m_tes.size()); // LCOV_EXCL_LINE
-            const auto &te = ed_data.m_tes[te_idx];
+            const auto te_idx = std::get<0>(edd.m_d_tes[0]);
+            assert(te_idx < edd.m_tes.size()); // LCOV_EXCL_LINE
+            const auto &te = edd.m_tes[te_idx];
 
             // Set the corresponding cooldown.
             if (te.get_cooldown() >= 0) {
                 // Cooldown explicitly provided by the user, use it.
-                ed_data.m_te_cooldowns[te_idx].emplace(0, te.get_cooldown());
+                edd.m_te_cooldowns[te_idx].emplace(0, te.get_cooldown());
             } else {
                 // Deduce the cooldown automatically.
                 // NOTE: if g_eps is not finite, we skipped event detection
                 // altogether and thus we never end up here. If the derivative
                 // of the event equation is not finite, the event is also skipped.
-                ed_data.m_te_cooldowns[te_idx].emplace(0,
-                                                       taylor_deduce_cooldown(g_eps, std::get<4>(ed_data.m_d_tes[0])));
+                edd.m_te_cooldowns[te_idx].emplace(0, taylor_deduce_cooldown(g_eps, std::get<4>(edd.m_d_tes[0])));
             }
 
             // Invoke the callback of the first terminal event, if it has one.
             if (te.get_callback()) {
-                te_cb_ret = te.get_callback()(*this, std::get<2>(ed_data.m_d_tes[0]), std::get<3>(ed_data.m_d_tes[0]));
+                te_cb_ret = te.get_callback()(*this, std::get<2>(edd.m_d_tes[0]), std::get<3>(edd.m_d_tes[0]));
             }
         }
 
-        if (ed_data.m_d_tes.empty()) {
+        if (edd.m_d_tes.empty()) {
             // No terminal events detected, return success or time limit.
             return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, h};
         } else {
             // Terminal event detected. Fetch its index.
-            const auto ev_idx = static_cast<std::int64_t>(std::get<0>(ed_data.m_d_tes[0]));
+            const auto ev_idx = static_cast<std::int64_t>(std::get<0>(edd.m_d_tes[0]));
 
             // NOTE: if te_cb_ret is true, it means that the terminal event has
             // a callback and its invocation returned true (meaning that the
@@ -2122,18 +2121,18 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
     } else {
         assert(m_ed_data); // LCOV_EXCL_LINE
 
-        auto &ed_data = *m_ed_data;
+        auto &edd = *m_ed_data;
 
         // Invoke the stepper for event handling. We will record the norm infinity of the state vector +
         // event equations at the beginning of the timestep for later use.
-        std::get<1>(m_step_f)(ed_data.m_ev_jet.data(), m_state.data(), m_pars.data(), m_time_hi.data(),
-                              m_delta_ts.data(), ed_data.m_max_abs_state.data());
+        std::get<1>(m_step_f)(edd.m_ev_jet.data(), m_state.data(), m_pars.data(), m_time_hi.data(), m_delta_ts.data(),
+                              edd.m_max_abs_state.data());
 
         // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
         // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
-        // in ed_data.detect_events() we skip event detection altogether.
+        // in edd.detect_events() we skip event detection altogether.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            const auto max_abs_state = ed_data.m_max_abs_state[i];
+            const auto max_abs_state = edd.m_max_abs_state[i];
 
             if (isfinite(max_abs_state)) {
                 // Are we in absolute or relative error control mode?
@@ -2153,21 +2152,20 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
                 // error control mode, to:
                 // if (m_tol < std::numeric_limits<T>::epsilon())
                 if (max_r_size < std::numeric_limits<T>::epsilon() * max_abs_state) {
-                    ed_data.m_g_eps[i] = std::numeric_limits<T>::epsilon() * max_abs_state;
+                    edd.m_g_eps[i] = std::numeric_limits<T>::epsilon() * max_abs_state;
                 } else {
-                    ed_data.m_g_eps[i] = max_r_size;
+                    edd.m_g_eps[i] = max_r_size;
                 }
             } else {
-                ed_data.m_g_eps[i] = std::numeric_limits<T>::infinity();
+                edd.m_g_eps[i] = std::numeric_limits<T>::infinity();
             }
         }
 
         // Write unconditionally the tcs.
-        std::copy(ed_data.m_ev_jet.data(), ed_data.m_ev_jet.data() + m_dim * (m_order + 1u) * m_batch_size,
-                  m_tc.data());
+        std::copy(edd.m_ev_jet.data(), edd.m_ev_jet.data() + m_dim * (m_order + 1u) * m_batch_size, m_tc.data());
 
         // Do the event detection.
-        ed_data.detect_events(m_delta_ts.data(), m_order, m_dim, m_batch_size);
+        edd.detect_events(m_delta_ts.data(), m_order, m_dim, m_batch_size);
 
         // NOTE: before this point, we did not alter
         // any user-visible data in the integrator (just
@@ -2181,22 +2179,22 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
         // for backward integration, thus we compare using
         // abs() so that the first events are those which
         // happen closer to the beginning of the timestep.
-        // NOTE: the checks inside ed_data.detect_events() ensure
+        // NOTE: the checks inside edd.detect_events() ensure
         // that we can safely sort the events' times.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             auto cmp = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
-            std::sort(ed_data.m_d_tes[i].begin(), ed_data.m_d_tes[i].end(), cmp);
-            std::sort(ed_data.m_d_ntes[i].begin(), ed_data.m_d_ntes[i].end(), cmp);
+            std::sort(edd.m_d_tes[i].begin(), edd.m_d_tes[i].end(), cmp);
+            std::sort(edd.m_d_ntes[i].begin(), edd.m_d_ntes[i].end(), cmp);
 
             // If we have terminal events we need
             // to update the value of h.
-            if (!ed_data.m_d_tes[i].empty()) {
-                m_delta_ts[i] = std::get<1>(ed_data.m_d_tes[i][0]);
+            if (!edd.m_d_tes[i].empty()) {
+                m_delta_ts[i] = std::get<1>(edd.m_d_tes[i][0]);
             }
         }
 
         // Update the state.
-        m_d_out_f(m_state.data(), ed_data.m_ev_jet.data(), m_delta_ts.data());
+        m_d_out_f(m_state.data(), edd.m_ev_jet.data(), m_delta_ts.data());
 
         // We will use this to capture the first exception thrown
         // by a callback, if any.
@@ -2227,7 +2225,7 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
             }
 
             // Update the cooldowns.
-            for (auto &cd : ed_data.m_te_cooldowns[i]) {
+            for (auto &cd : edd.m_te_cooldowns[i]) {
                 if (cd) {
                     // Check if the timestep we just took
                     // brought this event outside the cooldown.
@@ -2250,16 +2248,16 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
             // out which non-terminal events do not happen because their time
             // coordinate is past the the first terminal event.
             const auto ntes_end_it
-                = ed_data.m_d_tes[i].empty()
-                      ? ed_data.m_d_ntes[i].end()
-                      : std::lower_bound(ed_data.m_d_ntes[i].begin(), ed_data.m_d_ntes[i].end(), h,
+                = edd.m_d_tes[i].empty()
+                      ? edd.m_d_ntes[i].end()
+                      : std::lower_bound(edd.m_d_ntes[i].begin(), edd.m_d_ntes[i].end(), h,
                                          [](const auto &ev, const auto &t) { return abs(std::get<1>(ev)) < abs(t); });
 
             // Invoke the callbacks of the non-terminal events, which are guaranteed
             // to happen before the first terminal event.
-            for (auto it = ed_data.m_d_ntes[i].begin(); it != ntes_end_it; ++it) {
+            for (auto it = edd.m_d_ntes[i].begin(); it != ntes_end_it; ++it) {
                 const auto &t = *it;
-                const auto &cb = ed_data.m_ntes[std::get<0>(t)].get_callback();
+                const auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
                 assert(cb); // LCOV_EXCL_LINE
                 try {
                     cb(*this, static_cast<T>(new_time - m_last_h[i] + std::get<1>(t)), std::get<2>(t), i);
@@ -2275,30 +2273,30 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
             // unused if there are no terminal events.
             bool te_cb_ret = false;
 
-            if (!ed_data.m_d_tes[i].empty()) {
+            if (!edd.m_d_tes[i].empty()) {
                 // Fetch the first terminal event.
-                const auto te_idx = std::get<0>(ed_data.m_d_tes[i][0]);
-                assert(te_idx < ed_data.m_tes.size()); // LCOV_EXCL_LINE
-                const auto &te = ed_data.m_tes[te_idx];
+                const auto te_idx = std::get<0>(edd.m_d_tes[i][0]);
+                assert(te_idx < edd.m_tes.size()); // LCOV_EXCL_LINE
+                const auto &te = edd.m_tes[te_idx];
 
                 // Set the corresponding cooldown.
                 if (te.get_cooldown() >= 0) {
                     // Cooldown explicitly provided by the user, use it.
-                    ed_data.m_te_cooldowns[i][te_idx].emplace(0, te.get_cooldown());
+                    edd.m_te_cooldowns[i][te_idx].emplace(0, te.get_cooldown());
                 } else {
                     // Deduce the cooldown automatically.
                     // NOTE: if m_g_eps[i] is not finite, we skipped event detection
                     // altogether and thus we never end up here. If the derivative
                     // of the event equation is not finite, the event is also skipped.
-                    ed_data.m_te_cooldowns[i][te_idx].emplace(
-                        0, taylor_deduce_cooldown(ed_data.m_g_eps[i], std::get<4>(ed_data.m_d_tes[i][0])));
+                    edd.m_te_cooldowns[i][te_idx].emplace(
+                        0, taylor_deduce_cooldown(edd.m_g_eps[i], std::get<4>(edd.m_d_tes[i][0])));
                 }
 
                 // Invoke the callback of the first terminal event, if it has one.
                 if (te.get_callback()) {
                     try {
-                        te_cb_ret = te.get_callback()(*this, std::get<2>(ed_data.m_d_tes[i][0]),
-                                                      std::get<3>(ed_data.m_d_tes[i][0]), i);
+                        te_cb_ret = te.get_callback()(*this, std::get<2>(edd.m_d_tes[i][0]),
+                                                      std::get<3>(edd.m_d_tes[i][0]), i);
                     } catch (...) {
                         if (!eptr) {
                             eptr = std::current_exception();
@@ -2307,7 +2305,7 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
                 }
             }
 
-            if (ed_data.m_d_tes[i].empty()) {
+            if (edd.m_d_tes[i].empty()) {
                 // No terminal events detected, return success or time limit.
                 m_step_res[i] = std::tuple{
                     // NOTE: use here the original value of
@@ -2317,7 +2315,7 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
                     h == m_delta_ts[m_batch_size + i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
             } else {
                 // Terminal event detected. Fetch its index.
-                const auto ev_idx = static_cast<std::int64_t>(std::get<0>(ed_data.m_d_tes[i][0]));
+                const auto ev_idx = static_cast<std::int64_t>(std::get<0>(edd.m_d_tes[i][0]));
 
                 // NOTE: if te_cb_ret is true, it means that the terminal event has
                 // a callback and its invocation returned true (meaning that the

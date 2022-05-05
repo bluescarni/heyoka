@@ -1269,31 +1269,31 @@ TEST_CASE("minmax")
                     = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("max_nan"));
 
                 // The C++ implementations.
-                auto cpp_min = [batch_size](fp_t *ret_ptr, const fp_t *a_ptr, const fp_t *b_ptr) {
+                auto cpp_min = [batch_size](fp_t *ret_ptr_, const fp_t *a_ptr_, const fp_t *b_ptr_) {
                     for (auto i = 0u; i < batch_size; ++i) {
-                        ret_ptr[i] = (b_ptr[i] < a_ptr[i]) ? b_ptr[i] : a_ptr[i];
+                        ret_ptr_[i] = (b_ptr_[i] < a_ptr_[i]) ? b_ptr_[i] : a_ptr_[i];
                     }
                 };
-                auto cpp_max = [batch_size](fp_t *ret_ptr, const fp_t *a_ptr, const fp_t *b_ptr) {
+                auto cpp_max = [batch_size](fp_t *ret_ptr_, const fp_t *a_ptr_, const fp_t *b_ptr_) {
                     for (auto i = 0u; i < batch_size; ++i) {
-                        ret_ptr[i] = (a_ptr[i] < b_ptr[i]) ? b_ptr[i] : a_ptr[i];
+                        ret_ptr_[i] = (a_ptr_[i] < b_ptr_[i]) ? b_ptr_[i] : a_ptr_[i];
                     }
                 };
-                auto cpp_min_nan = [batch_size](fp_t *ret_ptr, const fp_t *a_ptr, const fp_t *b_ptr) {
+                auto cpp_min_nan = [batch_size](fp_t *ret_ptr_, const fp_t *a_ptr_, const fp_t *b_ptr_) {
                     for (auto i = 0u; i < batch_size; ++i) {
-                        if (isnan(a_ptr[i]) || isnan(b_ptr[i])) {
-                            ret_ptr[i] = std::numeric_limits<fp_t>::quiet_NaN();
+                        if (isnan(a_ptr_[i]) || isnan(b_ptr_[i])) {
+                            ret_ptr_[i] = std::numeric_limits<fp_t>::quiet_NaN();
                         } else {
-                            ret_ptr[i] = (b_ptr[i] < a_ptr[i]) ? b_ptr[i] : a_ptr[i];
+                            ret_ptr_[i] = (b_ptr_[i] < a_ptr_[i]) ? b_ptr_[i] : a_ptr_[i];
                         }
                     }
                 };
-                auto cpp_max_nan = [batch_size](fp_t *ret_ptr, const fp_t *a_ptr, const fp_t *b_ptr) {
+                auto cpp_max_nan = [batch_size](fp_t *ret_ptr_, const fp_t *a_ptr_, const fp_t *b_ptr_) {
                     for (auto i = 0u; i < batch_size; ++i) {
-                        if (isnan(a_ptr[i]) || isnan(b_ptr[i])) {
-                            ret_ptr[i] = std::numeric_limits<fp_t>::quiet_NaN();
+                        if (isnan(a_ptr_[i]) || isnan(b_ptr_[i])) {
+                            ret_ptr_[i] = std::numeric_limits<fp_t>::quiet_NaN();
                         } else {
-                            ret_ptr[i] = (a_ptr[i] < b_ptr[i]) ? b_ptr[i] : a_ptr[i];
+                            ret_ptr_[i] = (a_ptr_[i] < b_ptr_[i]) ? b_ptr_[i] : a_ptr_[i];
                         }
                     }
                 };
@@ -1652,10 +1652,10 @@ TEST_CASE("eft_product batch")
                     for (auto i = 0u; i < batch_size; ++i) {
                         auto a = a_vec[i];
                         auto b = b_vec[i];
-                        auto x = x_vec[i];
-                        auto y = y_vec[i];
+                        auto xv = x_vec[i];
+                        auto yv = y_vec[i];
 
-                        REQUIRE(x == a * b);
+                        REQUIRE(xv == a * b);
 
 #if defined(HEYOKA_HAVE_REAL128)
                         if constexpr (!std::is_same_v<fp_t, mppp::real128>) {
@@ -1664,7 +1664,7 @@ TEST_CASE("eft_product batch")
                             using mp_fp_t = bmp::number<
                                 bmp::cpp_bin_float<std::numeric_limits<fp_t>::digits * 2, bmp::digit_base_2>>;
 
-                            REQUIRE(mp_fp_t(x) + mp_fp_t(y) == mp_fp_t(a) * mp_fp_t(b));
+                            REQUIRE(mp_fp_t(xv) + mp_fp_t(yv) == mp_fp_t(a) * mp_fp_t(b));
 #if defined(HEYOKA_HAVE_REAL128)
                         }
 #endif
