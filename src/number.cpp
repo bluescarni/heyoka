@@ -401,7 +401,13 @@ llvm::Value *codegen(llvm_state &s, const number &n)
 {
     if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
         return std::visit(
-            [&s](const auto &v) { return llvm::ConstantFP::get(s.context(), llvm::APFloat(static_cast<T>(v))); },
+            [&s](const auto &v) {
+                // NOTE: it looks like the APFloat class infers the proper target type
+                // for a FP constant from the semantics. In case of float/double, it seems
+                // to be assuming that they correspond to single/double precision, which is
+                // also heyoka's assumption.
+                return llvm::ConstantFP::get(s.context(), llvm::APFloat(static_cast<T>(v)));
+            },
             n.value());
     } else if constexpr (std::is_same_v<T, long double>) {
         return std::visit(
