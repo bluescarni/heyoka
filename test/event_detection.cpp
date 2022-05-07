@@ -38,7 +38,7 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -124,12 +124,12 @@ TEST_CASE("fast exclusion check")
                     for (auto _ = 0; _ < 100; ++_) {
                         // Generate random polys.
                         for (auto &cf : poly) {
-                            cf = rdist(rng);
+                            cf = static_cast<fp_t>(rdist(rng));
                         }
 
                         // Generate random hs.
                         for (auto i = 0u; i < batch_size; ++i) {
-                            h[i] = rdist(rng);
+                            h[i] = static_cast<fp_t>(rdist(rng));
                             back_flag[i] = h[i] < 0;
                         }
 

@@ -1542,6 +1542,9 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
 
 // Explicit instantiations.
 template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_interval<float>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *, std::uint32_t);
+
+template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
 llvm_penc_interval<double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *, std::uint32_t);
 
 template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
@@ -1619,7 +1622,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
         // Update all elements of bj_series (apart from the last one).
         for (std::uint32_t i = 0; i < j; ++i) {
             bj_series[i] = builder.CreateFMul(
-                bj_series[i], vector_splat(builder, codegen<T>(s, number{static_cast<T>(j) / (j - i)}), batch_size));
+                bj_series[i],
+                vector_splat(builder, codegen<T>(s, number{static_cast<T>(j) / static_cast<T>(j - i)}), batch_size));
         }
 
         // Compute the new bj.
@@ -1641,6 +1645,9 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
 }
 
 // Explicit instantiations.
+template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
+llvm_penc_cargo_shisha<float>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
+
 template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
 llvm_penc_cargo_shisha<double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
 
