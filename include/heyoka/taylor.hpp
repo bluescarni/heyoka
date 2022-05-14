@@ -185,78 +185,16 @@ HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_deco
 HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>>
 taylor_decompose(const std::vector<std::pair<expression, expression>> &, const std::vector<expression> &);
 
-HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_dbl(llvm_state &, const std::string &, const std::vector<expression> &,
-                                                 std::uint32_t, std::uint32_t, bool, bool,
-                                                 const std::vector<expression> &, bool);
-HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_ldbl(llvm_state &, const std::string &, const std::vector<expression> &,
-                                                  std::uint32_t, std::uint32_t, bool, bool,
-                                                  const std::vector<expression> &, bool);
+template <typename>
+HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet(llvm_state &, const std::string &, const std::vector<expression> &,
+                                             std::uint32_t, std::uint32_t, bool, bool,
+                                             const std::vector<expression> & = {}, bool = false);
 
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_f128(llvm_state &, const std::string &, const std::vector<expression> &,
-                                                  std::uint32_t, std::uint32_t, bool, bool,
-                                                  const std::vector<expression> &, bool);
-
-#endif
-
-template <typename T>
-taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
-                           std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                           const std::vector<expression> &sv_funcs = {}, bool parallel_mode = false)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_add_jet_dbl(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
-                                  parallel_mode);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_add_jet_ldbl(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
-                                   parallel_mode);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_add_jet_f128(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
-                                   parallel_mode);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
-
-HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_dbl(llvm_state &, const std::string &,
-                                                 const std::vector<std::pair<expression, expression>> &, std::uint32_t,
-                                                 std::uint32_t, bool, bool, const std::vector<expression> &, bool);
-HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_ldbl(llvm_state &, const std::string &,
-                                                  const std::vector<std::pair<expression, expression>> &, std::uint32_t,
-                                                  std::uint32_t, bool, bool, const std::vector<expression> &, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_f128(llvm_state &, const std::string &,
-                                                  const std::vector<std::pair<expression, expression>> &, std::uint32_t,
-                                                  std::uint32_t, bool, bool, const std::vector<expression> &, bool);
-
-#endif
-
-template <typename T>
-taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name,
-                           const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
-                           std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                           const std::vector<expression> &sv_funcs = {}, bool parallel_mode = false)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_add_jet_dbl(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
-                                  parallel_mode);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_add_jet_ldbl(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
-                                   parallel_mode);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_add_jet_f128(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
-                                   parallel_mode);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
+template <typename>
+HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet(llvm_state &, const std::string &,
+                                             const std::vector<std::pair<expression, expression>> &, std::uint32_t,
+                                             std::uint32_t, bool, bool, const std::vector<expression> & = {},
+                                             bool = false);
 
 // Enum to represent the outcome of a stepping/propagate function.
 enum class taylor_outcome : std::int64_t {
@@ -290,10 +228,7 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, event_direction);
 // s11n because it is more specialised.
 // NOTE: this workaround is not necessary for the other enums in heyoka because
 // those all have ints as underlying type.
-namespace boost
-{
-
-namespace serialization
+namespace boost::serialization
 {
 
 template <typename Archive, typename... Args>
@@ -333,9 +268,7 @@ inline void serialize(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &
     split_free(ar, tup, v);
 }
 
-} // namespace serialization
-
-} // namespace boost
+} // namespace boost::serialization
 
 namespace heyoka
 {
