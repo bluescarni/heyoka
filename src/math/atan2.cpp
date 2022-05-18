@@ -41,6 +41,7 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -401,81 +402,18 @@ template <typename T, typename U, typename V,
 llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n0, const V &n1, std::uint32_t n_uvars,
                                               std::uint32_t batch_size)
 {
-    auto &md = s.module();
-    auto &builder = s.builder();
-    auto &context = s.context();
+    return taylor_c_diff_func_numpar<T>(
+        s, n_uvars, batch_size, "atan2", 1,
+        [&s](const auto &args) {
+            // LCOV_EXCL_START
+            assert(args.size() == 2u);
+            assert(args[0] != nullptr);
+            assert(args[1] != nullptr);
+            // LCOV_EXCL_STOP
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
-
-    // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "atan2", n_uvars, batch_size, {n0, n1}, 1);
-    const auto &fname = na_pair.first;
-    const auto &fargs = na_pair.second;
-
-    // Try to see if we already created the function.
-    auto f = md.getFunction(fname);
-
-    if (f == nullptr) {
-        // The function was not created before, do it now.
-
-        // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
-
-        // The return type is val_t.
-        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
-        // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
-        assert(f != nullptr); // LCOV_EXCL_LINE
-
-        // Fetch the necessary function arguments.
-        auto ord = f->args().begin();
-        auto par_ptr = f->args().begin() + 3;
-        auto num_y = f->args().begin() + 5;
-        auto num_x = f->args().begin() + 6;
-
-        // Create a new basic block to start insertion into.
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
-
-        // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
-
-        llvm_if_then_else(
-            s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
-                // If the order is zero, run the codegen.
-                auto ret = llvm_atan2(s, taylor_c_diff_numparam_codegen(s, n0, num_y, par_ptr, batch_size),
-                                      taylor_c_diff_numparam_codegen(s, n1, num_x, par_ptr, batch_size));
-
-                builder.CreateStore(ret, retval);
-            },
-            [&]() {
-                // Otherwise, return zero.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), retval);
-            });
-
-        // Return the result.
-        builder.CreateRet(builder.CreateLoad(val_t, retval));
-
-        // Verify.
-        s.verify_function(f);
-
-        // Restore the original insertion block.
-        builder.SetInsertPoint(orig_bb);
-        // LCOV_EXCL_START
-    } else {
-        // The function was created before. Check if the signatures match.
-        // NOTE: there could be a mismatch if the derivative function was created
-        // and then optimised - optimisation might remove arguments which are compile-time
-        // constants.
-        if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument(
-                "Inconsistent function signature for the Taylor derivative of atan2() in compact mode detected");
-        }
-    }
-    // LCOV_EXCL_STOP
-
-    return f;
+            return llvm_atan2(s, args[0], args[1]);
+        },
+        n0, n1);
 }
 
 // Derivative of atan2(var, number).

@@ -1120,7 +1120,7 @@ llvm::Value *llvm_atan2(llvm_state &s, llvm::Value *y, llvm::Value *x)
     } else {
 #endif
         if (x_t == to_llvm_type<double>(context)) {
-            if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
                 if (const auto sfn = sleef_function_name(context, "atan2", x_t,
                                                          boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
                     !sfn.empty()) {
@@ -2458,6 +2458,61 @@ template HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper<mppp::real128>(llvm_s
                                                                           const std::string &);
 
 #endif
+
+// Inverse cosine.
+llvm::Value *llvm_acos(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of the argument.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "acosq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context)) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "acos", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return call_extern_vec(s, {x}, "acos");
+        } else if (x_t == to_llvm_type<long double>(context)) {
+            return call_extern_vec(s, {x},
+#if defined(_MSC_VER)
+                                   // NOTE: it seems like the MSVC stdlib does not have an acos function,
+                                   // because LLVM complains about the symbol "acosl" not being
+                                   // defined. Hence, use our own wrapper instead.
+                                   "heyoka_acosl"
+#else
+                               "acosl"
+#endif
+            );
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of acos()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
 
 } // namespace heyoka::detail
 
