@@ -23,7 +23,6 @@
 
 #include <fmt/format.h>
 
-#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
@@ -32,7 +31,6 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
-#include <llvm/Support/Casting.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -42,7 +40,6 @@
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
-#include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
@@ -83,57 +80,6 @@ std::vector<expression> sinh_impl::gradient() const
     return {cosh(args()[0])};
 }
 
-llvm::Value *sinh_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(args[0]->getType())) {
-        if (const auto sfn = sleef_function_name(s.context(), "sinh", vec_t->getElementType(),
-                                                 boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-            !sfn.empty()) {
-            return llvm_invoke_external(
-                s, sfn, vec_t, args,
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
-        }
-    }
-
-    return call_extern_vec(s, args, "sinh");
-}
-
-llvm::Value *sinh_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    return call_extern_vec(s, args,
-#if defined(_MSC_VER)
-                           // NOTE: it seems like the MSVC stdlib does not have a sinhl function,
-                           // because LLVM complains about the symbol "sinhl" not being
-                           // defined. Hence, use our own wrapper instead.
-                           "heyoka_sinhl"
-#else
-                           "sinhl"
-#endif
-    );
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *sinh_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    return call_extern_vec(s, args, "sinhq");
-}
-
-#endif
-
 taylor_dc_t::size_type sinh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 1u);
@@ -158,12 +104,12 @@ namespace
 
 // Derivative of sinh(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_sinh_impl(llvm_state &s, const sinh_impl &f, const std::vector<std::uint32_t> &, const U &num,
+llvm::Value *taylor_diff_sinh_impl(llvm_state &s, const sinh_impl &, const std::vector<std::uint32_t> &, const U &num,
                                    const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
                                    std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     if (order == 0u) {
-        return codegen_from_values<T>(s, f, {taylor_codegen_numparam<T>(s, num, par_ptr, batch_size)});
+        return llvm_sinh(s, taylor_codegen_numparam<T>(s, num, par_ptr, batch_size));
     } else {
         return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
     }
@@ -171,7 +117,7 @@ llvm::Value *taylor_diff_sinh_impl(llvm_state &s, const sinh_impl &f, const std:
 
 // Derivative of sinh(variable).
 template <typename T>
-llvm::Value *taylor_diff_sinh_impl(llvm_state &s, const sinh_impl &f, const std::vector<std::uint32_t> &deps,
+llvm::Value *taylor_diff_sinh_impl(llvm_state &s, const sinh_impl &, const std::vector<std::uint32_t> &deps,
                                    const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *,
                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
@@ -181,7 +127,7 @@ llvm::Value *taylor_diff_sinh_impl(llvm_state &s, const sinh_impl &f, const std:
     const auto b_idx = uname_to_index(var.name());
 
     if (order == 0u) {
-        return codegen_from_values<T>(s, f, {taylor_fetch_diff(arr, b_idx, 0, n_uvars)});
+        return llvm_sinh(s, taylor_fetch_diff(arr, b_idx, 0, n_uvars));
     }
 
     // NOTE: iteration in the [1, order] range
@@ -273,15 +219,25 @@ namespace
 
 // Derivative of sinh(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &fn, const U &num, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &, const U &num, std::uint32_t n_uvars,
                                              std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_unary_num_det<T>(s, fn, num, n_uvars, batch_size, "sinh", 1);
+    return taylor_c_diff_func_numpar<T>(
+        s, n_uvars, batch_size, "sinh", 1,
+        [&s](const auto &args) {
+            // LCOV_EXCL_START
+            assert(args.size() == 1u);
+            assert(args[0] != nullptr);
+            // LCOV_EXCL_STOP
+
+            return llvm_sinh(s, args[0]);
+        },
+        num);
 }
 
 // Derivative of sinh(variable).
 template <typename T>
-llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &fn, const variable &var,
+llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &, const variable &var,
                                              std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
@@ -329,8 +285,7 @@ llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &fn,
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of b_idx.
-                builder.CreateStore(codegen_from_values<T>(
-                                        s, fn, {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx)}),
+                builder.CreateStore(llvm_sinh(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx)),
                                     retval);
             },
             [&]() {

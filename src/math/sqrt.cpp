@@ -21,7 +21,6 @@
 
 #include <fmt/format.h>
 
-#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
@@ -68,53 +67,6 @@ namespace detail
 sqrt_impl::sqrt_impl(expression e) : func_base("sqrt", std::vector{std::move(e)}) {}
 
 sqrt_impl::sqrt_impl() : sqrt_impl(0_dbl) {}
-
-llvm::Value *sqrt_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    // NOTE: no need for sleef here, SIMD instructions
-    // sets usually have direct support for sqrt (but perhaps
-    // double check in the future about non-x86).
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    return llvm_invoke_intrinsic(s.builder(), "llvm.sqrt", {args[0]->getType()}, args);
-}
-
-llvm::Value *sqrt_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    // NOTE: codegen is identical as in dbl.
-    return codegen_dbl(s, args);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *sqrt_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    auto &builder = s.builder();
-
-    // Decompose the argument into scalars.
-    auto scalars = vector_to_scalars(builder, args[0]);
-
-    // Invoke the function on each scalar.
-    std::vector<llvm::Value *> retvals;
-    for (auto scal : scalars) {
-        retvals.push_back(llvm_invoke_external(
-            s, "sqrtq", scal->getType(), {scal},
-            // NOTE: in theory we may add ReadNone here as well,
-            // but for some reason, at least up to LLVM 10,
-            // this causes strange codegen issues. Revisit
-            // in the future.
-            {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-    }
-
-    // Build a vector with the results.
-    return scalars_to_vector(builder, retvals);
-}
-
-#endif
 
 double sqrt_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
 {
@@ -179,12 +131,12 @@ namespace
 
 // Derivative of sqrt(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &f, const U &num, const std::vector<llvm::Value *> &,
+llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &, const U &num, const std::vector<llvm::Value *> &,
                                    llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
                                    std::uint32_t batch_size)
 {
     if (order == 0u) {
-        return codegen_from_values<T>(s, f, {taylor_codegen_numparam<T>(s, num, par_ptr, batch_size)});
+        return llvm_sqrt(s, taylor_codegen_numparam<T>(s, num, par_ptr, batch_size));
     } else {
         return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
     }
@@ -195,7 +147,7 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &f, const U &n
 // a = sqrt(b) -> a**2 = b -> (a**2)^[n] = b^[n]
 // and then using the squaring formula.
 template <typename T>
-llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &f, const variable &var,
+llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &, const variable &var,
                                    const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
                                    std::uint32_t order, std::uint32_t idx, std::uint32_t)
 {
@@ -205,7 +157,7 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &f, const vari
     const auto u_idx = uname_to_index(var.name());
 
     if (order == 0u) {
-        return codegen_from_values<T>(s, f, {taylor_fetch_diff(arr, u_idx, 0, n_uvars)});
+        return llvm_sqrt(s, taylor_fetch_diff(arr, u_idx, 0, n_uvars));
     }
 
     // Compute the divisor: 2*a^[0].
@@ -312,15 +264,25 @@ namespace
 
 // Derivative of sqrt(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn, const U &num, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &, const U &num, std::uint32_t n_uvars,
                                              std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_unary_num_det<T>(s, fn, num, n_uvars, batch_size, "sqrt");
+    return taylor_c_diff_func_numpar<T>(
+        s, n_uvars, batch_size, "sqrt", 0,
+        [&s](const auto &args) {
+            // LCOV_EXCL_START
+            assert(args.size() == 1u);
+            assert(args[0] != nullptr);
+            // LCOV_EXCL_STOP
+
+            return llvm_sqrt(s, args[0]);
+        },
+        num);
 }
 
 // Derivative of sqrt(variable).
 template <typename T>
-llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn, const variable &var,
+llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &, const variable &var,
                                              std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
@@ -369,9 +331,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn,
             [&]() {
                 // For order 0, invoke the function on the order 0 of var_idx.
                 builder.CreateStore(
-                    codegen_from_values<T>(s, fn,
-                                           {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)}),
-                    retval);
+                    llvm_sqrt(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)), retval);
             },
             [&]() {
                 // Compute the divisor: 2*a^[0].

@@ -57,6 +57,10 @@ using sleef_map_t = std::unordered_map<sleef_key_t, std::string, sleef_key_hashe
 // NOTE: at this time the sleef conda package for PPC64 does not seem
 // to provide VSX3 functions. Thus, for now we use only the
 // VSX implementations.
+// NOTE: currently we are not adding here any sqrt() implementation provided
+// by sleef, on the assumption that usually sqrt() is implemented directly in hardware
+// and thus there's no need to go through sleef. This is certainly true for x86,
+// but I am not 100% sure for the other archs. Let's keep this in mind.
 auto make_sleef_map_dbl()
 {
     const auto &features = get_target_features();

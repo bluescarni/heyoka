@@ -24,14 +24,12 @@
 
 #include <fmt/format.h>
 
-#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
-#include <llvm/Support/Casting.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -42,7 +40,6 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
-#include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
@@ -75,48 +72,6 @@ namespace detail
 log_impl::log_impl(expression e) : func_base("log", std::vector{std::move(e)}) {}
 
 log_impl::log_impl() : log_impl(1_dbl) {}
-
-llvm::Value *log_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(args[0]->getType())) {
-        if (const auto sfn = sleef_function_name(s.context(), "log", vec_t->getElementType(),
-                                                 boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-            !sfn.empty()) {
-            return llvm_invoke_external(
-                s, sfn, vec_t, args,
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
-        }
-    }
-
-    return llvm_invoke_intrinsic(s.builder(), "llvm.log", {args[0]->getType()}, args);
-}
-
-llvm::Value *log_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    return llvm_invoke_intrinsic(s.builder(), "llvm.log", {args[0]->getType()}, args);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *log_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    return call_extern_vec(s, args, "logq");
-}
-
-#endif
 
 double log_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
 {
@@ -180,12 +135,12 @@ namespace
 
 // Derivative of log(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_log_impl(llvm_state &s, const log_impl &f, const U &num, const std::vector<llvm::Value *> &,
+llvm::Value *taylor_diff_log_impl(llvm_state &s, const log_impl &, const U &num, const std::vector<llvm::Value *> &,
                                   llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
                                   std::uint32_t batch_size)
 {
     if (order == 0u) {
-        return codegen_from_values<T>(s, f, {taylor_codegen_numparam<T>(s, num, par_ptr, batch_size)});
+        return llvm_log(s, taylor_codegen_numparam<T>(s, num, par_ptr, batch_size));
     } else {
         return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
     }
@@ -193,7 +148,7 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, const log_impl &f, const U &num
 
 // Derivative of log(variable).
 template <typename T>
-llvm::Value *taylor_diff_log_impl(llvm_state &s, const log_impl &f, const variable &var,
+llvm::Value *taylor_diff_log_impl(llvm_state &s, const log_impl &, const variable &var,
                                   const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
                                   std::uint32_t order, std::uint32_t a_idx, std::uint32_t batch_size)
 {
@@ -203,7 +158,7 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, const log_impl &f, const variab
     const auto b_idx = uname_to_index(var.name());
 
     if (order == 0u) {
-        return codegen_from_values<T>(s, f, {taylor_fetch_diff(arr, b_idx, 0, n_uvars)});
+        return llvm_log(s, taylor_fetch_diff(arr, b_idx, 0, n_uvars));
     }
 
     // Create the fp version of the order.
@@ -300,16 +255,26 @@ namespace
 
 // Derivative of log(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const log_impl &fn, const U &num, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const log_impl &, const U &num, std::uint32_t n_uvars,
                                             std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_unary_num_det<T>(s, fn, num, n_uvars, batch_size, "log");
+    return taylor_c_diff_func_numpar<T>(
+        s, n_uvars, batch_size, "log", 0,
+        [&s](const auto &args) {
+            // LCOV_EXCL_START
+            assert(args.size() == 1u);
+            assert(args[0] != nullptr);
+            // LCOV_EXCL_STOP
+
+            return llvm_log(s, args[0]);
+        },
+        num);
 }
 
 // Derivative of log(variable).
 template <typename T>
-llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const log_impl &fn, const variable &var,
-                                            std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const log_impl &, const variable &var, std::uint32_t n_uvars,
+                                            std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -356,8 +321,7 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const log_impl &fn, c
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of b_idx.
-                builder.CreateStore(codegen_from_values<T>(
-                                        s, fn, {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx)}),
+                builder.CreateStore(llvm_log(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx)),
                                     retval);
             },
             [&]() {
