@@ -97,7 +97,7 @@ TEST_CASE("taylor pow approx")
     auto [x] = make_vars("x");
 
     {
-        llvm_state s{kw::opt_level = 0};
+        llvm_state s{kw::opt_level = 0u};
 
         taylor_add_jet<double>(s, "jet", {pow(x, -1.5) + pow(x, 1 / 3.)}, 3, 1, false, false);
 
@@ -106,7 +106,7 @@ TEST_CASE("taylor pow approx")
     }
 
     {
-        llvm_state s{kw::opt_level = 0};
+        llvm_state s{kw::opt_level = 0u};
 
         taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(par[0], -1.5)}}, 3, 1, false, false);
 
@@ -114,7 +114,7 @@ TEST_CASE("taylor pow approx")
     }
 
     {
-        llvm_state s{kw::opt_level = 0};
+        llvm_state s{kw::opt_level = 0u};
 
         taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(-1.5_dbl, par[0])}}, 3, 1, false, false);
 
@@ -122,7 +122,7 @@ TEST_CASE("taylor pow approx")
     }
 
     {
-        llvm_state s{kw::opt_level = 0};
+        llvm_state s{kw::opt_level = 0u};
 
         taylor_add_jet<double>(s, "jet", {pow(x, -1.5) + pow(x, 1 / 3.)}, 3, 1, false, true);
 
@@ -134,7 +134,7 @@ TEST_CASE("taylor pow approx")
     }
 
     {
-        llvm_state s{kw::opt_level = 0};
+        llvm_state s{kw::opt_level = 0u};
 
         taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(par[0], -1.5)}}, 3, 1, false, true);
 
@@ -143,7 +143,7 @@ TEST_CASE("taylor pow approx")
     }
 
     {
-        llvm_state s{kw::opt_level = 0};
+        llvm_state s{kw::opt_level = 0u};
 
         taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(-1.5_dbl, par[0])}}, 3, 1, false, true);
 
