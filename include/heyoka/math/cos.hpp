@@ -40,12 +40,6 @@ public:
     cos_impl();
     explicit cos_impl(expression);
 
-    llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-    llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
-#endif
-
     std::vector<expression> gradient() const;
 
     double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
