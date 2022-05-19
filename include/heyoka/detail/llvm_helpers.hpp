@@ -129,6 +129,7 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_sqrt(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_square(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_tan(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_tanh(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_pow(llvm_state &, llvm::Value *, llvm::Value *, bool = false);
 
 template <typename>
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc(llvm_state &, std::uint32_t, std::uint32_t);

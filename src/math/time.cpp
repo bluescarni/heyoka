@@ -132,7 +132,7 @@ namespace
 
 // NOTE: perhaps later on this can become a generic implementation
 // for nullary functions, in the same mold as
-// taylor_c_diff_func_unary_num_det().
+// taylor_c_diff_func_numpar().
 template <typename T>
 llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size)
 {

@@ -814,29 +814,6 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
 
-namespace detail
-{
-
-// Helper to run the codegen of a function-like object with the arguments
-// represented as a vector of LLVM values.
-template <typename T, typename F>
-inline llvm::Value *codegen_from_values(llvm_state &s, const F &f, const std::vector<llvm::Value *> &args_v)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return f.codegen_dbl(s, args_v);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return f.codegen_ldbl(s, args_v);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return f.codegen_f128(s, args_v);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
-
-} // namespace detail
-
 } // namespace heyoka
 
 // Macros for the registration of s11n for concrete functions.

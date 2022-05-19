@@ -3295,6 +3295,60 @@ llvm::Value *llvm_tanh(llvm_state &s, llvm::Value *x)
 #endif
 }
 
+// Exponentiation.
+llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_approx)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(y != nullptr);
+    assert(x->getType() == y->getType());
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of the arguments.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x, y}, "powq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context) || x_t == to_llvm_type<long double>(context)) {
+            // NOTE: we want to try the SLEEF route only if we are *not* allowing
+            // an approximated implementation.
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType()); !allow_approx && vec_t != nullptr) {
+                if (const auto sfn = sleef_function_name(context, "pow", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x, y},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            auto *ret = llvm_invoke_intrinsic(s.builder(), "llvm.pow", {x->getType()}, {x, y});
+
+            if (allow_approx) {
+                ret->setHasApproxFunc(true);
+            }
+
+            return ret;
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of pow()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
 } // namespace heyoka::detail
 
 // NOTE: this function will be called by the LLVM implementation

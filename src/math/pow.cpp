@@ -97,70 +97,6 @@ bool pow_allow_approx(const pow_impl &pi)
 
 } // namespace
 
-llvm::Value *pow_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    assert(args.size() == 2u);
-    assert(args[0] != nullptr);
-    assert(args[1] != nullptr);
-
-    const auto allow_approx = pow_allow_approx(*this);
-
-    // NOTE: we want to try the SLEEF route only if we are *not* approximating
-    // pow() with sqrt() or iterated multiplications (in which case we are fine
-    // with the LLVM builtin).
-    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(args[0]->getType()); !allow_approx && vec_t != nullptr) {
-        if (const auto sfn = sleef_function_name(s.context(), "pow", vec_t->getElementType(),
-                                                 boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-            !sfn.empty()) {
-            return llvm_invoke_external(
-                s, sfn, vec_t, args,
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
-        }
-    }
-
-    auto ret = llvm_invoke_intrinsic(s.builder(), "llvm.pow", {args[0]->getType()}, args);
-
-    if (allow_approx) {
-        llvm::cast<llvm::CallInst>(ret)->setHasApproxFunc(true);
-    }
-
-    return ret;
-}
-
-llvm::Value *pow_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    assert(args.size() == 2u);
-    assert(args[0] != nullptr);
-    assert(args[1] != nullptr);
-
-    const auto allow_approx = pow_allow_approx(*this);
-
-    auto ret = llvm_invoke_intrinsic(s.builder(), "llvm.pow", {args[0]->getType()}, args);
-
-    if (allow_approx) {
-        llvm::cast<llvm::CallInst>(ret)->setHasApproxFunc(true);
-    }
-
-    return ret;
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *pow_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    assert(args.size() == 2u);
-    assert(args[0] != nullptr);
-    assert(args[1] != nullptr);
-
-    return call_extern_vec(s, {args}, "powq");
-}
-
-#endif
-
 double pow_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
 {
     assert(args().size() == 2u);
@@ -232,10 +168,12 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const U &num
 {
     auto &builder = s.builder();
 
+    // Check if we can use the approximated version.
+    const auto allow_approx = pow_allow_approx(f);
+
     if (order == 0u) {
-        return codegen_from_values<T>(s, f,
-                                      {taylor_codegen_numparam<T>(s, num0, par_ptr, batch_size),
-                                       taylor_codegen_numparam<T>(s, num1, par_ptr, batch_size)});
+        return llvm_pow(s, taylor_codegen_numparam<T>(s, num0, par_ptr, batch_size),
+                        taylor_codegen_numparam<T>(s, num1, par_ptr, batch_size), allow_approx);
     } else {
         return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
     }
@@ -249,12 +187,15 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variab
 {
     auto &builder = s.builder();
 
+    // Check if we can use the approximated version.
+    const auto allow_approx = pow_allow_approx(f);
+
     // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
 
     if (order == 0u) {
-        return codegen_from_values<T>(
-            s, f, {taylor_fetch_diff(arr, u_idx, 0, n_uvars), taylor_codegen_numparam<T>(s, num, par_ptr, batch_size)});
+        return llvm_pow(s, taylor_fetch_diff(arr, u_idx, 0, n_uvars),
+                        taylor_codegen_numparam<T>(s, num, par_ptr, batch_size), allow_approx);
     }
 
     // NOTE: iteration in the [0, order) range
@@ -370,79 +311,24 @@ template <typename T, typename U, typename V,
 llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, const U &n0, const V &n1,
                                             std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    auto &module = s.module();
-    auto &builder = s.builder();
-    auto &context = s.context();
+    // Check if we can use the approximated version.
+    const auto allow_approx = pow_allow_approx(fn);
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Create the function name.
+    const auto *const pow_name = allow_approx ? "pow_approx" : "pow";
 
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "pow", n_uvars, batch_size, {n0, n1});
-    const auto &fname = na_pair.first;
-    const auto &fargs = na_pair.second;
+    return taylor_c_diff_func_numpar<T>(
+        s, n_uvars, batch_size, pow_name, 0,
+        [&s, allow_approx](const auto &args) {
+            // LCOV_EXCL_START
+            assert(args.size() == 2u);
+            assert(args[0] != nullptr);
+            assert(args[1] != nullptr);
+            // LCOV_EXCL_STOP
 
-    // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
-
-    if (f == nullptr) {
-        // The function was not created before, do it now.
-
-        // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
-
-        // The return type is val_t.
-        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
-        // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
-        assert(f != nullptr);
-
-        // Fetch the necessary function arguments.
-        auto ord = f->args().begin();
-        auto par_ptr = f->args().begin() + 3;
-        auto num_base = f->args().begin() + 5;
-        auto num_exp = f->args().begin() + 6;
-
-        // Create a new basic block to start insertion into.
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
-
-        // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
-
-        llvm_if_then_else(
-            s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
-                // If the order is zero, run the codegen.
-                builder.CreateStore(
-                    codegen_from_values<T>(s, fn,
-                                           {taylor_c_diff_numparam_codegen(s, n0, num_base, par_ptr, batch_size),
-                                            taylor_c_diff_numparam_codegen(s, n1, num_exp, par_ptr, batch_size)}),
-                    retval);
-            },
-            [&]() {
-                // Otherwise, return zero.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), retval);
-            });
-
-        // Return the result.
-        builder.CreateRet(builder.CreateLoad(val_t, retval));
-
-        // Verify.
-        s.verify_function(f);
-
-        // Restore the original insertion block.
-        builder.SetInsertPoint(orig_bb);
-    } else {
-        // The function was created before. Check if the signatures match.
-        // NOTE: there could be a mismatch if the derivative function was created
-        // and then optimised - optimisation might remove arguments which are compile-time
-        // constants.
-        if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument(
-                "Inconsistent function signature for the Taylor derivative of pow() in compact mode detected");
-        }
-    }
-
-    return f;
+            return llvm_pow(s, args[0], args[1], allow_approx);
+        },
+        n0, n1);
 }
 
 // Derivative of pow(variable, number).
@@ -454,10 +340,16 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
     auto &builder = s.builder();
     auto &context = s.context();
 
+    // Check if we can use the approximated version.
+    const auto allow_approx = pow_allow_approx(fn);
+
+    // Create the function name.
+    const auto *const pow_name = allow_approx ? "pow_approx" : "pow";
+
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "pow", n_uvars, batch_size, {var, n});
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, pow_name, n_uvars, batch_size, {var, n});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -497,11 +389,10 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of var_idx.
-                builder.CreateStore(
-                    codegen_from_values<T>(s, fn,
-                                           {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx),
-                                            taylor_c_diff_numparam_codegen(s, n, exponent, par_ptr, batch_size)}),
-                    retval);
+                builder.CreateStore(llvm_pow(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx),
+                                             taylor_c_diff_numparam_codegen(s, n, exponent, par_ptr, batch_size),
+                                             allow_approx),
+                                    retval);
             },
             [&]() {
                 // Create FP vector versions of exponent and order.
