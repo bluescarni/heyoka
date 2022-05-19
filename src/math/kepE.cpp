@@ -31,7 +31,6 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
-#include <llvm/Support/Casting.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -42,6 +41,7 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -53,18 +53,6 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
-
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
 
 namespace heyoka
 {
@@ -114,16 +102,16 @@ taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
 
     // Append the sin(a)/cos(a) decompositions.
-    u_vars_defs.emplace_back(sin(expression{variable{"u_{}"_format(u_vars_defs.size() - 1u)}}),
+    u_vars_defs.emplace_back(sin(expression{variable{fmt::format("u_{}", u_vars_defs.size() - 1u)}}),
                              std::vector<std::uint32_t>{});
-    u_vars_defs.emplace_back(cos(expression{variable{"u_{}"_format(u_vars_defs.size() - 2u)}}),
+    u_vars_defs.emplace_back(cos(expression{variable{fmt::format("u_{}", u_vars_defs.size() - 2u)}}),
                              std::vector<std::uint32_t>{});
 
     // Append the e*cos(a) decomposition.
     // NOTE: use mul() instead of * in order to avoid the automatic simplification
     // of 0 * cos(a) -> 0, which would result in an invalid entry in the Taylor decomposition
     // (i.e., a number entry).
-    u_vars_defs.emplace_back(mul(std::move(e_copy), expression{variable{"u_{}"_format(u_vars_defs.size() - 1u)}}),
+    u_vars_defs.emplace_back(mul(std::move(e_copy), expression{variable{fmt::format("u_{}", u_vars_defs.size() - 1u)}}),
                              std::vector<std::uint32_t>{});
 
     // Add the hidden deps.
@@ -375,9 +363,11 @@ llvm::Value *taylor_diff_kepE(llvm_state &s, const kepE_impl &f, const std::vect
     assert(f.args().size() == 2u);
 
     if (deps.size() != 2u) {
-        throw std::invalid_argument("A hidden dependency vector of size 2 is expected in order to compute the Taylor "
-                                    "derivative of kepE(), but a vector of size {} was passed "
-                                    "instead"_format(deps.size()));
+        throw std::invalid_argument(
+            fmt::format("A hidden dependency vector of size 2 is expected in order to compute the Taylor "
+                        "derivative of kepE(), but a vector of size {} was passed "
+                        "instead",
+                        deps.size()));
     }
 
     return std::visit(
@@ -426,82 +416,21 @@ template <typename T, typename U, typename V,
 llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n0, const V &n1, std::uint32_t n_uvars,
                                              std::uint32_t batch_size)
 {
-    auto &md = s.module();
-    auto &builder = s.builder();
-    auto &context = s.context();
+    return taylor_c_diff_func_numpar<T>(
+        s, n_uvars, batch_size, "kepE", 2,
+        [&s, batch_size](const auto &args) {
+            // LCOV_EXCL_START
+            assert(args.size() == 2u);
+            assert(args[0] != nullptr);
+            assert(args[1] != nullptr);
+            // LCOV_EXCL_STOP
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+            // Create/fetch the Kepler solver.
+            auto fkep = llvm_add_inv_kep_E<T>(s, batch_size);
 
-    // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "kepE", n_uvars, batch_size, {n0, n1}, 2);
-    const auto &fname = na_pair.first;
-    const auto &fargs = na_pair.second;
-
-    // Try to see if we already created the function.
-    auto f = md.getFunction(fname);
-
-    if (f == nullptr) {
-        // The function was not created before, do it now.
-
-        // Create/fetch the Kepler solver.
-        auto fkep = llvm_add_inv_kep_E<T>(s, batch_size);
-
-        // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
-
-        // The return type is val_t.
-        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
-        // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
-        assert(f != nullptr);
-
-        // Fetch the necessary function arguments.
-        auto ord = f->args().begin();
-        auto par_ptr = f->args().begin() + 3;
-        auto num_e = f->args().begin() + 5;
-        auto num_M = f->args().begin() + 6;
-
-        // Create a new basic block to start insertion into.
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
-
-        // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
-
-        llvm_if_then_else(
-            s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
-            [&]() {
-                // If the order is zero, run the codegen.
-                builder.CreateStore(
-                    builder.CreateCall(fkep, {taylor_c_diff_numparam_codegen(s, n0, num_e, par_ptr, batch_size),
-                                              taylor_c_diff_numparam_codegen(s, n1, num_M, par_ptr, batch_size)}),
-                    retval);
-            },
-            [&]() {
-                // Otherwise, return zero.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), retval);
-            });
-
-        // Return the result.
-        builder.CreateRet(builder.CreateLoad(val_t, retval));
-
-        // Verify.
-        s.verify_function(f);
-
-        // Restore the original insertion block.
-        builder.SetInsertPoint(orig_bb);
-    } else {
-        // The function was created before. Check if the signatures match.
-        // NOTE: there could be a mismatch if the derivative function was created
-        // and then optimised - optimisation might remove arguments which are compile-time
-        // constants.
-        if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument(
-                "Inconsistent function signature for the Taylor derivative of kepE() in compact mode detected");
-        }
-    }
-
-    return f;
+            return s.builder().CreateCall(fkep, args);
+        },
+        n0, n1);
 }
 
 // Derivative of kepE(var, number).

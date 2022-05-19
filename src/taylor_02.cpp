@@ -59,6 +59,7 @@
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -214,50 +215,6 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
     return llvm_min(s, x_v, llvm_abs(s, y_v));
 }
 
-// Helper to compute pow(x_v, y_v) in the Taylor stepper implementation.
-llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
-{
-    // LCOV_EXCL_START
-    assert(x_v != nullptr);
-    assert(y_v != nullptr);
-    assert(x_v->getType()->getScalarType()->isFloatingPointTy());
-    assert(x_v->getType() == y_v->getType());
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the vector arguments.
-    auto *x_t = x_v->getType()->getScalarType();
-
-#if defined(HEYOKA_HAVE_REAL128)
-    if (x_t == llvm::Type::getFP128Ty(context)) {
-        return call_extern_vec(s, {x_v, y_v}, "powq");
-    } else {
-#endif
-        // If we are operating on SIMD vectors, try to see if we have a sleef
-        // function available for pow().
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_v->getType())) {
-            // NOTE: if sfn ends up empty, we will be falling through
-            // below and use the LLVM intrinsic instead.
-            if (const auto sfn
-                = sleef_function_name(context, "pow", x_t, boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x_v, y_v},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
-            }
-        }
-
-        return llvm_invoke_intrinsic(s.builder(), "llvm.pow", {x_v->getType()}, {x_v, y_v});
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
-}
-
 } // namespace
 
 // Helper to generate the LLVM code to determine the timestep in an adaptive Taylor integrator,
@@ -400,11 +357,10 @@ llvm::Value *taylor_determine_h(llvm_state &s,
 
     // Estimate rho at orders order - 1 and order.
     auto num_rho = builder.CreateSelect(abs_or_rel, llvm::ConstantFP::get(vec_t, 1.), max_abs_state);
-    auto rho_o = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_o),
-                                 vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / order}), batch_size));
-    auto rho_om1
-        = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
-                          vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / (order - 1u)}), batch_size));
+    auto rho_o = llvm_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_o),
+                          vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / order}), batch_size));
+    auto rho_om1 = llvm_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
+                            vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / (order - 1u)}), batch_size));
 
     // Take the minimum.
     auto rho_m = llvm_min(s, rho_o, rho_om1);
@@ -2357,62 +2313,55 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 
 } // namespace detail
 
-taylor_dc_t taylor_add_jet_dbl(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
-                               std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                               const std::vector<expression> &sv_funcs, bool parallel_mode)
+template <typename T>
+taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
+                           std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
+                           const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
-    return detail::taylor_add_jet_impl<double>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
-                                               parallel_mode);
+    return detail::taylor_add_jet_impl<T>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
+                                          parallel_mode);
 }
 
-taylor_dc_t taylor_add_jet_ldbl(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
-                                std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                const std::vector<expression> &sv_funcs, bool parallel_mode)
+template <typename T>
+taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name,
+                           const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
+                           std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
+                           const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
-    return detail::taylor_add_jet_impl<long double>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
-                                                    sv_funcs, parallel_mode);
+    return detail::taylor_add_jet_impl<T>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
+                                          parallel_mode);
 }
+
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<double>(llvm_state &, const std::string &,
+                                                              const std::vector<expression> &, std::uint32_t,
+                                                              std::uint32_t, bool, bool,
+                                                              const std::vector<expression> &, bool);
+
+template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<double>(llvm_state &, const std::string &,
+                                                              const std::vector<std::pair<expression, expression>> &,
+                                                              std::uint32_t, std::uint32_t, bool, bool,
+                                                              const std::vector<expression> &, bool);
+
+template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<long double>(llvm_state &, const std::string &,
+                                                                   const std::vector<expression> &, std::uint32_t,
+                                                                   std::uint32_t, bool, bool,
+                                                                   const std::vector<expression> &, bool);
+
+template HEYOKA_DLL_PUBLIC taylor_dc_t
+taylor_add_jet<long double>(llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &,
+                            std::uint32_t, std::uint32_t, bool, bool, const std::vector<expression> &, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-taylor_dc_t taylor_add_jet_f128(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
-                                std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                const std::vector<expression> &sv_funcs, bool parallel_mode)
-{
-    return detail::taylor_add_jet_impl<mppp::real128>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
-                                                      sv_funcs, parallel_mode);
-}
+template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<mppp::real128>(llvm_state &, const std::string &,
+                                                                     const std::vector<expression> &, std::uint32_t,
+                                                                     std::uint32_t, bool, bool,
+                                                                     const std::vector<expression> &, bool);
 
-#endif
-
-taylor_dc_t taylor_add_jet_dbl(llvm_state &s, const std::string &name,
-                               const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
-                               std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                               const std::vector<expression> &sv_funcs, bool parallel_mode)
-{
-    return detail::taylor_add_jet_impl<double>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
-                                               parallel_mode);
-}
-
-taylor_dc_t taylor_add_jet_ldbl(llvm_state &s, const std::string &name,
-                                const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
-                                std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                const std::vector<expression> &sv_funcs, bool parallel_mode)
-{
-    return detail::taylor_add_jet_impl<long double>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
-                                                    sv_funcs, parallel_mode);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-taylor_dc_t taylor_add_jet_f128(llvm_state &s, const std::string &name,
-                                const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
-                                std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                const std::vector<expression> &sv_funcs, bool parallel_mode)
-{
-    return detail::taylor_add_jet_impl<mppp::real128>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
-                                                      sv_funcs, parallel_mode);
-}
+template HEYOKA_DLL_PUBLIC taylor_dc_t
+taylor_add_jet<mppp::real128>(llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &,
+                              std::uint32_t, std::uint32_t, bool, bool, const std::vector<expression> &, bool);
 
 #endif
 

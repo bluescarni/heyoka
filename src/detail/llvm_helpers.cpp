@@ -1120,7 +1120,7 @@ llvm::Value *llvm_atan2(llvm_state &s, llvm::Value *y, llvm::Value *x)
     } else {
 #endif
         if (x_t == to_llvm_type<double>(context)) {
-            if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
                 if (const auto sfn = sleef_function_name(context, "atan2", x_t,
                                                          boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
                     !sfn.empty()) {
@@ -1176,7 +1176,7 @@ llvm::Value *llvm_exp(llvm_state &s, llvm::Value *x)
     } else {
 #endif
         if (x_t == to_llvm_type<double>(context) || x_t == to_llvm_type<long double>(context)) {
-            if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
                 if (const auto sfn = sleef_function_name(context, "exp", x_t,
                                                          boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
                     !sfn.empty()) {
@@ -2458,6 +2458,896 @@ template HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper<mppp::real128>(llvm_s
                                                                           const std::string &);
 
 #endif
+
+// Inverse cosine.
+llvm::Value *llvm_acos(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of the argument.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "acosq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context)) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "acos", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return call_extern_vec(s, {x}, "acos");
+        } else if (x_t == to_llvm_type<long double>(context)) {
+            return call_extern_vec(s, {x},
+#if defined(_MSC_VER)
+                                   // NOTE: it seems like the MSVC stdlib does not have an acos function,
+                                   // because LLVM complains about the symbol "acosl" not being
+                                   // defined. Hence, use our own wrapper instead.
+                                   "heyoka_acosl"
+#else
+                               "acosl"
+#endif
+            );
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of acos()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Inverse hyperbolic cosine.
+llvm::Value *llvm_acosh(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of the argument.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "acoshq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context)) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "acosh", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return call_extern_vec(s, {x}, "acosh");
+        } else if (x_t == to_llvm_type<long double>(context)) {
+            return call_extern_vec(s, {x},
+#if defined(_MSC_VER)
+                                   // NOTE: it seems like the MSVC stdlib does not have an acosh function,
+                                   // because LLVM complains about the symbol "acoshl" not being
+                                   // defined. Hence, use our own wrapper instead.
+                                   "heyoka_acoshl"
+#else
+                               "acoshl"
+#endif
+            );
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument(
+                "Invalid floating-point type encountered in the LLVM implementation of acosh()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Inverse sine.
+llvm::Value *llvm_asin(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of the argument.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "asinq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context)) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "asin", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return call_extern_vec(s, {x}, "asin");
+        } else if (x_t == to_llvm_type<long double>(context)) {
+            return call_extern_vec(s, {x},
+#if defined(_MSC_VER)
+                                   // NOTE: it seems like the MSVC stdlib does not have an asin function,
+                                   // because LLVM complains about the symbol "asinl" not being
+                                   // defined. Hence, use our own wrapper instead.
+                                   "heyoka_asinl"
+#else
+                               "asinl"
+#endif
+            );
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of asin()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Inverse hyperbolic sine.
+llvm::Value *llvm_asinh(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of the argument.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "asinhq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context)) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "asinh", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return call_extern_vec(s, {x}, "asinh");
+        } else if (x_t == to_llvm_type<long double>(context)) {
+            return call_extern_vec(s, {x},
+#if defined(_MSC_VER)
+                                   // NOTE: it seems like the MSVC stdlib does not have an asinh function,
+                                   // because LLVM complains about the symbol "asinhl" not being
+                                   // defined. Hence, use our own wrapper instead.
+                                   "heyoka_asinhl"
+#else
+                               "asinhl"
+#endif
+            );
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument(
+                "Invalid floating-point type encountered in the LLVM implementation of asinh()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Inverse tangent.
+llvm::Value *llvm_atan(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of the argument.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "atanq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context)) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "atan", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return call_extern_vec(s, {x}, "atan");
+        } else if (x_t == to_llvm_type<long double>(context)) {
+            return call_extern_vec(s, {x},
+#if defined(_MSC_VER)
+                                   // NOTE: it seems like the MSVC stdlib does not have an atan function,
+                                   // because LLVM complains about the symbol "atanl" not being
+                                   // defined. Hence, use our own wrapper instead.
+                                   "heyoka_atanl"
+#else
+                               "atanl"
+#endif
+            );
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of atan()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Inverse hyperbolic tangent.
+llvm::Value *llvm_atanh(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of the argument.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "atanhq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context)) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "atanh", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return call_extern_vec(s, {x}, "atanh");
+        } else if (x_t == to_llvm_type<long double>(context)) {
+            return call_extern_vec(s, {x},
+#if defined(_MSC_VER)
+                                   // NOTE: it seems like the MSVC stdlib does not have an atanh function,
+                                   // because LLVM complains about the symbol "atanhl" not being
+                                   // defined. Hence, use our own wrapper instead.
+                                   "heyoka_atanhl"
+#else
+                               "atanhl"
+#endif
+            );
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument(
+                "Invalid floating-point type encountered in the LLVM implementation of atanh()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Cosine.
+llvm::Value *llvm_cos(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of x.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "cosq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context) || x_t == to_llvm_type<long double>(context)) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "cos", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return llvm_invoke_intrinsic(s.builder(), "llvm.cos", {x->getType()}, {x});
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of cos()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Sine.
+llvm::Value *llvm_sin(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of x.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "sinq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context) || x_t == to_llvm_type<long double>(context)) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "sin", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return llvm_invoke_intrinsic(s.builder(), "llvm.sin", {x->getType()}, {x});
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of sin()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Hyperbolic cosine.
+llvm::Value *llvm_cosh(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of the argument.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "coshq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context)) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "cosh", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return call_extern_vec(s, {x}, "cosh");
+        } else if (x_t == to_llvm_type<long double>(context)) {
+            return call_extern_vec(s, {x},
+#if defined(_MSC_VER)
+                                   // NOTE: it seems like the MSVC stdlib does not have an cosh function,
+                                   // because LLVM complains about the symbol "coshl" not being
+                                   // defined. Hence, use our own wrapper instead.
+                                   "heyoka_coshl"
+#else
+                               "coshl"
+#endif
+            );
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of cosh()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Error function.
+llvm::Value *llvm_erf(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of the argument.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "erfq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context)) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "erf", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return call_extern_vec(s, {x}, "erf");
+        } else if (x_t == to_llvm_type<long double>(context)) {
+            return call_extern_vec(s, {x},
+#if defined(_MSC_VER)
+                                   // NOTE: it seems like the MSVC stdlib does not have an erf function,
+                                   // because LLVM complains about the symbol "erfl" not being
+                                   // defined. Hence, use our own wrapper instead.
+                                   "heyoka_erfl"
+#else
+                               "erfl"
+#endif
+            );
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of erf()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Natural logarithm.
+llvm::Value *llvm_log(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of x.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "logq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context) || x_t == to_llvm_type<long double>(context)) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "log", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return llvm_invoke_intrinsic(s.builder(), "llvm.log", {x->getType()}, {x});
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of log()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Negation.
+llvm::Value *llvm_neg(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    return s.builder().CreateFNeg(x);
+}
+
+// Sigmoid.
+llvm::Value *llvm_sigmoid(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    // Fetch the batch size.
+    const auto batch_size = get_vector_size(x);
+
+    // Create the 1 constant.
+    auto *one_fp = vector_splat(builder, llvm::ConstantFP::get(x->getType()->getScalarType(), 1.), batch_size);
+
+    // Compute -x.
+    auto *m_x = builder.CreateFNeg(x);
+
+    // Compute e^(-x).
+    auto *e_m_x = llvm_exp(s, m_x);
+
+    // Return 1 / (1 + e_m_arg).
+    return builder.CreateFDiv(one_fp, builder.CreateFAdd(one_fp, e_m_x));
+}
+
+// Hyperbolic sine.
+llvm::Value *llvm_sinh(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of the argument.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "sinhq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context)) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "sinh", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return call_extern_vec(s, {x}, "sinh");
+        } else if (x_t == to_llvm_type<long double>(context)) {
+            return call_extern_vec(s, {x},
+#if defined(_MSC_VER)
+                                   // NOTE: it seems like the MSVC stdlib does not have an sinh function,
+                                   // because LLVM complains about the symbol "sinhl" not being
+                                   // defined. Hence, use our own wrapper instead.
+                                   "heyoka_sinhl"
+#else
+                               "sinhl"
+#endif
+            );
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of sinh()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Square root.
+llvm::Value *llvm_sqrt(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of x.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "sqrtq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context) || x_t == to_llvm_type<long double>(context)) {
+            // NOTE: currently we do not make available to heyoka any sqrt() implementation from sleef
+            // (see comments in sleef.cpp).
+            // LCOV_EXCL_START
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "sqrt", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+            // LCOV_EXCL_STOP
+
+            return llvm_invoke_intrinsic(s.builder(), "llvm.sqrt", {x->getType()}, {x});
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of sqrt()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Squaring.
+llvm::Value *llvm_square(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    return s.builder().CreateFMul(x, x);
+}
+
+// Tangent.
+llvm::Value *llvm_tan(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of the argument.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "tanq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context)) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "tan", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return call_extern_vec(s, {x}, "tan");
+        } else if (x_t == to_llvm_type<long double>(context)) {
+            return call_extern_vec(s, {x},
+#if defined(_MSC_VER)
+                                   // NOTE: it seems like the MSVC stdlib does not have an tan function,
+                                   // because LLVM complains about the symbol "tanl" not being
+                                   // defined. Hence, use our own wrapper instead.
+                                   "heyoka_tanl"
+#else
+                               "tanl"
+#endif
+            );
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of tan()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Hyperbolic tangent.
+llvm::Value *llvm_tanh(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of the argument.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x}, "tanhq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context)) {
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "tanh", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return call_extern_vec(s, {x}, "tanh");
+        } else if (x_t == to_llvm_type<long double>(context)) {
+            return call_extern_vec(s, {x},
+#if defined(_MSC_VER)
+                                   // NOTE: it seems like the MSVC stdlib does not have an tanh function,
+                                   // because LLVM complains about the symbol "tanhl" not being
+                                   // defined. Hence, use our own wrapper instead.
+                                   "heyoka_tanhl"
+#else
+                               "tanhl"
+#endif
+            );
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of tanh()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Exponentiation.
+llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_approx)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(y != nullptr);
+    assert(x->getType() == y->getType());
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of the arguments.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, {x, y}, "powq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context) || x_t == to_llvm_type<long double>(context)) {
+            // NOTE: we want to try the SLEEF route only if we are *not* allowing
+            // an approximated implementation.
+            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType()); !allow_approx && vec_t != nullptr) {
+                if (const auto sfn = sleef_function_name(context, "pow", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x, y},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            auto *ret = llvm_invoke_intrinsic(s.builder(), "llvm.pow", {x->getType()}, {x, y});
+
+            if (allow_approx) {
+                ret->setHasApproxFunc(true);
+            }
+
+            return ret;
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of pow()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
 
 } // namespace heyoka::detail
 

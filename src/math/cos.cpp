@@ -24,7 +24,6 @@
 
 #include <fmt/format.h>
 
-#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
@@ -33,7 +32,6 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
-#include <llvm/Support/Casting.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -43,7 +41,6 @@
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
-#include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
@@ -78,48 +75,6 @@ namespace detail
 cos_impl::cos_impl(expression e) : func_base("cos", std::vector{std::move(e)}) {}
 
 cos_impl::cos_impl() : cos_impl(0_dbl) {}
-
-llvm::Value *cos_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(args[0]->getType())) {
-        if (const auto sfn = sleef_function_name(s.context(), "cos", vec_t->getElementType(),
-                                                 boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-            !sfn.empty()) {
-            return llvm_invoke_external(
-                s, sfn, vec_t, args,
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
-        }
-    }
-
-    return llvm_invoke_intrinsic(s.builder(), "llvm.cos", {args[0]->getType()}, args);
-}
-
-llvm::Value *cos_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    return llvm_invoke_intrinsic(s.builder(), "llvm.cos", {args[0]->getType()}, args);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *cos_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    return call_extern_vec(s, args, "cosq");
-}
-
-#endif
 
 double cos_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
 {
@@ -202,19 +157,19 @@ namespace
 
 // Derivative of cos(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_cos_impl(llvm_state &s, const cos_impl &f, const std::vector<std::uint32_t> &, const U &num,
+llvm::Value *taylor_diff_cos_impl(llvm_state &s, const cos_impl &, const std::vector<std::uint32_t> &, const U &num,
                                   const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
                                   std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     if (order == 0u) {
-        return codegen_from_values<T>(s, f, {taylor_codegen_numparam<T>(s, num, par_ptr, batch_size)});
+        return llvm_cos(s, taylor_codegen_numparam<T>(s, num, par_ptr, batch_size));
     } else {
         return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
     }
 }
 
 template <typename T>
-llvm::Value *taylor_diff_cos_impl(llvm_state &s, const cos_impl &f, const std::vector<std::uint32_t> &deps,
+llvm::Value *taylor_diff_cos_impl(llvm_state &s, const cos_impl &, const std::vector<std::uint32_t> &deps,
                                   const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *,
                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
@@ -224,7 +179,7 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &s, const cos_impl &f, const std::v
     const auto u_idx = uname_to_index(var.name());
 
     if (order == 0u) {
-        return codegen_from_values<T>(s, f, {taylor_fetch_diff(arr, u_idx, 0, n_uvars)});
+        return llvm_cos(s, taylor_fetch_diff(arr, u_idx, 0, n_uvars));
     }
 
     // NOTE: iteration in the [1, order] range
@@ -316,16 +271,26 @@ namespace
 
 // Derivative of cos(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, const U &num, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &, const U &num, std::uint32_t n_uvars,
                                             std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_unary_num_det<T>(s, fn, num, n_uvars, batch_size, "cos", 1);
+    return taylor_c_diff_func_numpar<T>(
+        s, n_uvars, batch_size, "cos", 1,
+        [&s](const auto &args) {
+            // LCOV_EXCL_START
+            assert(args.size() == 1u);
+            assert(args[0] != nullptr);
+            // LCOV_EXCL_STOP
+
+            return llvm_cos(s, args[0]);
+        },
+        num);
 }
 
 // Derivative of cos(variable).
 template <typename T>
-llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, const variable &var,
-                                            std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &, const variable &var, std::uint32_t n_uvars,
+                                            std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -373,10 +338,8 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, c
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of var_idx.
-                builder.CreateStore(
-                    codegen_from_values<T>(s, fn,
-                                           {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)}),
-                    retval);
+                builder.CreateStore(llvm_cos(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)),
+                                    retval);
             },
             [&]() {
                 // Init the accumulator.

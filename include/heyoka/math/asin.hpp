@@ -48,12 +48,6 @@ public:
                             const std::vector<mppp::real128> &) const;
 #endif
 
-    llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-    llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
-#endif
-
     taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,

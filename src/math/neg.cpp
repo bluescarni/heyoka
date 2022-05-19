@@ -70,30 +70,6 @@ std::vector<expression> neg_impl::gradient() const
     return {-1_dbl};
 }
 
-llvm::Value *neg_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    return s.builder().CreateFNeg(args[0]);
-}
-
-llvm::Value *neg_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    // NOTE: codegen is identical as in dbl.
-    return codegen_dbl(s, args);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *neg_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &args) const
-{
-    // NOTE: codegen is identical as in dbl.
-    return codegen_dbl(s, args);
-}
-
-#endif
-
 double neg_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
 {
     assert(args().size() == 1u);
@@ -208,10 +184,20 @@ namespace
 
 // Derivative of neg(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, const neg_impl &fn, const U &num, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, const neg_impl &, const U &num, std::uint32_t n_uvars,
                                             std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_unary_num_det<T>(s, fn, num, n_uvars, batch_size, "neg");
+    return taylor_c_diff_func_numpar<T>(
+        s, n_uvars, batch_size, "neg", 0,
+        [&s](const auto &args) {
+            // LCOV_EXCL_START
+            assert(args.size() == 1u);
+            assert(args[0] != nullptr);
+            // LCOV_EXCL_STOP
+
+            return llvm_neg(s, args[0]);
+        },
+        num);
 }
 
 // Derivative of neg(variable).

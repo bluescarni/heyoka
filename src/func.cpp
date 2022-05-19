@@ -49,7 +49,6 @@
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
@@ -108,18 +107,6 @@ std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> 
 
 namespace detail
 {
-
-namespace
-{
-
-// Helper to check if a vector of llvm values contains
-// a nullptr.
-bool llvm_valvec_has_null(const std::vector<llvm::Value *> &v)
-{
-    return std::any_of(v.begin(), v.end(), [](llvm::Value *p) { return p == nullptr; });
-}
-
-} // namespace
 
 // Default implementation of to_stream() for func.
 void func_default_to_stream_impl(std::ostream &os, const func_base &f)
@@ -216,82 +203,6 @@ std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> 
 {
     return ptr()->get_mutable_args_it();
 }
-
-llvm::Value *func::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &v) const
-{
-    if (v.size() != args().size()) {
-        throw std::invalid_argument(
-            "Inconsistent number of arguments supplied to the double codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
-                get_name(), args().size(), v.size()));
-    }
-
-    if (detail::llvm_valvec_has_null(v)) {
-        throw std::invalid_argument(
-            "Null pointer detected in the array of values passed to func::codegen_dbl() for the function '{}'"_format(
-                get_name()));
-    }
-
-    auto ret = ptr()->codegen_dbl(s, v);
-
-    if (ret == nullptr) {
-        throw std::invalid_argument(
-            "The double codegen for the function '{}' returned a null pointer"_format(get_name()));
-    }
-
-    return ret;
-}
-
-llvm::Value *func::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &v) const
-{
-    if (v.size() != args().size()) {
-        throw std::invalid_argument(
-            "Inconsistent number of arguments supplied to the long double codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
-                get_name(), args().size(), v.size()));
-    }
-
-    if (detail::llvm_valvec_has_null(v)) {
-        throw std::invalid_argument(
-            "Null pointer detected in the array of values passed to func::codegen_ldbl() for the function '{}'"_format(
-                get_name()));
-    }
-
-    auto ret = ptr()->codegen_ldbl(s, v);
-
-    if (ret == nullptr) {
-        throw std::invalid_argument(
-            "The long double codegen for the function '{}' returned a null pointer"_format(get_name()));
-    }
-
-    return ret;
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *func::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &v) const
-{
-    if (v.size() != args().size()) {
-        throw std::invalid_argument(
-            "Inconsistent number of arguments supplied to the float128 codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
-                get_name(), args().size(), v.size()));
-    }
-
-    if (detail::llvm_valvec_has_null(v)) {
-        throw std::invalid_argument(
-            "Null pointer detected in the array of values passed to func::codegen_f128() for the function '{}'"_format(
-                get_name()));
-    }
-
-    auto ret = ptr()->codegen_f128(s, v);
-
-    if (ret == nullptr) {
-        throw std::invalid_argument(
-            "The float128 codegen for the function '{}' returned a null pointer"_format(get_name()));
-    }
-
-    return ret;
-}
-
-#endif
 
 std::vector<expression> func::fetch_gradient(const std::string &target) const
 {

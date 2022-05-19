@@ -15,7 +15,10 @@
 #include <random>
 #include <stdexcept>
 #include <tuple>
+#include <utility>
 #include <vector>
+
+#include <boost/algorithm/string/predicate.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -84,6 +87,68 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
                 REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx], T(1000)));
             }
         }
+    }
+}
+
+// Various tests to ensure that the approximated version of pow() is
+// being used under certain conditions.
+TEST_CASE("taylor pow approx")
+{
+    auto [x] = make_vars("x");
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        taylor_add_jet<double>(s, "jet", {pow(x, -1.5) + pow(x, 1 / 3.)}, 3, 1, false, false);
+
+        REQUIRE(boost::contains(s.get_ir(), "call contract afn double @llvm.pow"));
+        REQUIRE(boost::contains(s.get_ir(), "call contract double @llvm.pow"));
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(par[0], -1.5)}}, 3, 1, false, false);
+
+        REQUIRE(boost::contains(s.get_ir(), "call contract afn double @llvm.pow"));
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(-1.5_dbl, par[0])}}, 3, 1, false, false);
+
+        REQUIRE(!boost::contains(s.get_ir(), "call contract afn double @llvm.pow"));
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        taylor_add_jet<double>(s, "jet", {pow(x, -1.5) + pow(x, 1 / 3.)}, 3, 1, false, true);
+
+        REQUIRE(boost::contains(s.get_ir(), "call contract afn double @llvm.pow"));
+        REQUIRE(boost::contains(s.get_ir(), "call contract double @llvm.pow"));
+
+        REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.pow_approx."));
+        REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.pow."));
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(par[0], -1.5)}}, 3, 1, false, true);
+
+        REQUIRE(boost::contains(s.get_ir(), "call contract afn double @llvm.pow"));
+        REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.pow_approx."));
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(-1.5_dbl, par[0])}}, 3, 1, false, true);
+
+        REQUIRE(!boost::contains(s.get_ir(), "call contract afn double @llvm.pow"));
+        REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.pow."));
     }
 }
 

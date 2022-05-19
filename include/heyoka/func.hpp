@@ -96,12 +96,6 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual const std::vector<expression> &args() const = 0;
     virtual std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it() = 0;
 
-    virtual llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const = 0;
-    virtual llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const = 0;
-#if defined(HEYOKA_HAVE_REAL128)
-    virtual llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const = 0;
-#endif
-
     virtual bool has_diff_var() const = 0;
     virtual expression diff(std::unordered_map<const void *, expression> &, const std::string &) const = 0;
     virtual bool has_diff_par() const = 0;
@@ -169,31 +163,6 @@ using func_extra_hash_t = decltype(std::declval<std::add_lvalue_reference_t<cons
 
 template <typename T>
 inline constexpr bool func_has_extra_hash_v = std::is_same_v<detected_t<func_extra_hash_t, T>, std::size_t>;
-
-template <typename T>
-using func_codegen_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().codegen_dbl(
-    std::declval<llvm_state &>(), std::declval<const std::vector<llvm::Value *> &>()));
-
-template <typename T>
-inline constexpr bool func_has_codegen_dbl_v = std::is_same_v<detected_t<func_codegen_dbl_t, T>, llvm::Value *>;
-
-template <typename T>
-using func_codegen_ldbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().codegen_ldbl(
-    std::declval<llvm_state &>(), std::declval<const std::vector<llvm::Value *> &>()));
-
-template <typename T>
-inline constexpr bool func_has_codegen_ldbl_v = std::is_same_v<detected_t<func_codegen_ldbl_t, T>, llvm::Value *>;
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <typename T>
-using func_codegen_f128_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().codegen_f128(
-    std::declval<llvm_state &>(), std::declval<const std::vector<llvm::Value *> &>()));
-
-template <typename T>
-inline constexpr bool func_has_codegen_f128_v = std::is_same_v<detected_t<func_codegen_f128_t, T>, llvm::Value *>;
-
-#endif
 
 template <typename T>
 using func_diff_var_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(
@@ -421,34 +390,6 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     {
         return static_cast<func_base *>(&m_value)->get_mutable_args_it();
     }
-
-    // codegen.
-    llvm::Value *codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &v) const final
-    {
-        if constexpr (func_has_codegen_dbl_v<T>) {
-            return m_value.codegen_dbl(s, v);
-        } else {
-            throw not_implemented_error("double codegen is not implemented for the function '" + get_name() + "'");
-        }
-    }
-    llvm::Value *codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &v) const final
-    {
-        if constexpr (func_has_codegen_ldbl_v<T>) {
-            return m_value.codegen_ldbl(s, v);
-        } else {
-            throw not_implemented_error("long double codegen is not implemented for the function '" + get_name() + "'");
-        }
-    }
-#if defined(HEYOKA_HAVE_REAL128)
-    llvm::Value *codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &v) const final
-    {
-        if constexpr (func_has_codegen_f128_v<T>) {
-            return m_value.codegen_f128(s, v);
-        } else {
-            throw not_implemented_error("float128 codegen is not implemented for the function '" + get_name() + "'");
-        }
-    }
-#endif
 
     // diff.
     bool has_diff_var() const final
@@ -750,12 +691,6 @@ public:
     const std::vector<expression> &args() const;
     std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 
-    llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-    llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
-#endif
-
     expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
     expression diff(std::unordered_map<const void *, expression> &, const param &) const;
 
@@ -813,29 +748,6 @@ HEYOKA_DLL_PUBLIC void update_node_values_dbl(std::vector<double> &, const func 
 HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &, const func &,
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
-
-namespace detail
-{
-
-// Helper to run the codegen of a function-like object with the arguments
-// represented as a vector of LLVM values.
-template <typename T, typename F>
-inline llvm::Value *codegen_from_values(llvm_state &s, const F &f, const std::vector<llvm::Value *> &args_v)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return f.codegen_dbl(s, args_v);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return f.codegen_ldbl(s, args_v);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return f.codegen_f128(s, args_v);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
-
-} // namespace detail
 
 } // namespace heyoka
 
