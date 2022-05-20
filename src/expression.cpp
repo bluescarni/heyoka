@@ -41,6 +41,7 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -1267,19 +1268,13 @@ taylor_dc_t::size_type taylor_decompose(const expression &ex, taylor_dc_t &dc)
     return detail::taylor_decompose(func_map, ex, dc);
 }
 
-namespace detail
-{
-
-namespace
-{
-
 template <typename T>
-llvm::Value *taylor_diff_impl(llvm_state &s, const expression &ex, const std::vector<std::uint32_t> &deps,
-                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
-                              bool high_accuracy)
+llvm::Value *taylor_diff(llvm_state &s, const expression &ex, const std::vector<std::uint32_t> &deps,
+                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
+                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                         bool high_accuracy)
 {
-    if (auto fptr = std::get_if<func>(&ex.value())) {
+    if (const auto *fptr = std::get_if<func>(&ex.value())) {
         if constexpr (std::is_same_v<T, double>) {
             return fptr->taylor_diff_dbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
                                          high_accuracy);
@@ -1301,53 +1296,33 @@ llvm::Value *taylor_diff_impl(llvm_state &s, const expression &ex, const std::ve
     }
 }
 
-} // namespace
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff<double>(llvm_state &, const expression &,
+                                                            const std::vector<std::uint32_t> &,
+                                                            const std::vector<llvm::Value *> &, llvm::Value *,
+                                                            llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                                            std::uint32_t, bool);
 
-} // namespace detail
-
-llvm::Value *taylor_diff_dbl(llvm_state &s, const expression &ex, const std::vector<std::uint32_t> &deps,
-                             const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
-                             bool high_accuracy)
-
-{
-    return detail::taylor_diff_impl<double>(s, ex, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
-                                            high_accuracy);
-}
-
-llvm::Value *taylor_diff_ldbl(llvm_state &s, const expression &ex, const std::vector<std::uint32_t> &deps,
-                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
-                              bool high_accuracy)
-{
-    return detail::taylor_diff_impl<long double>(s, ex, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
-                                                 high_accuracy);
-}
+template HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff<long double>(llvm_state &, const expression &,
+                                                                 const std::vector<std::uint32_t> &,
+                                                                 const std::vector<llvm::Value *> &, llvm::Value *,
+                                                                 llvm::Value *, std::uint32_t, std::uint32_t,
+                                                                 std::uint32_t, std::uint32_t, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_diff_f128(llvm_state &s, const expression &ex, const std::vector<std::uint32_t> &deps,
-                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
-                              bool high_accuracy)
-{
-    return detail::taylor_diff_impl<mppp::real128>(s, ex, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
-                                                   high_accuracy);
-}
-
+template HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff<mppp::real128>(llvm_state &, const expression &,
+                                                                   const std::vector<std::uint32_t> &,
+                                                                   const std::vector<llvm::Value *> &, llvm::Value *,
+                                                                   llvm::Value *, std::uint32_t, std::uint32_t,
+                                                                   std::uint32_t, std::uint32_t, bool);
 #endif
 
-namespace detail
-{
-
-namespace
-{
-
 template <typename T>
-llvm::Function *taylor_c_diff_func_impl(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
-                                        std::uint32_t batch_size, bool high_accuracy)
+llvm::Function *taylor_c_diff_func(llvm_state &s, const expression &ex, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                   bool high_accuracy)
 {
-    if (auto fptr = std::get_if<func>(&ex.value())) {
+    if (const auto *fptr = std::get_if<func>(&ex.value())) {
         if constexpr (std::is_same_v<T, double>) {
             return fptr->taylor_c_diff_func_dbl(s, n_uvars, batch_size, high_accuracy);
         } else if constexpr (std::is_same_v<T, long double>) {
@@ -1366,29 +1341,17 @@ llvm::Function *taylor_c_diff_func_impl(llvm_state &s, const expression &ex, std
     }
 }
 
-} // namespace
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func<double>(llvm_state &, const expression &, std::uint32_t,
+                                                                      std::uint32_t, bool);
 
-} // namespace detail
-
-llvm::Function *taylor_c_diff_func_dbl(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
-                                       std::uint32_t batch_size, bool high_accuracy)
-{
-    return detail::taylor_c_diff_func_impl<double>(s, ex, n_uvars, batch_size, high_accuracy);
-}
-
-llvm::Function *taylor_c_diff_func_ldbl(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
-                                        std::uint32_t batch_size, bool high_accuracy)
-{
-    return detail::taylor_c_diff_func_impl<long double>(s, ex, n_uvars, batch_size, high_accuracy);
-}
+template HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func<long double>(llvm_state &, const expression &,
+                                                                           std::uint32_t, std::uint32_t, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *taylor_c_diff_func_f128(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
-                                        std::uint32_t batch_size, bool high_accuracy)
-{
-    return detail::taylor_c_diff_func_impl<mppp::real128>(s, ex, n_uvars, batch_size, high_accuracy);
-}
+template HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func<mppp::real128>(llvm_state &, const expression &,
+                                                                             std::uint32_t, std::uint32_t, bool);
 
 #endif
 
@@ -1439,9 +1402,14 @@ bool is_odd_integral_half(const expression &ex)
                             return false;
                         }
 
+                        // NOTE: here we will be assuming that, for all supported
+                        // float types, multiplication by 2 is exact.
+                        // Since we are assuming IEEE floats anyway, we should be
+                        // safe here.
+                        // NOTE: y should never become infinity here, because this would mean
+                        // that x is integral (since large float values are all integrals anyway).
                         const auto y = 2 * x;
-
-                        return isfinite(y) && y == trunc(y);
+                        return y == trunc(y);
                     },
                     v.value());
             } else {
