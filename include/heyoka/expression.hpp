@@ -336,7 +336,7 @@ namespace detail
 taylor_dc_t::size_type taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &, const expression &,
                                         taylor_dc_t &);
 
-}
+} // namespace detail
 
 HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose(const expression &, taylor_dc_t &);
 
