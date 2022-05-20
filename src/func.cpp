@@ -379,8 +379,8 @@ taylor_dc_t::size_type func::taylor_decompose(std::unordered_map<const void *, t
     } else {
         // Default implementation: append f_copy and return the index
         // at which it was appended.
+        ret = dc.size();
         dc.emplace_back(std::move(f_copy), std::vector<std::uint32_t>{});
-        ret = dc.size() - 1u;
     }
 
     if (ret == 0u) {
