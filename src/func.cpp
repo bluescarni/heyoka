@@ -355,7 +355,7 @@ void func_td_args(func &fb, std::unordered_map<const void *, taylor_dc_t::size_t
 taylor_dc_t::size_type func::taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &func_map,
                                               taylor_dc_t &dc) const
 {
-    const auto f_id = get_ptr();
+    const auto *const f_id = get_ptr();
 
     if (auto it = func_map.find(f_id); it != func_map.end()) {
         // We already decomposed the current function, fetch the result

@@ -38,6 +38,7 @@
 
 #endif
 
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/exceptions.hpp>
@@ -1247,7 +1248,7 @@ namespace detail
 taylor_dc_t::size_type taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &func_map,
                                         const expression &ex, taylor_dc_t &dc)
 {
-    if (auto fptr = std::get_if<func>(&ex.value())) {
+    if (const auto *fptr = std::get_if<func>(&ex.value())) {
         return fptr->taylor_decompose(func_map, dc);
     } else {
         return 0;
