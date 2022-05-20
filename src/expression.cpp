@@ -8,9 +8,11 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <limits>
 #include <ostream>
 #include <set>
@@ -119,7 +121,7 @@ namespace detail
 namespace
 {
 
-expression copy(std::unordered_map<const void *, expression> &func_map, const expression &e)
+expression copy_impl(std::unordered_map<const void *, expression> &func_map, const expression &e)
 {
     return std::visit(
         [&func_map](const auto &v) {
@@ -143,10 +145,10 @@ expression copy(std::unordered_map<const void *, expression> &func_map, const ex
                 auto b1 = v.args().begin();
                 for (auto [b2, e2] = f_copy.get_mutable_args_it(); b2 != e2; ++b1, ++b2) {
                     // NOTE: the argument needs to be copied via a recursive
-                    // call to copy() only if it is a func. Otherwise, the copy
+                    // call to copy_impl() only if it is a func. Otherwise, the copy
                     // we made earlier via the copy constructor is already a deep copy.
                     if (std::holds_alternative<func>(b1->value())) {
-                        *b2 = copy(func_map, *b1);
+                        *b2 = copy_impl(func_map, *b1);
                     }
                 }
 
@@ -172,7 +174,7 @@ expression copy(const expression &e)
 {
     std::unordered_map<const void *, expression> func_map;
 
-    return detail::copy(func_map, e);
+    return detail::copy_impl(func_map, e);
 }
 
 inline namespace literals
@@ -1536,6 +1538,29 @@ bool has_time(std::unordered_set<const void *> &func_set, const expression &ex)
 }
 
 } // namespace
+
+// A couple of helpers for deep-copying containers of expressions.
+std::vector<expression> copy(const std::vector<expression> &v_ex)
+{
+    std::vector<expression> ret;
+    ret.reserve(v_ex.size());
+
+    std::transform(v_ex.begin(), v_ex.end(), std::back_inserter(ret), [](const expression &e) { return copy(e); });
+
+    return ret;
+}
+
+std::vector<std::pair<expression, expression>> copy(const std::vector<std::pair<expression, expression>> &v)
+{
+    std::vector<std::pair<expression, expression>> ret;
+    ret.reserve(v.size());
+
+    std::transform(v.begin(), v.end(), std::back_inserter(ret), [](const auto &p) {
+        return std::pair{copy(p.first), copy(p.second)};
+    });
+
+    return ret;
+}
 
 } // namespace detail
 

@@ -331,7 +331,7 @@ namespace detail
 namespace
 {
 
-// Perform the decomposition of the arguments of a function. After this operation,
+// Perform the Taylor decomposition of the arguments of a function. After this operation,
 // each argument will be either:
 // - a variable,
 // - a number,
