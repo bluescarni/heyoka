@@ -908,6 +908,9 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
             // can return dres == 0 are const/params or
             // variables.
             ex = expression{"u_{}"_format(dres)};
+        } else {
+            assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
+                   || std::holds_alternative<param>(ex.value()));
         }
     }
 
@@ -1115,6 +1118,9 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
             // can return dres == 0 are const/params or
             // variables.
             ex = expression{"u_{}"_format(dres)};
+        } else {
+            assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
+                   || std::holds_alternative<param>(ex.value()));
         }
     }
 
