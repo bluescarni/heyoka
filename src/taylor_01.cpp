@@ -837,7 +837,10 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
                                                                     const std::vector<expression> &sv_funcs_)
 {
     // Need to operate on copies due to in-place mutation
-    // via rename_variables().
+    // via rename_variables() and taylor_decompose().
+    // NOTE: this is suboptimal, as expressions which are shared
+    // across different elements of v_ex/sv_funcs will be not shared any more
+    // after the copy.
     auto v_ex = detail::copy(v_ex_);
     auto sv_funcs = detail::copy(sv_funcs_);
 
@@ -994,6 +997,9 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 {
     // Need to operate on copies due to in-place mutation
     // via rename_variables().
+    // NOTE: this is suboptimal, as expressions which are shared
+    // across different elements of sys/sv_funcs will be not shared any more
+    // after the copy.
     auto sys = detail::copy(sys_);
     auto sv_funcs = detail::copy(sv_funcs_);
 
