@@ -90,6 +90,15 @@ public:
 
 HEYOKA_DLL_PUBLIC expression copy(const expression &);
 
+namespace detail
+{
+
+// A couple of helpers for deep-copying containers of expressions.
+std::vector<expression> copy(const std::vector<expression> &);
+std::vector<std::pair<expression, expression>> copy(const std::vector<std::pair<expression, expression>> &);
+
+} // namespace detail
+
 inline namespace literals
 {
 

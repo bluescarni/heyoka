@@ -17,7 +17,6 @@
 #include <exception>
 #include <initializer_list>
 #include <ios>
-#include <iterator>
 #include <limits>
 #include <locale>
 #include <numeric>
@@ -794,29 +793,6 @@ void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, c
 #endif
 
 // LCOV_EXCL_STOP
-
-// A couple of helpers for deep-copying containers of expressions.
-auto copy(const std::vector<expression> &v_ex)
-{
-    std::vector<expression> ret;
-    ret.reserve(v_ex.size());
-
-    std::transform(v_ex.begin(), v_ex.end(), std::back_inserter(ret), [](const expression &e) { return copy(e); });
-
-    return ret;
-}
-
-auto copy(const std::vector<std::pair<expression, expression>> &v)
-{
-    std::vector<std::pair<expression, expression>> ret;
-    ret.reserve(v.size());
-
-    std::transform(v.begin(), v.end(), std::back_inserter(ret), [](const auto &p) {
-        return std::pair{copy(p.first), copy(p.second)};
-    });
-
-    return ret;
-}
 
 } // namespace
 
