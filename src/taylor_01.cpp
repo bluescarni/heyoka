@@ -700,7 +700,7 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
                 using type = detail::uncvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, func>) {
-                    auto check_arg = [i](const auto &arg) {
+                    for (const auto &arg : v.args()) {
                         if (auto p_var = std::get_if<variable>(&arg.value())) {
                             assert(p_var->name().rfind("u_", 0) == 0);
                             assert(uname_to_index(p_var->name()) < i);
@@ -708,10 +708,6 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
                                    && std::get_if<param>(&arg.value()) == nullptr) {
                             assert(false);
                         }
-                    };
-
-                    for (const auto &arg : v.args()) {
-                        check_arg(arg);
                     }
                 } else {
                     assert(false);
