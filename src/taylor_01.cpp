@@ -949,6 +949,8 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
 #endif
 
     // Simplify the decomposition.
+    // NOTE: n_eq is implicitly converted to taylor_dc_t::size_type here. This is fine, as
+    // the size of the Taylor decomposition is always > n_eq anyway.
     u_vars_defs = detail::taylor_decompose_cse(u_vars_defs, sv_funcs_dc, n_eq);
 
 #if !defined(NDEBUG)
@@ -958,6 +960,8 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
 #endif
 
     // Run the breadth-first topological sort on the decomposition.
+    // NOTE: n_eq is implicitly converted to taylor_dc_t::size_type here. This is fine, as
+    // the size of the Taylor decomposition is always > n_eq anyway.
     u_vars_defs = detail::taylor_sort_dc(u_vars_defs, sv_funcs_dc, n_eq);
 
 #if !defined(NDEBUG)
@@ -1159,6 +1163,8 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 #endif
 
     // Simplify the decomposition.
+    // NOTE: n_eq is implicitly converted to taylor_dc_t::size_type here. This is fine, as
+    // the size of the Taylor decomposition is always > n_eq anyway.
     u_vars_defs = detail::taylor_decompose_cse(u_vars_defs, sv_funcs_dc, n_eq);
 
 #if !defined(NDEBUG)
@@ -1168,6 +1174,8 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 #endif
 
     // Run the breadth-first topological sort on the decomposition.
+    // NOTE: n_eq is implicitly converted to taylor_dc_t::size_type here. This is fine, as
+    // the size of the Taylor decomposition is always > n_eq anyway.
     u_vars_defs = detail::taylor_sort_dc(u_vars_defs, sv_funcs_dc, n_eq);
 
 #if !defined(NDEBUG)
