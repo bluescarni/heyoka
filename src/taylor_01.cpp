@@ -994,7 +994,8 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
     // - all the variables in the rhs expressions
     //   appear in the lhs expressions.
     // Note that not all variables in the lhs
-    // need to appear in the rhs.
+    // need to appear in the rhs: that is, not all variables
+    // need to appear in the ODEs.
 
     // This will eventually contain the list
     // of all variables in the system.
