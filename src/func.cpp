@@ -395,7 +395,7 @@ taylor_dc_t::size_type func::taylor_decompose(std::unordered_map<const void *, t
     }
 
     // Update the cache before exiting.
-    [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+    [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
     assert(flag);
 
     return ret;
