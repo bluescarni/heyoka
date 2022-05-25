@@ -1016,7 +1016,7 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
                     // Check if this is a duplicate variable.
                     if (auto res = lhs_vars_set.emplace(v.name()); res.second) {
                         // Not a duplicate, add it to lhs_vars.
-                        lhs_vars.emplace_back(v.name());
+                        lhs_vars.push_back(v.name());
                     } else {
                         // Duplicate, error out.
                         throw std::invalid_argument(
