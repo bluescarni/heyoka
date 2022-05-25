@@ -58,18 +58,6 @@
 #include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 namespace heyoka
 {
 
@@ -237,7 +225,7 @@ detail::prime_wrapper prime(expression e)
                 return detail::prime_wrapper{std::move(v.name())};
             } else {
                 throw std::invalid_argument(
-                    "Cannot apply the prime() operator to the non-variable expression '{}'"_format(e));
+                    fmt::format("Cannot apply the prime() operator to the non-variable expression '{}'", e));
             }
         },
         e.value());
