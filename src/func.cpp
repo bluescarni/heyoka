@@ -340,7 +340,25 @@ void func_td_args(func &fb, std::unordered_map<const void *, taylor_dc_t::size_t
 {
     for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
         if (const auto dres = taylor_decompose(func_map, *r.first, dc)) {
-            *r.first = expression{variable{"u_{}"_format(dres)}};
+            *r.first = expression{fmt::format("u_{}", dres)};
+        }
+
+        assert(std::holds_alternative<variable>(r.first->value()) || std::holds_alternative<number>(r.first->value())
+               || std::holds_alternative<param>(r.first->value()));
+    }
+}
+
+// Perform the decomposition of the arguments of a function. After this operation,
+// each argument will be either:
+// - a variable,
+// - a number,
+// - a param.
+void func_d_args(func &fb, std::unordered_map<const void *, std::vector<expression>::size_type> &func_map,
+                 std::vector<expression> &dc)
+{
+    for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
+        if (const auto dres = decompose(func_map, *r.first, dc)) {
+            *r.first = expression{fmt::format("u_{}", *dres)};
         }
 
         assert(std::holds_alternative<variable>(r.first->value()) || std::holds_alternative<number>(r.first->value())
@@ -351,6 +369,38 @@ void func_td_args(func &fb, std::unordered_map<const void *, taylor_dc_t::size_t
 } // namespace
 
 } // namespace detail
+
+std::vector<expression>::size_type
+func::decompose(std::unordered_map<const void *, std::vector<expression>::size_type> &func_map,
+                std::vector<expression> &dc) const
+{
+    const auto *const f_id = get_ptr();
+
+    if (auto it = func_map.find(f_id); it != func_map.end()) {
+        // We already decomposed the current function, fetch the result
+        // from the cache.
+        return it->second;
+    }
+
+    // Make a shallow copy: this will be a new function,
+    // but its arguments will be shallow-copied from this.
+    auto f_copy = copy();
+
+    // Decompose the arguments. This will overwrite
+    // the arguments in f_copy with their decomposition.
+    detail::func_d_args(f_copy, func_map, dc);
+
+    // Run the decomposition: append f_copy and return the index
+    // at which it was appended.
+    const auto ret = dc.size();
+    dc.emplace_back(std::move(f_copy));
+
+    // Update the cache before exiting.
+    [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
+    assert(flag);
+
+    return ret;
+}
 
 taylor_dc_t::size_type func::taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &func_map,
                                               taylor_dc_t &dc) const

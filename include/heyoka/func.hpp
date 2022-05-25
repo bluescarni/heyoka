@@ -706,6 +706,9 @@ public:
     double eval_num_dbl(const std::vector<double> &) const;
     double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
 
+    std::vector<expression>::size_type decompose(std::unordered_map<const void *, std::vector<expression>::size_type> &,
+                                                 std::vector<expression> &) const;
+
     taylor_dc_t::size_type taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &,
                                             taylor_dc_t &) const;
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,

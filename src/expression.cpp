@@ -14,6 +14,8 @@
 #include <cstdint>
 #include <iterator>
 #include <limits>
+#include <numeric>
+#include <optional>
 #include <ostream>
 #include <set>
 #include <stdexcept>
@@ -24,6 +26,9 @@
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/numeric/conversion/cast.hpp>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -42,6 +47,8 @@
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
@@ -1550,7 +1557,529 @@ std::vector<std::pair<expression, expression>> copy(const std::vector<std::pair<
     return ret;
 }
 
+std::optional<std::vector<expression>::size_type>
+decompose(std::unordered_map<const void *, std::vector<expression>::size_type> &func_map, const expression &ex,
+          std::vector<expression> &dc)
+{
+    if (const auto *fptr = std::get_if<func>(&ex.value())) {
+        return fptr->decompose(func_map, dc);
+    } else {
+        return {};
+    }
+}
+
+namespace
+{
+
+// LCOV_EXCL_START
+
+#if !defined(NDEBUG)
+
+// Helper to verify a function decomposition.
+void verify_function_dec(const std::vector<expression> &orig, const std::vector<expression> &dc,
+                         std::vector<expression>::size_type nvars)
+{
+    using idx_t = std::vector<expression>::size_type;
+
+    // Cache the number of outputs.
+    const auto nouts = orig.size();
+
+    assert(dc.size() >= nouts);
+
+    // The first nvars expressions of u variables
+    // must be just variables.
+    for (idx_t i = 0; i < nvars; ++i) {
+        assert(std::holds_alternative<variable>(dc[i].value()));
+    }
+
+    // From nvars to dc.size() - nouts, the expressions
+    // must be functions whose arguments
+    // are either variables in the u_n form,
+    // where n < i, or numbers/params.
+    for (auto i = nvars; i < dc.size() - nouts; ++i) {
+        std::visit(
+            [i](const auto &v) {
+                using type = detail::uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, func>) {
+                    for (const auto &arg : v.args()) {
+                        if (auto p_var = std::get_if<variable>(&arg.value())) {
+                            assert(p_var->name().rfind("u_", 0) == 0);
+                            assert(uname_to_index(p_var->name()) < i);
+                        } else if (std::get_if<number>(&arg.value()) == nullptr
+                                   && std::get_if<param>(&arg.value()) == nullptr) {
+                            assert(false);
+                        }
+                    }
+                } else {
+                    assert(false);
+                }
+            },
+            dc[i].value());
+    }
+
+    // From dc.size() - nouts to dc.size(), the expressions
+    // must be either variables in the u_n form, where n < i,
+    // or numbers/params.
+    for (auto i = dc.size() - nouts; i < dc.size(); ++i) {
+        std::visit(
+            [i](const auto &v) {
+                using type = detail::uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, variable>) {
+                    assert(v.name().rfind("u_", 0) == 0);
+                    assert(uname_to_index(v.name()) < i);
+                } else if constexpr (!std::is_same_v<type, number> && !std::is_same_v<type, param>) {
+                    assert(false);
+                }
+            },
+            dc[i].value());
+    }
+
+    std::unordered_map<std::string, expression> subs_map;
+
+    // For each u variable, expand its definition
+    // in terms of the original variables or other u variables,
+    // and store it in subs_map.
+    for (idx_t i = 0; i < dc.size() - nouts; ++i) {
+        subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map));
+    }
+
+    // Reconstruct the function components
+    // and compare them to the original ones.
+    for (auto i = dc.size() - nouts; i < dc.size(); ++i) {
+        assert(subs(dc[i], subs_map) == orig[i - (dc.size() - nouts)]);
+    }
+}
+
+#endif
+
+// LCOV_EXCL_STOP
+
+// Simplify a function decomposition by removing
+// common subexpressions.
+std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex, std::vector<expression>::size_type nvars,
+                                               std::vector<expression>::size_type nouts)
+{
+    using idx_t = std::vector<expression>::size_type;
+
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
+
+    // Cache the original size for logging later.
+    const auto orig_size = v_ex.size();
+
+    // A function decomposition is supposed
+    // to have nvars variables at the beginning,
+    // nouts variables at the end and possibly
+    // extra variables in the middle.
+    assert(v_ex.size() >= nouts + nvars);
+
+    // Init the return value.
+    std::vector<expression> retval;
+
+    // expression -> idx map. This will end up containing
+    // all the unique expressions from v_ex, and it will
+    // map them to their indices in retval (which will
+    // in general differ from their indices in v_ex).
+    std::unordered_map<expression, idx_t> ex_map;
+
+    // Map for the renaming of u variables
+    // in the expressions.
+    std::unordered_map<std::string, std::string> uvars_rename;
+
+    // The first nvars definitions are just renaming
+    // of the original variables into u variables.
+    for (idx_t i = 0; i < nvars; ++i) {
+        assert(std::holds_alternative<variable>(v_ex[i].value()));
+        retval.push_back(std::move(v_ex[i]));
+
+        // NOTE: the u vars that correspond to the original
+        // variables are never simplified,
+        // thus map them onto themselves.
+        [[maybe_unused]] const auto res = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", i));
+        assert(res.second);
+    }
+
+    // Handle the u variables which do not correspond to the original variables.
+    for (auto i = nvars; i < v_ex.size() - nouts; ++i) {
+        auto &ex = v_ex[i];
+
+        // Rename the u variables in ex.
+        rename_variables(ex, uvars_rename);
+
+        if (auto it = ex_map.find(ex); it == ex_map.end()) {
+            // This is the first occurrence of ex in the
+            // decomposition. Add it to retval.
+            retval.push_back(ex);
+
+            // Add ex to ex_map, mapping it to
+            // the index it corresponds to in retval
+            // (let's call it j).
+            ex_map.emplace(std::move(ex), retval.size() - 1u);
+
+            // Update uvars_rename. This will ensure that
+            // occurrences of the variable 'u_i' in the next
+            // elements of v_ex will be renamed to 'u_j'.
+            [[maybe_unused]] const auto res
+                = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", retval.size() - 1u));
+            assert(res.second);
+        } else {
+            // ex is redundant. This means
+            // that it already appears in retval at index
+            // it->second. Don't add anything to retval,
+            // and remap the variable name 'u_i' to
+            // 'u_{it->second}'.
+            [[maybe_unused]] const auto res
+                = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", it->second));
+            assert(res.second);
+        }
+    }
+
+    // Handle the definitions of the outputs at the end of the decomposition.
+    // We just need to ensure that
+    // the u variables in their definitions are renamed with
+    // the new indices.
+    for (auto i = v_ex.size() - nouts; i < v_ex.size(); ++i) {
+        auto &ex = v_ex[i];
+
+        // NOTE: here we expect only vars, numbers or params.
+        assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
+               || std::holds_alternative<param>(ex.value()));
+
+        rename_variables(ex, uvars_rename);
+
+        retval.push_back(std::move(ex));
+    }
+
+    get_logger()->debug("function CSE reduced decomposition size from {} to {}", orig_size, retval.size());
+    get_logger()->trace("function CSE runtime: {}", sw);
+
+    return retval;
+}
+
+// Perform a topological sort on a graph representation
+// of a function decomposition. This can improve performance
+// by grouping together operations that can be performed in parallel,
+// and it also makes compact mode much more effective by creating
+// clusters of subexpressions whose derivatives can be computed in
+// parallel.
+// NOTE: the original decomposition dc is already topologically sorted,
+// in the sense that the definitions of the u variables are already
+// ordered according to dependency. However, because the original decomposition
+// comes from a depth-first search, it has the tendency to group together
+// expressions which are dependent on each other. By doing another topological
+// sort, this time based on breadth-first search, we determine another valid
+// sorting in which independent operations tend to be clustered together.
+std::vector<expression> function_sort_dc(std::vector<expression> &dc, std::vector<expression>::size_type nvars,
+                                         std::vector<expression>::size_type nouts)
+{
+    // A function decomposition is supposed
+    // to have nvars variables at the beginning,
+    // nouts variables at the end and possibly
+    // extra variables in the middle.
+    assert(dc.size() >= nouts + nvars);
+
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
+
+    // The graph type that we will use for the topological sorting.
+    using graph_t = boost::adjacency_list<boost::vecS,           // std::vector for list of adjacent vertices
+                                          boost::vecS,           // std::vector for the list of vertices
+                                          boost::bidirectionalS, // directed graph with efficient access
+                                                                 // to in-edges
+                                          boost::no_property,    // no vertex properties
+                                          boost::no_property,    // no edge properties
+                                          boost::no_property,    // no graph properties
+                                          boost::listS           // std::list for of the graph's edge list
+                                          >;
+
+    graph_t g;
+
+    // Add the root node.
+    const auto root_v = boost::add_vertex(g);
+
+    // Add the nodes corresponding to the original variables.
+    for (decltype(nvars) i = 0; i < nvars; ++i) {
+        auto v = boost::add_vertex(g);
+
+        // Add a dependency on the root node.
+        boost::add_edge(root_v, v, g);
+    }
+
+    // Add the rest of the u variables.
+    for (decltype(nvars) i = nvars; i < dc.size() - nouts; ++i) {
+        auto v = boost::add_vertex(g);
+
+        // Fetch the list of variables in the current expression.
+        const auto vars = get_variables(dc[i]);
+
+        if (vars.empty()) {
+            // The current expression does not contain
+            // any variable: make it depend on the root
+            // node. This means that in the topological
+            // sort below, the current u var will appear
+            // immediately after the original variables.
+            boost::add_edge(root_v, v, g);
+        } else {
+            // Mark the current u variable as depending on all the
+            // variables in the current expression.
+            for (const auto &var : vars) {
+                // Extract the index.
+                const auto idx = uname_to_index(var);
+
+                // Add the dependency.
+                // NOTE: add +1 because the i-th vertex
+                // corresponds to the (i-1)-th u variable
+                // due to the presence of the root node.
+                boost::add_edge(boost::vertex(idx + 1u, g), v, g);
+            }
+        }
+    }
+
+    assert(boost::num_vertices(g) - 1u == dc.size() - nouts);
+
+    // Run the BF topological sort on the graph. This is Kahn's algorithm:
+    // https://en.wikipedia.org/wiki/Topological_sorting
+
+    // The result of the sort.
+    std::vector<decltype(dc.size())> v_idx;
+
+    // Temp variable used to sort a list of edges in the loop below.
+    std::vector<boost::graph_traits<graph_t>::edge_descriptor> tmp_edges;
+
+    // The set of all nodes with no incoming edge.
+    std::deque<decltype(dc.size())> tmp;
+    // The root node has no incoming edge.
+    tmp.push_back(0);
+
+    // Main loop.
+    while (!tmp.empty()) {
+        // Pop the first element from tmp
+        // and append it to the result.
+        const auto v = tmp.front();
+        tmp.pop_front();
+        v_idx.push_back(v);
+
+        // Fetch all the out edges of v and sort them according
+        // to the target vertex.
+        // NOTE: the sorting is important to ensure that all the original
+        // variables are insered into v_idx in the correct order.
+        const auto e_range = boost::out_edges(v, g);
+        tmp_edges.assign(e_range.first, e_range.second);
+        std::sort(tmp_edges.begin(), tmp_edges.end(),
+                  [&g](const auto &e1, const auto &e2) { return boost::target(e1, g) < boost::target(e2, g); });
+
+        // For each out edge of v:
+        // - eliminate it;
+        // - check if the target vertex of the edge
+        //   has other incoming edges;
+        // - if it does not, insert it into tmp.
+        for (auto &e : tmp_edges) {
+            // Fetch the target of the edge.
+            const auto t = boost::target(e, g);
+
+            // Remove the edge.
+            boost::remove_edge(e, g);
+
+            // Get the range of vertices connecting to t.
+            const auto iav = boost::inv_adjacent_vertices(t, g);
+
+            if (iav.first == iav.second) {
+                // t does not have any incoming edges, add it to tmp.
+                tmp.push_back(t);
+            }
+        }
+    }
+
+    assert(v_idx.size() == boost::num_vertices(g));
+    assert(boost::num_edges(g) == 0u);
+
+    // Adjust v_idx: remove the index of the root node,
+    // decrease by one all other indices, insert the final
+    // nouts indices.
+    for (decltype(v_idx.size()) i = 0; i < v_idx.size() - 1u; ++i) {
+        v_idx[i] = v_idx[i + 1u] - 1u;
+    }
+    v_idx.resize(boost::numeric_cast<decltype(v_idx.size())>(dc.size()));
+    std::iota(v_idx.data() + dc.size() - nouts, v_idx.data() + dc.size(), dc.size() - nouts);
+
+    // Create the remapping dictionary.
+    std::unordered_map<std::string, std::string> remap;
+    // NOTE: the u vars that correspond to the original
+    // variables were inserted into v_idx in the original
+    // order, thus they are not re-sorted and they do not
+    // need renaming.
+    for (decltype(v_idx.size()) i = 0; i < nvars; ++i) {
+        assert(v_idx[i] == i);
+        [[maybe_unused]] const auto res = remap.emplace(fmt::format("u_{}", i), fmt::format("u_{}", i));
+        assert(res.second);
+    }
+    // Establish the remapping for the u variables that are not
+    // original variables.
+    for (decltype(v_idx.size()) i = nvars; i < v_idx.size() - nouts; ++i) {
+        [[maybe_unused]] const auto res = remap.emplace(fmt::format("u_{}", v_idx[i]), fmt::format("u_{}", i));
+        assert(res.second);
+    }
+
+    // Do the remap for the definitions of the u variables and of the components.
+    for (auto *it = dc.data() + nvars; it != dc.data() + dc.size(); ++it) {
+        // Remap the expression.
+        rename_variables(*it, remap);
+    }
+
+    // Reorder the decomposition.
+    std::vector<expression> retval;
+    retval.reserve(v_idx.size());
+    for (auto idx : v_idx) {
+        retval.push_back(std::move(dc[idx]));
+    }
+
+    get_logger()->trace("function topological sort runtime: {}", sw);
+
+    return retval;
+}
+
+} // namespace
+
 } // namespace detail
+
+std::optional<std::vector<expression>::size_type> decompose(const expression &ex, std::vector<expression> &dc)
+{
+    std::unordered_map<const void *, std::vector<expression>::size_type> func_map;
+
+    return detail::decompose(func_map, ex, dc);
+}
+
+// Decomposition with automatic deduction of variables.
+std::pair<std::vector<expression>, std::vector<expression>::size_type>
+function_decompose(const std::vector<expression> &v_ex_)
+{
+    // Need to operate on a copy due to in-place mutation
+    // via rename_variables() and decompose().
+    // NOTE: this is suboptimal, as expressions which are shared
+    // across different elements of v_ex will be not shared any more
+    // after the copy.
+    auto v_ex = detail::copy(v_ex_);
+
+    if (v_ex.empty()) {
+        throw std::invalid_argument("Cannot decompose a function with no outputs");
+    }
+
+    // Determine the variables.
+    std::set<std::string> vars;
+    for (const auto &ex : v_ex) {
+        for (const auto &var : get_variables(ex)) {
+            vars.emplace(var);
+        }
+    }
+
+    // Cache the number of variables.
+    const auto nvars = vars.size();
+
+    // Cache the number of outputs.
+    const auto nouts = v_ex.size();
+
+    // Create the map for renaming the variables to u_i.
+    // The renaming will be done in alphabetical order.
+    std::unordered_map<std::string, std::string> repl_map;
+    {
+        decltype(vars.size()) var_idx = 0;
+        for (const auto &var : vars) {
+            [[maybe_unused]] const auto eres = repl_map.emplace(var, fmt::format("u_{}", var_idx++));
+            assert(eres.second);
+        }
+    }
+
+#if !defined(NDEBUG)
+
+    // Store a copy of the original function for checking later.
+    auto orig_v_ex = detail::copy(v_ex);
+
+#endif
+
+    // Rename the variables in the original function.
+    for (auto &ex : v_ex) {
+        rename_variables(ex, repl_map);
+    }
+
+    // Init the decomposition. It begins with a list
+    // of the original variables of the system.
+    std::vector<expression> ret;
+    ret.reserve(vars.size());
+    for (const auto &var : vars) {
+        ret.emplace_back(var);
+    }
+
+    // Log the construction runtime in trace mode.
+    spdlog::stopwatch sw;
+
+    // Run the decomposition on each component of the function.
+    for (auto &ex : v_ex) {
+        // Decompose the current equation.
+        if (const auto dres = decompose(ex, ret)) {
+            // NOTE: if the component was decomposed
+            // (that is, it is not constant or a single variable),
+            // we have to update the original definition
+            // of the equation in v_ex
+            // so that it points to the u variable
+            // that now represents it.
+            // NOTE: all functions are forced to return
+            // a non-empty dres
+            // in the func API, so the only entities that
+            // can return dres == 0 are const/params or
+            // variables.
+            ex = expression{fmt::format("u_{}", *dres)};
+        } else {
+            assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
+                   || std::holds_alternative<param>(ex.value()));
+        }
+    }
+
+    // Append the definitions of the outputs
+    // in terms of u variables.
+    for (auto &ex : v_ex) {
+        ret.emplace_back(std::move(ex));
+    }
+
+    detail::get_logger()->trace("function decomposition construction runtime: {}", sw);
+
+#if !defined(NDEBUG)
+
+    // Verify the decomposition.
+    // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
+    // This is fine, as the decomposition must contain at least nvars items.
+    detail::verify_function_dec(orig_v_ex, ret, nvars);
+
+#endif
+
+    // Simplify the decomposition.
+    // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
+    // This is fine, as the decomposition must contain at least nvars items.
+    ret = detail::function_decompose_cse(ret, nvars, nouts);
+
+#if !defined(NDEBUG)
+
+    // Verify the simplified decomposition.
+    detail::verify_function_dec(orig_v_ex, ret, nvars);
+
+#endif
+
+    // Run the breadth-first topological sort on the decomposition.
+    // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
+    // This is fine, as the decomposition must contain at least nvars items.
+    ret = detail::function_sort_dc(ret, nvars, nouts);
+
+#if !defined(NDEBUG)
+
+    // Verify the reordered decomposition.
+    detail::verify_function_dec(orig_v_ex, ret, nvars);
+
+#endif
+
+    // NOTE: static_cast is fine, as we know that ret contains at least nvars elements.
+    return std::make_pair(std::move(ret), static_cast<std::vector<expression>::size_type>(nvars));
+}
 
 // Determine if an expression is time-dependent.
 bool has_time(const expression &ex)
