@@ -473,7 +473,7 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
 }
 
 // Perform a topological sort on a graph representation
-// of the Taylor decomposition. This can improve performance
+// of a Taylor decomposition. This can improve performance
 // by grouping together operations that can be performed in parallel,
 // and it also makes compact mode much more effective by creating
 // clusters of subexpressions whose derivatives can be computed in
@@ -624,6 +624,7 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
     // order, thus they are not re-sorted and they do not
     // need renaming.
     for (decltype(v_idx.size()) i = 0; i < n_eq; ++i) {
+        assert(v_idx[i] == i);
         [[maybe_unused]] const auto res = remap.emplace("u_{}"_format(i), "u_{}"_format(i));
         assert(res.second);
     }
