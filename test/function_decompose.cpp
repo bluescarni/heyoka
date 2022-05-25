@@ -11,6 +11,7 @@
 #include <tuple>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/math/time.hpp>
 
 #include "catch.hpp"
 
@@ -68,5 +69,18 @@ TEST_CASE("basic auto")
     REQUIRE(dc[2] == "u_0"_var + "u_1"_var);
     REQUIRE(dc[3] == "u_2"_var + "u_2"_var);
     REQUIRE(dc[4] == "u_3"_var);
+    REQUIRE(nvars == 2u);
+
+    // Try with nullary function too.
+    std::tie(dc, nvars) = function_decompose({tmp + tmp, tmp * heyoka::time});
+    REQUIRE(dc.size() == 8u);
+    REQUIRE(dc[0] == x);
+    REQUIRE(dc[1] == y);
+    REQUIRE(dc[2] == heyoka::time);
+    REQUIRE(dc[3] == "u_0"_var + "u_1"_var);
+    REQUIRE(dc[4] == "u_3"_var + "u_3"_var);
+    REQUIRE(dc[5] == "u_3"_var * "u_2"_var);
+    REQUIRE(dc[6] == "u_4"_var);
+    REQUIRE(dc[7] == "u_5"_var);
     REQUIRE(nvars == 2u);
 }
