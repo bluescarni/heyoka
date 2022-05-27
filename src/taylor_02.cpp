@@ -1641,8 +1641,12 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
     // LCOV_EXCL_STOP
 
     if (compact_mode) {
-        // In compact mode, let's ensure that we can index into par_ptr using std::uint32_t.
-        // NOTE: in default mode the check is done inside taylor_codegen_numparam_par().
+        // In compact mode, we need to ensure that we can index into par_ptr using std::uint32_t.
+        // NOTE: in default mode the check is done inside taylor_codegen_numparam()
+        // during the construction of the IR code.
+        // In compact mode we cannot do that, as the determination of the index into
+        // par_ptr is done *within* the IR code (compare taylor_codegen_numparam()
+        // to taylor_c_diff_numparam_codegen()).
 
         // Deduce the size of the param array from the expressions in the decomposition.
         const auto param_size = n_pars_in_dc(dc);
