@@ -2098,6 +2098,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 #endif
 
     auto &builder = s.builder();
+    auto &context = s.context();
 
     // Record the number of equations/variables.
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -2118,10 +2119,13 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     assert(dc.size() > n_eq); // LCOV_EXCL_LINE
     const auto n_uvars = boost::numeric_cast<std::uint32_t>(dc.size() - n_eq);
 
+    // Fetch the current insertion block.
+    auto *orig_bb = builder.GetInsertBlock();
+
     // Prepare the function prototype. The first argument is a float pointer to the in/out array,
     // the second argument a const float pointer to the pars, the third argument
     // a float pointer to the time. These arrays cannot overlap.
-    auto *fp_t = to_llvm_type<T>(s.context());
+    auto *fp_t = to_llvm_type<T>(context);
     std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -2152,7 +2156,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     time_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(s.context(), "entry", f);
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
     assert(bb != nullptr); // LCOV_EXCL_LINE
     builder.SetInsertPoint(bb);
 
@@ -2302,6 +2306,9 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 
     // Verify it.
     s.verify_function(f);
+
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
 
     // Run the optimisation pass.
     s.optimise();
