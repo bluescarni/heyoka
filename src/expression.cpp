@@ -2017,18 +2017,18 @@ function_decompose(const std::vector<expression> &v_ex_)
 
     // Run the decomposition on each component of the function.
     for (auto &ex : v_ex) {
-        // Decompose the current equation.
+        // Decompose the current component.
         if (const auto dres = decompose(ex, ret)) {
             // NOTE: if the component was decomposed
             // (that is, it is not constant or a single variable),
             // we have to update the original definition
-            // of the equation in v_ex
+            // of the component in v_ex
             // so that it points to the u variable
             // that now represents it.
             // NOTE: all functions are forced to return
             // a non-empty dres
             // in the func API, so the only entities that
-            // can return dres == 0 are const/params or
+            // can return an empty dres are const/params or
             // variables.
             ex = expression{fmt::format("u_{}", *dres)};
         } else {
