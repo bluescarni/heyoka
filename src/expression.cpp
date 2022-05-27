@@ -1957,7 +1957,7 @@ std::pair<std::vector<expression>, std::vector<expression>::size_type>
 function_decompose(const std::vector<expression> &v_ex_)
 {
     // Need to operate on a copy due to in-place mutation
-    // via rename_variables() and decompose().
+    // via rename_variables().
     // NOTE: this is suboptimal, as expressions which are shared
     // across different elements of v_ex will be not shared any more
     // after the copy.
@@ -2086,7 +2086,7 @@ function_decompose(const std::vector<expression> &v_ex_)
 std::vector<expression> function_decompose(const std::vector<expression> &v_ex_, const std::vector<expression> &vars)
 {
     // Need to operate on copies due to in-place mutation
-    // via rename_variables() and decompose().
+    // via rename_variables().
     // NOTE: this is suboptimal, as expressions which are shared
     // across different elements of v_ex will be not shared any more
     // after the copy.
