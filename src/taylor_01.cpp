@@ -1094,9 +1094,6 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
         rename_variables(ex, repl_map);
     }
 
-    // Log the construction runtime in trace mode.
-    spdlog::stopwatch sw;
-
     // Init the decomposition. It begins with a list
     // of the original lhs variables of the system.
     taylor_dc_t u_vars_defs;
@@ -1104,6 +1101,9 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
     for (const auto &var : lhs_vars) {
         u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
     }
+
+    // Log the construction runtime in trace mode.
+    spdlog::stopwatch sw;
 
     // Run the decomposition on each equation.
     for (auto &[_, ex] : sys) {
