@@ -1733,7 +1733,7 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex, st
             // 'u_{it->second}'.
             [[maybe_unused]] const auto res
                 = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", it->second));
-            assert(res.second);
+            assert(res.second); // LCOV_EXCL_LINE
         }
     }
 
@@ -2005,9 +2005,9 @@ function_decompose(const std::vector<expression> &v_ex_)
     }
 
     // Init the decomposition. It begins with a list
-    // of the original variables of the system.
+    // of the original variables of the function.
     std::vector<expression> ret;
-    ret.reserve(vars.size());
+    ret.reserve(nvars);
     for (const auto &var : vars) {
         ret.emplace_back(var);
     }
