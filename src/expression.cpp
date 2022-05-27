@@ -1402,7 +1402,7 @@ bool is_odd_integral_half(const expression &ex)
 
                         // NOTE: here we will be assuming that, for all supported
                         // float types, multiplication by 2 is exact.
-                        // Since we are assuming IEEE floats anyway, we should be
+                        // Since we are assuming IEEE binary floats anyway, we should be
                         // safe here.
                         // NOTE: y should never become infinity here, because this would mean
                         // that x is integral (since large float values are all integrals anyway).

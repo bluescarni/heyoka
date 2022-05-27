@@ -175,4 +175,28 @@ TEST_CASE("basic explicit")
     REQUIRE(dc[3] == "u_1"_var + "u_0"_var);
     REQUIRE(dc[4] == "u_3"_var + "u_3"_var);
     REQUIRE(dc[5] == "u_4"_var);
+
+    // Try with nullary function too.
+    dc = function_decompose({tmp + tmp, tmp * heyoka::time}, {x, y});
+    REQUIRE(dc.size() == 8u);
+    REQUIRE(dc[0] == x);
+    REQUIRE(dc[1] == y);
+    REQUIRE(dc[2] == heyoka::time);
+    REQUIRE(dc[3] == "u_0"_var + "u_1"_var);
+    REQUIRE(dc[4] == "u_3"_var + "u_3"_var);
+    REQUIRE(dc[5] == "u_3"_var * "u_2"_var);
+    REQUIRE(dc[6] == "u_4"_var);
+    REQUIRE(dc[7] == "u_5"_var);
+
+    dc = function_decompose({tmp + tmp, tmp * heyoka::time}, {z, y, x});
+    REQUIRE(dc.size() == 9u);
+    REQUIRE(dc[0] == z);
+    REQUIRE(dc[1] == y);
+    REQUIRE(dc[2] == x);
+    REQUIRE(dc[3] == heyoka::time);
+    REQUIRE(dc[4] == "u_2"_var + "u_1"_var);
+    REQUIRE(dc[5] == "u_4"_var + "u_4"_var);
+    REQUIRE(dc[6] == "u_4"_var * "u_3"_var);
+    REQUIRE(dc[7] == "u_5"_var);
+    REQUIRE(dc[8] == "u_6"_var);
 }

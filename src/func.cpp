@@ -390,8 +390,7 @@ func::decompose(std::unordered_map<const void *, std::vector<expression>::size_t
     // the arguments in f_copy with their decomposition.
     detail::func_d_args(f_copy, func_map, dc);
 
-    // Run the decomposition: append f_copy and return the index
-    // at which it was appended.
+    // Append f_copy and return the index at which it was appended.
     const auto ret = dc.size();
     dc.emplace_back(std::move(f_copy));
 
