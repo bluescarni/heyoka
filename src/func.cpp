@@ -341,6 +341,10 @@ void func_td_args(func &fb, std::unordered_map<const void *, taylor_dc_t::size_t
     for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
         if (const auto dres = taylor_decompose(func_map, *r.first, dc)) {
             *r.first = expression{fmt::format("u_{}", dres)};
+        } else {
+            assert(std::holds_alternative<variable>(r.first->value())
+                   || std::holds_alternative<number>(r.first->value())
+                   || std::holds_alternative<param>(r.first->value()));
         }
 
         assert(std::holds_alternative<variable>(r.first->value()) || std::holds_alternative<number>(r.first->value())
@@ -359,6 +363,10 @@ void func_d_args(func &fb, std::unordered_map<const void *, std::vector<expressi
     for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
         if (const auto dres = decompose(func_map, *r.first, dc)) {
             *r.first = expression{fmt::format("u_{}", *dres)};
+        } else {
+            assert(std::holds_alternative<variable>(r.first->value())
+                   || std::holds_alternative<number>(r.first->value())
+                   || std::holds_alternative<param>(r.first->value()));
         }
 
         assert(std::holds_alternative<variable>(r.first->value()) || std::holds_alternative<number>(r.first->value())
