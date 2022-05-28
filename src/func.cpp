@@ -137,6 +137,13 @@ struct null_func : func_base {
 
 } // namespace detail
 
+} // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT(heyoka::detail::null_func)
+
+namespace heyoka
+{
+
 func::func(std::unique_ptr<detail::func_inner_base> p) : m_ptr(p.release()) {}
 
 func::func() : func(detail::null_func{}) {}

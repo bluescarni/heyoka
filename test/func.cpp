@@ -801,3 +801,28 @@ TEST_CASE("copy")
         std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).args()[1].value()).get_ptr()
         == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[1].value()).args()[1].value()).get_ptr());
 }
+
+// Bug: a default-constructed function is not serialisable.
+TEST_CASE("null func s11n")
+{
+    std::stringstream ss;
+
+    func f;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << f;
+    }
+
+    f = func{func_19{"pluto", {"x"_var}}};
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> f;
+    }
+
+    REQUIRE(f.get_name() == "null_func");
+    REQUIRE(f.args().empty());
+}
