@@ -121,7 +121,7 @@ expression copy_impl(std::unordered_map<const void *, expression> &func_map, con
 {
     return std::visit(
         [&func_map](const auto &v) {
-            if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, func>) {
+            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto f_id = v.get_ptr();
 
                 if (auto it = func_map.find(f_id); it != func_map.end()) {
@@ -259,7 +259,7 @@ void get_variables(std::unordered_set<const void *> &func_set, std::set<std::str
 {
     std::visit(
         [&func_set, &s_set](const auto &arg) {
-            using type = detail::uncvref_t<decltype(arg)>;
+            using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, func>) {
                 const auto f_id = arg.get_ptr();
@@ -292,7 +292,7 @@ void rename_variables(std::unordered_set<const void *> &func_set, expression &e,
 {
     std::visit(
         [&func_set, &repl_map](auto &arg) {
-            using type = detail::uncvref_t<decltype(arg)>;
+            using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, func>) {
                 const auto f_id = arg.get_ptr();
@@ -879,7 +879,7 @@ std::size_t get_n_nodes(std::unordered_map<const void *, std::size_t> &func_map,
 {
     return std::visit(
         [&func_map](const auto &arg) -> std::size_t {
-            if constexpr (std::is_same_v<func, detail::uncvref_t<decltype(arg)>>) {
+            if constexpr (std::is_same_v<func, uncvref_t<decltype(arg)>>) {
                 const auto f_id = arg.get_ptr();
 
                 if (auto it = func_map.find(f_id); it != func_map.end()) {
@@ -925,11 +925,12 @@ expression diff(std::unordered_map<const void *, expression> &func_map, const ex
 {
     return std::visit(
         [&func_map, &s](const auto &arg) {
-            using type = detail::uncvref_t<decltype(arg)>;
+            using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, number>) {
-                return std::visit([](const auto &v) { return expression{number{detail::uncvref_t<decltype(v)>(0)}}; },
-                                  arg.value());
+                return std::visit(
+                    [](const auto &v) { return expression{number{static_cast<uncvref_t<decltype(v)>>(0)}}; },
+                    arg.value());
             } else if constexpr (std::is_same_v<type, param>) {
                 // NOTE: if we ever implement single-precision support,
                 // this should be probably changed into 0_flt (i.e., the lowest
@@ -969,11 +970,12 @@ expression diff(std::unordered_map<const void *, expression> &func_map, const ex
 {
     return std::visit(
         [&func_map, &p](const auto &arg) {
-            using type = detail::uncvref_t<decltype(arg)>;
+            using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, number>) {
-                return std::visit([](const auto &v) { return expression{number{detail::uncvref_t<decltype(v)>(0)}}; },
-                                  arg.value());
+                return std::visit(
+                    [](const auto &v) { return expression{number{static_cast<uncvref_t<decltype(v)>>(0)}}; },
+                    arg.value());
             } else if constexpr (std::is_same_v<type, param>) {
                 if (p.idx() == arg.idx()) {
                     return 1_dbl;
@@ -1048,7 +1050,7 @@ expression subs(std::unordered_map<const void *, expression> &func_map, const ex
 {
     return std::visit(
         [&func_map, &smap](const auto &arg) {
-            using type = detail::uncvref_t<decltype(arg)>;
+            using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, number> || std::is_same_v<type, param>) {
                 return expression{arg};
@@ -1361,7 +1363,7 @@ bool is_integral(const expression &ex)
 {
     return std::visit(
         [](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
+            using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, number>) {
                 return std::visit(
@@ -1386,7 +1388,7 @@ bool is_odd_integral_half(const expression &ex)
 {
     return std::visit(
         [](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
+            using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, number>) {
                 return std::visit(
@@ -1437,7 +1439,7 @@ std::uint32_t get_param_size(std::unordered_set<const void *> &func_set, const e
 
     std::visit(
         [&retval, &func_set](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
+            using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, param>) {
                 if (v.idx() == std::numeric_limits<std::uint32_t>::max()) {
@@ -1503,7 +1505,7 @@ bool has_time(std::unordered_set<const void *> &func_set, const expression &ex)
     // - otherwise, return false.
     return std::visit(
         [&func_set](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
+            using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, func>) {
                 const auto f_id = v.get_ptr();
@@ -1600,7 +1602,7 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
     for (auto i = nvars; i < dc.size() - nouts; ++i) {
         std::visit(
             [i](const auto &v) {
-                using type = detail::uncvref_t<decltype(v)>;
+                using type = uncvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, func>) {
                     for (const auto &arg : v.args()) {
@@ -1625,7 +1627,7 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
     for (auto i = dc.size() - nouts; i < dc.size(); ++i) {
         std::visit(
             [i](const auto &v) {
-                using type = detail::uncvref_t<decltype(v)>;
+                using type = uncvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, variable>) {
                     assert(v.name().rfind("u_", 0) == 0);
