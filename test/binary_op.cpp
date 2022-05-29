@@ -121,7 +121,7 @@ TEST_CASE("diff par")
     REQUIRE(diff(par[3] / y, par[4]) == 0_dbl);
 }
 
-TEST_CASE("asin s11n")
+TEST_CASE("s11n")
 {
     std::stringstream ss;
 
