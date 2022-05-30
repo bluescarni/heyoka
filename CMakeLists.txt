@@ -272,6 +272,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/logging_impl.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/cm_utils.cpp"
     # NOTE: sleef.cpp needs to be compiled even if we are not
     # building with sleef support on.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
