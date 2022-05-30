@@ -108,7 +108,7 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
     auto udef_args_indices = [](const expression &ex) -> std::vector<std::uint32_t> {
         return std::visit(
             [](const auto &v) -> std::vector<std::uint32_t> {
-                using type = detail::uncvref_t<decltype(v)>;
+                using type = uncvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, func>) {
                     std::vector<std::uint32_t> retval;
@@ -116,7 +116,7 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
                     for (const auto &arg : v.args()) {
                         std::visit(
                             [&retval](const auto &x) {
-                                using tp = detail::uncvref_t<decltype(x)>;
+                                using tp = uncvref_t<decltype(x)>;
 
                                 if constexpr (std::is_same_v<tp, variable>) {
                                     retval.push_back(uname_to_index(x.name()));
@@ -899,7 +899,7 @@ auto taylor_udef_to_variants(const expression &ex, const std::vector<std::uint32
 {
     return std::visit(
         [&deps](const auto &v) -> std::vector<std::variant<std::uint32_t, number>> {
-            using type = detail::uncvref_t<decltype(v)>;
+            using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, func>) {
                 std::vector<std::variant<std::uint32_t, number>> retval;
@@ -907,7 +907,7 @@ auto taylor_udef_to_variants(const expression &ex, const std::vector<std::uint32
                 for (const auto &arg : v.args()) {
                     std::visit(
                         [&retval](const auto &x) {
-                            using tp = detail::uncvref_t<decltype(x)>;
+                            using tp = uncvref_t<decltype(x)>;
 
                             if constexpr (std::is_same_v<tp, variable>) {
                                 retval.emplace_back(uname_to_index(x.name()));
@@ -949,7 +949,7 @@ auto taylor_c_vv_transpose(const std::vector<std::variant<T...>> &v)
     // of the first element of v.
     auto retval = std::visit(
         [size = v.size()](const auto &x) {
-            using type = detail::uncvref_t<decltype(x)>;
+            using type = uncvref_t<decltype(x)>;
 
             std::vector<type> tmp;
             tmp.reserve(boost::numeric_cast<decltype(tmp.size())>(size));
@@ -966,10 +966,10 @@ auto taylor_c_vv_transpose(const std::vector<std::variant<T...>> &v)
                 std::visit(
                     [&x](auto &vv) {
                         // The value type of retval.
-                        using scal_t = typename detail::uncvref_t<decltype(vv)>::value_type;
+                        using scal_t = typename uncvref_t<decltype(vv)>::value_type;
 
                         // The type of the current element of v.
-                        using x_t = detail::uncvref_t<decltype(x)>;
+                        using x_t = uncvref_t<decltype(x)>;
 
                         if constexpr (std::is_same_v<scal_t, x_t>) {
                             vv.push_back(x);
@@ -1113,7 +1113,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
             for (const auto &v : vv) {
                 it->second.second.push_back(std::visit(
                     [&s](const auto &x) {
-                        using type = detail::uncvref_t<decltype(x)>;
+                        using type = uncvref_t<decltype(x)>;
 
                         if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
                             return taylor_c_make_arg_gen_vidx(s, x);
