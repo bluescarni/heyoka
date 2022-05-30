@@ -197,8 +197,8 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
     assert(counter == dc.size() - static_cast<decltype(dc.size())>(n_eq) * 2u);
 #endif
 
-    get_logger()->debug("Taylor N of segments: {}", s_dc.size());
-    get_logger()->trace("Taylor segment runtime: {}", sw);
+    get_logger()->debug("Taylor decomposition N of segments: {}", s_dc.size());
+    get_logger()->trace("Taylor decomposition segment runtime: {}", sw);
 
     return s_dc;
 }
