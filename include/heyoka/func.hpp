@@ -116,6 +116,8 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual double eval_num_dbl(const std::vector<double> &) const = 0;
     virtual double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const = 0;
 
+    virtual llvm::Value *llvm_eval(llvm_state &, const std::vector<llvm::Value *> &) const = 0;
+
     virtual taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) && = 0;
     virtual bool has_taylor_decompose() const = 0;
     virtual llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &,
@@ -230,6 +232,13 @@ using func_deval_num_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<c
 
 template <typename T>
 inline constexpr bool func_has_deval_num_dbl_v = std::is_same_v<detected_t<func_deval_num_dbl_t, T>, double>;
+
+template <typename T>
+using func_llvm_eval_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_eval(
+    std::declval<llvm_state &>(), std::declval<const std::vector<llvm::Value *> &>()));
+
+template <typename T>
+inline constexpr bool func_has_llvm_eval_v = std::is_same_v<detected_t<func_llvm_eval_t, T>, llvm::Value *>;
 
 template <typename T>
 using func_taylor_decompose_t
@@ -477,6 +486,15 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         }
     }
 
+    llvm::Value *llvm_eval(llvm_state &s, const std::vector<llvm::Value *> &args) const final
+    {
+        if constexpr (func_has_llvm_eval_v<T>) {
+            return m_value.llvm_eval(s, args);
+        } else {
+            throw not_implemented_error("LLVM eval is not implemented for the function '" + get_name() + "'");
+        }
+    }
+
     // Taylor.
     taylor_dc_t::size_type taylor_decompose(taylor_dc_t &dc) && final
     {
@@ -705,6 +723,8 @@ public:
                         const std::vector<double> &) const;
     double eval_num_dbl(const std::vector<double> &) const;
     double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
+
+    llvm::Value *llvm_eval(llvm_state &, const std::vector<llvm::Value *> &) const;
 
     std::vector<expression>::size_type decompose(std::unordered_map<const void *, std::vector<expression>::size_type> &,
                                                  std::vector<expression> &) const;

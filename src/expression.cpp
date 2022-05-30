@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <iterator>
 #include <limits>
 #include <numeric>
@@ -21,6 +22,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
@@ -34,7 +36,14 @@
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
 #include <fmt/format.h>
@@ -48,6 +57,7 @@
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -1108,7 +1118,7 @@ namespace
 
 // Pairwise reduction of a vector of expressions.
 template <typename F>
-expression pairwise_reduce(const F &func, std::vector<expression> list)
+expression pairwise_reduce_impl(const F &func, std::vector<expression> list)
 {
     assert(!list.empty());
 
@@ -1156,8 +1166,8 @@ expression pairwise_prod(std::vector<expression> prod)
         return 1_dbl;
     }
 
-    return detail::pairwise_reduce([](expression &&a, expression &&b) { return std::move(a) * std::move(b); },
-                                   std::move(prod));
+    return detail::pairwise_reduce_impl([](expression &&a, expression &&b) { return std::move(a) * std::move(b); },
+                                        std::move(prod));
 }
 
 double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map,
@@ -2248,6 +2258,289 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
 
     return ret;
 }
+
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
+                       const std::vector<expression> &dc, std::uint32_t nvars, std::uint32_t nuvars,
+                       std::uint32_t batch_size)
+{
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the scalar FP type.
+    auto *fp_t = to_llvm_type<T>(context);
+
+    // Helper to perform the codegen for a parameter.
+    auto par_codegen = [&](const param &p) {
+        // Determine the index into the parameter array.
+        // LCOV_EXCL_START
+        if (p.idx() > std::numeric_limits<std::uint32_t>::max() / batch_size) {
+            throw std::overflow_error("Overflow detected in the computation of the index into a parameter array");
+        }
+        // LCOV_EXCL_STOP
+        const auto arr_idx = static_cast<std::uint32_t>(p.idx() * batch_size);
+
+        // Compute the pointer to load from.
+        auto *ptr = builder.CreateInBoundsGEP(fp_t, par_ptr, builder.getInt32(arr_idx));
+
+        // Load and return.
+        return load_vector_from_memory(builder, ptr, batch_size);
+    };
+
+    // The array containing the evaluation of the decomposition.
+    std::vector<llvm::Value *> eval_arr;
+
+    // Init it by loading the input values from in_ptr.
+    for (std::uint32_t i = 0; i < nvars; ++i) {
+        auto *ptr = builder.CreateInBoundsGEP(fp_t, in_ptr, builder.getInt32(i * batch_size));
+        eval_arr.push_back(load_vector_from_memory(builder, ptr, batch_size));
+    }
+
+    // Evaluate the elementary subexpressions in the decomposition.
+    std::vector<llvm::Value *> llvm_args;
+    for (std::uint32_t i = nvars; i < nuvars; ++i) {
+        assert(std::holds_alternative<func>(dc[i].value()));
+
+        // Run the codegen for the arguments of the current subexpression.
+        llvm_args.clear();
+        for (const auto &arg : std::get<func>(dc[i].value()).args()) {
+            std::visit(
+                [&](const auto &v) {
+                    using type = uncvref_t<decltype(v)>;
+
+                    if constexpr (std::is_same_v<type, variable>) {
+                        // Fetch the index of the variable argument.
+                        const auto u_idx = uname_to_index(v.name());
+                        assert(u_idx < eval_arr.size());
+
+                        // Fetch the corresponding value from eval_arr.
+                        llvm_args.push_back(eval_arr[u_idx]);
+                    } else if constexpr (std::is_same_v<type, number>) {
+                        // Codegen the number argument.
+                        llvm_args.push_back(vector_splat(builder, codegen<T>(s, v), batch_size));
+                    } else if constexpr (std::is_same_v<type, param>) {
+                        // Codegen the parameter argument.
+                        llvm_args.push_back(par_codegen(v));
+                    } else {
+                        assert(false); // LCOV_EXCL_LINE
+                    }
+                },
+                arg.value());
+        }
+
+        // Proceed with the llvm eval.
+        eval_arr.push_back(std::get<func>(dc[i].value()).llvm_eval(s, llvm_args));
+    }
+
+    // Write the outputs.
+    for (decltype(dc.size()) i = nuvars; i < dc.size(); ++i) {
+        // Determine the index in the output array.
+        const auto out_idx = static_cast<std::uint32_t>((i - nuvars) * batch_size);
+
+        // Compute the pointer to load from.
+        auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.getInt32(out_idx));
+
+        std::visit(
+            [&](const auto &v) {
+                using type = uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, variable>) {
+                    // Fetch the index of the variable.
+                    const auto u_idx = uname_to_index(v.name());
+                    assert(u_idx < eval_arr.size());
+
+                    // Fetch the corresponding value from eval_arr and store it.
+                    store_vector_to_memory(builder, ptr, eval_arr[u_idx]);
+                } else if constexpr (std::is_same_v<type, number>) {
+                    // Codegen the number and store it.
+                    store_vector_to_memory(builder, ptr, vector_splat(builder, codegen<T>(s, v), batch_size));
+                } else if constexpr (std::is_same_v<type, param>) {
+                    // Codegen the parameter and store it.
+                    store_vector_to_memory(builder, ptr, par_codegen(v));
+                } else {
+                    assert(false); // LCOV_EXCL_LINE
+                }
+            },
+            dc[i].value());
+    }
+}
+
+template <typename T, typename F>
+auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::uint32_t batch_size, bool compact_mode,
+                    bool parallel_mode)
+{
+    if (s.is_compiled()) {
+        throw std::invalid_argument("A compiled function cannot be added to an llvm_state after compilation");
+    }
+
+    if (batch_size == 0u) {
+        throw std::invalid_argument("The batch size of a compiled function cannot be zero");
+    }
+
+    if (parallel_mode && !compact_mode) {
+        throw std::invalid_argument("Parallel mode can only be enabled in conjunction with compact mode");
+    }
+
+#if defined(HEYOKA_ARCH_PPC)
+    if constexpr (std::is_same_v<T, long double>) {
+        throw not_implemented_error("'long double' computations are not supported on PowerPC");
+    }
+#endif
+
+    // Decompose the function and cache the number of vars and outputs.
+    // NOTE: nvars and nouts are already safely cast to 32-bit integers.
+    auto [dc, nvars, nouts] = [&fn]() {
+        if constexpr (std::is_same_v<F, std::vector<expression>>) {
+            auto dec_res = function_decompose(fn);
+
+            return std::make_tuple(std::move(dec_res.first), boost::numeric_cast<std::uint32_t>(dec_res.second),
+                                   boost::numeric_cast<std::uint32_t>(fn.size()));
+        } else {
+            return std::make_tuple(function_decompose(fn.first, fn.second),
+                                   boost::numeric_cast<std::uint32_t>(fn.second.size()),
+                                   boost::numeric_cast<std::uint32_t>(fn.first.size()));
+        }
+    }();
+
+    // Determine the number of u variables.
+    // NOTE: this is also safely cast to a 32-bit integer.
+    assert(dc.size() >= nouts);
+    const auto nuvars = boost::numeric_cast<std::uint32_t>(dc.size() - nouts);
+
+    // Overflow checks. We need to be able to index into:
+    // - the output values (nouts * batch_size scalars),
+    // - the input values (nvars * batch_size scalars),
+    // - the parameters array (this will be checked separately by the
+    //   numparam codegen helper in non-compact mode, requires
+    //   an explicit extra check in compact mode),
+    // - the array for the evaluation of the decomposition (nuvars scalars or vectors).
+    // All indices need to be representable as 32-bit integers.
+    // LCOV_EXCL_START
+    if (nouts > std::numeric_limits<std::uint32_t>::max() / batch_size
+        || nvars > std::numeric_limits<std::uint32_t>::max() / batch_size) {
+        throw std::overflow_error("An overflow condition was detected in the construction of a compiled function");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the current insertion block.
+    auto *orig_bb = builder.GetInsertBlock();
+
+    // Prepare the function prototype. The first argument is a write-only float pointer to the outputs.
+    // The second argument is a const float pointer to the inputs. The third argument is a const float pointer to the
+    // pars. These arrays cannot overlap.
+    auto *fp_t = to_llvm_type<T>(context);
+    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_t));
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr); // LCOV_EXCL_LINE
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
+    if (f == nullptr) {
+        throw std::invalid_argument(fmt::format("Unable to create a compiled function with name '{}'", name));
+    }
+
+    // Set the names/attributes of the function arguments.
+    auto *out_ptr = f->args().begin();
+    out_ptr->setName("out_ptr");
+    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    out_ptr->addAttr(llvm::Attribute::NoAlias);
+    out_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+    auto *in_ptr = out_ptr + 1;
+    in_ptr->setName("in_ptr");
+    in_ptr->addAttr(llvm::Attribute::NoCapture);
+    in_ptr->addAttr(llvm::Attribute::NoAlias);
+    in_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto *par_ptr = out_ptr + 2;
+    par_ptr->setName("par_ptr");
+    par_ptr->addAttr(llvm::Attribute::NoCapture);
+    par_ptr->addAttr(llvm::Attribute::NoAlias);
+    par_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+    assert(bb != nullptr); // LCOV_EXCL_LINE
+    builder.SetInsertPoint(bb);
+
+    if (compact_mode) {
+        // TODO
+        // TODO: additional overflow checking about indexing
+        // into par_ptr in compact mode.
+        throw;
+    } else {
+        add_cfunc_nc_mode<T>(s, out_ptr, in_ptr, par_ptr, dc, nvars, nuvars, batch_size);
+    }
+
+    // Finish off the function.
+    builder.CreateRetVoid();
+
+    // Verify it.
+    s.verify_function(f);
+
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
+
+    // Run the optimisation pass.
+    s.optimise();
+
+    return dc;
+}
+
+} // namespace
+
+} // namespace detail
+
+template <typename T>
+std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &v_ex,
+                                  std::uint32_t batch_size, bool compact_mode, bool parallel_mode)
+{
+    return detail::add_cfunc_impl<T>(s, name, v_ex, batch_size, compact_mode, parallel_mode);
+}
+
+template <typename T>
+std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &v_ex,
+                                  const std::vector<expression> &vars, std::uint32_t batch_size, bool compact_mode,
+                                  bool parallel_mode)
+{
+    return detail::add_cfunc_impl<T>(s, name, std::make_pair(std::cref(v_ex), std::cref(vars)), batch_size,
+                                     compact_mode, parallel_mode);
+}
+
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC std::vector<expression>
+add_cfunc<double>(llvm_state &, const std::string &, const std::vector<expression> &, std::uint32_t, bool, bool);
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<double>(llvm_state &, const std::string &,
+                                                                     const std::vector<expression> &,
+                                                                     const std::vector<expression> &, std::uint32_t,
+                                                                     bool, bool);
+
+template HEYOKA_DLL_PUBLIC std::vector<expression>
+add_cfunc<long double>(llvm_state &, const std::string &, const std::vector<expression> &, std::uint32_t, bool, bool);
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<long double>(llvm_state &, const std::string &,
+                                                                          const std::vector<expression> &,
+                                                                          const std::vector<expression> &,
+                                                                          std::uint32_t, bool, bool);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template HEYOKA_DLL_PUBLIC std::vector<expression>
+add_cfunc<mppp::real128>(llvm_state &, const std::string &, const std::vector<expression> &, std::uint32_t, bool, bool);
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real128>(llvm_state &, const std::string &,
+                                                                            const std::vector<expression> &,
+                                                                            const std::vector<expression> &,
+                                                                            std::uint32_t, bool, bool);
+
+#endif
 
 // Determine if an expression is time-dependent.
 bool has_time(const expression &ex)

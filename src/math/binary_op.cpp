@@ -233,6 +233,23 @@ void binary_op::eval_batch_dbl(std::vector<double> &out_values,
     }
 }
 
+llvm::Value *binary_op::llvm_eval(llvm_state &s, const std::vector<llvm::Value *> &args) const
+{
+    assert(args.size() == 2u);
+
+    switch (op()) {
+        case binary_op::type::add:
+            return s.builder().CreateFAdd(args[0], args[1]);
+        case binary_op::type::sub:
+            return s.builder().CreateFSub(args[0], args[1]);
+        case binary_op::type::mul:
+            return s.builder().CreateFMul(args[0], args[1]);
+        default:
+            assert(op() == binary_op::type::div);
+            return s.builder().CreateFDiv(args[0], args[1]);
+    }
+}
+
 namespace
 {
 

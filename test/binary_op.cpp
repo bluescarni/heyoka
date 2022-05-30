@@ -9,6 +9,7 @@
 #include <sstream>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/binary_op.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -144,4 +145,27 @@ TEST_CASE("s11n")
     }
 
     REQUIRE(ex == x + y);
+}
+
+TEST_CASE("cfunc")
+{
+    using fp_t = double;
+
+    auto [x, y] = make_vars("x", "y");
+
+    llvm_state s;
+
+    add_cfunc<fp_t>(s, "cfunc", {(x + y) / par[0] + expression{static_cast<fp_t>(-1)}}, 1, false, false);
+
+    s.compile();
+
+    auto fptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
+
+    fp_t input[] = {2, 3};
+    fp_t output = 0;
+    fp_t pvals = 4;
+
+    fptr(&output, input, &pvals);
+
+    REQUIRE(output == (input[0] + input[1]) / pvals - 1);
 }

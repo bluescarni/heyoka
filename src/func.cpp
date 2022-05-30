@@ -332,6 +332,18 @@ double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::si
     return ptr()->deval_num_dbl(v, i);
 }
 
+llvm::Value *func::llvm_eval(llvm_state &s, const std::vector<llvm::Value *> &largs) const
+{
+    if (args().size() != largs.size()) {
+        throw std::invalid_argument(
+            fmt::format("Inconsistent arity detected in the LLVM evaluation of function '{}': the function has {} "
+                        "arguments, but {} LLVM arguments were provided instead",
+                        get_name(), args().size(), largs.size()));
+    }
+
+    return ptr()->llvm_eval(s, largs);
+}
+
 namespace detail
 {
 

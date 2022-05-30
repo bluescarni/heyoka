@@ -401,6 +401,14 @@ function_decompose(const std::vector<expression> &);
 HEYOKA_DLL_PUBLIC std::vector<expression> function_decompose(const std::vector<expression> &,
                                                              const std::vector<expression> &);
 
+template <typename>
+HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
+                                                    std::uint32_t, bool, bool = false);
+
+template <typename>
+HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
+                                                    const std::vector<expression> &, std::uint32_t, bool, bool = false);
+
 } // namespace heyoka
 
 namespace std
