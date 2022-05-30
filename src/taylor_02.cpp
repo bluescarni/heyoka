@@ -51,6 +51,7 @@
 
 #endif
 
+#include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -986,14 +987,6 @@ auto taylor_c_vv_transpose(const std::vector<std::variant<T...>> &v)
 
     return retval;
 }
-
-// Comparision operator for LLVM functions based on their names.
-struct llvm_func_name_compare {
-    bool operator()(const llvm::Function *f0, const llvm::Function *f1) const
-    {
-        return f0->getName() < f1->getName();
-    }
-};
 
 // For each segment in s_dc, this function will return a dict mapping an LLVM function
 // f for the computation of a Taylor derivative to a size and a vector of std::functions. For example, one entry
