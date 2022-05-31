@@ -892,53 +892,6 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state 
     };
 }
 
-// Helper to convert the arguments of the definition of a u variable
-// into a vector of variants. u variables will be converted to their indices,
-// numbers will be unchanged, parameters will be converted to their indices.
-// The hidden deps will also be converted to indices.
-auto taylor_udef_to_variants(const expression &ex, const std::vector<std::uint32_t> &deps)
-{
-    return std::visit(
-        [&deps](const auto &v) -> std::vector<std::variant<std::uint32_t, number>> {
-            using type = uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, func>) {
-                std::vector<std::variant<std::uint32_t, number>> retval;
-
-                for (const auto &arg : v.args()) {
-                    std::visit(
-                        [&retval](const auto &x) {
-                            using tp = uncvref_t<decltype(x)>;
-
-                            if constexpr (std::is_same_v<tp, variable>) {
-                                retval.emplace_back(uname_to_index(x.name()));
-                            } else if constexpr (std::is_same_v<tp, number>) {
-                                retval.emplace_back(x);
-                            } else if constexpr (std::is_same_v<tp, param>) {
-                                retval.emplace_back(x.idx());
-                            } else {
-                                throw std::invalid_argument(
-                                    "Invalid argument encountered in an element of a Taylor decomposition: the "
-                                    "argument is not a variable or a number");
-                            }
-                        },
-                        arg.value());
-                }
-
-                // Handle the hidden deps.
-                for (auto idx : deps) {
-                    retval.emplace_back(idx);
-                }
-
-                return retval;
-            } else {
-                throw std::invalid_argument("Invalid expression encountered in a Taylor decomposition: the "
-                                            "expression is not a function");
-            }
-        },
-        ex.value());
-}
-
 // Helper to convert a vector of variants into a variant of vectors.
 // All elements of v must be of the same type, and v cannot be empty.
 template <typename... T>
@@ -1026,7 +979,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 
         for (const auto &ex : seg) {
             // Get the function for the computation of the derivative.
-            auto func = taylor_c_diff_func<T>(s, ex.first, n_uvars, batch_size, high_accuracy);
+            auto *func = taylor_c_diff_func<T>(s, ex.first, n_uvars, batch_size, high_accuracy);
 
             // Insert the function into tmp_map.
             const auto [it, is_new_func] = tmp_map.try_emplace(func);
@@ -1035,7 +988,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 
             // Convert the variables/constants in the current dc
             // element into a set of indices/constants.
-            const auto cdiff_args = taylor_udef_to_variants(ex.first, ex.second);
+            const auto cdiff_args = udef_to_variants(ex.first, ex.second);
 
             if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
                 throw std::invalid_argument(

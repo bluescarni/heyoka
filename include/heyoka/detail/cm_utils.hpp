@@ -9,6 +9,11 @@
 #ifndef HEYOKA_DETAIL_CM_UTILS_HPP
 #define HEYOKA_DETAIL_CM_UTILS_HPP
 
+#include <cstdint>
+#include <variant>
+#include <vector>
+
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 
 namespace heyoka::detail
@@ -18,6 +23,9 @@ namespace heyoka::detail
 struct llvm_func_name_compare {
     bool operator()(const llvm::Function *, const llvm::Function *) const;
 };
+
+std::vector<std::variant<std::uint32_t, number>> udef_to_variants(const expression &,
+                                                                  const std::vector<std::uint32_t> &);
 
 } // namespace heyoka::detail
 
