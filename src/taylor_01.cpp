@@ -17,7 +17,6 @@
 #include <exception>
 #include <initializer_list>
 #include <ios>
-#include <iterator>
 #include <limits>
 #include <locale>
 #include <numeric>
@@ -474,7 +473,7 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
 }
 
 // Perform a topological sort on a graph representation
-// of the Taylor decomposition. This can improve performance
+// of a Taylor decomposition. This can improve performance
 // by grouping together operations that can be performed in parallel,
 // and it also makes compact mode much more effective by creating
 // clusters of subexpressions whose derivatives can be computed in
@@ -625,6 +624,7 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
     // order, thus they are not re-sorted and they do not
     // need renaming.
     for (decltype(v_idx.size()) i = 0; i < n_eq; ++i) {
+        assert(v_idx[i] == i);
         [[maybe_unused]] const auto res = remap.emplace("u_{}"_format(i), "u_{}"_format(i));
         assert(res.second);
     }
@@ -701,7 +701,7 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
                 using type = detail::uncvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, func>) {
-                    auto check_arg = [i](const auto &arg) {
+                    for (const auto &arg : v.args()) {
                         if (auto p_var = std::get_if<variable>(&arg.value())) {
                             assert(p_var->name().rfind("u_", 0) == 0);
                             assert(uname_to_index(p_var->name()) < i);
@@ -709,10 +709,6 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
                                    && std::get_if<param>(&arg.value()) == nullptr) {
                             assert(false);
                         }
-                    };
-
-                    for (const auto &arg : v.args()) {
-                        check_arg(arg);
                     }
                 } else {
                     assert(false);
@@ -795,29 +791,6 @@ void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, c
 
 // LCOV_EXCL_STOP
 
-// A couple of helpers for deep-copying containers of expressions.
-auto copy(const std::vector<expression> &v_ex)
-{
-    std::vector<expression> ret;
-    ret.reserve(v_ex.size());
-
-    std::transform(v_ex.begin(), v_ex.end(), std::back_inserter(ret), [](const expression &e) { return copy(e); });
-
-    return ret;
-}
-
-auto copy(const std::vector<std::pair<expression, expression>> &v)
-{
-    std::vector<std::pair<expression, expression>> ret;
-    ret.reserve(v.size());
-
-    std::transform(v.begin(), v.end(), std::back_inserter(ret), [](const auto &p) {
-        return std::pair{copy(p.first), copy(p.second)};
-    });
-
-    return ret;
-}
-
 } // namespace
 
 } // namespace detail
@@ -837,7 +810,10 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
                                                                     const std::vector<expression> &sv_funcs_)
 {
     // Need to operate on copies due to in-place mutation
-    // via rename_variables().
+    // via rename_variables() and taylor_decompose().
+    // NOTE: this is suboptimal, as expressions which are shared
+    // across different elements of v_ex/sv_funcs will be not shared any more
+    // after the copy.
     auto v_ex = detail::copy(v_ex_);
     auto sv_funcs = detail::copy(sv_funcs_);
 
@@ -929,6 +905,9 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
             // can return dres == 0 are const/params or
             // variables.
             ex = expression{"u_{}"_format(dres)};
+        } else {
+            assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
+                   || std::holds_alternative<param>(ex.value()));
         }
     }
 
@@ -967,6 +946,8 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
 #endif
 
     // Simplify the decomposition.
+    // NOTE: n_eq is implicitly converted to taylor_dc_t::size_type here. This is fine, as
+    // the size of the Taylor decomposition is always > n_eq anyway.
     u_vars_defs = detail::taylor_decompose_cse(u_vars_defs, sv_funcs_dc, n_eq);
 
 #if !defined(NDEBUG)
@@ -976,6 +957,8 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
 #endif
 
     // Run the breadth-first topological sort on the decomposition.
+    // NOTE: n_eq is implicitly converted to taylor_dc_t::size_type here. This is fine, as
+    // the size of the Taylor decomposition is always > n_eq anyway.
     u_vars_defs = detail::taylor_sort_dc(u_vars_defs, sv_funcs_dc, n_eq);
 
 #if !defined(NDEBUG)
@@ -993,7 +976,10 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>>
 taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, const std::vector<expression> &sv_funcs_)
 {
     // Need to operate on copies due to in-place mutation
-    // via rename_variables().
+    // via rename_variables() and taylor_decompose().
+    // NOTE: this is suboptimal, as expressions which are shared
+    // across different elements of sys/sv_funcs will be not shared any more
+    // after the copy.
     auto sys = detail::copy(sys_);
     auto sv_funcs = detail::copy(sv_funcs_);
 
@@ -1008,7 +994,8 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
     // - all the variables in the rhs expressions
     //   appear in the lhs expressions.
     // Note that not all variables in the lhs
-    // need to appear in the rhs.
+    // need to appear in the rhs: that is, not all variables
+    // need to appear in the ODEs.
 
     // This will eventually contain the list
     // of all variables in the system.
@@ -1029,7 +1016,7 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
                     // Check if this is a duplicate variable.
                     if (auto res = lhs_vars_set.emplace(v.name()); res.second) {
                         // Not a duplicate, add it to lhs_vars.
-                        lhs_vars.emplace_back(v.name());
+                        lhs_vars.push_back(v.name());
                     } else {
                         // Duplicate, error out.
                         throw std::invalid_argument(
@@ -1107,9 +1094,6 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
         rename_variables(ex, repl_map);
     }
 
-    // Log the construction runtime in trace mode.
-    spdlog::stopwatch sw;
-
     // Init the decomposition. It begins with a list
     // of the original lhs variables of the system.
     taylor_dc_t u_vars_defs;
@@ -1117,6 +1101,9 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
     for (const auto &var : lhs_vars) {
         u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
     }
+
+    // Log the construction runtime in trace mode.
+    spdlog::stopwatch sw;
 
     // Run the decomposition on each equation.
     for (auto &[_, ex] : sys) {
@@ -1133,6 +1120,9 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
             // can return dres == 0 are const/params or
             // variables.
             ex = expression{"u_{}"_format(dres)};
+        } else {
+            assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
+                   || std::holds_alternative<param>(ex.value()));
         }
     }
 
@@ -1171,6 +1161,8 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 #endif
 
     // Simplify the decomposition.
+    // NOTE: n_eq is implicitly converted to taylor_dc_t::size_type here. This is fine, as
+    // the size of the Taylor decomposition is always > n_eq anyway.
     u_vars_defs = detail::taylor_decompose_cse(u_vars_defs, sv_funcs_dc, n_eq);
 
 #if !defined(NDEBUG)
@@ -1180,6 +1172,8 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 #endif
 
     // Run the breadth-first topological sort on the decomposition.
+    // NOTE: n_eq is implicitly converted to taylor_dc_t::size_type here. This is fine, as
+    // the size of the Taylor decomposition is always > n_eq anyway.
     u_vars_defs = detail::taylor_sort_dc(u_vars_defs, sv_funcs_dc, n_eq);
 
 #if !defined(NDEBUG)

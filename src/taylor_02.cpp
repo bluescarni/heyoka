@@ -51,6 +51,7 @@
 
 #endif
 
+#include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -108,7 +109,7 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
     auto udef_args_indices = [](const expression &ex) -> std::vector<std::uint32_t> {
         return std::visit(
             [](const auto &v) -> std::vector<std::uint32_t> {
-                using type = detail::uncvref_t<decltype(v)>;
+                using type = uncvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, func>) {
                     std::vector<std::uint32_t> retval;
@@ -116,7 +117,7 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
                     for (const auto &arg : v.args()) {
                         std::visit(
                             [&retval](const auto &x) {
-                                using tp = detail::uncvref_t<decltype(x)>;
+                                using tp = uncvref_t<decltype(x)>;
 
                                 if constexpr (std::is_same_v<tp, variable>) {
                                     retval.push_back(uname_to_index(x.name()));
@@ -197,8 +198,8 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
     assert(counter == dc.size() - static_cast<decltype(dc.size())>(n_eq) * 2u);
 #endif
 
-    get_logger()->debug("Taylor N of segments: {}", s_dc.size());
-    get_logger()->trace("Taylor segment runtime: {}", sw);
+    get_logger()->debug("Taylor decomposition N of segments: {}", s_dc.size());
+    get_logger()->trace("Taylor decomposition segment runtime: {}", sw);
 
     return s_dc;
 }
@@ -891,110 +892,6 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state 
     };
 }
 
-// Helper to convert the arguments of the definition of a u variable
-// into a vector of variants. u variables will be converted to their indices,
-// numbers will be unchanged, parameters will be converted to their indices.
-// The hidden deps will also be converted to indices.
-auto taylor_udef_to_variants(const expression &ex, const std::vector<std::uint32_t> &deps)
-{
-    return std::visit(
-        [&deps](const auto &v) -> std::vector<std::variant<std::uint32_t, number>> {
-            using type = detail::uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, func>) {
-                std::vector<std::variant<std::uint32_t, number>> retval;
-
-                for (const auto &arg : v.args()) {
-                    std::visit(
-                        [&retval](const auto &x) {
-                            using tp = detail::uncvref_t<decltype(x)>;
-
-                            if constexpr (std::is_same_v<tp, variable>) {
-                                retval.emplace_back(uname_to_index(x.name()));
-                            } else if constexpr (std::is_same_v<tp, number>) {
-                                retval.emplace_back(x);
-                            } else if constexpr (std::is_same_v<tp, param>) {
-                                retval.emplace_back(x.idx());
-                            } else {
-                                throw std::invalid_argument(
-                                    "Invalid argument encountered in an element of a Taylor decomposition: the "
-                                    "argument is not a variable or a number");
-                            }
-                        },
-                        arg.value());
-                }
-
-                // Handle the hidden deps.
-                for (auto idx : deps) {
-                    retval.emplace_back(idx);
-                }
-
-                return retval;
-            } else {
-                throw std::invalid_argument("Invalid expression encountered in a Taylor decomposition: the "
-                                            "expression is not a function");
-            }
-        },
-        ex.value());
-}
-
-// Helper to convert a vector of variants into a variant of vectors.
-// All elements of v must be of the same type, and v cannot be empty.
-template <typename... T>
-auto taylor_c_vv_transpose(const std::vector<std::variant<T...>> &v)
-{
-    assert(!v.empty());
-
-    // Init the return value based on the type
-    // of the first element of v.
-    auto retval = std::visit(
-        [size = v.size()](const auto &x) {
-            using type = detail::uncvref_t<decltype(x)>;
-
-            std::vector<type> tmp;
-            tmp.reserve(boost::numeric_cast<decltype(tmp.size())>(size));
-            tmp.push_back(x);
-
-            return std::variant<std::vector<T>...>(std::move(tmp));
-        },
-        v[0]);
-
-    // Append the other values from v.
-    for (decltype(v.size()) i = 1; i < v.size(); ++i) {
-        std::visit(
-            [&retval](const auto &x) {
-                std::visit(
-                    [&x](auto &vv) {
-                        // The value type of retval.
-                        using scal_t = typename detail::uncvref_t<decltype(vv)>::value_type;
-
-                        // The type of the current element of v.
-                        using x_t = detail::uncvref_t<decltype(x)>;
-
-                        if constexpr (std::is_same_v<scal_t, x_t>) {
-                            vv.push_back(x);
-                        } else {
-                            throw std::invalid_argument(
-                                "Inconsistent types detected while building the transposed sets of "
-                                "arguments for the Taylor derivative functions in compact mode");
-                        }
-                    },
-                    retval);
-            },
-            v[i]);
-    }
-
-    return retval;
-}
-
-// Comparision operator for LLVM functions based on their names.
-struct llvm_func_name_compare {
-    bool operator()(const llvm::Function *f0, const llvm::Function *f1) const
-    {
-        return f0->getName() < f1->getName();
-    }
-};
-
 // For each segment in s_dc, this function will return a dict mapping an LLVM function
 // f for the computation of a Taylor derivative to a size and a vector of std::functions. For example, one entry
 // in the return value will read something like:
@@ -1033,7 +930,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 
         for (const auto &ex : seg) {
             // Get the function for the computation of the derivative.
-            auto func = taylor_c_diff_func<T>(s, ex.first, n_uvars, batch_size, high_accuracy);
+            auto *func = taylor_c_diff_func<T>(s, ex.first, n_uvars, batch_size, high_accuracy);
 
             // Insert the function into tmp_map.
             const auto [it, is_new_func] = tmp_map.try_emplace(func);
@@ -1042,7 +939,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 
             // Convert the variables/constants in the current dc
             // element into a set of indices/constants.
-            const auto cdiff_args = taylor_udef_to_variants(ex.first, ex.second);
+            const auto cdiff_args = udef_to_variants(ex.first, ex.second);
 
             if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
                 throw std::invalid_argument(
@@ -1089,7 +986,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 
                 // Turn tmp_c_vec (a vector of variants) into a variant
                 // of vectors, and insert the result.
-                it->second.push_back(taylor_c_vv_transpose(tmp_c_vec));
+                it->second.push_back(vv_transpose(tmp_c_vec));
             }
         }
 
@@ -1113,7 +1010,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
             for (const auto &v : vv) {
                 it->second.second.push_back(std::visit(
                     [&s](const auto &x) {
-                        using type = detail::uncvref_t<decltype(x)>;
+                        using type = uncvref_t<decltype(x)>;
 
                         if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
                             return taylor_c_make_arg_gen_vidx(s, x);
@@ -1641,8 +1538,12 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
     // LCOV_EXCL_STOP
 
     if (compact_mode) {
-        // In compact mode, let's ensure that we can index into par_ptr using std::uint32_t.
-        // NOTE: in default mode the check is done inside taylor_codegen_numparam_par().
+        // In compact mode, we need to ensure that we can index into par_ptr using std::uint32_t.
+        // NOTE: in default mode the check is done inside taylor_codegen_numparam()
+        // during the construction of the IR code.
+        // In compact mode we cannot do that, as the determination of the index into
+        // par_ptr is done *within* the IR code (compare taylor_codegen_numparam()
+        // to taylor_c_diff_numparam_codegen()).
 
         // Deduce the size of the param array from the expressions in the decomposition.
         const auto param_size = n_pars_in_dc(dc);
@@ -2098,6 +1999,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 #endif
 
     auto &builder = s.builder();
+    auto &context = s.context();
 
     // Record the number of equations/variables.
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -2118,10 +2020,13 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     assert(dc.size() > n_eq); // LCOV_EXCL_LINE
     const auto n_uvars = boost::numeric_cast<std::uint32_t>(dc.size() - n_eq);
 
+    // Fetch the current insertion block.
+    auto *orig_bb = builder.GetInsertBlock();
+
     // Prepare the function prototype. The first argument is a float pointer to the in/out array,
     // the second argument a const float pointer to the pars, the third argument
     // a float pointer to the time. These arrays cannot overlap.
-    auto *fp_t = to_llvm_type<T>(s.context());
+    auto *fp_t = to_llvm_type<T>(context);
     std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -2152,7 +2057,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     time_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(s.context(), "entry", f);
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
     assert(bb != nullptr); // LCOV_EXCL_LINE
     builder.SetInsertPoint(bb);
 
@@ -2302,6 +2207,9 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 
     // Verify it.
     s.verify_function(f);
+
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
 
     // Run the optimisation pass.
     s.optimise();

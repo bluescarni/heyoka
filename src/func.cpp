@@ -137,6 +137,13 @@ struct null_func : func_base {
 
 } // namespace detail
 
+} // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT(heyoka::detail::null_func)
+
+namespace heyoka
+{
+
 func::func(std::unique_ptr<detail::func_inner_base> p) : m_ptr(p.release()) {}
 
 func::func() : func(detail::null_func{}) {}
@@ -331,7 +338,7 @@ namespace detail
 namespace
 {
 
-// Perform the decomposition of the arguments of a function. After this operation,
+// Perform the Taylor decomposition of the arguments of a function. After this operation,
 // each argument will be either:
 // - a variable,
 // - a number,
@@ -355,7 +362,7 @@ void func_td_args(func &fb, std::unordered_map<const void *, taylor_dc_t::size_t
 taylor_dc_t::size_type func::taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &func_map,
                                               taylor_dc_t &dc) const
 {
-    const auto f_id = get_ptr();
+    const auto *const f_id = get_ptr();
 
     if (auto it = func_map.find(f_id); it != func_map.end()) {
         // We already decomposed the current function, fetch the result
@@ -379,8 +386,8 @@ taylor_dc_t::size_type func::taylor_decompose(std::unordered_map<const void *, t
     } else {
         // Default implementation: append f_copy and return the index
         // at which it was appended.
+        ret = dc.size();
         dc.emplace_back(std::move(f_copy), std::vector<std::uint32_t>{});
-        ret = dc.size() - 1u;
     }
 
     if (ret == 0u) {
@@ -395,7 +402,7 @@ taylor_dc_t::size_type func::taylor_decompose(std::unordered_map<const void *, t
     }
 
     // Update the cache before exiting.
-    [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+    [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
     assert(flag);
 
     return ret;
