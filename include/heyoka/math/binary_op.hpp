@@ -82,7 +82,14 @@ public:
     void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
                         const std::vector<double> &) const;
 
-    llvm::Value *llvm_eval(llvm_state &, const std::vector<llvm::Value *> &) const;
+    [[nodiscard]] llvm::Value *llvm_eval_dbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
+                                             std::uint32_t, bool) const;
+    [[nodiscard]] llvm::Value *llvm_eval_ldbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
+                                              std::uint32_t, bool) const;
+#if defined(HEYOKA_HAVE_REAL128)
+    [[nodiscard]] llvm::Value *llvm_eval_f128(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
+                                              std::uint32_t, bool) const;
+#endif
 
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,

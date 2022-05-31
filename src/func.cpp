@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <limits>
 #include <memory>
 #include <ostream>
 #include <stdexcept>
@@ -39,6 +40,11 @@
 
 #endif
 
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Type.h>
+#include <llvm/IR/Value.h>
+
 #include <fmt/format.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -49,10 +55,14 @@
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
@@ -332,17 +342,46 @@ double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::si
     return ptr()->deval_num_dbl(v, i);
 }
 
-llvm::Value *func::llvm_eval(llvm_state &s, const std::vector<llvm::Value *> &largs) const
+llvm::Value *func::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                 std::uint32_t batch_size, bool high_accuracy) const
 {
-    if (args().size() != largs.size()) {
-        throw std::invalid_argument(
-            fmt::format("Inconsistent arity detected in the LLVM evaluation of function '{}': the function has {} "
-                        "arguments, but {} LLVM arguments were provided instead",
-                        get_name(), args().size(), largs.size()));
-    }
-
-    return ptr()->llvm_eval(s, largs);
+    return ptr()->llvm_eval_dbl(s, eval_arr, par_ptr, batch_size, high_accuracy);
 }
+
+llvm::Value *func::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                  std::uint32_t batch_size, bool high_accuracy) const
+{
+    return ptr()->llvm_eval_ldbl(s, eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *func::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                  std::uint32_t batch_size, bool high_accuracy) const
+{
+    return ptr()->llvm_eval_f128(s, eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+#endif
+
+llvm::Function *func::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return ptr()->llvm_c_eval_func_dbl(s, batch_size, high_accuracy);
+}
+
+llvm::Function *func::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return ptr()->llvm_c_eval_func_ldbl(s, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *func::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return ptr()->llvm_c_eval_func_f128(s, batch_size, high_accuracy);
+}
+
+#endif
 
 namespace detail
 {
@@ -805,5 +844,98 @@ void update_connections(std::vector<std::vector<std::size_t>> &node_connections,
         update_connections(node_connections, f.args()[i], node_counter);
     };
 }
+
+namespace detail
+{
+
+// Helper to perform the codegen for a parameter during the creation
+// of a compiled function in non-compact mode.
+llvm::Value *cfunc_nc_param_codegen(llvm_state &s, const param &p, std::uint32_t batch_size, llvm::Type *fp_t,
+                                    llvm::Value *par_ptr)
+{
+    auto &builder = s.builder();
+
+    // Determine the index into the parameter array.
+    // LCOV_EXCL_START
+    if (p.idx() > std::numeric_limits<std::uint32_t>::max() / batch_size) {
+        throw std::overflow_error("Overflow detected in the computation of the index into a parameter array");
+    }
+    // LCOV_EXCL_STOP
+    const auto arr_idx = static_cast<std::uint32_t>(p.idx() * batch_size);
+
+    // Compute the pointer to load from.
+    auto *ptr = builder.CreateInBoundsGEP(fp_t, par_ptr, builder.getInt32(arr_idx));
+
+    // Load and return.
+    return load_vector_from_memory(builder, ptr, batch_size);
+}
+
+// Helper to implement the llvm_eval_*() methods in the func interface
+// used to create compiled functions in non-compact mode.
+template <typename T>
+llvm::Value *llvm_eval_helper(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &g,
+                              const func_base &f, llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
+                              llvm::Value *par_ptr, std::uint32_t batch_size, bool high_accuracy)
+{
+    assert(g);
+
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the scalar FP type.
+    auto *fp_t = to_llvm_type<T>(context);
+
+    // Codegen the function arguments.
+    std::vector<llvm::Value *> llvm_args;
+    for (const auto &arg : f.args()) {
+        std::visit(
+            [&](const auto &v) {
+                using type = uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, variable>) {
+                    // Fetch the index of the variable argument.
+                    const auto u_idx = uname_to_index(v.name());
+                    assert(u_idx < eval_arr.size());
+
+                    // Fetch the corresponding value from eval_arr.
+                    llvm_args.push_back(eval_arr[u_idx]);
+                } else if constexpr (std::is_same_v<type, number>) {
+                    // Codegen the number argument.
+                    llvm_args.push_back(vector_splat(builder, codegen<T>(s, v), batch_size));
+                } else if constexpr (std::is_same_v<type, param>) {
+                    // Codegen the parameter argument.
+                    llvm_args.push_back(cfunc_nc_param_codegen(s, v, batch_size, fp_t, par_ptr));
+                } else {
+                    assert(false); // LCOV_EXCL_LINE
+                }
+            },
+            arg.value());
+    }
+
+    // Run the generator and return the result.
+    return g(llvm_args, high_accuracy);
+}
+
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC llvm::Value *
+llvm_eval_helper<double>(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
+                         const func_base &, llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
+                         std::uint32_t, bool);
+
+template HEYOKA_DLL_PUBLIC llvm::Value *
+llvm_eval_helper<long double>(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
+                              const func_base &, llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
+                              std::uint32_t, bool);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template HEYOKA_DLL_PUBLIC llvm::Value *
+llvm_eval_helper<mppp::real128>(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
+                                const func_base &, llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
+                                std::uint32_t, bool);
+
+#endif
+
+} // namespace detail
 
 } // namespace heyoka

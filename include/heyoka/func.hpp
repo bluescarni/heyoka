@@ -13,6 +13,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <ostream>
 #include <stdexcept>
@@ -116,7 +117,26 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual double eval_num_dbl(const std::vector<double> &) const = 0;
     virtual double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const = 0;
 
-    virtual llvm::Value *llvm_eval(llvm_state &, const std::vector<llvm::Value *> &) const = 0;
+    [[nodiscard]] virtual llvm::Value *llvm_eval_dbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
+                                                     std::uint32_t, bool) const = 0;
+    [[nodiscard]] virtual bool has_llvm_eval_dbl() const = 0;
+    [[nodiscard]] virtual llvm::Value *llvm_eval_ldbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
+                                                      std::uint32_t, bool) const = 0;
+    [[nodiscard]] virtual bool has_llvm_eval_ldbl() const = 0;
+#if defined(HEYOKA_HAVE_REAL128)
+    [[nodiscard]] virtual llvm::Value *llvm_eval_f128(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
+                                                      std::uint32_t, bool) const = 0;
+    [[nodiscard]] virtual bool has_llvm_eval_f128() const = 0;
+#endif
+
+    [[nodiscard]] virtual llvm::Function *llvm_c_eval_func_dbl(llvm_state &, std::uint32_t, bool) const = 0;
+    [[nodiscard]] virtual bool has_llvm_c_eval_func_dbl() const = 0;
+    [[nodiscard]] virtual llvm::Function *llvm_c_eval_func_ldbl(llvm_state &, std::uint32_t, bool) const = 0;
+    [[nodiscard]] virtual bool has_llvm_c_eval_func_ldbl() const = 0;
+#if defined(HEYOKA_HAVE_REAL128)
+    [[nodiscard]] virtual llvm::Function *llvm_c_eval_func_f128(llvm_state &, std::uint32_t, bool) const = 0;
+    [[nodiscard]] virtual bool has_llvm_c_eval_func_f128() const = 0;
+#endif
 
     virtual taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) && = 0;
     virtual bool has_taylor_decompose() const = 0;
@@ -234,11 +254,62 @@ template <typename T>
 inline constexpr bool func_has_deval_num_dbl_v = std::is_same_v<detected_t<func_deval_num_dbl_t, T>, double>;
 
 template <typename T>
-using func_llvm_eval_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_eval(
-    std::declval<llvm_state &>(), std::declval<const std::vector<llvm::Value *> &>()));
+using func_llvm_eval_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_eval_dbl(
+    std::declval<llvm_state &>(), std::declval<const std::vector<llvm::Value *> &>(), std::declval<llvm::Value *>(),
+    std::declval<std::uint32_t>(), std::declval<bool>()));
 
 template <typename T>
-inline constexpr bool func_has_llvm_eval_v = std::is_same_v<detected_t<func_llvm_eval_t, T>, llvm::Value *>;
+inline constexpr bool func_has_llvm_eval_dbl_v = std::is_same_v<detected_t<func_llvm_eval_dbl_t, T>, llvm::Value *>;
+
+template <typename T>
+using func_llvm_eval_ldbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_eval_ldbl(
+    std::declval<llvm_state &>(), std::declval<const std::vector<llvm::Value *> &>(), std::declval<llvm::Value *>(),
+    std::declval<std::uint32_t>(), std::declval<bool>()));
+
+template <typename T>
+inline constexpr bool func_has_llvm_eval_ldbl_v = std::is_same_v<detected_t<func_llvm_eval_ldbl_t, T>, llvm::Value *>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <typename T>
+using func_llvm_eval_f128_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_eval_f128(
+    std::declval<llvm_state &>(), std::declval<const std::vector<llvm::Value *> &>(), std::declval<llvm::Value *>(),
+    std::declval<std::uint32_t>(), std::declval<bool>()));
+
+#endif
+
+template <typename T>
+inline constexpr bool func_has_llvm_eval_f128_v = std::is_same_v<detected_t<func_llvm_eval_f128_t, T>, llvm::Value *>;
+
+template <typename T>
+using func_llvm_c_eval_func_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_c_eval_func_dbl(
+    std::declval<llvm_state &>(), std::declval<std::uint32_t>(), std::declval<bool>()));
+
+template <typename T>
+inline constexpr bool func_has_llvm_c_eval_func_dbl_v
+    = std::is_same_v<detected_t<func_llvm_c_eval_func_dbl_t, T>, llvm::Function *>;
+
+template <typename T>
+using func_llvm_c_eval_func_ldbl_t
+    = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_c_eval_func_ldbl(
+        std::declval<llvm_state &>(), std::declval<std::uint32_t>(), std::declval<bool>()));
+
+template <typename T>
+inline constexpr bool func_has_llvm_c_eval_func_ldbl_v
+    = std::is_same_v<detected_t<func_llvm_c_eval_func_ldbl_t, T>, llvm::Function *>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <typename T>
+using func_llvm_c_eval_func_f128_t
+    = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_c_eval_func_f128(
+        std::declval<llvm_state &>(), std::declval<std::uint32_t>(), std::declval<bool>()));
+
+template <typename T>
+inline constexpr bool func_has_llvm_c_eval_func_f128_v
+    = std::is_same_v<detected_t<func_llvm_c_eval_func_f128_t, T>, llvm::Function *>;
+
+#endif
 
 template <typename T>
 using func_taylor_decompose_t
@@ -486,14 +557,95 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         }
     }
 
-    llvm::Value *llvm_eval(llvm_state &s, const std::vector<llvm::Value *> &args) const final
+    [[nodiscard]] llvm::Value *llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
+                                             llvm::Value *par_ptr, std::uint32_t batch_size,
+                                             bool high_accuracy) const final
     {
-        if constexpr (func_has_llvm_eval_v<T>) {
-            return m_value.llvm_eval(s, args);
+        if constexpr (func_has_llvm_eval_dbl_v<T>) {
+            return m_value.llvm_eval_dbl(s, eval_arr, par_ptr, batch_size, high_accuracy);
         } else {
-            throw not_implemented_error("LLVM eval is not implemented for the function '" + get_name() + "'");
+            throw not_implemented_error("llvm_eval_dbl() is not implemented for the function '" + get_name() + "'");
         }
     }
+    [[nodiscard]] bool has_llvm_eval_dbl() const final
+    {
+        return func_has_llvm_eval_dbl_v<T>;
+    }
+    [[nodiscard]] llvm::Value *llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
+                                              llvm::Value *par_ptr, std::uint32_t batch_size,
+                                              bool high_accuracy) const final
+    {
+        if constexpr (func_has_llvm_eval_ldbl_v<T>) {
+            return m_value.llvm_eval_ldbl(s, eval_arr, par_ptr, batch_size, high_accuracy);
+        } else {
+            throw not_implemented_error("llvm_eval_ldbl() is not implemented for the function '" + get_name() + "'");
+        }
+    }
+    [[nodiscard]] bool has_llvm_eval_ldbl() const final
+    {
+        return func_has_llvm_eval_ldbl_v<T>;
+    }
+#if defined(HEYOKA_HAVE_REAL128)
+    [[nodiscard]] llvm::Value *llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
+                                              llvm::Value *par_ptr, std::uint32_t batch_size,
+                                              bool high_accuracy) const final
+    {
+        if constexpr (func_has_llvm_eval_f128_v<T>) {
+            return m_value.llvm_eval_f128(s, eval_arr, par_ptr, batch_size, high_accuracy);
+        } else {
+            throw not_implemented_error("llvm_eval_f128() is not implemented for the function '" + get_name() + "'");
+        }
+    }
+    [[nodiscard]] bool has_llvm_eval_f128() const final
+    {
+        return func_has_llvm_eval_f128_v<T>;
+    }
+#endif
+
+    [[nodiscard]] llvm::Function *llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size,
+                                                       bool high_accuracy) const final
+    {
+        if constexpr (func_has_llvm_c_eval_func_dbl_v<T>) {
+            return m_value.llvm_c_eval_func_dbl(s, batch_size, high_accuracy);
+        } else {
+            assert(false);
+            throw;
+        }
+    }
+    [[nodiscard]] bool has_llvm_c_eval_func_dbl() const final
+    {
+        return func_has_llvm_c_eval_func_dbl_v<T>;
+    }
+    [[nodiscard]] llvm::Function *llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size,
+                                                        bool high_accuracy) const final
+    {
+        if constexpr (func_has_llvm_c_eval_func_ldbl_v<T>) {
+            return m_value.llvm_c_eval_func_ldbl(s, batch_size, high_accuracy);
+        } else {
+            assert(false);
+            throw;
+        }
+    }
+    [[nodiscard]] bool has_llvm_c_eval_func_ldbl() const final
+    {
+        return func_has_llvm_c_eval_func_ldbl_v<T>;
+    }
+#if defined(HEYOKA_HAVE_REAL128)
+    [[nodiscard]] llvm::Function *llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size,
+                                                        bool high_accuracy) const final
+    {
+        if constexpr (func_has_llvm_c_eval_func_f128_v<T>) {
+            return m_value.llvm_c_eval_func_f128(s, batch_size, high_accuracy);
+        } else {
+            assert(false);
+            throw;
+        }
+    }
+    [[nodiscard]] bool has_llvm_c_eval_func_f128() const final
+    {
+        return func_has_llvm_c_eval_func_f128_v<T>;
+    }
+#endif
 
     // Taylor.
     taylor_dc_t::size_type taylor_decompose(taylor_dc_t &dc) && final
@@ -724,7 +876,20 @@ public:
     double eval_num_dbl(const std::vector<double> &) const;
     double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
 
-    llvm::Value *llvm_eval(llvm_state &, const std::vector<llvm::Value *> &) const;
+    [[nodiscard]] llvm::Value *llvm_eval_dbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
+                                             std::uint32_t, bool) const;
+    [[nodiscard]] llvm::Value *llvm_eval_ldbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
+                                              std::uint32_t, bool) const;
+#if defined(HEYOKA_HAVE_REAL128)
+    [[nodiscard]] llvm::Value *llvm_eval_f128(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
+                                              std::uint32_t, bool) const;
+#endif
+
+    [[nodiscard]] llvm::Function *llvm_c_eval_func_dbl(llvm_state &, std::uint32_t, bool) const;
+    [[nodiscard]] llvm::Function *llvm_c_eval_func_ldbl(llvm_state &, std::uint32_t, bool) const;
+#if defined(HEYOKA_HAVE_REAL128)
+    [[nodiscard]] llvm::Function *llvm_c_eval_func_f128(llvm_state &, std::uint32_t, bool) const;
+#endif
 
     std::vector<expression>::size_type decompose(std::unordered_map<const void *, std::vector<expression>::size_type> &,
                                                  std::vector<expression> &) const;
@@ -771,6 +936,53 @@ HEYOKA_DLL_PUBLIC void update_node_values_dbl(std::vector<double> &, const func 
 HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &, const func &,
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
+
+namespace detail
+{
+
+[[nodiscard]] llvm::Value *cfunc_nc_param_codegen(llvm_state &, const param &, std::uint32_t, llvm::Type *,
+                                                  llvm::Value *);
+
+template <typename>
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *
+llvm_eval_helper(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &, const func_base &,
+                 llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, bool);
+
+} // namespace detail
+
+template <typename T>
+[[nodiscard]] inline llvm::Value *llvm_eval(const func &f, llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
+                                            llvm::Value *par_ptr, std::uint32_t batch_size, bool high_accuracy)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return f.llvm_eval_dbl(s, eval_arr, par_ptr, batch_size, high_accuracy);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return f.llvm_eval_ldbl(s, eval_arr, par_ptr, batch_size, high_accuracy);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return f.llvm_eval_f128(s, eval_arr, par_ptr, batch_size, high_accuracy);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
+template <typename T>
+[[nodiscard]] inline llvm::Function *llvm_c_eval_func(const func &f, llvm_state &s, std::uint32_t batch_size,
+                                                      bool high_accuracy)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return f.llvm_c_eval_func_dbl(s, batch_size, high_accuracy);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return f.llvm_c_eval_func_ldbl(s, batch_size, high_accuracy);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return f.llvm_c_eval_func_f128(s, batch_size, high_accuracy);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
 
 } // namespace heyoka
 
