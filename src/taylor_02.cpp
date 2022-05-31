@@ -892,55 +892,6 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state 
     };
 }
 
-// Helper to convert a vector of variants into a variant of vectors.
-// All elements of v must be of the same type, and v cannot be empty.
-template <typename... T>
-auto taylor_c_vv_transpose(const std::vector<std::variant<T...>> &v)
-{
-    assert(!v.empty());
-
-    // Init the return value based on the type
-    // of the first element of v.
-    auto retval = std::visit(
-        [size = v.size()](const auto &x) {
-            using type = uncvref_t<decltype(x)>;
-
-            std::vector<type> tmp;
-            tmp.reserve(boost::numeric_cast<decltype(tmp.size())>(size));
-            tmp.push_back(x);
-
-            return std::variant<std::vector<T>...>(std::move(tmp));
-        },
-        v[0]);
-
-    // Append the other values from v.
-    for (decltype(v.size()) i = 1; i < v.size(); ++i) {
-        std::visit(
-            [&retval](const auto &x) {
-                std::visit(
-                    [&x](auto &vv) {
-                        // The value type of retval.
-                        using scal_t = typename uncvref_t<decltype(vv)>::value_type;
-
-                        // The type of the current element of v.
-                        using x_t = uncvref_t<decltype(x)>;
-
-                        if constexpr (std::is_same_v<scal_t, x_t>) {
-                            vv.push_back(x);
-                        } else {
-                            throw std::invalid_argument(
-                                "Inconsistent types detected while building the transposed sets of "
-                                "arguments for the Taylor derivative functions in compact mode");
-                        }
-                    },
-                    retval);
-            },
-            v[i]);
-    }
-
-    return retval;
-}
-
 // For each segment in s_dc, this function will return a dict mapping an LLVM function
 // f for the computation of a Taylor derivative to a size and a vector of std::functions. For example, one entry
 // in the return value will read something like:
@@ -1035,7 +986,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 
                 // Turn tmp_c_vec (a vector of variants) into a variant
                 // of vectors, and insert the result.
-                it->second.push_back(taylor_c_vv_transpose(tmp_c_vec));
+                it->second.push_back(vv_transpose(tmp_c_vec));
             }
         }
 
