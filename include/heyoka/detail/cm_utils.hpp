@@ -11,6 +11,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <functional>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -80,6 +81,11 @@ inline auto vv_transpose(const std::vector<std::variant<T...>> &v)
 
     return retval;
 }
+
+std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vidx(llvm_state &, const std::vector<std::uint32_t> &);
+
+template <typename>
+std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vc(llvm_state &, const std::vector<number> &);
 
 } // namespace heyoka::detail
 
