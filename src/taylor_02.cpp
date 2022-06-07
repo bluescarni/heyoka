@@ -710,188 +710,6 @@ void taylor_c_compute_sv_diffs(llvm_state &s, const std::pair<std::array<llvm::G
     });
 }
 
-// Helper to check if a vector of indices consists of consecutive values:
-// [n, n + 1, n + 2, ...]
-// NOTE: requires a non-empty vector.
-bool is_consecutive(const std::vector<std::uint32_t> &v)
-{
-    assert(!v.empty());
-
-    for (decltype(v.size()) i = 1; i < v.size(); ++i) {
-        // NOTE: the first check is to avoid potential
-        // negative overflow in the second check.
-        if (v[i] <= v[i - 1u] || v[i] - v[i - 1u] != 1u) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-// Functions the create the arguments generators for the functions that compute
-// the Taylor derivatives in compact mode. The generators are created from vectors
-// of either u var indices (taylor_c_make_arg_gen_vidx()) or floating-point constants
-// (taylor_c_make_arg_gen_vc()).
-// NOTE: in these two functions we ensure that the return values do not capture
-// any LLVM value except for types and global variables. This way we ensure that
-// the generators do not rely on LLVM values created at the current insertion point.
-std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_state &s,
-                                                                       const std::vector<std::uint32_t> &ind)
-{
-    assert(!ind.empty()); // LCOV_EXCL_LINE
-
-    auto &builder = s.builder();
-
-    // Check if all indices in ind are the same.
-    if (std::all_of(ind.begin() + 1, ind.end(), [&ind](const auto &n) { return n == ind[0]; })) {
-        // If all indices are the same, don't construct an array, just always return
-        // the same value.
-        return [&builder, num = ind[0]](llvm::Value *) -> llvm::Value * { return builder.getInt32(num); };
-    }
-
-    // If ind consists of consecutive indices, we can replace
-    // the index array with a simple offset computation.
-    if (is_consecutive(ind)) {
-        return [&builder, start_idx = ind[0]](llvm::Value *cur_call_idx) -> llvm::Value * {
-            return builder.CreateAdd(builder.getInt32(start_idx), cur_call_idx);
-        };
-    }
-
-    // Check if ind consists of a repeated pattern like [a, a, a, b, b, b, c, c, c, ...],
-    // that is, [a X n, b X n, c X n, ...], such that [a, b, c, ...] are consecutive numbers.
-    if (ind.size() > 1u) {
-        // Determine the candidate number of repetitions.
-        decltype(ind.size()) n_reps = 1;
-        for (decltype(ind.size()) i = 1; i < ind.size(); ++i) {
-            if (ind[i] == ind[i - 1u]) {
-                ++n_reps;
-            } else {
-                break;
-            }
-        }
-
-        if (n_reps > 1u && (ind.size() % n_reps) == 0u) {
-            // There is an initial number of repetitions
-            // and the vector size is a multiple of that.
-            // See if the repetitions continue, and keep
-            // track of the repeated indices.
-            std::vector<std::uint32_t> rep_indices{ind[0]};
-
-            bool rep_flag = true;
-
-            // Iterate over the blocks of repetitions.
-            for (decltype(ind.size()) rep_idx = 1; rep_idx < ind.size() / n_reps; ++rep_idx) {
-                for (decltype(ind.size()) i = 1; i < n_reps; ++i) {
-                    const auto cur_idx = rep_idx * n_reps + i;
-
-                    if (ind[cur_idx] != ind[cur_idx - 1u]) {
-                        rep_flag = false;
-                        break;
-                    }
-                }
-
-                if (rep_flag) {
-                    rep_indices.push_back(ind[rep_idx * n_reps]);
-                } else {
-                    break;
-                }
-            }
-
-            if (rep_flag && is_consecutive(rep_indices)) {
-                // The pattern is  [a X n, b X n, c X n, ...] and [a, b, c, ...]
-                // are consecutive numbers. The m-th value in the array can thus
-                // be computed as a + floor(m / n).
-
-#if !defined(NDEBUG)
-                // Double-check the result in debug mode.
-                std::vector<std::uint32_t> checker;
-                for (decltype(ind.size()) i = 0; i < ind.size(); ++i) {
-                    checker.push_back(boost::numeric_cast<std::uint32_t>(ind[0] + i / n_reps));
-                }
-                assert(checker == ind); // LCOV_EXCL_LINE
-#endif
-
-                return [&builder, start_idx = rep_indices[0], n_reps = boost::numeric_cast<std::uint32_t>(n_reps)](
-                           llvm::Value *cur_call_idx) -> llvm::Value * {
-                    return builder.CreateAdd(builder.getInt32(start_idx),
-                                             builder.CreateUDiv(cur_call_idx, builder.getInt32(n_reps)));
-                };
-            }
-        }
-    }
-
-    auto &md = s.module();
-
-    // Generate the array of indices as llvm constants.
-    std::vector<llvm::Constant *> tmp_c_vec;
-    tmp_c_vec.reserve(ind.size());
-    for (const auto &val : ind) {
-        tmp_c_vec.push_back(builder.getInt32(val));
-    }
-
-    // Create the array type.
-    auto *arr_type = llvm::ArrayType::get(tmp_c_vec[0]->getType(), boost::numeric_cast<std::uint64_t>(ind.size()));
-    assert(arr_type != nullptr); // LCOV_EXCL_LINE
-
-    // Create the constant array as a global read-only variable.
-    auto *const_arr = llvm::ConstantArray::get(arr_type, tmp_c_vec);
-    assert(const_arr != nullptr); // LCOV_EXCL_LINE
-    // NOTE: naked new here is fine, gvar will be registered in the module
-    // object and cleaned up when the module is destroyed.
-    auto *gvar
-        = new llvm::GlobalVariable(md, const_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, const_arr);
-
-    // Return the generator.
-    return [&builder, gvar, arr_type](llvm::Value *cur_call_idx) -> llvm::Value * {
-        assert(llvm_depr_GEP_type_check(gvar, arr_type)); // LCOV_EXCL_LINE
-        return builder.CreateLoad(builder.getInt32Ty(),
-                                  builder.CreateInBoundsGEP(arr_type, gvar, {builder.getInt32(0), cur_call_idx}));
-    };
-}
-
-template <typename T>
-std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state &s, const std::vector<number> &vc)
-{
-    assert(!vc.empty()); // LCOV_EXCL_LINE
-
-    // Check if all the numbers are the same.
-    // NOTE: the comparison operator of number will consider two numbers of different
-    // type but equal value to be equal.
-    if (std::all_of(vc.begin() + 1, vc.end(), [&vc](const auto &n) { return n == vc[0]; })) {
-        // If all constants are the same, don't construct an array, just always return
-        // the same value.
-        return [&s, num = vc[0]](llvm::Value *) -> llvm::Value * { return codegen<T>(s, num); };
-    }
-
-    // Generate the array of constants as llvm constants.
-    std::vector<llvm::Constant *> tmp_c_vec;
-    tmp_c_vec.reserve(vc.size());
-    for (const auto &val : vc) {
-        tmp_c_vec.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, val)));
-    }
-
-    // Create the array type.
-    auto *arr_type = llvm::ArrayType::get(tmp_c_vec[0]->getType(), boost::numeric_cast<std::uint64_t>(vc.size()));
-    assert(arr_type != nullptr); // LCOV_EXCL_LINE
-
-    // Create the constant array as a global read-only variable.
-    auto *const_arr = llvm::ConstantArray::get(arr_type, tmp_c_vec);
-    assert(const_arr != nullptr); // LCOV_EXCL_LINE
-    // NOTE: naked new here is fine, gvar will be registered in the module
-    // object and cleaned up when the module is destroyed.
-    auto *gvar = new llvm::GlobalVariable(s.module(), const_arr->getType(), true, llvm::GlobalVariable::InternalLinkage,
-                                          const_arr);
-
-    // Return the generator.
-    return [&s, gvar, arr_type](llvm::Value *cur_call_idx) -> llvm::Value * {
-        auto &builder = s.builder();
-
-        assert(llvm_depr_GEP_type_check(gvar, arr_type)); // LCOV_EXCL_LINE
-        return builder.CreateLoad(arr_type->getArrayElementType(),
-                                  builder.CreateInBoundsGEP(arr_type, gvar, {builder.getInt32(0), cur_call_idx}));
-    };
-}
-
 // For each segment in s_dc, this function will return a dict mapping an LLVM function
 // f for the computation of a Taylor derivative to a size and a vector of std::functions. For example, one entry
 // in the return value will read something like:
@@ -995,6 +813,10 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
         auto &a_map = retval.back();
 
         for (const auto &[func, vv] : tmp_map_transpose) {
+            // NOTE: vv.size() is now the number of arguments. We know it cannot
+            // be zero because the functions to compute the Taylor derivatives
+            // in compact mode always have at least 1 argument (i.e., the index
+            // of the u variable whose derivative is being computed).
             assert(!vv.empty()); // LCOV_EXCL_LINE
 
             // Add the function.
@@ -1013,9 +835,9 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
                         using type = uncvref_t<decltype(x)>;
 
                         if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
-                            return taylor_c_make_arg_gen_vidx(s, x);
+                            return cm_make_arg_gen_vidx(s, x);
                         } else {
-                            return taylor_c_make_arg_gen_vc<T>(s, x);
+                            return cm_make_arg_gen_vc<T>(s, x);
                         }
                     },
                     v));
