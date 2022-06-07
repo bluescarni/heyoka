@@ -813,6 +813,10 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
         auto &a_map = retval.back();
 
         for (const auto &[func, vv] : tmp_map_transpose) {
+            // NOTE: vv.size() is now the number of arguments. We know it cannot
+            // be zero because the functions to compute the Taylor derivatives
+            // in compact mode always have at least 1 argument (i.e., the index
+            // of the u variable whose derivative is being computed).
             assert(!vv.empty()); // LCOV_EXCL_LINE
 
             // Add the function.
