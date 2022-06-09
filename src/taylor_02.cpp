@@ -867,20 +867,6 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
     return retval;
 }
 
-// Helper to create a global zero-inited array variable in the module m
-// with type t. The array is mutable and with internal linkage.
-llvm::GlobalVariable *make_global_zero_array(llvm::Module &m, llvm::ArrayType *t)
-{
-    assert(t != nullptr); // LCOV_EXCL_LINE
-
-    // Make the global array.
-    auto *gl_arr = new llvm::GlobalVariable(m, t, false, llvm::GlobalVariable::InternalLinkage,
-                                            llvm::ConstantAggregateZero::get(t));
-
-    // Return it.
-    return gl_arr;
-}
-
 } // namespace
 
 // Helper for the computation of a jet of derivatives in compact mode,
@@ -1096,7 +1082,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // func is the LLVM function for the computation of the Taylor derivative in the block,
     // ncalls the number of times it must be called, gens the generators for the
     // function arguments and cur_order the order of the derivative.
-    auto block_diff = [&](const auto &func, const auto &ncalls, const auto &gens, llvm::Value *cur_order) {
+    auto block_diff = [&](llvm::Function *func, const auto &ncalls, const auto &gens, llvm::Value *cur_order) {
         // LCOV_EXCL_START
         assert(ncalls > 0u);
         assert(!gens.empty());

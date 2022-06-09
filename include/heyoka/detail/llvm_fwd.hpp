@@ -18,6 +18,8 @@ class Module;
 class LLVMContext;
 class Type;
 class CallInst;
+class GlobalVariable;
+class ArrayType;
 
 // NOTE: IRBuilder is a template with default
 // parameters, hence we declare the default parameters
