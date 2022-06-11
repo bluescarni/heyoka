@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <functional>
 #include <stdexcept>
+#include <string>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -86,6 +87,11 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vidx(llvm_state &, c
 
 template <typename>
 std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vc(llvm_state &, const std::vector<number> &);
+
+std::string cm_mangle(const variable &);
+std::string cm_mangle(const number &);
+std::string cm_mangle(const param &);
+[[noreturn]] std::string cm_mangle(const func &);
 
 } // namespace heyoka::detail
 

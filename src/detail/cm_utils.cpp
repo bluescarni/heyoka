@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <functional>
 #include <stdexcept>
+#include <string>
 #include <type_traits>
 #include <variant>
 #include <vector>
@@ -44,6 +45,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
+#include <heyoka/variable.hpp>
 
 // NOTE: GCC warns about use of mismatched new/delete
 // when creating global variables. I am not sure this is
@@ -314,6 +316,28 @@ template std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vc<long dou
 template std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vc<mppp::real128>(llvm_state &,
                                                                                        const std::vector<number> &);
 #endif
+
+std::string cm_mangle(const variable &)
+{
+    return "var";
+}
+
+std::string cm_mangle(const number &)
+{
+    return "num";
+}
+
+std::string cm_mangle(const param &)
+{
+    return "par";
+}
+
+std::string cm_mangle(const func &)
+{
+    // LCOV_EXCL_START
+    throw std::invalid_argument("Cannot mangle the name of a function argument");
+    // LCOV_EXCL_STOP
+}
 
 } // namespace heyoka::detail
 
