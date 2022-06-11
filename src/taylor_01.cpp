@@ -65,6 +65,7 @@
 
 #endif
 
+#include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -95,26 +96,6 @@ namespace heyoka
 
 namespace detail
 {
-
-namespace
-{
-
-std::string taylor_c_diff_mangle(const variable &)
-{
-    return "var";
-}
-
-std::string taylor_c_diff_mangle(const number &)
-{
-    return "num";
-}
-
-std::string taylor_c_diff_mangle(const param &)
-{
-    return "par";
-}
-
-} // namespace
 
 // NOTE: precondition on name: must be conforming to LLVM requirements for
 // function names, and must not contain "." (as we use it as a separator in
@@ -150,7 +131,7 @@ taylor_c_diff_func_name_args_impl(llvm::LLVMContext &context, const std::string 
         }
 
         // Name mangling.
-        fname += std::visit([](const auto &v) { return taylor_c_diff_mangle(v); }, args[i]);
+        fname += std::visit([](const auto &v) { return cm_mangle(v); }, args[i]);
 
         // Add the arguments separator, if we are not at the
         // last argument.
