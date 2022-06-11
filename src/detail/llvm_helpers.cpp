@@ -220,6 +220,20 @@ std::uint64_t get_alignment(llvm::Module &md, llvm::Type *tp)
     return md.getDataLayout().getABITypeAlignment(tp);
 }
 
+// Helper to create a global zero-inited array variable in the module m
+// with type t. The array is mutable and with internal linkage.
+llvm::GlobalVariable *make_global_zero_array(llvm::Module &m, llvm::ArrayType *t)
+{
+    assert(t != nullptr); // LCOV_EXCL_LINE
+
+    // Make the global array.
+    auto *gl_arr = new llvm::GlobalVariable(m, t, false, llvm::GlobalVariable::InternalLinkage,
+                                            llvm::ConstantAggregateZero::get(t));
+
+    // Return it.
+    return gl_arr;
+}
+
 // Helper to load into a vector of size vector_size the sequential scalar data starting at ptr.
 // If vector_size is 1, a scalar is loaded instead.
 llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std::uint32_t vector_size)
