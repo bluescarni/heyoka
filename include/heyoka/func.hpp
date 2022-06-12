@@ -216,6 +216,7 @@ template <typename T>
 inline constexpr bool func_has_eval_ldbl_v = std::is_same_v<detected_t<func_eval_ldbl_t, T>, long double>;
 
 #if defined(HEYOKA_HAVE_REAL128)
+
 template <typename T>
 using func_eval_f128_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_f128(
     std::declval<const std::unordered_map<std::string, mppp::real128> &>(),
@@ -223,6 +224,7 @@ using func_eval_f128_t = decltype(std::declval<std::add_lvalue_reference_t<const
 
 template <typename T>
 inline constexpr bool func_has_eval_f128_v = std::is_same_v<detected_t<func_eval_f128_t, T>, mppp::real128>;
+
 #endif
 
 template <typename T>
@@ -270,10 +272,10 @@ using func_llvm_eval_f128_t = decltype(std::declval<std::add_lvalue_reference_t<
     std::declval<llvm_state &>(), std::declval<const std::vector<llvm::Value *> &>(), std::declval<llvm::Value *>(),
     std::declval<std::uint32_t>(), std::declval<bool>()));
 
-#endif
-
 template <typename T>
 inline constexpr bool func_has_llvm_eval_f128_v = std::is_same_v<detected_t<func_llvm_eval_f128_t, T>, llvm::Value *>;
+
+#endif
 
 template <typename T>
 using func_llvm_c_eval_func_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_c_eval_func_dbl(
