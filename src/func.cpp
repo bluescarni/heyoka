@@ -40,10 +40,15 @@
 
 #endif
 
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/Casting.h>
 
 #include <fmt/format.h>
 
@@ -53,6 +58,7 @@
 
 #endif
 
+#include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -933,6 +939,210 @@ template HEYOKA_DLL_PUBLIC llvm::Value *
 llvm_eval_helper<mppp::real128>(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
                                 const func_base &, llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
                                 std::uint32_t, bool);
+
+#endif
+
+namespace
+{
+
+// NOTE: precondition on name: must be conforming to LLVM requirements for
+// function names, and must not contain "." (as we use it as a separator in
+// the mangling scheme).
+template <typename T>
+std::pair<std::string, std::vector<llvm::Type *>>
+llvm_c_eval_func_name_args(llvm::LLVMContext &c, const std::string &name, std::uint32_t batch_size,
+                           const std::vector<expression> &args)
+{
+    // Fetch the floating-point type.
+    auto val_t = to_llvm_vector_type<T>(c, batch_size);
+
+    // Init the name.
+    auto fname = fmt::format("heyoka.llvm_c_eval.{}.", name);
+
+    // Init the vector of arguments:
+    // - idx of the u variable which is being evaluated,
+    // - eval array (pointer to val_t),
+    // - par ptr (pointer to scalar).
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(c), llvm::PointerType::getUnqual(val_t),
+                                    llvm::PointerType::getUnqual(val_t->getScalarType())};
+
+    // Add the mangling and LLVM arg types for the argument types.
+    for (decltype(args.size()) i = 0; i < args.size(); ++i) {
+        // Name mangling.
+        fname += std::visit([](const auto &v) { return cm_mangle(v); }, args[i].value());
+
+        // Add the arguments separator, if we are not at the
+        // last argument.
+        if (i != args.size() - 1u) {
+            fname += '_';
+        }
+
+        // Add the LLVM function argument type.
+        fargs.push_back(std::visit(
+            [&](const auto &v) -> llvm::Type * {
+                using type = detail::uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, number>) {
+                    // For numbers, the argument is passed as a scalar
+                    // floating-point value.
+                    return val_t->getScalarType();
+                } else if constexpr (std::is_same_v<type, variable> || std::is_same_v<type, param>) {
+                    // For vars and params, the argument is an index
+                    // in an array.
+                    return llvm::Type::getInt32Ty(c);
+                } else {
+                    // LCOV_EXCL_START
+                    assert(false);
+                    throw;
+                    // LCOV_EXCL_STOP
+                }
+            },
+            args[i].value()));
+    }
+
+    // Close the argument list with a ".".
+    // NOTE: this will result in a ".." in the name
+    // if the function has zero arguments.
+    fname += '.';
+
+    // Finally, add the mangling for the floating-point type.
+    fname += llvm_mangle_type(val_t);
+
+    return std::make_pair(std::move(fname), std::move(fargs));
+}
+
+} // namespace
+
+template <typename T>
+llvm::Function *llvm_c_eval_func_helper(const std::string &name,
+                                        const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &g,
+                                        const func_base &fb, llvm_state &s, std::uint32_t batch_size,
+                                        bool high_accuracy)
+{
+    // LCOV_EXCL_START
+    assert(g);
+    assert(batch_size > 0u);
+    // LCOV_EXCL_STOP
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the floating-point type.
+    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+
+    const auto na_pair = llvm_c_eval_func_name_args<T>(context, name, batch_size, fb.args());
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
+
+    // Try to see if we already created the function.
+    auto *f = md.getFunction(fname);
+
+    if (f == nullptr) {
+        // The function was not created before, do it now.
+
+        // Fetch the current insertion block.
+        auto *orig_bb = builder.GetInsertBlock();
+
+        // The return type is val_t.
+        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+        // Create the function
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        assert(f != nullptr);
+
+        // Create a new basic block to start insertion into.
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Fetch the necessary arguments.
+        auto *eval_arr = f->args().begin() + 1;
+        auto *par_ptr = f->args().begin() + 2;
+
+        // Create the arguments for g.
+        std::vector<llvm::Value *> g_args;
+        for (decltype(fb.args().size()) i = 0; i < fb.args().size(); ++i) {
+            auto *arg = std::visit(
+                [&](const auto &v) -> llvm::Value * {
+                    using type = detail::uncvref_t<decltype(v)>;
+
+                    const auto cur_f_arg = f->args().begin() + 3 + i;
+
+                    if constexpr (std::is_same_v<type, number>) {
+                        // NOTE: number arguments are passed directly as
+                        // FP constants when f is invoked. We just need to splat them.
+                        return vector_splat(builder, cur_f_arg, batch_size);
+                    } else if constexpr (std::is_same_v<type, variable>) {
+                        // NOTE: for variables, the u index is passed to f.
+                        return cfunc_c_load_eval(s, eval_arr, cur_f_arg);
+                    } else if constexpr (std::is_same_v<type, param>) {
+                        // NOTE: for params, we have to load the value from par_ptr.
+                        // NOTE: the overflow check is done in add_cfunc_impl().
+
+                        // LCOV_EXCL_START
+                        assert(llvm::isa<llvm::PointerType>(par_ptr->getType()));
+                        assert(!llvm::cast<llvm::PointerType>(par_ptr->getType())->isVectorTy());
+                        // LCOV_EXCL_STOP
+
+                        auto *ptr
+                            = builder.CreateInBoundsGEP(to_llvm_type<T>(context), par_ptr,
+                                                        builder.CreateMul(cur_f_arg, builder.getInt32(batch_size)));
+
+                        return load_vector_from_memory(builder, ptr, batch_size);
+                    } else {
+                        // LCOV_EXCL_START
+                        assert(false);
+                        throw;
+                        // LCOV_EXCL_STOP
+                    }
+                },
+                fb.args()[i].value());
+
+            g_args.push_back(arg);
+        }
+
+        // Compute the return value.
+        auto *ret = g(g_args, high_accuracy);
+        assert(ret != nullptr);
+
+        // Return it.
+        builder.CreateRet(ret);
+
+        // Verify.
+        s.verify_function(f);
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    } else {
+        // LCOV_EXCL_START
+        // The function was created before. Check if the signatures match.
+        // NOTE: there could be a mismatch if the function was created
+        // and then optimised - optimisation might remove arguments which are compile-time
+        // constants.
+        if (!compare_function_signature(f, val_t, fargs)) {
+            throw std::invalid_argument(fmt::format(
+                "Inconsistent function signature for the evaluation of {}() in compact mode detected", name));
+        }
+        // LCOV_EXCL_STOP
+    }
+
+    return f;
+}
+
+template HEYOKA_DLL_PUBLIC llvm::Function *
+llvm_c_eval_func_helper<double>(const std::string &,
+                                const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
+                                const func_base &, llvm_state &, std::uint32_t, bool);
+
+template HEYOKA_DLL_PUBLIC llvm::Function *
+llvm_c_eval_func_helper<long double>(const std::string &,
+                                     const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
+                                     const func_base &, llvm_state &, std::uint32_t, bool);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template HEYOKA_DLL_PUBLIC llvm::Function *
+llvm_c_eval_func_helper<mppp::real128>(const std::string &,
+                                       const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
+                                       const func_base &, llvm_state &, std::uint32_t, bool);
 
 #endif
 

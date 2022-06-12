@@ -155,7 +155,7 @@ TEST_CASE("cfunc")
 
     llvm_state s;
 
-    add_cfunc<fp_t>(s, "cfunc", {(x + y) / par[0] + expression{static_cast<fp_t>(-1)}}, 1, false, false);
+    add_cfunc<fp_t>(s, "cfunc", {(x + y) / par[0] + expression{static_cast<fp_t>(-1)}}, 1, false, true);
 
     s.compile();
 

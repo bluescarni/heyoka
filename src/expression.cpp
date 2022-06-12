@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -39,16 +40,21 @@
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constant.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/Casting.h>
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
+#include <fmt/ranges.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -77,6 +83,20 @@
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
+
+// NOTE: GCC warns about use of mismatched new/delete
+// when creating global variables. I am not sure this is
+// a real issue, as it looks like we are adopting the "canonical"
+// approach for the creation of global variables (at least
+// according to various sources online)
+// and clang is not complaining. But let us revisit
+// this issue in later LLVM versions.
+#if defined(__GNUC__) && (__GNUC__ >= 11)
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmismatched-new-delete"
+
+#endif
 
 namespace heyoka
 {
@@ -1777,8 +1797,7 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex, st
 // of a function decomposition. This can improve performance
 // by grouping together operations that can be performed in parallel,
 // and it also makes compact mode much more effective by creating
-// clusters of subexpressions whose derivatives can be computed in
-// parallel.
+// clusters of subexpressions which can be evaluated in parallel.
 // NOTE: the original decomposition dc is already topologically sorted,
 // in the sense that the definitions of the u variables are already
 // ordered according to dependency. However, because the original decomposition
@@ -2300,7 +2319,7 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
         // Determine the index in the output array.
         const auto out_idx = static_cast<std::uint32_t>((i - nuvars) * batch_size);
 
-        // Compute the pointer to load from.
+        // Compute the pointer to write to.
         auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.getInt32(out_idx));
 
         std::visit(
@@ -2446,7 +2465,7 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
         counter += s.size();
     }
 
-    assert(counter == nuvars);
+    assert(counter == nuvars - nvars);
 #endif
 
     get_logger()->debug("function decomposition N of segments: {}", s_dc.size());
@@ -2457,7 +2476,7 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
 
 template <typename T>
 auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expression>> &s_dc, std::uint32_t nvars,
-                               std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
+                               std::uint32_t batch_size, bool high_accuracy)
 {
     // Log runtime in trace mode.
     spdlog::stopwatch sw;
@@ -2486,7 +2505,7 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
 
         for (const auto &ex : seg) {
             // Get the evaluation function.
-            auto *func = llvm_c_eval_func<T>(s, std::get<heyoka::func>(ex.value()), batch_size, high_accuracy);
+            auto *func = llvm_c_eval_func<T>(std::get<heyoka::func>(ex.value()), s, batch_size, high_accuracy);
 
             // Insert the function into tmp_map.
             const auto [it, is_new_func] = tmp_map.try_emplace(func);
@@ -2505,7 +2524,11 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
             }
 
             // Add the new set of arguments.
-            it->second.emplace_back(cdiff_args.begin(), cdiff_args.end());
+            it->second.emplace_back();
+            // Add the idx of the u variable.
+            it->second.back().emplace_back(cur_u_idx);
+            // Add the actual function arguments.
+            it->second.back().insert(it->second.back().end(), cdiff_args.begin(), cdiff_args.end());
 
             ++cur_u_idx;
         }
@@ -2523,6 +2546,10 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
 
             const auto n_calls = vv.size();
             const auto n_args = vv[0].size();
+            // NOTE: n_args must be at least 1 because the u idx
+            // is prepended to the actual function arguments in
+            // the tmp_map entries.
+            assert(n_args >= 1u); // LCOV_EXCL_LINE
 
             for (decltype(vv[0].size()) i = 0; i < n_args; ++i) {
                 // Build the vector of values corresponding
@@ -2534,10 +2561,7 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
 
                 // Turn tmp_c_vec (a vector of variants) into a variant
                 // of vectors, and insert the result.
-                // NOTE: if tmp_c_vec is empty, use a default-constructed
-                // variant of vectors instead.
-                using v_vec_t = decltype(vv_transpose(tmp_c_vec));
-                it->second.push_back(tmp_c_vec.empty() ? v_vec_t{} : vv_transpose(tmp_c_vec));
+                it->second.push_back(vv_transpose(tmp_c_vec));
             }
         }
 
@@ -2546,6 +2570,10 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
         auto &a_map = retval.back();
 
         for (const auto &[func, vv] : tmp_map_transpose) {
+            // NOTE: vv.size() is now the number of arguments. We know it cannot
+            // be zero because the evaluation functions
+            // in compact mode always have at least 1 argument (i.e., the index
+            // of the u variable which is being evaluated).
             assert(!vv.empty()); // LCOV_EXCL_LINE
 
             // Add the function.
@@ -2564,9 +2592,9 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
                         using type = uncvref_t<decltype(x)>;
 
                         if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
-                            return taylor_c_make_arg_gen_vidx(s, x);
+                            return cm_make_arg_gen_vidx(s, x);
                         } else {
-                            return taylor_c_make_arg_gen_vc<T>(s, x);
+                            return cm_make_arg_gen_vc<T>(s, x);
                         }
                     },
                     v));
@@ -2574,7 +2602,260 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
         }
     }
 
-    get_logger()->trace("Taylor build function maps runtime: {}", sw);
+    get_logger()->trace("cfunc build function maps runtime: {}", sw);
+
+    // LCOV_EXCL_START
+    // Log a breakdown of the return value in trace mode.
+    if (get_logger()->should_log(spdlog::level::trace)) {
+        std::vector<std::vector<std::uint32_t>> fm_bd;
+
+        for (const auto &m : retval) {
+            fm_bd.emplace_back();
+
+            for (const auto &p : m) {
+                fm_bd.back().push_back(p.second.first);
+            }
+        }
+
+        get_logger()->trace("cfunc function maps breakdown: {}", fm_bd);
+    }
+    // LCOV_EXCL_STOP
+
+    return retval;
+}
+
+} // namespace
+
+void cfunc_c_store_eval(llvm_state &s, llvm::Value *eval_arr, llvm::Value *idx, llvm::Value *val)
+{
+    auto &builder = s.builder();
+
+    assert(llvm_depr_GEP_type_check(eval_arr, pointee_type(eval_arr))); // LCOV_EXCL_LINE
+    auto *ptr = builder.CreateInBoundsGEP(pointee_type(eval_arr), eval_arr, idx);
+
+    builder.CreateStore(val, ptr);
+}
+
+llvm::Value *cfunc_c_load_eval(llvm_state &s, llvm::Value *eval_arr, llvm::Value *idx)
+{
+    auto &builder = s.builder();
+
+    assert(llvm_depr_GEP_type_check(eval_arr, pointee_type(eval_arr))); // LCOV_EXCL_LINE
+    auto *ptr = builder.CreateInBoundsGEP(pointee_type(eval_arr), eval_arr, idx);
+
+    return builder.CreateLoad(pointee_type(eval_arr), ptr);
+}
+
+namespace
+{
+
+// Helper to construct the global arrays needed for the evaluation of a compiled
+// function in compact mode. The first part of the
+// return value is a set of 6 arrays:
+// - the indices of the outputs which are u variables, paired to
+// - the indices of said u variables, and
+// - the indices of the outputs which are constants, paired to
+// - the values of said constants, and
+// - the indices of the outputs which are params, paired to
+// - the indices of the params.
+// The second part of the return value is a boolean flag that will be true if
+// all outputs are u variables, false otherwise.
+template <typename T>
+std::pair<std::array<llvm::GlobalVariable *, 6>, bool>
+cfunc_c_make_output_globals(llvm_state &s, const std::vector<expression> &dc, std::uint32_t nuvars)
+{
+    auto &context = s.context();
+    auto &builder = s.builder();
+    auto &md = s.module();
+
+    // Build iteratively the output values as vectors of constants.
+    std::vector<llvm::Constant *> var_indices, vars, num_indices, nums, par_indices, pars;
+
+    // Keep track of how many outputs are u variables.
+    std::uint32_t n_out_vars = 0;
+
+    // NOTE: the definitions of the outputs are at the end of the decomposition.
+    for (auto i = nuvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
+        std::visit(
+            [&](const auto &v) {
+                using type = uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, variable>) {
+                    ++n_out_vars;
+                    // NOTE: remove from i the nuvars offset to get the
+                    // true index of the output.
+                    var_indices.push_back(builder.getInt32(i - nuvars));
+                    vars.push_back(builder.getInt32(uname_to_index(v.name())));
+                } else if constexpr (std::is_same_v<type, number>) {
+                    num_indices.push_back(builder.getInt32(i - nuvars));
+                    nums.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, v)));
+                } else if constexpr (std::is_same_v<type, param>) {
+                    par_indices.push_back(builder.getInt32(i - nuvars));
+                    pars.push_back(builder.getInt32(v.idx()));
+                } else {
+                    assert(false); // LCOV_EXCL_LINE
+                }
+            },
+            dc[i].value());
+    }
+
+    // Flag to signal that all outputs are u variables.
+    assert(dc.size() >= nuvars); // LCOV_EXCL_LINE
+    const auto all_out_vars = (n_out_vars == (dc.size() - nuvars));
+
+    assert(var_indices.size() == vars.size()); // LCOV_EXCL_LINE
+    assert(num_indices.size() == nums.size()); // LCOV_EXCL_LINE
+    assert(par_indices.size() == pars.size()); // LCOV_EXCL_LINE
+
+    // Turn the vectors into global read-only LLVM arrays.
+
+    // Variables.
+    auto *var_arr_type
+        = llvm::ArrayType::get(llvm::Type::getInt32Ty(context), boost::numeric_cast<std::uint64_t>(var_indices.size()));
+
+    auto *var_indices_arr = llvm::ConstantArray::get(var_arr_type, var_indices);
+    auto *g_var_indices = new llvm::GlobalVariable(md, var_indices_arr->getType(), true,
+                                                   llvm::GlobalVariable::InternalLinkage, var_indices_arr);
+
+    auto *vars_arr = llvm::ConstantArray::get(var_arr_type, vars);
+    auto *g_vars
+        = new llvm::GlobalVariable(md, vars_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, vars_arr);
+
+    // Numbers.
+    auto *num_indices_arr_type
+        = llvm::ArrayType::get(llvm::Type::getInt32Ty(context), boost::numeric_cast<std::uint64_t>(num_indices.size()));
+    auto *num_indices_arr = llvm::ConstantArray::get(num_indices_arr_type, num_indices);
+    auto *g_num_indices = new llvm::GlobalVariable(md, num_indices_arr->getType(), true,
+                                                   llvm::GlobalVariable::InternalLinkage, num_indices_arr);
+
+    auto nums_arr_type
+        = llvm::ArrayType::get(to_llvm_type<T>(context), boost::numeric_cast<std::uint64_t>(nums.size()));
+    auto nums_arr = llvm::ConstantArray::get(nums_arr_type, nums);
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+    auto *g_nums
+        = new llvm::GlobalVariable(md, nums_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, nums_arr);
+
+    // Params.
+    auto *par_arr_type
+        = llvm::ArrayType::get(llvm::Type::getInt32Ty(context), boost::numeric_cast<std::uint64_t>(par_indices.size()));
+
+    auto *par_indices_arr = llvm::ConstantArray::get(par_arr_type, par_indices);
+    auto *g_par_indices = new llvm::GlobalVariable(md, par_indices_arr->getType(), true,
+                                                   llvm::GlobalVariable::InternalLinkage, par_indices_arr);
+
+    auto *pars_arr = llvm::ConstantArray::get(par_arr_type, pars);
+    auto *g_pars
+        = new llvm::GlobalVariable(md, pars_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, pars_arr);
+
+    return std::pair{std::array{g_var_indices, g_vars, g_num_indices, g_nums, g_par_indices, g_pars}, all_out_vars};
+}
+
+// Small helper to compute the size of a global array.
+std::uint32_t cfunc_c_gl_arr_size(llvm::Value *v)
+{
+    return boost::numeric_cast<std::uint32_t>(
+        llvm::cast<llvm::ArrayType>(llvm::cast<llvm::GlobalVariable>(v)->getValueType())->getNumElements());
+}
+
+// Helper to write the outputs of a compiled function in compact mode.
+// cout_gl is the return value of cfunc_c_make_output_globals(), which contains
+// the indices/constants necessary for the computation.
+void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
+                           const std::pair<std::array<llvm::GlobalVariable *, 6>, bool> &cout_gl, llvm::Value *eval_arr,
+                           llvm::Value *par_ptr, std::uint32_t batch_size)
+{
+    assert(batch_size > 0u); // LCOV_EXCL_LINE
+
+    // Fetch the global arrays and
+    // the all_out_vars flag.
+    const auto &out_gl = cout_gl.first;
+    const auto all_out_vars = cout_gl.second;
+
+    auto &builder = s.builder();
+
+    // Recover the number of outputs which are
+    // u variables, numbers and params.
+    const auto n_vars = cfunc_c_gl_arr_size(out_gl[0]);
+    const auto n_nums = cfunc_c_gl_arr_size(out_gl[2]);
+    const auto n_pars = cfunc_c_gl_arr_size(out_gl[4]);
+
+    // Fetch the type stored in the evaluation array.
+    auto *fp_vec_t = pointee_type(eval_arr);
+    // Fetch the scalar type corresponding to fp_vec_t.
+    auto *fp_scal_t = fp_vec_t->getScalarType();
+
+    // Handle the u variable outputs.
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_vars), [&](llvm::Value *cur_idx) {
+        // Fetch the index of the output.
+        // NOTE: if all outputs are u variables, there's
+        // no need to lookup the index in the global array (which will just contain
+        // a range).
+        auto *out_idx = all_out_vars ? cur_idx
+                                     : builder.CreateLoad(builder.getInt32Ty(),
+                                                          builder.CreateInBoundsGEP(pointee_type(out_gl[0]), out_gl[0],
+                                                                                    {builder.getInt32(0), cur_idx}));
+
+        // Fetch the index of the u variable.
+        auto *u_idx
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[1]), out_gl[1],
+                                                                                 {builder.getInt32(0), cur_idx}));
+
+        // Fetch from eval_arr the value of the u variable u_idx.
+        auto *ret = cfunc_c_load_eval(s, eval_arr, u_idx);
+
+        // Compute the pointer into out_ptr.
+        auto *ptr
+            = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(out_idx, builder.getInt32(batch_size)));
+
+        // Store ret.
+        store_vector_to_memory(builder, ptr, ret);
+    });
+
+    // Handle the number definitions.
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_nums), [&](llvm::Value *cur_idx) {
+        // Fetch the index of the output.
+        auto *out_idx
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[2]), out_gl[2],
+                                                                                 {builder.getInt32(0), cur_idx}));
+
+        // Fetch the constant.
+        auto *num = builder.CreateLoad(
+            fp_scal_t, builder.CreateInBoundsGEP(pointee_type(out_gl[3]), out_gl[3], {builder.getInt32(0), cur_idx}));
+
+        // Splat it out.
+        auto *ret = vector_splat(builder, num, batch_size);
+
+        // Compute the pointer into out_ptr.
+        auto *ptr
+            = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(out_idx, builder.getInt32(batch_size)));
+
+        // Store ret.
+        store_vector_to_memory(builder, ptr, ret);
+    });
+
+    // Handle the param definitions.
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_pars), [&](llvm::Value *cur_idx) {
+        // Fetch the index of the output.
+        auto *out_idx
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[4]), out_gl[4],
+                                                                                 {builder.getInt32(0), cur_idx}));
+
+        // Fetch the index of the param.
+        auto *par_idx
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[5]), out_gl[5],
+                                                                                 {builder.getInt32(0), cur_idx}));
+
+        // Load the parameter value from the array.
+        auto *ptr
+            = builder.CreateInBoundsGEP(fp_scal_t, par_ptr, builder.CreateMul(par_idx, builder.getInt32(batch_size)));
+        auto *ret = load_vector_from_memory(builder, ptr, batch_size);
+
+        // Compute the pointer into out_ptr.
+        ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(out_idx, builder.getInt32(batch_size)));
+
+        // Store ret.
+        store_vector_to_memory(builder, ptr, ret);
+    });
 }
 
 template <typename T>
@@ -2582,8 +2863,104 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
                       const std::vector<expression> &dc, std::uint32_t nvars, std::uint32_t nuvars,
                       std::uint32_t batch_size, bool high_accuracy)
 {
+    auto &builder = s.builder();
+    auto &context = s.context();
+    auto &md = s.module();
+
     // Split dc into segments.
     const auto s_dc = function_segment_dc(dc, nvars, nuvars);
+
+    // Generate the function maps.
+    const auto f_maps = cfunc_build_function_maps<T>(s, s_dc, nvars, batch_size, high_accuracy);
+
+    // Log the runtime of IR construction in trace mode.
+    spdlog::stopwatch sw;
+
+    // Generate the global arrays used to write the outputs at the
+    // end of the computation.
+    const auto cout_gl = cfunc_c_make_output_globals<T>(s, dc, nuvars);
+
+    // Prepare the array that will contain the evaluation of all the
+    // elementary subexpressions.
+    // NOTE: the array size is specified as a 64-bit integer in the
+    // LLVM API.
+    // NOTE: fp_type is the original, scalar floating-point type.
+    // It will be turned into a vector type (if necessary) by
+    // make_vector_type() below.
+    auto *fp_type = to_llvm_type<T>(context);
+    auto *fp_vec_type = make_vector_type(fp_type, batch_size);
+    auto *array_type = llvm::ArrayType::get(fp_vec_type, nuvars);
+
+    // Make the global array and fetch a pointer to its first element.
+    // NOTE: we use a global array rather than a local one here because
+    // its size can grow quite large, which can lead to stack overflow issues.
+    // This has of course consequences in terms of thread safety, which
+    // we will have to document.
+    auto eval_arr_gvar = make_global_zero_array(md, array_type);
+    assert(llvm_depr_GEP_type_check(eval_arr_gvar, array_type)); // LCOV_EXCL_LINE
+    auto *eval_arr = builder.CreateInBoundsGEP(array_type, eval_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
+
+    // Copy over the values of the variables.
+    // NOTE: overflow checking is already done in the parent function.
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(nvars), [&](llvm::Value *cur_var_idx) {
+        // Fetch the pointer from in_ptr.
+        assert(llvm_depr_GEP_type_check(in_ptr, fp_type)); // LCOV_EXCL_LINE
+        auto *ptr
+            = builder.CreateInBoundsGEP(fp_type, in_ptr, builder.CreateMul(cur_var_idx, builder.getInt32(batch_size)));
+
+        // Load as a vector.
+        auto *vec = load_vector_from_memory(builder, ptr, batch_size);
+
+        // Store into diff_arr.
+        cfunc_c_store_eval(s, eval_arr, cur_var_idx, vec);
+    });
+
+    // TODO parallel mode.
+
+    // Helper to evaluate a block.
+    // func is the LLVM function for evaluation in the block,
+    // ncalls the number of times it must be called and gens the generators for the
+    // function arguments.
+    auto block_eval = [&](llvm::Function *func, const auto &ncalls, const auto &gens) {
+        // LCOV_EXCL_START
+        assert(ncalls > 0u);
+        assert(!gens.empty());
+        assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
+        // LCOV_EXCL_STOP
+
+        // Loop over the number of calls.
+        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+            // Create the u variable index from the first generator.
+            auto u_idx = gens[0](cur_call_idx);
+
+            // Initialise the vector of arguments with which func must be called. The following
+            // initial arguments are always present:
+            // - eval array,
+            // - pointer to the param values.
+            std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr};
+
+            // Create the other arguments via the generators.
+            for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                args.push_back(gens[i](cur_call_idx));
+            }
+
+            // Evaluate and store the result.
+            cfunc_c_store_eval(s, eval_arr, u_idx, builder.CreateCall(func, args));
+        });
+    };
+
+    // Evaluate all elementary subexpressions by iterating
+    // over all segments and blocks.
+    for (const auto &map : f_maps) {
+        for (const auto &p : map) {
+            block_eval(p.first, p.second.first, p.second.second);
+        }
+    }
+
+    // Write the results to the output pointer.
+    cfunc_c_write_outputs(s, out_ptr, cout_gl, eval_arr, par_ptr, batch_size);
+
+    get_logger()->trace("cfunc IR creation compact mode runtime: {}", sw);
 }
 
 template <typename T, typename F>
@@ -2779,3 +3156,9 @@ bool has_time(const expression &ex)
 }
 
 } // namespace heyoka
+
+#if defined(__GNUC__) && (__GNUC__ >= 11)
+
+#pragma GCC diagnostic pop
+
+#endif

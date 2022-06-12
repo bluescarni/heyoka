@@ -119,23 +119,17 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
 
     [[nodiscard]] virtual llvm::Value *llvm_eval_dbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
                                                      std::uint32_t, bool) const = 0;
-    [[nodiscard]] virtual bool has_llvm_eval_dbl() const = 0;
     [[nodiscard]] virtual llvm::Value *llvm_eval_ldbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
                                                       std::uint32_t, bool) const = 0;
-    [[nodiscard]] virtual bool has_llvm_eval_ldbl() const = 0;
 #if defined(HEYOKA_HAVE_REAL128)
     [[nodiscard]] virtual llvm::Value *llvm_eval_f128(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
                                                       std::uint32_t, bool) const = 0;
-    [[nodiscard]] virtual bool has_llvm_eval_f128() const = 0;
 #endif
 
     [[nodiscard]] virtual llvm::Function *llvm_c_eval_func_dbl(llvm_state &, std::uint32_t, bool) const = 0;
-    [[nodiscard]] virtual bool has_llvm_c_eval_func_dbl() const = 0;
     [[nodiscard]] virtual llvm::Function *llvm_c_eval_func_ldbl(llvm_state &, std::uint32_t, bool) const = 0;
-    [[nodiscard]] virtual bool has_llvm_c_eval_func_ldbl() const = 0;
 #if defined(HEYOKA_HAVE_REAL128)
     [[nodiscard]] virtual llvm::Function *llvm_c_eval_func_f128(llvm_state &, std::uint32_t, bool) const = 0;
-    [[nodiscard]] virtual bool has_llvm_c_eval_func_f128() const = 0;
 #endif
 
     virtual taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) && = 0;
@@ -567,10 +561,6 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
             throw not_implemented_error("llvm_eval_dbl() is not implemented for the function '" + get_name() + "'");
         }
     }
-    [[nodiscard]] bool has_llvm_eval_dbl() const final
-    {
-        return func_has_llvm_eval_dbl_v<T>;
-    }
     [[nodiscard]] llvm::Value *llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
                                               llvm::Value *par_ptr, std::uint32_t batch_size,
                                               bool high_accuracy) const final
@@ -580,10 +570,6 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         } else {
             throw not_implemented_error("llvm_eval_ldbl() is not implemented for the function '" + get_name() + "'");
         }
-    }
-    [[nodiscard]] bool has_llvm_eval_ldbl() const final
-    {
-        return func_has_llvm_eval_ldbl_v<T>;
     }
 #if defined(HEYOKA_HAVE_REAL128)
     [[nodiscard]] llvm::Value *llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
@@ -596,10 +582,6 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
             throw not_implemented_error("llvm_eval_f128() is not implemented for the function '" + get_name() + "'");
         }
     }
-    [[nodiscard]] bool has_llvm_eval_f128() const final
-    {
-        return func_has_llvm_eval_f128_v<T>;
-    }
 #endif
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size,
@@ -608,13 +590,9 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_llvm_c_eval_func_dbl_v<T>) {
             return m_value.llvm_c_eval_func_dbl(s, batch_size, high_accuracy);
         } else {
-            assert(false);
-            throw;
+            throw not_implemented_error("llvm_c_eval_func_dbl() is not implemented for the function '" + get_name()
+                                        + "'");
         }
-    }
-    [[nodiscard]] bool has_llvm_c_eval_func_dbl() const final
-    {
-        return func_has_llvm_c_eval_func_dbl_v<T>;
     }
     [[nodiscard]] llvm::Function *llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size,
                                                         bool high_accuracy) const final
@@ -622,13 +600,9 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_llvm_c_eval_func_ldbl_v<T>) {
             return m_value.llvm_c_eval_func_ldbl(s, batch_size, high_accuracy);
         } else {
-            assert(false);
-            throw;
+            throw not_implemented_error("llvm_c_eval_func_ldbl() is not implemented for the function '" + get_name()
+                                        + "'");
         }
-    }
-    [[nodiscard]] bool has_llvm_c_eval_func_ldbl() const final
-    {
-        return func_has_llvm_c_eval_func_ldbl_v<T>;
     }
 #if defined(HEYOKA_HAVE_REAL128)
     [[nodiscard]] llvm::Function *llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size,
@@ -637,13 +611,9 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_llvm_c_eval_func_f128_v<T>) {
             return m_value.llvm_c_eval_func_f128(s, batch_size, high_accuracy);
         } else {
-            assert(false);
-            throw;
+            throw not_implemented_error("llvm_c_eval_func_f128() is not implemented for the function '" + get_name()
+                                        + "'");
         }
-    }
-    [[nodiscard]] bool has_llvm_c_eval_func_f128() const final
-    {
-        return func_has_llvm_c_eval_func_f128_v<T>;
     }
 #endif
 
@@ -947,6 +917,12 @@ template <typename>
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Value *
 llvm_eval_helper(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &, const func_base &,
                  llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, bool);
+
+template <typename>
+[[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *
+llvm_c_eval_func_helper(const std::string &,
+                        const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
+                        const func_base &, llvm_state &, std::uint32_t, bool);
 
 } // namespace detail
 

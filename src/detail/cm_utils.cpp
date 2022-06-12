@@ -332,12 +332,12 @@ std::string cm_mangle(const param &)
     return "par";
 }
 
+// LCOV_EXCL_START
 std::string cm_mangle(const func &)
 {
-    // LCOV_EXCL_START
     throw std::invalid_argument("Cannot mangle the name of a function argument");
-    // LCOV_EXCL_STOP
 }
+// LCOV_EXCL_STOP
 
 } // namespace heyoka::detail
 
