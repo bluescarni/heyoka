@@ -148,10 +148,15 @@ taylor_c_diff_func_name_args_impl(llvm::LLVMContext &context, const std::string 
                     // For numbers, the argument is passed as a scalar
                     // floating-point value.
                     return val_t->getScalarType();
-                } else {
+                } else if constexpr (std::is_same_v<type, variable> || std::is_same_v<type, param>) {
                     // For vars and params, the argument is an index
                     // in an array.
                     return llvm::Type::getInt32Ty(context);
+                } else {
+                    // LCOV_EXCL_START
+                    assert(false);
+                    throw;
+                    // LCOV_EXCL_STOP
                 }
             },
             args[i]));
