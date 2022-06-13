@@ -290,7 +290,7 @@ template <typename T>
 [[nodiscard]] llvm::Function *bo_llvm_c_eval(llvm_state &s, const func_base &fb, std::uint32_t batch_size,
                                              bool high_accuracy, binary_op::type op)
 {
-    auto impl = [&s, op](const std::vector<llvm::Value *> &vargs, bool) { return bo_llvm_eval(s, vargs, op); };
+    auto impl = [&s, op](const std::vector<llvm::Value *> &args, bool) { return bo_llvm_eval(s, args, op); };
 
     switch (op) {
         case binary_op::type::add:

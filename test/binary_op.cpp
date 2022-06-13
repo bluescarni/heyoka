@@ -14,6 +14,8 @@
 #include <sstream>
 #include <tuple>
 
+#include <boost/algorithm/string/predicate.hpp>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -199,6 +201,13 @@ TEST_CASE("cfunc")
 
             add_cfunc<fp_t>(s, "cfunc", {x + y, x - y, x * y, x / y, x + par[0], x - 3_dbl, par[0] * y, 1_dbl / y},
                             batch_size, high_accuracy, compact_mode);
+
+            if (opt_level == 0u && compact_mode) {
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.add"));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.mul"));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.sub"));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.div"));
+            }
 
             s.compile();
 
