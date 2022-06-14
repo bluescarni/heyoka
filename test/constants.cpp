@@ -12,6 +12,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
+#include <type_traits>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>

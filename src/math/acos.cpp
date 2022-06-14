@@ -107,30 +107,6 @@ mppp::real128 acos_impl::eval_f128(const std::unordered_map<std::string, mppp::r
 }
 #endif
 
-taylor_dc_t::size_type acos_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
-{
-    assert(args().size() == 1u);
-
-    // Append arg * arg.
-    u_vars_defs.emplace_back(square(args()[0]), std::vector<std::uint32_t>{});
-
-    // Append 1 - arg * arg.
-    u_vars_defs.emplace_back(1_dbl - expression{"u_{}"_format(u_vars_defs.size() - 1u)}, std::vector<std::uint32_t>{});
-
-    // Append sqrt(1 - arg * arg).
-    u_vars_defs.emplace_back(sqrt(expression{"u_{}"_format(u_vars_defs.size() - 1u)}), std::vector<std::uint32_t>{});
-
-    // Append the acos decomposition.
-    u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
-
-    // Add the hidden dep.
-    (u_vars_defs.end() - 1)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 2u));
-
-    // Compute the return value (pointing to the
-    // decomposed acos).
-    return u_vars_defs.size() - 1u;
-}
-
 llvm::Value *acos_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
                                       std::uint32_t batch_size, bool high_accuracy) const
 {
@@ -191,6 +167,30 @@ llvm::Function *acos_impl::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t ba
 }
 
 #endif
+
+taylor_dc_t::size_type acos_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
+{
+    assert(args().size() == 1u);
+
+    // Append arg * arg.
+    u_vars_defs.emplace_back(square(args()[0]), std::vector<std::uint32_t>{});
+
+    // Append 1 - arg * arg.
+    u_vars_defs.emplace_back(1_dbl - expression{"u_{}"_format(u_vars_defs.size() - 1u)}, std::vector<std::uint32_t>{});
+
+    // Append sqrt(1 - arg * arg).
+    u_vars_defs.emplace_back(sqrt(expression{"u_{}"_format(u_vars_defs.size() - 1u)}), std::vector<std::uint32_t>{});
+
+    // Append the acos decomposition.
+    u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
+
+    // Add the hidden dep.
+    (u_vars_defs.end() - 1)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 2u));
+
+    // Compute the return value (pointing to the
+    // decomposed acos).
+    return u_vars_defs.size() - 1u;
+}
 
 namespace
 {
