@@ -16,10 +16,11 @@
 #include <sstream>
 #include <tuple>
 #include <type_traits>
-
-#include <llvm/Config/llvm-config.h>
+#include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
+
+#include <llvm/Config/llvm-config.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 

@@ -104,6 +104,64 @@ std::vector<expression> constant_impl::gradient() const
     return {};
 }
 
+llvm::Value *constant_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &, llvm::Value *,
+                                          std::uint32_t batch_size, bool) const
+{
+    return vector_splat(s.builder(), codegen<double>(s, get_value()), batch_size);
+}
+
+llvm::Value *constant_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &, llvm::Value *,
+                                           std::uint32_t batch_size, bool) const
+{
+    return vector_splat(s.builder(), codegen<long double>(s, get_value()), batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *constant_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &, llvm::Value *,
+                                           std::uint32_t batch_size, bool) const
+{
+    return vector_splat(s.builder(), codegen<mppp::real128>(s, get_value()), batch_size);
+}
+
+#endif
+
+namespace
+{
+
+template <typename T>
+[[nodiscard]] llvm::Function *constant_llvm_c_eval(llvm_state &s, const constant_impl &ci, std::uint32_t batch_size,
+                                                   bool high_accuracy)
+{
+    return llvm_c_eval_func_helper<T>(
+        ci.get_name(),
+        [&s, &ci, batch_size](const std::vector<llvm::Value *> &, bool) {
+            return vector_splat(s.builder(), codegen<T>(s, ci.get_value()), batch_size);
+        },
+        ci, s, batch_size, high_accuracy);
+}
+
+} // namespace
+
+llvm::Function *constant_impl::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return constant_llvm_c_eval<double>(s, *this, batch_size, high_accuracy);
+}
+
+llvm::Function *constant_impl::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return constant_llvm_c_eval<long double>(s, *this, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *constant_impl::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return constant_llvm_c_eval<mppp::real128>(s, *this, batch_size, high_accuracy);
+}
+
+#endif
+
 namespace
 {
 
