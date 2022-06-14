@@ -167,8 +167,8 @@ template <typename T>
                                                bool high_accuracy)
 {
     return llvm_c_eval_func_helper<T>(
-        "acos", [&s](const std::vector<llvm::Value *> &vargs, bool) { return llvm_acos(s, vargs[0]); }, fb, s,
-        batch_size, high_accuracy);
+        "acos", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_acos(s, args[0]); }, fb, s, batch_size,
+        high_accuracy);
 }
 
 } // namespace
