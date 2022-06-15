@@ -272,10 +272,10 @@ TEST_CASE("cfunc")
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(atan2(ins[i], ins[i + batch_size]), fp_t(100)));
-                // REQUIRE(outs[i + batch_size] == ins[i] - ins[i + batch_size]);
-                // REQUIRE(outs[i + 2u * batch_size] == ins[i] * ins[i + batch_size]);
-                // REQUIRE(outs[i + 3u * batch_size] == ins[i] / ins[i + batch_size]);
-                // REQUIRE(outs[i + 4u * batch_size] == ins[i] + pars[i]);
+                REQUIRE(outs[i + batch_size] == approximately(atan2(ins[i], pars[i]), fp_t(100)));
+                REQUIRE(outs[i + 2u * batch_size] == approximately(atan2(ins[i], fp_t(3)), fp_t(100)));
+                REQUIRE(outs[i + 3u * batch_size] == approximately(atan2(pars[i], ins[i + batch_size]), fp_t(100)));
+                REQUIRE(outs[i + 4u * batch_size] == approximately(atan2(fp_t(1), ins[i + batch_size]), fp_t(100)));
             }
         }
     };
