@@ -132,11 +132,11 @@ TEST_CASE("cfunc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {asin(x), asin(-.5_dbl), asin(par[0])}, batch_size, high_accuracy,
+            add_cfunc<fp_t>(s, "cfunc", {asin(x), asin(expression{fp_t(-.5)}), asin(par[0])}, batch_size, high_accuracy,
                             compact_mode);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.asin"));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.asin."));
             }
 
             s.compile();

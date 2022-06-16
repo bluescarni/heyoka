@@ -261,7 +261,7 @@ TEST_CASE("cfunc")
                             batch_size, high_accuracy, compact_mode);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.atan2"));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.atan2."));
             }
 
             s.compile();

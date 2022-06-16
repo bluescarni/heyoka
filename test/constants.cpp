@@ -171,7 +171,7 @@ TEST_CASE("pi cfunc")
             add_cfunc<fp_t>(s, "cfunc", {heyoka::pi}, batch_size, high_accuracy, compact_mode);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pi"));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pi."));
             }
 
             s.compile();

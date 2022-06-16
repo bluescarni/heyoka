@@ -132,11 +132,11 @@ TEST_CASE("cfunc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {acos(x), acos(-.5_dbl), acos(par[0])}, batch_size, high_accuracy,
+            add_cfunc<fp_t>(s, "cfunc", {acos(x), acos(expression{fp_t(-.5)}), acos(par[0])}, batch_size, high_accuracy,
                             compact_mode);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.acos"));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.acos."));
             }
 
             s.compile();

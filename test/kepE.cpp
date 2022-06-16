@@ -8,12 +8,25 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <initializer_list>
+#include <limits>
+#include <random>
 #include <sstream>
+#include <tuple>
+#include <type_traits>
+#include <utility>
 #include <variant>
 #include <vector>
+
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/math/constants/constants.hpp>
+#include <boost/math/tools/roots.hpp>
+
+#include <llvm/Config/llvm-config.h>
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -39,6 +52,8 @@
 #include "catch.hpp"
 #include "test_utils.hpp"
 
+static std::mt19937 rng;
+
 #if defined(_MSC_VER) && !defined(__clang__)
 
 // NOTE: MSVC has issues with the other "using"
@@ -53,6 +68,43 @@ using fmt::literals::operator""_format;
 
 using namespace heyoka;
 using namespace heyoka_test;
+
+const auto fp_types = std::tuple<double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
+#if defined(HEYOKA_HAVE_REAL128)
+                                 ,
+                                 mppp::real128
+#endif
+                                 >{};
+
+constexpr bool skip_batch_ld =
+#if LLVM_VERSION_MAJOR == 13 || LLVM_VERSION_MAJOR == 14
+    std::numeric_limits<long double>::digits == 64
+#else
+    false
+#endif
+    ;
+
+// Boost-based Kepler solver.
+auto bmt_inv_kep_E = [](auto ecc, auto M) {
+    using std::sin;
+    using std::cos;
+
+    using fp_t = decltype(ecc);
+
+    // Initial guess.
+    auto ig = ecc < 0.8 ? M : static_cast<fp_t>(boost::math::constants::pi<double>());
+
+    auto func = [ecc, M](auto E) { return std::make_pair(E - ecc * sin(E) - M, 1 - ecc * cos(E)); };
+
+    boost::uintmax_t max_iter = 50;
+
+    return boost::math::tools::newton_raphson_iterate(func, ig, fp_t(0), fp_t(2 * boost::math::constants::pi<double>()),
+                                                      std::numeric_limits<fp_t>::digits - 2, max_iter);
+};
 
 TEST_CASE("kepE def ctor")
 {
@@ -251,4 +303,67 @@ TEST_CASE("kepE s11n")
     }
 
     REQUIRE(ex == kepE(x, y));
+}
+
+TEST_CASE("cfunc")
+{
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
+        using fp_t = decltype(fp_x);
+
+        auto [x, y] = make_vars("x", "y");
+
+        std::uniform_real_distribution<double> rdist(0., 0.9);
+
+        auto gen = [&rdist]() { return static_cast<fp_t>(rdist(rng)); };
+
+        std::vector<fp_t> outs, ins, pars;
+
+        for (auto batch_size : {1u, 2u, 4u, 5u}) {
+            if (batch_size != 1u && std::is_same_v<fp_t, long double> && skip_batch_ld) {
+                continue;
+            }
+
+            outs.resize(batch_size * 5u);
+            ins.resize(batch_size * 2u);
+            pars.resize(batch_size);
+
+            std::generate(ins.begin(), ins.end(), gen);
+            std::generate(pars.begin(), pars.end(), gen);
+
+            llvm_state s{kw::opt_level = opt_level};
+
+            add_cfunc<fp_t>(s, "cfunc",
+                            {kepE(x, y), kepE(x, par[0]), kepE(x, .5_dbl), kepE(par[0], y), kepE(.5_dbl, y)},
+                            batch_size, high_accuracy, compact_mode);
+
+            if (opt_level == 0u && compact_mode) {
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.kepE."));
+            }
+
+            s.compile();
+
+            auto *cf_ptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
+
+            cf_ptr(outs.data(), ins.data(), pars.data());
+
+            for (auto i = 0u; i < batch_size; ++i) {
+                REQUIRE(outs[i] == approximately(bmt_inv_kep_E(ins[i], ins[i + batch_size]), fp_t(100)));
+                REQUIRE(outs[i + batch_size] == approximately(bmt_inv_kep_E(ins[i], pars[i]), fp_t(100)));
+                REQUIRE(outs[i + 2u * batch_size] == approximately(bmt_inv_kep_E(ins[i], fp_t(.5)), fp_t(100)));
+                REQUIRE(outs[i + 3u * batch_size]
+                        == approximately(bmt_inv_kep_E(pars[i], ins[i + batch_size]), fp_t(100)));
+                REQUIRE(outs[i + 4u * batch_size]
+                        == approximately(bmt_inv_kep_E(fp_t(.5), ins[i + batch_size]), fp_t(100)));
+            }
+        }
+    };
+
+    for (auto cm : {false, true}) {
+        for (auto f : {false, true}) {
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
+    }
 }

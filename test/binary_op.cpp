@@ -203,10 +203,10 @@ TEST_CASE("cfunc")
                             batch_size, high_accuracy, compact_mode);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.add"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.mul"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.sub"));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.div"));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.add."));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.mul."));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.sub."));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.div."));
             }
 
             s.compile();
