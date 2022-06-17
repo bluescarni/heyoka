@@ -347,13 +347,13 @@ TEST_CASE("cfunc")
             cf_ptr(outs.data(), ins.data(), pars.data());
 
             for (auto i = 0u; i < batch_size; ++i) {
-                REQUIRE(outs[i] == approximately(bmt_inv_kep_E(ins[i], ins[i + batch_size]), fp_t(100)));
-                REQUIRE(outs[i + batch_size] == approximately(bmt_inv_kep_E(ins[i], pars[i]), fp_t(100)));
-                REQUIRE(outs[i + 2u * batch_size] == approximately(bmt_inv_kep_E(ins[i], fp_t(.5)), fp_t(100)));
+                REQUIRE(outs[i] == approximately(bmt_inv_kep_E(ins[i], ins[i + batch_size]), fp_t(1000)));
+                REQUIRE(outs[i + batch_size] == approximately(bmt_inv_kep_E(ins[i], pars[i]), fp_t(1000)));
+                REQUIRE(outs[i + 2u * batch_size] == approximately(bmt_inv_kep_E(ins[i], fp_t(.5)), fp_t(1000)));
                 REQUIRE(outs[i + 3u * batch_size]
-                        == approximately(bmt_inv_kep_E(pars[i], ins[i + batch_size]), fp_t(100)));
+                        == approximately(bmt_inv_kep_E(pars[i], ins[i + batch_size]), fp_t(1000)));
                 REQUIRE(outs[i + 4u * batch_size]
-                        == approximately(bmt_inv_kep_E(fp_t(.5), ins[i + batch_size]), fp_t(100)));
+                        == approximately(bmt_inv_kep_E(fp_t(.5), ins[i + batch_size]), fp_t(1000)));
             }
         }
     };
