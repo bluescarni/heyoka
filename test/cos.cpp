@@ -169,7 +169,7 @@ TEST_CASE("cfunc")
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(cos(ins[i]), fp_t(100)));
-                REQUIRE(outs[i + batch_size] == approximately(cos(static_cast<fp_t>(-.5)), fp_t(1000000)));
+                REQUIRE(outs[i + batch_size] == approximately(cos(static_cast<fp_t>(-.5)), fp_t(100)));
                 REQUIRE(outs[i + 2u * batch_size] == approximately(cos(pars[i]), fp_t(100)));
             }
         }
