@@ -2624,8 +2624,6 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
     return retval;
 }
 
-} // namespace
-
 void cfunc_c_store_eval(llvm_state &s, llvm::Value *eval_arr, llvm::Value *idx, llvm::Value *val)
 {
     auto &builder = s.builder();
@@ -2635,6 +2633,8 @@ void cfunc_c_store_eval(llvm_state &s, llvm::Value *eval_arr, llvm::Value *idx, 
 
     builder.CreateStore(val, ptr);
 }
+
+} // namespace
 
 llvm::Value *cfunc_c_load_eval(llvm_state &s, llvm::Value *eval_arr, llvm::Value *idx)
 {
