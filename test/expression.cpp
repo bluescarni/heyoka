@@ -6,9 +6,12 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <initializer_list>
 #include <limits>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -22,6 +25,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
+#include <heyoka/nbody.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -35,6 +39,8 @@
 
 #include "catch.hpp"
 #include "test_utils.hpp"
+
+static std::mt19937 rng;
 
 using namespace heyoka;
 using namespace heyoka_test;
@@ -989,4 +995,90 @@ TEST_CASE("subs")
         std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[0].value()).args()[0].value()).get_ptr()
         == std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[1].value()).args()[1].value())
                .get_ptr());
+}
+
+TEST_CASE("cfunc nbody")
+{
+    auto masses = std::vector{1.00000597682, 1 / 1047.355, 1 / 3501.6, 1 / 22869., 1 / 19314., 7.4074074e-09};
+
+    const auto G = 0.01720209895 * 0.01720209895 * 365 * 365;
+
+    auto sys = make_nbody_sys(6, kw::masses = masses, kw::Gconst = G);
+    std::vector<expression> exs;
+    for (const auto &p : sys) {
+        exs.push_back(p.second);
+    }
+
+    std::vector<double> outs, ins;
+
+    std::uniform_real_distribution<double> rdist(-1., 1.);
+
+    auto gen = [&rdist]() { return rdist(rng); };
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        for (auto cm : {false, true}) {
+            for (auto batch_size : {1u, 2u, 4u, 5u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                outs.resize(36u * batch_size);
+                ins.resize(36u * batch_size);
+
+                std::generate(ins.begin(), ins.end(), gen);
+
+                auto dc = add_cfunc<double>(s, "cfunc", exs, batch_size, false, cm);
+
+                s.compile();
+
+                auto *cf_ptr
+                    = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+
+                cf_ptr(outs.data(), ins.data(), nullptr);
+
+                for (auto i = 0u; i < 6u; ++i) {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        // x_i' == vx_i.
+                        REQUIRE(outs[i * batch_size * 6u + j] == approximately(ins[i * batch_size + j], 100.));
+                        // y_i' == vy_i.
+                        REQUIRE(outs[i * batch_size * 6u + batch_size + j]
+                                == approximately(ins[i * batch_size + batch_size * 6u + j], 100.));
+                        // z_i' == vz_i.
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 2u + j]
+                                == approximately(ins[i * batch_size + batch_size * 6u * 2u + j], 100.));
+
+                        // Accelerations.
+                        auto acc_x = 0., acc_y = 0., acc_z = 0.;
+
+                        const auto xi = ins[18u * batch_size + i * batch_size + j];
+                        const auto yi = ins[24u * batch_size + i * batch_size + j];
+                        const auto zi = ins[30u * batch_size + i * batch_size + j];
+
+                        for (auto k = 0u; k < 6u; ++k) {
+                            if (k == i) {
+                                continue;
+                            }
+
+                            const auto xk = ins[18u * batch_size + k * batch_size + j];
+                            const auto dx = xk - xi;
+
+                            const auto yk = ins[24u * batch_size + k * batch_size + j];
+                            const auto dy = yk - yi;
+
+                            const auto zk = ins[30u * batch_size + k * batch_size + j];
+                            const auto dz = zk - zi;
+
+                            const auto rm3 = std::pow(dx * dx + dy * dy + dz * dz, -3 / 2.);
+
+                            acc_x += dx * G * masses[k] * rm3;
+                            acc_y += dy * G * masses[k] * rm3;
+                            acc_z += dz * G * masses[k] * rm3;
+                        }
+
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 3u + j] == approximately(acc_x, 100.));
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 4u + j] == approximately(acc_y, 100.));
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 5u + j] == approximately(acc_z, 100.));
+                    }
+                }
+            }
+        }
+    }
 }
