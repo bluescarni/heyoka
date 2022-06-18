@@ -62,6 +62,7 @@ constexpr bool skip_batch_ld =
     false
 #endif
     ;
+
 TEST_CASE("basic test")
 {
     auto [x, y, z] = make_vars("x", "y", "z");
