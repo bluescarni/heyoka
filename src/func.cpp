@@ -1060,7 +1060,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
         // Create the arguments for g.
         std::vector<llvm::Value *> g_args;
         for (decltype(fb.args().size()) i = 0; i < fb.args().size(); ++i) {
-            auto *arg = std::visit(
+            auto *arg = std::visit( // LCOV_EXCL_LINE
                 [&](const auto &v) -> llvm::Value * {
                     using type = detail::uncvref_t<decltype(v)>;
 

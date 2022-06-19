@@ -2392,9 +2392,11 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
                                 if constexpr (std::is_same_v<tp, variable>) {
                                     retval.push_back(uname_to_index(x.name()));
                                 } else if constexpr (!std::is_same_v<tp, number> && !std::is_same_v<tp, param>) {
+                                    // LCOV_EXCL_START
                                     throw std::invalid_argument(
                                         "Invalid argument encountered in an element of a function decomposition: the "
                                         "argument is not a variable or a number/param");
+                                    // LCOV_EXCL_STOP
                                 }
                             },
                             arg.value());
@@ -2402,8 +2404,10 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
 
                     return retval;
                 } else {
+                    // LCOV_EXCL_START
                     throw std::invalid_argument("Invalid expression encountered in a function decomposition: the "
                                                 "expression is not a function");
+                    // LCOV_EXCL_STOP
                 }
             },
             ex.value());
@@ -2517,10 +2521,12 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
             const auto cdiff_args = udef_to_variants(ex, {});
 
             if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
+                // LCOV_EXCL_START
                 throw std::invalid_argument(
                     fmt::format("Inconsistent arity detected in a compiled function in compact "
                                 "mode: the same function is being called with both {} and {} arguments",
                                 it->second.back().size() - 1u, cdiff_args.size()));
+                // LCOV_EXCL_STOP
             }
 
             // Add the new set of arguments.
@@ -3002,7 +3008,7 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
 
     // Determine the number of u variables.
     // NOTE: this is also safely cast to a 32-bit integer.
-    assert(dc.size() >= nouts);
+    assert(dc.size() >= nouts); // LCOV_EXCL_LINE
     const auto nuvars = boost::numeric_cast<std::uint32_t>(dc.size() - nouts);
 
     // Overflow checks. We need to be able to index into:
@@ -3037,7 +3043,9 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
     if (f == nullptr) {
+        // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to create a compiled function with name '{}'", name));
+        // LCOV_EXCL_STOP
     }
 
     // Set the names/attributes of the function arguments.
