@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <initializer_list>
+#include <stdexcept>
 #include <vector>
 
 #include <fmt/format.h>
@@ -492,3 +493,16 @@ TEST_CASE("ppc long double")
 }
 
 #endif
+
+TEST_CASE("parallel non compact")
+{
+    using Catch::Matchers::Message;
+
+    llvm_state s;
+
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE_THROWS_MATCHES(taylor_add_jet<double>(s, "jet", {prime(x) = y, prime(y) = x}, 3, 1, false, false, {}, true),
+                           std::invalid_argument,
+                           Message("Parallel mode can only be enabled in conjunction with compact mode"));
+}

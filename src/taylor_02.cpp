@@ -1800,6 +1800,10 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
         throw std::invalid_argument("The batch size of a Taylor jet cannot be zero");
     }
 
+    if (parallel_mode && !compact_mode) {
+        throw std::invalid_argument("Parallel mode can only be enabled in conjunction with compact mode");
+    }
+
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
         throw not_implemented_error("'long double' computations are not supported on PowerPC");
