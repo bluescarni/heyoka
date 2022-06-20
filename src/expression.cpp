@@ -2518,14 +2518,14 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
 
             // Convert the variables/constants in the current dc
             // element into a set of indices/constants.
-            const auto cdiff_args = udef_to_variants(ex, {});
+            const auto c_args = udef_to_variants(ex, {});
 
-            if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
+            if (!is_new_func && it->second.back().size() - 1u != c_args.size()) {
                 // LCOV_EXCL_START
                 throw std::invalid_argument(
                     fmt::format("Inconsistent arity detected in a compiled function in compact "
                                 "mode: the same function is being called with both {} and {} arguments",
-                                it->second.back().size() - 1u, cdiff_args.size()));
+                                it->second.back().size() - 1u, c_args.size()));
                 // LCOV_EXCL_STOP
             }
 
@@ -2534,7 +2534,7 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
             // Add the idx of the u variable.
             it->second.back().emplace_back(cur_u_idx);
             // Add the actual function arguments.
-            it->second.back().insert(it->second.back().end(), cdiff_args.begin(), cdiff_args.end());
+            it->second.back().insert(it->second.back().end(), c_args.begin(), c_args.end());
 
             ++cur_u_idx;
         }
@@ -2917,7 +2917,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
         // Load as a vector.
         auto *vec = load_vector_from_memory(builder, ptr, batch_size);
 
-        // Store into diff_arr.
+        // Store into eval_arr.
         cfunc_c_store_eval(s, eval_arr, cur_var_idx, vec);
     });
 
