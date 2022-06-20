@@ -19,6 +19,7 @@
 #include <variant>
 #include <vector>
 
+#include <heyoka/celmec/vsop2013.hpp>
 #include <heyoka/config.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
@@ -1264,6 +1265,13 @@ TEST_CASE("cfunc failure modes")
                                Message("Parallel mode can only be enabled in conjunction with compact mode"));
     }
 
+    {
+        llvm_state s;
+
+        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, 1, false, true, true),
+                               std::invalid_argument, Message("Parallel mode has not been implemented yet"));
+    }
+
 #if defined(HEYOKA_ARCH_PPC)
     {
         llvm_state s;
@@ -1272,4 +1280,38 @@ TEST_CASE("cfunc failure modes")
                                std::invalid_argument, Message('long double' computations are not supported on PowerPC));
     }
 #endif
+}
+
+TEST_CASE("cfunc vsop2013")
+{
+    const auto thr = 1e-5;
+    const auto date = 365. / 365250;
+
+    const auto [x, y, z, t] = make_vars("x", "y", "z", "t");
+
+    const auto venus_sol1 = vsop2013_cartesian_icrf(2, kw::time = par[0], kw::thresh = thr);
+    const auto venus_sol2 = vsop2013_cartesian_icrf(2, kw::time = t, kw::thresh = thr);
+
+    auto ta = taylor_adaptive<double>({prime(x) = venus_sol1[0], prime(y) = venus_sol1[1], prime(z) = venus_sol1[2]},
+                                      {0., 0., 0.}, kw::compact_mode = true);
+
+    ta.get_pars_data()[0] = date;
+
+    ta.propagate_until(1.);
+
+    llvm_state s;
+
+    add_cfunc<double>(s, "cfunc", {venus_sol2[0], venus_sol2[1], venus_sol2[2]}, 1, false, true);
+
+    s.compile();
+
+    auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+
+    double out[3] = {};
+
+    cf_ptr(out, &date, nullptr);
+
+    REQUIRE(out[0] == approximately(ta.get_state()[0], 100.));
+    REQUIRE(out[1] == approximately(ta.get_state()[1], 100.));
+    REQUIRE(out[2] == approximately(ta.get_state()[2], 100.));
 }

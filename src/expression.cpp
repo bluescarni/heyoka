@@ -2921,8 +2921,6 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
         cfunc_c_store_eval(s, eval_arr, cur_var_idx, vec);
     });
 
-    // TODO parallel mode.
-
     // Helper to evaluate a block.
     // func is the LLVM function for evaluation in the block,
     // ncalls the number of times it must be called and gens the generators for the
@@ -2983,6 +2981,10 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
 
     if (parallel_mode && !compact_mode) {
         throw std::invalid_argument("Parallel mode can only be enabled in conjunction with compact mode");
+    }
+
+    if (parallel_mode) {
+        throw std::invalid_argument("Parallel mode has not been implemented yet");
     }
 
 #if defined(HEYOKA_ARCH_PPC)
