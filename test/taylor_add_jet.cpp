@@ -505,4 +505,8 @@ TEST_CASE("parallel non compact")
     REQUIRE_THROWS_MATCHES(taylor_add_jet<double>(s, "jet", {prime(x) = y, prime(y) = x}, 3, 1, false, false, {}, true),
                            std::invalid_argument,
                            Message("Parallel mode can only be enabled in conjunction with compact mode"));
+
+    REQUIRE_THROWS_MATCHES(taylor_add_jet<double>(s, "jet", {y, x}, 3, 1, false, false, {}, true),
+                           std::invalid_argument,
+                           Message("Parallel mode can only be enabled in conjunction with compact mode"));
 }
