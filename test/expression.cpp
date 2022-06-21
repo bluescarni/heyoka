@@ -6,9 +6,12 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <initializer_list>
 #include <limits>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -16,12 +19,14 @@
 #include <variant>
 #include <vector>
 
+#include <heyoka/celmec/vsop2013.hpp>
 #include <heyoka/config.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
+#include <heyoka/nbody.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -35,6 +40,8 @@
 
 #include "catch.hpp"
 #include "test_utils.hpp"
+
+static std::mt19937 rng;
 
 using namespace heyoka;
 using namespace heyoka_test;
@@ -989,4 +996,322 @@ TEST_CASE("subs")
         std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[0].value()).args()[0].value()).get_ptr()
         == std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[1].value()).args()[1].value())
                .get_ptr());
+}
+
+// cfunc N-body with fixed masses.
+TEST_CASE("cfunc nbody")
+{
+    auto masses = std::vector{1.00000597682, 1 / 1047.355, 1 / 3501.6, 1 / 22869., 1 / 19314., 7.4074074e-09};
+
+    const auto G = 0.01720209895 * 0.01720209895 * 365 * 365;
+
+    auto sys = make_nbody_sys(6, kw::masses = masses, kw::Gconst = G);
+    std::vector<expression> exs;
+    for (const auto &p : sys) {
+        exs.push_back(p.second);
+    }
+
+    std::vector<double> outs, ins;
+
+    std::uniform_real_distribution<double> rdist(-1., 1.);
+
+    auto gen = [&rdist]() { return rdist(rng); };
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        for (auto cm : {false, true}) {
+            for (auto batch_size : {1u, 2u, 4u, 5u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                outs.resize(36u * batch_size);
+                ins.resize(36u * batch_size);
+
+                std::generate(ins.begin(), ins.end(), gen);
+
+                add_cfunc<double>(s, "cfunc", exs, batch_size, false, cm);
+
+                s.compile();
+
+                auto *cf_ptr
+                    = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+
+                cf_ptr(outs.data(), ins.data(), nullptr);
+
+                for (auto i = 0u; i < 6u; ++i) {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        // x_i' == vx_i.
+                        REQUIRE(outs[i * batch_size * 6u + j] == approximately(ins[i * batch_size + j], 100.));
+                        // y_i' == vy_i.
+                        REQUIRE(outs[i * batch_size * 6u + batch_size + j]
+                                == approximately(ins[i * batch_size + batch_size * 6u + j], 100.));
+                        // z_i' == vz_i.
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 2u + j]
+                                == approximately(ins[i * batch_size + batch_size * 6u * 2u + j], 100.));
+
+                        // Accelerations.
+                        auto acc_x = 0., acc_y = 0., acc_z = 0.;
+
+                        const auto xi = ins[18u * batch_size + i * batch_size + j];
+                        const auto yi = ins[24u * batch_size + i * batch_size + j];
+                        const auto zi = ins[30u * batch_size + i * batch_size + j];
+
+                        for (auto k = 0u; k < 6u; ++k) {
+                            if (k == i) {
+                                continue;
+                            }
+
+                            const auto xk = ins[18u * batch_size + k * batch_size + j];
+                            const auto dx = xk - xi;
+
+                            const auto yk = ins[24u * batch_size + k * batch_size + j];
+                            const auto dy = yk - yi;
+
+                            const auto zk = ins[30u * batch_size + k * batch_size + j];
+                            const auto dz = zk - zi;
+
+                            const auto rm3 = std::pow(dx * dx + dy * dy + dz * dz, -3 / 2.);
+
+                            acc_x += dx * G * masses[k] * rm3;
+                            acc_y += dy * G * masses[k] * rm3;
+                            acc_z += dz * G * masses[k] * rm3;
+                        }
+
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 3u + j] == approximately(acc_x, 100.));
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 4u + j] == approximately(acc_y, 100.));
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 5u + j] == approximately(acc_z, 100.));
+                    }
+                }
+            }
+        }
+    }
+}
+
+// cfunc N-body with parametric masses.
+TEST_CASE("cfunc nbody par")
+{
+    auto masses = std::vector{1.00000597682, 1 / 1047.355, 1 / 3501.6, 1 / 22869., 1 / 19314., 7.4074074e-09};
+
+    const auto G = 0.01720209895 * 0.01720209895 * 365 * 365;
+
+    auto sys = make_nbody_par_sys(6, kw::Gconst = G);
+    std::vector<expression> exs;
+    for (const auto &p : sys) {
+        exs.push_back(p.second);
+    }
+
+    std::vector<double> outs, ins, pars;
+
+    std::uniform_real_distribution<double> rdist(-1., 1.);
+
+    auto gen = [&rdist]() { return rdist(rng); };
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        for (auto cm : {false, true}) {
+            for (auto batch_size : {1u, 2u, 4u, 5u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                outs.resize(36u * batch_size);
+                ins.resize(36u * batch_size);
+                pars.resize(6u * batch_size);
+
+                for (auto i = 0u; i < 6u; ++i) {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        pars[i * batch_size + j] = masses[i];
+                    }
+                }
+
+                std::generate(ins.begin(), ins.end(), gen);
+
+                add_cfunc<double>(s, "cfunc", exs, batch_size, false, cm);
+
+                s.compile();
+
+                auto *cf_ptr
+                    = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+
+                cf_ptr(outs.data(), ins.data(), pars.data());
+
+                for (auto i = 0u; i < 6u; ++i) {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        // x_i' == vx_i.
+                        REQUIRE(outs[i * batch_size * 6u + j] == approximately(ins[i * batch_size + j], 100.));
+                        // y_i' == vy_i.
+                        REQUIRE(outs[i * batch_size * 6u + batch_size + j]
+                                == approximately(ins[i * batch_size + batch_size * 6u + j], 100.));
+                        // z_i' == vz_i.
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 2u + j]
+                                == approximately(ins[i * batch_size + batch_size * 6u * 2u + j], 100.));
+
+                        // Accelerations.
+                        auto acc_x = 0., acc_y = 0., acc_z = 0.;
+
+                        const auto xi = ins[18u * batch_size + i * batch_size + j];
+                        const auto yi = ins[24u * batch_size + i * batch_size + j];
+                        const auto zi = ins[30u * batch_size + i * batch_size + j];
+
+                        for (auto k = 0u; k < 6u; ++k) {
+                            if (k == i) {
+                                continue;
+                            }
+
+                            const auto xk = ins[18u * batch_size + k * batch_size + j];
+                            const auto dx = xk - xi;
+
+                            const auto yk = ins[24u * batch_size + k * batch_size + j];
+                            const auto dy = yk - yi;
+
+                            const auto zk = ins[30u * batch_size + k * batch_size + j];
+                            const auto dz = zk - zi;
+
+                            const auto rm3 = std::pow(dx * dx + dy * dy + dz * dz, -3 / 2.);
+
+                            acc_x += dx * G * masses[k] * rm3;
+                            acc_y += dy * G * masses[k] * rm3;
+                            acc_z += dz * G * masses[k] * rm3;
+                        }
+
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 3u + j] == approximately(acc_x, 100.));
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 4u + j] == approximately(acc_y, 100.));
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 5u + j] == approximately(acc_z, 100.));
+                    }
+                }
+            }
+        }
+    }
+}
+
+// A test in which all outputs are equal to numbers or params.
+TEST_CASE("cfunc numparams")
+{
+    std::vector<double> outs, pars;
+
+    std::uniform_real_distribution<double> rdist(-1., 1.);
+
+    auto gen = [&rdist]() { return rdist(rng); };
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        for (auto cm : {false, true}) {
+            for (auto batch_size : {1u, 2u, 4u, 5u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                outs.resize(2u * batch_size);
+                pars.resize(batch_size);
+
+                std::generate(pars.begin(), pars.end(), gen);
+
+                add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, batch_size, false, cm);
+
+                s.compile();
+
+                auto *cf_ptr
+                    = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+
+                cf_ptr(outs.data(), nullptr, pars.data());
+
+                for (auto j = 0u; j < batch_size; ++j) {
+                    REQUIRE(outs[j] == 1);
+                    REQUIRE(outs[j + batch_size] == pars[j]);
+                }
+            }
+        }
+    }
+}
+
+// A test with explicit variable list.
+TEST_CASE("cfunc explicit")
+{
+    llvm_state s;
+
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    add_cfunc<double>(s, "cfunc", {x + 2_dbl * y + 3_dbl * z}, {z, y, x}, 1, false, false);
+
+    s.compile();
+
+    auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+
+    double out = 0;
+    std::vector<double> ins = {10, 11, 12};
+
+    cf_ptr(&out, ins.data(), nullptr);
+
+    REQUIRE(out == 12. + 2. * 11 + 3. * 10);
+}
+
+TEST_CASE("cfunc failure modes")
+{
+    using Catch::Matchers::Message;
+
+    {
+        llvm_state s;
+
+        s.compile();
+
+        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, 1, false, false), std::invalid_argument,
+                               Message("A compiled function cannot be added to an llvm_state after compilation"));
+    }
+
+    {
+        llvm_state s;
+
+        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, 0, false, false), std::invalid_argument,
+                               Message("The batch size of a compiled function cannot be zero"));
+    }
+
+    {
+        llvm_state s;
+
+        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, 1, false, false, true),
+                               std::invalid_argument,
+                               Message("Parallel mode can only be enabled in conjunction with compact mode"));
+    }
+
+    {
+        llvm_state s;
+
+        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, 1, false, true, true),
+                               std::invalid_argument, Message("Parallel mode has not been implemented yet"));
+    }
+
+#if defined(HEYOKA_ARCH_PPC)
+    {
+        llvm_state s;
+
+        REQUIRE_THROWS_MATCHES(add_cfunc<long double>(s, "cfunc", {1_dbl, par[0]}, 1, false, false),
+                               std::invalid_argument, Message('long double' computations are not supported on PowerPC));
+    }
+#endif
+}
+
+TEST_CASE("cfunc vsop2013")
+{
+    const auto thr = 1e-5;
+    const auto date = 365. / 365250;
+
+    const auto [x, y, z, t] = make_vars("x", "y", "z", "t");
+
+    const auto venus_sol1 = vsop2013_cartesian_icrf(2, kw::time = par[0], kw::thresh = thr);
+    const auto venus_sol2 = vsop2013_cartesian_icrf(2, kw::time = t, kw::thresh = thr);
+
+    auto ta = taylor_adaptive<double>({prime(x) = venus_sol1[0], prime(y) = venus_sol1[1], prime(z) = venus_sol1[2]},
+                                      {0., 0., 0.}, kw::compact_mode = true);
+
+    ta.get_pars_data()[0] = date;
+
+    ta.propagate_until(1.);
+
+    llvm_state s;
+
+    add_cfunc<double>(s, "cfunc", {venus_sol2[0], venus_sol2[1], venus_sol2[2]}, 1, false, true);
+
+    s.compile();
+
+    auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+
+    double out[3] = {};
+
+    cf_ptr(out, &date, nullptr);
+
+    REQUIRE(out[0] == approximately(ta.get_state()[0], 100.));
+    REQUIRE(out[1] == approximately(ta.get_state()[1], 100.));
+    REQUIRE(out[2] == approximately(ta.get_state()[2], 100.));
 }

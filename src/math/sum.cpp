@@ -102,6 +102,75 @@ namespace
 {
 
 template <typename T>
+llvm::Value *sum_llvm_eval_impl(llvm_state &s, const func_base &fb, const std::vector<llvm::Value *> &eval_arr,
+                                llvm::Value *par_ptr, std::uint32_t batch_size, bool high_accuracy)
+{
+    return llvm_eval_helper<T>(
+        [&s](std::vector<llvm::Value *> args, bool) -> llvm::Value * { return pairwise_sum(s.builder(), args); }, fb, s,
+        eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+} // namespace
+
+llvm::Value *sum_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                     std::uint32_t batch_size, bool high_accuracy) const
+{
+    return sum_llvm_eval_impl<double>(s, *this, eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+llvm::Value *sum_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                      std::uint32_t batch_size, bool high_accuracy) const
+{
+    return sum_llvm_eval_impl<long double>(s, *this, eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *sum_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                      std::uint32_t batch_size, bool high_accuracy) const
+{
+    return sum_llvm_eval_impl<mppp::real128>(s, *this, eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+#endif
+
+namespace
+{
+
+template <typename T>
+[[nodiscard]] llvm::Function *sum_llvm_c_eval(llvm_state &s, const func_base &fb, std::uint32_t batch_size,
+                                              bool high_accuracy)
+{
+    return llvm_c_eval_func_helper<T>(
+        "sum", [&s](std::vector<llvm::Value *> args, bool) { return pairwise_sum(s.builder(), args); }, fb, s,
+        batch_size, high_accuracy);
+}
+
+} // namespace
+
+llvm::Function *sum_impl::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return sum_llvm_c_eval<double>(s, *this, batch_size, high_accuracy);
+}
+
+llvm::Function *sum_impl::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return sum_llvm_c_eval<long double>(s, *this, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *sum_impl::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return sum_llvm_c_eval<mppp::real128>(s, *this, batch_size, high_accuracy);
+}
+
+#endif
+
+namespace
+{
+
+template <typename T>
 llvm::Value *sum_taylor_diff_impl(llvm_state &s, const sum_impl &sf, const std::vector<std::uint32_t> &deps,
                                   const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                                   std::uint32_t order, std::uint32_t batch_size)

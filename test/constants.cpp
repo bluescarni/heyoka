@@ -6,10 +6,28 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
+#include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <tuple>
+#include <type_traits>
+#include <vector>
+
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/math/constants/constants.hpp>
+
+#include <llvm/Config/llvm-config.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/constants.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
@@ -17,8 +35,29 @@
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
+
+const auto fp_types = std::tuple<double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
+#if defined(HEYOKA_HAVE_REAL128)
+                                 ,
+                                 mppp::real128
+#endif
+                                 >{};
+
+constexpr bool skip_batch_ld =
+#if LLVM_VERSION_MAJOR == 13 || LLVM_VERSION_MAJOR == 14
+    std::numeric_limits<long double>::digits == 64
+#else
+    false
+#endif
+    ;
 
 class nc00_impl : public detail::constant_impl
 {
@@ -33,6 +72,17 @@ class nc01_impl : public detail::constant_impl
 public:
     nc01_impl() : detail::constant_impl("foo", number{0.}) {}
 };
+
+// Variable template for the constant pi at different levels of precision.
+template <typename T>
+const auto pi_const = boost::math::constants::pi<T>();
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+const mppp::real128 pi_const<mppp::real128> = mppp::pi_128;
+
+#endif
 
 TEST_CASE("api test")
 {
@@ -100,4 +150,48 @@ TEST_CASE("pi s11n")
     }
 
     REQUIRE(ex == heyoka::pi + x);
+}
+
+TEST_CASE("pi cfunc")
+{
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
+        using fp_t = decltype(fp_x);
+
+        std::vector<fp_t> outs;
+
+        for (auto batch_size : {1u, 2u, 4u, 5u}) {
+            if (batch_size != 1u && std::is_same_v<fp_t, long double> && skip_batch_ld) {
+                continue;
+            }
+
+            outs.resize(batch_size);
+
+            llvm_state s{kw::opt_level = opt_level};
+
+            add_cfunc<fp_t>(s, "cfunc", {heyoka::pi}, batch_size, high_accuracy, compact_mode);
+
+            if (opt_level == 0u && compact_mode) {
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pi."));
+            }
+
+            s.compile();
+
+            auto *cf_ptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
+
+            cf_ptr(outs.data(), nullptr, nullptr);
+
+            for (auto i = 0u; i < batch_size; ++i) {
+                REQUIRE(outs[i] == pi_const<fp_t>);
+            }
+        }
+    };
+
+    for (auto cm : {false, true}) {
+        for (auto f : {false, true}) {
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
+    }
 }

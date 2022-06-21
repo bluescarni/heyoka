@@ -148,10 +148,15 @@ taylor_c_diff_func_name_args_impl(llvm::LLVMContext &context, const std::string 
                     // For numbers, the argument is passed as a scalar
                     // floating-point value.
                     return val_t->getScalarType();
-                } else {
+                } else if constexpr (std::is_same_v<type, variable> || std::is_same_v<type, param>) {
                     // For vars and params, the argument is an index
                     // in an array.
                     return llvm::Type::getInt32Ty(context);
+                } else {
+                    // LCOV_EXCL_START
+                    assert(false);
+                    throw;
+                    // LCOV_EXCL_STOP
                 }
             },
             args[i]));
@@ -791,7 +796,7 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
                                                                     const std::vector<expression> &sv_funcs_)
 {
     // Need to operate on copies due to in-place mutation
-    // via rename_variables() and taylor_decompose().
+    // via rename_variables().
     // NOTE: this is suboptimal, as expressions which are shared
     // across different elements of v_ex/sv_funcs will be not shared any more
     // after the copy.
@@ -957,7 +962,7 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>>
 taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, const std::vector<expression> &sv_funcs_)
 {
     // Need to operate on copies due to in-place mutation
-    // via rename_variables() and taylor_decompose().
+    // via rename_variables().
     // NOTE: this is suboptimal, as expressions which are shared
     // across different elements of sys/sv_funcs will be not shared any more
     // after the copy.

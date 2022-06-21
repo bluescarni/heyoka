@@ -156,6 +156,76 @@ double pow_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>
     return a[1] * std::pow(a[0], a[1] - 1.) + std::log(a[0]) * std::pow(a[0], a[1]);
 }
 
+llvm::Value *pow_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                     std::uint32_t batch_size, bool high_accuracy) const
+{
+    return llvm_eval_helper<double>([&s, this](const std::vector<llvm::Value *> &args,
+                                               bool) { return llvm_pow(s, args[0], args[1], pow_allow_approx(*this)); },
+                                    *this, s, eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+llvm::Value *pow_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                      std::uint32_t batch_size, bool high_accuracy) const
+{
+    return llvm_eval_helper<long double>(
+        [&s, this](const std::vector<llvm::Value *> &args, bool) {
+            return llvm_pow(s, args[0], args[1], pow_allow_approx(*this));
+        },
+        *this, s, eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *pow_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                      std::uint32_t batch_size, bool high_accuracy) const
+{
+    return llvm_eval_helper<mppp::real128>(
+        [&s, this](const std::vector<llvm::Value *> &args, bool) {
+            return llvm_pow(s, args[0], args[1], pow_allow_approx(*this));
+        },
+        *this, s, eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+#endif
+
+namespace
+{
+
+template <typename T>
+[[nodiscard]] llvm::Function *pow_llvm_c_eval(llvm_state &s, const pow_impl &pimpl, std::uint32_t batch_size,
+                                              bool high_accuracy)
+{
+    const auto allow_approx = pow_allow_approx(pimpl);
+
+    return llvm_c_eval_func_helper<T>(
+        allow_approx ? "pow_approx" : "pow",
+        [&s, allow_approx](const std::vector<llvm::Value *> &args, bool) {
+            return llvm_pow(s, args[0], args[1], allow_approx);
+        },
+        pimpl, s, batch_size, high_accuracy);
+}
+
+} // namespace
+
+llvm::Function *pow_impl::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return pow_llvm_c_eval<double>(s, *this, batch_size, high_accuracy);
+}
+
+llvm::Function *pow_impl::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return pow_llvm_c_eval<long double>(s, *this, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *pow_impl::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return pow_llvm_c_eval<mppp::real128>(s, *this, batch_size, high_accuracy);
+}
+
+#endif
+
 namespace
 {
 

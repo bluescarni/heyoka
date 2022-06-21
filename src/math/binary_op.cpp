@@ -236,6 +236,99 @@ void binary_op::eval_batch_dbl(std::vector<double> &out_values,
 namespace
 {
 
+[[nodiscard]] llvm::Value *bo_llvm_eval(llvm_state &s, const std::vector<llvm::Value *> &args, binary_op::type op)
+{
+    assert(args.size() == 2u);
+
+    switch (op) {
+        case binary_op::type::add:
+            return s.builder().CreateFAdd(args[0], args[1]);
+        case binary_op::type::sub:
+            return s.builder().CreateFSub(args[0], args[1]);
+        case binary_op::type::mul:
+            return s.builder().CreateFMul(args[0], args[1]);
+        default:
+            assert(op == binary_op::type::div);
+            return s.builder().CreateFDiv(args[0], args[1]);
+    }
+}
+
+} // namespace
+
+llvm::Value *binary_op::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                      std::uint32_t batch_size, bool high_accuracy) const
+{
+    return llvm_eval_helper<double>(
+        [&s, this](const std::vector<llvm::Value *> &args, bool) { return bo_llvm_eval(s, args, op()); }, *this, s,
+        eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+llvm::Value *binary_op::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                       std::uint32_t batch_size, bool high_accuracy) const
+{
+    return llvm_eval_helper<long double>(
+        [&s, this](const std::vector<llvm::Value *> &args, bool) { return bo_llvm_eval(s, args, op()); }, *this, s,
+        eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *binary_op::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                       std::uint32_t batch_size, bool high_accuracy) const
+{
+    return llvm_eval_helper<mppp::real128>(
+        [&s, this](const std::vector<llvm::Value *> &args, bool) { return bo_llvm_eval(s, args, op()); }, *this, s,
+        eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+#endif
+
+namespace
+{
+
+template <typename T>
+[[nodiscard]] llvm::Function *bo_llvm_c_eval(llvm_state &s, const func_base &fb, std::uint32_t batch_size,
+                                             bool high_accuracy, binary_op::type op)
+{
+    auto impl = [&s, op](const std::vector<llvm::Value *> &args, bool) { return bo_llvm_eval(s, args, op); };
+
+    switch (op) {
+        case binary_op::type::add:
+            return llvm_c_eval_func_helper<T>("add", impl, fb, s, batch_size, high_accuracy);
+        case binary_op::type::sub:
+            return llvm_c_eval_func_helper<T>("sub", impl, fb, s, batch_size, high_accuracy);
+        case binary_op::type::mul:
+            return llvm_c_eval_func_helper<T>("mul", impl, fb, s, batch_size, high_accuracy);
+        default:
+            assert(op == binary_op::type::div);
+            return llvm_c_eval_func_helper<T>("div", impl, fb, s, batch_size, high_accuracy);
+    }
+}
+
+} // namespace
+
+llvm::Function *binary_op::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return bo_llvm_c_eval<double>(s, *this, batch_size, high_accuracy, op());
+}
+
+llvm::Function *binary_op::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return bo_llvm_c_eval<long double>(s, *this, batch_size, high_accuracy, op());
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *binary_op::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return bo_llvm_c_eval<mppp::real128>(s, *this, batch_size, high_accuracy, op());
+}
+
+#endif
+
+namespace
+{
+
 // Derivative of number +- number.
 template <bool AddOrSub, typename T, typename U, typename V,
           std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>

@@ -9,15 +9,22 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
+#include <functional>
 #include <iterator>
 #include <limits>
+#include <map>
+#include <numeric>
+#include <optional>
 #include <ostream>
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
@@ -25,14 +32,29 @@
 #include <variant>
 #include <vector>
 
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/numeric/conversion/cast.hpp>
+
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constant.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/Casting.h>
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
+#include <fmt/ranges.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -40,8 +62,12 @@
 
 #endif
 
+#include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
@@ -57,6 +83,20 @@
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
+
+// NOTE: GCC warns about use of mismatched new/delete
+// when creating global variables. I am not sure this is
+// a real issue, as it looks like we are adopting the "canonical"
+// approach for the creation of global variables (at least
+// according to various sources online)
+// and clang is not complaining. But let us revisit
+// this issue in later LLVM versions.
+#if defined(__GNUC__) && (__GNUC__ >= 11)
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmismatched-new-delete"
+
+#endif
 
 namespace heyoka
 {
@@ -113,7 +153,7 @@ expression copy_impl(std::unordered_map<const void *, expression> &func_map, con
 {
     return std::visit(
         [&func_map](const auto &v) {
-            if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, func>) {
+            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto f_id = v.get_ptr();
 
                 if (auto it = func_map.find(f_id); it != func_map.end()) {
@@ -251,7 +291,7 @@ void get_variables(std::unordered_set<const void *> &func_set, std::set<std::str
 {
     std::visit(
         [&func_set, &s_set](const auto &arg) {
-            using type = detail::uncvref_t<decltype(arg)>;
+            using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, func>) {
                 const auto f_id = arg.get_ptr();
@@ -284,7 +324,7 @@ void rename_variables(std::unordered_set<const void *> &func_set, expression &e,
 {
     std::visit(
         [&func_set, &repl_map](auto &arg) {
-            using type = detail::uncvref_t<decltype(arg)>;
+            using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, func>) {
                 const auto f_id = arg.get_ptr();
@@ -871,7 +911,7 @@ std::size_t get_n_nodes(std::unordered_map<const void *, std::size_t> &func_map,
 {
     return std::visit(
         [&func_map](const auto &arg) -> std::size_t {
-            if constexpr (std::is_same_v<func, detail::uncvref_t<decltype(arg)>>) {
+            if constexpr (std::is_same_v<func, uncvref_t<decltype(arg)>>) {
                 const auto f_id = arg.get_ptr();
 
                 if (auto it = func_map.find(f_id); it != func_map.end()) {
@@ -917,11 +957,12 @@ expression diff(std::unordered_map<const void *, expression> &func_map, const ex
 {
     return std::visit(
         [&func_map, &s](const auto &arg) {
-            using type = detail::uncvref_t<decltype(arg)>;
+            using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, number>) {
-                return std::visit([](const auto &v) { return expression{number{detail::uncvref_t<decltype(v)>(0)}}; },
-                                  arg.value());
+                return std::visit(
+                    [](const auto &v) { return expression{number{static_cast<uncvref_t<decltype(v)>>(0)}}; },
+                    arg.value());
             } else if constexpr (std::is_same_v<type, param>) {
                 // NOTE: if we ever implement single-precision support,
                 // this should be probably changed into 0_flt (i.e., the lowest
@@ -961,11 +1002,12 @@ expression diff(std::unordered_map<const void *, expression> &func_map, const ex
 {
     return std::visit(
         [&func_map, &p](const auto &arg) {
-            using type = detail::uncvref_t<decltype(arg)>;
+            using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, number>) {
-                return std::visit([](const auto &v) { return expression{number{detail::uncvref_t<decltype(v)>(0)}}; },
-                                  arg.value());
+                return std::visit(
+                    [](const auto &v) { return expression{number{static_cast<uncvref_t<decltype(v)>>(0)}}; },
+                    arg.value());
             } else if constexpr (std::is_same_v<type, param>) {
                 if (p.idx() == arg.idx()) {
                     return 1_dbl;
@@ -1040,7 +1082,7 @@ expression subs(std::unordered_map<const void *, expression> &func_map, const ex
 {
     return std::visit(
         [&func_map, &smap](const auto &arg) {
-            using type = detail::uncvref_t<decltype(arg)>;
+            using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, number> || std::is_same_v<type, param>) {
                 return expression{arg};
@@ -1098,7 +1140,7 @@ namespace
 
 // Pairwise reduction of a vector of expressions.
 template <typename F>
-expression pairwise_reduce(const F &func, std::vector<expression> list)
+expression pairwise_reduce_impl(const F &func, std::vector<expression> list)
 {
     assert(!list.empty());
 
@@ -1146,8 +1188,8 @@ expression pairwise_prod(std::vector<expression> prod)
         return 1_dbl;
     }
 
-    return detail::pairwise_reduce([](expression &&a, expression &&b) { return std::move(a) * std::move(b); },
-                                   std::move(prod));
+    return detail::pairwise_reduce_impl([](expression &&a, expression &&b) { return std::move(a) * std::move(b); },
+                                        std::move(prod));
 }
 
 double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map,
@@ -1353,7 +1395,7 @@ bool is_integral(const expression &ex)
 {
     return std::visit(
         [](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
+            using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, number>) {
                 return std::visit(
@@ -1378,7 +1420,7 @@ bool is_odd_integral_half(const expression &ex)
 {
     return std::visit(
         [](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
+            using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, number>) {
                 return std::visit(
@@ -1429,7 +1471,7 @@ std::uint32_t get_param_size(std::unordered_set<const void *> &func_set, const e
 
     std::visit(
         [&retval, &func_set](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
+            using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, param>) {
                 if (v.idx() == std::numeric_limits<std::uint32_t>::max()) {
@@ -1495,7 +1537,7 @@ bool has_time(std::unordered_set<const void *> &func_set, const expression &ex)
     // - otherwise, return false.
     return std::visit(
         [&func_set](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
+            using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, func>) {
                 const auto f_id = v.get_ptr();
@@ -1550,7 +1592,1570 @@ std::vector<std::pair<expression, expression>> copy(const std::vector<std::pair<
     return ret;
 }
 
+std::optional<std::vector<expression>::size_type>
+decompose(std::unordered_map<const void *, std::vector<expression>::size_type> &func_map, const expression &ex,
+          std::vector<expression> &dc)
+{
+    if (const auto *fptr = std::get_if<func>(&ex.value())) {
+        return fptr->decompose(func_map, dc);
+    } else {
+        return {};
+    }
+}
+
+namespace
+{
+
+// LCOV_EXCL_START
+
+#if !defined(NDEBUG)
+
+// Helper to verify a function decomposition.
+void verify_function_dec(const std::vector<expression> &orig, const std::vector<expression> &dc,
+                         std::vector<expression>::size_type nvars)
+{
+    using idx_t = std::vector<expression>::size_type;
+
+    // Cache the number of outputs.
+    const auto nouts = orig.size();
+
+    assert(dc.size() >= nouts);
+
+    // The first nvars expressions of u variables
+    // must be just variables.
+    for (idx_t i = 0; i < nvars; ++i) {
+        assert(std::holds_alternative<variable>(dc[i].value()));
+    }
+
+    // From nvars to dc.size() - nouts, the expressions
+    // must be functions whose arguments
+    // are either variables in the u_n form,
+    // where n < i, or numbers/params.
+    for (auto i = nvars; i < dc.size() - nouts; ++i) {
+        std::visit(
+            [i](const auto &v) {
+                using type = uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, func>) {
+                    for (const auto &arg : v.args()) {
+                        if (auto p_var = std::get_if<variable>(&arg.value())) {
+                            assert(p_var->name().rfind("u_", 0) == 0);
+                            assert(uname_to_index(p_var->name()) < i);
+                        } else if (std::get_if<number>(&arg.value()) == nullptr
+                                   && std::get_if<param>(&arg.value()) == nullptr) {
+                            assert(false);
+                        }
+                    }
+                } else {
+                    assert(false);
+                }
+            },
+            dc[i].value());
+    }
+
+    // From dc.size() - nouts to dc.size(), the expressions
+    // must be either variables in the u_n form, where n < i,
+    // or numbers/params.
+    for (auto i = dc.size() - nouts; i < dc.size(); ++i) {
+        std::visit(
+            [i](const auto &v) {
+                using type = uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, variable>) {
+                    assert(v.name().rfind("u_", 0) == 0);
+                    assert(uname_to_index(v.name()) < i);
+                } else if constexpr (!std::is_same_v<type, number> && !std::is_same_v<type, param>) {
+                    assert(false);
+                }
+            },
+            dc[i].value());
+    }
+
+    std::unordered_map<std::string, expression> subs_map;
+
+    // For each u variable, expand its definition
+    // in terms of the original variables or other u variables,
+    // and store it in subs_map.
+    for (idx_t i = 0; i < dc.size() - nouts; ++i) {
+        subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map));
+    }
+
+    // Reconstruct the function components
+    // and compare them to the original ones.
+    for (auto i = dc.size() - nouts; i < dc.size(); ++i) {
+        assert(subs(dc[i], subs_map) == orig[i - (dc.size() - nouts)]);
+    }
+}
+
+#endif
+
+// LCOV_EXCL_STOP
+
+// Simplify a function decomposition by removing
+// common subexpressions.
+std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex, std::vector<expression>::size_type nvars,
+                                               std::vector<expression>::size_type nouts)
+{
+    using idx_t = std::vector<expression>::size_type;
+
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
+
+    // Cache the original size for logging later.
+    const auto orig_size = v_ex.size();
+
+    // A function decomposition is supposed
+    // to have nvars variables at the beginning,
+    // nouts variables at the end and possibly
+    // extra variables in the middle.
+    assert(v_ex.size() >= nouts + nvars);
+
+    // Init the return value.
+    std::vector<expression> retval;
+
+    // expression -> idx map. This will end up containing
+    // all the unique expressions from v_ex, and it will
+    // map them to their indices in retval (which will
+    // in general differ from their indices in v_ex).
+    std::unordered_map<expression, idx_t> ex_map;
+
+    // Map for the renaming of u variables
+    // in the expressions.
+    std::unordered_map<std::string, std::string> uvars_rename;
+
+    // The first nvars definitions are just renaming
+    // of the original variables into u variables.
+    for (idx_t i = 0; i < nvars; ++i) {
+        assert(std::holds_alternative<variable>(v_ex[i].value()));
+        retval.push_back(std::move(v_ex[i]));
+
+        // NOTE: the u vars that correspond to the original
+        // variables are never simplified,
+        // thus map them onto themselves.
+        [[maybe_unused]] const auto res = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", i));
+        assert(res.second);
+    }
+
+    // Handle the u variables which do not correspond to the original variables.
+    for (auto i = nvars; i < v_ex.size() - nouts; ++i) {
+        auto &ex = v_ex[i];
+
+        // Rename the u variables in ex.
+        rename_variables(ex, uvars_rename);
+
+        if (auto it = ex_map.find(ex); it == ex_map.end()) {
+            // This is the first occurrence of ex in the
+            // decomposition. Add it to retval.
+            retval.push_back(ex);
+
+            // Add ex to ex_map, mapping it to
+            // the index it corresponds to in retval
+            // (let's call it j).
+            ex_map.emplace(std::move(ex), retval.size() - 1u);
+
+            // Update uvars_rename. This will ensure that
+            // occurrences of the variable 'u_i' in the next
+            // elements of v_ex will be renamed to 'u_j'.
+            [[maybe_unused]] const auto res
+                = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", retval.size() - 1u));
+            assert(res.second);
+        } else {
+            // ex is redundant. This means
+            // that it already appears in retval at index
+            // it->second. Don't add anything to retval,
+            // and remap the variable name 'u_i' to
+            // 'u_{it->second}'.
+            [[maybe_unused]] const auto res
+                = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", it->second));
+            assert(res.second); // LCOV_EXCL_LINE
+        }
+    }
+
+    // Handle the definitions of the outputs at the end of the decomposition.
+    // We just need to ensure that
+    // the u variables in their definitions are renamed with
+    // the new indices.
+    for (auto i = v_ex.size() - nouts; i < v_ex.size(); ++i) {
+        auto &ex = v_ex[i];
+
+        // NOTE: here we expect only vars, numbers or params.
+        assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
+               || std::holds_alternative<param>(ex.value()));
+
+        rename_variables(ex, uvars_rename);
+
+        retval.push_back(std::move(ex));
+    }
+
+    get_logger()->debug("cfunc CSE reduced decomposition size from {} to {}", orig_size, retval.size());
+    get_logger()->trace("cfunc CSE runtime: {}", sw);
+
+    return retval;
+}
+
+// Perform a topological sort on a graph representation
+// of a function decomposition. This can improve performance
+// by grouping together operations that can be performed in parallel,
+// and it also makes compact mode much more effective by creating
+// clusters of subexpressions which can be evaluated in parallel.
+// NOTE: the original decomposition dc is already topologically sorted,
+// in the sense that the definitions of the u variables are already
+// ordered according to dependency. However, because the original decomposition
+// comes from a depth-first search, it has the tendency to group together
+// expressions which are dependent on each other. By doing another topological
+// sort, this time based on breadth-first search, we determine another valid
+// sorting in which independent operations tend to be clustered together.
+std::vector<expression> function_sort_dc(std::vector<expression> &dc, std::vector<expression>::size_type nvars,
+                                         std::vector<expression>::size_type nouts)
+{
+    // A function decomposition is supposed
+    // to have nvars variables at the beginning,
+    // nouts variables at the end and possibly
+    // extra variables in the middle.
+    assert(dc.size() >= nouts + nvars);
+
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
+
+    // The graph type that we will use for the topological sorting.
+    using graph_t = boost::adjacency_list<boost::vecS,           // std::vector for list of adjacent vertices
+                                          boost::vecS,           // std::vector for the list of vertices
+                                          boost::bidirectionalS, // directed graph with efficient access
+                                                                 // to in-edges
+                                          boost::no_property,    // no vertex properties
+                                          boost::no_property,    // no edge properties
+                                          boost::no_property,    // no graph properties
+                                          boost::listS           // std::list for of the graph's edge list
+                                          >;
+
+    graph_t g;
+
+    // Add the root node.
+    const auto root_v = boost::add_vertex(g);
+
+    // Add the nodes corresponding to the original variables.
+    for (decltype(nvars) i = 0; i < nvars; ++i) {
+        auto v = boost::add_vertex(g);
+
+        // Add a dependency on the root node.
+        boost::add_edge(root_v, v, g);
+    }
+
+    // Add the rest of the u variables.
+    for (decltype(nvars) i = nvars; i < dc.size() - nouts; ++i) {
+        auto v = boost::add_vertex(g);
+
+        // Fetch the list of variables in the current expression.
+        const auto vars = get_variables(dc[i]);
+
+        if (vars.empty()) {
+            // The current expression does not contain
+            // any variable: make it depend on the root
+            // node. This means that in the topological
+            // sort below, the current u var will appear
+            // immediately after the original variables.
+            boost::add_edge(root_v, v, g);
+        } else {
+            // Mark the current u variable as depending on all the
+            // variables in the current expression.
+            for (const auto &var : vars) {
+                // Extract the index.
+                const auto idx = uname_to_index(var);
+
+                // Add the dependency.
+                // NOTE: add +1 because the i-th vertex
+                // corresponds to the (i-1)-th u variable
+                // due to the presence of the root node.
+                boost::add_edge(boost::vertex(idx + 1u, g), v, g);
+            }
+        }
+    }
+
+    assert(boost::num_vertices(g) - 1u == dc.size() - nouts);
+
+    // Run the BF topological sort on the graph. This is Kahn's algorithm:
+    // https://en.wikipedia.org/wiki/Topological_sorting
+
+    // The result of the sort.
+    std::vector<decltype(dc.size())> v_idx;
+
+    // Temp variable used to sort a list of edges in the loop below.
+    std::vector<boost::graph_traits<graph_t>::edge_descriptor> tmp_edges;
+
+    // The set of all nodes with no incoming edge.
+    std::deque<decltype(dc.size())> tmp;
+    // The root node has no incoming edge.
+    tmp.push_back(0);
+
+    // Main loop.
+    while (!tmp.empty()) {
+        // Pop the first element from tmp
+        // and append it to the result.
+        const auto v = tmp.front();
+        tmp.pop_front();
+        v_idx.push_back(v);
+
+        // Fetch all the out edges of v and sort them according
+        // to the target vertex.
+        // NOTE: the sorting is important to ensure that all the original
+        // variables are insered into v_idx in the correct order.
+        const auto e_range = boost::out_edges(v, g);
+        tmp_edges.assign(e_range.first, e_range.second);
+        std::sort(tmp_edges.begin(), tmp_edges.end(),
+                  [&g](const auto &e1, const auto &e2) { return boost::target(e1, g) < boost::target(e2, g); });
+
+        // For each out edge of v:
+        // - eliminate it;
+        // - check if the target vertex of the edge
+        //   has other incoming edges;
+        // - if it does not, insert it into tmp.
+        for (auto &e : tmp_edges) {
+            // Fetch the target of the edge.
+            const auto t = boost::target(e, g);
+
+            // Remove the edge.
+            boost::remove_edge(e, g);
+
+            // Get the range of vertices connecting to t.
+            const auto iav = boost::inv_adjacent_vertices(t, g);
+
+            if (iav.first == iav.second) {
+                // t does not have any incoming edges, add it to tmp.
+                tmp.push_back(t);
+            }
+        }
+    }
+
+    assert(v_idx.size() == boost::num_vertices(g));
+    assert(boost::num_edges(g) == 0u);
+
+    // Adjust v_idx: remove the index of the root node,
+    // decrease by one all other indices, insert the final
+    // nouts indices.
+    for (decltype(v_idx.size()) i = 0; i < v_idx.size() - 1u; ++i) {
+        v_idx[i] = v_idx[i + 1u] - 1u;
+    }
+    v_idx.resize(boost::numeric_cast<decltype(v_idx.size())>(dc.size()));
+    std::iota(v_idx.data() + dc.size() - nouts, v_idx.data() + dc.size(), dc.size() - nouts);
+
+    // Create the remapping dictionary.
+    std::unordered_map<std::string, std::string> remap;
+    // NOTE: the u vars that correspond to the original
+    // variables were inserted into v_idx in the original
+    // order, thus they are not re-sorted and they do not
+    // need renaming.
+    for (decltype(v_idx.size()) i = 0; i < nvars; ++i) {
+        assert(v_idx[i] == i);
+        [[maybe_unused]] const auto res = remap.emplace(fmt::format("u_{}", i), fmt::format("u_{}", i));
+        assert(res.second);
+    }
+    // Establish the remapping for the u variables that are not
+    // original variables.
+    for (decltype(v_idx.size()) i = nvars; i < v_idx.size() - nouts; ++i) {
+        [[maybe_unused]] const auto res = remap.emplace(fmt::format("u_{}", v_idx[i]), fmt::format("u_{}", i));
+        assert(res.second);
+    }
+
+    // Do the remap for the definitions of the u variables and of the components.
+    for (auto *it = dc.data() + nvars; it != dc.data() + dc.size(); ++it) {
+        // Remap the expression.
+        rename_variables(*it, remap);
+    }
+
+    // Reorder the decomposition.
+    std::vector<expression> retval;
+    retval.reserve(v_idx.size());
+    for (auto idx : v_idx) {
+        retval.push_back(std::move(dc[idx]));
+    }
+
+    get_logger()->trace("cfunc topological sort runtime: {}", sw);
+
+    return retval;
+}
+
+} // namespace
+
 } // namespace detail
+
+std::optional<std::vector<expression>::size_type> decompose(const expression &ex, std::vector<expression> &dc)
+{
+    std::unordered_map<const void *, std::vector<expression>::size_type> func_map;
+
+    return detail::decompose(func_map, ex, dc);
+}
+
+// Decomposition with automatic deduction of variables.
+std::pair<std::vector<expression>, std::vector<expression>::size_type>
+function_decompose(const std::vector<expression> &v_ex_)
+{
+    // Need to operate on a copy due to in-place mutation
+    // via rename_variables().
+    // NOTE: this is suboptimal, as expressions which are shared
+    // across different elements of v_ex will be not shared any more
+    // after the copy.
+    auto v_ex = detail::copy(v_ex_);
+
+    if (v_ex.empty()) {
+        throw std::invalid_argument("Cannot decompose a function with no outputs");
+    }
+
+    // Determine the variables.
+    std::set<std::string> vars;
+    for (const auto &ex : v_ex) {
+        for (const auto &var : get_variables(ex)) {
+            vars.emplace(var);
+        }
+    }
+
+    // Cache the number of variables.
+    const auto nvars = vars.size();
+
+    // Cache the number of outputs.
+    const auto nouts = v_ex.size();
+
+    // Create the map for renaming the variables to u_i.
+    // The renaming will be done in alphabetical order.
+    std::unordered_map<std::string, std::string> repl_map;
+    {
+        decltype(vars.size()) var_idx = 0;
+        for (const auto &var : vars) {
+            [[maybe_unused]] const auto eres = repl_map.emplace(var, fmt::format("u_{}", var_idx++));
+            assert(eres.second);
+        }
+    }
+
+#if !defined(NDEBUG)
+
+    // Store a copy of the original function for checking later.
+    auto orig_v_ex = detail::copy(v_ex);
+
+#endif
+
+    // Rename the variables in the original function.
+    for (auto &ex : v_ex) {
+        rename_variables(ex, repl_map);
+    }
+
+    // Init the decomposition. It begins with a list
+    // of the original variables of the function.
+    std::vector<expression> ret;
+    ret.reserve(nvars);
+    for (const auto &var : vars) {
+        ret.emplace_back(var);
+    }
+
+    // Log the construction runtime in trace mode.
+    spdlog::stopwatch sw;
+
+    // Run the decomposition on each component of the function.
+    for (auto &ex : v_ex) {
+        // Decompose the current component.
+        if (const auto dres = decompose(ex, ret)) {
+            // NOTE: if the component was decomposed
+            // (that is, it is not constant or a single variable),
+            // we have to update the original definition
+            // of the component in v_ex
+            // so that it points to the u variable
+            // that now represents it.
+            // NOTE: all functions are forced to return
+            // a non-empty dres
+            // in the func API, so the only entities that
+            // can return an empty dres are const/params or
+            // variables.
+            ex = expression{fmt::format("u_{}", *dres)};
+        } else {
+            assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
+                   || std::holds_alternative<param>(ex.value()));
+        }
+    }
+
+    // Append the definitions of the outputs
+    // in terms of u variables.
+    for (auto &ex : v_ex) {
+        ret.emplace_back(std::move(ex));
+    }
+
+    detail::get_logger()->trace("cfunc decomposition construction runtime: {}", sw);
+
+#if !defined(NDEBUG)
+
+    // Verify the decomposition.
+    // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
+    // This is fine, as the decomposition must contain at least nvars items.
+    detail::verify_function_dec(orig_v_ex, ret, nvars);
+
+#endif
+
+    // Simplify the decomposition.
+    // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
+    // This is fine, as the decomposition must contain at least nvars items.
+    ret = detail::function_decompose_cse(ret, nvars, nouts);
+
+#if !defined(NDEBUG)
+
+    // Verify the simplified decomposition.
+    detail::verify_function_dec(orig_v_ex, ret, nvars);
+
+#endif
+
+    // Run the breadth-first topological sort on the decomposition.
+    // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
+    // This is fine, as the decomposition must contain at least nvars items.
+    ret = detail::function_sort_dc(ret, nvars, nouts);
+
+#if !defined(NDEBUG)
+
+    // Verify the reordered decomposition.
+    detail::verify_function_dec(orig_v_ex, ret, nvars);
+
+#endif
+
+    // NOTE: static_cast is fine, as we know that ret contains at least nvars elements.
+    return std::make_pair(std::move(ret), static_cast<std::vector<expression>::size_type>(nvars));
+}
+
+// Function decomposition from with explicit list of input variables.
+std::vector<expression> function_decompose(const std::vector<expression> &v_ex_, const std::vector<expression> &vars)
+{
+    // Need to operate on copies due to in-place mutation
+    // via rename_variables().
+    // NOTE: this is suboptimal, as expressions which are shared
+    // across different elements of v_ex will be not shared any more
+    // after the copy.
+    auto v_ex = detail::copy(v_ex_);
+
+    if (v_ex.empty()) {
+        throw std::invalid_argument("Cannot decompose a function with no outputs");
+    }
+
+    // Sanity check vars. We need to ensure that:
+    // - all the expressions in vars are variables
+    //   and there are no duplicates,
+    // - all the variables appearing in v_ex
+    //   are present in vars.
+    // Note that vars is allowed to contain extra variables
+    // (that is, variables which are not present in v_ex).
+
+    // A set to check for duplicates in vars.
+    std::unordered_set<std::string> var_set;
+    // This set will contain all the variables in v_ex.
+    std::unordered_set<std::string> v_ex_vars;
+
+    for (const auto &ex : vars) {
+        if (const auto *var_ptr = std::get_if<variable>(&ex.value())) {
+            // Check if this is a duplicate variable.
+            if (auto res = var_set.emplace(var_ptr->name()); !res.second) {
+                // Duplicate, error out.
+                throw std::invalid_argument(fmt::format("Error in the decomposition of a function: the variable '{}' "
+                                                        "appears in the user-provided list of variables twice",
+                                                        var_ptr->name()));
+            }
+        } else {
+            throw std::invalid_argument(fmt::format("Error in the decomposition of a function: the "
+                                                    "user-provided list of variables contains the expression '{}', "
+                                                    "which is not a variable",
+                                                    ex));
+        }
+    }
+
+    // Build v_ex_vars.
+    for (const auto &ex : v_ex) {
+        for (auto &var : get_variables(ex)) {
+            v_ex_vars.emplace(std::move(var));
+        }
+    }
+
+    // Check that all variables in v_ex_vars appear in var_set.
+    for (const auto &var : v_ex_vars) {
+        if (var_set.find(var) == var_set.end()) {
+            throw std::invalid_argument(
+                fmt::format("Error in the decomposition of a function: the variable '{}' "
+                            "appears in the function but not in the user-provided list of variables",
+                            var));
+        }
+    }
+
+    // Cache the number of variables.
+    const auto nvars = vars.size();
+
+    // Cache the number of outputs.
+    const auto nouts = v_ex.size();
+
+    // Create the map for renaming the variables to u_i.
+    // The renaming will be done following the order of vars.
+    std::unordered_map<std::string, std::string> repl_map;
+    for (decltype(vars.size()) i = 0; i < nvars; ++i) {
+        [[maybe_unused]] const auto eres
+            = repl_map.emplace(std::get<variable>(vars[i].value()).name(), fmt::format("u_{}", i));
+        assert(eres.second);
+    }
+
+#if !defined(NDEBUG)
+
+    // Store a copy of the original function for checking later.
+    auto orig_v_ex = detail::copy(v_ex);
+
+#endif
+
+    // Rename the variables in the original function.
+    for (auto &ex : v_ex) {
+        rename_variables(ex, repl_map);
+    }
+
+    // Init the decomposition. It begins with a list
+    // of the original variables of the function.
+    std::vector<expression> ret;
+    ret.reserve(nvars);
+    for (const auto &var : vars) {
+        ret.push_back(var);
+    }
+
+    // Log the construction runtime in trace mode.
+    spdlog::stopwatch sw;
+
+    // Run the decomposition on each component of the function.
+    for (auto &ex : v_ex) {
+        // Decompose the current component.
+        if (const auto dres = decompose(ex, ret)) {
+            // NOTE: if the component was decomposed
+            // (that is, it is not constant or a single variable),
+            // we have to update the original definition
+            // of the component in v_ex
+            // so that it points to the u variable
+            // that now represents it.
+            // NOTE: all functions are forced to return
+            // a non-empty dres
+            // in the func API, so the only entities that
+            // can return an empty dres are const/params or
+            // variables.
+            ex = expression{fmt::format("u_{}", *dres)};
+        } else {
+            assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
+                   || std::holds_alternative<param>(ex.value()));
+        }
+    }
+
+    // Append the definitions of the outputs
+    // in terms of u variables.
+    for (auto &ex : v_ex) {
+        ret.emplace_back(std::move(ex));
+    }
+
+    detail::get_logger()->trace("cfunc decomposition construction runtime: {}", sw);
+
+#if !defined(NDEBUG)
+
+    // Verify the decomposition.
+    // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
+    // This is fine, as the decomposition must contain at least nvars items.
+    detail::verify_function_dec(orig_v_ex, ret, nvars);
+
+#endif
+
+    // Simplify the decomposition.
+    // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
+    // This is fine, as the decomposition must contain at least nvars items.
+    ret = detail::function_decompose_cse(ret, nvars, nouts);
+
+#if !defined(NDEBUG)
+
+    // Verify the simplified decomposition.
+    detail::verify_function_dec(orig_v_ex, ret, nvars);
+
+#endif
+
+    // Run the breadth-first topological sort on the decomposition.
+    // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
+    // This is fine, as the decomposition must contain at least nvars items.
+    ret = detail::function_sort_dc(ret, nvars, nouts);
+
+#if !defined(NDEBUG)
+
+    // Verify the reordered decomposition.
+    detail::verify_function_dec(orig_v_ex, ret, nvars);
+
+#endif
+
+    return ret;
+}
+
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
+                       const std::vector<expression> &dc, std::uint32_t nvars, std::uint32_t nuvars,
+                       std::uint32_t batch_size, bool high_accuracy)
+{
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the scalar FP type.
+    auto *fp_t = to_llvm_type<T>(context);
+
+    // The array containing the evaluation of the decomposition.
+    std::vector<llvm::Value *> eval_arr;
+
+    // Init it by loading the input values from in_ptr.
+    for (std::uint32_t i = 0; i < nvars; ++i) {
+        auto *ptr = builder.CreateInBoundsGEP(fp_t, in_ptr, builder.getInt32(i * batch_size));
+        eval_arr.push_back(load_vector_from_memory(builder, ptr, batch_size));
+    }
+
+    // Evaluate the elementary subexpressions in the decomposition.
+    for (std::uint32_t i = nvars; i < nuvars; ++i) {
+        assert(std::holds_alternative<func>(dc[i].value()));
+
+        eval_arr.push_back(
+            llvm_eval<T>(std::get<func>(dc[i].value()), s, eval_arr, par_ptr, batch_size, high_accuracy));
+    }
+
+    // Write the outputs.
+    for (decltype(dc.size()) i = nuvars; i < dc.size(); ++i) {
+        // Determine the index in the output array.
+        const auto out_idx = static_cast<std::uint32_t>((i - nuvars) * batch_size);
+
+        // Compute the pointer to write to.
+        auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.getInt32(out_idx));
+
+        std::visit(
+            [&](const auto &v) {
+                using type = uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, variable>) {
+                    // Fetch the index of the variable.
+                    const auto u_idx = uname_to_index(v.name());
+                    assert(u_idx < eval_arr.size());
+
+                    // Fetch the corresponding value from eval_arr and store it.
+                    store_vector_to_memory(builder, ptr, eval_arr[u_idx]);
+                } else if constexpr (std::is_same_v<type, number>) {
+                    // Codegen the number and store it.
+                    store_vector_to_memory(builder, ptr, vector_splat(builder, codegen<T>(s, v), batch_size));
+                } else if constexpr (std::is_same_v<type, param>) {
+                    // Codegen the parameter and store it.
+                    store_vector_to_memory(builder, ptr, cfunc_nc_param_codegen(s, v, batch_size, fp_t, par_ptr));
+                } else {
+                    assert(false); // LCOV_EXCL_LINE
+                }
+            },
+            dc[i].value());
+    }
+}
+
+// Small helper to deduce the number of parameters
+// present in a function decomposition.
+// NOTE: the first few entries in the decomposition are the mapping
+// u variables -> original variables. These never contain any param
+// by construction.
+std::uint32_t n_pars_in_fdc(const std::vector<expression> &dc)
+{
+    std::uint32_t retval = 0;
+
+    for (const auto &ex : dc) {
+        retval = std::max(retval, get_param_size(ex));
+    }
+
+    return retval;
+}
+
+// Function to split the central part of a function decomposition (i.e., the definitions of the u variables
+// that do not represent original variables) into parallelisable segments. Within a segment,
+// the definition of a u variable does not depend on any u variable defined within that segment.
+// NOTE: the segments in the return value will contain shallow copies of the
+// expressions in dc.
+std::vector<std::vector<expression>> function_segment_dc(const std::vector<expression> &dc, std::uint32_t nvars,
+                                                         std::uint32_t nuvars)
+{
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
+
+    // Helper that takes in input the definition ex of a u variable, and returns
+    // in output the list of indices of the u variables on which ex depends.
+    auto udef_args_indices = [](const expression &ex) -> std::vector<std::uint32_t> {
+        return std::visit(
+            [](const auto &v) -> std::vector<std::uint32_t> {
+                using type = uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, func>) {
+                    std::vector<std::uint32_t> retval;
+
+                    for (const auto &arg : v.args()) {
+                        std::visit(
+                            [&retval](const auto &x) {
+                                using tp = uncvref_t<decltype(x)>;
+
+                                if constexpr (std::is_same_v<tp, variable>) {
+                                    retval.push_back(uname_to_index(x.name()));
+                                } else if constexpr (!std::is_same_v<tp, number> && !std::is_same_v<tp, param>) {
+                                    // LCOV_EXCL_START
+                                    throw std::invalid_argument(
+                                        "Invalid argument encountered in an element of a function decomposition: the "
+                                        "argument is not a variable or a number/param");
+                                    // LCOV_EXCL_STOP
+                                }
+                            },
+                            arg.value());
+                    }
+
+                    return retval;
+                } else {
+                    // LCOV_EXCL_START
+                    throw std::invalid_argument("Invalid expression encountered in a function decomposition: the "
+                                                "expression is not a function");
+                    // LCOV_EXCL_STOP
+                }
+            },
+            ex.value());
+    };
+
+    // Init the return value.
+    std::vector<std::vector<expression>> s_dc;
+
+    // cur_limit_idx is initially the index of the first
+    // u variable which is not an original variable.
+    auto cur_limit_idx = nvars;
+    for (std::uint32_t i = nvars; i < nuvars; ++i) {
+        // NOTE: at the very first iteration of this for loop,
+        // no block has been created yet. Do it now.
+        if (i == nvars) {
+            assert(s_dc.empty());
+            s_dc.emplace_back();
+        } else {
+            assert(!s_dc.empty());
+        }
+
+        const auto &ex = dc[i];
+
+        // Determine the u indices on which ex depends.
+        const auto u_indices = udef_args_indices(ex);
+
+        if (std::any_of(u_indices.begin(), u_indices.end(),
+                        [cur_limit_idx](auto idx) { return idx >= cur_limit_idx; })) {
+            // The current expression depends on one or more variables
+            // within the current block. Start a new block and
+            // update cur_limit_idx with the start index of the new block.
+            s_dc.emplace_back();
+            cur_limit_idx = i;
+        }
+
+        // Append ex to the current block.
+        s_dc.back().push_back(ex);
+    }
+
+#if !defined(NDEBUG)
+    // Verify s_dc.
+
+    decltype(dc.size()) counter = 0;
+    for (const auto &s : s_dc) {
+        // No segment can be empty.
+        assert(!s.empty());
+
+        for (const auto &ex : s) {
+            // All the indices in the definitions of the
+            // u variables in the current block must be
+            // less than counter + nvars (which is the starting
+            // index of the block).
+            const auto u_indices = udef_args_indices(ex);
+            assert(std::all_of(u_indices.begin(), u_indices.end(),
+                               [idx_limit = counter + nvars](auto idx) { return idx < idx_limit; }));
+        }
+
+        // Update the counter.
+        counter += s.size();
+    }
+
+    assert(counter == nuvars - nvars);
+#endif
+
+    get_logger()->debug("cfunc decomposition N of segments: {}", s_dc.size());
+    get_logger()->trace("cfunc decomposition segment runtime: {}", sw);
+
+    return s_dc;
+}
+
+template <typename T>
+auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expression>> &s_dc, std::uint32_t nvars,
+                               std::uint32_t batch_size, bool high_accuracy)
+{
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
+
+    // Init the return value.
+    // NOTE: use maps with name-based comparison for the functions. This ensures that the order in which these
+    // functions are invoked is always the same. If we used directly pointer
+    // comparisons instead, the order could vary across different executions and different platforms. The name
+    // mangling we do when creating the function names should ensure that there are no possible name collisions.
+    std::vector<
+        std::map<llvm::Function *, std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>,
+                 llvm_func_name_compare>>
+        retval;
+
+    // Variable to keep track of the u variable
+    // on whose definition we are operating.
+    auto cur_u_idx = nvars;
+    for (const auto &seg : s_dc) {
+        // This structure maps an LLVM function to sets of arguments
+        // with which the function is to be called. For instance, if function
+        // f(x, y, z) is to be called as f(a, b, c) and f(d, e, f), then tmp_map
+        // will contain {f : [[a, b, c], [d, e, f]]}.
+        // After construction, we have verified that for each function
+        // in the map the sets of arguments have all the same size.
+        std::unordered_map<llvm::Function *, std::vector<std::vector<std::variant<std::uint32_t, number>>>> tmp_map;
+
+        for (const auto &ex : seg) {
+            // Get the evaluation function.
+            auto *func = llvm_c_eval_func<T>(std::get<heyoka::func>(ex.value()), s, batch_size, high_accuracy);
+
+            // Insert the function into tmp_map.
+            const auto [it, is_new_func] = tmp_map.try_emplace(func);
+
+            assert(is_new_func || !it->second.empty()); // LCOV_EXCL_LINE
+
+            // Convert the variables/constants in the current dc
+            // element into a set of indices/constants.
+            const auto c_args = udef_to_variants(ex, {});
+
+            if (!is_new_func && it->second.back().size() - 1u != c_args.size()) {
+                // LCOV_EXCL_START
+                throw std::invalid_argument(
+                    fmt::format("Inconsistent arity detected in a compiled function in compact "
+                                "mode: the same function is being called with both {} and {} arguments",
+                                it->second.back().size() - 1u, c_args.size()));
+                // LCOV_EXCL_STOP
+            }
+
+            // Add the new set of arguments.
+            it->second.emplace_back();
+            // Add the idx of the u variable.
+            it->second.back().emplace_back(cur_u_idx);
+            // Add the actual function arguments.
+            it->second.back().insert(it->second.back().end(), c_args.begin(), c_args.end());
+
+            ++cur_u_idx;
+        }
+
+        // Now we build the transposition of tmp_map: from {f : [[a, b, c], [d, e, f]]}
+        // to {f : [[a, d], [b, e], [c, f]]}.
+        std::unordered_map<llvm::Function *, std::vector<std::variant<std::vector<std::uint32_t>, std::vector<number>>>>
+            tmp_map_transpose;
+        for (const auto &[func, vv] : tmp_map) {
+            assert(!vv.empty()); // LCOV_EXCL_LINE
+
+            // Add the function.
+            const auto [it, ins_status] = tmp_map_transpose.try_emplace(func);
+            assert(ins_status); // LCOV_EXCL_LINE
+
+            const auto n_calls = vv.size();
+            const auto n_args = vv[0].size();
+            // NOTE: n_args must be at least 1 because the u idx
+            // is prepended to the actual function arguments in
+            // the tmp_map entries.
+            assert(n_args >= 1u); // LCOV_EXCL_LINE
+
+            for (decltype(vv[0].size()) i = 0; i < n_args; ++i) {
+                // Build the vector of values corresponding
+                // to the current argument index.
+                std::vector<std::variant<std::uint32_t, number>> tmp_c_vec;
+                for (decltype(vv.size()) j = 0; j < n_calls; ++j) {
+                    tmp_c_vec.push_back(vv[j][i]);
+                }
+
+                // Turn tmp_c_vec (a vector of variants) into a variant
+                // of vectors, and insert the result.
+                it->second.push_back(vv_transpose(tmp_c_vec));
+            }
+        }
+
+        // Add a new entry in retval for the current segment.
+        retval.emplace_back();
+        auto &a_map = retval.back();
+
+        for (const auto &[func, vv] : tmp_map_transpose) {
+            // NOTE: vv.size() is now the number of arguments. We know it cannot
+            // be zero because the evaluation functions
+            // in compact mode always have at least 1 argument (i.e., the index
+            // of the u variable which is being evaluated).
+            assert(!vv.empty()); // LCOV_EXCL_LINE
+
+            // Add the function.
+            const auto [it, ins_status] = a_map.try_emplace(func);
+            assert(ins_status); // LCOV_EXCL_LINE
+
+            // Set the number of calls for this function.
+            it->second.first
+                = std::visit([](const auto &x) { return boost::numeric_cast<std::uint32_t>(x.size()); }, vv[0]);
+            assert(it->second.first > 0u); // LCOV_EXCL_LINE
+
+            // Create the g functions for each argument.
+            for (const auto &v : vv) {
+                it->second.second.push_back(std::visit(
+                    [&s](const auto &x) {
+                        using type = uncvref_t<decltype(x)>;
+
+                        if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
+                            return cm_make_arg_gen_vidx(s, x);
+                        } else {
+                            return cm_make_arg_gen_vc<T>(s, x);
+                        }
+                    },
+                    v));
+            }
+        }
+    }
+
+    get_logger()->trace("cfunc build function maps runtime: {}", sw);
+
+    // LCOV_EXCL_START
+    // Log a breakdown of the return value in trace mode.
+    if (get_logger()->should_log(spdlog::level::trace)) {
+        std::vector<std::vector<std::uint32_t>> fm_bd;
+
+        for (const auto &m : retval) {
+            fm_bd.emplace_back();
+
+            for (const auto &p : m) {
+                fm_bd.back().push_back(p.second.first);
+            }
+        }
+
+        get_logger()->trace("cfunc function maps breakdown: {}", fm_bd);
+    }
+    // LCOV_EXCL_STOP
+
+    return retval;
+}
+
+void cfunc_c_store_eval(llvm_state &s, llvm::Value *eval_arr, llvm::Value *idx, llvm::Value *val)
+{
+    auto &builder = s.builder();
+
+    assert(llvm_depr_GEP_type_check(eval_arr, pointee_type(eval_arr))); // LCOV_EXCL_LINE
+    auto *ptr = builder.CreateInBoundsGEP(pointee_type(eval_arr), eval_arr, idx);
+
+    builder.CreateStore(val, ptr);
+}
+
+} // namespace
+
+llvm::Value *cfunc_c_load_eval(llvm_state &s, llvm::Value *eval_arr, llvm::Value *idx)
+{
+    auto &builder = s.builder();
+
+    assert(llvm_depr_GEP_type_check(eval_arr, pointee_type(eval_arr))); // LCOV_EXCL_LINE
+    auto *ptr = builder.CreateInBoundsGEP(pointee_type(eval_arr), eval_arr, idx);
+
+    return builder.CreateLoad(pointee_type(eval_arr), ptr);
+}
+
+namespace
+{
+
+// Helper to construct the global arrays needed for the evaluation of a compiled
+// function in compact mode. The first part of the
+// return value is a set of 6 arrays:
+// - the indices of the outputs which are u variables, paired to
+// - the indices of said u variables, and
+// - the indices of the outputs which are constants, paired to
+// - the values of said constants, and
+// - the indices of the outputs which are params, paired to
+// - the indices of the params.
+// The second part of the return value is a boolean flag that will be true if
+// all outputs are u variables, false otherwise.
+template <typename T>
+std::pair<std::array<llvm::GlobalVariable *, 6>, bool>
+cfunc_c_make_output_globals(llvm_state &s, const std::vector<expression> &dc, std::uint32_t nuvars)
+{
+    auto &context = s.context();
+    auto &builder = s.builder();
+    auto &md = s.module();
+
+    // Build iteratively the output values as vectors of constants.
+    std::vector<llvm::Constant *> var_indices, vars, num_indices, nums, par_indices, pars;
+
+    // Keep track of how many outputs are u variables.
+    std::uint32_t n_out_vars = 0;
+
+    // NOTE: the definitions of the outputs are at the end of the decomposition.
+    for (auto i = nuvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
+        std::visit(
+            [&](const auto &v) {
+                using type = uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, variable>) {
+                    ++n_out_vars;
+                    // NOTE: remove from i the nuvars offset to get the
+                    // true index of the output.
+                    var_indices.push_back(builder.getInt32(i - nuvars));
+                    vars.push_back(builder.getInt32(uname_to_index(v.name())));
+                } else if constexpr (std::is_same_v<type, number>) {
+                    num_indices.push_back(builder.getInt32(i - nuvars));
+                    nums.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, v)));
+                } else if constexpr (std::is_same_v<type, param>) {
+                    par_indices.push_back(builder.getInt32(i - nuvars));
+                    pars.push_back(builder.getInt32(v.idx()));
+                } else {
+                    assert(false); // LCOV_EXCL_LINE
+                }
+            },
+            dc[i].value());
+    }
+
+    // Flag to signal that all outputs are u variables.
+    assert(dc.size() >= nuvars); // LCOV_EXCL_LINE
+    const auto all_out_vars = (n_out_vars == (dc.size() - nuvars));
+
+    assert(var_indices.size() == vars.size()); // LCOV_EXCL_LINE
+    assert(num_indices.size() == nums.size()); // LCOV_EXCL_LINE
+    assert(par_indices.size() == pars.size()); // LCOV_EXCL_LINE
+
+    // Turn the vectors into global read-only LLVM arrays.
+
+    // Variables.
+    auto *var_arr_type
+        = llvm::ArrayType::get(llvm::Type::getInt32Ty(context), boost::numeric_cast<std::uint64_t>(var_indices.size()));
+
+    auto *var_indices_arr = llvm::ConstantArray::get(var_arr_type, var_indices);
+    auto *g_var_indices = new llvm::GlobalVariable(md, var_indices_arr->getType(), true,
+                                                   llvm::GlobalVariable::InternalLinkage, var_indices_arr);
+
+    auto *vars_arr = llvm::ConstantArray::get(var_arr_type, vars);
+    auto *g_vars
+        = new llvm::GlobalVariable(md, vars_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, vars_arr);
+
+    // Numbers.
+    auto *num_indices_arr_type
+        = llvm::ArrayType::get(llvm::Type::getInt32Ty(context), boost::numeric_cast<std::uint64_t>(num_indices.size()));
+    auto *num_indices_arr = llvm::ConstantArray::get(num_indices_arr_type, num_indices);
+    auto *g_num_indices = new llvm::GlobalVariable(md, num_indices_arr->getType(), true,
+                                                   llvm::GlobalVariable::InternalLinkage, num_indices_arr);
+
+    auto nums_arr_type
+        = llvm::ArrayType::get(to_llvm_type<T>(context), boost::numeric_cast<std::uint64_t>(nums.size()));
+    auto nums_arr = llvm::ConstantArray::get(nums_arr_type, nums);
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+    auto *g_nums
+        = new llvm::GlobalVariable(md, nums_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, nums_arr);
+
+    // Params.
+    auto *par_arr_type
+        = llvm::ArrayType::get(llvm::Type::getInt32Ty(context), boost::numeric_cast<std::uint64_t>(par_indices.size()));
+
+    auto *par_indices_arr = llvm::ConstantArray::get(par_arr_type, par_indices);
+    auto *g_par_indices = new llvm::GlobalVariable(md, par_indices_arr->getType(), true,
+                                                   llvm::GlobalVariable::InternalLinkage, par_indices_arr);
+
+    auto *pars_arr = llvm::ConstantArray::get(par_arr_type, pars);
+    auto *g_pars
+        = new llvm::GlobalVariable(md, pars_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, pars_arr);
+
+    return std::pair{std::array{g_var_indices, g_vars, g_num_indices, g_nums, g_par_indices, g_pars}, all_out_vars};
+}
+
+// Small helper to compute the size of a global array.
+std::uint32_t cfunc_c_gl_arr_size(llvm::Value *v)
+{
+    return boost::numeric_cast<std::uint32_t>(
+        llvm::cast<llvm::ArrayType>(llvm::cast<llvm::GlobalVariable>(v)->getValueType())->getNumElements());
+}
+
+// Helper to write the outputs of a compiled function in compact mode.
+// cout_gl is the return value of cfunc_c_make_output_globals(), which contains
+// the indices/constants necessary for the computation.
+void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
+                           const std::pair<std::array<llvm::GlobalVariable *, 6>, bool> &cout_gl, llvm::Value *eval_arr,
+                           llvm::Value *par_ptr, std::uint32_t batch_size)
+{
+    assert(batch_size > 0u); // LCOV_EXCL_LINE
+
+    // Fetch the global arrays and
+    // the all_out_vars flag.
+    const auto &out_gl = cout_gl.first;
+    const auto all_out_vars = cout_gl.second;
+
+    auto &builder = s.builder();
+
+    // Recover the number of outputs which are
+    // u variables, numbers and params.
+    const auto n_vars = cfunc_c_gl_arr_size(out_gl[0]);
+    const auto n_nums = cfunc_c_gl_arr_size(out_gl[2]);
+    const auto n_pars = cfunc_c_gl_arr_size(out_gl[4]);
+
+    // Fetch the type stored in the evaluation array.
+    auto *fp_vec_t = pointee_type(eval_arr);
+    // Fetch the scalar type corresponding to fp_vec_t.
+    auto *fp_scal_t = fp_vec_t->getScalarType();
+
+    // Handle the u variable outputs.
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_vars), [&](llvm::Value *cur_idx) {
+        // Fetch the index of the output.
+        // NOTE: if all outputs are u variables, there's
+        // no need to lookup the index in the global array (which will just contain
+        // a range).
+        auto *out_idx = all_out_vars ? cur_idx
+                                     : builder.CreateLoad(builder.getInt32Ty(),
+                                                          builder.CreateInBoundsGEP(pointee_type(out_gl[0]), out_gl[0],
+                                                                                    {builder.getInt32(0), cur_idx}));
+
+        // Fetch the index of the u variable.
+        auto *u_idx
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[1]), out_gl[1],
+                                                                                 {builder.getInt32(0), cur_idx}));
+
+        // Fetch from eval_arr the value of the u variable u_idx.
+        auto *ret = cfunc_c_load_eval(s, eval_arr, u_idx);
+
+        // Compute the pointer into out_ptr.
+        auto *ptr
+            = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(out_idx, builder.getInt32(batch_size)));
+
+        // Store ret.
+        store_vector_to_memory(builder, ptr, ret);
+    });
+
+    // Handle the number definitions.
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_nums), [&](llvm::Value *cur_idx) {
+        // Fetch the index of the output.
+        auto *out_idx
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[2]), out_gl[2],
+                                                                                 {builder.getInt32(0), cur_idx}));
+
+        // Fetch the constant.
+        auto *num = builder.CreateLoad(
+            fp_scal_t, builder.CreateInBoundsGEP(pointee_type(out_gl[3]), out_gl[3], {builder.getInt32(0), cur_idx}));
+
+        // Splat it out.
+        auto *ret = vector_splat(builder, num, batch_size);
+
+        // Compute the pointer into out_ptr.
+        auto *ptr
+            = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(out_idx, builder.getInt32(batch_size)));
+
+        // Store ret.
+        store_vector_to_memory(builder, ptr, ret);
+    });
+
+    // Handle the param definitions.
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_pars), [&](llvm::Value *cur_idx) {
+        // Fetch the index of the output.
+        auto *out_idx
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[4]), out_gl[4],
+                                                                                 {builder.getInt32(0), cur_idx}));
+
+        // Fetch the index of the param.
+        auto *par_idx
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[5]), out_gl[5],
+                                                                                 {builder.getInt32(0), cur_idx}));
+
+        // Load the parameter value from the array.
+        auto *ptr
+            = builder.CreateInBoundsGEP(fp_scal_t, par_ptr, builder.CreateMul(par_idx, builder.getInt32(batch_size)));
+        auto *ret = load_vector_from_memory(builder, ptr, batch_size);
+
+        // Compute the pointer into out_ptr.
+        ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(out_idx, builder.getInt32(batch_size)));
+
+        // Store ret.
+        store_vector_to_memory(builder, ptr, ret);
+    });
+}
+
+template <typename T>
+void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
+                      const std::vector<expression> &dc, std::uint32_t nvars, std::uint32_t nuvars,
+                      std::uint32_t batch_size, bool high_accuracy)
+{
+    auto &builder = s.builder();
+    auto &context = s.context();
+    auto &md = s.module();
+
+    // Split dc into segments.
+    const auto s_dc = function_segment_dc(dc, nvars, nuvars);
+
+    // Generate the function maps.
+    const auto f_maps = cfunc_build_function_maps<T>(s, s_dc, nvars, batch_size, high_accuracy);
+
+    // Log the runtime of IR construction in trace mode.
+    spdlog::stopwatch sw;
+
+    // Generate the global arrays used to write the outputs at the
+    // end of the computation.
+    const auto cout_gl = cfunc_c_make_output_globals<T>(s, dc, nuvars);
+
+    // Prepare the array that will contain the evaluation of all the
+    // elementary subexpressions.
+    // NOTE: the array size is specified as a 64-bit integer in the
+    // LLVM API.
+    // NOTE: fp_type is the original, scalar floating-point type.
+    // It will be turned into a vector type (if necessary) by
+    // make_vector_type() below.
+    auto *fp_type = to_llvm_type<T>(context);
+    auto *fp_vec_type = make_vector_type(fp_type, batch_size);
+    auto *array_type = llvm::ArrayType::get(fp_vec_type, nuvars);
+
+    // Make the global array and fetch a pointer to its first element.
+    // NOTE: we use a global array rather than a local one here because
+    // its size can grow quite large, which can lead to stack overflow issues.
+    // This has of course consequences in terms of thread safety, which
+    // we will have to document.
+    auto eval_arr_gvar = make_global_zero_array(md, array_type);
+    assert(llvm_depr_GEP_type_check(eval_arr_gvar, array_type)); // LCOV_EXCL_LINE
+    auto *eval_arr = builder.CreateInBoundsGEP(array_type, eval_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
+
+    // Copy over the values of the variables.
+    // NOTE: overflow checking is already done in the parent function.
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(nvars), [&](llvm::Value *cur_var_idx) {
+        // Fetch the pointer from in_ptr.
+        assert(llvm_depr_GEP_type_check(in_ptr, fp_type)); // LCOV_EXCL_LINE
+        auto *ptr
+            = builder.CreateInBoundsGEP(fp_type, in_ptr, builder.CreateMul(cur_var_idx, builder.getInt32(batch_size)));
+
+        // Load as a vector.
+        auto *vec = load_vector_from_memory(builder, ptr, batch_size);
+
+        // Store into eval_arr.
+        cfunc_c_store_eval(s, eval_arr, cur_var_idx, vec);
+    });
+
+    // Helper to evaluate a block.
+    // func is the LLVM function for evaluation in the block,
+    // ncalls the number of times it must be called and gens the generators for the
+    // function arguments.
+    auto block_eval = [&](llvm::Function *func, const auto &ncalls, const auto &gens) {
+        // LCOV_EXCL_START
+        assert(ncalls > 0u);
+        assert(!gens.empty());
+        assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
+        // LCOV_EXCL_STOP
+
+        // Loop over the number of calls.
+        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+            // Create the u variable index from the first generator.
+            auto u_idx = gens[0](cur_call_idx);
+
+            // Initialise the vector of arguments with which func must be called. The following
+            // initial arguments are always present:
+            // - eval array,
+            // - pointer to the param values.
+            std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr};
+
+            // Create the other arguments via the generators.
+            for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                args.push_back(gens[i](cur_call_idx));
+            }
+
+            // Evaluate and store the result.
+            cfunc_c_store_eval(s, eval_arr, u_idx, builder.CreateCall(func, args));
+        });
+    };
+
+    // Evaluate all elementary subexpressions by iterating
+    // over all segments and blocks.
+    for (const auto &map : f_maps) {
+        for (const auto &p : map) {
+            block_eval(p.first, p.second.first, p.second.second);
+        }
+    }
+
+    // Write the results to the output pointer.
+    cfunc_c_write_outputs(s, out_ptr, cout_gl, eval_arr, par_ptr, batch_size);
+
+    get_logger()->trace("cfunc IR creation compact mode runtime: {}", sw);
+}
+
+template <typename T, typename F>
+auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::uint32_t batch_size, bool high_accuracy,
+                    bool compact_mode, bool parallel_mode)
+{
+    if (s.is_compiled()) {
+        throw std::invalid_argument("A compiled function cannot be added to an llvm_state after compilation");
+    }
+
+    if (batch_size == 0u) {
+        throw std::invalid_argument("The batch size of a compiled function cannot be zero");
+    }
+
+    if (parallel_mode && !compact_mode) {
+        throw std::invalid_argument("Parallel mode can only be enabled in conjunction with compact mode");
+    }
+
+    if (parallel_mode) {
+        throw std::invalid_argument("Parallel mode has not been implemented yet");
+    }
+
+#if defined(HEYOKA_ARCH_PPC)
+    if constexpr (std::is_same_v<T, long double>) {
+        throw not_implemented_error("'long double' computations are not supported on PowerPC");
+    }
+#endif
+
+    // Decompose the function and cache the number of vars and outputs.
+    // NOTE: nvars and nouts are already safely cast to 32-bit integers.
+    auto [dc, nvars, nouts] = [&fn]() {
+        if constexpr (std::is_same_v<F, std::vector<expression>>) {
+            auto dec_res = function_decompose(fn);
+
+            return std::make_tuple(std::move(dec_res.first), boost::numeric_cast<std::uint32_t>(dec_res.second),
+                                   boost::numeric_cast<std::uint32_t>(fn.size()));
+        } else {
+            return std::make_tuple(function_decompose(fn.first, fn.second),
+                                   boost::numeric_cast<std::uint32_t>(fn.second.size()),
+                                   boost::numeric_cast<std::uint32_t>(fn.first.size()));
+        }
+    }();
+
+    // Determine the number of u variables.
+    // NOTE: this is also safely cast to a 32-bit integer.
+    assert(dc.size() >= nouts); // LCOV_EXCL_LINE
+    const auto nuvars = boost::numeric_cast<std::uint32_t>(dc.size() - nouts);
+
+    // Overflow checks. We need to be able to index into:
+    // - the output values (nouts * batch_size scalars),
+    // - the input values (nvars * batch_size scalars),
+    // - the parameters array (this will be checked separately by the
+    //   numparam codegen helper in non-compact mode, requires
+    //   an explicit extra check in compact mode),
+    // - the array for the evaluation of the decomposition (nuvars scalars or vectors).
+    // All indices need to be representable as 32-bit integers.
+    // LCOV_EXCL_START
+    if (nouts > std::numeric_limits<std::uint32_t>::max() / batch_size
+        || nvars > std::numeric_limits<std::uint32_t>::max() / batch_size) {
+        throw std::overflow_error("An overflow condition was detected in the construction of a compiled function");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the current insertion block.
+    auto *orig_bb = builder.GetInsertBlock();
+
+    // Prepare the function prototype. The first argument is a write-only float pointer to the outputs.
+    // The second argument is a const float pointer to the inputs. The third argument is a const float pointer to the
+    // pars. These arrays cannot overlap.
+    auto *fp_t = to_llvm_type<T>(context);
+    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_t));
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr); // LCOV_EXCL_LINE
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
+    if (f == nullptr) {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format("Unable to create a compiled function with name '{}'", name));
+        // LCOV_EXCL_STOP
+    }
+
+    // Set the names/attributes of the function arguments.
+    auto *out_ptr = f->args().begin();
+    out_ptr->setName("out_ptr");
+    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    out_ptr->addAttr(llvm::Attribute::NoAlias);
+    out_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+    auto *in_ptr = out_ptr + 1;
+    in_ptr->setName("in_ptr");
+    in_ptr->addAttr(llvm::Attribute::NoCapture);
+    in_ptr->addAttr(llvm::Attribute::NoAlias);
+    in_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto *par_ptr = out_ptr + 2;
+    par_ptr->setName("par_ptr");
+    par_ptr->addAttr(llvm::Attribute::NoCapture);
+    par_ptr->addAttr(llvm::Attribute::NoAlias);
+    par_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+    assert(bb != nullptr); // LCOV_EXCL_LINE
+    builder.SetInsertPoint(bb);
+
+    if (compact_mode) {
+        // In compact mode, we need to ensure that we can index into par_ptr using std::uint32_t.
+        // NOTE: in default mode the check is done inside add_cfunc_nc_mode()
+        // during the construction of the IR code.
+        // In compact mode we cannot do that, as the determination of the index into
+        // par_ptr is done *within* the IR code.
+
+        // Deduce the size of the param array from the expressions in the decomposition.
+        const auto param_size = n_pars_in_fdc(dc);
+        // LCOV_EXCL_START
+        if (param_size > std::numeric_limits<std::uint32_t>::max() / batch_size) {
+            throw std::overflow_error("An overflow condition was detected in the construction of a compiled function");
+        }
+        // LCOV_EXCL_STOP
+
+        add_cfunc_c_mode<T>(s, out_ptr, in_ptr, par_ptr, dc, nvars, nuvars, batch_size, high_accuracy);
+    } else {
+        add_cfunc_nc_mode<T>(s, out_ptr, in_ptr, par_ptr, dc, nvars, nuvars, batch_size, high_accuracy);
+    }
+
+    // Finish off the function.
+    builder.CreateRetVoid();
+
+    // Verify it.
+    s.verify_function(f);
+
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
+
+    // Run the optimisation pass.
+    s.optimise();
+
+    return dc;
+}
+
+} // namespace
+
+} // namespace detail
+
+template <typename T>
+std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &v_ex,
+                                  std::uint32_t batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode)
+{
+    return detail::add_cfunc_impl<T>(s, name, v_ex, batch_size, high_accuracy, compact_mode, parallel_mode);
+}
+
+template <typename T>
+std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &v_ex,
+                                  const std::vector<expression> &vars, std::uint32_t batch_size, bool high_accuracy,
+                                  bool compact_mode, bool parallel_mode)
+{
+    return detail::add_cfunc_impl<T>(s, name, std::make_pair(std::cref(v_ex), std::cref(vars)), batch_size,
+                                     high_accuracy, compact_mode, parallel_mode);
+}
+
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC std::vector<expression>
+add_cfunc<double>(llvm_state &, const std::string &, const std::vector<expression> &, std::uint32_t, bool, bool, bool);
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<double>(llvm_state &, const std::string &,
+                                                                     const std::vector<expression> &,
+                                                                     const std::vector<expression> &, std::uint32_t,
+                                                                     bool, bool, bool);
+
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<long double>(llvm_state &, const std::string &,
+                                                                          const std::vector<expression> &,
+                                                                          std::uint32_t, bool, bool, bool);
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<long double>(llvm_state &, const std::string &,
+                                                                          const std::vector<expression> &,
+                                                                          const std::vector<expression> &,
+                                                                          std::uint32_t, bool, bool, bool);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real128>(llvm_state &, const std::string &,
+                                                                            const std::vector<expression> &,
+                                                                            std::uint32_t, bool, bool, bool);
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real128>(llvm_state &, const std::string &,
+                                                                            const std::vector<expression> &,
+                                                                            const std::vector<expression> &,
+                                                                            std::uint32_t, bool, bool, bool);
+
+#endif
 
 // Determine if an expression is time-dependent.
 bool has_time(const expression &ex)
@@ -1561,3 +3166,9 @@ bool has_time(const expression &ex)
 }
 
 } // namespace heyoka
+
+#if defined(__GNUC__) && (__GNUC__ >= 11)
+
+#pragma GCC diagnostic pop
+
+#endif

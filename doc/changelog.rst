@@ -1,6 +1,16 @@
 Changelog
 =========
 
+0.19.0 (unreleased)
+-------------------
+
+New
+~~~
+
+- Add the capability to compile multivariate vector functions
+  at runtime
+  (`#261 <https://github.com/bluescarni/heyoka/pull/261>`__).
+
 0.18.0 (2022-05-11)
 -------------------
 

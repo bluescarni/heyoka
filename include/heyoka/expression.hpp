@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <ostream>
 #include <stdexcept>
 #include <string>
@@ -387,7 +388,29 @@ namespace detail
 HEYOKA_DLL_PUBLIC bool is_integral(const expression &);
 HEYOKA_DLL_PUBLIC bool is_odd_integral_half(const expression &);
 
+std::optional<std::vector<expression>::size_type>
+decompose(std::unordered_map<const void *, std::vector<expression>::size_type> &, const expression &,
+          std::vector<expression> &);
+
+llvm::Value *cfunc_c_load_eval(llvm_state &, llvm::Value *, llvm::Value *);
+
 } // namespace detail
+
+std::optional<std::vector<expression>::size_type> decompose(const expression &, std::vector<expression> &);
+
+HEYOKA_DLL_PUBLIC std::pair<std::vector<expression>, std::vector<expression>::size_type>
+function_decompose(const std::vector<expression> &);
+HEYOKA_DLL_PUBLIC std::vector<expression> function_decompose(const std::vector<expression> &,
+                                                             const std::vector<expression> &);
+
+template <typename>
+HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
+                                                    std::uint32_t, bool, bool, bool = false);
+
+template <typename>
+HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
+                                                    const std::vector<expression> &, std::uint32_t, bool, bool,
+                                                    bool = false);
 
 } // namespace heyoka
 

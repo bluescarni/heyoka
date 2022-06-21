@@ -88,6 +88,84 @@ expression kepE_impl::diff(std::unordered_map<const void *, expression> &func_ma
     return (detail::diff(func_map, e, p) * sin(E) + detail::diff(func_map, M, p)) / (1_dbl - e * cos(E));
 }
 
+namespace
+{
+
+template <typename T>
+llvm::Value *kepE_llvm_eval_impl(llvm_state &s, const func_base &fb, const std::vector<llvm::Value *> &eval_arr,
+                                 llvm::Value *par_ptr, std::uint32_t batch_size, bool high_accuracy)
+{
+    return llvm_eval_helper<T>(
+        [&s, batch_size](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
+            auto *kepE_func = llvm_add_inv_kep_E<T>(s, batch_size);
+
+            return s.builder().CreateCall(kepE_func, {args[0], args[1]});
+        },
+        fb, s, eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+} // namespace
+
+llvm::Value *kepE_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                      std::uint32_t batch_size, bool high_accuracy) const
+{
+    return kepE_llvm_eval_impl<double>(s, *this, eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+llvm::Value *kepE_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                       std::uint32_t batch_size, bool high_accuracy) const
+{
+    return kepE_llvm_eval_impl<long double>(s, *this, eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *kepE_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                       std::uint32_t batch_size, bool high_accuracy) const
+{
+    return kepE_llvm_eval_impl<mppp::real128>(s, *this, eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+#endif
+
+namespace
+{
+
+template <typename T>
+[[nodiscard]] llvm::Function *kepE_llvm_c_eval(llvm_state &s, const func_base &fb, std::uint32_t batch_size,
+                                               bool high_accuracy)
+{
+    return llvm_c_eval_func_helper<T>(
+        "kepE",
+        [&s, batch_size](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
+            auto *kepE_func = llvm_add_inv_kep_E<T>(s, batch_size);
+
+            return s.builder().CreateCall(kepE_func, {args[0], args[1]});
+        },
+        fb, s, batch_size, high_accuracy);
+}
+
+} // namespace
+
+llvm::Function *kepE_impl::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return kepE_llvm_c_eval<double>(s, *this, batch_size, high_accuracy);
+}
+
+llvm::Function *kepE_impl::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return kepE_llvm_c_eval<long double>(s, *this, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *kepE_impl::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return kepE_llvm_c_eval<mppp::real128>(s, *this, batch_size, high_accuracy);
+}
+
+#endif
+
 taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 2u);

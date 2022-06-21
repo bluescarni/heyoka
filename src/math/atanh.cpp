@@ -112,6 +112,67 @@ mppp::real128 atanh_impl::eval_f128(const std::unordered_map<std::string, mppp::
 }
 #endif
 
+llvm::Value *atanh_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                       std::uint32_t batch_size, bool high_accuracy) const
+{
+    return llvm_eval_helper<double>(
+        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_atanh(s, args[0]); }, *this, s, eval_arr,
+        par_ptr, batch_size, high_accuracy);
+}
+
+llvm::Value *atanh_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                        std::uint32_t batch_size, bool high_accuracy) const
+{
+    return llvm_eval_helper<long double>(
+        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_atanh(s, args[0]); }, *this, s, eval_arr,
+        par_ptr, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *atanh_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                        std::uint32_t batch_size, bool high_accuracy) const
+{
+    return llvm_eval_helper<mppp::real128>(
+        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_atanh(s, args[0]); }, *this, s, eval_arr,
+        par_ptr, batch_size, high_accuracy);
+}
+
+#endif
+
+namespace
+{
+
+template <typename T>
+[[nodiscard]] llvm::Function *atanh_llvm_c_eval(llvm_state &s, const func_base &fb, std::uint32_t batch_size,
+                                                bool high_accuracy)
+{
+    return llvm_c_eval_func_helper<T>(
+        "atanh", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_atanh(s, args[0]); }, fb, s,
+        batch_size, high_accuracy);
+}
+
+} // namespace
+
+llvm::Function *atanh_impl::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return atanh_llvm_c_eval<double>(s, *this, batch_size, high_accuracy);
+}
+
+llvm::Function *atanh_impl::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return atanh_llvm_c_eval<long double>(s, *this, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *atanh_impl::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return atanh_llvm_c_eval<mppp::real128>(s, *this, batch_size, high_accuracy);
+}
+
+#endif
+
 taylor_dc_t::size_type atanh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 1u);

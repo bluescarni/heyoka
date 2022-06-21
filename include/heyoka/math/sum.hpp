@@ -43,6 +43,21 @@ public:
 
     std::vector<expression> gradient() const;
 
+    [[nodiscard]] llvm::Value *llvm_eval_dbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
+                                             std::uint32_t, bool) const;
+    [[nodiscard]] llvm::Value *llvm_eval_ldbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
+                                              std::uint32_t, bool) const;
+#if defined(HEYOKA_HAVE_REAL128)
+    [[nodiscard]] llvm::Value *llvm_eval_f128(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
+                                              std::uint32_t, bool) const;
+#endif
+
+    [[nodiscard]] llvm::Function *llvm_c_eval_func_dbl(llvm_state &, std::uint32_t, bool) const;
+    [[nodiscard]] llvm::Function *llvm_c_eval_func_ldbl(llvm_state &, std::uint32_t, bool) const;
+#if defined(HEYOKA_HAVE_REAL128)
+    [[nodiscard]] llvm::Function *llvm_c_eval_func_f128(llvm_state &, std::uint32_t, bool) const;
+#endif
+
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                  std::uint32_t, bool) const;

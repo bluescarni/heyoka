@@ -98,6 +98,67 @@ expression atan2_impl::diff(std::unordered_map<const void *, expression> &func_m
     return (x * detail::diff(func_map, y, p) - y * detail::diff(func_map, x, p)) / std::move(den);
 }
 
+llvm::Value *atan2_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                       std::uint32_t batch_size, bool high_accuracy) const
+{
+    return llvm_eval_helper<double>(
+        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_atan2(s, args[0], args[1]); }, *this, s,
+        eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+llvm::Value *atan2_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                        std::uint32_t batch_size, bool high_accuracy) const
+{
+    return llvm_eval_helper<long double>(
+        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_atan2(s, args[0], args[1]); }, *this, s,
+        eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *atan2_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                        std::uint32_t batch_size, bool high_accuracy) const
+{
+    return llvm_eval_helper<mppp::real128>(
+        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_atan2(s, args[0], args[1]); }, *this, s,
+        eval_arr, par_ptr, batch_size, high_accuracy);
+}
+
+#endif
+
+namespace
+{
+
+template <typename T>
+[[nodiscard]] llvm::Function *atan2_llvm_c_eval(llvm_state &s, const func_base &fb, std::uint32_t batch_size,
+                                                bool high_accuracy)
+{
+    return llvm_c_eval_func_helper<T>(
+        "atan2", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_atan2(s, args[0], args[1]); }, fb, s,
+        batch_size, high_accuracy);
+}
+
+} // namespace
+
+llvm::Function *atan2_impl::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return atan2_llvm_c_eval<double>(s, *this, batch_size, high_accuracy);
+}
+
+llvm::Function *atan2_impl::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return atan2_llvm_c_eval<long double>(s, *this, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *atan2_impl::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+{
+    return atan2_llvm_c_eval<mppp::real128>(s, *this, batch_size, high_accuracy);
+}
+
+#endif
+
 taylor_dc_t::size_type atan2_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 2u);
