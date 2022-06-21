@@ -395,7 +395,9 @@ and satirist, who speaks, moves and reacts in an opposite fashion to the
 people around them.</p>
 </div></blockquote>
 <p>heyoka is a C++ library for the integration of ordinary differential equations
-(ODEs) via Taylor’s method. Notable features include:</p>
+(ODEs) via Taylor’s method, based
+on automatic differentiation techniques and aggressive just-in-time
+compilation via <a class="reference external" href="https://llvm.org/">LLVM</a>. Notable features include:</p>
 <ul class="simple">
 <li><p>support for both double-precision and extended-precision floating-point types
 (80-bit and 128-bit),</p></li>
@@ -405,10 +407,7 @@ tens of billions of timesteps,</p></li>
 <li><p>accurate and reliable event detection,</p></li>
 <li><p>batch mode integration to harness the power of modern
 <a class="reference external" href="https://en.wikipedia.org/wiki/SIMD">SIMD</a> instruction sets,</p></li>
-<li><p>ensemble simulations and automatic parallelisation,</p></li>
-<li><p>a high-performance implementation of Taylor’s method based
-on automatic differentiation techniques and aggressive just-in-time
-compilation via <a class="reference external" href="https://llvm.org/">LLVM</a>.</p></li>
+<li><p>ensemble simulations and automatic parallelisation.</p></li>
 </ul>
 <p>If you prefer using Python rather than C++, heyoka can be used from Python via
 <a class="reference external" href="https://github.com/bluescarni/heyoka.py">heyoka.py</a>, its Python bindings.</p>
@@ -428,6 +427,24 @@ to the heyoka paper (<a class="reference external" href="https://arxiv.org/abs/2
 <span class="w">    </span><span class="na">doi</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{10.1093/mnras/stab1032}</span><span class="p">,</span><span class="w"></span>
 <span class="w">    </span><span class="na">url</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{https://doi.org/10.1093/mnras/stab1032}</span><span class="p">,</span><span class="w"></span>
 <span class="w">    </span><span class="na">eprint</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{https://academic.oup.com/mnras/article-pdf/504/2/2614/37750349/stab1032.pdf}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>heyoka’s novel event detection system is described in the following paper
+(<a class="reference external" href="https://arxiv.org/abs/2204.09948">arXiv preprint</a>):</p>
+<div class="highlight-bibtex notranslate"><div class="highlight"><pre><span></span><span class="nc">@article</span><span class="p">{</span><span class="nl">10.1093/mnras/stac1092</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="na">author</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{Biscani, Francesco and Izzo, Dario}</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="na">title</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;{Reliable event detection for Taylor methods in astrodynamics}&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="na">journal</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{Monthly Notices of the Royal Astronomical Society}</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="na">volume</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{513}</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="na">number</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{4}</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="na">pages</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{4833-4844}</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="na">year</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{2022}</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="na">month</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{04}</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="na">issn</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{0035-8711}</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="na">doi</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{10.1093/mnras/stac1092}</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="na">url</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{https://doi.org/10.1093/mnras/stac1092}</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="na">eprint</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{https://academic.oup.com/mnras/article-pdf/513/4/4833/43796551/stac1092.pdf}</span><span class="w"></span>
 <span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
@@ -536,26 +553,27 @@ Dario Izzo (European Space Agency).</p>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#unreleased">0.19.0 (unreleased)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="changelog.html#id1">0.18.0 (2022-05-11)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id2">0.17.1 (2022-02-13)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id5">0.17.0 (2022-01-20)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id9">0.16.0 (2021-11-20)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id13">0.15.0 (2021-09-28)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id17">0.14.0 (2021-08-03)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id21">0.12.0 (2021-07-21)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id24">0.11.0 (2021-07-06)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id27">0.10.1 (2021-07-02)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id29">0.10.0 (2021-06-09)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id32">0.9.0 (2021-05-25)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id35">0.8.0 (2021-04-28)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id39">0.7.0 (2021-04-21)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id43">0.6.1 (2021-04-08)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id46">0.6.0 (2021-04-06)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id50">0.5.0 (2021-02-25)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id52">0.4.0 (2021-02-20)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id55">0.3.0 (2021-02-11)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id59">0.2.0 (2021-01-13)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id63">0.1.0 (2020-12-18)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id3">0.17.1 (2022-02-13)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id6">0.17.0 (2022-01-20)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id10">0.16.0 (2021-11-20)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id14">0.15.0 (2021-09-28)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id18">0.14.0 (2021-08-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id22">0.12.0 (2021-07-21)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id25">0.11.0 (2021-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id28">0.10.1 (2021-07-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id30">0.10.0 (2021-06-09)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id33">0.9.0 (2021-05-25)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id36">0.8.0 (2021-04-28)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id40">0.7.0 (2021-04-21)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id44">0.6.1 (2021-04-08)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id47">0.6.0 (2021-04-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id51">0.5.0 (2021-02-25)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id53">0.4.0 (2021-02-20)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id56">0.3.0 (2021-02-11)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id60">0.2.0 (2021-01-13)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#id64">0.1.0 (2020-12-18)</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="breaking_changes.html">Breaking changes</a><ul>
