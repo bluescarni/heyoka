@@ -277,12 +277,9 @@ namespace kw
 {
 
 IGOR_MAKE_NAMED_ARGUMENT(tol);
-IGOR_MAKE_NAMED_ARGUMENT(high_accuracy);
-IGOR_MAKE_NAMED_ARGUMENT(compact_mode);
 IGOR_MAKE_NAMED_ARGUMENT(pars);
 IGOR_MAKE_NAMED_ARGUMENT(t_events);
 IGOR_MAKE_NAMED_ARGUMENT(nt_events);
-IGOR_MAKE_NAMED_ARGUMENT(parallel_mode);
 
 // NOTE: these are used for constructing events.
 IGOR_MAKE_NAMED_ARGUMENT(callback);

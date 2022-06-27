@@ -1027,7 +1027,7 @@ TEST_CASE("cfunc nbody")
 
                 std::generate(ins.begin(), ins.end(), gen);
 
-                add_cfunc<double>(s, "cfunc", exs, batch_size, false, cm);
+                add_cfunc<double>(s, "cfunc", exs, kw::batch_size = batch_size, kw::compact_mode = cm);
 
                 s.compile();
 
@@ -1121,7 +1121,7 @@ TEST_CASE("cfunc nbody par")
 
                 std::generate(ins.begin(), ins.end(), gen);
 
-                add_cfunc<double>(s, "cfunc", exs, batch_size, false, cm);
+                add_cfunc<double>(s, "cfunc", exs, kw::batch_size = batch_size, kw::compact_mode = cm);
 
                 s.compile();
 
@@ -1198,7 +1198,7 @@ TEST_CASE("cfunc numparams")
 
                 std::generate(pars.begin(), pars.end(), gen);
 
-                add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, batch_size, false, cm);
+                add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, kw::batch_size = batch_size, kw::compact_mode = cm);
 
                 s.compile();
 
@@ -1223,7 +1223,7 @@ TEST_CASE("cfunc explicit")
 
     auto [x, y, z] = make_vars("x", "y", "z");
 
-    add_cfunc<double>(s, "cfunc", {x + 2_dbl * y + 3_dbl * z}, {z, y, x}, 1, false, false);
+    add_cfunc<double>(s, "cfunc", {x + 2_dbl * y + 3_dbl * z}, kw::vars = {z, y, x});
 
     s.compile();
 
@@ -1246,21 +1246,21 @@ TEST_CASE("cfunc failure modes")
 
         s.compile();
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, 1, false, false), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}), std::invalid_argument,
                                Message("A compiled function cannot be added to an llvm_state after compilation"));
     }
 
     {
         llvm_state s;
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, 0, false, false), std::invalid_argument,
-                               Message("The batch size of a compiled function cannot be zero"));
+        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, kw::batch_size = 0),
+                               std::invalid_argument, Message("The batch size of a compiled function cannot be zero"));
     }
 
     {
         llvm_state s;
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, 1, false, false, true),
+        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, kw::parallel_mode = true),
                                std::invalid_argument,
                                Message("Parallel mode can only be enabled in conjunction with compact mode"));
     }
@@ -1268,16 +1268,17 @@ TEST_CASE("cfunc failure modes")
     {
         llvm_state s;
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, 1, false, true, true),
-                               std::invalid_argument, Message("Parallel mode has not been implemented yet"));
+        REQUIRE_THROWS_MATCHES(
+            add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, kw::parallel_mode = true, kw::compact_mode = true),
+            std::invalid_argument, Message("Parallel mode has not been implemented yet"));
     }
 
 #if defined(HEYOKA_ARCH_PPC)
     {
         llvm_state s;
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<long double>(s, "cfunc", {1_dbl, par[0]}, 1, false, false),
-                               std::invalid_argument, Message('long double' computations are not supported on PowerPC));
+        REQUIRE_THROWS_MATCHES(add_cfunc<long double>(s, "cfunc", {1_dbl, par[0]}), std::invalid_argument,
+                               Message('long double' computations are not supported on PowerPC));
     }
 #endif
 }
@@ -1301,7 +1302,7 @@ TEST_CASE("cfunc vsop2013")
 
     llvm_state s;
 
-    add_cfunc<double>(s, "cfunc", {venus_sol2[0], venus_sol2[1], venus_sol2[2]}, 1, false, true);
+    add_cfunc<double>(s, "cfunc", {venus_sol2[0], venus_sol2[1], venus_sol2[2]}, kw::compact_mode = true);
 
     s.compile();
 

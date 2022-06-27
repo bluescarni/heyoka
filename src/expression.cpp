@@ -3111,8 +3111,6 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
 
 } // namespace
 
-} // namespace detail
-
 template <typename T>
 std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &v_ex,
                                   std::uint32_t batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode)
@@ -3156,6 +3154,8 @@ template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real128>(llvm
                                                                             std::uint32_t, bool, bool, bool);
 
 #endif
+
+} // namespace detail
 
 // Determine if an expression is time-dependent.
 bool has_time(const expression &ex)
