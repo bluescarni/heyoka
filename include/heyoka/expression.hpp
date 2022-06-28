@@ -435,7 +435,7 @@ inline std::vector<expression> add_cfunc(llvm_state &s, const std::string &name,
 
     if constexpr (p.has_unnamed_arguments()) {
         static_assert(detail::always_false_v<KwArgs...>,
-                      "The variadic arguments in add_cfunc() constain unnamed arguments.");
+                      "The variadic arguments in add_cfunc() contain unnamed arguments.");
     } else {
         // Check if the list of variables was
         // provided explicitly.
