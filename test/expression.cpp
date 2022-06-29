@@ -1253,7 +1253,7 @@ TEST_CASE("cfunc failure modes")
     {
         llvm_state s;
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, kw::batch_size = 0),
+        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, kw::batch_size = 0u),
                                std::invalid_argument, Message("The batch size of a compiled function cannot be zero"));
     }
 
