@@ -2629,3 +2629,64 @@ TEST_CASE("get_alignment")
     REQUIRE(detail::get_alignment(md, builder.getInt32Ty()) == alignof(std::uint32_t));
     REQUIRE(detail::get_alignment(md, builder.getInt32Ty()) == alignof(std::int32_t));
 }
+
+TEST_CASE("to_size_t")
+{
+    using namespace heyoka::detail;
+
+    {
+        llvm_state s;
+
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        std::vector<llvm::Type *> fargs(1, builder.getInt32Ty());
+        auto *lst = to_llvm_type<std::size_t>(context);
+        auto *ft = llvm::FunctionType::get(lst, fargs, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &s.module());
+
+        auto *in_val = f->args().begin();
+
+        auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+        builder.SetInsertPoint(bb);
+
+        builder.CreateRet(to_size_t(s, in_val));
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<std::size_t (*)(std::uint32_t)>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr(std::numeric_limits<std::uint32_t>::max())
+                == static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()));
+    }
+
+    {
+        llvm_state s;
+
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        std::vector<llvm::Type *> fargs(1, builder.getInt64Ty());
+        auto *lst = to_llvm_type<std::size_t>(context);
+        auto *ft = llvm::FunctionType::get(lst, fargs, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &s.module());
+
+        auto *in_val = f->args().begin();
+
+        auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+        builder.SetInsertPoint(bb);
+
+        builder.CreateRet(to_size_t(s, in_val));
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<std::size_t (*)(std::uint64_t)>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr(std::numeric_limits<std::uint64_t>::max())
+                == static_cast<std::size_t>(std::numeric_limits<std::uint64_t>::max()));
+    }
+}
