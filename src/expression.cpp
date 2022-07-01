@@ -2288,8 +2288,8 @@ namespace
 
 template <typename T>
 void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
-                       const std::vector<expression> &dc, std::uint32_t nvars, std::uint32_t nuvars,
-                       std::uint32_t batch_size, bool high_accuracy)
+                       llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars,
+                       std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
 {
     auto &builder = s.builder();
     auto &context = s.context();
@@ -2302,7 +2302,10 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
 
     // Init it by loading the input values from in_ptr.
     for (std::uint32_t i = 0; i < nvars; ++i) {
-        auto *ptr = builder.CreateInBoundsGEP(fp_t, in_ptr, builder.getInt32(i * batch_size));
+        // NOTE: cast to size_t is safe because we are indexing into
+        // memory buffers which are at least of size nvars.
+        auto *ptr
+            = builder.CreateInBoundsGEP(fp_t, in_ptr, builder.CreateMul(stride, to_size_t(s, builder.getInt32(i))));
         eval_arr.push_back(load_vector_from_memory(builder, ptr, batch_size));
     }
 
@@ -2311,16 +2314,19 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
         assert(std::holds_alternative<func>(dc[i].value()));
 
         eval_arr.push_back(
-            llvm_eval<T>(std::get<func>(dc[i].value()), s, eval_arr, par_ptr, batch_size, high_accuracy));
+            llvm_eval<T>(std::get<func>(dc[i].value()), s, eval_arr, par_ptr, stride, batch_size, high_accuracy));
     }
 
     // Write the outputs.
     for (decltype(dc.size()) i = nuvars; i < dc.size(); ++i) {
-        // Determine the index in the output array.
-        const auto out_idx = static_cast<std::uint32_t>((i - nuvars) * batch_size);
+        // Index of the current output.
+        const auto out_idx = static_cast<std::uint32_t>(i - nuvars);
 
         // Compute the pointer to write to.
-        auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.getInt32(out_idx));
+        // NOTE: cast to size_t is safe because we are indexing into
+        // memory buffers which are at least of size nouts.
+        auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr,
+                                              builder.CreateMul(stride, to_size_t(s, builder.getInt32(out_idx))));
 
         std::visit(
             [&](const auto &v) {
@@ -2338,7 +2344,8 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
                     store_vector_to_memory(builder, ptr, vector_splat(builder, codegen<T>(s, v), batch_size));
                 } else if constexpr (std::is_same_v<type, param>) {
                     // Codegen the parameter and store it.
-                    store_vector_to_memory(builder, ptr, cfunc_nc_param_codegen(s, v, batch_size, fp_t, par_ptr));
+                    store_vector_to_memory(builder, ptr,
+                                           cfunc_nc_param_codegen(s, v, batch_size, fp_t, par_ptr, stride));
                 } else {
                     assert(false); // LCOV_EXCL_LINE
                 }
@@ -2866,7 +2873,7 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
 
 template <typename T>
 void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
-                      const std::vector<expression> &dc, std::uint32_t nvars, std::uint32_t nuvars,
+                      llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars, std::uint32_t nuvars,
                       std::uint32_t batch_size, bool high_accuracy)
 {
     auto &builder = s.builder();
@@ -2967,6 +2974,20 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
     get_logger()->trace("cfunc IR creation compact mode runtime: {}", sw);
 }
 
+// NOTE: add_cfunc() will add two functions, one called 'name'
+// and the other called 'name' + '.strided'. The first function
+// indexes into the input/output/par buffers contiguously (that it,
+// it assumes the input/output/par scalar/vector values are stored one
+// after the other without "holes" between them).
+// The second function has an extra trailing argument, the stride
+// value, which indicates the distance between consecutive
+// input/output/par values in the buffers. The stride is measured in the number
+// of *scalar* values between input/output/par values.
+// For instance, for a batch size of 1 and a stride value of 3,
+// the input scalar values will be read from indices 0, 3, 6, 9, ...
+// in the input array. For a batch size of 2 and a stride value of 3,
+// the input vector values (of size 2) will be read from indices
+// [0, 1], [3, 4], [6, 7], [9, 10], ... in the input array.
 template <typename T, typename F>
 auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::uint32_t batch_size, bool high_accuracy,
                     bool compact_mode, bool parallel_mode)
@@ -3030,23 +3051,33 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
 
     auto &builder = s.builder();
     auto &context = s.context();
+    auto &md = s.module();
 
     // Fetch the current insertion block.
     auto *orig_bb = builder.GetInsertBlock();
 
-    // Prepare the function prototype. The first argument is a write-only float pointer to the outputs.
-    // The second argument is a const float pointer to the inputs. The third argument is a const float pointer to the
-    // pars. These arrays cannot overlap.
+    // Prepare the function prototype:
+    //
+    // - the first argument is a write-only float pointer to the outputs,
+    // - the second argument is a const float pointer to the inputs,
+    // - the third argument is a const float pointer to the pars,
+    // - the fourth argument is the stride.
+    //
+    // The pointer arguments cannot overlap.
     auto *fp_t = to_llvm_type<T>(context);
+    auto *lst = to_llvm_type<std::size_t>(context);
     std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_t));
+    fargs.push_back(lst);
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
+    // Append ".strided" to the function name.
+    const auto sname = name + ".strided";
     // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, sname, &md);
     if (f == nullptr) {
         // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Unable to create a compiled function with name '{}'", name));
+        throw std::invalid_argument(fmt::format("Unable to create a compiled function with name '{}'", sname));
         // LCOV_EXCL_STOP
     }
 
@@ -3069,6 +3100,9 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     par_ptr->addAttr(llvm::Attribute::NoAlias);
     par_ptr->addAttr(llvm::Attribute::ReadOnly);
 
+    auto *stride = out_ptr + 3;
+    stride->setName("stride");
+
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(context, "entry", f);
     assert(bb != nullptr); // LCOV_EXCL_LINE
@@ -3089,10 +3123,59 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
         }
         // LCOV_EXCL_STOP
 
-        add_cfunc_c_mode<T>(s, out_ptr, in_ptr, par_ptr, dc, nvars, nuvars, batch_size, high_accuracy);
+        add_cfunc_c_mode<T>(s, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
     } else {
-        add_cfunc_nc_mode<T>(s, out_ptr, in_ptr, par_ptr, dc, nvars, nuvars, batch_size, high_accuracy);
+        add_cfunc_nc_mode<T>(s, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
     }
+
+    // Finish off the function.
+    builder.CreateRetVoid();
+
+    // Verify it.
+    s.verify_function(f);
+
+    // Store the strided function pointer for use later.
+    auto *f_strided = f;
+
+    // Build the version of the function with stride == 1.
+    fargs.pop_back();
+    ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr); // LCOV_EXCL_LINE
+    f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &md);
+    if (f == nullptr) {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format("Unable to create a compiled function with name '{}'", name));
+        // LCOV_EXCL_STOP
+    }
+
+    // Set the names/attributes of the function arguments.
+    out_ptr = f->args().begin();
+    out_ptr->setName("out_ptr");
+    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    out_ptr->addAttr(llvm::Attribute::NoAlias);
+    out_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+    in_ptr = out_ptr + 1;
+    in_ptr->setName("in_ptr");
+    in_ptr->addAttr(llvm::Attribute::NoCapture);
+    in_ptr->addAttr(llvm::Attribute::NoAlias);
+    in_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    par_ptr = out_ptr + 2;
+    par_ptr->setName("par_ptr");
+    par_ptr->addAttr(llvm::Attribute::NoCapture);
+    par_ptr->addAttr(llvm::Attribute::NoAlias);
+    par_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    // Create a new basic block to start insertion into.
+    bb = llvm::BasicBlock::Create(context, "entry", f);
+    assert(bb != nullptr); // LCOV_EXCL_LINE
+    builder.SetInsertPoint(bb);
+
+    // Invoke the strided function with stride == batch_size.
+    // NOTE: cast to size_t is safe because we are indexing into
+    // memory buffers which are at least of size batch_size.
+    builder.CreateCall(f_strided, {out_ptr, in_ptr, par_ptr, to_size_t(s, builder.getInt32(batch_size))});
 
     // Finish off the function.
     builder.CreateRetVoid();

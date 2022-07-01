@@ -93,7 +93,8 @@ namespace
 
 template <typename T>
 llvm::Value *kepE_llvm_eval_impl(llvm_state &s, const func_base &fb, const std::vector<llvm::Value *> &eval_arr,
-                                 llvm::Value *par_ptr, std::uint32_t batch_size, bool high_accuracy)
+                                 llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                 bool high_accuracy)
 {
     return llvm_eval_helper<T>(
         [&s, batch_size](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
@@ -101,29 +102,29 @@ llvm::Value *kepE_llvm_eval_impl(llvm_state &s, const func_base &fb, const std::
 
             return s.builder().CreateCall(kepE_func, {args[0], args[1]});
         },
-        fb, s, eval_arr, par_ptr, batch_size, high_accuracy);
+        fb, s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 } // namespace
 
 llvm::Value *kepE_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                      std::uint32_t batch_size, bool high_accuracy) const
+                                      llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
-    return kepE_llvm_eval_impl<double>(s, *this, eval_arr, par_ptr, batch_size, high_accuracy);
+    return kepE_llvm_eval_impl<double>(s, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 llvm::Value *kepE_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                       std::uint32_t batch_size, bool high_accuracy) const
+                                       llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
-    return kepE_llvm_eval_impl<long double>(s, *this, eval_arr, par_ptr, batch_size, high_accuracy);
+    return kepE_llvm_eval_impl<long double>(s, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *kepE_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                       std::uint32_t batch_size, bool high_accuracy) const
+                                       llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
-    return kepE_llvm_eval_impl<mppp::real128>(s, *this, eval_arr, par_ptr, batch_size, high_accuracy);
+    return kepE_llvm_eval_impl<mppp::real128>(s, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 #endif

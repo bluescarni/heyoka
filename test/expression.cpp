@@ -1169,9 +1169,88 @@ TEST_CASE("cfunc nbody par")
                             acc_z += dz * G * masses[k] * rm3;
                         }
 
-                        REQUIRE(outs[i * batch_size * 6u + batch_size * 3u + j] == approximately(acc_x, 100.));
-                        REQUIRE(outs[i * batch_size * 6u + batch_size * 4u + j] == approximately(acc_y, 100.));
-                        REQUIRE(outs[i * batch_size * 6u + batch_size * 5u + j] == approximately(acc_z, 100.));
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 3u + j] == approximately(acc_x, 1000.));
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 4u + j] == approximately(acc_y, 1000.));
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 5u + j] == approximately(acc_z, 1000.));
+                    }
+                }
+
+                // TODO remove.
+                if (cm) {
+                    continue;
+                }
+
+                // Run the test on the strided function too.
+                const std::size_t extra_stride = 3;
+                outs.resize(36u * (batch_size + extra_stride));
+                ins.resize(36u * (batch_size + extra_stride));
+                pars.resize(6u * (batch_size + extra_stride));
+
+                for (auto i = 0u; i < 6u; ++i) {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        pars[i * (batch_size + extra_stride) + j] = masses[i];
+                    }
+                }
+
+                std::generate(ins.begin(), ins.end(), gen);
+
+                auto *cfs_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, std::size_t)>(
+                    s.jit_lookup("cfunc.strided"));
+
+                cfs_ptr(outs.data(), ins.data(), pars.data(), batch_size + extra_stride);
+
+                for (auto i = 0u; i < 6u; ++i) {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        // x_i' == vx_i.
+                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + j]
+                                == approximately(ins[i * (batch_size + extra_stride) + j], 100.));
+                        // y_i' == vy_i.
+                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) + j]
+                                == approximately(
+                                    ins[i * (batch_size + extra_stride) + (batch_size + extra_stride) * 6u + j], 100.));
+                        // z_i' == vz_i.
+                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 2u + j]
+                                == approximately(
+                                    ins[i * (batch_size + extra_stride) + (batch_size + extra_stride) * 6u * 2u + j],
+                                    100.));
+
+                        // Accelerations.
+                        auto acc_x = 0., acc_y = 0., acc_z = 0.;
+
+                        const auto xi = ins[18u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
+                        const auto yi = ins[24u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
+                        const auto zi = ins[30u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
+
+                        for (auto k = 0u; k < 6u; ++k) {
+                            if (k == i) {
+                                continue;
+                            }
+
+                            const auto xk
+                                = ins[18u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
+                            const auto dx = xk - xi;
+
+                            const auto yk
+                                = ins[24u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
+                            const auto dy = yk - yi;
+
+                            const auto zk
+                                = ins[30u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
+                            const auto dz = zk - zi;
+
+                            const auto rm3 = std::pow(dx * dx + dy * dy + dz * dz, -3 / 2.);
+
+                            acc_x += dx * G * masses[k] * rm3;
+                            acc_y += dy * G * masses[k] * rm3;
+                            acc_z += dz * G * masses[k] * rm3;
+                        }
+
+                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 3u + j]
+                                == approximately(acc_x, 1000.));
+                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 4u + j]
+                                == approximately(acc_y, 1000.));
+                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 5u + j]
+                                == approximately(acc_z, 1000.));
                     }
                 }
             }

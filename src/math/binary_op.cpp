@@ -256,29 +256,29 @@ namespace
 } // namespace
 
 llvm::Value *binary_op::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                      std::uint32_t batch_size, bool high_accuracy) const
+                                      llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
     return llvm_eval_helper<double>(
         [&s, this](const std::vector<llvm::Value *> &args, bool) { return bo_llvm_eval(s, args, op()); }, *this, s,
-        eval_arr, par_ptr, batch_size, high_accuracy);
+        eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 llvm::Value *binary_op::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                       std::uint32_t batch_size, bool high_accuracy) const
+                                       llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
     return llvm_eval_helper<long double>(
         [&s, this](const std::vector<llvm::Value *> &args, bool) { return bo_llvm_eval(s, args, op()); }, *this, s,
-        eval_arr, par_ptr, batch_size, high_accuracy);
+        eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *binary_op::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                       std::uint32_t batch_size, bool high_accuracy) const
+                                       llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
     return llvm_eval_helper<mppp::real128>(
         [&s, this](const std::vector<llvm::Value *> &args, bool) { return bo_llvm_eval(s, args, op()); }, *this, s,
-        eval_arr, par_ptr, batch_size, high_accuracy);
+        eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 #endif

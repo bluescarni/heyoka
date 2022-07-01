@@ -99,29 +99,29 @@ expression atan2_impl::diff(std::unordered_map<const void *, expression> &func_m
 }
 
 llvm::Value *atan2_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                       std::uint32_t batch_size, bool high_accuracy) const
+                                       llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
     return llvm_eval_helper<double>(
         [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_atan2(s, args[0], args[1]); }, *this, s,
-        eval_arr, par_ptr, batch_size, high_accuracy);
+        eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 llvm::Value *atan2_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                        std::uint32_t batch_size, bool high_accuracy) const
+                                        llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
     return llvm_eval_helper<long double>(
         [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_atan2(s, args[0], args[1]); }, *this, s,
-        eval_arr, par_ptr, batch_size, high_accuracy);
+        eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *atan2_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                        std::uint32_t batch_size, bool high_accuracy) const
+                                        llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
     return llvm_eval_helper<mppp::real128>(
         [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_atan2(s, args[0], args[1]); }, *this, s,
-        eval_arr, par_ptr, batch_size, high_accuracy);
+        eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 #endif

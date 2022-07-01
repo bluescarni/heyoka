@@ -349,23 +349,23 @@ double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::si
 }
 
 llvm::Value *func::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                 std::uint32_t batch_size, bool high_accuracy) const
+                                 llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
-    return ptr()->llvm_eval_dbl(s, eval_arr, par_ptr, batch_size, high_accuracy);
+    return ptr()->llvm_eval_dbl(s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 llvm::Value *func::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                  std::uint32_t batch_size, bool high_accuracy) const
+                                  llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
-    return ptr()->llvm_eval_ldbl(s, eval_arr, par_ptr, batch_size, high_accuracy);
+    return ptr()->llvm_eval_ldbl(s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *func::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                  std::uint32_t batch_size, bool high_accuracy) const
+                                  llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
-    return ptr()->llvm_eval_f128(s, eval_arr, par_ptr, batch_size, high_accuracy);
+    return ptr()->llvm_eval_f128(s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 #endif
@@ -857,20 +857,15 @@ namespace detail
 // Helper to perform the codegen for a parameter during the creation
 // of a compiled function in non-compact mode.
 llvm::Value *cfunc_nc_param_codegen(llvm_state &s, const param &p, std::uint32_t batch_size, llvm::Type *fp_t,
-                                    llvm::Value *par_ptr)
+                                    llvm::Value *par_ptr, llvm::Value *stride)
 {
     auto &builder = s.builder();
 
     // Determine the index into the parameter array.
-    // LCOV_EXCL_START
-    if (p.idx() > std::numeric_limits<std::uint32_t>::max() / batch_size) {
-        throw std::overflow_error("Overflow detected in the computation of the index into a parameter array");
-    }
-    // LCOV_EXCL_STOP
-    const auto arr_idx = static_cast<std::uint32_t>(p.idx() * batch_size);
+    auto *arr_idx = builder.CreateMul(stride, to_size_t(s, builder.getInt32(p.idx())));
 
     // Compute the pointer to load from.
-    auto *ptr = builder.CreateInBoundsGEP(fp_t, par_ptr, builder.getInt32(arr_idx));
+    auto *ptr = builder.CreateInBoundsGEP(fp_t, par_ptr, arr_idx);
 
     // Load and return.
     return load_vector_from_memory(builder, ptr, batch_size);
@@ -881,7 +876,7 @@ llvm::Value *cfunc_nc_param_codegen(llvm_state &s, const param &p, std::uint32_t
 template <typename T>
 llvm::Value *llvm_eval_helper(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &g,
                               const func_base &f, llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
-                              llvm::Value *par_ptr, std::uint32_t batch_size, bool high_accuracy)
+                              llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy)
 {
     assert(g);
 
@@ -910,7 +905,7 @@ llvm::Value *llvm_eval_helper(const std::function<llvm::Value *(const std::vecto
                     llvm_args.push_back(vector_splat(builder, codegen<T>(s, v), batch_size));
                 } else if constexpr (std::is_same_v<type, param>) {
                     // Codegen the parameter argument.
-                    llvm_args.push_back(cfunc_nc_param_codegen(s, v, batch_size, fp_t, par_ptr));
+                    llvm_args.push_back(cfunc_nc_param_codegen(s, v, batch_size, fp_t, par_ptr, stride));
                 } else {
                     assert(false); // LCOV_EXCL_LINE
                 }
@@ -926,19 +921,19 @@ llvm::Value *llvm_eval_helper(const std::function<llvm::Value *(const std::vecto
 template HEYOKA_DLL_PUBLIC llvm::Value *
 llvm_eval_helper<double>(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
                          const func_base &, llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
-                         std::uint32_t, bool);
+                         llvm::Value *, std::uint32_t, bool);
 
 template HEYOKA_DLL_PUBLIC llvm::Value *
 llvm_eval_helper<long double>(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
                               const func_base &, llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
-                              std::uint32_t, bool);
+                              llvm::Value *, std::uint32_t, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template HEYOKA_DLL_PUBLIC llvm::Value *
 llvm_eval_helper<mppp::real128>(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
                                 const func_base &, llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
-                                std::uint32_t, bool);
+                                llvm::Value *, std::uint32_t, bool);
 
 #endif
 
