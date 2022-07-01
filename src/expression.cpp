@@ -2775,7 +2775,7 @@ std::uint32_t cfunc_c_gl_arr_size(llvm::Value *v)
 // the indices/constants necessary for the computation.
 void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
                            const std::pair<std::array<llvm::GlobalVariable *, 6>, bool> &cout_gl, llvm::Value *eval_arr,
-                           llvm::Value *par_ptr, std::uint32_t batch_size)
+                           llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size)
 {
     assert(batch_size > 0u); // LCOV_EXCL_LINE
 
@@ -2817,8 +2817,7 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
         auto *ret = cfunc_c_load_eval(s, eval_arr, u_idx);
 
         // Compute the pointer into out_ptr.
-        auto *ptr
-            = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(out_idx, builder.getInt32(batch_size)));
+        auto *ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
 
         // Store ret.
         store_vector_to_memory(builder, ptr, ret);
@@ -2839,8 +2838,7 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
         auto *ret = vector_splat(builder, num, batch_size);
 
         // Compute the pointer into out_ptr.
-        auto *ptr
-            = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(out_idx, builder.getInt32(batch_size)));
+        auto *ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
 
         // Store ret.
         store_vector_to_memory(builder, ptr, ret);
@@ -2859,12 +2857,11 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
                                                                                  {builder.getInt32(0), cur_idx}));
 
         // Load the parameter value from the array.
-        auto *ptr
-            = builder.CreateInBoundsGEP(fp_scal_t, par_ptr, builder.CreateMul(par_idx, builder.getInt32(batch_size)));
+        auto *ptr = builder.CreateInBoundsGEP(fp_scal_t, par_ptr, builder.CreateMul(stride, to_size_t(s, par_idx)));
         auto *ret = load_vector_from_memory(builder, ptr, batch_size);
 
         // Compute the pointer into out_ptr.
-        ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(out_idx, builder.getInt32(batch_size)));
+        ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
 
         // Store ret.
         store_vector_to_memory(builder, ptr, ret);
@@ -2918,8 +2915,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(nvars), [&](llvm::Value *cur_var_idx) {
         // Fetch the pointer from in_ptr.
         assert(llvm_depr_GEP_type_check(in_ptr, fp_type)); // LCOV_EXCL_LINE
-        auto *ptr
-            = builder.CreateInBoundsGEP(fp_type, in_ptr, builder.CreateMul(cur_var_idx, builder.getInt32(batch_size)));
+        auto *ptr = builder.CreateInBoundsGEP(fp_type, in_ptr, builder.CreateMul(stride, to_size_t(s, cur_var_idx)));
 
         // Load as a vector.
         auto *vec = load_vector_from_memory(builder, ptr, batch_size);
@@ -2947,8 +2943,9 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
             // Initialise the vector of arguments with which func must be called. The following
             // initial arguments are always present:
             // - eval array,
-            // - pointer to the param values.
-            std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr};
+            // - pointer to the param values,
+            // - stride.
+            std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr, stride};
 
             // Create the other arguments via the generators.
             for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
@@ -2969,7 +2966,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
     }
 
     // Write the results to the output pointer.
-    cfunc_c_write_outputs(s, out_ptr, cout_gl, eval_arr, par_ptr, batch_size);
+    cfunc_c_write_outputs(s, out_ptr, cout_gl, eval_arr, par_ptr, stride, batch_size);
 
     get_logger()->trace("cfunc IR creation compact mode runtime: {}", sw);
 }

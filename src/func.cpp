@@ -957,9 +957,10 @@ llvm_c_eval_func_name_args(llvm::LLVMContext &c, const std::string &name, std::u
     // Init the vector of arguments:
     // - idx of the u variable which is being evaluated,
     // - eval array (pointer to val_t),
-    // - par ptr (pointer to scalar).
+    // - par ptr (pointer to scalar),
+    // - stride value.
     std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(c), llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(val_t->getScalarType())};
+                                    llvm::PointerType::getUnqual(val_t->getScalarType()), to_llvm_type<std::size_t>(c)};
 
     // Add the mangling and LLVM arg types for the argument types.
     for (decltype(args.size()) i = 0; i < args.size(); ++i) {
@@ -1051,6 +1052,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
         // Fetch the necessary arguments.
         auto *eval_arr = f->args().begin() + 1;
         auto *par_ptr = f->args().begin() + 2;
+        auto *stride = f->args().begin() + 3;
 
         // Create the arguments for g.
         std::vector<llvm::Value *> g_args;
@@ -1059,7 +1061,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
                 [&](const auto &v) -> llvm::Value * {
                     using type = detail::uncvref_t<decltype(v)>;
 
-                    const auto cur_f_arg = f->args().begin() + 3 + i;
+                    const auto cur_f_arg = f->args().begin() + 4 + i;
 
                     if constexpr (std::is_same_v<type, number>) {
                         // NOTE: number arguments are passed directly as
@@ -1077,9 +1079,8 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
                         assert(!llvm::cast<llvm::PointerType>(par_ptr->getType())->isVectorTy());
                         // LCOV_EXCL_STOP
 
-                        auto *ptr
-                            = builder.CreateInBoundsGEP(to_llvm_type<T>(context), par_ptr,
-                                                        builder.CreateMul(cur_f_arg, builder.getInt32(batch_size)));
+                        auto *ptr = builder.CreateInBoundsGEP(to_llvm_type<T>(context), par_ptr,
+                                                              builder.CreateMul(stride, to_size_t(s, cur_f_arg)));
 
                         return load_vector_from_memory(builder, ptr, batch_size);
                     } else {

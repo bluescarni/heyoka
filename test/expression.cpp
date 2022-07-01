@@ -1175,11 +1175,6 @@ TEST_CASE("cfunc nbody par")
                     }
                 }
 
-                // TODO remove.
-                if (cm) {
-                    continue;
-                }
-
                 // Run the test on the strided function too.
                 const std::size_t extra_stride = 3;
                 outs.resize(36u * (batch_size + extra_stride));
@@ -1289,6 +1284,23 @@ TEST_CASE("cfunc numparams")
                 for (auto j = 0u; j < batch_size; ++j) {
                     REQUIRE(outs[j] == 1);
                     REQUIRE(outs[j + batch_size] == pars[j]);
+                }
+
+                // Run the test on the strided function too.
+                const std::size_t extra_stride = 3;
+                outs.resize(2u * (batch_size + extra_stride));
+                pars.resize(batch_size + extra_stride);
+
+                std::generate(pars.begin(), pars.end(), gen);
+
+                auto *cfs_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, std::size_t)>(
+                    s.jit_lookup("cfunc.strided"));
+
+                cfs_ptr(outs.data(), nullptr, pars.data(), batch_size + extra_stride);
+
+                for (auto j = 0u; j < batch_size; ++j) {
+                    REQUIRE(outs[j] == 1);
+                    REQUIRE(outs[j + batch_size + extra_stride] == pars[j]);
                 }
             }
         }
