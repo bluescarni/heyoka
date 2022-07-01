@@ -1368,7 +1368,7 @@ TEST_CASE("cfunc failure modes")
     {
         llvm_state s;
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<long double>(s, "cfunc", {1_dbl, par[0]}), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(add_cfunc<long double>(s, "cfunc", {1_dbl, par[0]}), not_implemented_error,
                                Message("'long double' computations are not supported on PowerPC"));
     }
 #endif
