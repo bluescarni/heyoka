@@ -116,7 +116,7 @@ llvm::Type *int_to_llvm(llvm::LLVMContext &c)
     static_assert(std::is_integral_v<T>);
 
     auto *ret = llvm::Type::getIntNTy(c, std::numeric_limits<T>::digits);
-    assert(ret != nullptr);
+    assert(ret != nullptr); // LCOV_EXCL_LINE
     return ret;
 };
 
