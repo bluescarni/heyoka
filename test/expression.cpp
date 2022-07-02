@@ -1328,6 +1328,60 @@ TEST_CASE("cfunc explicit")
     REQUIRE(out == 12. + 2. * 11 + 3. * 10);
 }
 
+// Test for stride values under the batch size.
+TEST_CASE("cfunc bogus stride")
+{
+    std::vector<double> outs, ins, pars;
+
+    std::uniform_real_distribution<double> rdist(-1., 1.);
+
+    auto gen = [&rdist]() { return rdist(rng); };
+
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    for (auto cm : {false, true}) {
+        for (auto batch_size : {1u, 2u, 4u, 5u}) {
+            llvm_state s;
+
+            outs.resize(2u * batch_size);
+            ins.resize(3u * batch_size);
+            pars.resize(2u * batch_size);
+
+            std::generate(ins.begin(), ins.end(), gen);
+            std::generate(pars.begin(), pars.end(), gen);
+
+            add_cfunc<double>(s, "cfunc", {x + 2_dbl * y + par[0] * z, par[1] - x * y}, kw::batch_size = batch_size,
+                              kw::compact_mode = cm);
+
+            s.compile();
+
+            auto *cfs_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, std::size_t)>(
+                s.jit_lookup("cfunc.strided"));
+
+            cfs_ptr(outs.data(), ins.data(), pars.data(), batch_size - 1u);
+
+            if (batch_size > 1u) {
+                for (auto j = 0u; j < batch_size - 1u; ++j) {
+                    REQUIRE(outs[j]
+                            == approximately(ins[j] + 2. * ins[(batch_size - 1u) + j]
+                                                 + pars[j] * ins[(batch_size - 1u) * 2u + j],
+                                             100.));
+                    REQUIRE(outs[(batch_size - 1u) + j]
+                            == approximately(pars[(batch_size - 1u) + j] - ins[j] * ins[(batch_size - 1u) + j], 100.));
+                }
+
+                cfs_ptr(outs.data(), ins.data(), pars.data(), 0);
+
+                for (auto j = 0u; j < batch_size; ++j) {
+                    REQUIRE(outs[j] == approximately(pars[j] - ins[j] * ins[j], 100.));
+                }
+            } else {
+                REQUIRE(outs[0] == approximately(pars[0] - ins[0] * ins[0], 100.));
+            }
+        }
+    }
+}
+
 TEST_CASE("cfunc failure modes")
 {
     using Catch::Matchers::Message;

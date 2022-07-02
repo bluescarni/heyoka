@@ -2302,8 +2302,6 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
 
     // Init it by loading the input values from in_ptr.
     for (std::uint32_t i = 0; i < nvars; ++i) {
-        // NOTE: cast to size_t is safe because we are indexing into
-        // memory buffers which are at least of size nvars.
         auto *ptr
             = builder.CreateInBoundsGEP(fp_t, in_ptr, builder.CreateMul(stride, to_size_t(s, builder.getInt32(i))));
         eval_arr.push_back(load_vector_from_memory(builder, ptr, batch_size));
@@ -2323,8 +2321,6 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
         const auto out_idx = static_cast<std::uint32_t>(i - nuvars);
 
         // Compute the pointer to write to.
-        // NOTE: cast to size_t is safe because we are indexing into
-        // memory buffers which are at least of size nouts.
         auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr,
                                               builder.CreateMul(stride, to_size_t(s, builder.getInt32(out_idx))));
 
@@ -2352,22 +2348,6 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
             },
             dc[i].value());
     }
-}
-
-// Small helper to deduce the number of parameters
-// present in a function decomposition.
-// NOTE: the first few entries in the decomposition are the mapping
-// u variables -> original variables. These never contain any param
-// by construction.
-std::uint32_t n_pars_in_fdc(const std::vector<expression> &dc)
-{
-    std::uint32_t retval = 0;
-
-    for (const auto &ex : dc) {
-        retval = std::max(retval, get_param_size(ex));
-    }
-
-    return retval;
 }
 
 // Function to split the central part of a function decomposition (i.e., the definitions of the u variables
@@ -3031,20 +3011,11 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     assert(dc.size() >= nouts); // LCOV_EXCL_LINE
     const auto nuvars = boost::numeric_cast<std::uint32_t>(dc.size() - nouts);
 
-    // Overflow checks. We need to be able to index into:
-    // - the output values (nouts * batch_size scalars),
-    // - the input values (nvars * batch_size scalars),
-    // - the parameters array (this will be checked separately by the
-    //   numparam codegen helper in non-compact mode, requires
-    //   an explicit extra check in compact mode),
-    // - the array for the evaluation of the decomposition (nuvars scalars or vectors).
-    // All indices need to be representable as 32-bit integers.
-    // LCOV_EXCL_START
-    if (nouts > std::numeric_limits<std::uint32_t>::max() / batch_size
-        || nvars > std::numeric_limits<std::uint32_t>::max() / batch_size) {
-        throw std::overflow_error("An overflow condition was detected in the construction of a compiled function");
-    }
-    // LCOV_EXCL_STOP
+    // NOTE: due to the presence of the stride argument, we will be always
+    // indexing into the input, output and parameter arrays via size_t.
+    // Hence, we don't need here the same overflow checking we need to perform
+    // in the integrators, as we assume that any array allocated from C++
+    // can't have a size larger than the max size_t.
 
     auto &builder = s.builder();
     auto &context = s.context();
@@ -3106,20 +3077,6 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     builder.SetInsertPoint(bb);
 
     if (compact_mode) {
-        // In compact mode, we need to ensure that we can index into par_ptr using std::uint32_t.
-        // NOTE: in default mode the check is done inside add_cfunc_nc_mode()
-        // during the construction of the IR code.
-        // In compact mode we cannot do that, as the determination of the index into
-        // par_ptr is done *within* the IR code.
-
-        // Deduce the size of the param array from the expressions in the decomposition.
-        const auto param_size = n_pars_in_fdc(dc);
-        // LCOV_EXCL_START
-        if (param_size > std::numeric_limits<std::uint32_t>::max() / batch_size) {
-            throw std::overflow_error("An overflow condition was detected in the construction of a compiled function");
-        }
-        // LCOV_EXCL_STOP
-
         add_cfunc_c_mode<T>(s, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
     } else {
         add_cfunc_nc_mode<T>(s, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
@@ -3170,8 +3127,6 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     builder.SetInsertPoint(bb);
 
     // Invoke the strided function with stride == batch_size.
-    // NOTE: cast to size_t is safe because we are indexing into
-    // memory buffers which are at least of size batch_size.
     builder.CreateCall(f_strided, {out_ptr, in_ptr, par_ptr, to_size_t(s, builder.getInt32(batch_size))});
 
     // Finish off the function.

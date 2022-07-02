@@ -2668,6 +2668,47 @@ TEST_CASE("to_size_t")
         auto &builder = s.builder();
         auto &context = s.context();
 
+        auto *lst = to_llvm_type<std::size_t>(context);
+        std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(lst),
+                                        llvm::PointerType::getUnqual(builder.getInt32Ty())};
+        auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &s.module());
+
+        auto *out_val = f->args().begin();
+        auto *in_val = f->args().begin() + 1;
+
+        auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+        builder.SetInsertPoint(bb);
+
+        auto *ret = to_size_t(s, load_vector_from_memory(builder, in_val, 4));
+        store_vector_to_memory(builder, out_val, ret);
+
+        builder.CreateRetVoid();
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<void (*)(std::size_t *, std::uint32_t *)>(s.jit_lookup("test"));
+
+        std::uint32_t in[] = {std::numeric_limits<std::uint32_t>::max(), std::numeric_limits<std::uint32_t>::max(),
+                              std::numeric_limits<std::uint32_t>::max(), std::numeric_limits<std::uint32_t>::max()};
+        std::size_t out[4];
+
+        f_ptr(out, in);
+
+        REQUIRE(out[0] == static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()));
+        REQUIRE(out[1] == static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()));
+        REQUIRE(out[2] == static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()));
+        REQUIRE(out[3] == static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()));
+    }
+
+    {
+        llvm_state s;
+
+        auto &builder = s.builder();
+        auto &context = s.context();
+
         std::vector<llvm::Type *> fargs(1, builder.getInt64Ty());
         auto *lst = to_llvm_type<std::size_t>(context);
         auto *ft = llvm::FunctionType::get(lst, fargs, false);
@@ -2688,5 +2729,46 @@ TEST_CASE("to_size_t")
 
         REQUIRE(f_ptr(std::numeric_limits<std::uint64_t>::max())
                 == static_cast<std::size_t>(std::numeric_limits<std::uint64_t>::max()));
+    }
+
+    {
+        llvm_state s;
+
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *lst = to_llvm_type<std::size_t>(context);
+        std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(lst),
+                                        llvm::PointerType::getUnqual(builder.getInt64Ty())};
+        auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &s.module());
+
+        auto *out_val = f->args().begin();
+        auto *in_val = f->args().begin() + 1;
+
+        auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+        builder.SetInsertPoint(bb);
+
+        auto *ret = to_size_t(s, load_vector_from_memory(builder, in_val, 4));
+        store_vector_to_memory(builder, out_val, ret);
+
+        builder.CreateRetVoid();
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<void (*)(std::size_t *, std::uint64_t *)>(s.jit_lookup("test"));
+
+        std::uint64_t in[] = {std::numeric_limits<std::uint64_t>::max(), std::numeric_limits<std::uint64_t>::max(),
+                              std::numeric_limits<std::uint64_t>::max(), std::numeric_limits<std::uint64_t>::max()};
+        std::size_t out[4];
+
+        f_ptr(out, in);
+
+        REQUIRE(out[0] == static_cast<std::size_t>(std::numeric_limits<std::uint64_t>::max()));
+        REQUIRE(out[1] == static_cast<std::size_t>(std::numeric_limits<std::uint64_t>::max()));
+        REQUIRE(out[2] == static_cast<std::size_t>(std::numeric_limits<std::uint64_t>::max()));
+        REQUIRE(out[3] == static_cast<std::size_t>(std::numeric_limits<std::uint64_t>::max()));
     }
 }
