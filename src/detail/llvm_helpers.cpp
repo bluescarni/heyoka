@@ -108,6 +108,18 @@ namespace heyoka::detail
 namespace
 {
 
+// Helper to associate a C++ integral type
+// to an LLVM integral type.
+template <typename T>
+llvm::Type *int_to_llvm(llvm::LLVMContext &c)
+{
+    static_assert(std::is_integral_v<T>);
+
+    auto *ret = llvm::Type::getIntNTy(c, std::numeric_limits<T>::digits);
+    assert(ret != nullptr); // LCOV_EXCL_LINE
+    return ret;
+};
+
 // The global type map to associate a C++ type to an LLVM type.
 // NOLINTNEXTLINE(cert-err58-cpp,readability-function-cognitive-complexity)
 const auto type_map = []() {
@@ -170,6 +182,13 @@ const auto type_map = []() {
 
 #endif
 
+    // Associate a few unsigned integral types
+    // with the goal of associating common implementations
+    // of std::size_t.
+    retval[typeid(unsigned)] = int_to_llvm<unsigned>;
+    retval[typeid(unsigned long)] = int_to_llvm<unsigned long>;
+    retval[typeid(unsigned long long)] = int_to_llvm<unsigned long long>;
+
     return retval;
 }();
 
@@ -207,7 +226,7 @@ std::string llvm_mangle_type(llvm::Type *t)
 // 1 will be returned.
 std::uint32_t get_vector_size(llvm::Value *x)
 {
-    if (auto vector_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+    if (auto *vector_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
         return boost::numeric_cast<std::uint32_t>(vector_t->getNumElements());
     } else {
         return 1;
@@ -218,6 +237,39 @@ std::uint32_t get_vector_size(llvm::Value *x)
 std::uint64_t get_alignment(llvm::Module &md, llvm::Type *tp)
 {
     return md.getDataLayout().getABITypeAlignment(tp);
+}
+
+// Convert the input integral value n to the type std::size_t.
+// If an upcast is needed, it will be performed via zero extension.
+llvm::Value *to_size_t(llvm_state &s, llvm::Value *n)
+{
+    // Get the bit width of the type of n.
+    const auto n_bw = llvm::cast<llvm::IntegerType>(n->getType()->getScalarType())->getBitWidth();
+
+    // Fetch the LLVM type corresponding to size_t, and its bit width.
+    auto *lst = to_llvm_type<std::size_t>(s.context());
+    const auto lst_bw = llvm::cast<llvm::IntegerType>(lst)->getBitWidth();
+    assert(lst_bw == static_cast<unsigned>(std::numeric_limits<std::size_t>::digits)); // LCOV_EXCL_LINE
+
+    if (lst_bw == n_bw) {
+        // n is of type size_t, return it unchanged.
+        assert(n->getType()->getScalarType() == lst); // LCOV_EXCL_LINE
+        return n;
+    } else {
+        // Get the vector size of the type of n.
+        const auto n_vs = get_vector_size(n);
+
+        // Fetch the target type for the cast.
+        auto *tgt_t = make_vector_type(lst, n_vs);
+
+        if (n_bw > lst_bw) {
+            // The type of n is bigger than size_t, truncate.
+            return s.builder().CreateTrunc(n, tgt_t); // LCOV_EXCL_LINE
+        } else {
+            // The type of n is smaller than size_t, extend.
+            return s.builder().CreateZExt(n, tgt_t);
+        }
+    }
 }
 
 // Helper to create a global zero-inited array variable in the module m

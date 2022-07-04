@@ -200,7 +200,8 @@ TEST_CASE("cfunc")
             llvm_state s{kw::opt_level = opt_level};
 
             add_cfunc<fp_t>(s, "cfunc", {x + y, x - y, x * y, x / y, x + par[0], x - 3_dbl, par[0] * y, 1_dbl / y},
-                            batch_size, high_accuracy, compact_mode);
+                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                            kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
                 REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.add."));

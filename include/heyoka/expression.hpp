@@ -34,10 +34,12 @@
 #endif
 
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
@@ -403,14 +405,88 @@ function_decompose(const std::vector<expression> &);
 HEYOKA_DLL_PUBLIC std::vector<expression> function_decompose(const std::vector<expression> &,
                                                              const std::vector<expression> &);
 
-template <typename>
-HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
-                                                    std::uint32_t, bool, bool, bool = false);
+namespace kw
+{
+
+IGOR_MAKE_NAMED_ARGUMENT(stride);
+IGOR_MAKE_NAMED_ARGUMENT(vars);
+IGOR_MAKE_NAMED_ARGUMENT(batch_size);
+
+} // namespace kw
+
+namespace detail
+{
 
 template <typename>
 HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
-                                                    const std::vector<expression> &, std::uint32_t, bool, bool,
-                                                    bool = false);
+                                                    std::uint32_t, bool, bool, bool);
+
+template <typename>
+HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
+                                                    const std::vector<expression> &, std::uint32_t, bool, bool, bool);
+
+} // namespace detail
+
+template <typename T, typename... KwArgs>
+inline std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &fn,
+                                         KwArgs &&...kw_args)
+{
+    igor::parser p{kw_args...};
+
+    if constexpr (p.has_unnamed_arguments()) {
+        static_assert(detail::always_false_v<KwArgs...>,
+                      "The variadic arguments in add_cfunc() contain unnamed arguments.");
+    } else {
+        // Check if the list of variables was
+        // provided explicitly.
+        std::optional<std::vector<expression>> vars;
+        if constexpr (p.has(kw::vars)) {
+            vars = std::forward<decltype(p(kw::vars))>(p(kw::vars));
+        }
+
+        // Batch size (defaults to 1).
+        const auto batch_size = [&]() -> std::uint32_t {
+            if constexpr (p.has(kw::batch_size)) {
+                return std::forward<decltype(p(kw::batch_size))>(p(kw::batch_size));
+            } else {
+                return 1;
+            }
+        }();
+
+        // High accuracy mode (defaults to false).
+        const auto high_accuracy = [&p]() -> bool {
+            if constexpr (p.has(kw::high_accuracy)) {
+                return std::forward<decltype(p(kw::high_accuracy))>(p(kw::high_accuracy));
+            } else {
+                return false;
+            }
+        }();
+
+        // Compact mode (defaults to false).
+        const auto compact_mode = [&p]() -> bool {
+            if constexpr (p.has(kw::compact_mode)) {
+                return std::forward<decltype(p(kw::compact_mode))>(p(kw::compact_mode));
+            } else {
+                return false;
+            }
+        }();
+
+        // Parallel mode (defaults to false).
+        const auto parallel_mode = [&p]() -> bool {
+            if constexpr (p.has(kw::parallel_mode)) {
+                return std::forward<decltype(p(kw::parallel_mode))>(p(kw::parallel_mode));
+            } else {
+                return false;
+            }
+        }();
+
+        if (vars) {
+            return detail::add_cfunc<T>(s, name, fn, *vars, batch_size, high_accuracy, compact_mode, parallel_mode);
+        } else {
+            return detail::add_cfunc<T>(s, name, fn, batch_size, high_accuracy, compact_mode, parallel_mode);
+        }
+    }
+}
 
 } // namespace heyoka
 

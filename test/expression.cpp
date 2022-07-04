@@ -1027,7 +1027,7 @@ TEST_CASE("cfunc nbody")
 
                 std::generate(ins.begin(), ins.end(), gen);
 
-                add_cfunc<double>(s, "cfunc", exs, batch_size, false, cm);
+                add_cfunc<double>(s, "cfunc", exs, kw::batch_size = batch_size, kw::compact_mode = cm);
 
                 s.compile();
 
@@ -1121,7 +1121,7 @@ TEST_CASE("cfunc nbody par")
 
                 std::generate(ins.begin(), ins.end(), gen);
 
-                add_cfunc<double>(s, "cfunc", exs, batch_size, false, cm);
+                add_cfunc<double>(s, "cfunc", exs, kw::batch_size = batch_size, kw::compact_mode = cm);
 
                 s.compile();
 
@@ -1169,9 +1169,83 @@ TEST_CASE("cfunc nbody par")
                             acc_z += dz * G * masses[k] * rm3;
                         }
 
-                        REQUIRE(outs[i * batch_size * 6u + batch_size * 3u + j] == approximately(acc_x, 100.));
-                        REQUIRE(outs[i * batch_size * 6u + batch_size * 4u + j] == approximately(acc_y, 100.));
-                        REQUIRE(outs[i * batch_size * 6u + batch_size * 5u + j] == approximately(acc_z, 100.));
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 3u + j] == approximately(acc_x, 1000.));
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 4u + j] == approximately(acc_y, 1000.));
+                        REQUIRE(outs[i * batch_size * 6u + batch_size * 5u + j] == approximately(acc_z, 1000.));
+                    }
+                }
+
+                // Run the test on the strided function too.
+                const std::size_t extra_stride = 3;
+                outs.resize(36u * (batch_size + extra_stride));
+                ins.resize(36u * (batch_size + extra_stride));
+                pars.resize(6u * (batch_size + extra_stride));
+
+                for (auto i = 0u; i < 6u; ++i) {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        pars[i * (batch_size + extra_stride) + j] = masses[i];
+                    }
+                }
+
+                std::generate(ins.begin(), ins.end(), gen);
+
+                auto *cfs_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, std::size_t)>(
+                    s.jit_lookup("cfunc.strided"));
+
+                cfs_ptr(outs.data(), ins.data(), pars.data(), batch_size + extra_stride);
+
+                for (auto i = 0u; i < 6u; ++i) {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        // x_i' == vx_i.
+                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + j]
+                                == approximately(ins[i * (batch_size + extra_stride) + j], 100.));
+                        // y_i' == vy_i.
+                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) + j]
+                                == approximately(
+                                    ins[i * (batch_size + extra_stride) + (batch_size + extra_stride) * 6u + j], 100.));
+                        // z_i' == vz_i.
+                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 2u + j]
+                                == approximately(
+                                    ins[i * (batch_size + extra_stride) + (batch_size + extra_stride) * 6u * 2u + j],
+                                    100.));
+
+                        // Accelerations.
+                        auto acc_x = 0., acc_y = 0., acc_z = 0.;
+
+                        const auto xi = ins[18u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
+                        const auto yi = ins[24u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
+                        const auto zi = ins[30u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
+
+                        for (auto k = 0u; k < 6u; ++k) {
+                            if (k == i) {
+                                continue;
+                            }
+
+                            const auto xk
+                                = ins[18u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
+                            const auto dx = xk - xi;
+
+                            const auto yk
+                                = ins[24u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
+                            const auto dy = yk - yi;
+
+                            const auto zk
+                                = ins[30u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
+                            const auto dz = zk - zi;
+
+                            const auto rm3 = std::pow(dx * dx + dy * dy + dz * dz, -3 / 2.);
+
+                            acc_x += dx * G * masses[k] * rm3;
+                            acc_y += dy * G * masses[k] * rm3;
+                            acc_z += dz * G * masses[k] * rm3;
+                        }
+
+                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 3u + j]
+                                == approximately(acc_x, 1000.));
+                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 4u + j]
+                                == approximately(acc_y, 1000.));
+                        REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 5u + j]
+                                == approximately(acc_z, 1000.));
                     }
                 }
             }
@@ -1198,7 +1272,7 @@ TEST_CASE("cfunc numparams")
 
                 std::generate(pars.begin(), pars.end(), gen);
 
-                add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, batch_size, false, cm);
+                add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, kw::batch_size = batch_size, kw::compact_mode = cm);
 
                 s.compile();
 
@@ -1210,6 +1284,23 @@ TEST_CASE("cfunc numparams")
                 for (auto j = 0u; j < batch_size; ++j) {
                     REQUIRE(outs[j] == 1);
                     REQUIRE(outs[j + batch_size] == pars[j]);
+                }
+
+                // Run the test on the strided function too.
+                const std::size_t extra_stride = 3;
+                outs.resize(2u * (batch_size + extra_stride));
+                pars.resize(batch_size + extra_stride);
+
+                std::generate(pars.begin(), pars.end(), gen);
+
+                auto *cfs_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, std::size_t)>(
+                    s.jit_lookup("cfunc.strided"));
+
+                cfs_ptr(outs.data(), nullptr, pars.data(), batch_size + extra_stride);
+
+                for (auto j = 0u; j < batch_size; ++j) {
+                    REQUIRE(outs[j] == 1);
+                    REQUIRE(outs[j + batch_size + extra_stride] == pars[j]);
                 }
             }
         }
@@ -1223,7 +1314,7 @@ TEST_CASE("cfunc explicit")
 
     auto [x, y, z] = make_vars("x", "y", "z");
 
-    add_cfunc<double>(s, "cfunc", {x + 2_dbl * y + 3_dbl * z}, {z, y, x}, 1, false, false);
+    add_cfunc<double>(s, "cfunc", {x + 2_dbl * y + 3_dbl * z}, kw::vars = {z, y, x});
 
     s.compile();
 
@@ -1237,6 +1328,60 @@ TEST_CASE("cfunc explicit")
     REQUIRE(out == 12. + 2. * 11 + 3. * 10);
 }
 
+// Test for stride values under the batch size.
+TEST_CASE("cfunc bogus stride")
+{
+    std::vector<double> outs, ins, pars;
+
+    std::uniform_real_distribution<double> rdist(-1., 1.);
+
+    auto gen = [&rdist]() { return rdist(rng); };
+
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    for (auto cm : {false, true}) {
+        for (auto batch_size : {1u, 2u, 4u, 5u}) {
+            llvm_state s;
+
+            outs.resize(2u * batch_size);
+            ins.resize(3u * batch_size);
+            pars.resize(2u * batch_size);
+
+            std::generate(ins.begin(), ins.end(), gen);
+            std::generate(pars.begin(), pars.end(), gen);
+
+            add_cfunc<double>(s, "cfunc", {x + 2_dbl * y + par[0] * z, par[1] - x * y}, kw::batch_size = batch_size,
+                              kw::compact_mode = cm);
+
+            s.compile();
+
+            auto *cfs_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, std::size_t)>(
+                s.jit_lookup("cfunc.strided"));
+
+            cfs_ptr(outs.data(), ins.data(), pars.data(), batch_size - 1u);
+
+            if (batch_size > 1u) {
+                for (auto j = 0u; j < batch_size - 1u; ++j) {
+                    REQUIRE(outs[j]
+                            == approximately(ins[j] + 2. * ins[(batch_size - 1u) + j]
+                                                 + pars[j] * ins[(batch_size - 1u) * 2u + j],
+                                             100.));
+                    REQUIRE(outs[(batch_size - 1u) + j]
+                            == approximately(pars[(batch_size - 1u) + j] - ins[j] * ins[(batch_size - 1u) + j], 100.));
+                }
+
+                cfs_ptr(outs.data(), ins.data(), pars.data(), 0);
+
+                for (auto j = 0u; j < batch_size; ++j) {
+                    REQUIRE(outs[j] == approximately(pars[j] - ins[j] * ins[j], 100.));
+                }
+            } else {
+                REQUIRE(outs[0] == approximately(pars[0] - ins[0] * ins[0], 100.));
+            }
+        }
+    }
+}
+
 TEST_CASE("cfunc failure modes")
 {
     using Catch::Matchers::Message;
@@ -1246,21 +1391,21 @@ TEST_CASE("cfunc failure modes")
 
         s.compile();
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, 1, false, false), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}), std::invalid_argument,
                                Message("A compiled function cannot be added to an llvm_state after compilation"));
     }
 
     {
         llvm_state s;
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, 0, false, false), std::invalid_argument,
-                               Message("The batch size of a compiled function cannot be zero"));
+        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, kw::batch_size = 0u),
+                               std::invalid_argument, Message("The batch size of a compiled function cannot be zero"));
     }
 
     {
         llvm_state s;
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, 1, false, false, true),
+        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, kw::parallel_mode = true),
                                std::invalid_argument,
                                Message("Parallel mode can only be enabled in conjunction with compact mode"));
     }
@@ -1268,16 +1413,17 @@ TEST_CASE("cfunc failure modes")
     {
         llvm_state s;
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, 1, false, true, true),
-                               std::invalid_argument, Message("Parallel mode has not been implemented yet"));
+        REQUIRE_THROWS_MATCHES(
+            add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, kw::parallel_mode = true, kw::compact_mode = true),
+            std::invalid_argument, Message("Parallel mode has not been implemented yet"));
     }
 
 #if defined(HEYOKA_ARCH_PPC)
     {
         llvm_state s;
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<long double>(s, "cfunc", {1_dbl, par[0]}, 1, false, false),
-                               std::invalid_argument, Message('long double' computations are not supported on PowerPC));
+        REQUIRE_THROWS_MATCHES(add_cfunc<long double>(s, "cfunc", {1_dbl, par[0]}), not_implemented_error,
+                               Message("'long double' computations are not supported on PowerPC"));
     }
 #endif
 }
@@ -1301,7 +1447,7 @@ TEST_CASE("cfunc vsop2013")
 
     llvm_state s;
 
-    add_cfunc<double>(s, "cfunc", {venus_sol2[0], venus_sol2[1], venus_sol2[2]}, 1, false, true);
+    add_cfunc<double>(s, "cfunc", {venus_sol2[0], venus_sol2[1], venus_sol2[2]}, kw::compact_mode = true);
 
     s.compile();
 

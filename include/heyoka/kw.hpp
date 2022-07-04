@@ -11,10 +11,9 @@
 
 #include <heyoka/detail/igor.hpp>
 
-namespace heyoka
-{
-
-namespace kw
+// NOTE: these are keyword arguments that are
+// shared among several files.
+namespace heyoka::kw
 {
 
 IGOR_MAKE_NAMED_ARGUMENT(masses);
@@ -23,9 +22,10 @@ IGOR_MAKE_NAMED_ARGUMENT(omega);
 IGOR_MAKE_NAMED_ARGUMENT(state);
 IGOR_MAKE_NAMED_ARGUMENT(Gconst);
 IGOR_MAKE_NAMED_ARGUMENT(time);
+IGOR_MAKE_NAMED_ARGUMENT(compact_mode);
+IGOR_MAKE_NAMED_ARGUMENT(high_accuracy);
+IGOR_MAKE_NAMED_ARGUMENT(parallel_mode);
 
-} // namespace kw
-
-} // namespace heyoka
+} // namespace heyoka::kw
 
 #endif

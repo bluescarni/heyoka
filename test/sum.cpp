@@ -269,8 +269,9 @@ TEST_CASE("cfunc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {sum({x, y}), sum({x, expression{fp_t(.5)}}), sum({par[0], y})}, batch_size,
-                            high_accuracy, compact_mode);
+            add_cfunc<fp_t>(s, "cfunc", {sum({x, y}), sum({x, expression{fp_t(.5)}}), sum({par[0], y})},
+                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                            kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
                 REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.sum."));

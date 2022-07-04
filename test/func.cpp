@@ -83,12 +83,12 @@ TEST_CASE("func minimal")
     REQUIRE_THROWS_MATCHES(f.deval_num_dbl({1., 1.}, 2), std::invalid_argument,
                            Message("Invalid index supplied to the double numerical evaluation of the derivative of "
                                    "function 'f': index 2 was supplied, but the number of arguments is only 2"));
-    REQUIRE_THROWS_MATCHES(f.llvm_eval_dbl(s, {}, nullptr, 1, false), not_implemented_error,
+    REQUIRE_THROWS_MATCHES(f.llvm_eval_dbl(s, {}, nullptr, nullptr, 1, false), not_implemented_error,
                            Message("llvm_eval_dbl() is not implemented for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.llvm_eval_ldbl(s, {}, nullptr, 1, false), not_implemented_error,
+    REQUIRE_THROWS_MATCHES(f.llvm_eval_ldbl(s, {}, nullptr, nullptr, 1, false), not_implemented_error,
                            Message("llvm_eval_ldbl() is not implemented for the function 'f'"));
 #if defined(HEYOKA_HAVE_REAL128)
-    REQUIRE_THROWS_MATCHES(f.llvm_eval_f128(s, {}, nullptr, 1, false), not_implemented_error,
+    REQUIRE_THROWS_MATCHES(f.llvm_eval_f128(s, {}, nullptr, nullptr, 1, false), not_implemented_error,
                            Message("llvm_eval_f128() is not implemented for the function 'f'"));
 #endif
     REQUIRE_THROWS_MATCHES(f.llvm_c_eval_func_dbl(s, 1, false), not_implemented_error,

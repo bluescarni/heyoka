@@ -103,33 +103,33 @@ namespace
 
 template <typename T>
 llvm::Value *sum_llvm_eval_impl(llvm_state &s, const func_base &fb, const std::vector<llvm::Value *> &eval_arr,
-                                llvm::Value *par_ptr, std::uint32_t batch_size, bool high_accuracy)
+                                llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy)
 {
     return llvm_eval_helper<T>(
         [&s](std::vector<llvm::Value *> args, bool) -> llvm::Value * { return pairwise_sum(s.builder(), args); }, fb, s,
-        eval_arr, par_ptr, batch_size, high_accuracy);
+        eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 } // namespace
 
 llvm::Value *sum_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                     std::uint32_t batch_size, bool high_accuracy) const
+                                     llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
-    return sum_llvm_eval_impl<double>(s, *this, eval_arr, par_ptr, batch_size, high_accuracy);
+    return sum_llvm_eval_impl<double>(s, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 llvm::Value *sum_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                      std::uint32_t batch_size, bool high_accuracy) const
+                                      llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
-    return sum_llvm_eval_impl<long double>(s, *this, eval_arr, par_ptr, batch_size, high_accuracy);
+    return sum_llvm_eval_impl<long double>(s, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *sum_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                      std::uint32_t batch_size, bool high_accuracy) const
+                                      llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
-    return sum_llvm_eval_impl<mppp::real128>(s, *this, eval_arr, par_ptr, batch_size, high_accuracy);
+    return sum_llvm_eval_impl<mppp::real128>(s, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 #endif
