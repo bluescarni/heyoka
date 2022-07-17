@@ -53,18 +53,6 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 namespace heyoka
 {
 
@@ -115,8 +103,9 @@ double tan_impl::eval_num_dbl(const std::vector<double> &a) const
 {
     if (a.size() != 1u) {
         throw std::invalid_argument(
-            "Inconsistent number of arguments when computing the numerical value of the "
-            "tangent over doubles (1 argument was expected, but {} arguments were provided"_format(a.size()));
+            fmt::format("Inconsistent number of arguments when computing the numerical value of the "
+                        "tangent over doubles (1 argument was expected, but {} arguments were provided",
+                        a.size()));
     }
 
     return std::tan(a[0]);
@@ -200,7 +189,7 @@ taylor_dc_t::size_type tan_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
 
     // Append the auxiliary function tan(arg) * tan(arg).
-    u_vars_defs.emplace_back(square(expression{variable{"u_{}"_format(u_vars_defs.size() - 1u)}}),
+    u_vars_defs.emplace_back(square(expression{variable{fmt::format("u_{}", u_vars_defs.size() - 1u)}}),
                              std::vector<std::uint32_t>{});
 
     // Add the hidden dep.
@@ -283,8 +272,9 @@ llvm::Value *taylor_diff_tan(llvm_state &s, const tan_impl &f, const std::vector
 
     if (deps.size() != 1u) {
         throw std::invalid_argument(
-            "A hidden dependency vector of size 1 is expected in order to compute the Taylor "
-            "derivative of the tangent, but a vector of size {} was passed instead"_format(deps.size()));
+            fmt::format("A hidden dependency vector of size 1 is expected in order to compute the Taylor "
+                        "derivative of the tangent, but a vector of size {} was passed instead",
+                        deps.size()));
     }
 
     return std::visit(

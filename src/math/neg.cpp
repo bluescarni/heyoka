@@ -199,9 +199,11 @@ llvm::Value *taylor_diff_neg(llvm_state &s, const neg_impl &f, const std::vector
     if (!deps.empty()) {
         using namespace fmt::literals;
 
-        throw std::invalid_argument("An empty hidden dependency vector is expected in order to compute the Taylor "
-                                    "derivative of the negation, but a vector of size {} was passed "
-                                    "instead"_format(deps.size()));
+        throw std::invalid_argument(
+            fmt::format("An empty hidden dependency vector is expected in order to compute the Taylor "
+                        "derivative of the negation, but a vector of size {} was passed "
+                        "instead",
+                        deps.size()));
     }
 
     return std::visit(

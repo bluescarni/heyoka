@@ -52,18 +52,6 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 namespace heyoka
 {
 
@@ -656,8 +644,10 @@ llvm::Value *taylor_diff_bo_impl(llvm_state &s, const binary_op &bo, const std::
     assert(bo.op() >= binary_op::type::add && bo.op() <= binary_op::type::div);
 
     if (!deps.empty()) {
-        throw std::invalid_argument("The vector of hidden dependencies in the Taylor diff for a binary operator "
-                                    "should be empty, but instead it has a size of {}"_format(deps.size()));
+        throw std::invalid_argument(
+            fmt::format("The vector of hidden dependencies in the Taylor diff for a binary operator "
+                        "should be empty, but instead it has a size of {}",
+                        deps.size()));
     }
 
     switch (bo.op()) {
@@ -793,8 +783,9 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, const binary_op &bo
         // and then optimised - optimisation might remove arguments which are compile-time
         // constants.
         if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of {}() "
-                                        "in compact mode detected"_format(op_name));
+            throw std::invalid_argument(fmt::format("Inconsistent function signature for the Taylor derivative of {}() "
+                                                    "in compact mode detected",
+                                                    op_name));
         }
     }
 

@@ -53,18 +53,6 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 namespace heyoka
 {
 
@@ -115,8 +103,9 @@ double sin_impl::eval_num_dbl(const std::vector<double> &a) const
 {
     if (a.size() != 1u) {
         throw std::invalid_argument(
-            "Inconsistent number of arguments when computing the numerical value of the "
-            "sine over doubles (1 argument was expected, but {} arguments were provided"_format(a.size()));
+            fmt::format("Inconsistent number of arguments when computing the numerical value of the "
+                        "sine over doubles (1 argument was expected, but {} arguments were provided",
+                        a.size()));
     }
 
     return std::sin(a[0]);
@@ -285,8 +274,9 @@ llvm::Value *taylor_diff_sin(llvm_state &s, const sin_impl &f, const std::vector
 
     if (deps.size() != 1u) {
         throw std::invalid_argument(
-            "A hidden dependency vector of size 1 is expected in order to compute the Taylor "
-            "derivative of the sine, but a vector of size {} was passed instead"_format(deps.size()));
+            fmt::format("A hidden dependency vector of size 1 is expected in order to compute the Taylor "
+                        "derivative of the sine, but a vector of size {} was passed instead",
+                        deps.size()));
     }
 
     return std::visit(

@@ -52,18 +52,6 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 namespace heyoka
 {
 
@@ -149,7 +137,8 @@ taylor_dc_t::size_type tanh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
 
     // Append the auxiliary function tanh(arg) * tanh(arg).
-    u_vars_defs.emplace_back(square(expression{"u_{}"_format(u_vars_defs.size() - 1u)}), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(square(expression{fmt::format("u_{}", u_vars_defs.size() - 1u)}),
+                             std::vector<std::uint32_t>{});
 
     // Add the hidden dep.
     (u_vars_defs.end() - 2)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
@@ -231,8 +220,9 @@ llvm::Value *taylor_diff_tanh(llvm_state &s, const tanh_impl &f, const std::vect
 
     if (deps.size() != 1u) {
         throw std::invalid_argument(
-            "A hidden dependency vector of size 1 is expected in order to compute the Taylor "
-            "derivative of the hyperbolic tangent, but a vector of size {} was passed instead"_format(deps.size()));
+            fmt::format("A hidden dependency vector of size 1 is expected in order to compute the Taylor "
+                        "derivative of the hyperbolic tangent, but a vector of size {} was passed instead",
+                        deps.size()));
     }
 
     return std::visit(

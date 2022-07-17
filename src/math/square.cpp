@@ -46,18 +46,6 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 namespace heyoka
 {
 
@@ -247,9 +235,11 @@ llvm::Value *taylor_diff_square(llvm_state &s, const square_impl &f, const std::
     assert(f.args().size() == 1u);
 
     if (!deps.empty()) {
-        throw std::invalid_argument("An empty hidden dependency vector is expected in order to compute the Taylor "
-                                    "derivative of the square, but a vector of size {} was passed "
-                                    "instead"_format(deps.size()));
+        throw std::invalid_argument(
+            fmt::format("An empty hidden dependency vector is expected in order to compute the Taylor "
+                        "derivative of the square, but a vector of size {} was passed "
+                        "instead",
+                        deps.size()));
     }
 
     return std::visit(

@@ -49,18 +49,6 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 namespace heyoka
 {
 
@@ -181,8 +169,9 @@ llvm::Value *sum_taylor_diff_impl(llvm_state &s, const sum_impl &sf, const std::
 
     if (!deps.empty()) {
         // LCOV_EXCL_START
-        throw std::invalid_argument("The vector of hidden dependencies in the Taylor diff for a sum "
-                                    "should be empty, but instead it has a size of {}"_format(deps.size()));
+        throw std::invalid_argument(fmt::format("The vector of hidden dependencies in the Taylor diff for a sum "
+                                                "should be empty, but instead it has a size of {}",
+                                                deps.size()));
         // LCOV_EXCL_STOP
     }
 
@@ -412,7 +401,7 @@ expression sum(std::vector<expression> args, std::uint32_t split)
 {
     if (split < 2u) {
         throw std::invalid_argument(
-            "The 'split' value for a sum must be at least 2, but it is {} instead"_format(split));
+            fmt::format("The 'split' value for a sum must be at least 2, but it is {} instead", split));
     }
 
     // Partition args so that all numbers are at the end.

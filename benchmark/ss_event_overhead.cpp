@@ -102,14 +102,14 @@ void run_integration(const std::string &filename, T t_final, double perturb, boo
     std::vector<nt_event<T>> evs;
     auto cb = [](taylor_adaptive<T> &, T, int) { throw; };
     for (auto i = 0; i < 6; ++i) {
-        auto xi = expression("x_{}"_format(i));
-        auto yi = expression("y_{}"_format(i));
-        auto zi = expression("z_{}"_format(i));
+        auto xi = expression(fmt::format("x_{}",i));
+        auto yi = expression(fmt::format("y_{}",i));
+        auto zi = expression(fmt::format("z_{}",i));
 
         for (auto j = i + 1; j < 6; ++j) {
-            auto xj = expression("x_{}"_format(j));
-            auto yj = expression("y_{}"_format(j));
-            auto zj = expression("z_{}"_format(j));
+            auto xj = expression(fmt::format("x_{}",j));
+            auto yj = expression(fmt::format("y_{}",j));
+            auto zj = expression(fmt::format("z_{}",j));
 
             auto diff_x = xj - xi;
             auto diff_y = yj - yi;

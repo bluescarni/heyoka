@@ -45,18 +45,6 @@
 #include "catch.hpp"
 #include "test_utils.hpp"
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 using namespace heyoka;
 using namespace heyoka_test;
 
@@ -1010,7 +998,7 @@ TEST_CASE("csc_scalar")
             s.compile();
 
             auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(
-                "heyoka_csc_degree_{}_{}"_format(degree, llvm_mangle_type(to_llvm_type<fp_t>(s.context())))));
+                fmt::format("heyoka_csc_degree_{}_{}", degree, llvm_mangle_type(to_llvm_type<fp_t>(s.context())))));
 
             // Random testing.
             std::uniform_real_distribution<double> rdist(-10., 10.);
@@ -1085,9 +1073,9 @@ TEST_CASE("csc_batch")
 
                 s.compile();
 
-                auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(
-                    s.jit_lookup("heyoka_csc_degree_{}_{}"_format(
-                        degree, llvm_mangle_type(make_vector_type(to_llvm_type<fp_t>(s.context()), batch_size)))));
+                auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(
+                    fmt::format("heyoka_csc_degree_{}_{}", degree,
+                                llvm_mangle_type(make_vector_type(to_llvm_type<fp_t>(s.context()), batch_size)))));
 
                 // Random testing.
                 std::uniform_real_distribution<double> rdist(-10., 10.);

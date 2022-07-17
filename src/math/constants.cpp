@@ -47,18 +47,6 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 namespace heyoka
 {
 
@@ -228,7 +216,7 @@ llvm::Function *taylor_c_diff_constant_impl(const constant_impl &c, llvm_state &
 
     // Fetch the function name and arguments.
     const auto na_pair
-        = taylor_c_diff_func_name_args<T>(context, "constant_{}"_format(c.get_name()), n_uvars, batch_size, {});
+        = taylor_c_diff_func_name_args<T>(context, fmt::format("constant_{}", c.get_name()), n_uvars, batch_size, {});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
