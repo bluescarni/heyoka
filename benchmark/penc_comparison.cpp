@@ -28,7 +28,6 @@
 #include <boost/program_options.hpp>
 
 #include <fmt/format.h>
-#include <fmt/ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
