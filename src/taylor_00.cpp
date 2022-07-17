@@ -30,7 +30,6 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
-#include <fmt/ostream.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -475,12 +474,13 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
     if (!isfinite(m_time)) {
         throw std::invalid_argument(
             fmt::format("Cannot initialise an adaptive Taylor integrator with a non-finite initial time of {}",
-                        static_cast<T>(m_time)));
+                        fp_to_string(static_cast<T>(m_time))));
     }
 
     if (!isfinite(tol) || tol <= 0) {
         throw std::invalid_argument(fmt::format(
-            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead", tol));
+            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead",
+            fp_to_string(tol)));
     }
 
     if (parallel_mode && !compact_mode) {
@@ -1493,14 +1493,14 @@ void dtime_checks(T hi, T lo)
     if (!isfinite(hi) || !isfinite(lo)) {
         throw std::invalid_argument(fmt::format("The components of the double-length representation of the time "
                                                 "coordinate must both be finite, but they are {} and {} instead",
-                                                hi, lo));
+                                                fp_to_string(hi), fp_to_string(lo)));
     }
 
     if (abs(hi) < abs(lo)) {
         throw std::invalid_argument(
             fmt::format("The first component of the double-length representation of the time "
                         "coordinate ({}) must not be smaller in magnitude than the second component ({})",
-                        hi, lo));
+                        fp_to_string(hi), fp_to_string(lo)));
     }
 }
 
@@ -1648,7 +1648,8 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
 
     if (!isfinite(tol) || tol <= 0) {
         throw std::invalid_argument(fmt::format(
-            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead", tol));
+            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead",
+            fp_to_string(tol)));
     }
 
     if (parallel_mode && !compact_mode) {

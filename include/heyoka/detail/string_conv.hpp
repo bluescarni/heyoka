@@ -22,6 +22,14 @@ namespace heyoka::detail
 // will return 123.
 HEYOKA_DLL_PUBLIC std::uint32_t uname_to_index(const std::string &);
 
+// Small helper to convert an input floating-point value to string.
+// There are no guarantees on the output format - in fact this
+// exists only for logging purposes as a workaround until mp++
+// supports fmt formatting. Once happens, we can directly
+// format mppp::real128 and the need for this helper disappears.
+template <typename T>
+HEYOKA_DLL_PUBLIC std::string fp_to_string(const T &);
+
 } // namespace heyoka::detail
 
 #endif

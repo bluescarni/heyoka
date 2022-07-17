@@ -31,6 +31,8 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <fmt/core.h>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -39,6 +41,7 @@
 
 #include <heyoka/callable.hpp>
 #include <heyoka/detail/dfloat.hpp>
+#include <heyoka/detail/fmt_compat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -217,6 +220,21 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, event_direction);
 
 } // namespace heyoka
+
+// fmt formatters for taylor_outcome and event_direction, implemented
+// on top of the streaming operator.
+namespace fmt
+{
+
+template <>
+struct formatter<heyoka::taylor_outcome> : heyoka::detail::ostream_formatter {
+};
+
+template <>
+struct formatter<heyoka::event_direction> : heyoka::detail::ostream_formatter {
+};
+
+} // namespace fmt
 
 // NOTE: implement a workaround for the serialisation of tuples whose first element
 // is a taylor outcome. We need this because Boost.Serialization treats all enums

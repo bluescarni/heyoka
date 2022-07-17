@@ -6,13 +6,26 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <charconv>
 #include <cstdint>
 #include <string>
 #include <system_error>
+#include <type_traits>
+
+#include <fmt/format.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/visibility.hpp>
 
 namespace heyoka::detail
 {
@@ -27,5 +40,29 @@ std::uint32_t uname_to_index(const std::string &s)
 
     return value;
 }
+
+template <typename T>
+std::string fp_to_string(const T &x)
+{
+    if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>) {
+        return fmt::format("{}", x);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return x.to_string();
+#endif
+    } else {
+        static_assert(always_false_v<T>, "Unhandled type.");
+    }
+}
+
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC std::string fp_to_string<double>(const double &);
+template HEYOKA_DLL_PUBLIC std::string fp_to_string<long double>(const long double &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template HEYOKA_DLL_PUBLIC std::string fp_to_string<mppp::real128>(const mppp::real128 &);
+
+#endif
 
 } // namespace heyoka::detail

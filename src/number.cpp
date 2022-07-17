@@ -33,7 +33,6 @@
 #include <llvm/IR/Value.h>
 
 #include <fmt/format.h>
-#include <fmt/ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 

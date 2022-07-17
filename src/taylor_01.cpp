@@ -45,7 +45,6 @@
 #include <tbb/parallel_invoke.h>
 
 #include <fmt/format.h>
-#include <fmt/ostream.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -1550,7 +1549,7 @@ std::ostream &t_event_impl_stream_impl(std::ostream &os, const expression &eq, e
     os << "Event equation : " << eq << '\n';
     os << "Event direction: " << dir << '\n';
     os << "With callback  : " << (callback ? "yes" : "no") << '\n';
-    os << "Cooldown       : " << (cooldown < 0 ? "auto" : fmt::format("{}", cooldown)) << '\n';
+    os << "Cooldown       : " << (cooldown < 0 ? "auto" : fp_to_string(cooldown)) << '\n';
 
     return os;
 }
@@ -2137,7 +2136,8 @@ void continuous_output<T>::call_impl(T t)
     // LCOV_EXCL_STOP
 
     if (!isfinite(t)) {
-        throw std::invalid_argument(fmt::format("Cannot compute the continuous output at the non-finite time {}", t));
+        throw std::invalid_argument(
+            fmt::format("Cannot compute the continuous output at the non-finite time {}", detail::fp_to_string(t)));
     }
 
     m_f_ptr(m_output.data(), t, m_tcs.data(), m_times_hi.data(), m_times_lo.data());
@@ -2227,8 +2227,8 @@ std::ostream &c_out_stream_impl(std::ostream &os, const continuous_output<T> &co
 
         oss << "Direction : " << (dir ? "forward" : "backward") << '\n';
         oss << "Time range: "
-            << (dir ? fmt::format("[{}, {})", co.m_times_hi[0], co.m_times_hi.back())
-                    : fmt::format("({}, {}]", co.m_times_hi.back(), co.m_times_hi[0]))
+            << (dir ? fmt::format("[{}, {})", fp_to_string(co.m_times_hi[0]), fp_to_string(co.m_times_hi.back()))
+                    : fmt::format("({}, {}]", fp_to_string(co.m_times_hi.back()), fp_to_string(co.m_times_hi[0])))
             << '\n';
         oss << "N of steps: " << (co.m_times_hi.size() - 1u) << '\n';
     }
@@ -2759,7 +2759,7 @@ void continuous_output_batch<T>::call_impl(const T *t)
         if (!isfinite(t[i])) {
             throw std::invalid_argument(fmt::format("Cannot compute the continuous output in batch mode "
                                                     "for the batch index {} at the non-finite time {}",
-                                                    i, t[i]));
+                                                    i, detail::fp_to_string(t[i])));
         }
 
         m_tmp_tm[i] = t[i];
@@ -2819,7 +2819,7 @@ const std::vector<T> &continuous_output_batch<T>::operator()(T tm)
     if (!isfinite(tm)) {
         throw std::invalid_argument(fmt::format("Cannot compute the continuous output in batch mode "
                                                 "at the non-finite time {}",
-                                                tm));
+                                                detail::fp_to_string(tm)));
     }
 
     // Copy over the time to the temp buffer.
@@ -2952,8 +2952,8 @@ std::ostream &c_out_batch_stream_impl(std::ostream &os, const continuous_output_
                 df_t_end(co.m_times_hi[co.m_times_hi.size() - 2u * batch_size + i],
                          co.m_times_lo[co.m_times_lo.size() - 2u * batch_size + i]);
             const auto dir = df_t_start < df_t_end;
-            oss << (dir ? fmt::format("[{}, {})", df_t_start.hi, df_t_end.hi)
-                        : fmt::format("({}, {}]", df_t_end.hi, df_t_start.hi));
+            oss << (dir ? fmt::format("[{}, {})", fp_to_string(df_t_start.hi), fp_to_string(df_t_end.hi))
+                        : fmt::format("({}, {}]", fp_to_string(df_t_end.hi), fp_to_string(df_t_start.hi)));
 
             if (i != batch_size - 1u) {
                 oss << ", ";

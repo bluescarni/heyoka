@@ -27,12 +27,15 @@
 #include <variant>
 #include <vector>
 
+#include <fmt/core.h>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
 
 #endif
 
+#include <heyoka/detail/fmt_compat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -186,6 +189,22 @@ HEYOKA_DLL_PUBLIC void swap(expression &, expression &) noexcept;
 HEYOKA_DLL_PUBLIC std::size_t hash(const expression &);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression &);
+
+} // namespace heyoka
+
+// fmt formatter for expression, implemented
+// on top of the streaming operator.
+namespace fmt
+{
+
+template <>
+struct formatter<heyoka::expression> : heyoka::detail::ostream_formatter {
+};
+
+} // namespace fmt
+
+namespace heyoka
+{
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const expression &);
 HEYOKA_DLL_PUBLIC void rename_variables(expression &, const std::unordered_map<std::string, std::string> &);

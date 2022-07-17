@@ -36,7 +36,6 @@
 #endif
 
 #include <fmt/format.h>
-#include <fmt/ostream.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -53,6 +52,7 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -467,7 +467,7 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
     } else {
         get_logger()->warn("deducing a cooldown of zero for a terminal event because the automatic deduction "
                            "heuristic produced a non-finite value of {}",
-                           ret);
+                           fp_to_string(ret));
 
         return 0;
     }
@@ -881,13 +881,13 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
 
     // LCOV_EXCL_START
     if (!isfinite(h)) {
-        get_logger()->warn("event detection skipped due to an invalid timestep value of {}", h);
+        get_logger()->warn("event detection skipped due to an invalid timestep value of {}", fp_to_string(h));
         return;
     }
     if (!isfinite(g_eps)) {
         get_logger()->warn("event detection skipped due to an invalid value of {} for the maximum error on the Taylor "
                            "series of the event equations",
-                           g_eps);
+                           fp_to_string(g_eps));
         return;
     }
     // LCOV_EXCL_STOP
@@ -947,7 +947,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                 if (!isfinite(root)) {
                     // LCOV_EXCL_START
                     get_logger()->warn("polynomial root finding produced a non-finite root of {} - skipping the event",
-                                       root);
+                                       fp_to_string(root));
                     return;
                     // LCOV_EXCL_STOP
                 }
@@ -968,7 +968,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                     // range from the other side.
                     get_logger()->warn("polynomial root finding produced the root {} which is not smaller, in absolute "
                                        "value, than the integration timestep {}",
-                                       root, h);
+                                       fp_to_string(root), fp_to_string(h));
 
                     using std::nextafter;
                     root = nextafter(h, T(0));
@@ -984,7 +984,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                     // LCOV_EXCL_START
                     get_logger()->warn("polynomial root finding produced the root {} with nonfinite derivative {} - "
                                        "skipping the event",
-                                       root, der);
+                                       fp_to_string(root), fp_to_string(der));
                     return;
                     // LCOV_EXCL_STOP
                 }
@@ -1576,14 +1576,15 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                 // LCOV_EXCL_START
                 if (!isfinite(h)) {
                     get_logger()->warn(
-                        "event detection skipped due to an invalid timestep value of {} at the batch index {}", h, j);
+                        "event detection skipped due to an invalid timestep value of {} at the batch index {}",
+                        fp_to_string(h), j);
                     continue;
                 }
                 if (!isfinite(g_eps)) {
                     get_logger()->warn(
                         "event detection skipped due to an invalid value of {} for the maximum error on the Taylor "
                         "series of the event equations at the batch index {}",
-                        g_eps, j);
+                        fp_to_string(g_eps), j);
                     continue;
                 }
                 // LCOV_EXCL_STOP
@@ -1619,7 +1620,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                         // LCOV_EXCL_START
                         get_logger()->warn("polynomial root finding produced a non-finite root of {} at the batch "
                                            "index {} - skipping the event",
-                                           root, j);
+                                           fp_to_string(root), j);
                         return;
                         // LCOV_EXCL_STOP
                     }
@@ -1641,7 +1642,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                         get_logger()->warn(
                             "polynomial root finding produced the root {} which is not smaller, in absolute "
                             "value, than the integration timestep {}",
-                            root, h);
+                            fp_to_string(root), fp_to_string(h));
 
                         using std::nextafter;
                         root = nextafter(h, T(0));
@@ -1657,7 +1658,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                         // LCOV_EXCL_START
                         get_logger()->warn("polynomial root finding produced the root {} with nonfinite derivative {} "
                                            "at the batch index {} - skipping the event",
-                                           root, der, j);
+                                           fp_to_string(root), fp_to_string(der), j);
                         return;
                         // LCOV_EXCL_STOP
                     }

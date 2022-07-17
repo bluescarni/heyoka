@@ -21,7 +21,6 @@
 #include <xtensor/xview.hpp>
 
 #include <fmt/format.h>
-#include <fmt/ostream.h>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
