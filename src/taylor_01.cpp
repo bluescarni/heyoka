@@ -79,18 +79,6 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 namespace heyoka
 {
 
@@ -109,7 +97,7 @@ taylor_c_diff_func_name_args_impl(llvm::LLVMContext &context, const std::string 
     assert(n_uvars > 0u);
 
     // Init the name.
-    auto fname = "heyoka.taylor_c_diff.{}."_format(name);
+    auto fname = fmt::format("heyoka.taylor_c_diff.{}.", name);
 
     // Init the vector of arguments:
     // - diff order,
@@ -170,7 +158,7 @@ taylor_c_diff_func_name_args_impl(llvm::LLVMContext &context, const std::string 
     // If we have variables in the arguments, add mangling
     // for n_uvars.
     if (with_var) {
-        fname += "n_uvars_{}."_format(n_uvars);
+        fname += fmt::format("n_uvars_{}.", n_uvars);
     }
 
     // Finally, add the mangling for the floating-point type.
@@ -380,7 +368,7 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
         // NOTE: the u vars that correspond to state
         // variables are never simplified,
         // thus map them onto themselves.
-        [[maybe_unused]] const auto res = uvars_rename.emplace("u_{}"_format(i), "u_{}"_format(i));
+        [[maybe_unused]] const auto res = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", i));
         assert(res.second);
     }
 
@@ -404,7 +392,8 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
             // Update uvars_rename. This will ensure that
             // occurrences of the variable 'u_i' in the next
             // elements of v_ex will be renamed to 'u_j'.
-            [[maybe_unused]] const auto res = uvars_rename.emplace("u_{}"_format(i), "u_{}"_format(retval.size() - 1u));
+            [[maybe_unused]] const auto res
+                = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", retval.size() - 1u));
             assert(res.second);
         } else {
             // ex is redundant. This means
@@ -412,7 +401,8 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
             // it->second. Don't add anything to retval,
             // and remap the variable name 'u_i' to
             // 'u_{it->second}'.
-            [[maybe_unused]] const auto res = uvars_rename.emplace("u_{}"_format(i), "u_{}"_format(it->second));
+            [[maybe_unused]] const auto res
+                = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", it->second));
             assert(res.second);
         }
     }
@@ -439,7 +429,7 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
     // for the renaming of the uvars.
     for (auto &[_, deps] : retval) {
         for (auto &idx : deps) {
-            auto it = uvars_rename.find("u_{}"_format(idx));
+            auto it = uvars_rename.find(fmt::format("u_{}", idx));
             assert(it != uvars_rename.end());
             idx = uname_to_index(it->second);
         }
@@ -447,7 +437,7 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
 
     // Same for the indices in sv_funcs_dc.
     for (auto &idx : sv_funcs_dc) {
-        auto it = uvars_rename.find("u_{}"_format(idx));
+        auto it = uvars_rename.find(fmt::format("u_{}", idx));
         assert(it != uvars_rename.end());
         idx = uname_to_index(it->second);
     }
@@ -611,13 +601,13 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
     // need renaming.
     for (decltype(v_idx.size()) i = 0; i < n_eq; ++i) {
         assert(v_idx[i] == i);
-        [[maybe_unused]] const auto res = remap.emplace("u_{}"_format(i), "u_{}"_format(i));
+        [[maybe_unused]] const auto res = remap.emplace(fmt::format("u_{}", i), fmt::format("u_{}", i));
         assert(res.second);
     }
     // Establish the remapping for the u variables that are not
     // state variables.
     for (decltype(v_idx.size()) i = n_eq; i < v_idx.size() - n_eq; ++i) {
-        [[maybe_unused]] const auto res = remap.emplace("u_{}"_format(v_idx[i]), "u_{}"_format(i));
+        [[maybe_unused]] const auto res = remap.emplace(fmt::format("u_{}", v_idx[i]), fmt::format("u_{}", i));
         assert(res.second);
     }
 
@@ -629,7 +619,7 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
 
         // Remap the hidden dependencies.
         for (auto &idx : it->second) {
-            auto it_remap = remap.find("u_{}"_format(idx));
+            auto it_remap = remap.find(fmt::format("u_{}", idx));
             assert(it_remap != remap.end());
             idx = uname_to_index(it_remap->second);
         }
@@ -637,7 +627,7 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
 
     // Do the remap for sv_funcs.
     for (auto &idx : sv_funcs_dc) {
-        auto it_remap = remap.find("u_{}"_format(idx));
+        auto it_remap = remap.find(fmt::format("u_{}", idx));
         assert(it_remap != remap.end());
         idx = uname_to_index(it_remap->second);
     }
@@ -738,7 +728,7 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
     // in terms of state variables or other u variables,
     // and store it in subs_map.
     for (idx_t i = 0; i < dc.size() - n_eq; ++i) {
-        subs_map.emplace("u_{}"_format(i), subs(dc[i].first, subs_map));
+        subs_map.emplace(fmt::format("u_{}", i), subs(dc[i].first, subs_map));
     }
 
     // Reconstruct the right-hand sides of the system
@@ -760,7 +750,7 @@ void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, c
     // in terms of state variables or other u variables,
     // and store it in subs_map.
     for (decltype(dc.size()) i = 0; i < dc.size() - n_eq; ++i) {
-        subs_map.emplace("u_{}"_format(i), subs(dc[i].first, subs_map));
+        subs_map.emplace(fmt::format("u_{}", i), subs(dc[i].first, subs_map));
     }
 
     // Reconstruct the sv functions and compare them to the
@@ -815,9 +805,9 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
         }
     }
     if (vars.size() != v_ex.size()) {
-        throw std::invalid_argument(
-            "The number of deduced variables for a Taylor decomposition ({}) differs from the number of equations ({})"_format(
-                vars.size(), v_ex.size()));
+        throw std::invalid_argument(fmt::format(
+            "The number of deduced variables for a Taylor decomposition ({}) differs from the number of equations ({})",
+            vars.size(), v_ex.size()));
     }
 
     // Check that the expressions in sv_funcs contain only
@@ -825,8 +815,10 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
     for (const auto &ex : sv_funcs) {
         for (const auto &var : get_variables(ex)) {
             if (vars.find(var) == vars.end()) {
-                throw std::invalid_argument("The extra functions in a Taylor decomposition contain the variable '{}', "
-                                            "which is not a state variable"_format(var));
+                throw std::invalid_argument(
+                    fmt::format("The extra functions in a Taylor decomposition contain the variable '{}', "
+                                "which is not a state variable",
+                                var));
             }
         }
     }
@@ -841,7 +833,7 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
     {
         decltype(vars.size()) var_idx = 0;
         for (const auto &var : vars) {
-            [[maybe_unused]] const auto eres = repl_map.emplace(var, "u_{}"_format(var_idx++));
+            [[maybe_unused]] const auto eres = repl_map.emplace(var, fmt::format("u_{}", var_idx++));
             assert(eres.second);
         }
     }
@@ -890,7 +882,7 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
             // in the func API, so the only entities that
             // can return dres == 0 are const/params or
             // variables.
-            ex = expression{"u_{}"_format(dres)};
+            ex = expression{fmt::format("u_{}", dres)};
         } else {
             assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
                    || std::holds_alternative<param>(ex.value()));
@@ -1006,13 +998,15 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
                     } else {
                         // Duplicate, error out.
                         throw std::invalid_argument(
-                            "Error in the Taylor decomposition of a system of equations: the variable '{}' "
-                            "appears in the left-hand side twice"_format(v.name()));
+                            fmt::format("Error in the Taylor decomposition of a system of equations: the variable '{}' "
+                                        "appears in the left-hand side twice",
+                                        v.name()));
                     }
                 } else {
                     throw std::invalid_argument(
-                        "Error in the Taylor decomposition of a system of equations: the "
-                        "left-hand side contains the expression '{}', which is not a variable"_format(lhs));
+                        fmt::format("Error in the Taylor decomposition of a system of equations: the "
+                                    "left-hand side contains the expression '{}', which is not a variable",
+                                    lhs));
                 }
             },
             lhs.value());
@@ -1027,8 +1021,10 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
     // Check that all variables in the rhs appear in the lhs.
     for (const auto &var : rhs_vars_set) {
         if (lhs_vars_set.find(var) == lhs_vars_set.end()) {
-            throw std::invalid_argument("Error in the Taylor decomposition of a system of equations: the variable '{}' "
-                                        "appears in the right-hand side but not in the left-hand side"_format(var));
+            throw std::invalid_argument(
+                fmt::format("Error in the Taylor decomposition of a system of equations: the variable '{}' "
+                            "appears in the right-hand side but not in the left-hand side",
+                            var));
         }
     }
 
@@ -1037,8 +1033,10 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
     for (const auto &ex : sv_funcs) {
         for (const auto &var : get_variables(ex)) {
             if (lhs_vars_set.find(var) == lhs_vars_set.end()) {
-                throw std::invalid_argument("The extra functions in a Taylor decomposition contain the variable '{}', "
-                                            "which is not a state variable"_format(var));
+                throw std::invalid_argument(
+                    fmt::format("The extra functions in a Taylor decomposition contain the variable '{}', "
+                                "which is not a state variable",
+                                var));
             }
         }
     }
@@ -1052,7 +1050,7 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
     // variables.
     std::unordered_map<std::string, std::string> repl_map;
     for (decltype(lhs_vars.size()) i = 0; i < lhs_vars.size(); ++i) {
-        [[maybe_unused]] const auto eres = repl_map.emplace(lhs_vars[i], "u_{}"_format(i));
+        [[maybe_unused]] const auto eres = repl_map.emplace(lhs_vars[i], fmt::format("u_{}", i));
         assert(eres.second);
     }
 
@@ -1105,7 +1103,7 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
             // in the func API, so the only entities that
             // can return dres == 0 are const/params or
             // variables.
-            ex = expression{"u_{}"_format(dres)};
+            ex = expression{fmt::format("u_{}", dres)};
         } else {
             assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
                    || std::holds_alternative<param>(ex.value()));
@@ -1349,10 +1347,10 @@ std::ostream &operator<<(std::ostream &os, taylor_outcome oc)
         default:
             if (oc >= taylor_outcome{0}) {
                 // Continuing terminal event.
-                os << "taylor_outcome::terminal_event_{} (continuing)"_format(static_cast<std::int64_t>(oc));
+                os << fmt::format("taylor_outcome::terminal_event_{} (continuing)", static_cast<std::int64_t>(oc));
             } else if (oc > taylor_outcome::success) {
                 // Stopping terminal event.
-                os << "taylor_outcome::terminal_event_{} (stopping)"_format(-static_cast<std::int64_t>(oc) - 1);
+                os << fmt::format("taylor_outcome::terminal_event_{} (stopping)", -static_cast<std::int64_t>(oc) - 1);
             } else {
                 // Unknown value.
                 os << "taylor_outcome::??";
@@ -1552,7 +1550,7 @@ std::ostream &t_event_impl_stream_impl(std::ostream &os, const expression &eq, e
     os << "Event equation : " << eq << '\n';
     os << "Event direction: " << dir << '\n';
     os << "With callback  : " << (callback ? "yes" : "no") << '\n';
-    os << "Cooldown       : " << (cooldown < 0 ? "auto" : "{}"_format(cooldown)) << '\n';
+    os << "Cooldown       : " << (cooldown < 0 ? "auto" : fmt::format("{}", cooldown)) << '\n';
 
     return os;
 }
@@ -2139,7 +2137,7 @@ void continuous_output<T>::call_impl(T t)
     // LCOV_EXCL_STOP
 
     if (!isfinite(t)) {
-        throw std::invalid_argument("Cannot compute the continuous output at the non-finite time {}"_format(t));
+        throw std::invalid_argument(fmt::format("Cannot compute the continuous output at the non-finite time {}", t));
     }
 
     m_f_ptr(m_output.data(), t, m_tcs.data(), m_times_hi.data(), m_times_lo.data());
@@ -2229,8 +2227,8 @@ std::ostream &c_out_stream_impl(std::ostream &os, const continuous_output<T> &co
 
         oss << "Direction : " << (dir ? "forward" : "backward") << '\n';
         oss << "Time range: "
-            << (dir ? "[{}, {})"_format(co.m_times_hi[0], co.m_times_hi.back())
-                    : "({}, {}]"_format(co.m_times_hi.back(), co.m_times_hi[0]))
+            << (dir ? fmt::format("[{}, {})", co.m_times_hi[0], co.m_times_hi.back())
+                    : fmt::format("({}, {}]", co.m_times_hi.back(), co.m_times_hi[0]))
             << '\n';
         oss << "N of steps: " << (co.m_times_hi.size() - 1u) << '\n';
     }
@@ -2759,8 +2757,9 @@ void continuous_output_batch<T>::call_impl(const T *t)
     // other data members.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         if (!isfinite(t[i])) {
-            throw std::invalid_argument("Cannot compute the continuous output in batch mode "
-                                        "for the batch index {} at the non-finite time {}"_format(i, t[i]));
+            throw std::invalid_argument(fmt::format("Cannot compute the continuous output in batch mode "
+                                                    "for the batch index {} at the non-finite time {}",
+                                                    i, t[i]));
         }
 
         m_tmp_tm[i] = t[i];
@@ -2778,8 +2777,9 @@ const std::vector<T> &continuous_output_batch<T>::operator()(const std::vector<T
 
     if (tm.size() != m_batch_size) {
         throw std::invalid_argument(
-            "An invalid time vector was passed to the call operator of continuous_output_batch: the "
-            "vector size is {}, but a size of {} was expected instead"_format(tm.size(), m_batch_size));
+            fmt::format("An invalid time vector was passed to the call operator of continuous_output_batch: the "
+                        "vector size is {}, but a size of {} was expected instead",
+                        tm.size(), m_batch_size));
     }
 
     return (*this)(tm.data());
@@ -2817,8 +2817,9 @@ const std::vector<T> &continuous_output_batch<T>::operator()(T tm)
     // LCOV_EXCL_STOP
 
     if (!isfinite(tm)) {
-        throw std::invalid_argument("Cannot compute the continuous output in batch mode "
-                                    "at the non-finite time {}"_format(tm));
+        throw std::invalid_argument(fmt::format("Cannot compute the continuous output in batch mode "
+                                                "at the non-finite time {}",
+                                                tm));
     }
 
     // Copy over the time to the temp buffer.
@@ -2951,8 +2952,8 @@ std::ostream &c_out_batch_stream_impl(std::ostream &os, const continuous_output_
                 df_t_end(co.m_times_hi[co.m_times_hi.size() - 2u * batch_size + i],
                          co.m_times_lo[co.m_times_lo.size() - 2u * batch_size + i]);
             const auto dir = df_t_start < df_t_end;
-            oss << (dir ? "[{}, {})"_format(df_t_start.hi, df_t_end.hi)
-                        : "({}, {}]"_format(df_t_end.hi, df_t_start.hi));
+            oss << (dir ? fmt::format("[{}, {})", df_t_start.hi, df_t_end.hi)
+                        : fmt::format("({}, {}]", df_t_end.hi, df_t_start.hi));
 
             if (i != batch_size - 1u) {
                 oss << ", ";

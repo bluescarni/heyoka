@@ -27,18 +27,6 @@
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 namespace heyoka
 {
 
@@ -54,22 +42,23 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
     if (masses.size() != n) {
         using namespace fmt::literals;
 
-        throw std::invalid_argument(
+        throw std::invalid_argument(fmt::format(
             "Inconsistent sizes detected while creating an N-body system: the vector of masses has a size of "
-            "{}, while the number of bodies is {}"_format(masses.size(), n));
+            "{}, while the number of bodies is {}",
+            masses.size(), n));
     }
 
     // Create the state variables.
     std::vector<expression> x_vars, y_vars, z_vars, vx_vars, vy_vars, vz_vars;
 
     for (std::uint32_t i = 0; i < n; ++i) {
-        x_vars.emplace_back(variable("x_{}"_format(i)));
-        y_vars.emplace_back(variable("y_{}"_format(i)));
-        z_vars.emplace_back(variable("z_{}"_format(i)));
+        x_vars.emplace_back(variable(fmt::format("x_{}", i)));
+        y_vars.emplace_back(variable(fmt::format("y_{}", i)));
+        z_vars.emplace_back(variable(fmt::format("z_{}", i)));
 
-        vx_vars.emplace_back(variable("vx_{}"_format(i)));
-        vy_vars.emplace_back(variable("vy_{}"_format(i)));
-        vz_vars.emplace_back(variable("vz_{}"_format(i)));
+        vx_vars.emplace_back(variable(fmt::format("vx_{}", i)));
+        vy_vars.emplace_back(variable(fmt::format("vy_{}", i)));
+        vz_vars.emplace_back(variable(fmt::format("vz_{}", i)));
     }
 
     // Create the return value.
@@ -340,21 +329,22 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::ui
     if (n_massive > n) {
         using namespace fmt::literals;
 
-        throw std::invalid_argument("The number of massive bodies, {}, cannot be larger than the "
-                                    "total number of bodies, {}"_format(n_massive, n));
+        throw std::invalid_argument(fmt::format("The number of massive bodies, {}, cannot be larger than the "
+                                                "total number of bodies, {}",
+                                                n_massive, n));
     }
 
     // Create the state variables.
     std::vector<expression> x_vars, y_vars, z_vars, vx_vars, vy_vars, vz_vars;
 
     for (std::uint32_t i = 0; i < n; ++i) {
-        x_vars.emplace_back(variable("x_{}"_format(i)));
-        y_vars.emplace_back(variable("y_{}"_format(i)));
-        z_vars.emplace_back(variable("z_{}"_format(i)));
+        x_vars.emplace_back(variable(fmt::format("x_{}", i)));
+        y_vars.emplace_back(variable(fmt::format("y_{}", i)));
+        z_vars.emplace_back(variable(fmt::format("z_{}", i)));
 
-        vx_vars.emplace_back(variable("vx_{}"_format(i)));
-        vy_vars.emplace_back(variable("vy_{}"_format(i)));
-        vz_vars.emplace_back(variable("vz_{}"_format(i)));
+        vx_vars.emplace_back(variable(fmt::format("vx_{}", i)));
+        vy_vars.emplace_back(variable(fmt::format("vy_{}", i)));
+        vz_vars.emplace_back(variable(fmt::format("vz_{}", i)));
     }
 
     // Create the return value.
