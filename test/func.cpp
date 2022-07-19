@@ -19,6 +19,8 @@
 #include <variant>
 #include <vector>
 
+#include <fmt/format.h>
+
 #include <heyoka/config.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/exceptions.hpp>
@@ -509,6 +511,15 @@ TEST_CASE("func ostream")
     oss << f1;
 
     REQUIRE(oss.str() == "f(y)");
+}
+
+TEST_CASE("func fmt")
+{
+    auto f1 = func(func_10{{"x"_var, "y"_var}});
+
+    auto fmt_str = fmt::format("{}", f1);
+
+    REQUIRE(fmt_str == "f(x, y)");
 }
 
 TEST_CASE("func hash")

@@ -26,12 +26,15 @@
 #include <utility>
 #include <vector>
 
+#include <fmt/core.h>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
 
 #endif
 
+#include <heyoka/detail/fmt_compat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -733,6 +736,22 @@ using is_func = std::conjunction<std::is_same<T, uncvref_t<T>>, std::is_default_
 HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const func &);
+
+} // namespace heyoka
+
+// fmt formatter for func, implemented
+// on top of the streaming operator.
+namespace fmt
+{
+
+template <>
+struct formatter<heyoka::func> : heyoka::detail::ostream_formatter {
+};
+
+} // namespace fmt
+
+namespace heyoka
+{
 
 HEYOKA_DLL_PUBLIC std::size_t hash(const func &);
 

@@ -10,11 +10,16 @@
 
 #include <functional>
 #include <initializer_list>
+#include <iomanip>
 #include <limits>
+#include <locale>
 #include <sstream>
+#include <string>
 #include <variant>
 
 #include <boost/algorithm/string/predicate.hpp>
+
+#include <fmt/format.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -295,4 +300,36 @@ TEST_CASE("number s11n")
 
     REQUIRE(n == number{1.1});
 #endif
+}
+
+TEST_CASE("number ostream")
+{
+    // Test with double, as the codepath is identical.
+    std::string cmp;
+
+    {
+        std::ostringstream oss;
+        oss.precision(std::numeric_limits<double>::max_digits10);
+        oss.imbue(std::locale::classic());
+        oss << std::showpoint;
+
+        oss << 1.1;
+
+        cmp = oss.str();
+    }
+
+    {
+        std::ostringstream oss;
+        oss << number(1.1);
+
+        REQUIRE(oss.str() == cmp);
+    }
+}
+
+TEST_CASE("number fmt")
+{
+    std::ostringstream oss;
+    oss << number(1.1);
+
+    REQUIRE(oss.str() == fmt::format("{}", number(1.1)));
 }

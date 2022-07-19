@@ -20,12 +20,15 @@
 #include <variant>
 #include <vector>
 
+#include <fmt/core.h>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
 
 #endif
 
+#include <heyoka/detail/fmt_compat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -79,6 +82,22 @@ HEYOKA_DLL_PUBLIC void swap(number &, number &) noexcept;
 HEYOKA_DLL_PUBLIC std::size_t hash(const number &);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const number &);
+
+} // namespace heyoka
+
+// fmt formatter for number, implemented
+// on top of the streaming operator.
+namespace fmt
+{
+
+template <>
+struct formatter<heyoka::number> : heyoka::detail::ostream_formatter {
+};
+
+} // namespace fmt
+
+namespace heyoka
+{
 
 HEYOKA_DLL_PUBLIC bool is_zero(const number &);
 HEYOKA_DLL_PUBLIC bool is_one(const number &);
