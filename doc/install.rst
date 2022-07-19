@@ -57,18 +57,27 @@ computations varies depending on the software/hardware platform.
 
 80-bit precision support requires an x86 processor. Additionally, the 80-bit floating-point
 type must be available in C++ as the ``long double`` type. This is case for most compilers,
-with the notable exception of Microsoft Visual C++, in which ``long double`` is a synonym for ``double``.
-Thus, on Windows heyoka (and all its dependencies) must be compiled with a non-MSVC compiler
-in order to enable 80-bit computations.
+with the notable exception of Microsoft Visual C++ (MSVC), where ``long double`` is a synonym for ``double``.
+Thus, on Windows 80-bit precision support is **not** available, unless
+heyoka (and all its dependencies) have been compiled with a compiler supporting the
+80-bit floating-point type.
 
 128-bit precision
 ^^^^^^^^^^^^^^^^^
 
 On platforms where ``long double`` is a quadruple-precision floating-point datatype (e.g., 64-bit ARM),
 quadruple-precision integrations are always supported. Otherwise,
-on platforms such as x86-64, the nonstandard ``__float128`` floating-point type must be
-`available and supported <https://gcc.gnu.org/onlinedocs/gcc/Floating-Types.html>`__
-and heyoka must be compiled with the ``HEYOKA_WITH_MPPP`` option enabled (see :ref:`below <installation_from_source>`).
+on platforms such as x86-64, quadruple-precision computations are supported if:
+
+* the nonstandard ``__float128`` floating-point type is
+  `available and supported <https://gcc.gnu.org/onlinedocs/gcc/Floating-Types.html>`__, and
+* an installation of the `mp++ <https://bluescarni.github.io/mppp/>`__ library with support
+  for the :cpp:class:`mppp::real128` class is available (see the :ref:`mp++ installation instructions <mppp:installation>`),
+  and
+* heyoka is compiled with the ``HEYOKA_WITH_MPPP`` option enabled (see :ref:`below <installation_from_source>`).
+
+If these conditions are satisfied, then quadruple-precision computations are supported in heyoka
+via the :cpp:class:`mppp::real128` type.
 
 .. note::
 
@@ -135,9 +144,7 @@ of heyoka, you can use ``cmake`` to configure the build to your liking
 (e.g., enabling optional features, customizing the installation
 path, etc.). The available configuration options are:
 
-* ``HEYOKA_WITH_MPPP``: enable features relying on the mp++ library (i.e., support for
-  quadruple-precision computations on platforms supporting the ``__float128``
-  datatype, off by default),
+* ``HEYOKA_WITH_MPPP``: enable features relying on the mp++ library (off by default),
 * ``HEYOKA_WITH_SLEEF``: enable features relying on the SLEEF library (off by default),
 * ``HEYOKA_BUILD_TESTS``: build the test suite (off by default),
 * ``HEYOKA_BUILD_BENCHMARKS``: build the benchmarking suite (off by default),
@@ -226,7 +233,9 @@ heyoka's config-file package also exports the following boolean variables to sig
 dependencies heyoka was compiled:
 
 * ``heyoka_WITH_SLEEF`` if SLEEF support was enabled,
-* ``heyoka_WITH_MPPP`` if mp++ support was enabled.
+* ``heyoka_WITH_MPPP`` if mp++ support was enabled,
+* ``heyoka_WITH_REAL128`` (new in version 0.19) if quadruple-precision
+  computations via the :cpp:class:`mppp::real128` type are supported.
 
 .. versionadded:: 0.17.0
 

@@ -12,6 +12,7 @@ endif()
 # optional deps.
 set(heyoka_WITH_SLEEF @HEYOKA_WITH_SLEEF@)
 set(heyoka_WITH_MPPP @HEYOKA_WITH_MPPP@)
+set(heyoka_WITH_REAL128 @_HEYOKA_WITH_REAL128@)
 
 # Record the LLVM major version against which
 # heyoka was built.
