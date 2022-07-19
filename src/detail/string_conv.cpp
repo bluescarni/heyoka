@@ -34,7 +34,7 @@ std::uint32_t uname_to_index(const std::string &s)
 {
     assert(s.rfind("u_", 0) == 0);
 
-    std::uint32_t value;
+    std::uint32_t value = 0;
     [[maybe_unused]] auto ret = std::from_chars(s.data() + 2, s.data() + s.size(), value);
     assert(ret.ec == std::errc{});
 
