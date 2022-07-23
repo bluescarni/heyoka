@@ -76,18 +76,6 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 // NOTE: GCC warns about use of mismatched new/delete
 // when creating global variables. I am not sure this is
 // a real issue, as it looks like we are adopting the "canonical"
@@ -201,7 +189,7 @@ llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp)
     const auto it = type_map.find(tp);
 
     if (it == type_map.end()) {
-        throw std::invalid_argument("Unable to associate the C++ type '{}' to an LLVM type"_format(tp.name()));
+        throw std::invalid_argument(fmt::format("Unable to associate the C++ type '{}' to an LLVM type", tp.name()));
     } else {
         return it->second(c);
     }
@@ -215,7 +203,7 @@ std::string llvm_mangle_type(llvm::Type *t)
     if (auto *v_t = llvm::dyn_cast<llvm_vector_type>(t)) {
         // If the type is a vector, get the name of the element type
         // and append the vector size.
-        return "{}_{}"_format(llvm_type_name(v_t->getElementType()), v_t->getNumElements());
+        return fmt::format("{}_{}", llvm_type_name(v_t->getElementType()), v_t->getNumElements());
     } else {
         // Otherwise just return the type name.
         return llvm_type_name(t);
@@ -533,7 +521,7 @@ llvm::CallInst *llvm_invoke_intrinsic(ir_builder &builder, const std::string &na
     // Fetch the intrinsic ID from the name.
     const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(name);
     if (intrinsic_ID == 0) {
-        throw std::invalid_argument("Cannot fetch the ID of the intrinsic '{}'"_format(name));
+        throw std::invalid_argument(fmt::format("Cannot fetch the ID of the intrinsic '{}'", name));
     }
 
     // Fetch the declaration.
@@ -544,18 +532,19 @@ llvm::CallInst *llvm_invoke_intrinsic(ir_builder &builder, const std::string &na
     assert(builder.GetInsertBlock() != nullptr); // LCOV_EXCL_LINE
     auto *callee_f = llvm::Intrinsic::getDeclaration(builder.GetInsertBlock()->getModule(), intrinsic_ID, types);
     if (callee_f == nullptr) {
-        throw std::invalid_argument("Error getting the declaration of the intrinsic '{}'"_format(name));
+        throw std::invalid_argument(fmt::format("Error getting the declaration of the intrinsic '{}'", name));
     }
     if (!callee_f->isDeclaration()) {
         // It does not make sense to have a definition of a builtin.
-        throw std::invalid_argument("The intrinsic '{}' must be only declared, not defined"_format(name));
+        throw std::invalid_argument(fmt::format("The intrinsic '{}' must be only declared, not defined", name));
     }
 
     // Check the number of arguments.
     if (callee_f->arg_size() != args.size()) {
         throw std::invalid_argument(
-            "Incorrect # of arguments passed while calling the intrinsic '{}': {} are "
-            "expected, but {} were provided instead"_format(name, callee_f->arg_size(), args.size()));
+            fmt::format("Incorrect # of arguments passed while calling the intrinsic '{}': {} are "
+                        "expected, but {} were provided instead",
+                        name, callee_f->arg_size(), args.size()));
     }
 
     // Create the function call.
@@ -581,7 +570,8 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
         auto *ft = llvm::FunctionType::get(ret_type, arg_types, false);
         callee_f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
         if (callee_f == nullptr) {
-            throw std::invalid_argument("Unable to create the prototype for the external function '{}'"_format(name));
+            throw std::invalid_argument(
+                fmt::format("Unable to create the prototype for the external function '{}'", name));
         }
 
         // Add the function attributes.
@@ -593,14 +583,16 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
         // The function declaration exists already. Check that it is only a
         // declaration and not a definition.
         if (!callee_f->isDeclaration()) {
-            throw std::invalid_argument("Cannot call the function '{}' as an external function, because "
-                                        "it is defined as an internal module function"_format(name));
+            throw std::invalid_argument(fmt::format("Cannot call the function '{}' as an external function, because "
+                                                    "it is defined as an internal module function",
+                                                    name));
         }
         // Check the number of arguments.
         if (callee_f->arg_size() != args.size()) {
             throw std::invalid_argument(
-                "Incorrect # of arguments passed while calling the external function '{}': {} "
-                "are expected, but {} were provided instead"_format(name, callee_f->arg_size(), args.size()));
+                fmt::format("Incorrect # of arguments passed while calling the external function '{}': {} "
+                            "are expected, but {} were provided instead",
+                            name, callee_f->arg_size(), args.size()));
         }
         // NOTE: perhaps in the future we should consider adding more checks here
         // (e.g., argument types, return type).
@@ -1341,7 +1333,7 @@ llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch
     auto *tp = make_vector_type(scal_t, batch_size);
 
     // Fetch the function name.
-    const auto fname = "heyoka_csc_degree_{}_{}"_format(n, llvm_mangle_type(tp));
+    const auto fname = fmt::format("heyoka_csc_degree_{}_{}", n, llvm_mangle_type(tp));
 
     // The function arguments:
     // - pointer to the return value,

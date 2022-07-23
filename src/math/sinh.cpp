@@ -52,18 +52,6 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 namespace heyoka
 {
 
@@ -234,8 +222,9 @@ llvm::Value *taylor_diff_sinh(llvm_state &s, const sinh_impl &f, const std::vect
 
     if (deps.size() != 1u) {
         throw std::invalid_argument(
-            "A hidden dependency vector of size 1 is expected in order to compute the Taylor "
-            "derivative of the hyperbolic sine, but a vector of size {} was passed instead"_format(deps.size()));
+            fmt::format("A hidden dependency vector of size 1 is expected in order to compute the Taylor "
+                        "derivative of the hyperbolic sine, but a vector of size {} was passed instead",
+                        deps.size()));
     }
 
     return std::visit(

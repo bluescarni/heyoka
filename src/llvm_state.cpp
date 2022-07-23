@@ -126,18 +126,6 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 namespace heyoka
 {
 
@@ -433,8 +421,8 @@ struct llvm_state::jit {
 
             ostr << err;
 
-            throw std::invalid_argument(
-                "The function for adding a module to the jit failed. The full error message:\n{}"_format(ostr.str()));
+            throw std::invalid_argument(fmt::format(
+                "The function for adding a module to the jit failed. The full error message:\n{}", ostr.str()));
         }
         // LCOV_EXCL_STOP
     }
@@ -490,9 +478,8 @@ void llvm_state_add_obj_to_jit(Jit &j, const std::string &obj)
 
         ostr << err;
 
-        throw std::invalid_argument(
-            "The function for adding a compiled module to the jit failed. The full error message:\n{}"_format(
-                ostr.str()));
+        throw std::invalid_argument(fmt::format(
+            "The function for adding a compiled module to the jit failed. The full error message:\n{}", ostr.str()));
     }
     // LCOV_EXCL_STOP
 }
@@ -514,7 +501,7 @@ auto llvm_state_ir_to_module(std::string &&ir, llvm::LLVMContext &ctx)
 
         err.print("", ostr);
 
-        throw std::invalid_argument("IR parsing failed. The full error message:\n{}"_format(ostr.str()));
+        throw std::invalid_argument(fmt::format("IR parsing failed. The full error message:\n{}", ostr.str()));
     }
     // LCOV_EXCL_STOP
 
@@ -830,7 +817,7 @@ void llvm_state::check_uncompiled(const char *f) const
 {
     if (!m_module) {
         throw std::invalid_argument(
-            "The function '{}' can be invoked only if the module has not been compiled yet"_format(f));
+            fmt::format("The function '{}' can be invoked only if the module has not been compiled yet", f));
     }
 }
 
@@ -838,7 +825,7 @@ void llvm_state::check_compiled(const char *f) const
 {
     if (m_module) {
         throw std::invalid_argument(
-            "The function '{}' can be invoked only after the module has been compiled"_format(f));
+            fmt::format("The function '{}' can be invoked only after the module has been compiled", f));
     }
 }
 
@@ -857,8 +844,8 @@ void llvm_state::verify_function(llvm::Function *f)
         const auto fname = std::string(f->getName());
         f->eraseFromParent();
 
-        throw std::invalid_argument(
-            "The verification of the function '{}' failed. The full error message:\n{}"_format(fname, ostr.str()));
+        throw std::invalid_argument(fmt::format(
+            "The verification of the function '{}' failed. The full error message:\n{}", fname, ostr.str()));
     }
 }
 
@@ -869,7 +856,7 @@ void llvm_state::verify_function(const std::string &name)
     // Lookup the function in the module.
     auto f = m_module->getFunction(name);
     if (f == nullptr) {
-        throw std::invalid_argument("The function '{}' does not exist in the module"_format(name));
+        throw std::invalid_argument(fmt::format("The function '{}' does not exist in the module", name));
     }
 
     // Run the actual check.
@@ -1089,7 +1076,7 @@ void llvm_state::compile()
 
         if (llvm::verifyModule(*m_module, &ostr)) {
             throw std::runtime_error(
-                "The verification of the module '{}' produced an error:\n{}"_format(m_module_name, ostr.str()));
+                fmt::format("The verification of the module '{}' produced an error:\n{}", m_module_name, ostr.str()));
         }
     }
 
@@ -1127,7 +1114,7 @@ std::uintptr_t llvm_state::jit_lookup(const std::string &name)
 
     auto sym = m_jitter->lookup(name);
     if (!sym) {
-        throw std::invalid_argument("Could not find the symbol '{}' in the compiled module"_format(name));
+        throw std::invalid_argument(fmt::format("Could not find the symbol '{}' in the compiled module", name));
     }
 
     return static_cast<std::uintptr_t>((*sym).getAddress());

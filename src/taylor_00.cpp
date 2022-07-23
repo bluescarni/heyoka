@@ -30,7 +30,6 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
-#include <fmt/ostream.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -66,18 +65,6 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
-
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
 
 namespace heyoka
 {
@@ -207,7 +194,7 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     // LCOV_EXCL_START
     if (f == nullptr) {
         throw std::invalid_argument(
-            "Unable to create a function for an adaptive Taylor stepper with name '{}'"_format(name));
+            fmt::format("Unable to create a function for an adaptive Taylor stepper with name '{}'", name));
     }
     // LCOV_EXCL_STOP
 
@@ -339,7 +326,7 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
     if (f == nullptr) {
         throw std::invalid_argument(
-            "Unable to create a function for an adaptive Taylor stepper with name '{}'"_format(name));
+            fmt::format("Unable to create a function for an adaptive Taylor stepper with name '{}'", name));
     }
 
     // Set the names/attributes of the function arguments.
@@ -479,21 +466,21 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
 
     if (m_state.size() != sys.size()) {
         throw std::invalid_argument(
-            "Inconsistent sizes detected in the initialization of an adaptive Taylor "
-            "integrator: the state vector has a dimension of {}, while the number of equations is {}"_format(
-                m_state.size(), sys.size()));
+            fmt::format("Inconsistent sizes detected in the initialization of an adaptive Taylor "
+                        "integrator: the state vector has a dimension of {}, while the number of equations is {}",
+                        m_state.size(), sys.size()));
     }
 
     if (!isfinite(m_time)) {
         throw std::invalid_argument(
-            "Cannot initialise an adaptive Taylor integrator with a non-finite initial time of {}"_format(
-                static_cast<T>(m_time)));
+            fmt::format("Cannot initialise an adaptive Taylor integrator with a non-finite initial time of {}",
+                        fp_to_string(static_cast<T>(m_time))));
     }
 
     if (!isfinite(tol) || tol <= 0) {
-        throw std::invalid_argument(
-            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead"_format(
-                tol));
+        throw std::invalid_argument(fmt::format(
+            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead",
+            fp_to_string(tol)));
     }
 
     if (parallel_mode && !compact_mode) {
@@ -538,10 +525,10 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
     if (m_pars.size() < npars) {
         m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
     } else if (m_pars.size() > npars) {
-        throw std::invalid_argument(
+        throw std::invalid_argument(fmt::format(
             "Excessive number of parameter values passed to the constructor of an adaptive "
-            "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters"_format(
-                m_pars.size(), npars));
+            "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters",
+            m_pars.size(), npars));
     }
 
     // Log runtimes in trace mode.
@@ -673,8 +660,9 @@ void taylor_adaptive_impl<T>::load_impl(Archive &ar, unsigned version)
 {
     // LCOV_EXCL_START
     if (version < static_cast<unsigned>(boost::serialization::version<taylor_adaptive_impl<T>>::type::value)) {
-        throw std::invalid_argument("Unable to load a taylor_adaptive integrator: "
-                                    "the archive version ({}) is too old"_format(version));
+        throw std::invalid_argument(fmt::format("Unable to load a taylor_adaptive integrator: "
+                                                "the archive version ({}) is too old",
+                                                version));
     }
     // LCOV_EXCL_STOP
 
@@ -1505,14 +1493,14 @@ void dtime_checks(T hi, T lo)
     if (!isfinite(hi) || !isfinite(lo)) {
         throw std::invalid_argument(fmt::format("The components of the double-length representation of the time "
                                                 "coordinate must both be finite, but they are {} and {} instead",
-                                                hi, lo));
+                                                fp_to_string(hi), fp_to_string(lo)));
     }
 
     if (abs(hi) < abs(lo)) {
         throw std::invalid_argument(
             fmt::format("The first component of the double-length representation of the time "
                         "coordinate ({}) must not be smaller in magnitude than the second component ({})",
-                        hi, lo));
+                        fp_to_string(hi), fp_to_string(lo)));
     }
 }
 
@@ -1632,23 +1620,24 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
 
     if (m_state.size() % m_batch_size != 0u) {
         throw std::invalid_argument(
-            "Invalid size detected in the initialization of an adaptive Taylor "
-            "integrator: the state vector has a size of {}, which is not a multiple of the batch size ({})"_format(
-                m_state.size(), m_batch_size));
+            fmt::format("Invalid size detected in the initialization of an adaptive Taylor "
+                        "integrator: the state vector has a size of {}, which is not a multiple of the batch size ({})",
+                        m_state.size(), m_batch_size));
     }
 
     if (m_state.size() / m_batch_size != sys.size()) {
         throw std::invalid_argument(
-            "Inconsistent sizes detected in the initialization of an adaptive Taylor "
-            "integrator: the state vector has a dimension of {} and a batch size of {}, "
-            "while the number of equations is {}"_format(m_state.size() / m_batch_size, m_batch_size, sys.size()));
+            fmt::format("Inconsistent sizes detected in the initialization of an adaptive Taylor "
+                        "integrator: the state vector has a dimension of {} and a batch size of {}, "
+                        "while the number of equations is {}",
+                        m_state.size() / m_batch_size, m_batch_size, sys.size()));
     }
 
     if (m_time_hi.size() != m_batch_size) {
         throw std::invalid_argument(
-            "Invalid size detected in the initialization of an adaptive Taylor "
-            "integrator: the time vector has a size of {}, which is not equal to the batch size ({})"_format(
-                m_time_hi.size(), m_batch_size));
+            fmt::format("Invalid size detected in the initialization of an adaptive Taylor "
+                        "integrator: the time vector has a size of {}, which is not equal to the batch size ({})",
+                        m_time_hi.size(), m_batch_size));
     }
     // NOTE: no need to check m_time_lo for finiteness, as it
     // was inited to zero already.
@@ -1658,9 +1647,9 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
     }
 
     if (!isfinite(tol) || tol <= 0) {
-        throw std::invalid_argument(
-            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead"_format(
-                tol));
+        throw std::invalid_argument(fmt::format(
+            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead",
+            fp_to_string(tol)));
     }
 
     if (parallel_mode && !compact_mode) {
@@ -1711,10 +1700,12 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
     if (m_pars.size() < npars * m_batch_size) {
         m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars * m_batch_size));
     } else if (m_pars.size() > npars * m_batch_size) {
-        throw std::invalid_argument("Excessive number of parameter values passed to the constructor of an adaptive "
-                                    "Taylor integrator in batch mode: {} parameter values were passed, but the ODE "
-                                    "system contains only {} parameters "
-                                    "(in batches of {})"_format(m_pars.size(), npars, m_batch_size));
+        throw std::invalid_argument(
+            fmt::format("Excessive number of parameter values passed to the constructor of an adaptive "
+                        "Taylor integrator in batch mode: {} parameter values were passed, but the ODE "
+                        "system contains only {} parameters "
+                        "(in batches of {})",
+                        m_pars.size(), npars, m_batch_size));
     }
 
     // Log runtimes in trace mode.
@@ -1905,8 +1896,9 @@ void taylor_adaptive_batch_impl<T>::load_impl(Archive &ar, unsigned version)
 {
     // LCOV_EXCL_START
     if (version < static_cast<unsigned>(boost::serialization::version<taylor_adaptive_batch_impl<T>>::type::value)) {
-        throw std::invalid_argument("Unable to load a taylor_adaptive_batch integrator: "
-                                    "the archive version ({}) is too old"_format(version));
+        throw std::invalid_argument(fmt::format("Unable to load a taylor_adaptive_batch integrator: "
+                                                "the archive version ({}) is too old",
+                                                version));
     }
     // LCOV_EXCL_STOP
 
@@ -1966,9 +1958,10 @@ void taylor_adaptive_batch_impl<T>::set_time(const std::vector<T> &new_time)
 {
     // Check the dimensionality of new_time.
     if (new_time.size() != m_batch_size) {
-        throw std::invalid_argument(
+        throw std::invalid_argument(fmt::format(
             "Invalid number of new times specified in a Taylor integrator in batch mode: the batch size is {}, "
-            "but the number of specified times is {}"_format(m_batch_size, new_time.size()));
+            "but the number of specified times is {}",
+            m_batch_size, new_time.size()));
     }
 
     // Copy over the new times.
@@ -1995,9 +1988,10 @@ void taylor_adaptive_batch_impl<T>::set_dtime(const std::vector<T> &hi, const st
 {
     // Check the dimensionalities.
     if (hi.size() != m_batch_size || lo.size() != m_batch_size) {
-        throw std::invalid_argument(
+        throw std::invalid_argument(fmt::format(
             "Invalid number of new times specified in a Taylor integrator in batch mode: the batch size is {}, "
-            "but the number of specified times is ({}, {})"_format(m_batch_size, hi.size(), lo.size()));
+            "but the number of specified times is ({}, {})",
+            m_batch_size, hi.size(), lo.size()));
     }
 
     // Check the values in hi/lo.
@@ -2351,9 +2345,10 @@ void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, boo
 {
     // Check the dimensionality of max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
-        throw std::invalid_argument(
+        throw std::invalid_argument(fmt::format(
             "Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is {}, "
-            "but the number of specified timesteps is {}"_format(m_batch_size, max_delta_ts.size()));
+            "but the number of specified timesteps is {}",
+            m_batch_size, max_delta_ts.size()));
     }
 
     // Make sure no values in max_delta_ts are nan.
@@ -2376,9 +2371,10 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
 {
     // Check the dimensionality of delta_ts.
     if (delta_ts.size() != m_batch_size) {
-        throw std::invalid_argument("Invalid number of time intervals specified in a Taylor integrator in batch mode: "
-                                    "the batch size is {}, but the number of specified time intervals is {}"_format(
-                                        m_batch_size, delta_ts.size()));
+        throw std::invalid_argument(
+            fmt::format("Invalid number of time intervals specified in a Taylor integrator in batch mode: "
+                        "the batch size is {}, but the number of specified time intervals is {}",
+                        m_batch_size, delta_ts.size()));
     }
 
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
@@ -2433,9 +2429,10 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
 
     // Check max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
-        throw std::invalid_argument(
+        throw std::invalid_argument(fmt::format(
             "Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is {}, "
-            "but the number of specified timesteps is {}"_format(m_batch_size, max_delta_ts.size()));
+            "but the number of specified timesteps is {}",
+            m_batch_size, max_delta_ts.size()));
     }
     for (const auto &dt : max_delta_ts) {
         if (isnan(dt)) {
@@ -2709,8 +2706,9 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
     // Check the dimensionality of ts.
     if (ts.size() != m_batch_size) {
         throw std::invalid_argument(
-            "Invalid number of time limits specified in a Taylor integrator in batch mode: the "
-            "batch size is {}, but the number of specified time limits is {}"_format(m_batch_size, ts.size()));
+            fmt::format("Invalid number of time limits specified in a Taylor integrator in batch mode: the "
+                        "batch size is {}, but the number of specified time limits is {}",
+                        m_batch_size, ts.size()));
     }
 
     // NOTE: re-use m_pfor_ts as tmp storage.
@@ -2753,10 +2751,10 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
 
     // Check that the grid size is a multiple of m_batch_size.
     if (grid.size() % m_batch_size != 0u) {
-        throw std::invalid_argument(
+        throw std::invalid_argument(fmt::format(
             "Invalid grid size detected in propagate_grid() for an adaptive Taylor integrator in batch mode: "
-            "the grid has a size of {}, which is not a multiple of the batch size ({})"_format(grid.size(),
-                                                                                               m_batch_size));
+            "the grid has a size of {}, which is not a multiple of the batch size ({})",
+            grid.size(), m_batch_size));
     }
 
     // Check the current time coordinates.
@@ -2768,9 +2766,10 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
 
     // Check max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
-        throw std::invalid_argument(
+        throw std::invalid_argument(fmt::format(
             "Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is {}, "
-            "but the number of specified timesteps is {}"_format(m_batch_size, max_delta_ts.size()));
+            "but the number of specified timesteps is {}",
+            m_batch_size, max_delta_ts.size()));
     }
     for (const auto &dt : max_delta_ts) {
         if (isnan(dt)) {
@@ -3215,9 +3214,10 @@ const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(const std::
 {
     // Check the dimensionality of time.
     if (time.size() != m_batch_size) {
-        throw std::invalid_argument(
+        throw std::invalid_argument(fmt::format(
             "Invalid number of time coordinates specified for the dense output in a Taylor integrator in batch "
-            "mode: the batch size is {}, but the number of time coordinates is {}"_format(m_batch_size, time.size()));
+            "mode: the batch size is {}, but the number of time coordinates is {}",
+            m_batch_size, time.size()));
     }
 
     // NOTE: "time" needs to be translated
@@ -3283,8 +3283,8 @@ void taylor_adaptive_batch_impl<T>::reset_cooldowns(std::uint32_t i)
 
     if (i >= m_batch_size) {
         throw std::invalid_argument(
-            "Cannot reset the cooldowns at batch index {}: the batch size for this integrator is only {}"_format(
-                i, m_batch_size));
+            fmt::format("Cannot reset the cooldowns at batch index {}: the batch size for this integrator is only {}",
+                        i, m_batch_size));
     }
 
     for (auto &cd : m_ed_data->m_te_cooldowns[i]) {

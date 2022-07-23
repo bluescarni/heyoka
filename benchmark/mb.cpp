@@ -21,7 +21,6 @@
 #include <xtensor/xview.hpp>
 
 #include <fmt/format.h>
-#include <fmt/ostream.h>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
@@ -34,7 +33,6 @@
 int main(int argc, char *argv[])
 {
     namespace po = boost::program_options;
-    using namespace fmt::literals;
     using namespace heyoka;
     using std::sqrt;
     using t_ev_t = t_event<double>;
@@ -77,7 +75,8 @@ int main(int argc, char *argv[])
     std::vector<std::pair<expression, expression>> eqns;
 
     for (auto i = 0u; i < N; ++i) {
-        auto [xi, yi, vxi, vyi] = make_vars("x_{}"_format(i), "y_{}"_format(i), "vx_{}"_format(i), "vy_{}"_format(i));
+        auto [xi, yi, vxi, vyi] = make_vars(fmt::format("x_{}", i), fmt::format("y_{}", i), fmt::format("vx_{}", i),
+                                            fmt::format("vy_{}", i));
 
         eqns.push_back(prime(xi) = vxi);
         eqns.push_back(prime(yi) = vyi);
@@ -154,22 +153,22 @@ int main(int argc, char *argv[])
 
     // Collisions with the box walls.
     for (auto i = 0u; i < N; ++i) {
-        t_events.emplace_back(expression("y_{}"_format(i)) + (box_size / 2 - p_radius), kw::callback = cb_top_bottom{i},
-                              kw::direction = event_direction::negative);
-        t_events.emplace_back(expression("y_{}"_format(i)) - (box_size / 2 - p_radius), kw::callback = cb_top_bottom{i},
-                              kw::direction = event_direction::positive);
-        t_events.emplace_back(expression("x_{}"_format(i)) + (box_size / 2 - p_radius), kw::callback = cb_left_right{i},
-                              kw::direction = event_direction::negative);
-        t_events.emplace_back(expression("x_{}"_format(i)) - (box_size / 2 - p_radius), kw::callback = cb_left_right{i},
-                              kw::direction = event_direction::positive);
+        t_events.emplace_back(expression(fmt::format("y_{}", i)) + (box_size / 2 - p_radius),
+                              kw::callback = cb_top_bottom{i}, kw::direction = event_direction::negative);
+        t_events.emplace_back(expression(fmt::format("y_{}", i)) - (box_size / 2 - p_radius),
+                              kw::callback = cb_top_bottom{i}, kw::direction = event_direction::positive);
+        t_events.emplace_back(expression(fmt::format("x_{}", i)) + (box_size / 2 - p_radius),
+                              kw::callback = cb_left_right{i}, kw::direction = event_direction::negative);
+        t_events.emplace_back(expression(fmt::format("x_{}", i)) - (box_size / 2 - p_radius),
+                              kw::callback = cb_left_right{i}, kw::direction = event_direction::positive);
     }
 
     // Sphere-sphere collisions.
     for (auto i = 0u; i < N; ++i) {
-        auto [xi, yi] = make_vars("x_{}"_format(i), "y_{}"_format(i));
+        auto [xi, yi] = make_vars(fmt::format("x_{}", i), fmt::format("y_{}", i));
 
         for (auto j = i + 1u; j < N; ++j) {
-            auto [xj, yj] = make_vars("x_{}"_format(j), "y_{}"_format(j));
+            auto [xj, yj] = make_vars(fmt::format("x_{}", j), fmt::format("y_{}", j));
 
             t_events.emplace_back(square(xi - xj) + square(yi - yj) - 4 * p_radius * p_radius,
                                   kw::callback = cb_sph_sph{i, j}, kw::direction = event_direction::negative);

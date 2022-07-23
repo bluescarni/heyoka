@@ -362,13 +362,13 @@ TEST_CASE("nbody")
     for (auto i = 0; i < 6; ++i) {
         using namespace fmt::literals;
 
-        x_vars.emplace_back("x_{}"_format(i));
-        y_vars.emplace_back("y_{}"_format(i));
-        z_vars.emplace_back("z_{}"_format(i));
+        x_vars.emplace_back(fmt::format("x_{}", i));
+        y_vars.emplace_back(fmt::format("y_{}", i));
+        z_vars.emplace_back(fmt::format("z_{}", i));
 
-        vx_vars.emplace_back("vx_{}"_format(i));
-        vy_vars.emplace_back("vy_{}"_format(i));
-        vz_vars.emplace_back("vz_{}"_format(i));
+        vx_vars.emplace_back(fmt::format("vx_{}", i));
+        vy_vars.emplace_back(fmt::format("vy_{}", i));
+        vz_vars.emplace_back(fmt::format("vz_{}", i));
     }
 
     for (auto cm : {false, true}) {

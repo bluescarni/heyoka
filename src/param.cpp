@@ -63,9 +63,7 @@ std::size_t hash(const param &p)
 
 std::ostream &operator<<(std::ostream &os, const param &p)
 {
-    using namespace fmt::literals;
-
-    return os << "p{}"_format(p.idx());
+    return os << fmt::format("p{}", p.idx());
 }
 
 bool operator==(const param &p0, const param &p1)
@@ -81,11 +79,10 @@ bool operator!=(const param &p0, const param &p1)
 double eval_dbl(const param &p, const std::unordered_map<std::string, double> &, const std::vector<double> &pars)
 {
     if (p.idx() >= pars.size()) {
-        using namespace fmt::literals;
-
         throw std::out_of_range(
-            "Index error in the double numerical evaluation of a parameter: the parameter index is {}, "
-            "but the vector of parametric values has a size of only {}"_format(p.idx(), pars.size()));
+            fmt::format("Index error in the double numerical evaluation of a parameter: the parameter index is {}, "
+                        "but the vector of parametric values has a size of only {}",
+                        p.idx(), pars.size()));
     }
 
     return pars[static_cast<decltype(pars.size())>(p.idx())];
@@ -95,11 +92,10 @@ long double eval_ldbl(const param &p, const std::unordered_map<std::string, long
                       const std::vector<long double> &pars)
 {
     if (p.idx() >= pars.size()) {
-        using namespace fmt::literals;
-
-        throw std::out_of_range(
+        throw std::out_of_range(fmt::format(
             "Index error in the long double numerical evaluation of a parameter: the parameter index is {}, "
-            "but the vector of parametric values has a size of only {}"_format(p.idx(), pars.size()));
+            "but the vector of parametric values has a size of only {}",
+            p.idx(), pars.size()));
     }
 
     return pars[static_cast<decltype(pars.size())>(p.idx())];
@@ -110,11 +106,10 @@ mppp::real128 eval_f128(const param &p, const std::unordered_map<std::string, mp
                         const std::vector<mppp::real128> &pars)
 {
     if (p.idx() >= pars.size()) {
-        using namespace fmt::literals;
-
         throw std::out_of_range(
-            "Index error in the real 128 numerical evaluation of a parameter: the parameter index is {}, "
-            "but the vector of parametric values has a size of only {}"_format(p.idx(), pars.size()));
+            fmt::format("Index error in the real 128 numerical evaluation of a parameter: the parameter index is {}, "
+                        "but the vector of parametric values has a size of only {}",
+                        p.idx(), pars.size()));
     }
 
     return pars[static_cast<decltype(pars.size())>(p.idx())];
@@ -125,11 +120,10 @@ void eval_batch_dbl(std::vector<double> &out, const param &p,
                     const std::unordered_map<std::string, std::vector<double>> &, const std::vector<double> &pars)
 {
     if (p.idx() >= pars.size()) {
-        using namespace fmt::literals;
-
-        throw std::out_of_range(
+        throw std::out_of_range(fmt::format(
             "Index error in the batch double numerical evaluation of a parameter: the parameter index is {}, "
-            "but the vector of parametric values has a size of only {}"_format(p.idx(), pars.size()));
+            "but the vector of parametric values has a size of only {}",
+            p.idx(), pars.size()));
     }
 
     std::fill(out.begin(), out.end(), pars[static_cast<decltype(pars.size())>(p.idx())]);

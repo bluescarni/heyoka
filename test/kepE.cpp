@@ -54,18 +54,6 @@
 
 static std::mt19937 rng;
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 using namespace heyoka;
 using namespace heyoka_test;
 

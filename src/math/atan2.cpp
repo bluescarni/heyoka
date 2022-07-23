@@ -52,18 +52,6 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 namespace heyoka
 {
 
@@ -168,8 +156,8 @@ taylor_dc_t::size_type atan2_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     u_vars_defs.emplace_back(square(args()[0]), std::vector<std::uint32_t>{});
 
     // Append x*x + y*y.
-    u_vars_defs.emplace_back(expression{"u_{}"_format(u_vars_defs.size() - 2u)}
-                                 + expression{"u_{}"_format(u_vars_defs.size() - 1u)},
+    u_vars_defs.emplace_back(expression{fmt::format("u_{}", u_vars_defs.size() - 2u)}
+                                 + expression{fmt::format("u_{}", u_vars_defs.size() - 1u)},
                              std::vector<std::uint32_t>{});
 
     // Append the atan2 decomposition.
@@ -411,9 +399,11 @@ llvm::Value *taylor_diff_atan2(llvm_state &s, const atan2_impl &f, const std::ve
     assert(f.args().size() == 2u);
 
     if (deps.size() != 1u) {
-        throw std::invalid_argument("A hidden dependency vector of size 1 is expected in order to compute the Taylor "
-                                    "derivative of atan2(), but a vector of size {} was passed "
-                                    "instead"_format(deps.size()));
+        throw std::invalid_argument(
+            fmt::format("A hidden dependency vector of size 1 is expected in order to compute the Taylor "
+                        "derivative of atan2(), but a vector of size {} was passed "
+                        "instead",
+                        deps.size()));
     }
     // LCOV_EXCL_STOP
 

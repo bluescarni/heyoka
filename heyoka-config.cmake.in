@@ -1,17 +1,19 @@
-# Mandatory public dependency on Boost.
-find_package(Boost 1.60 REQUIRED serialization)
+# Remember several build options.
+set(heyoka_WITH_SLEEF @HEYOKA_WITH_SLEEF@)
+set(heyoka_WITH_MPPP @HEYOKA_WITH_MPPP@)
+set(heyoka_WITH_REAL128 @_HEYOKA_WITH_REAL128@)
 
-if(@HEYOKA_WITH_MPPP@)
+# Mandatory public dependencies on Boost and fmt.
+find_package(Boost 1.60 REQUIRED serialization)
+find_package(fmt REQUIRED CONFIG)
+
+# Optional public dependency on mp++.
+if(${heyoka_WITH_MPPP})
     find_package(mp++ REQUIRED CONFIG)
     if(${mp++_VERSION} VERSION_LESS @_HEYOKA_MIN_MPPP_VERSION@)
         message(FATAL_ERROR "mp++ >= @_HEYOKA_MIN_MPPP_VERSION@ is required.")
     endif()
 endif()
-
-# Signal that heyoka was built with
-# optional deps.
-set(heyoka_WITH_SLEEF @HEYOKA_WITH_SLEEF@)
-set(heyoka_WITH_MPPP @HEYOKA_WITH_MPPP@)
 
 # Record the LLVM major version against which
 # heyoka was built.

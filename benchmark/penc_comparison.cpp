@@ -28,7 +28,6 @@
 #include <boost/program_options.hpp>
 
 #include <fmt/format.h>
-#include <fmt/ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -37,6 +36,7 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/llvm_state.hpp>
 
 using namespace heyoka;
@@ -182,8 +182,9 @@ void run_benchmark(unsigned order)
     }
 
     std::cout << fmt::format("Runtime (interval vs CS): {}μs vs {}μs\n", tot_int_time / 1000., tot_cs_time / 1000.);
-    std::cout << fmt::format("Average width (interval vs CS): {} vs {}\n", tot_int_width / ntrials,
-                             tot_cs_width / ntrials);
+    std::cout << fmt::format("Average width (interval vs CS): {} vs {}\n",
+                             detail::fp_to_string(tot_int_width / ntrials),
+                             detail::fp_to_string(tot_cs_width / ntrials));
 }
 
 int main(int argc, char *argv[])

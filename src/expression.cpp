@@ -53,7 +53,6 @@
 #include <llvm/Support/Casting.h>
 
 #include <fmt/format.h>
-#include <fmt/ostream.h>
 #include <fmt/ranges.h>
 
 #if defined(HEYOKA_HAVE_REAL128)

@@ -90,7 +90,7 @@ double eval_dbl(const variable &var, const std::unordered_map<std::string, doubl
         return it->second;
     } else {
         throw std::invalid_argument(
-            "Cannot evaluate the variable '{}' because it is missing from the evaluation map"_format(var.name()));
+            fmt::format("Cannot evaluate the variable '{}' because it is missing from the evaluation map", var.name()));
     }
 }
 
@@ -102,7 +102,7 @@ long double eval_ldbl(const variable &var, const std::unordered_map<std::string,
         return it->second;
     } else {
         throw std::invalid_argument(
-            "Cannot evaluate the variable '{}' because it is missing from the evaluation map"_format(var.name()));
+            fmt::format("Cannot evaluate the variable '{}' because it is missing from the evaluation map", var.name()));
     }
 }
 
@@ -116,7 +116,7 @@ mppp::real128 eval_f128(const variable &var, const std::unordered_map<std::strin
         return it->second;
     } else {
         throw std::invalid_argument(
-            "Cannot evaluate the variable '{}' because it is missing from the evaluation map"_format(var.name()));
+            fmt::format("Cannot evaluate the variable '{}' because it is missing from the evaluation map", var.name()));
     }
 }
 

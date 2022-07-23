@@ -62,18 +62,6 @@
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 namespace heyoka
 {
 
@@ -193,18 +181,21 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
 {
     // Check the input values.
     if (pl_idx < 1u || pl_idx > 9u) {
-        throw std::invalid_argument("Invalid planet index passed to vsop2013_elliptic(): "
-                                    "the index must be in the [1, 9] range, but it is {} instead"_format(pl_idx));
+        throw std::invalid_argument(fmt::format("Invalid planet index passed to vsop2013_elliptic(): "
+                                                "the index must be in the [1, 9] range, but it is {} instead",
+                                                pl_idx));
     }
 
     if (var_idx < 1u || var_idx > 6u) {
-        throw std::invalid_argument("Invalid variable index passed to vsop2013_elliptic(): "
-                                    "the index must be in the [1, 6] range, but it is {} instead"_format(var_idx));
+        throw std::invalid_argument(fmt::format("Invalid variable index passed to vsop2013_elliptic(): "
+                                                "the index must be in the [1, 6] range, but it is {} instead",
+                                                var_idx));
     }
 
     if (!std::isfinite(thresh) || thresh < 0.) {
-        throw std::invalid_argument("Invalid threshold value passed to vsop2013_elliptic(): "
-                                    "the value must be finite and non-negative, but it is {} instead"_format(thresh));
+        throw std::invalid_argument(fmt::format("Invalid threshold value passed to vsop2013_elliptic(): "
+                                                "the value must be finite and non-negative, but it is {} instead",
+                                                thresh));
     }
 
     // The lambda_l values (constant + linear term).

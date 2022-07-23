@@ -45,18 +45,6 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 namespace heyoka
 {
 
@@ -79,15 +67,15 @@ tpoly_impl::tpoly_impl(expression b, expression e)
     m_e_idx = std::get<param>(args()[1].value()).idx();
 
     if (m_e_idx <= m_b_idx) {
-        throw std::invalid_argument(
-            "Cannot construct a time polynomial from param indices {} and {}: the first index is not less than the second"_format(
-                m_b_idx, m_e_idx));
+        throw std::invalid_argument(fmt::format("Cannot construct a time polynomial from param indices {} and {}: the "
+                                                "first index is not less than the second",
+                                                m_b_idx, m_e_idx));
     }
 }
 
 void tpoly_impl::to_stream(std::ostream &os) const
 {
-    os << "tpoly({}, {})"_format(m_b_idx, m_e_idx);
+    os << fmt::format("tpoly({}, {})", m_b_idx, m_e_idx);
 }
 
 namespace
@@ -197,7 +185,7 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
     // NOTE: we mangle on the poly degree as well, so that we will be
     // generating a different function for each polynomial degree.
     const auto na_pair = taylor_c_diff_func_name_args<T>(
-        context, "tpoly_{}"_format(n_const), n_uvars, batch_size,
+        context, fmt::format("tpoly_{}", n_const), n_uvars, batch_size,
         {std::get<param>(tp.args()[0].value()), std::get<param>(tp.args()[1].value())});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;

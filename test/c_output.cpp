@@ -35,18 +35,6 @@
 #include "catch.hpp"
 #include "test_utils.hpp"
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-// NOTE: MSVC has issues with the other "using"
-// statement form.
-using namespace fmt::literals;
-
-#else
-
-using fmt::literals::operator""_format;
-
-#endif
-
 using namespace heyoka;
 using namespace heyoka_test;
 
@@ -692,8 +680,10 @@ TEST_CASE("batch")
         // Try with an input vector to the call operator of the wrong size.
         REQUIRE_THROWS_MATCHES(
             co(std::vector<fp_t>{}), std::invalid_argument,
-            Message("An invalid time vector was passed to the call operator of continuous_output_batch: the "
-                    "vector size is 0, but a size of {} was expected instead"_format(batch_size)));
+            Message(
+                fmt::format("An invalid time vector was passed to the call operator of continuous_output_batch: the "
+                            "vector size is 0, but a size of {} was expected instead",
+                            batch_size)));
 
         // Try with c_output=false too.
         std::copy(ic.begin(), ic.end(), ta.get_state_data());
