@@ -437,11 +437,13 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
 
 } // namespace
 
+} // namespace detail
+
 template <typename T>
 template <typename U>
-void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, T time, T tol, bool high_accuracy,
-                                                 bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
-                                                 std::vector<nt_event_t> ntes, bool parallel_mode)
+void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, T time, T tol, bool high_accuracy,
+                                            bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
+                                            std::vector<nt_event_t> ntes, bool parallel_mode)
 {
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
@@ -453,7 +455,7 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
 
     // Assign the data members.
     m_state = std::move(state);
-    m_time = dfloat<T>(time);
+    m_time = detail::dfloat<T>(time);
     m_pars = std::move(pars);
     m_high_accuracy = high_accuracy;
     m_compact_mode = compact_mode;
@@ -474,13 +476,13 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
     if (!isfinite(m_time)) {
         throw std::invalid_argument(
             fmt::format("Cannot initialise an adaptive Taylor integrator with a non-finite initial time of {}",
-                        fp_to_string(static_cast<T>(m_time))));
+                        detail::fp_to_string(static_cast<T>(m_time))));
     }
 
     if (!isfinite(tol) || tol <= 0) {
         throw std::invalid_argument(fmt::format(
             "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead",
-            fp_to_string(tol)));
+            detail::fp_to_string(tol)));
     }
 
     if (parallel_mode && !compact_mode) {
@@ -499,7 +501,7 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
     // Temporarily disable optimisations in s, so that
     // we don't optimise twice when adding the step
     // and then the d_out.
-    std::optional<opt_disabler> od(m_llvm);
+    std::optional<detail::opt_disabler> od(m_llvm);
 
     // Add the stepper function.
     if (with_events) {
@@ -513,15 +515,15 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
             ee.push_back(ev.get_expression());
         }
 
-        std::tie(m_dc, m_order) = taylor_add_adaptive_step_with_events<T>(
+        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step_with_events<T>(
             m_llvm, "step_e", sys, tol, 1, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
     } else {
-        std::tie(m_dc, m_order)
-            = taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, 1, high_accuracy, compact_mode, parallel_mode);
+        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, 1, high_accuracy,
+                                                                      compact_mode, parallel_mode);
     }
 
     // Fix m_pars' size, if necessary.
-    const auto npars = n_pars_in_dc(m_dc);
+    const auto npars = detail::n_pars_in_dc(m_dc);
     if (m_pars.size() < npars) {
         m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
     } else if (m_pars.size() > npars) {
@@ -536,9 +538,9 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
 
     // Add the function for the computation of
     // the dense output.
-    taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, 1, high_accuracy);
+    detail::taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, 1, high_accuracy);
 
-    get_logger()->trace("Taylor dense output runtime: {}", sw);
+    detail::get_logger()->trace("Taylor dense output runtime: {}", sw);
     sw.reset();
 
     // Restore the original optimisation level in s.
@@ -547,13 +549,13 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
     // Run the optimisation pass manually.
     m_llvm.optimise();
 
-    get_logger()->trace("Taylor global opt pass runtime: {}", sw);
+    detail::get_logger()->trace("Taylor global opt pass runtime: {}", sw);
     sw.reset();
 
     // Run the jit.
     m_llvm.compile();
 
-    get_logger()->trace("Taylor LLVM compilation runtime: {}", sw);
+    detail::get_logger()->trace("Taylor LLVM compilation runtime: {}", sw);
 
     // Fetch the stepper.
     if (with_events) {
@@ -588,13 +590,12 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
 }
 
 template <typename T>
-taylor_adaptive_impl<T>::taylor_adaptive_impl()
-    : taylor_adaptive_impl({prime("x"_var) = 0_dbl}, {T(0)}, kw::tol = T(1e-1))
+taylor_adaptive<T>::taylor_adaptive() : taylor_adaptive({prime("x"_var) = 0_dbl}, {T(0)}, kw::tol = T(1e-1))
 {
 }
 
 template <typename T>
-taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
+taylor_adaptive<T>::taylor_adaptive(const taylor_adaptive &other)
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_order(other.m_order),
       m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode),
       m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
@@ -615,28 +616,28 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
 }
 
 template <typename T>
-taylor_adaptive_impl<T>::taylor_adaptive_impl(taylor_adaptive_impl &&) noexcept = default;
+taylor_adaptive<T>::taylor_adaptive(taylor_adaptive &&) noexcept = default;
 
 template <typename T>
-taylor_adaptive_impl<T> &taylor_adaptive_impl<T>::operator=(const taylor_adaptive_impl &other)
+taylor_adaptive<T> &taylor_adaptive<T>::operator=(const taylor_adaptive &other)
 {
     if (this != &other) {
-        *this = taylor_adaptive_impl(other);
+        *this = taylor_adaptive(other);
     }
 
     return *this;
 }
 
 template <typename T>
-taylor_adaptive_impl<T> &taylor_adaptive_impl<T>::operator=(taylor_adaptive_impl &&) noexcept = default;
+taylor_adaptive<T> &taylor_adaptive<T>::operator=(taylor_adaptive &&) noexcept = default;
 
 template <typename T>
-taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
+taylor_adaptive<T>::~taylor_adaptive() = default;
 
 // NOTE: the save/load patterns mimic the copy constructor logic.
 template <typename T>
 template <typename Archive>
-void taylor_adaptive_impl<T>::save_impl(Archive &ar, unsigned) const
+void taylor_adaptive<T>::save_impl(Archive &ar, unsigned) const
 {
     ar << m_state;
     ar << m_time;
@@ -656,10 +657,10 @@ void taylor_adaptive_impl<T>::save_impl(Archive &ar, unsigned) const
 
 template <typename T>
 template <typename Archive>
-void taylor_adaptive_impl<T>::load_impl(Archive &ar, unsigned version)
+void taylor_adaptive<T>::load_impl(Archive &ar, unsigned version)
 {
     // LCOV_EXCL_START
-    if (version < static_cast<unsigned>(boost::serialization::version<taylor_adaptive_impl<T>>::type::value)) {
+    if (version < static_cast<unsigned>(boost::serialization::version<taylor_adaptive<T>>::type::value)) {
         throw std::invalid_argument(fmt::format("Unable to load a taylor_adaptive integrator: "
                                                 "the archive version ({}) is too old",
                                                 version));
@@ -691,13 +692,13 @@ void taylor_adaptive_impl<T>::load_impl(Archive &ar, unsigned version)
 }
 
 template <typename T>
-void taylor_adaptive_impl<T>::save(boost::archive::binary_oarchive &ar, unsigned v) const
+void taylor_adaptive<T>::save(boost::archive::binary_oarchive &ar, unsigned v) const
 {
     save_impl(ar, v);
 }
 
 template <typename T>
-void taylor_adaptive_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
+void taylor_adaptive<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
 {
     load_impl(ar, v);
 }
@@ -731,7 +732,7 @@ void taylor_adaptive_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned
 //   and the Taylor coefficients being recorded in the internal array
 //   (if wtc == true). That is, h == 0 is not treated in any special way.
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, bool wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool wtc)
 {
     using std::abs;
     using std::isfinite;
@@ -912,7 +913,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
                 // NOTE: if g_eps is not finite, we skipped event detection
                 // altogether and thus we never end up here. If the derivative
                 // of the event equation is not finite, the event is also skipped.
-                edd.m_te_cooldowns[te_idx].emplace(0, taylor_deduce_cooldown(g_eps, std::get<4>(edd.m_d_tes[0])));
+                edd.m_te_cooldowns[te_idx].emplace(0,
+                                                   detail::taylor_deduce_cooldown(g_eps, std::get<4>(edd.m_d_tes[0])));
             }
 
             // Invoke the callback of the first terminal event, if it has one.
@@ -939,7 +941,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 }
 
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(bool wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(bool wtc)
 {
     // NOTE: time limit +inf means integration forward in time
     // and no time limit.
@@ -947,13 +949,13 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(bool wtc)
 }
 
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_backward(bool wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_backward(bool wtc)
 {
     return step_impl(-std::numeric_limits<T>::infinity(), wtc);
 }
 
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(T max_delta_t, bool wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(T max_delta_t, bool wtc)
 {
     using std::isnan;
 
@@ -967,7 +969,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(T max_delta_t, bool 
 
 // Reset all cooldowns for the terminal events.
 template <typename T>
-void taylor_adaptive_impl<T>::reset_cooldowns()
+void taylor_adaptive<T>::reset_cooldowns()
 {
     if (!m_ed_data) {
         throw std::invalid_argument("No events were defined for this integrator");
@@ -991,9 +993,8 @@ void taylor_adaptive_impl<T>::reset_cooldowns()
 // unless a non-finite state was detected.
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t max_steps, T max_delta_t,
-                                              const std::function<bool(taylor_adaptive_impl &)> &cb, bool wtc,
-                                              bool with_c_out)
+taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t max_steps, T max_delta_t,
+                                         const std::function<bool(taylor_adaptive &)> &cb, bool wtc, bool with_c_out)
 {
     using std::abs;
     using std::isfinite;
@@ -1091,14 +1092,14 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
     auto update_c_out = [&]() {
         if (with_c_out) {
 #if !defined(NDEBUG)
-            const dfloat<T> prev_time(c_out_times_hi.back(), c_out_times_lo.back());
+            const detail::dfloat<T> prev_time(c_out_times_hi.back(), c_out_times_lo.back());
 #endif
 
             c_out_times_hi.push_back(m_time.hi);
             c_out_times_lo.push_back(m_time.lo);
 
 #if !defined(NDEBUG)
-            const dfloat<T> new_time(c_out_times_hi.back(), c_out_times_lo.back());
+            const detail::dfloat<T> new_time(c_out_times_hi.back(), c_out_times_lo.back());
             assert(isfinite(new_time));
             if (t_dir) {
                 assert(!(new_time < prev_time));
@@ -1118,8 +1119,8 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         // If some non-finite state/time is generated in
         // the step function, the integration will be stopped.
         assert((rem_time >= T(0)) == t_dir); // LCOV_EXCL_LINE
-        const auto dt_limit
-            = t_dir ? std::min(dfloat<T>(max_delta_t), rem_time) : std::max(dfloat<T>(-max_delta_t), rem_time);
+        const auto dt_limit = t_dir ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
+                                    : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
         const auto [oc, h] = step_impl(static_cast<T>(dt_limit), wtc);
 
@@ -1198,8 +1199,8 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
 // a non-finite state was detected.
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
-taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps, T max_delta_t,
-                                             const std::function<bool(taylor_adaptive_impl &)> &cb)
+taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps, T max_delta_t,
+                                        const std::function<bool(taylor_adaptive &)> &cb)
 {
     using std::abs;
     using std::isfinite;
@@ -1340,7 +1341,7 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
             // if we are at the last timestep. We do this in order to avoid
             // numerical issues when deciding if the last grid point
             // falls within the range of the last step.
-            if ((cur_tt >= t0 && cur_tt <= t1) || (rem_time == dfloat<T>(T(0)))) {
+            if ((cur_tt >= t0 && cur_tt <= t1) || (rem_time == detail::dfloat<T>(T(0)))) {
                 // The current time target falls within the range of
                 // the last step. Compute the dense output in cur_tt.
                 update_d_output(cur_tt);
@@ -1374,8 +1375,8 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
         // If some non-finite state/time is generated in
         // the step function, the integration will be stopped.
         assert((rem_time >= T(0)) == t_dir); // LCOV_EXCL_LINE
-        const auto dt_limit
-            = t_dir ? std::min(dfloat<T>(max_delta_t), rem_time) : std::max(dfloat<T>(-max_delta_t), rem_time);
+        const auto dt_limit = t_dir ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
+                                    : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
         const auto [oc, h] = step_impl(static_cast<T>(dt_limit), true);
 
         if (oc == taylor_outcome::err_nf_state) {
@@ -1421,7 +1422,7 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
         // will also force the processing of all remaining grid points.
         if (h == static_cast<T>(rem_time)) {
             assert(oc == taylor_outcome::time_limit); // LCOV_EXCL_LINE
-            rem_time = dfloat<T>(T(0));
+            rem_time = detail::dfloat<T>(T(0));
         } else {
             // NOTE: this should never flip the time direction of the
             // integration for the same reasons as explained in the
@@ -1438,43 +1439,43 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
 }
 
 template <typename T>
-const llvm_state &taylor_adaptive_impl<T>::get_llvm_state() const
+const llvm_state &taylor_adaptive<T>::get_llvm_state() const
 {
     return m_llvm;
 }
 
 template <typename T>
-const taylor_dc_t &taylor_adaptive_impl<T>::get_decomposition() const
+const taylor_dc_t &taylor_adaptive<T>::get_decomposition() const
 {
     return m_dc;
 }
 
 template <typename T>
-std::uint32_t taylor_adaptive_impl<T>::get_order() const
+std::uint32_t taylor_adaptive<T>::get_order() const
 {
     return m_order;
 }
 
 template <typename T>
-T taylor_adaptive_impl<T>::get_tol() const
+T taylor_adaptive<T>::get_tol() const
 {
     return m_tol;
 }
 
 template <typename T>
-bool taylor_adaptive_impl<T>::get_high_accuracy() const
+bool taylor_adaptive<T>::get_high_accuracy() const
 {
     return m_high_accuracy;
 }
 
 template <typename T>
-bool taylor_adaptive_impl<T>::get_compact_mode() const
+bool taylor_adaptive<T>::get_compact_mode() const
 {
     return m_compact_mode;
 }
 
 template <typename T>
-std::uint32_t taylor_adaptive_impl<T>::get_dim() const
+std::uint32_t taylor_adaptive<T>::get_dim() const
 {
     return m_dim;
 }
@@ -1493,30 +1494,30 @@ void dtime_checks(T hi, T lo)
     if (!isfinite(hi) || !isfinite(lo)) {
         throw std::invalid_argument(fmt::format("The components of the double-length representation of the time "
                                                 "coordinate must both be finite, but they are {} and {} instead",
-                                                fp_to_string(hi), fp_to_string(lo)));
+                                                detail::fp_to_string(hi), detail::fp_to_string(lo)));
     }
 
     if (abs(hi) < abs(lo)) {
         throw std::invalid_argument(
             fmt::format("The first component of the double-length representation of the time "
                         "coordinate ({}) must not be smaller in magnitude than the second component ({})",
-                        fp_to_string(hi), fp_to_string(lo)));
+                        detail::fp_to_string(hi), detail::fp_to_string(lo)));
     }
 }
 
 } // namespace
 
 template <typename T>
-void taylor_adaptive_impl<T>::set_dtime(T hi, T lo)
+void taylor_adaptive<T>::set_dtime(T hi, T lo)
 {
     // Check the components.
     dtime_checks(hi, lo);
 
-    m_time = normalise(dfloat<T>(hi, lo));
+    m_time = normalise(detail::dfloat<T>(hi, lo));
 }
 
 template <typename T>
-const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time, bool rel_time)
+const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
 {
     // NOTE: "time" needs to be translated
     // because m_d_out_f expects a time coordinate
@@ -1540,56 +1541,51 @@ const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time, bool rel_
 // Explicit instantiation of the implementation classes/functions.
 // NOTE: on Windows apparently it is necessary to declare that
 // these instantiations are meant to be dll-exported.
-template class taylor_adaptive_impl<double>;
+template class taylor_adaptive<double>;
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<double>::finalise_ctor_impl(const std::vector<expression> &,
-                                                                                 std::vector<double>, double, double,
-                                                                                 bool, bool, std::vector<double>,
-                                                                                 std::vector<t_event_t>,
-                                                                                 std::vector<nt_event_t>, bool);
+template HEYOKA_DLL_PUBLIC void taylor_adaptive<double>::finalise_ctor_impl(const std::vector<expression> &,
+                                                                            std::vector<double>, double, double, bool,
+                                                                            bool, std::vector<double>,
+                                                                            std::vector<t_event_t>,
+                                                                            std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_impl<double>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &,
-                                                 std::vector<double>, double, double, bool, bool, std::vector<double>,
+taylor_adaptive<double>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &, std::vector<double>,
+                                            double, double, bool, bool, std::vector<double>, std::vector<t_event_t>,
+                                            std::vector<nt_event_t>, bool);
+
+template class taylor_adaptive<long double>;
+
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive<long double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<long double>, long double,
+                                                 long double, bool, bool, std::vector<long double>,
                                                  std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
-template class taylor_adaptive_impl<long double>;
-
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_impl<long double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<long double>,
-                                                      long double, long double, bool, bool, std::vector<long double>,
-                                                      std::vector<t_event_t>, std::vector<nt_event_t>, bool);
-
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<long double>::finalise_ctor_impl(
+template HEYOKA_DLL_PUBLIC void taylor_adaptive<long double>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<long double>, long double, long double, bool,
     bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template class taylor_adaptive_impl<mppp::real128>;
+template class taylor_adaptive<mppp::real128>;
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
-    const std::vector<expression> &, std::vector<mppp::real128>, mppp::real128, mppp::real128, bool, bool,
-    std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive<mppp::real128>::finalise_ctor_impl(const std::vector<expression> &, std::vector<mppp::real128>,
+                                                   mppp::real128, mppp::real128, bool, bool, std::vector<mppp::real128>,
+                                                   std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
+template HEYOKA_DLL_PUBLIC void taylor_adaptive<mppp::real128>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, mppp::real128, mppp::real128,
     bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 #endif
 
-} // namespace detail
-
-namespace detail
-{
-
 template <typename T>
 template <typename U>
-void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, std::uint32_t batch_size,
-                                                       std::vector<T> time, T tol, bool high_accuracy,
-                                                       bool compact_mode, std::vector<T> pars,
-                                                       std::vector<t_event_t> tes, std::vector<nt_event_t> ntes,
-                                                       bool parallel_mode)
+void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, std::uint32_t batch_size,
+                                                  std::vector<T> time, T tol, bool high_accuracy, bool compact_mode,
+                                                  std::vector<T> pars, std::vector<t_event_t> tes,
+                                                  std::vector<nt_event_t> ntes, bool parallel_mode)
 {
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
@@ -1649,7 +1645,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
     if (!isfinite(tol) || tol <= 0) {
         throw std::invalid_argument(fmt::format(
             "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead",
-            fp_to_string(tol)));
+            detail::fp_to_string(tol)));
     }
 
     if (parallel_mode && !compact_mode) {
@@ -1668,7 +1664,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
     // Temporarily disable optimisations in s, so that
     // we don't optimise twice when adding the step
     // and then the d_out.
-    std::optional<opt_disabler> od(m_llvm);
+    std::optional<detail::opt_disabler> od(m_llvm);
 
     // Add the stepper function.
     if (with_events) {
@@ -1682,15 +1678,15 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
             ee.push_back(ev.get_expression());
         }
 
-        std::tie(m_dc, m_order) = taylor_add_adaptive_step_with_events<T>(
+        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step_with_events<T>(
             m_llvm, "step_e", sys, tol, batch_size, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
     } else {
-        std::tie(m_dc, m_order) = taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, batch_size, high_accuracy,
-                                                              compact_mode, parallel_mode);
+        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, batch_size,
+                                                                      high_accuracy, compact_mode, parallel_mode);
     }
 
     // Fix m_pars' size, if necessary.
-    const auto npars = n_pars_in_dc(m_dc);
+    const auto npars = detail::n_pars_in_dc(m_dc);
     // LCOV_EXCL_START
     if (npars > std::numeric_limits<std::uint32_t>::max() / m_batch_size) {
         throw std::overflow_error("Overflow detected when computing the size of the parameter array in an adaptive "
@@ -1713,9 +1709,9 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
 
     // Add the function for the computation of
     // the dense output.
-    taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, m_batch_size, high_accuracy);
+    detail::taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, m_batch_size, high_accuracy);
 
-    get_logger()->trace("Taylor batch dense output runtime: {}", sw);
+    detail::get_logger()->trace("Taylor batch dense output runtime: {}", sw);
     sw.reset();
 
     // Restore the original optimisation level in s.
@@ -1724,13 +1720,13 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
     // Run the optimisation pass manually.
     m_llvm.optimise();
 
-    get_logger()->trace("Taylor batch global opt pass runtime: {}", sw);
+    detail::get_logger()->trace("Taylor batch global opt pass runtime: {}", sw);
     sw.reset();
 
     // Run the jit.
     m_llvm.compile();
 
-    get_logger()->trace("Taylor batch LLVM compilation runtime: {}", sw);
+    detail::get_logger()->trace("Taylor batch LLVM compilation runtime: {}", sw);
 
     // Fetch the stepper.
     if (with_events) {
@@ -1801,13 +1797,13 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
 }
 
 template <typename T>
-taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl()
-    : taylor_adaptive_batch_impl({prime("x"_var) = 0_dbl}, {T(0)}, 1u, kw::tol = T(1e-1))
+taylor_adaptive_batch<T>::taylor_adaptive_batch()
+    : taylor_adaptive_batch({prime("x"_var) = 0_dbl}, {T(0)}, 1u, kw::tol = T(1e-1))
 {
 }
 
 template <typename T>
-taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &other)
+taylor_adaptive_batch<T>::taylor_adaptive_batch(const taylor_adaptive_batch &other)
     // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time_hi(other.m_time_hi), m_time_lo(other.m_time_lo),
       m_llvm(other.m_llvm), m_dim(other.m_dim), m_order(other.m_order), m_tol(other.m_tol),
@@ -1834,29 +1830,28 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_
 }
 
 template <typename T>
-taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(taylor_adaptive_batch_impl &&) noexcept = default;
+taylor_adaptive_batch<T>::taylor_adaptive_batch(taylor_adaptive_batch &&) noexcept = default;
 
 template <typename T>
-taylor_adaptive_batch_impl<T> &taylor_adaptive_batch_impl<T>::operator=(const taylor_adaptive_batch_impl &other)
+taylor_adaptive_batch<T> &taylor_adaptive_batch<T>::operator=(const taylor_adaptive_batch &other)
 {
     if (this != &other) {
-        *this = taylor_adaptive_batch_impl(other);
+        *this = taylor_adaptive_batch(other);
     }
 
     return *this;
 }
 
 template <typename T>
-taylor_adaptive_batch_impl<T> &
-taylor_adaptive_batch_impl<T>::operator=(taylor_adaptive_batch_impl &&) noexcept = default;
+taylor_adaptive_batch<T> &taylor_adaptive_batch<T>::operator=(taylor_adaptive_batch &&) noexcept = default;
 
 template <typename T>
-taylor_adaptive_batch_impl<T>::~taylor_adaptive_batch_impl() = default;
+taylor_adaptive_batch<T>::~taylor_adaptive_batch() = default;
 
 // NOTE: the save/load patterns mimic the copy constructor logic.
 template <typename T>
 template <typename Archive>
-void taylor_adaptive_batch_impl<T>::save_impl(Archive &ar, unsigned) const
+void taylor_adaptive_batch<T>::save_impl(Archive &ar, unsigned) const
 {
     // NOTE: save all members, apart from the function pointers.
     ar << m_batch_size;
@@ -1892,10 +1887,10 @@ void taylor_adaptive_batch_impl<T>::save_impl(Archive &ar, unsigned) const
 
 template <typename T>
 template <typename Archive>
-void taylor_adaptive_batch_impl<T>::load_impl(Archive &ar, unsigned version)
+void taylor_adaptive_batch<T>::load_impl(Archive &ar, unsigned version)
 {
     // LCOV_EXCL_START
-    if (version < static_cast<unsigned>(boost::serialization::version<taylor_adaptive_batch_impl<T>>::type::value)) {
+    if (version < static_cast<unsigned>(boost::serialization::version<taylor_adaptive_batch<T>>::type::value)) {
         throw std::invalid_argument(fmt::format("Unable to load a taylor_adaptive_batch integrator: "
                                                 "the archive version ({}) is too old",
                                                 version));
@@ -1942,19 +1937,19 @@ void taylor_adaptive_batch_impl<T>::load_impl(Archive &ar, unsigned version)
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::save(boost::archive::binary_oarchive &ar, unsigned v) const
+void taylor_adaptive_batch<T>::save(boost::archive::binary_oarchive &ar, unsigned v) const
 {
     save_impl(ar, v);
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
+void taylor_adaptive_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
 {
     load_impl(ar, v);
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::set_time(const std::vector<T> &new_time)
+void taylor_adaptive_batch<T>::set_time(const std::vector<T> &new_time)
 {
     // Check the dimensionality of new_time.
     if (new_time.size() != m_batch_size) {
@@ -1975,7 +1970,7 @@ void taylor_adaptive_batch_impl<T>::set_time(const std::vector<T> &new_time)
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::set_time(T new_time)
+void taylor_adaptive_batch<T>::set_time(T new_time)
 {
     // Set the hi part.
     std::fill(m_time_hi.begin(), m_time_hi.end(), new_time);
@@ -1984,7 +1979,7 @@ void taylor_adaptive_batch_impl<T>::set_time(T new_time)
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::set_dtime(const std::vector<T> &hi, const std::vector<T> &lo)
+void taylor_adaptive_batch<T>::set_dtime(const std::vector<T> &hi, const std::vector<T> &lo)
 {
     // Check the dimensionalities.
     if (hi.size() != m_batch_size || lo.size() != m_batch_size) {
@@ -2003,7 +1998,7 @@ void taylor_adaptive_batch_impl<T>::set_dtime(const std::vector<T> &hi, const st
     // Copy over the new times, ensuring proper
     // normalisation.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        const auto tmp = normalise(dfloat<T>(hi[i], lo[i]));
+        const auto tmp = normalise(detail::dfloat<T>(hi[i], lo[i]));
 
         m_time_hi[i] = tmp.hi;
         m_time_lo[i] = tmp.lo;
@@ -2011,14 +2006,14 @@ void taylor_adaptive_batch_impl<T>::set_dtime(const std::vector<T> &hi, const st
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::set_dtime(T hi, T lo)
+void taylor_adaptive_batch<T>::set_dtime(T hi, T lo)
 {
     // Check the components.
     dtime_checks(hi, lo);
 
     // Copy over the new time, ensuring proper
     // normalisation.
-    const auto tmp = normalise(dfloat<T>(hi, lo));
+    const auto tmp = normalise(detail::dfloat<T>(hi, lo));
     std::fill(m_time_hi.begin(), m_time_hi.end(), tmp.hi);
     std::fill(m_time_lo.begin(), m_time_lo.end(), tmp.lo);
 }
@@ -2047,7 +2042,7 @@ void taylor_adaptive_batch_impl<T>::set_dtime(T hi, T lo)
 // - the docs for the scalar step function are applicable to
 //   the batch version too.
 template <typename T>
-void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
+void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
 {
     using std::abs;
     using std::isfinite;
@@ -2092,7 +2087,7 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
             const auto h = m_delta_ts[i];
 
             // Compute the new time in double-length arithmetic.
-            const auto new_time = dfloat<T>(m_time_hi[i], m_time_lo[i]) + h;
+            const auto new_time = detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) + h;
             m_time_hi[i] = new_time.hi;
             m_time_lo[i] = new_time.lo;
 
@@ -2198,7 +2193,7 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
             const auto h = m_delta_ts[i];
 
             // Compute the new time in double-length arithmetic.
-            const auto new_time = dfloat<T>(m_time_hi[i], m_time_lo[i]) + h;
+            const auto new_time = detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) + h;
             m_time_hi[i] = new_time.hi;
             m_time_lo[i] = new_time.lo;
 
@@ -2283,7 +2278,7 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
                     // altogether and thus we never end up here. If the derivative
                     // of the event equation is not finite, the event is also skipped.
                     edd.m_te_cooldowns[i][te_idx].emplace(
-                        0, taylor_deduce_cooldown(edd.m_g_eps[i], std::get<4>(edd.m_d_tes[i][0])));
+                        0, detail::taylor_deduce_cooldown(edd.m_g_eps[i], std::get<4>(edd.m_d_tes[i][0])));
                 }
 
                 // Invoke the callback of the first terminal event, if it has one.
@@ -2329,19 +2324,19 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::step(bool wtc)
+void taylor_adaptive_batch<T>::step(bool wtc)
 {
     step_impl(m_pinf, wtc);
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::step_backward(bool wtc)
+void taylor_adaptive_batch<T>::step_backward(bool wtc)
 {
     step_impl(m_minf, wtc);
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, bool wtc)
+void taylor_adaptive_batch<T>::step(const std::vector<T> &max_delta_ts, bool wtc)
 {
     // Check the dimensionality of max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
@@ -2365,9 +2360,9 @@ void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, boo
 }
 
 template <typename T>
-std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propagate_for_impl(
+std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_for_impl(
     const std::vector<T> &delta_ts, std::size_t max_steps, const std::vector<T> &max_delta_ts,
-    const std::function<bool(taylor_adaptive_batch_impl &)> &cb, bool wtc, bool with_c_out)
+    const std::function<bool(taylor_adaptive_batch &)> &cb, bool wtc, bool with_c_out)
 {
     // Check the dimensionality of delta_ts.
     if (delta_ts.size() != m_batch_size) {
@@ -2378,7 +2373,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
     }
 
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        m_pfor_ts[i] = dfloat<T>(m_time_hi[i], m_time_lo[i]) + delta_ts[i];
+        m_pfor_ts[i] = detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) + delta_ts[i];
     }
 
     // NOTE: max_delta_ts is checked in propagate_until_impl().
@@ -2401,9 +2396,9 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
 // The continuous output is always updated at the end of each timestep,
 // unless a non-finite state was detected in any batch element.
 template <typename T>
-std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propagate_until_impl(
-    const std::vector<dfloat<T>> &ts, std::size_t max_steps, const std::vector<T> &max_delta_ts,
-    const std::function<bool(taylor_adaptive_batch_impl &)> &cb, bool wtc, bool with_c_out)
+std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_until_impl(
+    const std::vector<detail::dfloat<T>> &ts, std::size_t max_steps, const std::vector<T> &max_delta_ts,
+    const std::function<bool(taylor_adaptive_batch &)> &cb, bool wtc, bool with_c_out)
 {
     using std::abs;
     using std::isfinite;
@@ -2468,7 +2463,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
     // Compute the integration directions and init
     // the remaining times.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        m_rem_time[i] = ts[i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
+        m_rem_time[i] = ts[i] - detail::dfloat<T>(m_time_hi[i], m_time_lo[i]);
         if (!isfinite(m_rem_time[i])) {
             throw std::invalid_argument("The final time passed to the propagate_until() function of an adaptive Taylor "
                                         "integrator in batch mode results in an overflow condition");
@@ -2525,7 +2520,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
     auto update_c_out = [&]() {
         if (with_c_out) {
 #if !defined(NDEBUG)
-            std::vector<dfloat<T>> prev_times;
+            std::vector<detail::dfloat<T>> prev_times;
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
                 prev_times.emplace_back(c_out_times_hi[c_out_times_hi.size() - m_batch_size + i],
                                         c_out_times_lo[c_out_times_lo.size() - m_batch_size + i]);
@@ -2537,8 +2532,8 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
 
 #if !defined(NDEBUG)
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                const dfloat<T> new_time(c_out_times_hi[c_out_times_hi.size() - m_batch_size + i],
-                                         c_out_times_lo[c_out_times_lo.size() - m_batch_size + i]);
+                const detail::dfloat<T> new_time(c_out_times_hi[c_out_times_hi.size() - m_batch_size + i],
+                                                 c_out_times_lo[c_out_times_lo.size() - m_batch_size + i]);
                 assert(isfinite(new_time));
                 if (m_t_dir[i]) {
                     assert(!(new_time < prev_times[i]));
@@ -2562,8 +2557,8 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
             assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0)); // LCOV_EXCL_LINE
 
             // Compute the time limit.
-            const auto dt_limit = m_t_dir[i] ? std::min(dfloat<T>(max_delta_ts[i]), m_rem_time[i])
-                                             : std::max(dfloat<T>(-max_delta_ts[i]), m_rem_time[i]);
+            const auto dt_limit = m_t_dir[i] ? std::min(detail::dfloat<T>(max_delta_ts[i]), m_rem_time[i])
+                                             : std::max(detail::dfloat<T>(-max_delta_ts[i]), m_rem_time[i]);
 
             // Store it.
             m_cur_max_delta_ts[i] = static_cast<T>(dt_limit);
@@ -2628,13 +2623,13 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
                     // NOTE: if m_rem_time[i] was previously set to zero, it
                     // will end up being repeatedly set to zero here. This
                     // should be harmless.
-                    m_rem_time[i] = dfloat<T>(T(0));
+                    m_rem_time[i] = detail::dfloat<T>(T(0));
                 } else {
                     // NOTE: this should never flip the time direction of the
                     // integration for the same reasons as explained in the
                     // scalar implementation.
                     assert(abs(h) < abs(static_cast<T>(m_rem_time[i]))); // LCOV_EXCL_LINE
-                    m_rem_time[i] = ts[i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
+                    m_rem_time[i] = ts[i] - detail::dfloat<T>(m_time_hi[i], m_time_lo[i]);
                 }
             }
 
@@ -2699,9 +2694,9 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
 }
 
 template <typename T>
-std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propagate_until_impl(
+std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_until_impl(
     const std::vector<T> &ts, std::size_t max_steps, const std::vector<T> &max_delta_ts,
-    const std::function<bool(taylor_adaptive_batch_impl &)> &cb, bool wtc, bool with_c_out)
+    const std::function<bool(taylor_adaptive_batch &)> &cb, bool wtc, bool with_c_out)
 {
     // Check the dimensionality of ts.
     if (ts.size() != m_batch_size) {
@@ -2714,7 +2709,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
     // NOTE: re-use m_pfor_ts as tmp storage.
     assert(m_pfor_ts.size() == m_batch_size); // LCOV_EXCL_LINE
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        m_pfor_ts[i] = dfloat<T>(ts[i]);
+        m_pfor_ts[i] = detail::dfloat<T>(ts[i]);
     }
 
     // NOTE: max_delta_ts is checked in the other propagate_until_impl() overload.
@@ -2730,10 +2725,9 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
 // The callback is always executed at the end of each timestep, unless
 // a non-finite state was detected.
 template <typename T>
-std::vector<T>
-taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
-                                                   const std::vector<T> &max_delta_ts,
-                                                   const std::function<bool(taylor_adaptive_batch_impl &)> &cb)
+std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
+                                                             const std::vector<T> &max_delta_ts,
+                                                             const std::function<bool(taylor_adaptive_batch &)> &cb)
 {
     using std::abs;
     using std::isnan;
@@ -2884,7 +2878,8 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
 
     // Init the remaining times and directions.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        m_rem_time[i] = grid_ptr[(n_grid_points - 1u) * m_batch_size + i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
+        m_rem_time[i]
+            = grid_ptr[(n_grid_points - 1u) * m_batch_size + i] - detail::dfloat<T>(m_time_hi[i], m_time_lo[i]);
 
         // Check it.
         if (!isfinite(m_rem_time[i])) {
@@ -2915,7 +2910,9 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
         boost::numeric_cast<typename std::vector<decltype(grid.size())>::size_type>(m_batch_size), 1);
 
     // Vectors to keep track of the time range of the last taken timestep.
-    std::vector<dfloat<T>> t0(boost::numeric_cast<typename std::vector<dfloat<T>>::size_type>(m_batch_size)), t1(t0);
+    std::vector<detail::dfloat<T>> t0(
+        boost::numeric_cast<typename std::vector<detail::dfloat<T>>::size_type>(m_batch_size)),
+        t1(t0);
 
     // Vector of flags to keep track of the batch elements
     // we can compute dense output for.
@@ -2933,7 +2930,7 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
         // taken timestep.
         // NOTE: t0 < t1.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            const dfloat<T> cur_time(m_time_hi[i], m_time_lo[i]), cmp = cur_time - m_last_h[i];
+            const detail::dfloat<T> cur_time(m_time_hi[i], m_time_lo[i]), cmp = cur_time - m_last_h[i];
 
             t0[i] = std::min(cur_time, cmp);
             t1[i] = std::max(cur_time, cmp);
@@ -2965,8 +2962,8 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
                     // he last grid point falls within the range of validity
                     // of the dense output.
                     const auto idx = gidx * m_batch_size + i;
-                    const auto d_avail
-                        = (grid_ptr[idx] >= t0[i] && grid_ptr[idx] <= t1[i]) || (m_rem_time[i] == dfloat<T>(T(0)));
+                    const auto d_avail = (grid_ptr[idx] >= t0[i] && grid_ptr[idx] <= t1[i])
+                                         || (m_rem_time[i] == detail::dfloat<T>(T(0)));
                     dflags[i] = d_avail;
                     counter += d_avail;
 
@@ -3053,8 +3050,8 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
 
             // Compute the step limit for the current batch element.
             assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0)); // LCOV_EXCL_LINE
-            const auto dt_limit = m_t_dir[i] ? std::min(dfloat<T>(max_delta_t), m_rem_time[i])
-                                             : std::max(dfloat<T>(-max_delta_t), m_rem_time[i]);
+            const auto dt_limit = m_t_dir[i] ? std::min(detail::dfloat<T>(max_delta_t), m_rem_time[i])
+                                             : std::max(detail::dfloat<T>(-max_delta_t), m_rem_time[i]);
 
             pgrid_tmp[i] = static_cast<T>(dt_limit);
         }
@@ -3109,14 +3106,14 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
                 // could also result in time_limit.
                 if (h == static_cast<T>(m_rem_time[i])) {
                     assert(oc == taylor_outcome::time_limit); // LCOV_EXCL_LINE
-                    m_rem_time[i] = dfloat<T>(T(0));
+                    m_rem_time[i] = detail::dfloat<T>(T(0));
                 } else {
                     // NOTE: this should never flip the time direction of the
                     // integration for the same reasons as explained in the
                     // scalar implementation of propagate_until().
                     assert(abs(h) < abs(static_cast<T>(m_rem_time[i]))); // LCOV_EXCL_LINE
-                    m_rem_time[i]
-                        = grid_ptr[(n_grid_points - 1u) * m_batch_size + i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
+                    m_rem_time[i] = grid_ptr[(n_grid_points - 1u) * m_batch_size + i]
+                                    - detail::dfloat<T>(m_time_hi[i], m_time_lo[i]);
                 }
             }
 
@@ -3162,55 +3159,55 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
 }
 
 template <typename T>
-const llvm_state &taylor_adaptive_batch_impl<T>::get_llvm_state() const
+const llvm_state &taylor_adaptive_batch<T>::get_llvm_state() const
 {
     return m_llvm;
 }
 
 template <typename T>
-const taylor_dc_t &taylor_adaptive_batch_impl<T>::get_decomposition() const
+const taylor_dc_t &taylor_adaptive_batch<T>::get_decomposition() const
 {
     return m_dc;
 }
 
 template <typename T>
-std::uint32_t taylor_adaptive_batch_impl<T>::get_order() const
+std::uint32_t taylor_adaptive_batch<T>::get_order() const
 {
     return m_order;
 }
 
 template <typename T>
-T taylor_adaptive_batch_impl<T>::get_tol() const
+T taylor_adaptive_batch<T>::get_tol() const
 {
     return m_tol;
 }
 
 template <typename T>
-bool taylor_adaptive_batch_impl<T>::get_high_accuracy() const
+bool taylor_adaptive_batch<T>::get_high_accuracy() const
 {
     return m_high_accuracy;
 }
 
 template <typename T>
-bool taylor_adaptive_batch_impl<T>::get_compact_mode() const
+bool taylor_adaptive_batch<T>::get_compact_mode() const
 {
     return m_compact_mode;
 }
 
 template <typename T>
-std::uint32_t taylor_adaptive_batch_impl<T>::get_batch_size() const
+std::uint32_t taylor_adaptive_batch<T>::get_batch_size() const
 {
     return m_batch_size;
 }
 
 template <typename T>
-std::uint32_t taylor_adaptive_batch_impl<T>::get_dim() const
+std::uint32_t taylor_adaptive_batch<T>::get_dim() const
 {
     return m_dim;
 }
 
 template <typename T>
-const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(const std::vector<T> &time, bool rel_time)
+const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(const std::vector<T> &time, bool rel_time)
 {
     // Check the dimensionality of time.
     if (time.size() != m_batch_size) {
@@ -3232,7 +3229,7 @@ const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(const std::
     } else {
         // Absolute time coordinate.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            m_d_out_time[i] = static_cast<T>(time[i] - (dfloat<T>(m_time_hi[i], m_time_lo[i]) - m_last_h[i]));
+            m_d_out_time[i] = static_cast<T>(time[i] - (detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) - m_last_h[i]));
         }
     }
 
@@ -3243,7 +3240,7 @@ const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(const std::
 
 // NOTE: there's some overlap with the code from the other overload here.
 template <typename T>
-const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(T time, bool rel_time)
+const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(T time, bool rel_time)
 {
     // NOTE: "time" needs to be translated
     // because m_d_out_f expects a time coordinate
@@ -3257,7 +3254,7 @@ const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(T time, boo
     } else {
         // Absolute time coordinate.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            m_d_out_time[i] = static_cast<T>(time - (dfloat<T>(m_time_hi[i], m_time_lo[i]) - m_last_h[i]));
+            m_d_out_time[i] = static_cast<T>(time - (detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) - m_last_h[i]));
         }
     }
 
@@ -3267,7 +3264,7 @@ const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(T time, boo
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::reset_cooldowns()
+void taylor_adaptive_batch<T>::reset_cooldowns()
 {
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         reset_cooldowns(i);
@@ -3275,7 +3272,7 @@ void taylor_adaptive_batch_impl<T>::reset_cooldowns()
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::reset_cooldowns(std::uint32_t i)
+void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
 {
     if (!m_ed_data) {
         throw std::invalid_argument("No events were defined for this integrator");
@@ -3293,42 +3290,41 @@ void taylor_adaptive_batch_impl<T>::reset_cooldowns(std::uint32_t i)
 }
 
 // Explicit instantiation of the batch implementation classes.
-template class taylor_adaptive_batch_impl<double>;
+template class taylor_adaptive_batch<double>;
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<double>::finalise_ctor_impl(
-    const std::vector<expression> &, std::vector<double>, std::uint32_t, std::vector<double>, double, bool, bool,
-    std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive_batch<double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<double>, std::uint32_t,
+                                                  std::vector<double>, double, bool, bool, std::vector<double>,
+                                                  std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<double>::finalise_ctor_impl(
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<double>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<double>, std::uint32_t, std::vector<double>,
     double, bool, bool, std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
-template class taylor_adaptive_batch_impl<long double>;
+template class taylor_adaptive_batch<long double>;
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<long double>::finalise_ctor_impl(
     const std::vector<expression> &, std::vector<long double>, std::uint32_t, std::vector<long double>, long double,
     bool, bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<long double>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<long double>, std::uint32_t,
     std::vector<long double>, long double, bool, bool, std::vector<long double>, std::vector<t_event_t>,
     std::vector<nt_event_t>, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template class taylor_adaptive_batch_impl<mppp::real128>;
+template class taylor_adaptive_batch<mppp::real128>;
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<mppp::real128>::finalise_ctor_impl(
     const std::vector<expression> &, std::vector<mppp::real128>, std::uint32_t, std::vector<mppp::real128>,
     mppp::real128, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<mppp::real128>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, std::uint32_t,
     std::vector<mppp::real128>, mppp::real128, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>,
     std::vector<nt_event_t>, bool);
 
 #endif
-
-} // namespace detail
 
 } // namespace heyoka
