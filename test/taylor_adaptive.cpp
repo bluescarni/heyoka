@@ -19,6 +19,7 @@
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -1954,4 +1955,95 @@ TEST_CASE("propagate_grid ste")
         REQUIRE(out[i * 2u] == approximately(std::sin(t_grid[i])));
         REQUIRE(out[i * 2u + 1u] == approximately(std::cos(t_grid[i])));
     }
+}
+
+TEST_CASE("ctad")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    // With vector first.
+    {
+        auto ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector{0., 1.});
+
+        REQUIRE(std::is_same_v<decltype(ta), taylor_adaptive<double>>);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+
+        ta = taylor_adaptive({v, -x}, std::vector{0., 1.});
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+    }
+
+#if !defined(HEYOKA_ARCH_PPC)
+    {
+        auto ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector{0.l, 1.l});
+
+        REQUIRE(std::is_same_v<decltype(ta), taylor_adaptive<long double>>);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+
+        ta = taylor_adaptive({v, -x}, std::vector{0.l, 1.l});
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+    }
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+    {
+        using namespace mppp::literals;
+
+        auto ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector{0._rq, 1._rq});
+
+        REQUIRE(std::is_same_v<decltype(ta), taylor_adaptive<mppp::real128>>);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+
+        ta = taylor_adaptive({v, -x}, std::vector{0._rq, 1._rq});
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+    }
+#endif
+
+    // With init list.
+    {
+        auto ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, {0., 1.});
+
+        REQUIRE(std::is_same_v<decltype(ta), taylor_adaptive<double>>);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+
+        ta = taylor_adaptive({v, -x}, {0., 1.});
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+    }
+
+#if !defined(HEYOKA_ARCH_PPC)
+    {
+        auto ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, {0.l, 1.l});
+
+        REQUIRE(std::is_same_v<decltype(ta), taylor_adaptive<long double>>);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+
+        ta = taylor_adaptive({v, -x}, {0.l, 1.l});
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+    }
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+    {
+        using namespace mppp::literals;
+
+        auto ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, {0._rq, 1._rq});
+
+        REQUIRE(std::is_same_v<decltype(ta), taylor_adaptive<mppp::real128>>);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+
+        ta = taylor_adaptive({v, -x}, {0._rq, 1._rq});
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+    }
+#endif
 }

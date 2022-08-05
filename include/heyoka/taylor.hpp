@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -1078,11 +1079,22 @@ public:
         finalise_ctor(sys, std::move(state), std::forward<KwArgs>(kw_args)...);
     }
     template <typename... KwArgs>
+    explicit taylor_adaptive(const std::vector<expression> &sys, std::initializer_list<T> state, KwArgs &&...kw_args)
+        : taylor_adaptive(sys, std::vector<T>(state), std::forward<KwArgs>(kw_args)...)
+    {
+    }
+    template <typename... KwArgs>
     explicit taylor_adaptive(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
                              KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
         finalise_ctor(sys, std::move(state), std::forward<KwArgs>(kw_args)...);
+    }
+    template <typename... KwArgs>
+    explicit taylor_adaptive(const std::vector<std::pair<expression, expression>> &sys, std::initializer_list<T> state,
+                             KwArgs &&...kw_args)
+        : taylor_adaptive(sys, std::vector<T>(state), std::forward<KwArgs>(kw_args)...)
+    {
     }
 
     taylor_adaptive(const taylor_adaptive &);
@@ -1579,11 +1591,23 @@ public:
         finalise_ctor(sys, std::move(state), batch_size, std::forward<KwArgs>(kw_args)...);
     }
     template <typename... KwArgs>
+    explicit taylor_adaptive_batch(const std::vector<expression> &sys, std::initializer_list<T> state,
+                                   std::uint32_t batch_size, KwArgs &&...kw_args)
+        : taylor_adaptive_batch(sys, std::vector<T>(state), batch_size, std::forward<KwArgs>(kw_args)...)
+    {
+    }
+    template <typename... KwArgs>
     explicit taylor_adaptive_batch(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
                                    std::uint32_t batch_size, KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
         finalise_ctor(sys, std::move(state), batch_size, std::forward<KwArgs>(kw_args)...);
+    }
+    template <typename... KwArgs>
+    explicit taylor_adaptive_batch(const std::vector<std::pair<expression, expression>> &sys,
+                                   std::initializer_list<T> state, std::uint32_t batch_size, KwArgs &&...kw_args)
+        : taylor_adaptive_batch(sys, std::vector<T>(state), batch_size, std::forward<KwArgs>(kw_args)...)
+    {
     }
 
     taylor_adaptive_batch(const taylor_adaptive_batch &);

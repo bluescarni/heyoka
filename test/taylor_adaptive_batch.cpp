@@ -1656,3 +1656,94 @@ TEST_CASE("propagate_grid ste")
     REQUIRE(std::isnan(res[14]));
     REQUIRE(std::isnan(res[15]));
 }
+
+TEST_CASE("ctad")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    // With vector first.
+    {
+        auto ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, std::vector{0., 1.}, 1u);
+
+        REQUIRE(std::is_same_v<decltype(ta), taylor_adaptive_batch<double>>);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+
+        ta = taylor_adaptive_batch({v, -x}, std::vector{0., 1.}, 1u);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+    }
+
+#if !defined(HEYOKA_ARCH_PPC)
+    {
+        auto ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, std::vector{0.l, 1.l}, 1u);
+
+        REQUIRE(std::is_same_v<decltype(ta), taylor_adaptive_batch<long double>>);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+
+        ta = taylor_adaptive_batch({v, -x}, std::vector{0.l, 1.l}, 1u);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+    }
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+    {
+        using namespace mppp::literals;
+
+        auto ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, std::vector{0._rq, 1._rq}, 1u);
+
+        REQUIRE(std::is_same_v<decltype(ta), taylor_adaptive_batch<mppp::real128>>);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+
+        ta = taylor_adaptive_batch({v, -x}, std::vector{0._rq, 1._rq}, 1u);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+    }
+#endif
+
+    // With init list.
+    {
+        auto ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, {0., 1.}, 1u);
+
+        REQUIRE(std::is_same_v<decltype(ta), taylor_adaptive_batch<double>>);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+
+        ta = taylor_adaptive_batch({v, -x}, {0., 1.}, 1u);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+    }
+
+#if !defined(HEYOKA_ARCH_PPC)
+    {
+        auto ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, {0.l, 1.l}, 1u);
+
+        REQUIRE(std::is_same_v<decltype(ta), taylor_adaptive_batch<long double>>);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+
+        ta = taylor_adaptive_batch({v, -x}, {0.l, 1.l}, 1u);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+    }
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+    {
+        using namespace mppp::literals;
+
+        auto ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, {0._rq, 1._rq}, 1u);
+
+        REQUIRE(std::is_same_v<decltype(ta), taylor_adaptive_batch<mppp::real128>>);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+
+        ta = taylor_adaptive_batch({v, -x}, {0._rq, 1._rq}, 1u);
+        REQUIRE(ta.get_state()[0] == 0);
+        REQUIRE(ta.get_state()[1] == 1);
+    }
+#endif
+}
