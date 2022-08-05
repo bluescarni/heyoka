@@ -1035,7 +1035,7 @@ private:
                           "unnamed arguments.");
         } else {
             // Initial time (defaults to zero).
-            const auto time = [&p]() -> T {
+            const auto tm = [&p]() -> T {
                 if constexpr (p.has(kw::time)) {
                     return std::forward<decltype(p(kw::time))>(p(kw::time));
                 } else {
@@ -1064,7 +1064,7 @@ private:
                 }
             }();
 
-            finalise_ctor_impl(sys, std::move(state), time, tol, high_accuracy, compact_mode, std::move(pars),
+            finalise_ctor_impl(sys, std::move(state), tm, tol, high_accuracy, compact_mode, std::move(pars),
                                std::move(tes), std::move(ntes), parallel_mode);
         }
     }
@@ -1546,7 +1546,7 @@ private:
                           "unnamed arguments.");
         } else {
             // Initial times (defaults to a vector of zeroes).
-            auto time = [&p, batch_size]() -> std::vector<T> {
+            auto tm = [&p, batch_size]() -> std::vector<T> {
                 if constexpr (p.has(kw::time)) {
                     return std::forward<decltype(p(kw::time))>(p(kw::time));
                 } else {
@@ -1575,7 +1575,7 @@ private:
                 }
             }();
 
-            finalise_ctor_impl(sys, std::move(state), batch_size, std::move(time), tol, high_accuracy, compact_mode,
+            finalise_ctor_impl(sys, std::move(state), batch_size, std::move(tm), tol, high_accuracy, compact_mode,
                                std::move(pars), std::move(tes), std::move(ntes), parallel_mode);
         }
     }
