@@ -427,7 +427,6 @@ HEYOKA_DLL_PUBLIC std::vector<expression> function_decompose(const std::vector<e
 namespace kw
 {
 
-IGOR_MAKE_NAMED_ARGUMENT(stride);
 IGOR_MAKE_NAMED_ARGUMENT(vars);
 IGOR_MAKE_NAMED_ARGUMENT(batch_size);
 
