@@ -60,7 +60,10 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
-namespace heyoka::detail
+namespace heyoka
+{
+
+namespace detail
 {
 
 namespace
@@ -734,13 +737,15 @@ public:
     std::vector<T> v;
 };
 
+} // namespace detail
+
 // NOTE: the def ctor is used only for serialisation purposes.
 template <typename T>
-taylor_adaptive_impl<T>::ed_data::ed_data() = default;
+taylor_adaptive<T>::ed_data::ed_data() = default;
 
 template <typename T>
-taylor_adaptive_impl<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vector<nt_event_t> ntes, std::uint32_t order,
-                                          std::uint32_t dim)
+taylor_adaptive<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vector<nt_event_t> ntes, std::uint32_t order,
+                                     std::uint32_t dim)
     : m_tes(std::move(tes)), m_ntes(std::move(ntes))
 {
     assert(!m_tes.empty() || !m_ntes.empty()); // LCOV_EXCL_LINE
@@ -772,10 +777,10 @@ taylor_adaptive_impl<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vecto
 
     // Add the rtscc function. This will also indirectly
     // add the translator function.
-    llvm_add_poly_rtscc<T>(m_state, order, 1);
+    detail::llvm_add_poly_rtscc<T>(m_state, order, 1);
 
     // Add the function for the fast exclusion check.
-    llvm_add_fex_check<T>(m_state, order, 1);
+    detail::llvm_add_fex_check<T>(m_state, order, 1);
 
     // Run the optimisation pass.
     m_state.optimise();
@@ -790,7 +795,7 @@ taylor_adaptive_impl<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vecto
 }
 
 template <typename T>
-taylor_adaptive_impl<T>::ed_data::ed_data(const ed_data &o)
+taylor_adaptive<T>::ed_data::ed_data(const ed_data &o)
     : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_te_cooldowns(o.m_te_cooldowns), m_state(o.m_state),
       m_poly_cache(o.m_poly_cache)
 {
@@ -810,10 +815,10 @@ taylor_adaptive_impl<T>::ed_data::ed_data(const ed_data &o)
 }
 
 template <typename T>
-taylor_adaptive_impl<T>::ed_data::~ed_data() = default;
+taylor_adaptive<T>::ed_data::~ed_data() = default;
 
 template <typename T>
-void taylor_adaptive_impl<T>::ed_data::save(boost::archive::binary_oarchive &ar, unsigned) const
+void taylor_adaptive<T>::ed_data::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
     ar << m_tes;
     ar << m_ntes;
@@ -831,7 +836,7 @@ void taylor_adaptive_impl<T>::ed_data::save(boost::archive::binary_oarchive &ar,
 }
 
 template <typename T>
-void taylor_adaptive_impl<T>::ed_data::load(boost::archive::binary_iarchive &ar, unsigned)
+void taylor_adaptive<T>::ed_data::load(boost::archive::binary_iarchive &ar, unsigned)
 {
     ar >> m_tes;
     ar >> m_ntes;
@@ -868,7 +873,7 @@ void taylor_adaptive_impl<T>::ed_data::load(boost::archive::binary_iarchive &ar,
 
 // Implementation of event detection.
 template <typename T>
-void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, std::uint32_t dim, T g_eps)
+void taylor_adaptive<T>::ed_data::detect_events(T h, std::uint32_t order, std::uint32_t dim, T g_eps)
 {
     using std::abs;
     using std::isfinite;
@@ -881,13 +886,15 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
 
     // LCOV_EXCL_START
     if (!isfinite(h)) {
-        get_logger()->warn("event detection skipped due to an invalid timestep value of {}", fp_to_string(h));
+        detail::get_logger()->warn("event detection skipped due to an invalid timestep value of {}",
+                                   detail::fp_to_string(h));
         return;
     }
     if (!isfinite(g_eps)) {
-        get_logger()->warn("event detection skipped due to an invalid value of {} for the maximum error on the Taylor "
-                           "series of the event equations",
-                           fp_to_string(g_eps));
+        detail::get_logger()->warn(
+            "event detection skipped due to an invalid value of {} for the maximum error on the Taylor "
+            "series of the event equations",
+            detail::fp_to_string(g_eps));
         return;
     }
     // LCOV_EXCL_STOP
@@ -900,7 +907,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
     assert(order >= 2u); // LCOV_EXCL_LINE
 
     // Temporary polynomials used in the bisection loop.
-    taylor_pwrap<T> tmp1(m_poly_cache, order), tmp2(m_poly_cache, order), tmp(m_poly_cache, order);
+    detail::taylor_pwrap<T> tmp1(m_poly_cache, order), tmp2(m_poly_cache, order), tmp(m_poly_cache, order);
 
     // Determine if we are integrating backwards in time.
     const std::uint32_t back_int = h < 0;
@@ -910,13 +917,13 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
     // events, 'ev_vec' the input vector of events to detect.
     auto run_detection = [&](auto &out, const auto &ev_vec) {
         // Fetch the event type.
-        using ev_type = typename uncvref_t<decltype(ev_vec)>::value_type;
+        using ev_type = typename detail::uncvref_t<decltype(ev_vec)>::value_type;
 
         for (std::uint32_t i = 0; i < ev_vec.size(); ++i) {
             // Extract the pointer to the Taylor polynomial for the
             // current event.
-            const auto ptr
-                = m_ev_jet.data() + (i + dim + (is_terminal_event_v<ev_type> ? 0u : m_tes.size())) * (order + 1u);
+            const auto ptr = m_ev_jet.data()
+                             + (i + dim + (detail::is_terminal_event_v<ev_type> ? 0u : m_tes.size())) * (order + 1u);
 
             // Run the fast exclusion check.
             // NOTE: in case of non-finite values in the Taylor
@@ -946,8 +953,9 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                 // sorting the events by time is safe.
                 if (!isfinite(root)) {
                     // LCOV_EXCL_START
-                    get_logger()->warn("polynomial root finding produced a non-finite root of {} - skipping the event",
-                                       fp_to_string(root));
+                    detail::get_logger()->warn(
+                        "polynomial root finding produced a non-finite root of {} - skipping the event",
+                        detail::fp_to_string(root));
                     return;
                     // LCOV_EXCL_STOP
                 }
@@ -966,9 +974,10 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                     // of root finding the lower bound always remains exactly zero,
                     // it should not be possible for root to exit the [0, h)
                     // range from the other side.
-                    get_logger()->warn("polynomial root finding produced the root {} which is not smaller, in absolute "
-                                       "value, than the integration timestep {}",
-                                       fp_to_string(root), fp_to_string(h));
+                    detail::get_logger()->warn(
+                        "polynomial root finding produced the root {} which is not smaller, in absolute "
+                        "value, than the integration timestep {}",
+                        detail::fp_to_string(root), detail::fp_to_string(h));
 
                     using std::nextafter;
                     root = nextafter(h, T(0));
@@ -976,15 +985,16 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                 }
 
                 // Evaluate the derivative and its absolute value.
-                const auto der = poly_eval_1(ptr, root, order);
+                const auto der = detail::poly_eval_1(ptr, root, order);
                 const auto abs_der = abs(der);
 
                 // Check it before proceeding.
                 if (!isfinite(der)) {
                     // LCOV_EXCL_START
-                    get_logger()->warn("polynomial root finding produced the root {} with nonfinite derivative {} - "
-                                       "skipping the event",
-                                       fp_to_string(root), fp_to_string(der));
+                    detail::get_logger()->warn(
+                        "polynomial root finding produced the root {} with nonfinite derivative {} - "
+                        "skipping the event",
+                        detail::fp_to_string(root), detail::fp_to_string(der));
                     return;
                     // LCOV_EXCL_STOP
                 }
@@ -993,15 +1003,16 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                 // period for a terminal event. For non-terminal events,
                 // this will be unused.
                 [[maybe_unused]] const bool has_multi_roots = [&]() {
-                    if constexpr (is_terminal_event_v<ev_type>) {
+                    if constexpr (detail::is_terminal_event_v<ev_type>) {
                         // Establish the cooldown time.
                         // NOTE: this is the same logic that is
                         // employed in taylor.cpp to assign a cooldown
                         // to a detected terminal event. g_eps has been checked
                         // for finiteness early on, abs_der also has been checked for
                         // finiteness above.
-                        const auto cd = (ev_vec[i].get_cooldown() >= 0) ? ev_vec[i].get_cooldown()
-                                                                        : taylor_deduce_cooldown(g_eps, abs_der);
+                        const auto cd = (ev_vec[i].get_cooldown() >= 0)
+                                            ? ev_vec[i].get_cooldown()
+                                            : detail::taylor_deduce_cooldown(g_eps, abs_der);
 
                         // NOTE: if the cooldown is zero, no sense to
                         // run the check.
@@ -1010,8 +1021,8 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                         }
 
                         // Evaluate the polynomial at the cooldown boundaries.
-                        const auto e1 = poly_eval(ptr, root + cd, order);
-                        const auto e2 = poly_eval(ptr, root - cd, order);
+                        const auto e1 = detail::poly_eval(ptr, root + cd, order);
+                        const auto e2 = detail::poly_eval(ptr, root - cd, order);
 
                         // We detect multiple roots within the cooldown
                         // if the signs of e1 and e2 are equal.
@@ -1022,7 +1033,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                 }();
 
                 // Compute sign of the derivative.
-                const auto d_sgn = sgn(der);
+                const auto d_sgn = detail::sgn(der);
 
                 // Fetch and cache the desired event direction.
                 const auto dir = ev_vec[i].get_direction();
@@ -1030,7 +1041,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                 if (dir == event_direction::any) {
                     // If the event direction does not
                     // matter, just add it.
-                    if constexpr (is_terminal_event_v<ev_type>) {
+                    if constexpr (detail::is_terminal_event_v<ev_type>) {
                         out.emplace_back(i, root, has_multi_roots, d_sgn, abs_der);
                     } else {
                         out.emplace_back(i, root, d_sgn);
@@ -1039,7 +1050,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                     // Otherwise, we need to record the event only if its direction
                     // matches the sign of the derivative.
                     if (static_cast<event_direction>(d_sgn) == dir) {
-                        if constexpr (is_terminal_event_v<ev_type>) {
+                        if constexpr (detail::is_terminal_event_v<ev_type>) {
                             out.emplace_back(i, root, has_multi_roots, d_sgn, abs_der);
                         } else {
                             out.emplace_back(i, root, d_sgn);
@@ -1053,7 +1064,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
             // lb_offset is the value in the original [0, 1) range corresponding
             // to the end of the cooldown.
             const auto lb_offset = [&]() {
-                if constexpr (is_terminal_event_v<ev_type>) {
+                if constexpr (detail::is_terminal_event_v<ev_type>) {
                     if (m_te_cooldowns[i]) {
                         // NOTE: need to distinguish between forward
                         // and backward integration.
@@ -1075,7 +1086,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                 // NOTE: the whole integration range is in the cooldown range,
                 // move to the next event.
                 SPDLOG_LOGGER_DEBUG(
-                    get_logger(),
+                    detail::get_logger(),
                     "the integration timestep falls within the cooldown range for the terminal event {}, skipping", i);
                 continue;
                 // LCOV_EXCL_STOP
@@ -1091,7 +1102,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
             // here again, tmp will be again in a well-formed state.
             assert(!tmp.v.empty());             // LCOV_EXCL_LINE
             assert(tmp.v.size() - 1u == order); // LCOV_EXCL_LINE
-            poly_rescale(tmp.v.data(), ptr, h, order);
+            detail::poly_rescale(tmp.v.data(), ptr, h, order);
 
             // Place the first element in the working list.
             m_wlist.emplace_back(0, 1, std::move(tmp));
@@ -1135,9 +1146,9 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                     // with a terminal event on cooldown and the lower bound
                     // falls within the cooldown time.
                     bool skip_event = false;
-                    if constexpr (is_terminal_event_v<ev_type>) {
+                    if constexpr (detail::is_terminal_event_v<ev_type>) {
                         if (lb < lb_offset) {
-                            SPDLOG_LOGGER_DEBUG(get_logger(),
+                            SPDLOG_LOGGER_DEBUG(detail::get_logger(),
                                                 "terminal event {} detected at the beginning of an isolating interval "
                                                 "is subject to cooldown, ignoring",
                                                 i);
@@ -1166,7 +1177,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
 
                     // First we transform q into 2**n * q(x/2) and store the result
                     // into tmp1.
-                    poly_rescale_p2(tmp1.v.data(), tmp.v.data(), order);
+                    detail::poly_rescale_p2(tmp1.v.data(), tmp.v.data(), order);
                     // Then we take tmp1 and translate it to produce 2**n * q((x+1)/2).
                     m_pt(tmp2.v.data(), tmp1.v.data());
 
@@ -1178,18 +1189,18 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                         m_wlist.emplace_back(lb, mid, std::move(tmp1));
 
                         // Revive tmp1.
-                        tmp1 = taylor_pwrap<T>(m_poly_cache, order);
+                        tmp1 = detail::taylor_pwrap<T>(m_poly_cache, order);
                     } else {
                         // LCOV_EXCL_START
                         SPDLOG_LOGGER_DEBUG(
-                            get_logger(),
+                            detail::get_logger(),
                             "ignoring lower interval in a bisection that would fall entirely in the cooldown period");
                         // LCOV_EXCL_STOP
                     }
                     m_wlist.emplace_back(mid, ub, std::move(tmp2));
 
                     // Revive tmp2.
-                    tmp2 = taylor_pwrap<T>(m_poly_cache, order);
+                    tmp2 = detail::taylor_pwrap<T>(m_poly_cache, order);
                 }
 
 #if !defined(NDEBUG)
@@ -1204,7 +1215,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                 // cases. The second check is that we cannot possibly find more isolating
                 // intervals than the degree of the polynomial.
                 if (m_wlist.size() > 250u || m_isol.size() > order) {
-                    get_logger()->warn(
+                    detail::get_logger()->warn(
                         "the polynomial root isolation algorithm failed during event detection: the working "
                         "list size is {} and the number of isolating intervals is {}",
                         m_wlist.size(), m_isol.size());
@@ -1218,8 +1229,8 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
             } while (!m_wlist.empty());
 
 #if !defined(NDEBUG)
-            SPDLOG_LOGGER_DEBUG(get_logger(), "max working list size: {}", max_wl_size);
-            SPDLOG_LOGGER_DEBUG(get_logger(), "max isol list size   : {}", max_isol_size);
+            SPDLOG_LOGGER_DEBUG(detail::get_logger(), "max working list size: {}", max_wl_size);
+            SPDLOG_LOGGER_DEBUG(detail::get_logger(), "max isol list size   : {}", max_isol_size);
 #endif
 
             if (m_isol.empty() || loop_failed) {
@@ -1235,11 +1246,11 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
             // isolating intervals are also rescaled to [0, 1).
             // NOTE: tmp1 was either created with the correct size outside this
             // function, or it was re-created in the bisection above.
-            poly_rescale(tmp1.v.data(), ptr, h, order);
+            detail::poly_rescale(tmp1.v.data(), ptr, h, order);
 
             // Run the root finding in the isolating intervals.
             for (auto &[lb, ub] : m_isol) {
-                if constexpr (is_terminal_event_v<ev_type>) {
+                if constexpr (detail::is_terminal_event_v<ev_type>) {
                     // NOTE: if we are dealing with a terminal event
                     // subject to cooldown, we need to ensure that
                     // we don't look for roots before the cooldown has expired.
@@ -1253,18 +1264,19 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                         assert(lb < ub); // LCOV_EXCL_LINE
 
                         // Check if the interval still contains a zero.
-                        const auto f_lb = poly_eval(tmp1.v.data(), lb, order);
-                        const auto f_ub = poly_eval(tmp1.v.data(), ub, order);
+                        const auto f_lb = detail::poly_eval(tmp1.v.data(), lb, order);
+                        const auto f_ub = detail::poly_eval(tmp1.v.data(), ub, order);
 
                         if (!(f_lb * f_ub < 0)) {
-                            SPDLOG_LOGGER_DEBUG(get_logger(), "terminal event {} is subject to cooldown, ignoring", i);
+                            SPDLOG_LOGGER_DEBUG(detail::get_logger(),
+                                                "terminal event {} is subject to cooldown, ignoring", i);
                             continue;
                         }
                     }
                 }
 
                 // Run the root finding.
-                const auto [root, cflag] = bracketed_root_find(tmp1.v.data(), order, lb, ub);
+                const auto [root, cflag] = detail::bracketed_root_find(tmp1.v.data(), order, lb, ub);
 
                 if (cflag == 0) {
                     // Root finding finished successfully, record the event.
@@ -1275,10 +1287,10 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                     // Root finding encountered some issue. Ignore the
                     // event and log the issue.
                     if (cflag == -1) {
-                        get_logger()->warn(
+                        detail::get_logger()->warn(
                             "polynomial root finding during event detection failed due to too many iterations");
                     } else {
-                        get_logger()->warn(
+                        detail::get_logger()->warn(
                             "polynomial root finding during event detection returned a nonzero errno with message '{}'",
                             std::strerror(cflag));
                     }
@@ -1294,22 +1306,22 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
 
 // Instantiate the book-keeping structure for event detection
 // in the scalar integrator.
-template struct taylor_adaptive_impl<double>::ed_data;
-template struct taylor_adaptive_impl<long double>::ed_data;
+template struct taylor_adaptive<double>::ed_data;
+template struct taylor_adaptive<long double>::ed_data;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template struct taylor_adaptive_impl<mppp::real128>::ed_data;
+template struct taylor_adaptive<mppp::real128>::ed_data;
 
 #endif
 
 // NOTE: the def ctor is used only for serialisation purposes.
 template <typename T>
-taylor_adaptive_batch_impl<T>::ed_data::ed_data() = default;
+taylor_adaptive_batch<T>::ed_data::ed_data() = default;
 
 template <typename T>
-taylor_adaptive_batch_impl<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vector<nt_event_t> ntes,
-                                                std::uint32_t order, std::uint32_t dim, std::uint32_t batch_size)
+taylor_adaptive_batch<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vector<nt_event_t> ntes,
+                                           std::uint32_t order, std::uint32_t dim, std::uint32_t batch_size)
     : m_tes(std::move(tes)), m_ntes(std::move(ntes))
 {
     assert(!m_tes.empty() || !m_ntes.empty()); // LCOV_EXCL_LINE
@@ -1368,11 +1380,11 @@ taylor_adaptive_batch_impl<T>::ed_data::ed_data(std::vector<t_event_t> tes, std:
     // add the translator function.
     // NOTE: keep batch size to 1 because the real-root
     // isolation is scalarised.
-    llvm_add_poly_rtscc<T>(m_state, order, 1);
+    detail::llvm_add_poly_rtscc<T>(m_state, order, 1);
 
     // Add the function for the fast exclusion check.
     // NOTE: the fast exclusion check is vectorised.
-    llvm_add_fex_check<T>(m_state, order, batch_size);
+    detail::llvm_add_fex_check<T>(m_state, order, batch_size);
 
     // Run the optimisation pass.
     m_state.optimise();
@@ -1387,7 +1399,7 @@ taylor_adaptive_batch_impl<T>::ed_data::ed_data(std::vector<t_event_t> tes, std:
 }
 
 template <typename T>
-taylor_adaptive_batch_impl<T>::ed_data::ed_data(const ed_data &o)
+taylor_adaptive_batch<T>::ed_data::ed_data(const ed_data &o)
     : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_max_abs_state(o.m_max_abs_state), m_g_eps(o.m_g_eps),
       m_te_cooldowns(o.m_te_cooldowns), m_state(o.m_state), m_back_int(o.m_back_int),
       m_fex_check_res(o.m_fex_check_res), m_poly_cache(o.m_poly_cache)
@@ -1418,10 +1430,10 @@ taylor_adaptive_batch_impl<T>::ed_data::ed_data(const ed_data &o)
 }
 
 template <typename T>
-taylor_adaptive_batch_impl<T>::ed_data::~ed_data() = default;
+taylor_adaptive_batch<T>::ed_data::~ed_data() = default;
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::ed_data::save(boost::archive::binary_oarchive &ar, unsigned) const
+void taylor_adaptive_batch<T>::ed_data::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
     ar << m_tes;
     ar << m_ntes;
@@ -1453,7 +1465,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::save(boost::archive::binary_oarchiv
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::ed_data::load(boost::archive::binary_iarchive &ar, unsigned)
+void taylor_adaptive_batch<T>::ed_data::load(boost::archive::binary_iarchive &ar, unsigned)
 {
     ar >> m_tes;
     ar >> m_ntes;
@@ -1508,8 +1520,8 @@ void taylor_adaptive_batch_impl<T>::ed_data::load(boost::archive::binary_iarchiv
 
 // Implementation of event detection.
 template <typename T>
-void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::uint32_t order, std::uint32_t dim,
-                                                           std::uint32_t batch_size)
+void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint32_t order, std::uint32_t dim,
+                                                      std::uint32_t batch_size)
 {
     using std::abs;
     using std::isfinite;
@@ -1525,24 +1537,24 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
     assert(order >= 2u); // LCOV_EXCL_LINE
 
     // Temporary polynomials used in the bisection loop.
-    taylor_pwrap<T> tmp1(m_poly_cache, order), tmp2(m_poly_cache, order), tmp(m_poly_cache, order);
+    detail::taylor_pwrap<T> tmp1(m_poly_cache, order), tmp2(m_poly_cache, order), tmp(m_poly_cache, order);
     // The temporary polynomial used when extracting a specific batch element
     // from a polynomial of batches.
-    taylor_pwrap<T> scal_poly(m_poly_cache, order);
+    detail::taylor_pwrap<T> scal_poly(m_poly_cache, order);
 
     // Helper to run event detection on a vector of events
     // (terminal or not). 'out_vec' is the vector of detected
     // events, 'ev_vec' the input vector of events to detect.
     auto run_detection = [&](auto &out_vec, const auto &ev_vec) {
         // Fetch the event type.
-        using ev_type = typename uncvref_t<decltype(ev_vec)>::value_type;
+        using ev_type = typename detail::uncvref_t<decltype(ev_vec)>::value_type;
 
         for (std::uint32_t i = 0; i < ev_vec.size(); ++i) {
             // Extract the pointer to the Taylor polynomial for the
             // current event.
             const auto batch_ptr
                 = m_ev_jet.data()
-                  + (i + dim + (is_terminal_event_v<ev_type> ? 0u : m_tes.size())) * (order + 1u) * batch_size;
+                  + (i + dim + (detail::is_terminal_event_v<ev_type> ? 0u : m_tes.size())) * (order + 1u) * batch_size;
 
             // Run the fast exclusion check.
             // NOTE: in case of non-finite values in the Taylor
@@ -1575,16 +1587,16 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
 
                 // LCOV_EXCL_START
                 if (!isfinite(h)) {
-                    get_logger()->warn(
+                    detail::get_logger()->warn(
                         "event detection skipped due to an invalid timestep value of {} at the batch index {}",
-                        fp_to_string(h), j);
+                        detail::fp_to_string(h), j);
                     continue;
                 }
                 if (!isfinite(g_eps)) {
-                    get_logger()->warn(
+                    detail::get_logger()->warn(
                         "event detection skipped due to an invalid value of {} for the maximum error on the Taylor "
                         "series of the event equations at the batch index {}",
-                        fp_to_string(g_eps), j);
+                        detail::fp_to_string(g_eps), j);
                     continue;
                 }
                 // LCOV_EXCL_STOP
@@ -1618,9 +1630,10 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                     // sorting the events by time is safe.
                     if (!isfinite(root)) {
                         // LCOV_EXCL_START
-                        get_logger()->warn("polynomial root finding produced a non-finite root of {} at the batch "
-                                           "index {} - skipping the event",
-                                           fp_to_string(root), j);
+                        detail::get_logger()->warn(
+                            "polynomial root finding produced a non-finite root of {} at the batch "
+                            "index {} - skipping the event",
+                            detail::fp_to_string(root), j);
                         return;
                         // LCOV_EXCL_STOP
                     }
@@ -1639,10 +1652,10 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                         // of root finding the lower bound always remains exactly zero,
                         // it should not be possible for root to exit the [0, h)
                         // range from the other side.
-                        get_logger()->warn(
+                        detail::get_logger()->warn(
                             "polynomial root finding produced the root {} which is not smaller, in absolute "
                             "value, than the integration timestep {}",
-                            fp_to_string(root), fp_to_string(h));
+                            detail::fp_to_string(root), detail::fp_to_string(h));
 
                         using std::nextafter;
                         root = nextafter(h, T(0));
@@ -1650,15 +1663,16 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                     }
 
                     // Evaluate the derivative and its absolute value.
-                    const auto der = poly_eval_1(ptr, root, order);
+                    const auto der = detail::poly_eval_1(ptr, root, order);
                     const auto abs_der = abs(der);
 
                     // Check it before proceeding.
                     if (!isfinite(der)) {
                         // LCOV_EXCL_START
-                        get_logger()->warn("polynomial root finding produced the root {} with nonfinite derivative {} "
-                                           "at the batch index {} - skipping the event",
-                                           fp_to_string(root), fp_to_string(der), j);
+                        detail::get_logger()->warn(
+                            "polynomial root finding produced the root {} with nonfinite derivative {} "
+                            "at the batch index {} - skipping the event",
+                            detail::fp_to_string(root), detail::fp_to_string(der), j);
                         return;
                         // LCOV_EXCL_STOP
                     }
@@ -1667,15 +1681,16 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                     // period for a terminal event. For non-terminal events,
                     // this will be unused.
                     [[maybe_unused]] const bool has_multi_roots = [&]() {
-                        if constexpr (is_terminal_event_v<ev_type>) {
+                        if constexpr (detail::is_terminal_event_v<ev_type>) {
                             // Establish the cooldown time.
                             // NOTE: this is the same logic that is
                             // employed in taylor.cpp to assign a cooldown
                             // to a detected terminal event. g_eps has been checked
                             // for finiteness early on, abs_der also has been checked for
                             // finiteness above.
-                            const auto cd = (ev_vec[i].get_cooldown() >= 0) ? ev_vec[i].get_cooldown()
-                                                                            : taylor_deduce_cooldown(g_eps, abs_der);
+                            const auto cd = (ev_vec[i].get_cooldown() >= 0)
+                                                ? ev_vec[i].get_cooldown()
+                                                : detail::taylor_deduce_cooldown(g_eps, abs_der);
 
                             // NOTE: if the cooldown is zero, no sense to
                             // run the check.
@@ -1684,8 +1699,8 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                             }
 
                             // Evaluate the polynomial at the cooldown boundaries.
-                            const auto e1 = poly_eval(ptr, root + cd, order);
-                            const auto e2 = poly_eval(ptr, root - cd, order);
+                            const auto e1 = detail::poly_eval(ptr, root + cd, order);
+                            const auto e2 = detail::poly_eval(ptr, root - cd, order);
 
                             // We detect multiple roots within the cooldown
                             // if the signs of e1 and e2 are equal.
@@ -1696,7 +1711,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                     }();
 
                     // Compute sign of the derivative.
-                    const auto d_sgn = sgn(der);
+                    const auto d_sgn = detail::sgn(der);
 
                     // Fetch and cache the desired event direction.
                     const auto dir = ev_vec[i].get_direction();
@@ -1704,7 +1719,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                     if (dir == event_direction::any) {
                         // If the event direction does not
                         // matter, just add it.
-                        if constexpr (is_terminal_event_v<ev_type>) {
+                        if constexpr (detail::is_terminal_event_v<ev_type>) {
                             out.emplace_back(i, root, has_multi_roots, d_sgn, abs_der);
                         } else {
                             out.emplace_back(i, root, d_sgn);
@@ -1713,7 +1728,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                         // Otherwise, we need to record the event only if its direction
                         // matches the sign of the derivative.
                         if (static_cast<event_direction>(d_sgn) == dir) {
-                            if constexpr (is_terminal_event_v<ev_type>) {
+                            if constexpr (detail::is_terminal_event_v<ev_type>) {
                                 out.emplace_back(i, root, has_multi_roots, d_sgn, abs_der);
                             } else {
                                 out.emplace_back(i, root, d_sgn);
@@ -1727,7 +1742,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                 // lb_offset is the value in the original [0, 1) range corresponding
                 // to the end of the cooldown.
                 const auto lb_offset = [&]() {
-                    if constexpr (is_terminal_event_v<ev_type>) {
+                    if constexpr (detail::is_terminal_event_v<ev_type>) {
                         if (m_te_cooldowns[j][i]) {
                             // NOTE: need to distinguish between forward
                             // and backward integration.
@@ -1748,7 +1763,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                     // LCOV_EXCL_START
                     // NOTE: the whole integration range is in the cooldown range,
                     // move to the next event.
-                    SPDLOG_LOGGER_DEBUG(get_logger(),
+                    SPDLOG_LOGGER_DEBUG(detail::get_logger(),
                                         "the integration timestep falls within the cooldown range for the terminal "
                                         "event {} at the batch index {}, skipping",
                                         i, j);
@@ -1766,7 +1781,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                 // here again, tmp will be again in a well-formed state.
                 assert(!tmp.v.empty());             // LCOV_EXCL_LINE
                 assert(tmp.v.size() - 1u == order); // LCOV_EXCL_LINE
-                poly_rescale(tmp.v.data(), ptr, h, order);
+                detail::poly_rescale(tmp.v.data(), ptr, h, order);
 
                 // Place the first element in the working list.
                 m_wlist.emplace_back(0, 1, std::move(tmp));
@@ -1807,9 +1822,9 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                         // with a terminal event on cooldown and the lower bound
                         // falls within the cooldown time.
                         bool skip_event = false;
-                        if constexpr (is_terminal_event_v<ev_type>) {
+                        if constexpr (detail::is_terminal_event_v<ev_type>) {
                             if (lb < lb_offset) {
-                                SPDLOG_LOGGER_DEBUG(get_logger(),
+                                SPDLOG_LOGGER_DEBUG(detail::get_logger(),
                                                     "terminal event {} detected at the beginning of an isolating "
                                                     "interval at the batch index {} "
                                                     "is subject to cooldown, ignoring",
@@ -1839,7 +1854,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
 
                         // First we transform q into 2**n * q(x/2) and store the result
                         // into tmp1.
-                        poly_rescale_p2(tmp1.v.data(), tmp.v.data(), order);
+                        detail::poly_rescale_p2(tmp1.v.data(), tmp.v.data(), order);
                         // Then we take tmp1 and translate it to produce 2**n * q((x+1)/2).
                         m_pt(tmp2.v.data(), tmp1.v.data());
 
@@ -1853,10 +1868,10 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                             m_wlist.emplace_back(lb, mid, std::move(tmp1));
 
                             // Revive tmp1.
-                            tmp1 = taylor_pwrap<T>(m_poly_cache, order);
+                            tmp1 = detail::taylor_pwrap<T>(m_poly_cache, order);
                         } else {
                             // LCOV_EXCL_START
-                            SPDLOG_LOGGER_DEBUG(get_logger(),
+                            SPDLOG_LOGGER_DEBUG(detail::get_logger(),
                                                 "ignoring lower interval in a bisection that would fall "
                                                 "entirely in the cooldown period at the batch index {}",
                                                 j);
@@ -1865,7 +1880,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                         m_wlist.emplace_back(mid, ub, std::move(tmp2));
 
                         // Revive tmp2.
-                        tmp2 = taylor_pwrap<T>(m_poly_cache, order);
+                        tmp2 = detail::taylor_pwrap<T>(m_poly_cache, order);
                     }
 
 #if !defined(NDEBUG)
@@ -1880,10 +1895,11 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                     // intervals than the degree of the polynomial.
                     // LCOV_EXCL_START
                     if (m_wlist.size() > 250u || m_isol.size() > order) {
-                        get_logger()->warn("the polynomial root isolation algorithm failed during event detection at "
-                                           "the batch index {}: the working "
-                                           "list size is {} and the number of isolating intervals is {}",
-                                           j, m_wlist.size(), m_isol.size());
+                        detail::get_logger()->warn(
+                            "the polynomial root isolation algorithm failed during event detection at "
+                            "the batch index {}: the working "
+                            "list size is {} and the number of isolating intervals is {}",
+                            j, m_wlist.size(), m_isol.size());
 
                         loop_failed = true;
 
@@ -1894,8 +1910,10 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                 } while (!m_wlist.empty());
 
 #if !defined(NDEBUG)
-                SPDLOG_LOGGER_DEBUG(get_logger(), "max working list size at the batch index {}: {}", j, max_wl_size);
-                SPDLOG_LOGGER_DEBUG(get_logger(), "max isol list size at the batch index {}   : {}", j, max_isol_size);
+                SPDLOG_LOGGER_DEBUG(detail::get_logger(), "max working list size at the batch index {}: {}", j,
+                                    max_wl_size);
+                SPDLOG_LOGGER_DEBUG(detail::get_logger(), "max isol list size at the batch index {}   : {}", j,
+                                    max_isol_size);
 #endif
 
                 if (m_isol.empty() || loop_failed) {
@@ -1911,11 +1929,11 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                 // isolating intervals are also rescaled to [0, 1).
                 // NOTE: tmp1 was either created with the correct size outside this
                 // function, or it was re-created in the bisection above.
-                poly_rescale(tmp1.v.data(), ptr, h, order);
+                detail::poly_rescale(tmp1.v.data(), ptr, h, order);
 
                 // Run the root finding in the isolating intervals.
                 for (auto &[lb, ub] : m_isol) {
-                    if constexpr (is_terminal_event_v<ev_type>) {
+                    if constexpr (detail::is_terminal_event_v<ev_type>) {
                         // NOTE: if we are dealing with a terminal event
                         // subject to cooldown, we need to ensure that
                         // we don't look for roots before the cooldown has expired.
@@ -1929,12 +1947,12 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                             assert(lb < ub); // LCOV_EXCL_LINE
 
                             // Check if the interval still contains a zero.
-                            const auto f_lb = poly_eval(tmp1.v.data(), lb, order);
-                            const auto f_ub = poly_eval(tmp1.v.data(), ub, order);
+                            const auto f_lb = detail::poly_eval(tmp1.v.data(), lb, order);
+                            const auto f_ub = detail::poly_eval(tmp1.v.data(), ub, order);
 
                             if (!(f_lb * f_ub < 0)) {
                                 SPDLOG_LOGGER_DEBUG(
-                                    get_logger(),
+                                    detail::get_logger(),
                                     "terminal event {} at the batch index {} is subject to cooldown, ignoring", i, j);
                                 continue;
                             }
@@ -1942,7 +1960,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                     }
 
                     // Run the root finding.
-                    const auto [root, cflag] = bracketed_root_find(tmp1.v.data(), order, lb, ub);
+                    const auto [root, cflag] = detail::bracketed_root_find(tmp1.v.data(), order, lb, ub);
 
                     if (cflag == 0) {
                         // Root finding finished successfully, record the event.
@@ -1953,13 +1971,15 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                         // Root finding encountered some issue. Ignore the
                         // event and log the issue.
                         if (cflag == -1) {
-                            get_logger()->warn("polynomial root finding during event detection failed due to too many "
-                                               "iterations at the batch index {}",
-                                               j);
+                            detail::get_logger()->warn(
+                                "polynomial root finding during event detection failed due to too many "
+                                "iterations at the batch index {}",
+                                j);
                         } else {
-                            get_logger()->warn("polynomial root finding during event detection at the batch index {} "
-                                               "returned a nonzero errno with message '{}'",
-                                               j, std::strerror(cflag));
+                            detail::get_logger()->warn(
+                                "polynomial root finding during event detection at the batch index {} "
+                                "returned a nonzero errno with message '{}'",
+                                j, std::strerror(cflag));
                         }
                         // LCOV_EXCL_STOP
                     }
@@ -1974,13 +1994,13 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
 
 // Instantiate the book-keeping structure for event detection
 // in the batch integrator.
-template struct taylor_adaptive_batch_impl<double>::ed_data;
-template struct taylor_adaptive_batch_impl<long double>::ed_data;
+template struct taylor_adaptive_batch<double>::ed_data;
+template struct taylor_adaptive_batch<long double>::ed_data;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template struct taylor_adaptive_batch_impl<mppp::real128>::ed_data;
+template struct taylor_adaptive_batch<mppp::real128>::ed_data;
 
 #endif
 
-} // namespace heyoka::detail
+} // namespace heyoka

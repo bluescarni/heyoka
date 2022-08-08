@@ -15,7 +15,7 @@ install:
 - conda update -n base conda
 - conda config --add channels conda-forge
 - conda config --set channel_priority strict
-- conda create --name heyoka cmake llvmdev tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel 'fmt=8.0.*' 'spdlog=1.9.2' sleef
+- conda create --name heyoka cmake llvmdev tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel 'fmt=8.1.*' 'spdlog=1.10.*' sleef
 - call activate heyoka
 
 build_script:

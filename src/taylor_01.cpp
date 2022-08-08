@@ -1176,7 +1176,7 @@ namespace
 
 // Implementation of the streaming operator for the scalar integrators.
 template <typename T>
-std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptive_impl<T> &ta)
+std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptive<T> &ta)
 {
     std::ostringstream oss;
     oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
@@ -1226,7 +1226,7 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
 
 // Implementation of the streaming operator for the batch integrators.
 template <typename T>
-std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_adaptive_batch_impl<T> &ta)
+std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_adaptive_batch<T> &ta)
 {
     std::ostringstream oss;
     oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
@@ -1284,51 +1284,51 @@ std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_a
 
 } // namespace
 
-template <>
-std::ostream &operator<<(std::ostream &os, const taylor_adaptive_impl<double> &ta)
-{
-    return taylor_adaptive_stream_impl(os, ta);
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const taylor_adaptive_impl<long double> &ta)
-{
-    return taylor_adaptive_stream_impl(os, ta);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-std::ostream &operator<<(std::ostream &os, const taylor_adaptive_impl<mppp::real128> &ta)
-{
-    return taylor_adaptive_stream_impl(os, ta);
-}
-
-#endif
-
-template <>
-std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch_impl<double> &ta)
-{
-    return taylor_adaptive_batch_stream_impl(os, ta);
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch_impl<long double> &ta)
-{
-    return taylor_adaptive_batch_stream_impl(os, ta);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch_impl<mppp::real128> &ta)
-{
-    return taylor_adaptive_batch_stream_impl(os, ta);
-}
-
-#endif
-
 } // namespace detail
+
+template <>
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive<double> &ta)
+{
+    return detail::taylor_adaptive_stream_impl(os, ta);
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive<long double> &ta)
+{
+    return detail::taylor_adaptive_stream_impl(os, ta);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive<mppp::real128> &ta)
+{
+    return detail::taylor_adaptive_stream_impl(os, ta);
+}
+
+#endif
+
+template <>
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch<double> &ta)
+{
+    return detail::taylor_adaptive_batch_stream_impl(os, ta);
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch<long double> &ta)
+{
+    return detail::taylor_adaptive_batch_stream_impl(os, ta);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch<mppp::real128> &ta)
+{
+    return detail::taylor_adaptive_batch_stream_impl(os, ta);
+}
+
+#endif
 
 #define HEYOKA_TAYLOR_ENUM_STREAM_CASE(val)                                                                            \
     case val:                                                                                                          \
@@ -1387,9 +1387,9 @@ template <typename T, bool B>
 auto nt_event_def_cb()
 {
     if constexpr (B) {
-        return [](taylor_adaptive_batch_impl<T> &, T, int, std::uint32_t) {};
+        return [](taylor_adaptive_batch<T> &, T, int, std::uint32_t) {};
     } else {
-        return [](taylor_adaptive_impl<T> &, T, int) {};
+        return [](taylor_adaptive<T> &, T, int) {};
     }
 }
 

@@ -99,18 +99,18 @@ at which the event was detected (i.e., the trigger time), and the last argument 
 of the event equation at the trigger time (-1 for negative derivative, 1 for positive derivative and 0 for
 zero derivative).
 
+.. warning::
+
+    The ``taylor_adaptive`` object is passed as a non-const reference only so that it is possible to call
+    non-const functions on it (such as ``update_d_output()``). Do not try to assign a new integrator object
+    from within the callback, as that will result in undefined behaviour.
+
 Because non-terminal event detection is performed at the end of an integration step,
 when the callback is invoked the state and time of the integrator object are those *at the end* of the integration
 step in which the event was detected. Note that when integrating an ODE system with events, the ``taylor_adaptive``
 class ensures that the Taylor coefficients are always kept up to date (as explained in the tutorial about
 :ref:`dense output <tut_d_output>`), and thus in the callback function it is always possible to use the ``update_d_output()``
 function to compute the dense output at any time within the last timestep that was taken.
-
-.. warning::
-
-    The ``taylor_adaptive`` object is passed as a non-const reference only so that it is possible to call
-    non-const functions on it (such as ``update_d_output()``). Do not try to assign a new integrator object
-    from within the callback, as that will result in undefined behaviour.
 
 In this example, we perform two actions in the callback:
 
@@ -420,8 +420,8 @@ that takes into account:
 - the error tolerance of the integrator,
 - the derivative of the event equation at the trigger time.
 
-The heuristic works best under the assumption that the event equation does not change (much) after the
-execution of the event's callback. If, for any reason, the automatic deduction heuristic is
+The heuristic works best under the assumption that the event function :math:`g\left( t, \boldsymbol{x} \left( t \right) \right)`
+does not change (much) after the execution of the event's callback. If, for any reason, the automatic deduction heuristic is
 to be avoided, it is possible to set a custom value for the cooldown.
 A custom cooldown period can be selected when constructing
 a terminal event via the ``kw::cooldown`` keyword argument.

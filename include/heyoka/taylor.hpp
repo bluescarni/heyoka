@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -383,8 +384,8 @@ class HEYOKA_DLL_PUBLIC nt_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = callable<std::conditional_t<B, void(taylor_adaptive_batch_impl<T> &, T, int, std::uint32_t),
-                                                   void(taylor_adaptive_impl<T> &, T, int)>>;
+    using callback_t = callable<std::conditional_t<B, void(taylor_adaptive_batch<T> &, T, int, std::uint32_t),
+                                                   void(taylor_adaptive<T> &, T, int)>>;
 
 private:
     expression eq;
@@ -477,8 +478,8 @@ class HEYOKA_DLL_PUBLIC t_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = callable<std::conditional_t<B, bool(taylor_adaptive_batch_impl<T> &, bool, int, std::uint32_t),
-                                                   bool(taylor_adaptive_impl<T> &, bool, int)>>;
+    using callback_t = callable<std::conditional_t<B, bool(taylor_adaptive_batch<T> &, bool, int, std::uint32_t),
+                                                   bool(taylor_adaptive<T> &, bool, int)>>;
 
 private:
     expression eq;
@@ -561,7 +562,7 @@ public:
 template <typename T, bool B>
 inline std::ostream &operator<<(std::ostream &os, const t_event_impl<T, B> &)
 {
-    static_assert(always_false_v<T>, "Unhandled type.");
+    static_assert(detail::always_false_v<T>, "Unhandled type.");
 
     return os;
 }
@@ -616,7 +617,7 @@ class HEYOKA_DLL_PUBLIC continuous_output
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
 
     template <typename>
-    friend class HEYOKA_DLL_PUBLIC detail::taylor_adaptive_impl;
+    friend class HEYOKA_DLL_PUBLIC taylor_adaptive;
 
     friend std::ostream &detail::c_out_stream_impl<T>(std::ostream &, const continuous_output<T> &);
 
@@ -708,7 +709,7 @@ class HEYOKA_DLL_PUBLIC continuous_output_batch
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
 
     template <typename>
-    friend class HEYOKA_DLL_PUBLIC detail::taylor_adaptive_batch_impl;
+    friend class HEYOKA_DLL_PUBLIC taylor_adaptive_batch;
 
     friend std::ostream &detail::c_out_batch_stream_impl<T>(std::ostream &, const continuous_output_batch<T> &);
 
@@ -839,7 +840,7 @@ inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
         // signature is passed as argument, return a const reference wrapper to it
         // in order to avoid a useless copy.
         auto cb = [&p]() {
-            using cb_func_t = std::function<bool(taylor_adaptive_impl<T> &)>;
+            using cb_func_t = std::function<bool(taylor_adaptive<T> &)>;
 
             if constexpr (p.has(kw::callback)) {
                 if constexpr (std::is_same_v<uncvref_t<decltype(p(kw::callback))>, cb_func_t>) {
@@ -881,10 +882,12 @@ inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
     }
 }
 
+} // namespace detail
+
 template <typename T>
-class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
+class HEYOKA_DLL_PUBLIC taylor_adaptive
 {
-    static_assert(is_supported_fp_v<T>, "Unhandled type.");
+    static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
 
 public:
     using nt_event_t = nt_event<T>;
@@ -894,7 +897,7 @@ private:
     // Struct implementing the data/logic for event detection.
     struct HEYOKA_DLL_PUBLIC ed_data {
         // The working list type used during real root isolation.
-        using wlist_t = std::vector<std::tuple<T, T, taylor_pwrap<T>>>;
+        using wlist_t = std::vector<std::tuple<T, T, detail::taylor_pwrap<T>>>;
         // The type used to store the list of isolating intervals.
         using isol_t = std::vector<std::tuple<T, T>>;
         // Polynomial translation function type.
@@ -936,7 +939,7 @@ private:
         // to and interact with m_poly_cache during destruction,
         // and we must be sure that m_wlist is destroyed *before*
         // m_poly_cache.
-        taylor_poly_cache<T> m_poly_cache;
+        detail::taylor_poly_cache<T> m_poly_cache;
         // The working list.
         wlist_t m_wlist;
         // The list of isolating intervals.
@@ -969,7 +972,7 @@ private:
     // State vector.
     std::vector<T> m_state;
     // Time.
-    dfloat<T> m_time;
+    detail::dfloat<T> m_time;
     // The LLVM machinery.
     llvm_state m_llvm;
     // Dimension of the system.
@@ -1032,7 +1035,7 @@ private:
                           "unnamed arguments.");
         } else {
             // Initial time (defaults to zero).
-            const auto time = [&p]() -> T {
+            const auto tm = [&p]() -> T {
                 if constexpr (p.has(kw::time)) {
                     return std::forward<decltype(p(kw::time))>(p(kw::time));
                 } else {
@@ -1041,7 +1044,7 @@ private:
             }();
 
             auto [high_accuracy, tol, compact_mode, pars, parallel_mode]
-                = taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
+                = detail::taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
 
             // Extract the terminal events, if any.
             auto tes = [&p]() -> std::vector<t_event_t> {
@@ -1061,35 +1064,46 @@ private:
                 }
             }();
 
-            finalise_ctor_impl(sys, std::move(state), time, tol, high_accuracy, compact_mode, std::move(pars),
+            finalise_ctor_impl(sys, std::move(state), tm, tol, high_accuracy, compact_mode, std::move(pars),
                                std::move(tes), std::move(ntes), parallel_mode);
         }
     }
 
 public:
-    taylor_adaptive_impl();
+    taylor_adaptive();
 
     template <typename... KwArgs>
-    explicit taylor_adaptive_impl(const std::vector<expression> &sys, std::vector<T> state, KwArgs &&...kw_args)
+    explicit taylor_adaptive(const std::vector<expression> &sys, std::vector<T> state, KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
         finalise_ctor(sys, std::move(state), std::forward<KwArgs>(kw_args)...);
     }
     template <typename... KwArgs>
-    explicit taylor_adaptive_impl(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
-                                  KwArgs &&...kw_args)
+    explicit taylor_adaptive(const std::vector<expression> &sys, std::initializer_list<T> state, KwArgs &&...kw_args)
+        : taylor_adaptive(sys, std::vector<T>(state), std::forward<KwArgs>(kw_args)...)
+    {
+    }
+    template <typename... KwArgs>
+    explicit taylor_adaptive(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
+                             KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
         finalise_ctor(sys, std::move(state), std::forward<KwArgs>(kw_args)...);
     }
+    template <typename... KwArgs>
+    explicit taylor_adaptive(const std::vector<std::pair<expression, expression>> &sys, std::initializer_list<T> state,
+                             KwArgs &&...kw_args)
+        : taylor_adaptive(sys, std::vector<T>(state), std::forward<KwArgs>(kw_args)...)
+    {
+    }
 
-    taylor_adaptive_impl(const taylor_adaptive_impl &);
-    taylor_adaptive_impl(taylor_adaptive_impl &&) noexcept;
+    taylor_adaptive(const taylor_adaptive &);
+    taylor_adaptive(taylor_adaptive &&) noexcept;
 
-    taylor_adaptive_impl &operator=(const taylor_adaptive_impl &);
-    taylor_adaptive_impl &operator=(taylor_adaptive_impl &&) noexcept;
+    taylor_adaptive &operator=(const taylor_adaptive &);
+    taylor_adaptive &operator=(taylor_adaptive &&) noexcept;
 
-    ~taylor_adaptive_impl();
+    ~taylor_adaptive();
 
     const llvm_state &get_llvm_state() const;
 
@@ -1107,7 +1121,7 @@ public:
     }
     void set_time(T t)
     {
-        m_time = dfloat<T>(t);
+        m_time = detail::dfloat<T>(t);
     }
 
     // Time set/get in double-length format.
@@ -1196,10 +1210,10 @@ public:
 private:
     // Implementations of the propagate_*() functions.
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-    propagate_until_impl(const dfloat<T> &, std::size_t, T, const std::function<bool(taylor_adaptive_impl &)> &, bool,
-                         bool);
+    propagate_until_impl(const detail::dfloat<T> &, std::size_t, T, const std::function<bool(taylor_adaptive &)> &,
+                         bool, bool);
     std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
-    propagate_grid_impl(const std::vector<T> &, std::size_t, T, const std::function<bool(taylor_adaptive_impl &)> &);
+    propagate_grid_impl(const std::vector<T> &, std::size_t, T, const std::function<bool(taylor_adaptive &)> &);
 
 public:
     // NOTE: return values:
@@ -1217,16 +1231,16 @@ public:
     propagate_until(T t, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
-            = taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
+            = detail::taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
 
-        return propagate_until_impl(dfloat<T>(t), max_steps, max_delta_t, cb, write_tc, with_c_out);
+        return propagate_until_impl(detail::dfloat<T>(t), max_steps, max_delta_t, cb, write_tc, with_c_out);
     }
     template <typename... KwArgs>
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
     propagate_for(T delta_t, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
-            = taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
+            = detail::taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
 
         return propagate_until_impl(m_time + delta_t, max_steps, max_delta_t, cb, write_tc, with_c_out);
     }
@@ -1236,16 +1250,12 @@ public:
     std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid(std::vector<T> grid,
                                                                                  KwArgs &&...kw_args)
     {
-        auto [max_steps, max_delta_t, cb, _] = taylor_propagate_common_ops<T, true>(std::forward<KwArgs>(kw_args)...);
+        auto [max_steps, max_delta_t, cb, _]
+            = detail::taylor_propagate_common_ops<T, true>(std::forward<KwArgs>(kw_args)...);
 
         return propagate_grid_impl(grid, max_steps, max_delta_t, cb);
     }
 };
-
-} // namespace detail
-
-template <typename T>
-using taylor_adaptive = detail::taylor_adaptive_impl<T>;
 
 namespace detail
 {
@@ -1260,9 +1270,8 @@ inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, KwArgs &
     igor::parser p{kw_args...};
 
     if constexpr (p.has_unnamed_arguments()) {
-        static_assert(detail::always_false_v<KwArgs...>,
-                      "The variadic arguments to a propagate_*() function in an "
-                      "adaptive Taylor integrator in batch mode contain unnamed arguments.");
+        static_assert(always_false_v<KwArgs...>, "The variadic arguments to a propagate_*() function in an "
+                                                 "adaptive Taylor integrator in batch mode contain unnamed arguments.");
         throw;
     } else {
         // Max number of steps (defaults to zero).
@@ -1312,7 +1321,7 @@ inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, KwArgs &
         // signature is passed as argument, return a const reference wrapper to it
         // in order to avoid a useless copy.
         auto cb = [&p]() {
-            using cb_func_t = std::function<bool(taylor_adaptive_batch_impl<T> &)>;
+            using cb_func_t = std::function<bool(taylor_adaptive_batch<T> &)>;
 
             if constexpr (p.has(kw::callback)) {
                 if constexpr (std::is_same_v<uncvref_t<decltype(p(kw::callback))>, cb_func_t>) {
@@ -1354,10 +1363,12 @@ inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, KwArgs &
     }
 }
 
+} // namespace detail
+
 template <typename T>
-class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
+class HEYOKA_DLL_PUBLIC taylor_adaptive_batch
 {
-    static_assert(is_supported_fp_v<T>, "Unhandled type.");
+    static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
 
 public:
     using nt_event_t = nt_event_batch<T>;
@@ -1367,7 +1378,7 @@ private:
     // Struct implementing the data/logic for event detection.
     struct HEYOKA_DLL_PUBLIC ed_data {
         // The working list type used during real root isolation.
-        using wlist_t = std::vector<std::tuple<T, T, taylor_pwrap<T>>>;
+        using wlist_t = std::vector<std::tuple<T, T, detail::taylor_pwrap<T>>>;
         // The type used to store the list of isolating intervals.
         using isol_t = std::vector<std::tuple<T, T>>;
         // Polynomial translation function type.
@@ -1419,7 +1430,7 @@ private:
         // to and interact with m_poly_cache during destruction,
         // and we must be sure that m_wlist is destroyed *before*
         // m_poly_cache.
-        taylor_poly_cache<T> m_poly_cache;
+        detail::taylor_poly_cache<T> m_poly_cache;
         // The working list.
         wlist_t m_wlist;
         // The list of isolating intervals.
@@ -1499,9 +1510,9 @@ private:
     std::vector<std::size_t> m_ts_count;
     std::vector<T> m_min_abs_h, m_max_abs_h;
     std::vector<T> m_cur_max_delta_ts;
-    std::vector<dfloat<T>> m_pfor_ts;
+    std::vector<detail::dfloat<T>> m_pfor_ts;
     std::vector<int> m_t_dir;
-    std::vector<dfloat<T>> m_rem_time;
+    std::vector<detail::dfloat<T>> m_rem_time;
     // Temporary vector used in the dense output implementation.
     std::vector<T> m_d_out_time;
     // Auxiliary data/functions for event detection.
@@ -1535,7 +1546,7 @@ private:
                           "unnamed arguments.");
         } else {
             // Initial times (defaults to a vector of zeroes).
-            auto time = [&p, batch_size]() -> std::vector<T> {
+            auto tm = [&p, batch_size]() -> std::vector<T> {
                 if constexpr (p.has(kw::time)) {
                     return std::forward<decltype(p(kw::time))>(p(kw::time));
                 } else {
@@ -1544,7 +1555,7 @@ private:
             }();
 
             auto [high_accuracy, tol, compact_mode, pars, parallel_mode]
-                = taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
+                = detail::taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
 
             // Extract the terminal events, if any.
             auto tes = [&p]() -> std::vector<t_event_t> {
@@ -1564,36 +1575,48 @@ private:
                 }
             }();
 
-            finalise_ctor_impl(sys, std::move(state), batch_size, std::move(time), tol, high_accuracy, compact_mode,
+            finalise_ctor_impl(sys, std::move(state), batch_size, std::move(tm), tol, high_accuracy, compact_mode,
                                std::move(pars), std::move(tes), std::move(ntes), parallel_mode);
         }
     }
 
 public:
-    taylor_adaptive_batch_impl();
+    taylor_adaptive_batch();
 
     template <typename... KwArgs>
-    explicit taylor_adaptive_batch_impl(const std::vector<expression> &sys, std::vector<T> state,
-                                        std::uint32_t batch_size, KwArgs &&...kw_args)
+    explicit taylor_adaptive_batch(const std::vector<expression> &sys, std::vector<T> state, std::uint32_t batch_size,
+                                   KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
         finalise_ctor(sys, std::move(state), batch_size, std::forward<KwArgs>(kw_args)...);
     }
     template <typename... KwArgs>
-    explicit taylor_adaptive_batch_impl(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
-                                        std::uint32_t batch_size, KwArgs &&...kw_args)
+    explicit taylor_adaptive_batch(const std::vector<expression> &sys, std::initializer_list<T> state,
+                                   std::uint32_t batch_size, KwArgs &&...kw_args)
+        : taylor_adaptive_batch(sys, std::vector<T>(state), batch_size, std::forward<KwArgs>(kw_args)...)
+    {
+    }
+    template <typename... KwArgs>
+    explicit taylor_adaptive_batch(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
+                                   std::uint32_t batch_size, KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
         finalise_ctor(sys, std::move(state), batch_size, std::forward<KwArgs>(kw_args)...);
     }
+    template <typename... KwArgs>
+    explicit taylor_adaptive_batch(const std::vector<std::pair<expression, expression>> &sys,
+                                   std::initializer_list<T> state, std::uint32_t batch_size, KwArgs &&...kw_args)
+        : taylor_adaptive_batch(sys, std::vector<T>(state), batch_size, std::forward<KwArgs>(kw_args)...)
+    {
+    }
 
-    taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &);
-    taylor_adaptive_batch_impl(taylor_adaptive_batch_impl &&) noexcept;
+    taylor_adaptive_batch(const taylor_adaptive_batch &);
+    taylor_adaptive_batch(taylor_adaptive_batch &&) noexcept;
 
-    taylor_adaptive_batch_impl &operator=(const taylor_adaptive_batch_impl &);
-    taylor_adaptive_batch_impl &operator=(taylor_adaptive_batch_impl &&) noexcept;
+    taylor_adaptive_batch &operator=(const taylor_adaptive_batch &);
+    taylor_adaptive_batch &operator=(taylor_adaptive_batch &&) noexcept;
 
-    ~taylor_adaptive_batch_impl();
+    ~taylor_adaptive_batch();
 
     const llvm_state &get_llvm_state() const;
 
@@ -1713,17 +1736,20 @@ public:
 
 private:
     // Implementations of the propagate_*() functions.
-    std::optional<continuous_output_batch<T>>
-    propagate_until_impl(const std::vector<dfloat<T>> &, std::size_t, const std::vector<T> &,
-                         const std::function<bool(taylor_adaptive_batch_impl &)> &, bool, bool);
-    std::optional<continuous_output_batch<T>>
-    propagate_until_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
-                         const std::function<bool(taylor_adaptive_batch_impl &)> &, bool, bool);
-    std::optional<continuous_output_batch<T>>
-    propagate_for_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
-                       const std::function<bool(taylor_adaptive_batch_impl &)> &, bool, bool);
+    std::optional<continuous_output_batch<T>> propagate_until_impl(const std::vector<detail::dfloat<T>> &, std::size_t,
+                                                                   const std::vector<T> &,
+                                                                   const std::function<bool(taylor_adaptive_batch &)> &,
+                                                                   bool, bool);
+    std::optional<continuous_output_batch<T>> propagate_until_impl(const std::vector<T> &, std::size_t,
+                                                                   const std::vector<T> &,
+                                                                   const std::function<bool(taylor_adaptive_batch &)> &,
+                                                                   bool, bool);
+    std::optional<continuous_output_batch<T>> propagate_for_impl(const std::vector<T> &, std::size_t,
+                                                                 const std::vector<T> &,
+                                                                 const std::function<bool(taylor_adaptive_batch &)> &,
+                                                                 bool, bool);
     std::vector<T> propagate_grid_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
-                                       const std::function<bool(taylor_adaptive_batch_impl &)> &);
+                                       const std::function<bool(taylor_adaptive_batch &)> &);
 
 public:
     // NOTE: in propagate_for/until(), we can take 'ts' as const reference because it is always
@@ -1733,7 +1759,8 @@ public:
     std::optional<continuous_output_batch<T>> propagate_until(const std::vector<T> &ts, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, std::forward<KwArgs>(kw_args)...);
+            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size,
+                                                                         std::forward<KwArgs>(kw_args)...);
 
         return propagate_until_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb, write_tc,
                                     with_c_out); // LCOV_EXCL_LINE
@@ -1742,11 +1769,12 @@ public:
     std::optional<continuous_output_batch<T>> propagate_until(T t, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, std::forward<KwArgs>(kw_args)...);
+            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size,
+                                                                         std::forward<KwArgs>(kw_args)...);
 
         // NOTE: re-use m_pfor_ts as tmp storage, as the other overload does.
         assert(m_pfor_ts.size() == m_batch_size); // LCOV_EXCL_LINE
-        std::fill(m_pfor_ts.begin(), m_pfor_ts.end(), dfloat<T>(t));
+        std::fill(m_pfor_ts.begin(), m_pfor_ts.end(), detail::dfloat<T>(t));
         return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb, write_tc,
                                     with_c_out); // LCOV_EXCL_LINE
     }
@@ -1754,7 +1782,8 @@ public:
     std::optional<continuous_output_batch<T>> propagate_for(const std::vector<T> &delta_ts, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, std::forward<KwArgs>(kw_args)...);
+            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size,
+                                                                         std::forward<KwArgs>(kw_args)...);
 
         return propagate_for_impl(delta_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb, write_tc,
                                   with_c_out); // LCOV_EXCL_LINE
@@ -1763,11 +1792,12 @@ public:
     std::optional<continuous_output_batch<T>> propagate_for(T delta_t, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, std::forward<KwArgs>(kw_args)...);
+            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size,
+                                                                         std::forward<KwArgs>(kw_args)...);
 
         // NOTE: this is a slight repetition of the other overload's code.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            m_pfor_ts[i] = dfloat<T>(m_time_hi[i], m_time_lo[i]) + delta_t;
+            m_pfor_ts[i] = detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) + delta_t;
         }
         return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb, write_tc,
                                     with_c_out); // LCOV_EXCL_LINE
@@ -1778,7 +1808,7 @@ public:
     std::vector<T> propagate_grid(std::vector<T> grid, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, _]
-            = taylor_propagate_common_ops_batch<T, true, false>(m_batch_size, std::forward<KwArgs>(kw_args)...);
+            = detail::taylor_propagate_common_ops_batch<T, true, false>(m_batch_size, std::forward<KwArgs>(kw_args)...);
 
         return propagate_grid_impl(grid, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb);
     }
@@ -1788,57 +1818,47 @@ public:
     }
 };
 
-} // namespace detail
-
 template <typename T>
-using taylor_adaptive_batch = detail::taylor_adaptive_batch_impl<T>;
-
-namespace detail
+inline std::ostream &operator<<(std::ostream &os, const taylor_adaptive<T> &)
 {
-
-template <typename T>
-inline std::ostream &operator<<(std::ostream &os, const taylor_adaptive_impl<T> &)
-{
-    static_assert(always_false_v<T>, "Unhandled type.");
+    static_assert(detail::always_false_v<T>, "Unhandled type.");
 
     return os;
 }
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_impl<double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive<double> &);
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_impl<long double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive<long double> &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_impl<mppp::real128> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive<mppp::real128> &);
 
 #endif
 
 template <typename T>
-inline std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch_impl<T> &)
+inline std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch<T> &)
 {
-    static_assert(always_false_v<T>, "Unhandled type.");
+    static_assert(detail::always_false_v<T>, "Unhandled type.");
 
     return os;
 }
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch_impl<double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch<double> &);
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch_impl<long double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch<long double> &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch_impl<mppp::real128> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch<mppp::real128> &);
 
 #endif
-
-} // namespace detail
 
 } // namespace heyoka
 

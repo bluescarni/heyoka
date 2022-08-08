@@ -7,9 +7,18 @@ Changelog
 New
 ~~~
 
+- The numerical integrator classes now support class template argument deduction
+  (`#267 <https://github.com/bluescarni/heyoka/pull/267>`__).
 - Add the capability to compile multivariate vector functions
   at runtime
   (`#261 <https://github.com/bluescarni/heyoka/pull/261>`__).
+
+Changes
+~~~~~~~
+
+- heyoka now builds against recent versions of the fmt library
+  without deprecation warnings
+  (`#266 <https://github.com/bluescarni/heyoka/pull/266>`__).
 
 0.18.0 (2022-05-11)
 -------------------
