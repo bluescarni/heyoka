@@ -348,6 +348,8 @@ if(TARGET LLVM)
     # a target called LLVM.
     target_link_libraries(heyoka_llvm_internal INTERFACE LLVM)
 else()
+    find_package(ZLIB REQUIRED)
+
     # Otherwise, LLVM is built as a collection of
     # separate libraries/components.
 
