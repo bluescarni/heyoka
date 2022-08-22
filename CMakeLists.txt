@@ -343,15 +343,21 @@ endif()
 target_include_directories(heyoka_llvm_internal SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
 
 if(TARGET LLVM)
-    # On some platforms, LLVM is built as a single library,
+    # On some platforms, LLVM is built as a single shared library,
     # which is exported by LLVM's CMake config-file package as
     # a target called LLVM.
     target_link_libraries(heyoka_llvm_internal INTERFACE LLVM)
 else()
-    find_package(ZLIB REQUIRED)
-
     # Otherwise, LLVM is built as a collection of
-    # separate libraries/components.
+    # separate static libraries/components.
+
+    # NOTE: this is necessary because LLVM's config-file packages
+    # do not look for zlib, despite linking to the ZLIB::ZLIB
+    # target. I think this is not necessary in shared library builds
+    # because zlib might be a private dependency and thus it is not
+    # necessary to bring it into the link chain explicitly (as the
+    # LLVM shared object already brings it in).
+    find_package(ZLIB REQUIRED)
 
     # NOTE: these components have been determined heuristically.
     set(_HEYOKA_LLVM_COMPONENTS native orcjit)
