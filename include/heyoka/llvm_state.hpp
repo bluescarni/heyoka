@@ -204,31 +204,30 @@ public:
     ir_builder &builder();
     llvm::LLVMContext &context();
     unsigned &opt_level();
-    bool &fast_math();
 
-    const std::string &module_name() const;
-    const llvm::Module &module() const;
-    const ir_builder &builder() const;
-    const llvm::LLVMContext &context() const;
-    const unsigned &opt_level() const;
-    const bool &fast_math() const;
+    [[nodiscard]] const std::string &module_name() const;
+    [[nodiscard]] const llvm::Module &module() const;
+    [[nodiscard]] const ir_builder &builder() const;
+    [[nodiscard]] const llvm::LLVMContext &context() const;
+    [[nodiscard]] const unsigned &opt_level() const;
+    [[nodiscard]] bool fast_math() const;
 
-    std::string get_ir() const;
+    [[nodiscard]] std::string get_ir() const;
     void dump_object_code(const std::string &) const;
-    const std::string &get_object_code() const;
+    [[nodiscard]] const std::string &get_object_code() const;
 
     void verify_function(const std::string &);
     void verify_function(llvm::Function *);
 
     void optimise();
 
-    bool is_compiled() const;
+    [[nodiscard]] bool is_compiled() const;
 
     void compile();
 
     std::uintptr_t jit_lookup(const std::string &);
 
-    llvm_state make_similar() const;
+    [[nodiscard]] llvm_state make_similar() const;
 };
 
 } // namespace heyoka
