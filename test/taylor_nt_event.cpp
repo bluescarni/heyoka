@@ -176,7 +176,7 @@ TEST_CASE("taylor nte")
 
             auto [v] = make_vars("v");
 
-            using ev_t = std::conditional_t<decltype(bflag)::value, nt_event_batch<fp_t>, nt_event<fp_t>>;
+            using ev_t = detail::nt_event_impl<fp_t, decltype(bflag)::value>;
 
             std::ostringstream oss;
             oss << ev_t(v * v - 1e-10, [](auto &, fp_t, int, auto...) {});
