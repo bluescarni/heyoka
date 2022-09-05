@@ -1862,27 +1862,4 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive
 
 } // namespace heyoka
 
-// NOTE: copy the implementation of the BOOST_CLASS_VERSION macro, as it does
-// not support class templates.
-namespace boost::serialization
-{
-
-template <typename T>
-struct version<heyoka::taylor_adaptive<T>> {
-    typedef mpl::int_<2> type;
-    typedef mpl::integral_c_tag tag;
-    BOOST_STATIC_CONSTANT(int, value = version::type::value);
-    BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<2>, boost::mpl::int_<256>>));
-};
-
-template <typename T>
-struct version<heyoka::taylor_adaptive_batch<T>> {
-    typedef mpl::int_<2> type;
-    typedef mpl::integral_c_tag tag;
-    BOOST_STATIC_CONSTANT(int, value = version::type::value);
-    BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<2>, boost::mpl::int_<256>>));
-};
-
-} // namespace boost::serialization
-
 #endif
