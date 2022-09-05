@@ -440,9 +440,9 @@ public:
 
     ~nt_event_impl();
 
-    const expression &get_expression() const;
+    [[nodiscard]] const expression &get_expression() const;
     const callback_t &get_callback() const;
-    event_direction get_direction() const;
+    [[nodiscard]] event_direction get_direction() const;
 };
 
 template <typename T, bool B>
@@ -553,9 +553,9 @@ public:
 
     ~t_event_impl();
 
-    const expression &get_expression() const;
+    [[nodiscard]] const expression &get_expression() const;
     const callback_t &get_callback() const;
-    event_direction get_direction() const;
+    [[nodiscard]] event_direction get_direction() const;
     T get_cooldown() const;
 };
 
@@ -609,7 +609,7 @@ namespace detail
 template <typename T>
 std::ostream &c_out_stream_impl(std::ostream &, const continuous_output<T> &);
 
-}
+} // namespace detail
 
 template <typename T>
 class HEYOKA_DLL_PUBLIC continuous_output
@@ -647,7 +647,7 @@ public:
     continuous_output &operator=(const continuous_output &);
     continuous_output &operator=(continuous_output &&) noexcept;
 
-    const llvm_state &get_llvm_state() const;
+    [[nodiscard]] const llvm_state &get_llvm_state() const;
 
     const std::vector<T> &operator()(T tm)
     {
@@ -668,7 +668,7 @@ public:
     }
 
     std::pair<T, T> get_bounds() const;
-    std::size_t get_n_steps() const;
+    [[nodiscard]] std::size_t get_n_steps() const;
 };
 
 template <typename T>
@@ -701,7 +701,7 @@ namespace detail
 template <typename T>
 std::ostream &c_out_batch_stream_impl(std::ostream &, const continuous_output_batch<T> &);
 
-}
+} // namespace detail
 
 template <typename T>
 class HEYOKA_DLL_PUBLIC continuous_output_batch
@@ -741,7 +741,7 @@ public:
     continuous_output_batch &operator=(const continuous_output_batch &);
     continuous_output_batch &operator=(continuous_output_batch &&) noexcept;
 
-    const llvm_state &get_llvm_state() const;
+    [[nodiscard]] const llvm_state &get_llvm_state() const;
 
     const std::vector<T> &operator()(const T *tm)
     {
@@ -765,10 +765,10 @@ public:
     {
         return m_tcs;
     }
-    std::uint32_t get_batch_size() const;
+    [[nodiscard]] std::uint32_t get_batch_size() const;
 
     std::pair<std::vector<T>, std::vector<T>> get_bounds() const;
-    std::size_t get_n_steps() const;
+    [[nodiscard]] std::size_t get_n_steps() const;
 };
 
 template <typename T>
@@ -1105,15 +1105,15 @@ public:
 
     ~taylor_adaptive();
 
-    const llvm_state &get_llvm_state() const;
+    [[nodiscard]] const llvm_state &get_llvm_state() const;
 
-    const taylor_dc_t &get_decomposition() const;
+    [[nodiscard]] const taylor_dc_t &get_decomposition() const;
 
-    std::uint32_t get_order() const;
+    [[nodiscard]] std::uint32_t get_order() const;
     T get_tol() const;
-    bool get_high_accuracy() const;
-    bool get_compact_mode() const;
-    std::uint32_t get_dim() const;
+    [[nodiscard]] bool get_high_accuracy() const;
+    [[nodiscard]] bool get_compact_mode() const;
+    [[nodiscard]] std::uint32_t get_dim() const;
 
     T get_time() const
     {
@@ -1173,7 +1173,7 @@ public:
     }
     const std::vector<T> &update_d_output(T, bool = false);
 
-    bool with_events() const
+    [[nodiscard]] bool with_events() const
     {
         return static_cast<bool>(m_ed_data);
     }
@@ -1618,16 +1618,16 @@ public:
 
     ~taylor_adaptive_batch();
 
-    const llvm_state &get_llvm_state() const;
+    [[nodiscard]] const llvm_state &get_llvm_state() const;
 
-    const taylor_dc_t &get_decomposition() const;
+    [[nodiscard]] const taylor_dc_t &get_decomposition() const;
 
-    std::uint32_t get_batch_size() const;
-    std::uint32_t get_order() const;
+    [[nodiscard]] std::uint32_t get_batch_size() const;
+    [[nodiscard]] std::uint32_t get_order() const;
     T get_tol() const;
-    bool get_high_accuracy() const;
-    bool get_compact_mode() const;
-    std::uint32_t get_dim() const;
+    [[nodiscard]] bool get_high_accuracy() const;
+    [[nodiscard]] bool get_compact_mode() const;
+    [[nodiscard]] std::uint32_t get_dim() const;
 
     const std::vector<T> &get_time() const
     {
@@ -1695,7 +1695,7 @@ public:
     const std::vector<T> &update_d_output(const std::vector<T> &, bool = false);
     const std::vector<T> &update_d_output(T, bool = false);
 
-    bool with_events() const
+    [[nodiscard]] bool with_events() const
     {
         return static_cast<bool>(m_ed_data);
     }
