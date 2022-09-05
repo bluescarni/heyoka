@@ -207,12 +207,8 @@ template <typename>
 struct is_terminal_event : std::false_type {
 };
 
-template <typename T>
-struct is_terminal_event<t_event<T>> : std::true_type {
-};
-
-template <typename T>
-struct is_terminal_event<t_event_batch<T>> : std::true_type {
+template <typename T, bool B>
+struct is_terminal_event<t_event_impl<T, B>> : std::true_type {
 };
 
 template <typename T>
