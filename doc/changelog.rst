@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add a short tutorial on extended-precision computations
+  (`#270 <https://github.com/bluescarni/heyoka/pull/270>`__).
 - The numerical integrator classes now support class template argument deduction
   (`#267 <https://github.com/bluescarni/heyoka/pull/267>`__).
 - Add the capability to compile multivariate vector functions
@@ -19,6 +21,12 @@ Changes
 - heyoka now builds against recent versions of the fmt library
   without deprecation warnings
   (`#266 <https://github.com/bluescarni/heyoka/pull/266>`__).
+
+Fix
+~~~
+
+- Fix compilation against recent LLVM 14.x releases on Windows
+  (`#268 <https://github.com/bluescarni/heyoka/pull/268>`__).
 
 0.18.0 (2022-05-11)
 -------------------
