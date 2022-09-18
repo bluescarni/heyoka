@@ -448,10 +448,6 @@ void llvm_state::ctor_setup_math_flags()
         fmf.setFast();
     } else {
         // By default, allow only fp contraction.
-        // NOTE: if we ever implement double-double
-        // arithmetic, we must either revisit this
-        // or make sure that fp contraction is off
-        // for the double-double primitives.
         fmf.setAllowContract();
     }
 
@@ -781,11 +777,6 @@ unsigned &llvm_state::opt_level()
     return m_opt_level;
 }
 
-bool &llvm_state::fast_math()
-{
-    return m_fast_math;
-}
-
 const llvm::Module &llvm_state::module() const
 {
     check_uncompiled(__func__);
@@ -808,7 +799,7 @@ const unsigned &llvm_state::opt_level() const
     return m_opt_level;
 }
 
-const bool &llvm_state::fast_math() const
+bool llvm_state::fast_math() const
 {
     return m_fast_math;
 }
