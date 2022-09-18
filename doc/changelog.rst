@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add a short tutorial on extended-precision computations
+  (`#270 <https://github.com/bluescarni/heyoka/pull/270>`__).
 - The numerical integrator classes now support class template argument deduction
   (`#267 <https://github.com/bluescarni/heyoka/pull/267>`__).
 - Add the capability to compile multivariate vector functions
