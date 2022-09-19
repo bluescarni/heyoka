@@ -93,3 +93,10 @@ The :ref:`event classes <tut_events>`, for instance, can be constructed in exten
 or :cpp:class:`mppp::real128` as the template parameter (instead of ``double``). Note that the precision of an event
 must match the precision of the integrator object in which the event is used, otherwise an error will be produced
 at compilation time.
+
+Full code listing
+-----------------
+
+.. literalinclude:: ../tutorial/extended_precision.cpp
+   :language: c++
+   :lines: 9-
