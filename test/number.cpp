@@ -77,37 +77,27 @@ TEST_CASE("number hash eq")
     REQUIRE(number{1.1} == number{1.1});
     REQUIRE(number{1.1} != number{1.2});
 
-    REQUIRE(number{1.} == number{1.l});
-    REQUIRE(number{1.l} == number{1.});
-    REQUIRE(number{0.} == number{-0.l});
-    REQUIRE(number{0.l} == number{-0.});
+    REQUIRE(number{1.} != number{1.l});
+    REQUIRE(number{1.l} != number{1.});
+    REQUIRE(number{0.} != number{-0.l});
+    REQUIRE(number{0.l} != number{-0.});
     REQUIRE(number{1.1} != number{1.2l});
     REQUIRE(number{1.2l} != number{1.1});
-    REQUIRE(number{1.} == number{1.f});
-    REQUIRE(number{1.f} == number{1.});
-    REQUIRE(number{0.} == number{-0.f});
-    REQUIRE(number{0.f} == number{-0.});
+    REQUIRE(number{1.} != number{1.f});
+    REQUIRE(number{1.f} != number{1.});
+    REQUIRE(number{0.} != number{-0.f});
+    REQUIRE(number{0.f} != number{-0.});
     REQUIRE(number{1.1} != number{1.2f});
     REQUIRE(number{1.2f} != number{1.1});
-    REQUIRE(hash_number(number{1.l}) == hash_number(number{1.}));
-    REQUIRE(hash_number(number{0.l}) == hash_number(number{-0.}));
-    REQUIRE(hash_number(number{1.f}) == hash_number(number{1.}));
-    REQUIRE(hash_number(number{0.f}) == hash_number(number{-0.l}));
 
-    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} == number{std::numeric_limits<double>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<float>::quiet_NaN()} == number{std::numeric_limits<float>::quiet_NaN()});
+    REQUIRE(hash_number(number{1.1f}) == std::hash<float>{}(1.1f));
+    REQUIRE(hash_number(number{1.1}) == std::hash<double>{}(1.1));
+    REQUIRE(hash_number(number{1.1l}) == std::hash<long double>{}(1.1l));
+
+    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{std::numeric_limits<double>::quiet_NaN()});
+    REQUIRE(number{std::numeric_limits<float>::quiet_NaN()} != number{std::numeric_limits<float>::quiet_NaN()});
     REQUIRE(number{std::numeric_limits<long double>::quiet_NaN()}
-            == number{std::numeric_limits<long double>::quiet_NaN()});
-
-    REQUIRE(number{std::numeric_limits<long double>::quiet_NaN()} == number{std::numeric_limits<double>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} == number{std::numeric_limits<long double>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} == number{std::numeric_limits<float>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<float>::quiet_NaN()} == number{std::numeric_limits<double>::quiet_NaN()});
-
-    REQUIRE(hash_number(number{std::numeric_limits<long double>::quiet_NaN()})
-            == hash_number(number{std::numeric_limits<double>::quiet_NaN()}));
-    REQUIRE(hash_number(number{std::numeric_limits<long double>::quiet_NaN()})
-            == hash_number(number{std::numeric_limits<float>::quiet_NaN()}));
+            != number{std::numeric_limits<long double>::quiet_NaN()});
 
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{0.l});
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{0.f});
@@ -124,44 +114,28 @@ TEST_CASE("number hash eq")
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-    REQUIRE(number{1.} == number{1._rq});
-    REQUIRE(number{1.f} == number{1._rq});
-    REQUIRE(number{1._rq} == number{1.});
-    REQUIRE(number{1._rq} == number{1.f});
-    REQUIRE(number{0.} == number{-0._rq});
-    REQUIRE(number{0.f} == number{-0._rq});
-    REQUIRE(number{0._rq} == number{-0.});
-    REQUIRE(number{0._rq} == number{-0.f});
+    REQUIRE(number{1.} != number{1._rq});
+    REQUIRE(number{1.f} != number{1._rq});
+    REQUIRE(number{1._rq} != number{1.});
+    REQUIRE(number{1._rq} != number{1.f});
+    REQUIRE(number{0.} != number{-0._rq});
+    REQUIRE(number{0.f} != number{-0._rq});
+    REQUIRE(number{0._rq} != number{-0.});
+    REQUIRE(number{0._rq} != number{-0.f});
     REQUIRE(number{1.1} != number{1.2_rq});
     REQUIRE(number{1.1f} != number{1.2_rq});
     REQUIRE(number{1.2_rq} != number{1.1});
     REQUIRE(number{1.2_rq} != number{1.1f});
-    REQUIRE(hash_number(number{1._rq}) == hash_number(number{1.}));
-    REQUIRE(hash_number(number{1._rq}) == hash_number(number{1.f}));
-    REQUIRE(hash_number(number{0._rq}) == hash_number(number{-0.}));
-    REQUIRE(hash_number(number{0._rq}) == hash_number(number{-0.f}));
 
     REQUIRE(number{1.1} != number{1.1_rq});
     REQUIRE(number{1.1f} != number{1.1_rq});
     REQUIRE(number{1.1_rq} != number{1.1});
     REQUIRE(number{1.1_rq} != number{1.1f});
 
-    REQUIRE(number{std::numeric_limits<mppp::real128>::quiet_NaN()}
-            == number{std::numeric_limits<mppp::real128>::quiet_NaN()});
+    REQUIRE(hash_number(number{1.1_rq}) == std::hash<mppp::real128>{}(1.1_rq));
 
     REQUIRE(number{std::numeric_limits<mppp::real128>::quiet_NaN()}
-            == number{std::numeric_limits<double>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<mppp::real128>::quiet_NaN()}
-            == number{std::numeric_limits<double>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<mppp::real128>::quiet_NaN()} == number{std::numeric_limits<float>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()}
-            == number{std::numeric_limits<mppp::real128>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<float>::quiet_NaN()} == number{std::numeric_limits<mppp::real128>::quiet_NaN()});
-
-    REQUIRE(hash_number(number{std::numeric_limits<mppp::real128>::quiet_NaN()})
-            == hash_number(number{std::numeric_limits<double>::quiet_NaN()}));
-    REQUIRE(hash_number(number{std::numeric_limits<mppp::real128>::quiet_NaN()})
-            == hash_number(number{std::numeric_limits<float>::quiet_NaN()}));
+            != number{std::numeric_limits<mppp::real128>::quiet_NaN()});
 
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{0._rq});
     REQUIRE(number{std::numeric_limits<float>::quiet_NaN()} != number{0._rq});
@@ -180,7 +154,7 @@ TEST_CASE("number hash eq")
 
     // Verify that subexpressions which differ only
     // by the type of the constants (but not their values)
-    // are correctly simplified.
+    // are not simplified.
     auto [x, y] = make_vars("x", "y");
 
     {
@@ -188,11 +162,7 @@ TEST_CASE("number hash eq")
 
         auto dc = taylor_add_jet<double>(s, "jet", {prime(x) = (y + 1.) + (y + 1.l), prime(y) = x}, 1, 1, false, true);
 
-        REQUIRE(dc.size() == 6u);
-
-        // Make sure the vector of constants has been
-        // optimised out because both constants are 1.
-        REQUIRE(!boost::contains(s.get_ir(), "internal constant [2 x double]"));
+        REQUIRE(dc.size() == 7u);
     }
 
     {
@@ -201,11 +171,7 @@ TEST_CASE("number hash eq")
         auto dc = taylor_add_jet<double>(s, "jet", {prime(x) = (y + 1.) + (y + expression{number{1.f}}), prime(y) = x},
                                          1, 1, false, true);
 
-        REQUIRE(dc.size() == 6u);
-
-        // Make sure the vector of constants has been
-        // optimised out because both constants are 1.
-        REQUIRE(!boost::contains(s.get_ir(), "internal constant [2 x double]"));
+        REQUIRE(dc.size() == 7u);
     }
 }
 

@@ -546,7 +546,7 @@ TEST_CASE("add simpls")
     auto [x, y] = make_vars("x", "y");
 
     REQUIRE(1_dbl + 2_dbl == 3_dbl);
-    REQUIRE(1_ldbl + 2_dbl == 3_dbl);
+    REQUIRE(1_ldbl + 2_dbl == 3_ldbl);
 
     REQUIRE(0_dbl + (x + y) == x + y);
 
@@ -571,7 +571,7 @@ TEST_CASE("sub simpls")
     auto [x, y] = make_vars("x", "y");
 
     REQUIRE(1_dbl - 2_dbl == -1_dbl);
-    REQUIRE(1_ldbl - 3_dbl == -2_dbl);
+    REQUIRE(1_ldbl - 3_dbl == -2_ldbl);
 
     REQUIRE(0_dbl - x == -x);
 
@@ -597,7 +597,7 @@ TEST_CASE("mul simpls")
     REQUIRE(x * x == square(x));
 
     REQUIRE(1_dbl * 2_dbl == 2_dbl);
-    REQUIRE(3_ldbl * 2_dbl == 6_dbl);
+    REQUIRE(3_ldbl * 2_dbl == 6_ldbl);
 
     REQUIRE(0_dbl * x == 0_dbl);
     REQUIRE(1_dbl * (x + y) == x + y);

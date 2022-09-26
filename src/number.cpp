@@ -99,33 +99,9 @@ void swap(number &n0, number &n1) noexcept
     std::swap(n0.value(), n1.value());
 }
 
-// NOTE: for consistency with the equality operator,
-// we want to ensure that:
-// - all nan values hash to the same value,
-// - two numbers with the same value hash to the same value,
-//   even if they are of different types.
-// The strategy is then to cast the value to the largest
-// floating-point type (which ensures that the original
-// value is preserved exactly) and then hash on that.
 std::size_t hash(const number &n)
 {
-    return std::visit(
-        [](const auto &v) -> std::size_t {
-#if defined(HEYOKA_HAVE_REAL128)
-            // NOTE: mppp::hash() already ensures that
-            // all nans hash to the same value.
-            return mppp::hash(static_cast<mppp::real128>(v));
-#else
-            if (std::isnan(v)) {
-                // Make sure all nan values
-                // have the same hash.
-                return 0;
-            } else {
-                return std::hash<long double>{}(static_cast<long double>(v));
-            }
-#endif
-        },
-        n.value());
+    return std::visit([](const auto &v) { return std::hash<detail::uncvref_t<decltype(v)>>{}(v); }, n.value());
 }
 
 std::ostream &operator<<(std::ostream &os, const number &n)
@@ -206,14 +182,6 @@ template <typename T, typename U = T>
 using is_divisible = std::conjunction<is_detected<div_t, T, U>, is_detected<div_t, U, T>,
                                       std::is_same<detected_t<div_t, T, U>, detected_t<div_t, U, T>>>;
 
-template <typename T, typename U>
-using eq_t = decltype(std::declval<T>() == std::declval<U>());
-
-template <typename T, typename U = T>
-using is_equality_comparable = std::conjunction<is_detected<eq_t, T, U>, is_detected<eq_t, U, T>,
-                                                std::is_same<detected_t<eq_t, T, U>, detected_t<eq_t, U, T>>,
-                                                std::is_convertible<detected_t<eq_t, U, T>, bool>>;
-
 } // namespace
 
 } // namespace detail
@@ -286,24 +254,20 @@ number operator/(number n1, number n2)
         std::move(n1.value()), std::move(n2.value()));
 }
 
+// NOTE: in order for equality to be consistent with hashing,
+// we want to make sure that two numbers of different type
+// are always considered different (were they considered equal,
+// we would have then to ensure that they both hash to the same
+// value, which would be quite hard to do).
 bool operator==(const number &n1, const number &n2)
 {
     return std::visit(
         [](const auto &v1, const auto &v2) -> bool {
-            if constexpr (detail::is_equality_comparable<decltype(v1), decltype(v2)>::value) {
-                using std::isnan;
+            using type1 = detail::uncvref_t<decltype(v1)>;
+            using type2 = detail::uncvref_t<decltype(v2)>;
 
-                if (isnan(v1) && isnan(v2)) {
-                    // NOTE: make nan compare equal, for consistency
-                    // with hashing.
-                    return true;
-                } else {
-                    // NOTE: this covers the following cases:
-                    // - neither v1 nor v2 is nan,
-                    // - v1 is nan and v2 is not,
-                    // - v2 is nan and v1 is not.
-                    return v1 == v2;
-                }
+            if constexpr (std::is_same_v<type1, type2>) {
+                return v1 == v2;
             } else {
                 // LCOV_EXCL_START
                 throw std::invalid_argument(
