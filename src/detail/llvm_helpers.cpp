@@ -140,7 +140,6 @@ const auto type_map = []() {
                 assert(ret != nullptr);
                 return ret;
             };
-#if defined(HEYOKA_ARCH_X86)
         } else if (std::numeric_limits<long double>::digits == 64) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // x86 extended precision format.
@@ -148,7 +147,6 @@ const auto type_map = []() {
                 assert(ret != nullptr);
                 return ret;
             };
-#endif
         } else if (std::numeric_limits<long double>::digits == 113) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // IEEE quadruple-precision format (e.g., ARM 64).
