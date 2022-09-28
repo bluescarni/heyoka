@@ -249,7 +249,9 @@ llvm::Value *taylor_determine_h(llvm_state &s,
 
     llvm::Value *max_abs_state = nullptr, *max_abs_diff_o = nullptr, *max_abs_diff_om1 = nullptr;
 
-    auto *vec_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *vec_t = make_vector_type(fp_t, batch_size);
 
     if (diff_variant.index() == 0u) {
         // Compact mode.
@@ -359,9 +361,10 @@ llvm::Value *taylor_determine_h(llvm_state &s,
     // Estimate rho at orders order - 1 and order.
     auto num_rho = builder.CreateSelect(abs_or_rel, llvm::ConstantFP::get(vec_t, 1.), max_abs_state);
     auto rho_o = llvm_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_o),
-                          vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / order}), batch_size));
-    auto rho_om1 = llvm_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
-                            vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / (order - 1u)}), batch_size));
+                          vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / order}), batch_size));
+    auto rho_om1
+        = llvm_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
+                   vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / (order - 1u)}), batch_size));
 
     // Take the minimum.
     auto rho_m = llvm_min(s, rho_o, rho_om1);
@@ -371,7 +374,7 @@ llvm::Value *taylor_determine_h(llvm_state &s,
                         / (exp(static_cast<T>(1)) * exp(static_cast<T>(1)));
 
     // Determine the step size in absolute value.
-    auto h = builder.CreateFMul(rho_m, vector_splat(builder, codegen<T>(s, number{rhofac}), batch_size));
+    auto h = builder.CreateFMul(rho_m, vector_splat(builder, llvm_codegen(s, fp_t, number{rhofac}), batch_size));
 
     // Ensure that the step size does not exceed the limit in absolute value.
     auto *max_h_vec = load_vector_from_memory(builder, h_ptr, batch_size);
@@ -452,6 +455,9 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
 
     auto &builder = s.builder();
 
+    // Fetch ths type corresponding to T.
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     return std::visit(
         [&](const auto &v) -> llvm::Value * {
             using type = uncvref_t<decltype(v)>;
@@ -469,7 +475,7 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
                 // We have to divide the derivative by order
                 // to get the normalised derivative of the state variable.
                 return builder.CreateFDiv(
-                    ret, vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size));
+                    ret, vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(order))), batch_size));
             } else if constexpr (std::is_same_v<type, number> || std::is_same_v<type, param>) {
                 // The first-order derivative is a constant.
                 // If the first-order derivative is being requested,
@@ -509,6 +515,9 @@ taylor_c_make_sv_diff_globals(llvm_state &s, const taylor_dc_t &dc, std::uint32_
     auto &builder = s.builder();
     auto &md = s.module();
 
+    // Fetch the type corresponding to T.
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Build iteratively the output values as vectors of constants.
     std::vector<llvm::Constant *> var_indices, vars, num_indices, nums, par_indices, pars;
 
@@ -530,7 +539,7 @@ taylor_c_make_sv_diff_globals(llvm_state &s, const taylor_dc_t &dc, std::uint32_
                     vars.push_back(builder.getInt32(uname_to_index(v.name())));
                 } else if constexpr (std::is_same_v<type, number>) {
                     num_indices.push_back(builder.getInt32(i - n_uvars));
-                    nums.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, v)));
+                    nums.push_back(llvm::cast<llvm::Constant>(llvm_codegen(s, fp_t, v)));
                 } else if constexpr (std::is_same_v<type, param>) {
                     par_indices.push_back(builder.getInt32(i - n_uvars));
                     pars.push_back(builder.getInt32(v.idx()));

@@ -2336,7 +2336,7 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
                     store_vector_to_memory(builder, ptr, eval_arr[u_idx]);
                 } else if constexpr (std::is_same_v<type, number>) {
                     // Codegen the number and store it.
-                    store_vector_to_memory(builder, ptr, vector_splat(builder, codegen<T>(s, v), batch_size));
+                    store_vector_to_memory(builder, ptr, vector_splat(builder, llvm_codegen(s, fp_t, v), batch_size));
                 } else if constexpr (std::is_same_v<type, param>) {
                     // Codegen the parameter and store it.
                     store_vector_to_memory(builder, ptr,
@@ -2660,6 +2660,9 @@ cfunc_c_make_output_globals(llvm_state &s, const std::vector<expression> &dc, st
     auto &builder = s.builder();
     auto &md = s.module();
 
+    // Fetch the type corresponding to T.
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Build iteratively the output values as vectors of constants.
     std::vector<llvm::Constant *> var_indices, vars, num_indices, nums, par_indices, pars;
 
@@ -2680,7 +2683,7 @@ cfunc_c_make_output_globals(llvm_state &s, const std::vector<expression> &dc, st
                     vars.push_back(builder.getInt32(uname_to_index(v.name())));
                 } else if constexpr (std::is_same_v<type, number>) {
                     num_indices.push_back(builder.getInt32(i - nuvars));
-                    nums.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, v)));
+                    nums.push_back(llvm::cast<llvm::Constant>(llvm_codegen(s, fp_t, v)));
                 } else if constexpr (std::is_same_v<type, param>) {
                     par_indices.push_back(builder.getInt32(i - nuvars));
                     pars.push_back(builder.getInt32(v.idx()));

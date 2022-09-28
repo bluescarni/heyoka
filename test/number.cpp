@@ -18,8 +18,17 @@
 #include <variant>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/math/constants/constants.hpp>
 
 #include <fmt/format.h>
+
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -332,4 +341,115 @@ TEST_CASE("number fmt")
     oss << number(1.1);
 
     REQUIRE(oss.str() == fmt::format("{}", number(1.1)));
+}
+
+TEST_CASE("llvm_codegen")
+{
+    {
+        llvm_state s{kw::opt_level = 0};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = builder.getDoubleTy();
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{boost::math::constants::pi<double>()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == boost::math::constants::pi<double>());
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = builder.getFloatTy();
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{boost::math::constants::pi<float>()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<float (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == boost::math::constants::pi<float>());
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = builder.getFloatTy();
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{boost::math::constants::pi<double>()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<float (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == static_cast<float>(boost::math::constants::pi<double>()));
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = builder.getDoubleTy();
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{boost::math::constants::pi<float>()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == boost::math::constants::pi<float>());
+    }
 }

@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <functional>
 #include <initializer_list>
+#include <ios>
 #include <limits>
 #include <locale>
 #include <ostream>
@@ -27,6 +28,7 @@
 #include <vector>
 
 #include <boost/core/demangle.hpp>
+#include <boost/numeric/conversion/cast.hpp>
 
 #include <llvm/ADT/APFloat.h>
 #include <llvm/IR/Constants.h>
@@ -468,5 +470,57 @@ template HEYOKA_DLL_PUBLIC llvm::Value *codegen<long double>(llvm_state &, const
 template HEYOKA_DLL_PUBLIC llvm::Value *codegen<mppp::real128>(llvm_state &, const number &);
 
 #endif
+
+llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
+{
+    assert(tp != nullptr);
+    assert(!tp->isPPC_FP128Ty());
+
+    if (tp->isFloatingPointTy()) {
+        // Fetch the FP semantics and precision.
+        const auto &sem = tp->getFltSemantics();
+        const auto prec = llvm::APFloatBase::semanticsPrecision(sem);
+
+        // Compute the number of base-10 digits that are necessary to uniquely represent
+        // all distinct values of the type tp. See:
+        // https://en.cppreference.com/w/cpp/types/numeric_limits/max_digits10
+        const auto max_d10 = boost::numeric_cast<std::streamsize>(std::ceil(prec * std::log10(2.) + 1));
+
+#if !defined(NDEBUG)
+        // Check the calculation of max_d10 for a couple of types
+        // available on all platforms.
+        if (tp->isDoubleTy()) {
+            assert(max_d10 == std::numeric_limits<double>::max_digits10);
+        }
+        if (tp->isFloatTy()) {
+            assert(max_d10 == std::numeric_limits<float>::max_digits10);
+        }
+#endif
+
+        // Fetch a string representation of n via the stream operator.
+        // Ensure that we use max_d10 digits in the representation, so that
+        // we get the same string we would get if we formally promoted
+        // the value of n to fp_t and then we printed the converted value
+        // with max_digits10 digits.
+        std::ostringstream ss;
+        ss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+        ss.imbue(std::locale::classic());
+        ss.precision(max_d10);
+
+        const auto str_rep = std::visit(
+            [&ss](const auto &v) {
+                ss << v;
+
+                return ss.str();
+            },
+            n.value());
+
+        // Construct the FP constant.
+        return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, str_rep));
+    } else {
+        throw std::invalid_argument(
+            fmt::format("Cannot generate an LLVM constant of type {}", detail::llvm_type_name(tp)));
+    }
+}
 
 } // namespace heyoka
