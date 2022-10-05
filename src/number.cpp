@@ -471,12 +471,13 @@ template HEYOKA_DLL_PUBLIC llvm::Value *codegen<mppp::real128>(llvm_state &, con
 
 #endif
 
+// Generate an LLVM constant of type tp representing the number n.
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
 {
     assert(tp != nullptr);
-    assert(!tp->isPPC_FP128Ty());
 
-    if (tp->isFloatingPointTy()) {
+    if (tp->isFloatingPointTy() && tp->isIEEE()) {
         // Fetch the FP semantics and precision.
         const auto &sem = tp->getFltSemantics();
         const auto prec = llvm::APFloatBase::semanticsPrecision(sem);
@@ -487,21 +488,32 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
         const auto max_d10 = boost::numeric_cast<std::streamsize>(std::ceil(prec * std::log10(2.) + 1));
 
 #if !defined(NDEBUG)
-        // Check the calculation of max_d10 for a couple of types
-        // available on all platforms.
+
+        // Check the calculation of max_d10 for a couple of types.
         if (tp->isDoubleTy()) {
             assert(max_d10 == std::numeric_limits<double>::max_digits10);
+            assert(prec == static_cast<unsigned>(std::numeric_limits<double>::digits));
         }
+
         if (tp->isFloatTy()) {
             assert(max_d10 == std::numeric_limits<float>::max_digits10);
+            assert(prec == static_cast<unsigned>(std::numeric_limits<float>::digits));
         }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+        if (tp == llvm::Type::getFP128Ty(s.context())) {
+            assert(max_d10 == std::numeric_limits<mppp::real128>::max_digits10);
+            assert(prec == static_cast<unsigned>(std::numeric_limits<mppp::real128>::digits));
+        }
+
+#endif
+
 #endif
 
         // Fetch a string representation of n via the stream operator.
         // Ensure that we use max_d10 digits in the representation, so that
-        // we get the same string we would get if we formally promoted
-        // the value of n to fp_t and then we printed the converted value
-        // with max_digits10 digits.
+        // we get the closest approximation possible of n for the type tp.
         std::ostringstream ss;
         ss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
         ss.imbue(std::locale::classic());
@@ -516,6 +528,8 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
             n.value());
 
         // Construct the FP constant.
+        // NOTE: llvm will deduce the correct type for the codegen from the supplied
+        // floating-point semantics.
         return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, str_rep));
     } else {
         throw std::invalid_argument(
