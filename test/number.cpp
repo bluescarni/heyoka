@@ -348,7 +348,7 @@ TEST_CASE("number fmt")
 TEST_CASE("llvm_codegen")
 {
     {
-        llvm_state s{kw::opt_level = 0};
+        llvm_state s{kw::opt_level = 0u};
 
         auto &md = s.module();
         auto &builder = s.builder();
@@ -375,7 +375,7 @@ TEST_CASE("llvm_codegen")
     }
 
     {
-        llvm_state s{kw::opt_level = 0};
+        llvm_state s{kw::opt_level = 0u};
 
         auto &md = s.module();
         auto &builder = s.builder();
@@ -402,7 +402,7 @@ TEST_CASE("llvm_codegen")
     }
 
     {
-        llvm_state s{kw::opt_level = 0};
+        llvm_state s{kw::opt_level = 0u};
 
         auto &md = s.module();
         auto &builder = s.builder();
@@ -429,7 +429,7 @@ TEST_CASE("llvm_codegen")
     }
 
     {
-        llvm_state s{kw::opt_level = 0};
+        llvm_state s{kw::opt_level = 0u};
 
         auto &md = s.module();
         auto &builder = s.builder();
