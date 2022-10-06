@@ -93,6 +93,8 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
 
     auto &builder = s.builder();
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Null retval if the diff order is larger than the
     // polynomial order.
     if (order > n) {
@@ -106,7 +108,7 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
     // binomial coefficient).
     assert(tp.m_e_idx > 0u);
     auto bc = binomial<T>(n, order);
-    auto ret = taylor_codegen_numparam<T>(s, param{tp.m_e_idx - 1u}, par_ptr, batch_size);
+    auto ret = taylor_codegen_numparam(s, fp_t, param{tp.m_e_idx - 1u}, par_ptr, batch_size);
     ret = builder.CreateFMul(ret, vector_splat(builder, codegen<T>(s, number{bc}), batch_size));
 
     // Horner evaluation of polynomial derivative.
@@ -119,7 +121,7 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
         bc = binomial<T>(i + order, order);
 
         // Load the poly coefficient from the par array and multiply it by bc.
-        auto cf = taylor_codegen_numparam<T>(s, param{tp.m_b_idx + i + order}, par_ptr, batch_size);
+        auto cf = taylor_codegen_numparam(s, fp_t, param{tp.m_b_idx + i + order}, par_ptr, batch_size);
         cf = builder.CreateFMul(cf, vector_splat(builder, codegen<T>(s, number{bc}), batch_size));
 
         // Horner iteration.

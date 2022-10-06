@@ -181,17 +181,19 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32
                                     const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
                                     std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     auto &builder = s.builder();
 
     if (order == 0u) {
         // Do the number codegen.
-        auto y = taylor_codegen_numparam<T>(s, num0, par_ptr, batch_size);
-        auto x = taylor_codegen_numparam<T>(s, num1, par_ptr, batch_size);
+        auto y = taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size);
+        auto x = taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size);
 
         // Compute and return the atan2.
         return llvm_atan2(s, y, x);
     } else {
-        return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+        return vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
@@ -206,11 +208,13 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32
 
     auto &builder = s.builder();
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Fetch the index of the y variable argument.
     const auto y_idx = uname_to_index(var.name());
 
     // Do the codegen for the x number argument.
-    auto x = taylor_codegen_numparam<T>(s, num, par_ptr, batch_size);
+    auto x = taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size);
 
     if (order == 0u) {
         // Compute and return the atan2.
@@ -262,11 +266,13 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32
 
     auto &builder = s.builder();
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Fetch the index of the x variable argument.
     const auto x_idx = uname_to_index(var.name());
 
     // Do the codegen for the y number argument.
-    auto y = taylor_codegen_numparam<T>(s, num, par_ptr, batch_size);
+    auto y = taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size);
 
     if (order == 0u) {
         // Compute and return the atan2.

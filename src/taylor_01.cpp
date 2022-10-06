@@ -170,16 +170,14 @@ taylor_c_diff_func_name_args_impl(llvm::LLVMContext &context, const std::string 
     return std::make_pair(std::move(fname), std::move(fargs));
 }
 
-namespace
+llvm::Value *taylor_codegen_numparam(llvm_state &s, llvm::Type *fp_t, const number &num, llvm::Value *,
+                                     std::uint32_t batch_size)
 {
-
-template <typename T>
-llvm::Value *taylor_codegen_numparam_num(llvm_state &s, const number &num, std::uint32_t batch_size)
-{
-    return vector_splat(s.builder(), codegen<T>(s, num), batch_size);
+    return vector_splat(s.builder(), llvm_codegen(s, fp_t, num), batch_size);
 }
 
-llvm::Value *taylor_codegen_numparam_par(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
+llvm::Value *taylor_codegen_numparam(llvm_state &s, llvm::Type *, const param &p, llvm::Value *par_ptr,
+                                     std::uint32_t batch_size)
 {
     // LCOV_EXCL_START
     assert(batch_size > 0u);
@@ -204,46 +202,6 @@ llvm::Value *taylor_codegen_numparam_par(llvm_state &s, const param &p, llvm::Va
     // Load.
     return load_vector_from_memory(builder, ptr, batch_size);
 }
-
-} // namespace
-
-llvm::Value *taylor_codegen_numparam_dbl(llvm_state &s, const number &num, llvm::Value *, std::uint32_t batch_size)
-{
-    return taylor_codegen_numparam_num<double>(s, num, batch_size);
-}
-
-llvm::Value *taylor_codegen_numparam_ldbl(llvm_state &s, const number &num, llvm::Value *, std::uint32_t batch_size)
-{
-    return taylor_codegen_numparam_num<long double>(s, num, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_codegen_numparam_f128(llvm_state &s, const number &num, llvm::Value *, std::uint32_t batch_size)
-{
-    return taylor_codegen_numparam_num<mppp::real128>(s, num, batch_size);
-}
-
-#endif
-
-llvm::Value *taylor_codegen_numparam_dbl(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
-{
-    return taylor_codegen_numparam_par(s, p, par_ptr, batch_size);
-}
-
-llvm::Value *taylor_codegen_numparam_ldbl(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
-{
-    return taylor_codegen_numparam_par(s, p, par_ptr, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_codegen_numparam_f128(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
-{
-    return taylor_codegen_numparam_par(s, p, par_ptr, batch_size);
-}
-
-#endif
 
 // Codegen helpers for number/param for use in the generic c_diff implementations.
 llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const number &, llvm::Value *n, llvm::Value *,

@@ -480,7 +480,7 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
                 // nonzero value that can be produced here is the first-order
                 // derivative.
                 if (order == 1u) {
-                    return taylor_codegen_numparam<T>(s, v, par_ptr, batch_size);
+                    return taylor_codegen_numparam(s, fp_t, v, par_ptr, batch_size);
                 } else {
                     return llvm::ConstantFP::get(to_llvm_vector_type<T>(s.context(), batch_size), 0.);
                 }

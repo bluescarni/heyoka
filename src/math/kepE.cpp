@@ -217,10 +217,12 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 {
     auto &builder = s.builder();
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     if (order == 0u) {
         // Do the number codegen.
-        auto e = taylor_codegen_numparam<T>(s, num0, par_ptr, batch_size);
-        auto M = taylor_codegen_numparam<T>(s, num1, par_ptr, batch_size);
+        auto e = taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size);
+        auto M = taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size);
 
         // Create/fetch the Kepler solver.
         auto fkep = llvm_add_inv_kep_E<T>(s, batch_size);
@@ -243,11 +245,13 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 
     auto &builder = s.builder();
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Fetch the index of the e variable argument.
     const auto e_idx = uname_to_index(var.name());
 
     // Do the codegen for the M number argument.
-    auto M = taylor_codegen_numparam<T>(s, num, par_ptr, batch_size);
+    auto M = taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size);
 
     if (order == 0u) {
         // Create/fetch the Kepler solver.
@@ -309,11 +313,13 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 
     auto &builder = s.builder();
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Fetch the index of the M variable argument.
     const auto M_idx = uname_to_index(var.name());
 
     // Do the codegen for the e number argument.
-    auto e = taylor_codegen_numparam<T>(s, num, par_ptr, batch_size);
+    auto e = taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size);
 
     if (order == 0u) {
         // Create/fetch the Kepler solver.

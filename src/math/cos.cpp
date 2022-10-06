@@ -210,8 +210,10 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &s, const cos_impl &, const std::ve
                                   const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
                                   std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     if (order == 0u) {
-        return llvm_cos(s, taylor_codegen_numparam<T>(s, num, par_ptr, batch_size));
+        return llvm_cos(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
         return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
     }

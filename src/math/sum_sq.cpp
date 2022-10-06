@@ -218,6 +218,8 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, const sum_sq_impl &sf, const
 
     auto &builder = s.builder();
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Each vector in v_sums will contain the terms in the summation in the formula
     // for the computation of the Taylor derivative of square() for each argument in sf.
     std::vector<std::vector<llvm::Value *>> v_sums;
@@ -302,7 +304,7 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, const sum_sq_impl &sf, const
                     } else if constexpr (is_num_param_v<type>) {
                         // Number/param.
                         if (order == 0u) {
-                            auto val = taylor_codegen_numparam<T>(s, v, par_ptr, batch_size);
+                            auto val = taylor_codegen_numparam(s, fp_t, v, par_ptr, batch_size);
                             return builder.CreateFMul(val, val);
                         } else {
                             return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
@@ -321,7 +323,7 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, const sum_sq_impl &sf, const
             // the items in v_sums are all empty and tmp.back() contains only the term
             // outside the summation.
             if (order > 0u) {
-                auto p_sum = pairwise_sum(builder, v_sums[k]);
+                auto *p_sum = pairwise_sum(builder, v_sums[k]);
                 // Muliply the pairwise sum by 2.
                 p_sum = builder.CreateFAdd(p_sum, p_sum);
                 // Add it to the term outside the sum.

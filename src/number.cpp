@@ -503,6 +503,17 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
         !tp->isPPC_FP128Ty()
 #endif
     ) {
+        // NOTE: for float and double we can construct
+        // directly an APFloat.
+        if (tp->isFloatTy() || tp->isDoubleTy()) {
+            const auto apf
+                = tp->isFloatTy()
+                      ? llvm::APFloat(std::visit([](const auto &v) { return static_cast<float>(v); }, n.value()))
+                      : llvm::APFloat(std::visit([](const auto &v) { return static_cast<double>(v); }, n.value()));
+
+            return llvm::ConstantFP::get(s.context(), apf);
+        }
+
         // Fetch the FP semantics and precision.
         const auto &sem = tp->getFltSemantics();
         const auto prec = llvm::APFloatBase::semanticsPrecision(sem);
@@ -512,27 +523,12 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
         // https://en.cppreference.com/w/cpp/types/numeric_limits/max_digits10
         const auto max_d10 = boost::numeric_cast<std::streamsize>(std::ceil(prec * std::log10(2.) + 1));
 
-#if !defined(NDEBUG)
-
-        // Check the calculation of max_d10 for a couple of types.
-        if (tp->isDoubleTy()) {
-            assert(max_d10 == std::numeric_limits<double>::max_digits10);
-            assert(prec == static_cast<unsigned>(std::numeric_limits<double>::digits));
-        }
-
-        if (tp->isFloatTy()) {
-            assert(max_d10 == std::numeric_limits<float>::max_digits10);
-            assert(prec == static_cast<unsigned>(std::numeric_limits<float>::digits));
-        }
-
-#if defined(HEYOKA_HAVE_REAL128)
+#if !defined(NDEBUG) && defined(HEYOKA_HAVE_REAL128)
 
         if (tp == llvm::Type::getFP128Ty(s.context())) {
             assert(max_d10 == std::numeric_limits<mppp::real128>::max_digits10);
             assert(prec == static_cast<unsigned>(std::numeric_limits<mppp::real128>::digits));
         }
-
-#endif
 
 #endif
 

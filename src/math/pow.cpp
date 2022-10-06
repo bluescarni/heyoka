@@ -227,12 +227,14 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const U &num
 {
     auto &builder = s.builder();
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Check if we can use the approximated version.
     const auto allow_approx = pow_allow_approx(f);
 
     if (order == 0u) {
-        return llvm_pow(s, taylor_codegen_numparam<T>(s, num0, par_ptr, batch_size),
-                        taylor_codegen_numparam<T>(s, num1, par_ptr, batch_size), allow_approx);
+        return llvm_pow(s, taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size),
+                        taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size), allow_approx);
     } else {
         return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
     }
@@ -246,6 +248,8 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variab
 {
     auto &builder = s.builder();
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Check if we can use the approximated version.
     const auto allow_approx = pow_allow_approx(f);
 
@@ -254,15 +258,15 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variab
 
     if (order == 0u) {
         return llvm_pow(s, taylor_fetch_diff(arr, u_idx, 0, n_uvars),
-                        taylor_codegen_numparam<T>(s, num, par_ptr, batch_size), allow_approx);
+                        taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size), allow_approx);
     }
 
     // NOTE: iteration in the [0, order) range
     // (i.e., order *not* included).
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 0; j < order; ++j) {
-        auto v0 = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
-        auto v1 = taylor_fetch_diff(arr, idx, j, n_uvars);
+        auto *v0 = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
+        auto *v1 = taylor_fetch_diff(arr, idx, j, n_uvars);
 
         // Compute the scalar factor: order * num - j * (num + 1).
         auto scal_f = [&]() -> llvm::Value * {
@@ -272,7 +276,7 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variab
                                                       - number(static_cast<T>(j)) * (num + number(static_cast<T>(1)))),
                                     batch_size);
             } else {
-                auto pc = taylor_codegen_numparam<T>(s, num, par_ptr, batch_size);
+                auto pc = taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size);
                 auto jvec = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
                 auto ordvec = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
                 auto onevec = vector_splat(builder, codegen<T>(s, number(static_cast<T>(1))), batch_size);
@@ -289,11 +293,11 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variab
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = pairwise_sum(builder, sum);
+    auto *ret_acc = pairwise_sum(builder, sum);
 
     // Compute the final divisor: order * (zero-th derivative of u_idx).
     auto ord_f = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
-    auto b0 = taylor_fetch_diff(arr, u_idx, 0, n_uvars);
+    auto *b0 = taylor_fetch_diff(arr, u_idx, 0, n_uvars);
     auto div = builder.CreateFMul(ord_f, b0);
 
     // Compute and return the result: ret_acc / div.

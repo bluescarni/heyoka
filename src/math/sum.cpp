@@ -176,6 +176,8 @@ llvm::Value *sum_taylor_diff_impl(llvm_state &s, const sum_impl &sf, const std::
 
     auto &builder = s.builder();
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Load all values to be summed in local variables and
     // do a pairwise summation.
     std::vector<llvm::Value *> vals;
@@ -191,7 +193,7 @@ llvm::Value *sum_taylor_diff_impl(llvm_state &s, const sum_impl &sf, const std::
                 } else if constexpr (is_num_param_v<type>) {
                     // Number/param.
                     if (order == 0u) {
-                        vals.push_back(taylor_codegen_numparam<T>(s, v, par_ptr, batch_size));
+                        vals.push_back(taylor_codegen_numparam(s, fp_t, v, par_ptr, batch_size));
                     } else {
                         vals.push_back(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
                     }
