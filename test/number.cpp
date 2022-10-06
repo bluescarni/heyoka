@@ -509,7 +509,12 @@ TEST_CASE("exp")
 {
     REQUIRE(exp(number{1.f}) == number{std::exp(1.f)});
     REQUIRE(exp(number{1.}) == number{std::exp(1.)});
+
+#if !defined(HEYOKA_ARCH_PPC)
+
     REQUIRE(exp(number{1.l}) == number{std::exp(1.l)});
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 

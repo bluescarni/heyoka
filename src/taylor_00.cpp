@@ -321,7 +321,7 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
     // These pointers cannot overlap.
     auto *fp_t = to_llvm_type<T>(context);
     auto *fp_vec_t = make_vector_type(fp_t, batch_size);
-    std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(fp_t));
+    const std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(fp_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
