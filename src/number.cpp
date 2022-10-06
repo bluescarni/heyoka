@@ -32,6 +32,7 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <llvm/ADT/APFloat.h>
+#include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
@@ -491,7 +492,17 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
 {
     assert(tp != nullptr);
 
-    if (tp->isFloatingPointTy() && tp->isIEEE()) {
+    // NOTE: isIEEE() is only available since LLVM 13.
+    // For earlier versions of LLVM, we check that
+    // tp is not a double-double, all the other available
+    // FP types should be IEEE.
+    if (tp->isFloatingPointTy() &&
+#if LLVM_VERSION_MAJOR >= 13
+        tp->isIEEE()
+#else
+        !tp->isPPC_FP128Ty()
+#endif
+    ) {
         // Fetch the FP semantics and precision.
         const auto &sem = tp->getFltSemantics();
         const auto prec = llvm::APFloatBase::semanticsPrecision(sem);
