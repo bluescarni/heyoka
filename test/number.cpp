@@ -14,6 +14,7 @@
 #include <limits>
 #include <locale>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <variant>
 
@@ -452,4 +453,53 @@ TEST_CASE("llvm_codegen")
 
         REQUIRE(f_ptr() == boost::math::constants::pi<float>());
     }
+}
+
+TEST_CASE("number_like")
+{
+    using Catch::Matchers::Message;
+
+    llvm_state s;
+
+    auto &builder = s.builder();
+
+    auto num = detail::number_like(s, builder.getFloatTy(), 42);
+    REQUIRE(num == number{42.f});
+    REQUIRE(std::holds_alternative<float>(num.value()));
+
+    num = detail::number_like(s, builder.getDoubleTy(), 42);
+    REQUIRE(num == number{42.});
+    REQUIRE(std::holds_alternative<double>(num.value()));
+
+    if (std::numeric_limits<long double>::is_iec559) {
+        if (std::numeric_limits<long double>::digits == 53) {
+            // NOTE: here we are on Windows + MSVC, where long double == double
+            // and thus C++ long double associates to LLVM double.
+            // In number_like(), we check tp == to_llvm_type<double> *before*
+            // tp == to_llvm_type<long double>, so we get a number containing
+            // double rather than long double.
+            num = detail::number_like(s, llvm::Type::getDoubleTy(s.context()), 42);
+            REQUIRE(num == number{42.});
+            REQUIRE(std::holds_alternative<double>(num.value()));
+        } else if (std::numeric_limits<long double>::digits == 64) {
+            num = detail::number_like(s, llvm::Type::getX86_FP80Ty(s.context()), 42);
+            REQUIRE(num == number{42.l});
+            REQUIRE(std::holds_alternative<long double>(num.value()));
+        } else if (std::numeric_limits<long double>::digits == 113) {
+            num = detail::number_like(s, llvm::Type::getFP128Ty(s.context()), 42);
+            REQUIRE(num == number{42.l});
+            REQUIRE(std::holds_alternative<long double>(num.value()));
+        }
+    }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    num = detail::number_like(s, llvm::Type::getFP128Ty(s.context()), 42);
+    REQUIRE(num == number{42_rq});
+    REQUIRE(std::holds_alternative<mppp::real128>(num.value()));
+
+#endif
+
+    REQUIRE_THROWS_MATCHES(detail::number_like(s, llvm::Type::getVoidTy(s.context()), 42), std::invalid_argument,
+                           Message("Unable to create a number of type 'void' from the input value 42"));
 }

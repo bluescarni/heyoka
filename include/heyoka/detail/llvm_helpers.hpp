@@ -29,13 +29,13 @@
 namespace heyoka::detail
 {
 
-HEYOKA_DLL_PUBLIC llvm::Type *to_llvm_type_impl(llvm::LLVMContext &, const std::type_info &);
+HEYOKA_DLL_PUBLIC llvm::Type *to_llvm_type_impl(llvm::LLVMContext &, const std::type_info &, bool);
 
 // Helper to associate a C++ type to an LLVM type.
 template <typename T>
-inline llvm::Type *to_llvm_type(llvm::LLVMContext &c)
+inline llvm::Type *to_llvm_type(llvm::LLVMContext &c, bool err_throw = true)
 {
-    return to_llvm_type_impl(c, typeid(T));
+    return to_llvm_type_impl(c, typeid(T), err_throw);
 }
 
 HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);

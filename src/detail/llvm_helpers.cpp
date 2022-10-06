@@ -103,9 +103,7 @@ llvm::Type *int_to_llvm(llvm::LLVMContext &c)
 {
     static_assert(std::is_integral_v<T>);
 
-    auto *ret = llvm::Type::getIntNTy(c, std::numeric_limits<T>::digits);
-    assert(ret != nullptr); // LCOV_EXCL_LINE
-    return ret;
+    return llvm::Type::getIntNTy(c, std::numeric_limits<T>::digits);
 };
 
 // The global type map to associate a C++ type to an LLVM type.
@@ -115,20 +113,12 @@ const auto type_map = []() {
 
     // Try to associate C++ float to LLVM float.
     if (std::numeric_limits<float>::is_iec559 && std::numeric_limits<float>::digits == 24) {
-        retval[typeid(float)] = [](llvm::LLVMContext &c) {
-            auto *ret = llvm::Type::getFloatTy(c);
-            assert(ret != nullptr);
-            return ret;
-        };
+        retval[typeid(float)] = [](llvm::LLVMContext &c) { return llvm::Type::getFloatTy(c); };
     }
 
     // Try to associate C++ double to LLVM double.
     if (std::numeric_limits<double>::is_iec559 && std::numeric_limits<double>::digits == 53) {
-        retval[typeid(double)] = [](llvm::LLVMContext &c) {
-            auto *ret = llvm::Type::getDoubleTy(c);
-            assert(ret != nullptr);
-            return ret;
-        };
+        retval[typeid(double)] = [](llvm::LLVMContext &c) { return llvm::Type::getDoubleTy(c); };
     }
 
     // Try to associate C++ long double to an LLVM fp type.
@@ -136,23 +126,17 @@ const auto type_map = []() {
         if (std::numeric_limits<long double>::digits == 53) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // IEEE double-precision format (this is the case on MSVC for instance).
-                auto *ret = llvm::Type::getDoubleTy(c);
-                assert(ret != nullptr);
-                return ret;
+                return llvm::Type::getDoubleTy(c);
             };
         } else if (std::numeric_limits<long double>::digits == 64) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // x86 extended precision format.
-                auto *ret = llvm::Type::getX86_FP80Ty(c);
-                assert(ret != nullptr);
-                return ret;
+                return llvm::Type::getX86_FP80Ty(c);
             };
         } else if (std::numeric_limits<long double>::digits == 113) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // IEEE quadruple-precision format (e.g., ARM 64).
-                auto *ret = llvm::Type::getFP128Ty(c);
-                assert(ret != nullptr);
-                return ret;
+                return llvm::Type::getFP128Ty(c);
             };
         }
     }
@@ -160,11 +144,7 @@ const auto type_map = []() {
 #if defined(HEYOKA_HAVE_REAL128)
 
     // Associate mppp::real128 to fp128.
-    retval[typeid(mppp::real128)] = [](llvm::LLVMContext &c) {
-        auto *ret = llvm::Type::getFP128Ty(c);
-        assert(ret != nullptr);
-        return ret;
-    };
+    retval[typeid(mppp::real128)] = [](llvm::LLVMContext &c) { return llvm::Type::getFP128Ty(c); };
 
 #endif
 
@@ -182,14 +162,22 @@ const auto type_map = []() {
 
 // Implementation of the function to associate a C++ type to
 // an LLVM type.
-llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp)
+llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp, bool err_throw)
 {
     const auto it = type_map.find(tp);
 
+    const auto *err_msg = "Unable to associate the C++ type '{}' to an LLVM type";
+
     if (it == type_map.end()) {
-        throw std::invalid_argument(fmt::format("Unable to associate the C++ type '{}' to an LLVM type", tp.name()));
+        return err_throw ? throw std::invalid_argument(fmt::format(err_msg, tp.name())) : nullptr;
     } else {
-        return it->second(c);
+        auto *ret = it->second(c);
+
+        if (ret == nullptr) {
+            return err_throw ? throw std::invalid_argument(fmt::format(err_msg, tp.name())) : nullptr;
+        }
+
+        return ret;
     }
 }
 

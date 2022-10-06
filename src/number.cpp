@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <functional>
@@ -32,6 +33,8 @@
 
 #include <llvm/ADT/APFloat.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
 #include <fmt/format.h>
@@ -536,5 +539,34 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
             fmt::format("Cannot generate an LLVM constant of type {}", detail::llvm_type_name(tp)));
     }
 }
+
+namespace detail
+{
+
+// A small helper to create a number instance containing the value val
+// cast to the C++ type corresponding to the LLVM type tp.
+number number_like(llvm_state &s, llvm::Type *tp, double val)
+{
+    assert(tp != nullptr);
+
+    auto &context = s.context();
+
+    if (tp == to_llvm_type<float>(context, false)) {
+        return number{static_cast<float>(val)};
+    } else if (tp == to_llvm_type<double>(context, false)) {
+        return number{val};
+    } else if (tp == to_llvm_type<long double>(context, false)) {
+        return number{static_cast<long double>(val)};
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if (tp == to_llvm_type<mppp::real128>(context, false)) {
+        return number{static_cast<mppp::real128>(val)};
+#endif
+    }
+
+    throw std::invalid_argument(
+        fmt::format("Unable to create a number of type '{}' from the input value {}", llvm_type_name(tp), val));
+}
+
+} // namespace detail
 
 } // namespace heyoka

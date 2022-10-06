@@ -140,6 +140,13 @@ HEYOKA_DLL_PUBLIC llvm::Value *codegen(llvm_state &, const number &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_codegen(llvm_state &, llvm::Type *, const number &);
 
+namespace detail
+{
+
+HEYOKA_DLL_PUBLIC number number_like(llvm_state &, llvm::Type *, double);
+
+} // namespace detail
+
 } // namespace heyoka
 
 #endif
