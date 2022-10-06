@@ -29,7 +29,7 @@ jobs:
         shell: pwsh
         run: |
           conda config --set always_yes yes
-          conda create --name heyoka cmake llvmdev tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel 'fmt=8.1.*' 'spdlog=1.10.*' sleef zlib libzlib
+          conda create --name heyoka cmake 'llvmdev<15' tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel 'fmt=8.1.*' 'spdlog=1.10.*' sleef zlib libzlib
           conda activate heyoka
           mkdir build
           cd build

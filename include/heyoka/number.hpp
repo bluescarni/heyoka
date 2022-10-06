@@ -113,6 +113,8 @@ HEYOKA_DLL_PUBLIC number operator/(number, number);
 HEYOKA_DLL_PUBLIC bool operator==(const number &, const number &);
 HEYOKA_DLL_PUBLIC bool operator!=(const number &, const number &);
 
+HEYOKA_DLL_PUBLIC number exp(number);
+
 HEYOKA_DLL_PUBLIC double eval_dbl(const number &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);
 HEYOKA_DLL_PUBLIC long double eval_ldbl(const number &, const std::unordered_map<std::string, long double> &,

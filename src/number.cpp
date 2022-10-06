@@ -316,6 +316,17 @@ bool operator!=(const number &n1, const number &n2)
     return !(n1 == n2);
 }
 
+number exp(number n)
+{
+    return std::visit(
+        [](auto &&arg) {
+            using std::exp;
+
+            return number{exp(std::forward<decltype(arg)>(arg))};
+        },
+        std::move(n.value()));
+}
+
 namespace detail
 {
 

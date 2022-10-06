@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <cmath>
 #include <functional>
 #include <initializer_list>
 #include <iomanip>
@@ -502,4 +503,17 @@ TEST_CASE("number_like")
 
     REQUIRE_THROWS_MATCHES(detail::number_like(s, llvm::Type::getVoidTy(s.context()), 42), std::invalid_argument,
                            Message("Unable to create a number of type 'void' from the input value 42"));
+}
+
+TEST_CASE("exp")
+{
+    REQUIRE(exp(number{1.f}) == number{std::exp(1.f)});
+    REQUIRE(exp(number{1.}) == number{std::exp(1.)});
+    REQUIRE(exp(number{1.l}) == number{std::exp(1.l)});
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    REQUIRE(exp(number{1._rq}) == number{exp(1._rq)});
+
+#endif
 }
