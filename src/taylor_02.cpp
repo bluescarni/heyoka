@@ -216,6 +216,20 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
     return llvm_min(s, x_v, llvm_abs(s, y_v));
 }
 
+// Helper to compute the scaling + safety factor
+// in taylor_determine_h().
+number taylor_determine_h_rhofac(llvm_state &s, llvm::Type *fp_t, std::uint32_t order)
+{
+    assert(fp_t != nullptr);
+    assert(order > 0u);
+
+    auto const_m7_10 = number_like(s, fp_t, -7.) / number_like(s, fp_t, 10.);
+    auto const_e2 = exp(number_like(s, fp_t, 1.)) * exp(number_like(s, fp_t, 1.));
+    auto const_om1 = number_like(s, fp_t, static_cast<double>(order - 1u));
+
+    return exp(std::move(const_m7_10) / std::move(const_om1)) / std::move(const_e2);
+}
+
 } // namespace
 
 // Helper to generate the LLVM code to determine the timestep in an adaptive Taylor integrator,
@@ -224,8 +238,7 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
 // the clamping values for the timesteps. svf_ptr is a pointer to the first element of an LLVM array containing the
 // values in sv_funcs_dc. If max_abs_state_ptr is not nullptr, the computed norm infinity of the
 // state vector (including sv_funcs, if any) will be written into it.
-template <typename T>
-llvm::Value *taylor_determine_h(llvm_state &s,
+llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
                                 const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
                                 const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *h_ptr,
                                 std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
@@ -245,12 +258,10 @@ llvm::Value *taylor_determine_h(llvm_state &s,
     using std::exp;
 
     auto &builder = s.builder();
-    auto &context = s.context();
 
     llvm::Value *max_abs_state = nullptr, *max_abs_diff_o = nullptr, *max_abs_diff_om1 = nullptr;
 
-    // Fetch the scalar and vector types.
-    auto *fp_t = to_llvm_type<T>(context);
+    // Fetch the vector type.
     auto *vec_t = make_vector_type(fp_t, batch_size);
 
     if (diff_variant.index() == 0u) {
@@ -356,60 +367,45 @@ llvm::Value *taylor_determine_h(llvm_state &s,
     }
 
     // Determine if we are in absolute or relative tolerance mode.
-    auto abs_or_rel = builder.CreateFCmpOLE(max_abs_state, llvm::ConstantFP::get(vec_t, 1.));
+    auto *abs_or_rel = builder.CreateFCmpOLE(max_abs_state, llvm::ConstantFP::get(vec_t, 1.));
 
     // Estimate rho at orders order - 1 and order.
-    auto num_rho = builder.CreateSelect(abs_or_rel, llvm::ConstantFP::get(vec_t, 1.), max_abs_state);
-    auto rho_o = llvm_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_o),
-                          vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / order}), batch_size));
-    auto rho_om1
-        = llvm_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
-                   vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / (order - 1u)}), batch_size));
+    auto *num_rho = builder.CreateSelect(abs_or_rel, llvm::ConstantFP::get(vec_t, 1.), max_abs_state);
+
+    // NOTE: it is fine here to static_cast<double>(order), as order is a 32-bit integer
+    // and double is a IEEE double-precision type (i.e., 53 bits).
+    auto *rho_o = llvm_pow(
+        s, builder.CreateFDiv(num_rho, max_abs_diff_o),
+        vector_splat(builder,
+                     llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, static_cast<double>(order))),
+                     batch_size));
+    auto *rho_om1 = llvm_pow(
+        s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
+        vector_splat(
+            builder,
+            llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, static_cast<double>(order - 1u))),
+            batch_size));
 
     // Take the minimum.
-    auto rho_m = llvm_min(s, rho_o, rho_om1);
+    auto *rho_m = llvm_min(s, rho_o, rho_om1);
 
     // Compute the scaling + safety factor.
-    const auto rhofac = exp((static_cast<T>(-7) / static_cast<T>(10)) / (order - 1u))
-                        / (exp(static_cast<T>(1)) * exp(static_cast<T>(1)));
+    const auto rhofac = taylor_determine_h_rhofac(s, fp_t, order);
 
     // Determine the step size in absolute value.
-    auto h = builder.CreateFMul(rho_m, vector_splat(builder, llvm_codegen(s, fp_t, number{rhofac}), batch_size));
+    auto *h = builder.CreateFMul(rho_m, vector_splat(builder, llvm_codegen(s, fp_t, rhofac), batch_size));
 
     // Ensure that the step size does not exceed the limit in absolute value.
     auto *max_h_vec = load_vector_from_memory(builder, h_ptr, batch_size);
     h = taylor_step_minabs(s, h, max_h_vec);
 
     // Handle backwards propagation.
-    auto backward = builder.CreateFCmpOLT(max_h_vec, llvm::ConstantFP::get(vec_t, 0.));
-    auto h_fac = builder.CreateSelect(backward, llvm::ConstantFP::get(vec_t, -1.), llvm::ConstantFP::get(vec_t, 1.));
+    auto *backward = builder.CreateFCmpOLT(max_h_vec, llvm::ConstantFP::get(vec_t, 0.));
+    auto *h_fac = builder.CreateSelect(backward, llvm::ConstantFP::get(vec_t, -1.), llvm::ConstantFP::get(vec_t, 1.));
     h = builder.CreateFMul(h_fac, h);
 
     return h;
 }
-
-// Instantiate the required versions of taylor_determine_h().
-template llvm::Value *taylor_determine_h<double>(llvm_state &,
-                                                 const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
-                                                 const std::vector<std::uint32_t> &, llvm::Value *, llvm::Value *,
-                                                 std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t,
-                                                 llvm::Value *);
-
-template llvm::Value *taylor_determine_h<long double>(llvm_state &,
-                                                      const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
-                                                      const std::vector<std::uint32_t> &, llvm::Value *, llvm::Value *,
-                                                      std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t,
-                                                      llvm::Value *);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template llvm::Value *taylor_determine_h<mppp::real128>(llvm_state &,
-                                                        const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
-                                                        const std::vector<std::uint32_t> &, llvm::Value *,
-                                                        llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                                        std::uint32_t, llvm::Value *);
-
-#endif
 
 // Create a global read-only array containing the values in sv_funcs_dc, if any
 // (otherwise, the return value will be null). This is for use in the adaptive steppers

@@ -128,8 +128,8 @@ std::uint32_t n_pars_in_dc(const taylor_dc_t &);
 
 llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &, const std::vector<std::uint32_t> &);
 
-template <typename T>
-llvm::Value *taylor_determine_h(llvm_state &, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
+llvm::Value *taylor_determine_h(llvm_state &, llvm::Type *,
+                                const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
                                 const std::vector<std::uint32_t> &, llvm::Value *, llvm::Value *, std::uint32_t,
                                 std::uint32_t, std::uint32_t, std::uint32_t, llvm::Value *);
 

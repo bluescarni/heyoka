@@ -177,6 +177,9 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     auto &builder = s.builder();
     auto &context = s.context();
 
+    // Fetch the LLVM type corresponding to T.
+    auto *fp_t = to_llvm_type<T>(context);
+
     // Prepare the function prototype. The arguments are:
     // - pointer to the output jet of derivative (write only),
     // - pointer to the current state vector (read only),
@@ -248,8 +251,8 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
                                               batch_size, compact_mode, high_accuracy, parallel_mode);
 
     // Determine the integration timestep.
-    auto h = taylor_determine_h<T>(s, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size,
-                                   max_abs_state_ptr);
+    auto h = taylor_determine_h(s, fp_t, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size,
+                                max_abs_state_ptr);
 
     // Store h to memory.
     store_vector_to_memory(builder, h_ptr, h);
@@ -368,8 +371,8 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
                                               compact_mode, high_accuracy, parallel_mode);
 
     // Determine the integration timestep.
-    auto h = taylor_determine_h<T>(s, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size,
-                                   nullptr);
+    auto h = taylor_determine_h(s, fp_t, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size,
+                                nullptr);
 
     // Evaluate the Taylor polynomials, producing the updated state of the system.
     auto new_state_var
