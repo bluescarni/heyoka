@@ -222,7 +222,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32
     }
 
     // Splat the order.
-    auto n = vector_splat(builder, codegen<T>(s, number{static_cast<T>(order)}), batch_size);
+    auto n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(order)}), batch_size);
 
     // Compute the divisor: n * d^[0].
     const auto d_idx = deps[0];
@@ -238,12 +238,12 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32
 
         // NOTE: iteration in the [1, order) range.
         for (std::uint32_t j = 1; j < order; ++j) {
-            auto fac = vector_splat(builder, codegen<T>(s, number(-static_cast<T>(j))), batch_size);
+            auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(-static_cast<T>(j))), batch_size);
 
-            auto dnj = taylor_fetch_diff(arr, d_idx, order - j, n_uvars);
-            auto aj = taylor_fetch_diff(arr, idx, j, n_uvars);
+            auto *dnj = taylor_fetch_diff(arr, d_idx, order - j, n_uvars);
+            auto *aj = taylor_fetch_diff(arr, idx, j, n_uvars);
 
-            auto tmp = builder.CreateFMul(dnj, aj);
+            auto *tmp = builder.CreateFMul(dnj, aj);
             tmp = builder.CreateFMul(fac, tmp);
             sum.push_back(tmp);
         }
@@ -280,7 +280,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32
     }
 
     // Splat the order.
-    auto n = vector_splat(builder, codegen<T>(s, number{static_cast<T>(order)}), batch_size);
+    auto n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(order)}), batch_size);
 
     // Compute the divisor: n * d^[0].
     const auto d_idx = deps[0];
@@ -297,12 +297,12 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32
 
         // NOTE: iteration in the [1, order) range.
         for (std::uint32_t j = 1; j < order; ++j) {
-            auto fac = vector_splat(builder, codegen<T>(s, number(-static_cast<T>(j))), batch_size);
+            auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(-static_cast<T>(j))), batch_size);
 
-            auto dnj = taylor_fetch_diff(arr, d_idx, order - j, n_uvars);
-            auto aj = taylor_fetch_diff(arr, idx, j, n_uvars);
+            auto *dnj = taylor_fetch_diff(arr, d_idx, order - j, n_uvars);
+            auto *aj = taylor_fetch_diff(arr, idx, j, n_uvars);
 
-            auto tmp = builder.CreateFMul(dnj, aj);
+            auto *tmp = builder.CreateFMul(dnj, aj);
             tmp = builder.CreateFMul(fac, tmp);
             sum.push_back(tmp);
         }
@@ -325,6 +325,8 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32
 
     auto &builder = s.builder();
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Fetch the indices of the y and x variable arguments.
     const auto y_idx = uname_to_index(var0.name());
     const auto x_idx = uname_to_index(var1.name());
@@ -335,14 +337,14 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32
     }
 
     // Splat the order.
-    auto n = vector_splat(builder, codegen<T>(s, number{static_cast<T>(order)}), batch_size);
+    auto n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(order)}), batch_size);
 
     // Compute the divisor: n * d^[0].
     const auto d_idx = deps[0];
     auto divisor = builder.CreateFMul(n, taylor_fetch_diff(arr, d_idx, 0, n_uvars));
 
     // Compute the first part of the dividend: n * (c^[0] * b^[n] - b^[0] * c^[n]).
-    auto dividend
+    auto *dividend
         = builder.CreateFMul(taylor_fetch_diff(arr, x_idx, 0, n_uvars), taylor_fetch_diff(arr, y_idx, order, n_uvars));
     dividend = builder.CreateFSub(dividend, builder.CreateFMul(taylor_fetch_diff(arr, y_idx, 0, n_uvars),
                                                                taylor_fetch_diff(arr, x_idx, order, n_uvars)));
@@ -355,21 +357,21 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32
 
         // NOTE: iteration in the [1, order) range.
         for (std::uint32_t j = 1; j < order; ++j) {
-            auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
+            auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(j))), batch_size);
 
-            auto cnj = taylor_fetch_diff(arr, x_idx, order - j, n_uvars);
-            auto bj = taylor_fetch_diff(arr, y_idx, j, n_uvars);
+            auto *cnj = taylor_fetch_diff(arr, x_idx, order - j, n_uvars);
+            auto *bj = taylor_fetch_diff(arr, y_idx, j, n_uvars);
 
-            auto bnj = taylor_fetch_diff(arr, y_idx, order - j, n_uvars);
-            auto cj = taylor_fetch_diff(arr, x_idx, j, n_uvars);
+            auto *bnj = taylor_fetch_diff(arr, y_idx, order - j, n_uvars);
+            auto *cj = taylor_fetch_diff(arr, x_idx, j, n_uvars);
 
-            auto dnj = taylor_fetch_diff(arr, d_idx, order - j, n_uvars);
-            auto aj = taylor_fetch_diff(arr, idx, j, n_uvars);
+            auto *dnj = taylor_fetch_diff(arr, d_idx, order - j, n_uvars);
+            auto *aj = taylor_fetch_diff(arr, idx, j, n_uvars);
 
-            auto tmp1 = builder.CreateFMul(cnj, bj);
-            auto tmp2 = builder.CreateFMul(bnj, cj);
-            auto tmp3 = builder.CreateFMul(dnj, aj);
-            auto tmp = builder.CreateFSub(builder.CreateFSub(tmp1, tmp2), tmp3);
+            auto *tmp1 = builder.CreateFMul(cnj, bj);
+            auto *tmp2 = builder.CreateFMul(bnj, cj);
+            auto *tmp3 = builder.CreateFMul(dnj, aj);
+            auto *tmp = builder.CreateFSub(builder.CreateFSub(tmp1, tmp2), tmp3);
 
             tmp = builder.CreateFMul(fac, tmp);
             sum.push_back(tmp);
@@ -482,8 +484,9 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
     const auto na_pair = taylor_c_diff_func_name_args<T>(context, "atan2", n_uvars, batch_size, {var, n}, 1);
@@ -497,7 +500,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -534,7 +537,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
             },
             [&]() {
                 // Create FP vector version of the order.
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
                 // Compute the divisor: ord * d^[0].
                 auto divisor = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), d_idx);
@@ -546,11 +549,11 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
                 dividend = builder.CreateFMul(dividend, taylor_c_load_diff(s, diff_ptr, n_uvars, ord, y_idx));
 
                 // Init the accumulator.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
                     auto d_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
                     auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
@@ -599,8 +602,9 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
     const auto na_pair = taylor_c_diff_func_name_args<T>(context, "atan2", n_uvars, batch_size, {n, var}, 1);
@@ -614,7 +618,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -651,7 +655,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
             },
             [&]() {
                 // Create FP vector version of the order.
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
                 // Compute the divisor: ord * d^[0].
                 auto divisor = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), d_idx);
@@ -663,11 +667,11 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
                 dividend = builder.CreateFMul(dividend, taylor_c_load_diff(s, diff_ptr, n_uvars, ord, x_idx));
 
                 // Init the accumulator.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
                     auto d_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
                     auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
@@ -716,8 +720,9 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
     const auto na_pair = taylor_c_diff_func_name_args<T>(context, "atan2", n_uvars, batch_size, {var0, var1}, 1);
@@ -731,7 +736,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -767,7 +772,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
             },
             [&]() {
                 // Create FP vector version of the order.
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
                 // Compute the divisor: ord * d^[0].
                 auto divisor = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), d_idx);
@@ -782,11 +787,11 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
                 dividend = builder.CreateFMul(ord_v, dividend);
 
                 // Init the accumulator.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
                     auto c_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), x_idx);
                     auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, y_idx);
