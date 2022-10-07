@@ -202,7 +202,7 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, const erf_impl &, const std::ve
     if (order == 0u) {
         return llvm_erf(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
-        return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+        return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
@@ -216,6 +216,8 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, const erf_impl &, const std::ve
 
     auto &builder = s.builder();
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Fetch the index of the variable argument.
     const auto b_idx = uname_to_index(var.name());
 
@@ -228,21 +230,21 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, const erf_impl &, const std::ve
     for (std::uint32_t j = 1; j <= order; ++j) {
         // NOTE: the only hidden dependency contains the index of the
         // u variable whose definition is exp(- var * var).
-        auto bj = taylor_fetch_diff(arr, b_idx, j, n_uvars);
-        auto cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
+        auto *bj = taylor_fetch_diff(arr, b_idx, j, n_uvars);
+        auto *cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
 
-        auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
+        auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(j))), batch_size);
 
         // Add j*cnj*bj to the sum vector.
         sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(cnj, bj)));
     }
 
     // Create ret with the sum.
-    auto ret = pairwise_sum(builder, sum);
+    auto *ret = pairwise_sum(builder, sum);
 
     // Generate the factor n * sqrt(pi) / 2.
     auto fac = number(order * sqrt_pi_2<T>);
-    auto fac_s = vector_splat(builder, codegen<T>(s, fac), batch_size);
+    auto *fac_s = vector_splat(builder, llvm_codegen(s, fp_t, fac), batch_size);
 
     // Multiply and return.
     return builder.CreateFDiv(ret, fac_s);
@@ -339,8 +341,9 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &, con
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
     const auto na_pair = taylor_c_diff_func_name_args<T>(context, "erf", n_uvars, batch_size, {var}, 1);
@@ -354,7 +357,7 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &, con
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -386,17 +389,17 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &, con
             },
             [&]() {
                 // Compute the fp version of the order.
-                auto ord_fp = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+                auto ord_fp = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
                 // Init the accumulator.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
                     auto c_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
                     auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, b_idx);
 
-                    auto fac = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+                    auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
                     builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
                                                            builder.CreateFMul(fac, builder.CreateFMul(c_nj, bj))),
@@ -404,7 +407,7 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &, con
                 });
 
                 // Generate the factor n * sqrt(pi) /2
-                auto t1_llvm = vector_splat(builder, codegen<T>(s, number(sqrt_pi_2<T>)), batch_size);
+                auto t1_llvm = vector_splat(builder, llvm_codegen(s, fp_t, number(sqrt_pi_2<T>)), batch_size);
                 auto fac = builder.CreateFMul(t1_llvm, ord_fp);
 
                 // Store into retval.

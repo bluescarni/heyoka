@@ -249,7 +249,7 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, const sum_sq_impl &sf, const
                         // will be zero. Thus, ensure that v_sums[k] just
                         // contains a single zero.
                         if (v_sums[k].empty()) {
-                            v_sums[k].push_back(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+                            v_sums[k].push_back(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size));
                         }
                     } else {
                         // LCOV_EXCL_START
@@ -307,7 +307,7 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, const sum_sq_impl &sf, const
                             auto val = taylor_codegen_numparam(s, fp_t, v, par_ptr, batch_size);
                             return builder.CreateFMul(val, val);
                         } else {
-                            return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+                            return vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
                         }
                     } else {
                         // LCOV_EXCL_START
@@ -381,8 +381,9 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Build the vector of arguments needed to determine the function name.
     std::vector<std::variant<variable, number, param>> nm_args;
@@ -416,7 +417,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -440,7 +441,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
         v_accs.resize(boost::numeric_cast<decltype(v_accs.size())>(sf.args().size()));
         for (auto &acc : v_accs) {
             acc = builder.CreateAlloca(val_t);
-            builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+            builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
         }
 
         // Create the return value.
@@ -552,7 +553,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
                                     [&]() {
                                         // Order 2 or higher, store zero.
                                         builder.CreateStore(
-                                            vector_splat(builder, codegen<T>(s, number{0.}), batch_size), ret);
+                                            vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), ret);
                                     });
 
                                 auto val = builder.CreateLoad(val_t, ret);

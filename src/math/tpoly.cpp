@@ -98,18 +98,18 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
     // Null retval if the diff order is larger than the
     // polynomial order.
     if (order > n) {
-        return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+        return vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 
     // Load the time value.
-    auto tm = load_vector_from_memory(builder, time_ptr, batch_size);
+    auto *tm = load_vector_from_memory(builder, time_ptr, batch_size);
 
     // Init the return value with the highest-order coefficient (scaled by the corresponding
     // binomial coefficient).
     assert(tp.m_e_idx > 0u);
     auto bc = binomial<T>(n, order);
     auto ret = taylor_codegen_numparam(s, fp_t, param{tp.m_e_idx - 1u}, par_ptr, batch_size);
-    ret = builder.CreateFMul(ret, vector_splat(builder, codegen<T>(s, number{bc}), batch_size));
+    ret = builder.CreateFMul(ret, vector_splat(builder, llvm_codegen(s, fp_t, number{bc}), batch_size));
 
     // Horner evaluation of polynomial derivative.
     for (std::uint32_t i_ = 1; i_ <= n - order; ++i_) {
@@ -122,7 +122,7 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
 
         // Load the poly coefficient from the par array and multiply it by bc.
         auto cf = taylor_codegen_numparam(s, fp_t, param{tp.m_b_idx + i + order}, par_ptr, batch_size);
-        cf = builder.CreateFMul(cf, vector_splat(builder, codegen<T>(s, number{bc}), batch_size));
+        cf = builder.CreateFMul(cf, vector_splat(builder, llvm_codegen(s, fp_t, number{bc}), batch_size));
 
         // Horner iteration.
         ret = builder.CreateFAdd(cf, builder.CreateFMul(ret, tm));
@@ -199,13 +199,13 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // Helper to fetch the (i, j) binomial coefficient from
         // a precomputed global array. The returned value is already
         // splatted.
         auto get_bc = [&, bc_ptr = llvm_add_bc_array<T>(s, n_const)](llvm::Value *i, llvm::Value *j) {
-            auto idx = builder.CreateMul(i, builder.getInt32(n_const + 1u));
+            auto *idx = builder.CreateMul(i, builder.getInt32(n_const + 1u));
             idx = builder.CreateAdd(idx, j);
 
             auto val = builder.CreateLoad(scal_t, builder.CreateInBoundsGEP(scal_t, bc_ptr, idx));
@@ -233,14 +233,16 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
         auto retval = builder.CreateAlloca(val_t);
 
         // Cache the order of the polynomial.
-        auto n = builder.getInt32(n_const);
+        auto *n = builder.getInt32(n_const);
 
         // Null retval if the diff order is larger than the
         // polynomial order.
         // NOTE: unsigned comparison.
         llvm_if_then_else(
             s, builder.CreateICmpUGT(ord, n),
-            [&]() { builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), retval); },
+            [&]() {
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, scal_t, number{0.}), batch_size), retval);
+            },
             [&]() {
                 // Load the time value.
                 auto tm = load_vector_from_memory(builder, t_ptr, batch_size);

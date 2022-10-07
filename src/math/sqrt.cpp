@@ -190,7 +190,7 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &, const U &nu
     if (order == 0u) {
         return llvm_sqrt(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
-        return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+        return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
@@ -213,31 +213,31 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &, const varia
     }
 
     // Compute the divisor: 2*a^[0].
-    auto div = taylor_fetch_diff(arr, idx, 0, n_uvars);
+    auto *div = taylor_fetch_diff(arr, idx, 0, n_uvars);
     div = builder.CreateFAdd(div, div);
 
     // Init the factor: b^[n].
-    auto fac = taylor_fetch_diff(arr, u_idx, order, n_uvars);
+    auto *fac = taylor_fetch_diff(arr, u_idx, order, n_uvars);
 
     std::vector<llvm::Value *> sum;
     if (order % 2u == 1u) {
         // Odd order.
         for (std::uint32_t j = 1; j <= (order - 1u) / 2u; ++j) {
-            auto v0 = taylor_fetch_diff(arr, idx, order - j, n_uvars);
-            auto v1 = taylor_fetch_diff(arr, idx, j, n_uvars);
+            auto *v0 = taylor_fetch_diff(arr, idx, order - j, n_uvars);
+            auto *v1 = taylor_fetch_diff(arr, idx, j, n_uvars);
 
             sum.push_back(builder.CreateFMul(v0, v1));
         }
     } else {
         // Even order.
         for (std::uint32_t j = 1; j <= (order - 2u) / 2u; ++j) {
-            auto v0 = taylor_fetch_diff(arr, idx, order - j, n_uvars);
-            auto v1 = taylor_fetch_diff(arr, idx, j, n_uvars);
+            auto *v0 = taylor_fetch_diff(arr, idx, order - j, n_uvars);
+            auto *v1 = taylor_fetch_diff(arr, idx, j, n_uvars);
 
             sum.push_back(builder.CreateFMul(v0, v1));
         }
 
-        auto tmp = taylor_fetch_diff(arr, idx, order / 2u, n_uvars);
+        auto *tmp = taylor_fetch_diff(arr, idx, order / 2u, n_uvars);
         tmp = builder.CreateFMul(tmp, tmp);
 
         fac = builder.CreateFSub(fac, tmp);
@@ -245,7 +245,7 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &, const varia
 
     // Avoid summing if the sum is empty.
     if (!sum.empty()) {
-        auto tmp = pairwise_sum(builder, sum);
+        auto *tmp = pairwise_sum(builder, sum);
         tmp = builder.CreateFAdd(tmp, tmp);
 
         fac = builder.CreateFSub(fac, tmp);
@@ -343,8 +343,9 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &, c
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     const auto na_pair = taylor_c_diff_func_name_args<T>(context, "sqrt", n_uvars, batch_size, {var});
     const auto &fname = na_pair.first;
@@ -357,7 +358,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &, c
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -402,7 +403,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &, c
                     builder.getInt32(2));
 
                 // Perform the summation.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
                 llvm_loop_u32(
                     s, builder.getInt32(1), builder.CreateAdd(upper, builder.getInt32(1)), [&](llvm::Value *j) {
                         auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), u_idx);

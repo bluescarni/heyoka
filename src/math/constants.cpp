@@ -95,13 +95,13 @@ std::vector<expression> constant_impl::gradient() const
 llvm::Value *constant_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &, llvm::Value *,
                                           llvm::Value *, std::uint32_t batch_size, bool) const
 {
-    return vector_splat(s.builder(), codegen<double>(s, get_value()), batch_size);
+    return vector_splat(s.builder(), llvm_codegen(s, to_llvm_type<double>(s.context()), get_value()), batch_size);
 }
 
 llvm::Value *constant_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &, llvm::Value *,
                                            llvm::Value *, std::uint32_t batch_size, bool) const
 {
-    return vector_splat(s.builder(), codegen<long double>(s, get_value()), batch_size);
+    return vector_splat(s.builder(), llvm_codegen(s, to_llvm_type<long double>(s.context()), get_value()), batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -109,7 +109,8 @@ llvm::Value *constant_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm
 llvm::Value *constant_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &, llvm::Value *,
                                            llvm::Value *, std::uint32_t batch_size, bool) const
 {
-    return vector_splat(s.builder(), codegen<mppp::real128>(s, get_value()), batch_size);
+    return vector_splat(s.builder(), llvm_codegen(s, to_llvm_type<mppp::real128>(s.context()), get_value()),
+                        batch_size);
 }
 
 #endif
@@ -124,7 +125,7 @@ template <typename T>
     return llvm_c_eval_func_helper<T>(
         ci.get_name(),
         [&s, &ci, batch_size](const std::vector<llvm::Value *> &, bool) {
-            return vector_splat(s.builder(), codegen<T>(s, ci.get_value()), batch_size);
+            return vector_splat(s.builder(), llvm_codegen(s, to_llvm_type<T>(s.context()), ci.get_value()), batch_size);
         },
         ci, s, batch_size, high_accuracy);
 }
@@ -159,14 +160,16 @@ llvm::Value *constant_taylor_diff_impl(const constant_impl &c, llvm_state &s, st
 {
     auto &builder = s.builder();
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // NOTE: no need for normalisation of the derivative,
     // as the only nonzero retval is for order 0
     // for which the normalised derivative coincides with
     // the non-normalised derivative.
     if (order == 0u) {
-        return vector_splat(builder, codegen<T>(s, c.get_value()), batch_size);
+        return vector_splat(builder, llvm_codegen(s, fp_t, c.get_value()), batch_size);
     } else {
-        return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+        return vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
@@ -211,8 +214,9 @@ llvm::Function *taylor_c_diff_constant_impl(const constant_impl &c, llvm_state &
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
     const auto na_pair
@@ -227,7 +231,7 @@ llvm::Function *taylor_c_diff_constant_impl(const constant_impl &c, llvm_state &
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -252,11 +256,11 @@ llvm::Function *taylor_c_diff_constant_impl(const constant_impl &c, llvm_state &
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // If the order is zero, return the constant itself.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, c.get_value()), batch_size), retval);
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, c.get_value()), batch_size), retval);
             },
             [&]() {
                 // Otherwise, return zero.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), retval);
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), retval);
             });
 
         // Return the result.

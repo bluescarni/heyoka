@@ -236,7 +236,7 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const U &num
         return llvm_pow(s, taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size),
                         taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size), allow_approx);
     } else {
-        return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+        return vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
@@ -272,14 +272,15 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variab
         auto scal_f = [&]() -> llvm::Value * {
             if constexpr (std::is_same_v<U, number>) {
                 return vector_splat(builder,
-                                    codegen<T>(s, number(static_cast<T>(order)) * num
-                                                      - number(static_cast<T>(j)) * (num + number(static_cast<T>(1)))),
+                                    llvm_codegen(s, fp_t,
+                                                 number(static_cast<T>(order)) * num
+                                                     - number(static_cast<T>(j)) * (num + number(static_cast<T>(1)))),
                                     batch_size);
             } else {
                 auto pc = taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size);
-                auto jvec = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
-                auto ordvec = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
-                auto onevec = vector_splat(builder, codegen<T>(s, number(static_cast<T>(1))), batch_size);
+                auto jvec = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(j))), batch_size);
+                auto ordvec = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(order))), batch_size);
+                auto onevec = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(1))), batch_size);
 
                 auto tmp1 = builder.CreateFMul(ordvec, pc);
                 auto tmp2 = builder.CreateFMul(jvec, builder.CreateFAdd(pc, onevec));
@@ -296,7 +297,7 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variab
     auto *ret_acc = pairwise_sum(builder, sum);
 
     // Compute the final divisor: order * (zero-th derivative of u_idx).
-    auto ord_f = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
+    auto ord_f = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(order))), batch_size);
     auto *b0 = taylor_fetch_diff(arr, u_idx, 0, n_uvars);
     auto div = builder.CreateFMul(ord_f, b0);
 
@@ -411,8 +412,9 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
     // Create the function name.
     const auto *const pow_name = allow_approx ? "pow_approx" : "pow";
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     const auto na_pair = taylor_c_diff_func_name_args<T>(context, pow_name, n_uvars, batch_size, {var, n});
     const auto &fname = na_pair.first;
@@ -425,7 +427,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -465,7 +467,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
                 // Init the accumulator.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(0), ord, [&](llvm::Value *j) {
@@ -477,8 +479,8 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
                     auto fac = builder.CreateFSub(
                         builder.CreateFMul(ord_v, alpha_v),
                         builder.CreateFMul(
-                            j_v,
-                            builder.CreateFAdd(alpha_v, vector_splat(builder, codegen<T>(s, number{1.}), batch_size))));
+                            j_v, builder.CreateFAdd(
+                                     alpha_v, vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size))));
 
                     builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
                                                            builder.CreateFMul(fac, builder.CreateFMul(b_nj, aj))),

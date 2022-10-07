@@ -169,7 +169,7 @@ llvm::Value *taylor_diff_neg_impl(llvm_state &s, const neg_impl &, const U &num,
     if (order == 0u) {
         return s.builder().CreateFNeg(taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
-        return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+        return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 

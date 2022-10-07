@@ -195,7 +195,7 @@ llvm::Value *sum_taylor_diff_impl(llvm_state &s, const sum_impl &sf, const std::
                     if (order == 0u) {
                         vals.push_back(taylor_codegen_numparam(s, fp_t, v, par_ptr, batch_size));
                     } else {
-                        vals.push_back(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+                        vals.push_back(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size));
                     }
                 } else {
                     // LCOV_EXCL_START
@@ -255,8 +255,9 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Build the vector of arguments needed to determine the function name.
     std::vector<std::variant<variable, number, param>> nm_args;
@@ -290,7 +291,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -333,8 +334,8 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
                             },
                             [&]() {
                                 // Otherwise, return zero.
-                                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size),
-                                                    retval);
+                                builder.CreateStore(
+                                    vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), retval);
                             });
 
                         return builder.CreateLoad(val_t, retval);
