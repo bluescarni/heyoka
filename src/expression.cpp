@@ -2471,6 +2471,8 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
     // Log runtime in trace mode.
     spdlog::stopwatch sw;
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Init the return value.
     // NOTE: use maps with name-based comparison for the functions. This ensures that the order in which these
     // functions are invoked is always the same. If we used directly pointer
@@ -2580,13 +2582,13 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
             // Create the g functions for each argument.
             for (const auto &v : vv) {
                 it->second.second.push_back(std::visit(
-                    [&s](const auto &x) {
+                    [&s, fp_t](const auto &x) {
                         using type = uncvref_t<decltype(x)>;
 
                         if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
                             return cm_make_arg_gen_vidx(s, x);
                         } else {
-                            return cm_make_arg_gen_vc<T>(s, x);
+                            return cm_make_arg_gen_vc(s, fp_t, x);
                         }
                     },
                     v));

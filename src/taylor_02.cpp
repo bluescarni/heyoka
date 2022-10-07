@@ -729,6 +729,8 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
     // Log runtime in trace mode.
     spdlog::stopwatch sw;
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Init the return value.
     // NOTE: use maps with name-based comparison for the functions. This ensures that the order in which these
     // functions are invoked in taylor_compute_jet_compact_mode() is always the same. If we used directly pointer
@@ -836,13 +838,13 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
             // Create the g functions for each argument.
             for (const auto &v : vv) {
                 it->second.second.push_back(std::visit(
-                    [&s](const auto &x) {
+                    [&s, fp_t](const auto &x) {
                         using type = uncvref_t<decltype(x)>;
 
                         if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
                             return cm_make_arg_gen_vidx(s, x);
                         } else {
-                            return cm_make_arg_gen_vc<T>(s, x);
+                            return cm_make_arg_gen_vc(s, fp_t, x);
                         }
                     },
                     v));
@@ -1844,7 +1846,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     // the second argument a const float pointer to the pars, the third argument
     // a float pointer to the time. These arrays cannot overlap.
     auto *fp_t = to_llvm_type<T>(context);
-    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_t));
+    const std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
