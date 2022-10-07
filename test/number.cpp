@@ -348,6 +348,8 @@ TEST_CASE("number fmt")
 
 TEST_CASE("llvm_codegen")
 {
+    using std::isnan;
+
     // Pi double.
     {
         llvm_state s{kw::opt_level = 0u};
@@ -428,7 +430,7 @@ TEST_CASE("llvm_codegen")
 
         auto f_ptr = reinterpret_cast<double (*)()>(s.jit_lookup("test"));
 
-        REQUIRE(std::isnan(f_ptr()));
+        REQUIRE(isnan(f_ptr()));
     }
 
 #if !defined(HEYOKA_ARCH_PPC)
@@ -513,7 +515,7 @@ TEST_CASE("llvm_codegen")
 
         auto f_ptr = reinterpret_cast<long double (*)()>(s.jit_lookup("test"));
 
-        REQUIRE(std::isnan(f_ptr()));
+        REQUIRE(isnan(f_ptr()));
     }
 
 #endif
