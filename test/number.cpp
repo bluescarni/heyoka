@@ -38,6 +38,7 @@
 
 #endif
 
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -347,6 +348,7 @@ TEST_CASE("number fmt")
 
 TEST_CASE("llvm_codegen")
 {
+    // Pi double.
     {
         llvm_state s{kw::opt_level = 0u};
 
@@ -374,6 +376,236 @@ TEST_CASE("llvm_codegen")
         REQUIRE(f_ptr() == boost::math::constants::pi<double>());
     }
 
+    // Non-finite doubles.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = builder.getDoubleTy();
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<double>::infinity()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == -std::numeric_limits<double>::infinity());
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = builder.getDoubleTy();
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<double>::quiet_NaN()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(std::isnan(f_ptr()));
+    }
+
+#if !defined(HEYOKA_ARCH_PPC)
+
+    // Pi long double.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = detail::to_llvm_type<long double>(context);
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{boost::math::constants::pi<long double>()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<long double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == boost::math::constants::pi<long double>());
+    }
+
+    // Non-finite long doubles.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = detail::to_llvm_type<long double>(context);
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<long double>::infinity()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<long double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == -std::numeric_limits<long double>::infinity());
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = detail::to_llvm_type<long double>(context);
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<long double>::quiet_NaN()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<long double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(std::isnan(f_ptr()));
+    }
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    // Pi real128.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = detail::to_llvm_type<mppp::real128>(context);
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{mppp::pi_128}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<mppp::real128 (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == mppp::pi_128);
+    }
+
+    // real128 non-finite.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = detail::to_llvm_type<mppp::real128>(context);
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<mppp::real128>::infinity()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<mppp::real128 (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == -std::numeric_limits<mppp::real128>::infinity());
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = detail::to_llvm_type<mppp::real128>(context);
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<mppp::real128>::quiet_NaN()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<mppp::real128 (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(isnan(f_ptr()));
+    }
+
+#endif
+
+    // Small float test.
     {
         llvm_state s{kw::opt_level = 0u};
 
@@ -401,6 +633,7 @@ TEST_CASE("llvm_codegen")
         REQUIRE(f_ptr() == boost::math::constants::pi<float>());
     }
 
+    // Mix float/double in the definition of the number vs codegen.
     {
         llvm_state s{kw::opt_level = 0u};
 
