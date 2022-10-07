@@ -1657,8 +1657,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
         auto *ptr = builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.getInt32(j * batch_size));
         auto *cur_cf = load_vector_from_memory(builder, ptr, batch_size);
         auto *new_term = builder.CreateFMul(cur_cf, cur_h_pow);
-        new_term
-            = builder.CreateFDiv(new_term, vector_splat(builder, codegen<T>(s, number{binomial<T>(n, j)}), batch_size));
+        new_term = builder.CreateFDiv(
+            new_term, vector_splat(builder, llvm_codegen(s, fp_t, number{binomial<T>(n, j)}), batch_size));
 
         // Add it to bj_series.
         bj_series.push_back(new_term);
@@ -1667,7 +1667,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
         for (std::uint32_t i = 0; i < j; ++i) {
             bj_series[i] = builder.CreateFMul(
                 bj_series[i],
-                vector_splat(builder, codegen<T>(s, number{static_cast<T>(j) / static_cast<T>(j - i)}), batch_size));
+                vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(j) / static_cast<T>(j - i)}),
+                             batch_size));
         }
 
         // Compute the new bj.
@@ -1784,8 +1785,9 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto tp = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(s.context());
+    auto *tp = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name.
     const auto fname = fmt::format("heyoka.inv_kep_E.{}", llvm_mangle_type(tp));
@@ -1793,7 +1795,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
     // The function arguments:
     // - eccentricity,
     // - mean anomaly.
-    std::vector<llvm::Type *> fargs{tp, tp};
+    const std::vector<llvm::Type *> fargs{tp, tp};
 
     // Try to see if we already created the function.
     auto f = md.getFunction(fname);
@@ -1821,7 +1823,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         auto *ecc_is_nan_or_neg = builder.CreateFCmpULT(ecc_arg, llvm::Constant::getNullValue(ecc_arg->getType()));
         // Is the eccentricity >= 1?
         auto *ecc_is_gte1
-            = builder.CreateFCmpOGE(ecc_arg, vector_splat(builder, codegen<T>(s, number{1.}), batch_size));
+            = builder.CreateFCmpOGE(ecc_arg, vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size));
 
         // Is the eccentricity NaN or out of range?
         // NOTE: this is a logical OR.
@@ -1830,7 +1832,8 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
 
         // Replace invalid eccentricity values with quiet NaNs.
         auto *ecc = builder.CreateSelect(
-            ecc_invalid, vector_splat(builder, codegen<T>(s, number{std::numeric_limits<T>::quiet_NaN()}), batch_size),
+            ecc_invalid,
+            vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<T>::quiet_NaN()}), batch_size),
             ecc_arg);
 
         // Create the return value.
@@ -1845,8 +1848,8 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
 
         // Reduce M modulo 2*pi in extended precision.
         auto *M = llvm_dl_modulus(s, M_arg, llvm::Constant::getNullValue(M_arg->getType()),
-                                  vector_splat(builder, codegen<T>(s, number{dl_twopi_hi}), batch_size),
-                                  vector_splat(builder, codegen<T>(s, number{dl_twopi_lo}), batch_size))
+                                  vector_splat(builder, llvm_codegen(s, fp_t, number{dl_twopi_hi}), batch_size),
+                                  vector_splat(builder, llvm_codegen(s, fp_t, number{dl_twopi_lo}), batch_size))
                       .first;
 
         // Compute the initial guess from the usual elliptic expansion
@@ -1863,8 +1866,8 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         auto cos_M_2 = builder.CreateFMul(cos_M, cos_M);
 
         // 3/2 and 1/2 constants.
-        auto c_3_2 = vector_splat(builder, codegen<T>(s, number{static_cast<T>(3) / 2}), batch_size);
-        auto c_1_2 = vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / 2}), batch_size);
+        auto c_3_2 = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(3) / 2}), batch_size);
+        auto c_1_2 = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / 2}), batch_size);
 
         // M + e*sin(M).
         auto tmp1 = builder.CreateFAdd(M, e_sin_M);
@@ -1882,7 +1885,8 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
 
         // Make extra sure the initial guess is in the [0, 2*pi) range.
         auto lb = llvm::ConstantFP::get(tp, 0.);
-        auto ub = vector_splat(builder, codegen<T>(s, number{nextafter(dl_twopi_hi, static_cast<T>(0))}), batch_size);
+        auto ub = vector_splat(builder, llvm_codegen(s, fp_t, number{nextafter(dl_twopi_hi, static_cast<T>(0))}),
+                               batch_size);
         ig = llvm_max(s, ig, lb);
         ig = llvm_min(s, ig, ub);
 
@@ -1925,10 +1929,11 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Define the stopping condition functor.
         // NOTE: hard-code this for the time being.
         auto *max_iter = builder.getInt32(50);
-        auto loop_cond = [&,
-                          // NOTE: tolerance is 4 * eps.
-                          tol = vector_splat(builder, codegen<T>(s, number{std::numeric_limits<T>::epsilon() * 4}),
-                                             batch_size)]() -> llvm::Value * {
+        auto loop_cond
+            = [&,
+               // NOTE: tolerance is 4 * eps.
+               tol = vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<T>::epsilon() * 4}),
+                                  batch_size)]() -> llvm::Value * {
             auto *c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
 
             // Keep on iterating as long as abs(f(E)) > tol.
@@ -1944,46 +1949,49 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         };
 
         // Run the loop.
-        llvm_while_loop(s, loop_cond, [&, one_c = vector_splat(builder, codegen<T>(s, number{1.}), batch_size)]() {
-            // Compute the new value.
-            auto old_val = builder.CreateLoad(tp, retval);
-            auto new_val
-                = builder.CreateFDiv(builder.CreateLoad(tp, fE),
-                                     builder.CreateFSub(one_c, builder.CreateFMul(ecc, builder.CreateLoad(tp, cos_E))));
-            new_val = builder.CreateFSub(old_val, new_val);
+        llvm_while_loop(
+            s, loop_cond, [&, one_c = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size)]() {
+                // Compute the new value.
+                auto old_val = builder.CreateLoad(tp, retval);
+                auto new_val = builder.CreateFDiv(
+                    builder.CreateLoad(tp, fE),
+                    builder.CreateFSub(one_c, builder.CreateFMul(ecc, builder.CreateLoad(tp, cos_E))));
+                new_val = builder.CreateFSub(old_val, new_val);
 
-            // Bisect if new_val > ub.
-            // NOTE: '>' is fine here, ub is the maximum allowed value.
-            auto bcheck = builder.CreateFCmpOGT(new_val, ub);
-            new_val = builder.CreateSelect(
-                bcheck,
-                builder.CreateFMul(vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / 2}), batch_size),
-                                   builder.CreateFAdd(old_val, ub)),
-                new_val);
+                // Bisect if new_val > ub.
+                // NOTE: '>' is fine here, ub is the maximum allowed value.
+                auto bcheck = builder.CreateFCmpOGT(new_val, ub);
+                new_val = builder.CreateSelect(
+                    bcheck,
+                    builder.CreateFMul(
+                        vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / 2}), batch_size),
+                        builder.CreateFAdd(old_val, ub)),
+                    new_val);
 
-            // Bisect if new_val < lb.
-            bcheck = builder.CreateFCmpOLT(new_val, lb);
-            new_val = builder.CreateSelect(
-                bcheck,
-                builder.CreateFMul(vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / 2}), batch_size),
-                                   builder.CreateFAdd(old_val, lb)),
-                new_val);
+                // Bisect if new_val < lb.
+                bcheck = builder.CreateFCmpOLT(new_val, lb);
+                new_val = builder.CreateSelect(
+                    bcheck,
+                    builder.CreateFMul(
+                        vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / 2}), batch_size),
+                        builder.CreateFAdd(old_val, lb)),
+                    new_val);
 
-            // Store the new value.
-            builder.CreateStore(new_val, retval);
+                // Store the new value.
+                builder.CreateStore(new_val, retval);
 
-            // Update sin_E/cos_E.
-            sin_cos_E = llvm_sincos(s, new_val);
-            builder.CreateStore(sin_cos_E.first, sin_E);
-            builder.CreateStore(sin_cos_E.second, cos_E);
+                // Update sin_E/cos_E.
+                sin_cos_E = llvm_sincos(s, new_val);
+                builder.CreateStore(sin_cos_E.first, sin_E);
+                builder.CreateStore(sin_cos_E.second, cos_E);
 
-            // Update f(E).
-            builder.CreateStore(fE_compute(), fE);
+                // Update f(E).
+                builder.CreateStore(fE_compute(), fE);
 
-            // Update the counter.
-            builder.CreateStore(
-                builder.CreateAdd(builder.CreateLoad(builder.getInt32Ty(), counter), builder.getInt32(1)), counter);
-        });
+                // Update the counter.
+                builder.CreateStore(
+                    builder.CreateAdd(builder.CreateLoad(builder.getInt32Ty(), counter), builder.getInt32(1)), counter);
+            });
 
         // Check the counter.
         llvm_if_then_else(
@@ -1996,7 +2004,8 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
                 auto *old_val = builder.CreateLoad(tp, retval);
                 auto *new_val = builder.CreateSelect(
                     tol_check,
-                    vector_splat(builder, codegen<T>(s, number{std::numeric_limits<T>::quiet_NaN()}), batch_size),
+                    vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<T>::quiet_NaN()}),
+                                 batch_size),
                     old_val);
                 builder.CreateStore(new_val, retval);
 
@@ -2066,6 +2075,8 @@ llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
     auto &builder = s.builder();
     auto &context = s.context();
 
+    auto *fp_t = to_llvm_type<T>(context);
+
     // Fetch the array type.
     auto *arr_type
         = llvm::ArrayType::get(to_llvm_type<T>(context), boost::numeric_cast<std::uint64_t>((n + 1u) * (n + 1u)));
@@ -2076,8 +2087,8 @@ llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
         for (std::uint32_t j = 0; j <= n; ++j) {
             // NOTE: the Boost implementation requires j <= i. We don't care about
             // j > i anyway.
-            const auto val = (j <= i) ? binomial<T>(i, j) : T(0);
-            bc_const.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, number{val})));
+            const auto val = (j <= i) ? binomial<T>(i, j) : static_cast<T>(0);
+            bc_const.push_back(llvm::cast<llvm::Constant>(llvm_codegen(s, fp_t, number{val})));
         }
     }
 
