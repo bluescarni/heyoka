@@ -471,7 +471,7 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
                 // We have to divide the derivative by order
                 // to get the normalised derivative of the state variable.
                 return builder.CreateFDiv(
-                    ret, vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(order))), batch_size));
+                    ret, vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size));
             } else if constexpr (std::is_same_v<type, number> || std::is_same_v<type, param>) {
                 // The first-order derivative is a constant.
                 // If the first-order derivative is being requested,

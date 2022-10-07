@@ -192,7 +192,7 @@ llvm::Value *taylor_diff_sinh_impl(llvm_state &s, const sinh_impl &, const std::
         auto *cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
         auto *bj = taylor_fetch_diff(arr, b_idx, j, n_uvars);
 
-        auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(j))), batch_size);
+        auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*cnj*bj to the sum.
         sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(cnj, bj)));
@@ -202,7 +202,7 @@ llvm::Value *taylor_diff_sinh_impl(llvm_state &s, const sinh_impl &, const std::
     auto *ret_acc = pairwise_sum(builder, sum);
 
     // Compute and return the result: ret_acc / order
-    auto div = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(order))), batch_size);
+    auto div = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
 
     return builder.CreateFDiv(ret_acc, div);
 }

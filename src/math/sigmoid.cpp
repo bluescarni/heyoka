@@ -262,7 +262,7 @@ llvm::Value *taylor_diff_sigmoid_impl(llvm_state &s, const sigmoid_impl &, const
         auto *bj = taylor_fetch_diff(arr, u_idx, j, n_uvars);
         auto *cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
 
-        auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(j))), batch_size);
+        auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*(anj-cnj)*bj to the sum.
         auto *tmp1 = builder.CreateFSub(anj, cnj);
@@ -276,7 +276,7 @@ llvm::Value *taylor_diff_sigmoid_impl(llvm_state &s, const sigmoid_impl &, const
     auto *ret_acc = pairwise_sum(builder, sum);
 
     // Finalise the return value: ret_acc / n.
-    auto *div = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(order))), batch_size);
+    auto *div = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
 
     return builder.CreateFDiv(ret_acc, div);
 }

@@ -233,7 +233,7 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, const erf_impl &, const std::ve
         auto *bj = taylor_fetch_diff(arr, b_idx, j, n_uvars);
         auto *cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
 
-        auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(j))), batch_size);
+        auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*cnj*bj to the sum vector.
         sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(cnj, bj)));

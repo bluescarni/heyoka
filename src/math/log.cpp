@@ -215,7 +215,7 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, const log_impl &, const variabl
     }
 
     // Create the fp version of the order.
-    auto ord_fp = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(order))), batch_size);
+    auto ord_fp = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
 
     // Compute n*b^[0].
     auto nb0 = builder.CreateFMul(ord_fp, taylor_fetch_diff(arr, b_idx, 0, n_uvars));
@@ -232,7 +232,7 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, const log_impl &, const variabl
             auto *bnj = taylor_fetch_diff(arr, b_idx, order - j, n_uvars);
             auto *aj = taylor_fetch_diff(arr, a_idx, j, n_uvars);
 
-            auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(j))), batch_size);
+            auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
             // Add j*bnj*aj to the sum.
             sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(bnj, aj)));

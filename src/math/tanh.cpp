@@ -188,7 +188,7 @@ llvm::Value *taylor_diff_tanh_impl(llvm_state &s, const tanh_impl &, const std::
         auto *bj = taylor_fetch_diff(arr, b_idx, j, n_uvars);
         auto *cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
 
-        auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(j))), batch_size);
+        auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*cnj*bj to the sum.
         sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(cnj, bj)));
@@ -199,7 +199,7 @@ llvm::Value *taylor_diff_tanh_impl(llvm_state &s, const tanh_impl &, const std::
 
     // Divide by order.
     ret_acc = builder.CreateFDiv(
-        ret_acc, vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(order))), batch_size));
+        ret_acc, vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size));
 
     // Create and return the result.
     return builder.CreateFSub(taylor_fetch_diff(arr, b_idx, order, n_uvars), ret_acc);

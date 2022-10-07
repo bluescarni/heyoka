@@ -262,7 +262,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
     }
 
     // Splat the order.
-    auto n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(order)}), batch_size);
+    auto n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<double>(order)}), batch_size);
 
     // Compute the divisor: n * (1 - c^[0]).
     const auto c_idx = deps[0];
@@ -282,7 +282,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 
         // NOTE: iteration in the [1, order) range.
         for (std::uint32_t j = 1; j < order; ++j) {
-            auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(j))), batch_size);
+            auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
             auto *cnj = taylor_fetch_diff(arr, c_idx, order - j, n_uvars);
             auto *aj = taylor_fetch_diff(arr, idx, j, n_uvars);
@@ -330,7 +330,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
     }
 
     // Splat the order.
-    auto n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(order)}), batch_size);
+    auto n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<double>(order)}), batch_size);
 
     // Compute the divisor: n * (1 - c^[0]).
     const auto c_idx = deps[0];
@@ -348,7 +348,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 
         // NOTE: iteration in the [1, order) range.
         for (std::uint32_t j = 1; j < order; ++j) {
-            auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(j))), batch_size);
+            auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
             auto *cnj = taylor_fetch_diff(arr, c_idx, order - j, n_uvars);
             auto *aj = taylor_fetch_diff(arr, idx, j, n_uvars);
@@ -391,7 +391,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
     }
 
     // Splat the order.
-    auto n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(order)}), batch_size);
+    auto n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<double>(order)}), batch_size);
 
     // Compute the divisor: n * (1 - c^[0]).
     const auto c_idx = deps[0];
@@ -412,7 +412,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 
         // NOTE: iteration in the [1, order) range.
         for (std::uint32_t j = 1; j < order; ++j) {
-            auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(j))), batch_size);
+            auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
             auto *cnj = taylor_fetch_diff(arr, c_idx, order - j, n_uvars);
             auto *aj = taylor_fetch_diff(arr, idx, j, n_uvars);

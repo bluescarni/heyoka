@@ -273,14 +273,15 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variab
             if constexpr (std::is_same_v<U, number>) {
                 return vector_splat(builder,
                                     llvm_codegen(s, fp_t,
-                                                 number(static_cast<T>(order)) * num
-                                                     - number(static_cast<T>(j)) * (num + number(static_cast<T>(1)))),
+                                                 number(static_cast<double>(order)) * num
+                                                     - number(static_cast<double>(j)) * (num + number(1.))),
                                     batch_size);
             } else {
                 auto pc = taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size);
-                auto jvec = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(j))), batch_size);
-                auto ordvec = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(order))), batch_size);
-                auto onevec = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(1))), batch_size);
+                auto jvec = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
+                auto ordvec
+                    = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
+                auto onevec = vector_splat(builder, llvm_codegen(s, fp_t, number(1.)), batch_size);
 
                 auto tmp1 = builder.CreateFMul(ordvec, pc);
                 auto tmp2 = builder.CreateFMul(jvec, builder.CreateFAdd(pc, onevec));
@@ -297,7 +298,7 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variab
     auto *ret_acc = pairwise_sum(builder, sum);
 
     // Compute the final divisor: order * (zero-th derivative of u_idx).
-    auto ord_f = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<T>(order))), batch_size);
+    auto ord_f = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
     auto *b0 = taylor_fetch_diff(arr, u_idx, 0, n_uvars);
     auto div = builder.CreateFMul(ord_f, b0);
 
