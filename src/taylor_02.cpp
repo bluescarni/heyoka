@@ -1478,7 +1478,8 @@ taylor_compute_jet<mppp::real128>(llvm_state &, llvm::Value *, llvm::Value *, ll
 // Helper to generate the LLVM code to store the Taylor coefficients of the state variables and
 // the sv funcs into an external array. The Taylor polynomials are stored in row-major order,
 // first the state variables and after the sv funcs. For use in the adaptive timestepper implementations.
-void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
+void taylor_write_tc(llvm_state &s, llvm::Type *fp_t,
+                     const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
                      const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *tc_ptr,
                      std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
@@ -1520,20 +1521,20 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
 
         // Write out the Taylor coefficients for the state variables.
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var) {
-            llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
-                          [&](llvm::Value *cur_order) {
-                              // Load the value of the derivative from diff_arr.
-                              auto *diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var);
+            llvm_loop_u32(
+                s, builder.getInt32(0), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+                [&](llvm::Value *cur_order) {
+                    // Load the value of the derivative from diff_arr.
+                    auto *diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var);
 
-                              // Compute the index in the output pointer.
-                              auto *out_idx = builder.CreateAdd(
-                                  builder.CreateMul(builder.getInt32((order + 1u) * batch_size), cur_var),
-                                  builder.CreateMul(cur_order, builder.getInt32(batch_size)));
+                    // Compute the index in the output pointer.
+                    auto *out_idx
+                        = builder.CreateAdd(builder.CreateMul(builder.getInt32((order + 1u) * batch_size), cur_var),
+                                            builder.CreateMul(cur_order, builder.getInt32(batch_size)));
 
-                              // Store into tc_ptr.
-                              store_vector_to_memory(
-                                  builder, builder.CreateInBoundsGEP(pointee_type(tc_ptr), tc_ptr, out_idx), diff_val);
-                          });
+                    // Store into tc_ptr.
+                    store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_t, tc_ptr, out_idx), diff_val);
+                });
         });
 
         // Write out the Taylor coefficients for the sv funcs, if necessary.
@@ -1557,8 +1558,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
                                                 builder.CreateMul(cur_order, builder.getInt32(batch_size)));
 
                         // Store into tc_ptr.
-                        store_vector_to_memory(
-                            builder, builder.CreateInBoundsGEP(pointee_type(tc_ptr), tc_ptr, out_idx), diff_val);
+                        store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_t, tc_ptr, out_idx), diff_val);
                     });
             });
         }
@@ -1581,8 +1581,8 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
                 const auto out_idx = (order + 1u) * batch_size * j + cur_order * batch_size;
 
                 // Write to tc_ptr.
-                auto *out_ptr = builder.CreateInBoundsGEP(pointee_type(tc_ptr), tc_ptr,
-                                                          builder.getInt32(static_cast<std::uint32_t>(out_idx)));
+                auto *out_ptr
+                    = builder.CreateInBoundsGEP(fp_t, tc_ptr, builder.getInt32(static_cast<std::uint32_t>(out_idx)));
                 store_vector_to_memory(builder, out_ptr, val);
             }
         }
@@ -1595,8 +1595,9 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
 // is h. The evaluation is run in parallel over the polynomials of all the state
 // variables.
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_run_multihorner(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_var,
-                       llvm::Value *h, std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+taylor_run_multihorner(llvm_state &s, llvm::Type *fp_t,
+                       const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_var, llvm::Value *h,
+                       std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
                        bool compact_mode)
 {
     auto &builder = s.builder();
@@ -1606,7 +1607,7 @@ taylor_run_multihorner(llvm_state &s, const std::variant<llvm::Value *, std::vec
         auto *diff_arr = std::get<llvm::Value *>(diff_var);
 
         // Create the array storing the results of the evaluation.
-        auto *fp_vec_t = pointee_type(diff_arr);
+        auto *fp_vec_t = make_vector_type(fp_t, batch_size);
         auto *array_type = llvm::ArrayType::get(fp_vec_t, n_eq);
         auto *array_inst = builder.CreateAlloca(array_type);
         assert(llvm_depr_GEP_type_check(array_inst, array_type)); // LCOV_EXCL_LINE
@@ -1666,8 +1667,10 @@ taylor_run_multihorner(llvm_state &s, const std::variant<llvm::Value *, std::vec
 // Same as taylor_run_multihorner(), but instead of the Horner scheme this implementation uses
 // a compensated summation over the naive evaluation of monomials.
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_var, llvm::Value *h,
-                 std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, bool, bool compact_mode)
+taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
+                 const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_var, llvm::Value *h,
+                 std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, bool, std::uint32_t batch_size,
+                 bool compact_mode)
 {
     auto &builder = s.builder();
 
@@ -1676,7 +1679,7 @@ taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<ll
         auto *diff_arr = std::get<llvm::Value *>(diff_var);
 
         // Create the arrays storing the results of the evaluation and the running compensations.
-        auto *fp_vec_t = pointee_type(diff_arr);
+        auto *fp_vec_t = make_vector_type(fp_t, batch_size);
         auto *array_type = llvm::ArrayType::get(fp_vec_t, n_eq);
         auto *res_arr_inst = builder.CreateAlloca(array_type);
         auto *comp_arr_inst = builder.CreateAlloca(array_type);

@@ -115,17 +115,17 @@ taylor_compute_jet(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, co
                    const std::vector<std::uint32_t> &, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool,
                    bool, bool);
 
-void taylor_write_tc(llvm_state &, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
+void taylor_write_tc(llvm_state &, llvm::Type *, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
                      const std::vector<std::uint32_t> &, llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t,
                      std::uint32_t, std::uint32_t);
 
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_run_multihorner(llvm_state &, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &, llvm::Value *,
-                       std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool);
+taylor_run_multihorner(llvm_state &, llvm::Type *, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
+                       llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool);
 
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_run_ceval(llvm_state &, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &, llvm::Value *,
-                 std::uint32_t, std::uint32_t, std::uint32_t, bool, bool);
+taylor_run_ceval(llvm_state &, llvm::Type *, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
+                 llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, bool, std::uint32_t, bool);
 
 // NOTE: this function will return a pair containing:
 //

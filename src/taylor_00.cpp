@@ -258,7 +258,7 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     store_vector_to_memory(builder, h_ptr, h);
 
     // Copy the jet of derivatives to jet_ptr.
-    taylor_write_tc(s, diff_variant, ev_dc, svf_ptr, jet_ptr, n_eq, n_uvars, order, batch_size);
+    taylor_write_tc(s, fp_t, diff_variant, ev_dc, svf_ptr, jet_ptr, n_eq, n_uvars, order, batch_size);
 
     // Create the return value.
     builder.CreateRetVoid();
@@ -375,9 +375,10 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
                                 nullptr);
 
     // Evaluate the Taylor polynomials, producing the updated state of the system.
-    auto new_state_var
-        = high_accuracy ? taylor_run_ceval(s, diff_variant, h, n_eq, n_uvars, order, high_accuracy, compact_mode)
-                        : taylor_run_multihorner(s, diff_variant, h, n_eq, n_uvars, order, batch_size, compact_mode);
+    auto new_state_var = high_accuracy ? taylor_run_ceval(s, fp_t, diff_variant, h, n_eq, n_uvars, order, high_accuracy,
+                                                          batch_size, compact_mode)
+                                       : taylor_run_multihorner(s, fp_t, diff_variant, h, n_eq, n_uvars, order,
+                                                                batch_size, compact_mode);
 
     // Store the new state.
     // NOTE: no need to perform overflow check on n_eq * batch_size,
@@ -417,7 +418,7 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
         [&]() {
             // tc_ptr is not null: copy the Taylor coefficients
             // for the state variables.
-            taylor_write_tc(s, diff_variant, {}, nullptr, tc_ptr, n_eq, n_uvars, order, batch_size);
+            taylor_write_tc(s, fp_t, diff_variant, {}, nullptr, tc_ptr, n_eq, n_uvars, order, batch_size);
         },
         []() {
             // Taylor coefficients were not requested,
