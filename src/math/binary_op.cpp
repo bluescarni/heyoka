@@ -765,8 +765,8 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, const binary_op &bo
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // If the order is zero, run the codegen.
-                auto vnum0 = taylor_c_diff_numparam_codegen(s, n0, num0, par_ptr, batch_size);
-                auto vnum1 = taylor_c_diff_numparam_codegen(s, n1, num1, par_ptr, batch_size);
+                auto vnum0 = taylor_c_diff_numparam_codegen(s, fp_t, n0, num0, par_ptr, batch_size);
+                auto vnum1 = taylor_c_diff_numparam_codegen(s, fp_t, n1, num1, par_ptr, batch_size);
 
                 switch (bo.op()) {
                     case binary_op::type::add:
@@ -828,8 +828,9 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
     const auto na_pair
@@ -869,7 +870,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
             s, builder.CreateICmpEQ(order, builder.getInt32(0)),
             [&]() {
                 // For order zero, run the codegen.
-                auto num_vec = taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size);
+                auto num_vec = taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size);
                 auto ret = taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), var_idx);
 
                 builder.CreateStore(AddOrSub ? builder.CreateFAdd(num_vec, ret) : builder.CreateFSub(num_vec, ret),
@@ -918,8 +919,9 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
     const auto na_pair
@@ -960,7 +962,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
             [&]() {
                 // For order zero, run the codegen.
                 auto ret = taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), var_idx);
-                auto num_vec = taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size);
+                auto num_vec = taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size);
 
                 builder.CreateStore(AddOrSub ? builder.CreateFAdd(ret, num_vec) : builder.CreateFSub(ret, num_vec),
                                     retval);
@@ -1115,8 +1117,9 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
     const auto na_pair = taylor_c_diff_func_name_args<T>(context, "mul", n_uvars, batch_size, {var, n});
@@ -1152,7 +1155,8 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
         auto ret = taylor_c_load_diff(s, diff_arr, n_uvars, order, var_idx);
 
         // Create the return value.
-        builder.CreateRet(builder.CreateFMul(ret, taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size)));
+        builder.CreateRet(
+            builder.CreateFMul(ret, taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size)));
 
         // Verify.
         s.verify_function(f);
@@ -1182,8 +1186,9 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
     const auto na_pair = taylor_c_diff_func_name_args<T>(context, "mul", n_uvars, batch_size, {n, var});
@@ -1219,7 +1224,8 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
         auto ret = taylor_c_load_diff(s, diff_arr, n_uvars, order, var_idx);
 
         // Create the return value.
-        builder.CreateRet(builder.CreateFMul(ret, taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size)));
+        builder.CreateRet(
+            builder.CreateFMul(ret, taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size)));
 
         // Verify.
         s.verify_function(f);
@@ -1356,8 +1362,9 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
     const auto na_pair = taylor_c_diff_func_name_args<T>(context, "div", n_uvars, batch_size, {var, n});
@@ -1371,7 +1378,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -1393,7 +1400,8 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
         auto ret = taylor_c_load_diff(s, diff_arr, n_uvars, order, var_idx);
 
         // Create the return value.
-        builder.CreateRet(builder.CreateFDiv(ret, taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size)));
+        builder.CreateRet(
+            builder.CreateFDiv(ret, taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size)));
 
         // Verify.
         s.verify_function(f);
@@ -1471,7 +1479,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order zero, run the codegen.
-                auto num_vec = taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size);
+                auto num_vec = taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size);
                 auto ret = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx);
 
                 builder.CreateStore(builder.CreateFDiv(num_vec, ret), retval);

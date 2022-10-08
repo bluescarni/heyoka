@@ -176,7 +176,7 @@ llvm::Value *taylor_codegen_numparam(llvm_state &s, llvm::Type *fp_t, const numb
     return vector_splat(s.builder(), llvm_codegen(s, fp_t, num), batch_size);
 }
 
-llvm::Value *taylor_codegen_numparam(llvm_state &s, llvm::Type *, const param &p, llvm::Value *par_ptr,
+llvm::Value *taylor_codegen_numparam(llvm_state &s, llvm::Type *fp_t, const param &p, llvm::Value *par_ptr,
                                      std::uint32_t batch_size)
 {
     // LCOV_EXCL_START
@@ -196,22 +196,21 @@ llvm::Value *taylor_codegen_numparam(llvm_state &s, llvm::Type *, const param &p
     const auto arr_idx = static_cast<std::uint32_t>(p.idx() * batch_size);
 
     // Compute the pointer to load from.
-    auto *ptr = builder.CreateInBoundsGEP(llvm::cast<llvm::PointerType>(par_ptr->getType())->getPointerElementType(),
-                                          par_ptr, builder.getInt32(arr_idx));
+    auto *ptr = builder.CreateInBoundsGEP(fp_t, par_ptr, builder.getInt32(arr_idx));
 
     // Load.
     return load_vector_from_memory(builder, ptr, batch_size);
 }
 
 // Codegen helpers for number/param for use in the generic c_diff implementations.
-llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const number &, llvm::Value *n, llvm::Value *,
+llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, llvm::Type *, const number &, llvm::Value *n, llvm::Value *,
                                             std::uint32_t batch_size)
 {
     return vector_splat(s.builder(), n, batch_size);
 }
 
-llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::Value *p, llvm::Value *par_ptr,
-                                            std::uint32_t batch_size)
+llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, llvm::Type *fp_t, const param &, llvm::Value *p,
+                                            llvm::Value *par_ptr, std::uint32_t batch_size)
 {
     // LCOV_EXCL_START
     assert(batch_size > 0u);
@@ -222,8 +221,7 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::
 
     // Fetch the pointer into par_ptr.
     // NOTE: the overflow check is done in taylor_compute_jet().
-    auto *ptr = builder.CreateInBoundsGEP(llvm::cast<llvm::PointerType>(par_ptr->getType())->getPointerElementType(),
-                                          par_ptr, builder.CreateMul(p, builder.getInt32(batch_size)));
+    auto *ptr = builder.CreateInBoundsGEP(fp_t, par_ptr, builder.CreateMul(p, builder.getInt32(batch_size)));
 
     return load_vector_from_memory(builder, ptr, batch_size);
 }

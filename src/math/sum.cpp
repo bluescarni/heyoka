@@ -330,7 +330,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
                             [&]() {
                                 // If the order is zero, run the codegen.
                                 builder.CreateStore(
-                                    taylor_c_diff_numparam_codegen(s, v, terms + i, par_ptr, batch_size), retval);
+                                    taylor_c_diff_numparam_codegen(s, fp_t, v, terms + i, par_ptr, batch_size), retval);
                             },
                             [&]() {
                                 // Otherwise, return zero.

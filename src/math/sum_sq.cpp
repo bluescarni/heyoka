@@ -548,7 +548,8 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
                                     [&]() {
                                         // Order 0, store the num/param.
                                         builder.CreateStore(
-                                            taylor_c_diff_numparam_codegen(s, v, terms + k, par_ptr, batch_size), ret);
+                                            taylor_c_diff_numparam_codegen(s, fp_t, v, terms + k, par_ptr, batch_size),
+                                            ret);
                                     },
                                     [&]() {
                                         // Order 2 or higher, store zero.

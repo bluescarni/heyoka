@@ -459,13 +459,13 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
             [&]() {
                 // For order 0, invoke the function on the order 0 of var_idx.
                 builder.CreateStore(llvm_pow(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx),
-                                             taylor_c_diff_numparam_codegen(s, n, exponent, par_ptr, batch_size),
+                                             taylor_c_diff_numparam_codegen(s, fp_t, n, exponent, par_ptr, batch_size),
                                              allow_approx),
                                     retval);
             },
             [&]() {
                 // Create FP vector versions of exponent and order.
-                auto alpha_v = taylor_c_diff_numparam_codegen(s, n, exponent, par_ptr, batch_size);
+                auto alpha_v = taylor_c_diff_numparam_codegen(s, fp_t, n, exponent, par_ptr, batch_size);
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
                 // Init the accumulator.

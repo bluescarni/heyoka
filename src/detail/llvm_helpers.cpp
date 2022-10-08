@@ -267,7 +267,6 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std:
     assert(vector_size > 0u);
     assert(llvm::isa<llvm::PointerType>(ptr->getType()));
     assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
-    assert(!llvm::isa<llvm_vector_type>(ptr->getType()->getPointerElementType()));
     // LCOV_EXCL_STOP
 
     // Fetch the scalar type.
@@ -302,7 +301,6 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
     // LCOV_EXCL_START
     assert(llvm::isa<llvm::PointerType>(ptr->getType()));
     assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
-    assert(!llvm::isa<llvm_vector_type>(ptr->getType()->getPointerElementType()));
     // LCOV_EXCL_STOP
 
     auto scal_t = ptr->getType()->getPointerElementType();

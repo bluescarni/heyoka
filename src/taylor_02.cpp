@@ -607,7 +607,8 @@ std::uint32_t taylor_c_gl_arr_size(llvm::Value *v)
 // Helper to compute and store the derivatives of the state variables in compact mode at order 'order'.
 // svd_gl is the return value of taylor_c_make_sv_diff_globals(), which contains
 // the indices/constants necessary for the computation.
-void taylor_c_compute_sv_diffs(llvm_state &s, const std::pair<std::array<llvm::GlobalVariable *, 6>, bool> &svd_gl,
+void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
+                               const std::pair<std::array<llvm::GlobalVariable *, 6>, bool> &svd_gl,
                                llvm::Value *diff_arr, llvm::Value *par_ptr, std::uint32_t n_uvars, llvm::Value *order,
                                std::uint32_t batch_size)
 {
@@ -706,7 +707,7 @@ void taylor_c_compute_sv_diffs(llvm_state &s, const std::pair<std::array<llvm::G
                 // Derivative of order 1. Fetch the value from par_ptr.
                 // NOTE: param{0} is unused, its only purpose is type tagging.
                 taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx,
-                                    taylor_c_diff_numparam_codegen(s, param{0}, par_idx, par_ptr, batch_size));
+                                    taylor_c_diff_numparam_codegen(s, fp_t, param{0}, par_idx, par_ptr, batch_size));
             },
             [&]() {
                 // Derivative of order > 1, return 0.
@@ -1189,14 +1190,14 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // Compute all derivatives up to order 'order - 1'.
     llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(order), [&](llvm::Value *cur_order) {
         // State variables first.
-        taylor_c_compute_sv_diffs(s, svd_gl, diff_arr, par_ptr, n_uvars, cur_order, batch_size);
+        taylor_c_compute_sv_diffs(s, fp_type, svd_gl, diff_arr, par_ptr, n_uvars, cur_order, batch_size);
 
         // The other u variables.
         compute_u_diffs(cur_order);
     });
 
     // Compute the last-order derivatives for the state variables.
-    taylor_c_compute_sv_diffs(s, svd_gl, diff_arr, par_ptr, n_uvars, builder.getInt32(order), batch_size);
+    taylor_c_compute_sv_diffs(s, fp_type, svd_gl, diff_arr, par_ptr, n_uvars, builder.getInt32(order), batch_size);
 
     // Compute the last-order derivatives for the sv_funcs, if any. Because the sv funcs
     // correspond to u variables in the decomposition, we will have to compute the

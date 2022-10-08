@@ -531,7 +531,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
             [&]() {
                 // For order 0, run the codegen.
                 auto ret = llvm_atan2(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), y_idx),
-                                      taylor_c_diff_numparam_codegen(s, n, num_x, par_ptr, batch_size));
+                                      taylor_c_diff_numparam_codegen(s, fp_t, n, num_x, par_ptr, batch_size));
 
                 builder.CreateStore(ret, retval);
             },
@@ -545,7 +545,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
 
                 // Init the dividend: ord * c^[0] * b^[n].
                 auto dividend
-                    = builder.CreateFMul(ord_v, taylor_c_diff_numparam_codegen(s, n, num_x, par_ptr, batch_size));
+                    = builder.CreateFMul(ord_v, taylor_c_diff_numparam_codegen(s, fp_t, n, num_x, par_ptr, batch_size));
                 dividend = builder.CreateFMul(dividend, taylor_c_load_diff(s, diff_ptr, n_uvars, ord, y_idx));
 
                 // Init the accumulator.
@@ -648,7 +648,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, run the codegen.
-                auto ret = llvm_atan2(s, taylor_c_diff_numparam_codegen(s, n, num_y, par_ptr, batch_size),
+                auto ret = llvm_atan2(s, taylor_c_diff_numparam_codegen(s, fp_t, n, num_y, par_ptr, batch_size),
                                       taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), x_idx));
 
                 builder.CreateStore(ret, retval);
@@ -662,8 +662,8 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
                 divisor = builder.CreateFMul(ord_v, divisor);
 
                 // Init the dividend: -ord * b^[0] * c^[n].
-                auto dividend = builder.CreateFMul(builder.CreateFNeg(ord_v),
-                                                   taylor_c_diff_numparam_codegen(s, n, num_y, par_ptr, batch_size));
+                auto dividend = builder.CreateFMul(
+                    builder.CreateFNeg(ord_v), taylor_c_diff_numparam_codegen(s, fp_t, n, num_y, par_ptr, batch_size));
                 dividend = builder.CreateFMul(dividend, taylor_c_load_diff(s, diff_ptr, n_uvars, ord, x_idx));
 
                 // Init the accumulator.

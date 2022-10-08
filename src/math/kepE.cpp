@@ -581,7 +581,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &var,
                 // For order 0, invoke the function on the order 0 of e_idx.
                 builder.CreateStore(
                     builder.CreateCall(fkep, {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), e_idx),
-                                              taylor_c_diff_numparam_codegen(s, n, num_M, par_ptr, batch_size)}),
+                                              taylor_c_diff_numparam_codegen(s, fp_t, n, num_M, par_ptr, batch_size)}),
                     retval);
             },
             [&]() {
@@ -674,7 +674,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n, const va
         auto fkep = llvm_add_inv_kep_E<T>(s, batch_size);
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -705,7 +705,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n, const va
             [&]() {
                 // For order 0, invoke the function on the order 0 of M_idx.
                 builder.CreateStore(
-                    builder.CreateCall(fkep, {taylor_c_diff_numparam_codegen(s, n, num_e, par_ptr, batch_size),
+                    builder.CreateCall(fkep, {taylor_c_diff_numparam_codegen(s, fp_t, n, num_e, par_ptr, batch_size),
                                               taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), M_idx)}),
                     retval);
             },

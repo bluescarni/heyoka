@@ -47,10 +47,10 @@ namespace heyoka::detail
 // array (see the implementation of taylor_c_diff_numparam_codegen()).
 template <typename Tup, typename ArgIter, std::size_t... I>
 inline std::vector<llvm::Value *>
-taylor_c_diff_func_numpar_codegen_impl(llvm_state &s, const Tup &np_tup, ArgIter numpar_begin, llvm::Value *par_ptr,
-                                       std::uint32_t batch_size, std::index_sequence<I...>)
+taylor_c_diff_func_numpar_codegen_impl(llvm_state &s, llvm::Type *fp_t, const Tup &np_tup, ArgIter numpar_begin,
+                                       llvm::Value *par_ptr, std::uint32_t batch_size, std::index_sequence<I...>)
 {
-    return {taylor_c_diff_numparam_codegen(s, std::get<I>(np_tup), numpar_begin + I, par_ptr, batch_size)...};
+    return {taylor_c_diff_numparam_codegen(s, fp_t, std::get<I>(np_tup), numpar_begin + I, par_ptr, batch_size)...};
 }
 
 // Helper to implement the function for the differentiation of
@@ -68,8 +68,9 @@ inline llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, std::uint32_t n_
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto *val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
     const auto na_pair = taylor_c_diff_func_name_args<T>(context, name, n_uvars, batch_size, {np...}, n_hidden_deps);
@@ -106,7 +107,7 @@ inline llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, std::uint32_t n_
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // Generate the vector of num/param arguments.
-                auto np_args = taylor_c_diff_func_numpar_codegen_impl(s, std::make_tuple(std::cref(np)...),
+                auto np_args = taylor_c_diff_func_numpar_codegen_impl(s, fp_t, std::make_tuple(std::cref(np)...),
                                                                       numpar_begin, par_ptr, batch_size,
                                                                       std::make_index_sequence<sizeof...(np)>{});
 
