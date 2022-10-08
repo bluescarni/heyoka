@@ -11,6 +11,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <initializer_list>
 #include <ios>
@@ -42,10 +43,12 @@
 
 #if defined(HEYOKA_HAVE_REAL128)
 
+#include <mp++/integer.hpp>
 #include <mp++/real128.hpp>
 
 #endif
 
+#include <heyoka/detail/binomial.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -326,6 +329,54 @@ number exp(number n)
             return number{exp(std::forward<decltype(arg)>(arg))};
         },
         std::move(n.value()));
+}
+
+number binomial(const number &i, const number &j)
+{
+    return std::visit(
+        [](const auto &v1, const auto &v2) -> number {
+            using type1 = detail::uncvref_t<decltype(v1)>;
+            using type2 = detail::uncvref_t<decltype(v2)>;
+
+            if constexpr (!std::is_same_v<type1, type2>) {
+                throw std::invalid_argument("Cannot compute the binomial coefficient of two numbers of different type");
+            } else {
+                using std::isfinite;
+                using std::trunc;
+
+                if (!isfinite(v1) || !isfinite(v2)) {
+                    throw std::invalid_argument("Cannot compute the binomial coefficient of non-finite values");
+                }
+
+                if (trunc(v1) != v1 || trunc(v2) != v2) {
+                    throw std::invalid_argument("Cannot compute the binomial coefficient non-integral values");
+                }
+
+                if constexpr (std::is_floating_point_v<type1>) {
+                    // For C++ FP types, we can use directly the binomial
+                    // implementation in detail, after casting the
+                    // arguments back to std::uint32_t.
+                    return number{detail::binomial<type1>(boost::numeric_cast<std::uint32_t>(v1),
+                                                          boost::numeric_cast<std::uint32_t>(v2))};
+#if defined(HEYOKA_HAVE_REAL128)
+                } else if constexpr (std::is_same_v<type1, mppp::real128>) {
+                    // For real128, we cannot use boost::numeric_cast, so we go through
+                    // a checked conversion via mppp::integer.
+                    const auto n1 = static_cast<mppp::integer<1>>(v1);
+                    const auto n2 = static_cast<mppp::integer<1>>(v2);
+
+                    return number{
+                        detail::binomial<type1>(static_cast<std::uint32_t>(n1), static_cast<std::uint32_t>(n2))};
+#endif
+                    // LCOV_EXCL_START
+                } else {
+                    throw std::invalid_argument(fmt::format("Arguments of type '{}' are not supported by binomial()",
+                                                            boost::core::demangle(typeid(type1).name())));
+                }
+                // LCOV_EXCL_STOP
+            }
+        },
+        i.value(), j.value());
 }
 
 namespace detail

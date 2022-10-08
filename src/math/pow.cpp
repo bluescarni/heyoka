@@ -271,11 +271,12 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variab
         // Compute the scalar factor: order * num - j * (num + 1).
         auto scal_f = [&]() -> llvm::Value * {
             if constexpr (std::is_same_v<U, number>) {
-                return vector_splat(builder,
-                                    llvm_codegen(s, fp_t,
-                                                 number(static_cast<double>(order)) * num
-                                                     - number(static_cast<double>(j)) * (num + number(1.))),
-                                    batch_size);
+                return vector_splat(
+                    builder,
+                    llvm_codegen(s, fp_t,
+                                 number_like(s, fp_t, static_cast<double>(order)) * num
+                                     - number_like(s, fp_t, static_cast<double>(j)) * (num + number_like(s, fp_t, 1.))),
+                    batch_size);
             } else {
                 auto pc = taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size);
                 auto jvec = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);

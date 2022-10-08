@@ -751,3 +751,41 @@ TEST_CASE("exp")
 
 #endif
 }
+
+TEST_CASE("binomial")
+{
+    using Catch::Matchers::Message;
+
+    auto n = binomial(number(4.f), number(2.f));
+    REQUIRE(n == number(6.f));
+    REQUIRE(std::holds_alternative<float>(n.value()));
+
+    n = binomial(number(4.), number(2.));
+    REQUIRE(n == number(6.));
+    REQUIRE(std::holds_alternative<double>(n.value()));
+
+#if !defined(HEYOKA_ARCH_PPC)
+
+    n = binomial(number(4.l), number(2.l));
+    REQUIRE(n == number(6.l));
+    REQUIRE(std::holds_alternative<long double>(n.value()));
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    n = binomial(number(4._rq), number(2._rq));
+    REQUIRE(n == number(6._rq));
+    REQUIRE(std::holds_alternative<mppp::real128>(n.value()));
+
+#endif
+
+    REQUIRE_THROWS_MATCHES(binomial(number(4.), number(2.f)), std::invalid_argument,
+                           Message("Cannot compute the binomial coefficient of two numbers of different type"));
+
+    REQUIRE_THROWS_MATCHES(binomial(number(4.), number(std::numeric_limits<double>::infinity())), std::invalid_argument,
+                           Message("Cannot compute the binomial coefficient of non-finite values"));
+
+    REQUIRE_THROWS_MATCHES(binomial(number(4.), number(3.1)), std::invalid_argument,
+                           Message("Cannot compute the binomial coefficient non-integral values"));
+}

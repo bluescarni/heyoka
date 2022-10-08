@@ -34,7 +34,6 @@
 
 #endif
 
-#include <heyoka/detail/binomial.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -107,9 +106,9 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
     // Init the return value with the highest-order coefficient (scaled by the corresponding
     // binomial coefficient).
     assert(tp.m_e_idx > 0u);
-    auto bc = binomial<T>(n, order);
+    auto bc = binomial(number_like(s, fp_t, static_cast<double>(n)), number_like(s, fp_t, static_cast<double>(order)));
     auto ret = taylor_codegen_numparam(s, fp_t, param{tp.m_e_idx - 1u}, par_ptr, batch_size);
-    ret = builder.CreateFMul(ret, vector_splat(builder, llvm_codegen(s, fp_t, number{bc}), batch_size));
+    ret = builder.CreateFMul(ret, vector_splat(builder, llvm_codegen(s, fp_t, bc), batch_size));
 
     // Horner evaluation of polynomial derivative.
     for (std::uint32_t i_ = 1; i_ <= n - order; ++i_) {
@@ -118,11 +117,12 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
         const auto i = n - order - i_;
 
         // Compute the binomial coefficient.
-        bc = binomial<T>(i + order, order);
+        bc = binomial(number_like(s, fp_t, static_cast<double>(i + order)),
+                      number_like(s, fp_t, static_cast<double>(order)));
 
         // Load the poly coefficient from the par array and multiply it by bc.
         auto cf = taylor_codegen_numparam(s, fp_t, param{tp.m_b_idx + i + order}, par_ptr, batch_size);
-        cf = builder.CreateFMul(cf, vector_splat(builder, llvm_codegen(s, fp_t, number{bc}), batch_size));
+        cf = builder.CreateFMul(cf, vector_splat(builder, llvm_codegen(s, fp_t, bc), batch_size));
 
         // Horner iteration.
         ret = builder.CreateFAdd(cf, builder.CreateFMul(ret, tm));

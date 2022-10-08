@@ -66,7 +66,6 @@
 
 #endif
 
-#include <heyoka/detail/binomial.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
@@ -1657,8 +1656,12 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
         auto *ptr = builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.getInt32(j * batch_size));
         auto *cur_cf = load_vector_from_memory(builder, ptr, batch_size);
         auto *new_term = builder.CreateFMul(cur_cf, cur_h_pow);
-        new_term = builder.CreateFDiv(
-            new_term, vector_splat(builder, llvm_codegen(s, fp_t, number{binomial<T>(n, j)}), batch_size));
+        new_term = builder.CreateFDiv(new_term,
+                                      vector_splat(builder,
+                                                   llvm_codegen(s, fp_t,
+                                                                binomial(number_like(s, fp_t, static_cast<double>(n)),
+                                                                         number_like(s, fp_t, static_cast<double>(j)))),
+                                                   batch_size));
 
         // Add it to bj_series.
         bj_series.push_back(new_term);
@@ -1666,9 +1669,11 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
         // Update all elements of bj_series (apart from the last one).
         for (std::uint32_t i = 0; i < j; ++i) {
             bj_series[i] = builder.CreateFMul(
-                bj_series[i],
-                vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(j) / static_cast<T>(j - i)}),
-                             batch_size));
+                bj_series[i], vector_splat(builder,
+                                           llvm_codegen(s, fp_t,
+                                                        number_like(s, fp_t, static_cast<double>(j))
+                                                            / number_like(s, fp_t, static_cast<double>(j - i))),
+                                           batch_size));
         }
 
         // Compute the new bj.
@@ -2078,8 +2083,7 @@ llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
     auto *fp_t = to_llvm_type<T>(context);
 
     // Fetch the array type.
-    auto *arr_type
-        = llvm::ArrayType::get(to_llvm_type<T>(context), boost::numeric_cast<std::uint64_t>((n + 1u) * (n + 1u)));
+    auto *arr_type = llvm::ArrayType::get(fp_t, boost::numeric_cast<std::uint64_t>((n + 1u) * (n + 1u)));
 
     // Generate the binomials as constants.
     std::vector<llvm::Constant *> bc_const;
@@ -2087,8 +2091,10 @@ llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
         for (std::uint32_t j = 0; j <= n; ++j) {
             // NOTE: the Boost implementation requires j <= i. We don't care about
             // j > i anyway.
-            const auto val = (j <= i) ? binomial<T>(i, j) : static_cast<T>(0);
-            bc_const.push_back(llvm::cast<llvm::Constant>(llvm_codegen(s, fp_t, number{val})));
+            const auto val = (j <= i) ? binomial(number_like(s, fp_t, static_cast<double>(i)),
+                                                 number_like(s, fp_t, static_cast<double>(j)))
+                                      : number_like(s, fp_t, 0.);
+            bc_const.push_back(llvm::cast<llvm::Constant>(llvm_codegen(s, fp_t, val)));
         }
     }
 
