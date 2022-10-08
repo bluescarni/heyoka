@@ -627,8 +627,8 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
     const auto n_nums = taylor_c_gl_arr_size(sv_diff_gl[2]);
     const auto n_pars = taylor_c_gl_arr_size(sv_diff_gl[4]);
 
-    // Fetch the type stored in the array of derivatives.
-    auto *fp_vec_t = pointee_type(diff_arr);
+    // Fetch the vector type.
+    auto *fp_vec_t = make_vector_type(fp_t, batch_size);
 
     // Handle the u variables definitions.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_vars), [&](llvm::Value *cur_idx) {
@@ -639,13 +639,13 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
         auto *sv_idx = all_der_vars
                            ? cur_idx
                            : builder.CreateLoad(builder.getInt32Ty(),
-                                                builder.CreateInBoundsGEP(pointee_type(sv_diff_gl[0]), sv_diff_gl[0],
+                                                builder.CreateInBoundsGEP(sv_diff_gl[0]->getValueType(), sv_diff_gl[0],
                                                                           {builder.getInt32(0), cur_idx}));
 
         // Fetch the index of the u variable.
         auto *u_idx = builder.CreateLoad(
             builder.getInt32Ty(),
-            builder.CreateInBoundsGEP(pointee_type(sv_diff_gl[1]), sv_diff_gl[1], {builder.getInt32(0), cur_idx}));
+            builder.CreateInBoundsGEP(sv_diff_gl[1]->getValueType(), sv_diff_gl[1], {builder.getInt32(0), cur_idx}));
 
         // Fetch from diff_arr the derivative of order 'order - 1' of the u variable u_idx.
         auto *ret = taylor_c_load_diff(s, diff_arr, n_uvars, builder.CreateSub(order, builder.getInt32(1)), u_idx);
@@ -664,12 +664,12 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
         // Fetch the index of the state variable.
         auto *sv_idx = builder.CreateLoad(
             builder.getInt32Ty(),
-            builder.CreateInBoundsGEP(pointee_type(sv_diff_gl[2]), sv_diff_gl[2], {builder.getInt32(0), cur_idx}));
+            builder.CreateInBoundsGEP(sv_diff_gl[2]->getValueType(), sv_diff_gl[2], {builder.getInt32(0), cur_idx}));
 
         // Fetch the constant.
         auto *num = builder.CreateLoad(
             fp_vec_t->getScalarType(),
-            builder.CreateInBoundsGEP(pointee_type(sv_diff_gl[3]), sv_diff_gl[3], {builder.getInt32(0), cur_idx}));
+            builder.CreateInBoundsGEP(sv_diff_gl[3]->getValueType(), sv_diff_gl[3], {builder.getInt32(0), cur_idx}));
 
         // If the first-order derivative is being requested,
         // do the codegen for the constant itself, otherwise
@@ -689,12 +689,12 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
         // Fetch the index of the state variable.
         auto *sv_idx = builder.CreateLoad(
             builder.getInt32Ty(),
-            builder.CreateInBoundsGEP(pointee_type(sv_diff_gl[4]), sv_diff_gl[4], {builder.getInt32(0), cur_idx}));
+            builder.CreateInBoundsGEP(sv_diff_gl[4]->getValueType(), sv_diff_gl[4], {builder.getInt32(0), cur_idx}));
 
         // Fetch the index of the param.
         auto *par_idx = builder.CreateLoad(
             builder.getInt32Ty(),
-            builder.CreateInBoundsGEP(pointee_type(sv_diff_gl[5]), sv_diff_gl[5], {builder.getInt32(0), cur_idx}));
+            builder.CreateInBoundsGEP(sv_diff_gl[5]->getValueType(), sv_diff_gl[5], {builder.getInt32(0), cur_idx}));
 
         // If the first-order derivative is being requested,
         // do the codegen for the constant itself, otherwise
@@ -1296,7 +1296,7 @@ auto taylor_load_values(llvm_state &s, llvm::Type *fp_t, llvm::Value *in, std::u
     for (std::uint32_t i = 0; i < n; ++i) {
         // Fetch the pointer from in.
         // NOTE: overflow checking is done in the parent function.
-        auto *ptr = builder.CreateInBoundsGEP(pointee_type(in), in, builder.getInt32(i * batch_size));
+        auto *ptr = builder.CreateInBoundsGEP(fp_t, in, builder.getInt32(i * batch_size));
 
         // Load the value in vector mode.
         retval.push_back(load_vector_from_memory(builder, fp_t, ptr, batch_size));

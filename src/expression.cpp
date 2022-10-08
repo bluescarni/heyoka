@@ -2755,7 +2755,7 @@ std::uint32_t cfunc_c_gl_arr_size(llvm::Value *v)
 // Helper to write the outputs of a compiled function in compact mode.
 // cout_gl is the return value of cfunc_c_make_output_globals(), which contains
 // the indices/constants necessary for the computation.
-void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
+void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *out_ptr,
                            const std::pair<std::array<llvm::GlobalVariable *, 6>, bool> &cout_gl, llvm::Value *eval_arr,
                            llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size)
 {
@@ -2774,10 +2774,8 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
     const auto n_nums = cfunc_c_gl_arr_size(out_gl[2]);
     const auto n_pars = cfunc_c_gl_arr_size(out_gl[4]);
 
-    // Fetch the type stored in the evaluation array.
-    auto *fp_vec_t = pointee_type(eval_arr);
-    // Fetch the scalar type corresponding to fp_vec_t.
-    auto *fp_scal_t = fp_vec_t->getScalarType();
+    // Fetch the vector type.
+    auto *fp_vec_t = make_vector_type(fp_scal_t, batch_size);
 
     // Handle the u variable outputs.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_vars), [&](llvm::Value *cur_idx) {
@@ -2785,14 +2783,15 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
         // NOTE: if all outputs are u variables, there's
         // no need to lookup the index in the global array (which will just contain
         // a range).
-        auto *out_idx = all_out_vars ? cur_idx
-                                     : builder.CreateLoad(builder.getInt32Ty(),
-                                                          builder.CreateInBoundsGEP(pointee_type(out_gl[0]), out_gl[0],
-                                                                                    {builder.getInt32(0), cur_idx}));
+        auto *out_idx = all_out_vars
+                            ? cur_idx
+                            : builder.CreateLoad(builder.getInt32Ty(),
+                                                 builder.CreateInBoundsGEP(out_gl[0]->getValueType(), out_gl[0],
+                                                                           {builder.getInt32(0), cur_idx}));
 
         // Fetch the index of the u variable.
         auto *u_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[1]), out_gl[1],
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[1]->getValueType(), out_gl[1],
                                                                                  {builder.getInt32(0), cur_idx}));
 
         // Fetch from eval_arr the value of the u variable u_idx.
@@ -2809,12 +2808,12 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_nums), [&](llvm::Value *cur_idx) {
         // Fetch the index of the output.
         auto *out_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[2]), out_gl[2],
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[2]->getValueType(), out_gl[2],
                                                                                  {builder.getInt32(0), cur_idx}));
 
         // Fetch the constant.
         auto *num = builder.CreateLoad(
-            fp_scal_t, builder.CreateInBoundsGEP(pointee_type(out_gl[3]), out_gl[3], {builder.getInt32(0), cur_idx}));
+            fp_scal_t, builder.CreateInBoundsGEP(out_gl[3]->getValueType(), out_gl[3], {builder.getInt32(0), cur_idx}));
 
         // Splat it out.
         auto *ret = vector_splat(builder, num, batch_size);
@@ -2830,12 +2829,12 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_pars), [&](llvm::Value *cur_idx) {
         // Fetch the index of the output.
         auto *out_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[4]), out_gl[4],
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[4]->getValueType(), out_gl[4],
                                                                                  {builder.getInt32(0), cur_idx}));
 
         // Fetch the index of the param.
         auto *par_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[5]), out_gl[5],
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[5]->getValueType(), out_gl[5],
                                                                                  {builder.getInt32(0), cur_idx}));
 
         // Load the parameter value from the array.
@@ -2948,7 +2947,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
     }
 
     // Write the results to the output pointer.
-    cfunc_c_write_outputs(s, out_ptr, cout_gl, eval_arr, par_ptr, stride, batch_size);
+    cfunc_c_write_outputs(s, fp_type, out_ptr, cout_gl, eval_arr, par_ptr, stride, batch_size);
 
     get_logger()->trace("cfunc IR creation compact mode runtime: {}", sw);
 }
