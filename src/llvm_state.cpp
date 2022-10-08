@@ -38,6 +38,7 @@
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/Triple.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
+#include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/Config/llvm-config.h>
 #include <llvm/ExecutionEngine/JITSymbol.h>
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
@@ -105,7 +106,6 @@
 
 #else
 
-#include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/CodeGen/TargetPassConfig.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/Pass.h>
@@ -428,7 +428,7 @@ struct llvm_state::jit {
     }
 
     // Symbol lookup.
-    llvm::Expected<llvm::JITEvaluatedSymbol> lookup(const std::string &name)
+    auto lookup(const std::string &name) const
     {
         return m_lljit->lookup(name);
     }
@@ -845,7 +845,7 @@ void llvm_state::verify_function(const std::string &name)
     check_uncompiled(__func__);
 
     // Lookup the function in the module.
-    auto f = m_module->getFunction(name);
+    auto *f = m_module->getFunction(name);
     if (f == nullptr) {
         throw std::invalid_argument(fmt::format("The function '{}' does not exist in the module", name));
     }
@@ -1108,7 +1108,11 @@ std::uintptr_t llvm_state::jit_lookup(const std::string &name)
         throw std::invalid_argument(fmt::format("Could not find the symbol '{}' in the compiled module", name));
     }
 
+#if LLVM_VERSION_MAJOR >= 15
+    return static_cast<std::uintptr_t>((*sym).getValue());
+#else
     return static_cast<std::uintptr_t>((*sym).getAddress());
+#endif
 }
 
 std::string llvm_state::get_ir() const
