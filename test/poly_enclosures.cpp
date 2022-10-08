@@ -87,8 +87,8 @@ TEST_CASE("polynomial enclosures")
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
                 // Load the h values.
-                auto *h_lo_val = detail::load_vector_from_memory(builder, h_lo_ptr, batch_size);
-                auto *h_hi_val = detail::load_vector_from_memory(builder, h_hi_ptr, batch_size);
+                auto *h_lo_val = detail::load_vector_from_memory(builder, val_t, h_lo_ptr, batch_size);
+                auto *h_hi_val = detail::load_vector_from_memory(builder, val_t, h_hi_ptr, batch_size);
 
                 {
                     auto [res_lo, res_hi]
@@ -119,7 +119,7 @@ TEST_CASE("polynomial enclosures")
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
                 // Load the h values.
-                auto *h_val = detail::load_vector_from_memory(builder, h_ptr, batch_size);
+                auto *h_val = detail::load_vector_from_memory(builder, val_t, h_ptr, batch_size);
 
                 {
                     auto [res_lo, res_hi] = detail::llvm_penc_cargo_shisha(s, val_t, cf_ptr, order, h_val, batch_size);

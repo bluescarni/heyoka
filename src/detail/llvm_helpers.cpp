@@ -291,39 +291,6 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Type *tp, llvm::
     return ret;
 }
 
-llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std::uint32_t vector_size)
-{
-    // LCOV_EXCL_START
-    assert(vector_size > 0u);
-    assert(llvm::isa<llvm::PointerType>(ptr->getType()));
-    assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
-    // LCOV_EXCL_STOP
-
-    // Fetch the scalar type.
-    auto scal_t = ptr->getType()->getPointerElementType();
-
-    if (vector_size == 1u) {
-        // Scalar case.
-        return builder.CreateLoad(scal_t, ptr);
-    }
-
-    // Create the vector type.
-    auto vector_t = make_vector_type(scal_t, vector_size);
-    assert(vector_t != nullptr); // LCOV_EXCL_LINE
-
-    // Create the mask (all 1s).
-    auto mask = llvm::ConstantInt::get(make_vector_type(builder.getInt1Ty(), vector_size), 1u);
-
-    // Create the passthrough value. This can stay undefined as it is never used
-    // due to the mask being all 1s.
-    auto passthru = llvm::UndefValue::get(vector_t);
-
-    // Invoke the intrinsic.
-    auto ret = llvm_invoke_intrinsic(builder, "llvm.masked.expandload", {vector_t}, {ptr, mask, passthru});
-
-    return ret;
-}
-
 // Helper to store the content of vector vec to the pointer ptr. If vec is not a vector,
 // a plain store will be performed.
 void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *vec)
@@ -333,11 +300,7 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
     assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
     // LCOV_EXCL_STOP
 
-    auto scal_t = ptr->getType()->getPointerElementType();
-
     if (auto vector_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
-        assert(scal_t == vec->getType()->getScalarType()); // LCOV_EXCL_LINE
-
         // Determine the vector size.
         const auto vector_size = boost::numeric_cast<std::uint32_t>(vector_t->getNumElements());
 
@@ -347,8 +310,6 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
         // Invoke the intrinsic.
         llvm_invoke_intrinsic(builder, "llvm.masked.compressstore", {vector_t}, {vec, ptr, mask});
     } else {
-        assert(scal_t == vec->getType()); // LCOV_EXCL_LINE
-
         // Not a vector, store vec directly.
         builder.CreateStore(vec, ptr);
     }
@@ -364,7 +325,6 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
         assert(llvm::isa<llvm_vector_type>(ptrs->getType()));
         assert(llvm::cast<llvm_vector_type>(vec_tp)->getNumElements()
                == llvm::cast<llvm_vector_type>(ptrs->getType())->getNumElements());
-        assert(ptrs->getType()->getScalarType()->getPointerElementType() == vec_tp->getScalarType());
         // LCOV_EXCL_STOP
 
         // Fetch the alignment of the scalar type.
@@ -386,7 +346,6 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
     } else {
         // LCOV_EXCL_START
         assert(!llvm::isa<llvm_vector_type>(ptrs->getType()));
-        assert(ptrs->getType()->getPointerElementType() == vec_tp);
         // LCOV_EXCL_STOP
 
         return builder.CreateLoad(vec_tp, ptrs);
@@ -1425,7 +1384,7 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
             // Load the current poly coefficient(s).
             assert(llvm_depr_GEP_type_check(cf_ptr, scal_t)); // LCOV_EXCL_LINE
             auto *cur_cf = load_vector_from_memory(
-                builder,
+                builder, scal_t,
                 builder.CreateInBoundsGEP(scal_t, cf_ptr, builder.CreateMul(cur_n, builder.getInt32(batch_size))),
                 batch_size);
 
@@ -1565,7 +1524,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
     // Init the accumulator's lo/hi components with the highest-order coefficient.
     assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
     auto *ho_cf = load_vector_from_memory(
-        builder,
+        builder, fp_t,
         builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.CreateMul(builder.getInt32(n), builder.getInt32(batch_size))),
         batch_size);
     builder.CreateStore(ho_cf, acc_lo);
@@ -1580,7 +1539,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
         assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
         auto *ptr = builder.CreateInBoundsGEP(
             fp_t, cf_ptr, builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size)));
-        auto *cur_cf = load_vector_from_memory(builder, ptr, batch_size);
+        auto *cur_cf = load_vector_from_memory(builder, fp_t, ptr, batch_size);
 
         // Multiply the accumulator by h.
         auto [acc_h_lo, acc_h_hi]
@@ -1635,7 +1594,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
     auto *cur_h_pow = h;
 
     // Compute the first value, b0, and add it to bj_series.
-    auto *b0 = load_vector_from_memory(builder, cf_ptr, batch_size);
+    auto *b0 = load_vector_from_memory(builder, fp_t, cf_ptr, batch_size);
     bj_series.push_back(b0);
 
     // Init min/max bj with b0.
@@ -1645,7 +1604,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
     for (std::uint32_t j = 1u; j <= n; ++j) {
         // Compute the new term of the series.
         auto *ptr = builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.getInt32(j * batch_size));
-        auto *cur_cf = load_vector_from_memory(builder, ptr, batch_size);
+        auto *cur_cf = load_vector_from_memory(builder, fp_t, ptr, batch_size);
         auto *new_term = builder.CreateFMul(cur_cf, cur_h_pow);
         new_term = builder.CreateFDiv(new_term,
                                       vector_splat(builder,
@@ -2434,8 +2393,8 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, std::uint32_t batch_size, const s
     builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
     // Load the data from the pointers.
-    auto *ecc = load_vector_from_memory(builder, ecc_ptr, batch_size);
-    auto *M = load_vector_from_memory(builder, M_ptr, batch_size);
+    auto *ecc = load_vector_from_memory(builder, scal_t, ecc_ptr, batch_size);
+    auto *M = load_vector_from_memory(builder, scal_t, M_ptr, batch_size);
 
     // Invoke the implementation function.
     auto *ret = builder.CreateCall(impl_f, {ecc, M});
