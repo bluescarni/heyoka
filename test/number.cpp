@@ -8,18 +8,29 @@
 
 #include <heyoka/config.hpp>
 
+#include <cmath>
 #include <functional>
 #include <initializer_list>
 #include <iomanip>
 #include <limits>
 #include <locale>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <variant>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/math/constants/constants.hpp>
 
 #include <fmt/format.h>
+
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -27,6 +38,7 @@
 
 #endif
 
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -332,4 +344,448 @@ TEST_CASE("number fmt")
     oss << number(1.1);
 
     REQUIRE(oss.str() == fmt::format("{}", number(1.1)));
+}
+
+TEST_CASE("llvm_codegen")
+{
+    using std::isnan;
+
+    // Pi double.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = builder.getDoubleTy();
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{boost::math::constants::pi<double>()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == boost::math::constants::pi<double>());
+    }
+
+    // Non-finite doubles.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = builder.getDoubleTy();
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<double>::infinity()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == -std::numeric_limits<double>::infinity());
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = builder.getDoubleTy();
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<double>::quiet_NaN()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(isnan(f_ptr()));
+    }
+
+#if !defined(HEYOKA_ARCH_PPC)
+
+    // Pi long double.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = detail::to_llvm_type<long double>(context);
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{boost::math::constants::pi<long double>()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<long double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == boost::math::constants::pi<long double>());
+    }
+
+    // Non-finite long doubles.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = detail::to_llvm_type<long double>(context);
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<long double>::infinity()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<long double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == -std::numeric_limits<long double>::infinity());
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = detail::to_llvm_type<long double>(context);
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<long double>::quiet_NaN()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<long double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(isnan(f_ptr()));
+    }
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    // Pi real128.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = detail::to_llvm_type<mppp::real128>(context);
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{mppp::pi_128}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<mppp::real128 (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == mppp::pi_128);
+    }
+
+    // real128 non-finite.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = detail::to_llvm_type<mppp::real128>(context);
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<mppp::real128>::infinity()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<mppp::real128 (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == -std::numeric_limits<mppp::real128>::infinity());
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = detail::to_llvm_type<mppp::real128>(context);
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{-std::numeric_limits<mppp::real128>::quiet_NaN()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<mppp::real128 (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(isnan(f_ptr()));
+    }
+
+#endif
+
+    // Small float test.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = builder.getFloatTy();
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{boost::math::constants::pi<float>()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<float (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == boost::math::constants::pi<float>());
+    }
+
+    // Mix float/double in the definition of the number vs codegen.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = builder.getFloatTy();
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{boost::math::constants::pi<double>()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<float (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == static_cast<float>(boost::math::constants::pi<double>()));
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = builder.getDoubleTy();
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{boost::math::constants::pi<float>()}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == boost::math::constants::pi<float>());
+    }
+}
+
+TEST_CASE("number_like")
+{
+    using Catch::Matchers::Message;
+
+    llvm_state s;
+
+    auto &builder = s.builder();
+
+    auto num = detail::number_like(s, builder.getFloatTy(), 42);
+    REQUIRE(num == number{42.f});
+    REQUIRE(std::holds_alternative<float>(num.value()));
+
+    num = detail::number_like(s, builder.getDoubleTy(), 42);
+    REQUIRE(num == number{42.});
+    REQUIRE(std::holds_alternative<double>(num.value()));
+
+    if (std::numeric_limits<long double>::is_iec559) {
+        if (std::numeric_limits<long double>::digits == 53) {
+            // NOTE: here we are on Windows + MSVC, where long double == double
+            // and thus C++ long double associates to LLVM double.
+            // In number_like(), we check tp == to_llvm_type<double> *before*
+            // tp == to_llvm_type<long double>, so we get a number containing
+            // double rather than long double.
+            num = detail::number_like(s, llvm::Type::getDoubleTy(s.context()), 42);
+            REQUIRE(num == number{42.});
+            REQUIRE(std::holds_alternative<double>(num.value()));
+        } else if (std::numeric_limits<long double>::digits == 64) {
+            num = detail::number_like(s, llvm::Type::getX86_FP80Ty(s.context()), 42);
+            REQUIRE(num == number{42.l});
+            REQUIRE(std::holds_alternative<long double>(num.value()));
+        } else if (std::numeric_limits<long double>::digits == 113) {
+            num = detail::number_like(s, llvm::Type::getFP128Ty(s.context()), 42);
+            REQUIRE(num == number{42.l});
+            REQUIRE(std::holds_alternative<long double>(num.value()));
+        }
+    }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    num = detail::number_like(s, llvm::Type::getFP128Ty(s.context()), 42);
+    REQUIRE(num == number{42_rq});
+    REQUIRE(std::holds_alternative<mppp::real128>(num.value()));
+
+#endif
+
+    REQUIRE_THROWS_MATCHES(detail::number_like(s, llvm::Type::getVoidTy(s.context()), 42), std::invalid_argument,
+                           Message("Unable to create a number of type 'void' from the input value 42"));
+}
+
+TEST_CASE("exp")
+{
+    REQUIRE(exp(number{1.f}) == number{std::exp(1.f)});
+    REQUIRE(exp(number{1.}) == number{std::exp(1.)});
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    REQUIRE(exp(number{1._rq}) == number{exp(1._rq)});
+
+#endif
+}
+
+TEST_CASE("binomial")
+{
+    using Catch::Matchers::Message;
+
+    auto n = binomial(number(4.f), number(2.f));
+    REQUIRE(n == number(6.f));
+    REQUIRE(std::holds_alternative<float>(n.value()));
+
+    n = binomial(number(4.), number(2.));
+    REQUIRE(n == number(6.));
+    REQUIRE(std::holds_alternative<double>(n.value()));
+
+#if !defined(HEYOKA_ARCH_PPC)
+
+    n = binomial(number(4.l), number(2.l));
+    REQUIRE(n == number(6.l));
+    REQUIRE(std::holds_alternative<long double>(n.value()));
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    n = binomial(number(4._rq), number(2._rq));
+    REQUIRE(n == number(6._rq));
+    REQUIRE(std::holds_alternative<mppp::real128>(n.value()));
+
+#endif
+
+    REQUIRE_THROWS_MATCHES(binomial(number(4.), number(2.f)), std::invalid_argument,
+                           Message("Cannot compute the binomial coefficient of two numbers of different type"));
+
+    REQUIRE_THROWS_MATCHES(binomial(number(4.), number(std::numeric_limits<double>::infinity())), std::invalid_argument,
+                           Message("Cannot compute the binomial coefficient of non-finite values"));
+
+    REQUIRE_THROWS_MATCHES(binomial(number(4.), number(3.1)), std::invalid_argument,
+                           Message("Cannot compute the binomial coefficient non-integral values"));
 }

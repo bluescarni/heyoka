@@ -29,13 +29,13 @@
 namespace heyoka::detail
 {
 
-HEYOKA_DLL_PUBLIC llvm::Type *to_llvm_type_impl(llvm::LLVMContext &, const std::type_info &);
+HEYOKA_DLL_PUBLIC llvm::Type *to_llvm_type_impl(llvm::LLVMContext &, const std::type_info &, bool);
 
 // Helper to associate a C++ type to an LLVM type.
 template <typename T>
-inline llvm::Type *to_llvm_type(llvm::LLVMContext &c)
+inline llvm::Type *to_llvm_type(llvm::LLVMContext &c, bool err_throw = true)
 {
-    return to_llvm_type_impl(c, typeid(T));
+    return to_llvm_type_impl(c, typeid(T), err_throw);
 }
 
 HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
@@ -135,16 +135,14 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_tan(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_tanh(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_pow(llvm_state &, llvm::Value *, llvm::Value *, bool = false);
 
-template <typename>
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc(llvm_state &, std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
 
-template <typename>
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_interval(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &, llvm::Type *, llvm::Value *,
+                                                                             std::uint32_t, llvm::Value *,
+                                                                             llvm::Value *, std::uint32_t);
 
-template <typename>
 HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_cargo_shisha(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
+llvm_penc_cargo_shisha(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
 
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_dbl(llvm_state &, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_ldbl(llvm_state &, std::uint32_t);
@@ -174,30 +172,7 @@ inline llvm::Function *llvm_add_inv_kep_E(llvm_state &s, std::uint32_t batch_siz
 template <typename>
 HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper(llvm_state &, std::uint32_t, const std::string &);
 
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array_dbl(llvm_state &, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array_ldbl(llvm_state &, std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array_f128(llvm_state &, std::uint32_t);
-
-#endif
-
-template <typename T>
-inline llvm::Value *llvm_add_bc_array(llvm_state &s, std::uint32_t n)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return llvm_add_bc_array_dbl(s, n);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return llvm_add_bc_array_ldbl(s, n);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return llvm_add_bc_array_f128(s, n);
-#endif
-    } else {
-        static_assert(always_false_v<T>, "Unhandled type.");
-    }
-}
+llvm::Value *llvm_add_bc_array(llvm_state &, llvm::Type *, std::uint32_t);
 
 // Helpers to double check the modifications needed
 // by LLVM deprecations.

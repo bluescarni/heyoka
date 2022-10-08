@@ -895,7 +895,7 @@ llvm::Value *llvm_eval_helper(const std::function<llvm::Value *(const std::vecto
                     llvm_args.push_back(eval_arr[u_idx]);
                 } else if constexpr (std::is_same_v<type, number>) {
                     // Codegen the number argument.
-                    llvm_args.push_back(vector_splat(builder, codegen<T>(s, v), batch_size));
+                    llvm_args.push_back(vector_splat(builder, llvm_codegen(s, fp_t, v), batch_size));
                 } else if constexpr (std::is_same_v<type, param>) {
                     // Codegen the parameter argument.
                     llvm_args.push_back(cfunc_nc_param_codegen(s, v, batch_size, fp_t, par_ptr, stride));

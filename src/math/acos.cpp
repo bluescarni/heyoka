@@ -191,10 +191,12 @@ llvm::Value *taylor_diff_acos_impl(llvm_state &s, const acos_impl &, const std::
                                    const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
                                    std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     if (order == 0u) {
-        return llvm_acos(s, taylor_codegen_numparam<T>(s, num, par_ptr, batch_size));
+        return llvm_acos(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
-        return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+        return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
@@ -207,6 +209,8 @@ llvm::Value *taylor_diff_acos_impl(llvm_state &s, const acos_impl &, const std::
     assert(deps.size() == 1u);
 
     auto &builder = s.builder();
+
+    auto *fp_t = to_llvm_type<T>(s.context());
 
     // Fetch the index of the variable argument.
     const auto b_idx = uname_to_index(var.name());
@@ -223,7 +227,7 @@ llvm::Value *taylor_diff_acos_impl(llvm_state &s, const acos_impl &, const std::
     }
 
     // Create the fp version of the order.
-    auto ord_fp = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
+    auto *ord_fp = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
 
     // Assemble the first part of the result: n*b^[n].
     auto ret = builder.CreateFMul(ord_fp, taylor_fetch_diff(arr, b_idx, order, n_uvars));
@@ -236,10 +240,10 @@ llvm::Value *taylor_diff_acos_impl(llvm_state &s, const acos_impl &, const std::
     for (std::uint32_t j = 1; j < order; ++j) {
         // NOTE: the only hidden dependency contains the index of the
         // u variable whose definition is sqrt(1 - var * var).
-        auto cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
-        auto aj = taylor_fetch_diff(arr, idx, j, n_uvars);
+        auto *cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
+        auto *aj = taylor_fetch_diff(arr, idx, j, n_uvars);
 
-        auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
+        auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*cnj*aj to the sum.
         sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(cnj, aj)));
@@ -343,8 +347,9 @@ llvm::Function *taylor_c_diff_func_acos_impl(llvm_state &s, const acos_impl &, c
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
     const auto na_pair = taylor_c_diff_func_name_args<T>(context, "acos", n_uvars, batch_size, {var}, 1);
@@ -358,7 +363,7 @@ llvm::Function *taylor_c_diff_func_acos_impl(llvm_state &s, const acos_impl &, c
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -391,7 +396,7 @@ llvm::Function *taylor_c_diff_func_acos_impl(llvm_state &s, const acos_impl &, c
             },
             [&]() {
                 // Compute the fp version of the order.
-                auto ord_fp = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+                auto ord_fp = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
                 // Compute n*b^[n].
                 auto ret = builder.CreateFMul(ord_fp, taylor_c_load_diff(s, diff_ptr, n_uvars, ord, b_idx));
@@ -401,14 +406,14 @@ llvm::Function *taylor_c_diff_func_acos_impl(llvm_state &s, const acos_impl &, c
                     builder.CreateFMul(ord_fp, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), c_idx)));
 
                 // Init the accumulator.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
                     auto c_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
                     auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, a_idx);
 
-                    auto fac = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+                    auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
                     builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
                                                            builder.CreateFMul(fac, builder.CreateFMul(c_nj, aj))),

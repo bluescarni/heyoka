@@ -164,10 +164,12 @@ llvm::Value *taylor_diff_neg_impl(llvm_state &s, const neg_impl &, const U &num,
                                   llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
                                   std::uint32_t batch_size)
 {
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     if (order == 0u) {
-        return s.builder().CreateFNeg(taylor_codegen_numparam<T>(s, num, par_ptr, batch_size));
+        return s.builder().CreateFNeg(taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
-        return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+        return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 

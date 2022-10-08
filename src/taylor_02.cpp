@@ -216,6 +216,20 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
     return llvm_min(s, x_v, llvm_abs(s, y_v));
 }
 
+// Helper to compute the scaling + safety factor
+// in taylor_determine_h().
+number taylor_determine_h_rhofac(llvm_state &s, llvm::Type *fp_t, std::uint32_t order)
+{
+    assert(fp_t != nullptr);
+    assert(order > 0u);
+
+    auto const_m7_10 = number_like(s, fp_t, -7.) / number_like(s, fp_t, 10.);
+    auto const_e2 = exp(number_like(s, fp_t, 1.)) * exp(number_like(s, fp_t, 1.));
+    auto const_om1 = number_like(s, fp_t, static_cast<double>(order - 1u));
+
+    return exp(std::move(const_m7_10) / std::move(const_om1)) / std::move(const_e2);
+}
+
 } // namespace
 
 // Helper to generate the LLVM code to determine the timestep in an adaptive Taylor integrator,
@@ -224,8 +238,7 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
 // the clamping values for the timesteps. svf_ptr is a pointer to the first element of an LLVM array containing the
 // values in sv_funcs_dc. If max_abs_state_ptr is not nullptr, the computed norm infinity of the
 // state vector (including sv_funcs, if any) will be written into it.
-template <typename T>
-llvm::Value *taylor_determine_h(llvm_state &s,
+llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
                                 const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
                                 const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *h_ptr,
                                 std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
@@ -245,11 +258,11 @@ llvm::Value *taylor_determine_h(llvm_state &s,
     using std::exp;
 
     auto &builder = s.builder();
-    auto &context = s.context();
 
     llvm::Value *max_abs_state = nullptr, *max_abs_diff_o = nullptr, *max_abs_diff_om1 = nullptr;
 
-    auto *vec_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the vector type.
+    auto *vec_t = make_vector_type(fp_t, batch_size);
 
     if (diff_variant.index() == 0u) {
         // Compact mode.
@@ -354,59 +367,45 @@ llvm::Value *taylor_determine_h(llvm_state &s,
     }
 
     // Determine if we are in absolute or relative tolerance mode.
-    auto abs_or_rel = builder.CreateFCmpOLE(max_abs_state, llvm::ConstantFP::get(vec_t, 1.));
+    auto *abs_or_rel = builder.CreateFCmpOLE(max_abs_state, llvm::ConstantFP::get(vec_t, 1.));
 
     // Estimate rho at orders order - 1 and order.
-    auto num_rho = builder.CreateSelect(abs_or_rel, llvm::ConstantFP::get(vec_t, 1.), max_abs_state);
-    auto rho_o = llvm_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_o),
-                          vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / order}), batch_size));
-    auto rho_om1 = llvm_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
-                            vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / (order - 1u)}), batch_size));
+    auto *num_rho = builder.CreateSelect(abs_or_rel, llvm::ConstantFP::get(vec_t, 1.), max_abs_state);
+
+    // NOTE: it is fine here to static_cast<double>(order), as order is a 32-bit integer
+    // and double is a IEEE double-precision type (i.e., 53 bits).
+    auto *rho_o = llvm_pow(
+        s, builder.CreateFDiv(num_rho, max_abs_diff_o),
+        vector_splat(builder,
+                     llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, static_cast<double>(order))),
+                     batch_size));
+    auto *rho_om1 = llvm_pow(
+        s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
+        vector_splat(
+            builder,
+            llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, static_cast<double>(order - 1u))),
+            batch_size));
 
     // Take the minimum.
-    auto rho_m = llvm_min(s, rho_o, rho_om1);
+    auto *rho_m = llvm_min(s, rho_o, rho_om1);
 
     // Compute the scaling + safety factor.
-    const auto rhofac = exp((static_cast<T>(-7) / static_cast<T>(10)) / (order - 1u))
-                        / (exp(static_cast<T>(1)) * exp(static_cast<T>(1)));
+    const auto rhofac = taylor_determine_h_rhofac(s, fp_t, order);
 
     // Determine the step size in absolute value.
-    auto h = builder.CreateFMul(rho_m, vector_splat(builder, codegen<T>(s, number{rhofac}), batch_size));
+    auto *h = builder.CreateFMul(rho_m, vector_splat(builder, llvm_codegen(s, fp_t, rhofac), batch_size));
 
     // Ensure that the step size does not exceed the limit in absolute value.
     auto *max_h_vec = load_vector_from_memory(builder, h_ptr, batch_size);
     h = taylor_step_minabs(s, h, max_h_vec);
 
     // Handle backwards propagation.
-    auto backward = builder.CreateFCmpOLT(max_h_vec, llvm::ConstantFP::get(vec_t, 0.));
-    auto h_fac = builder.CreateSelect(backward, llvm::ConstantFP::get(vec_t, -1.), llvm::ConstantFP::get(vec_t, 1.));
+    auto *backward = builder.CreateFCmpOLT(max_h_vec, llvm::ConstantFP::get(vec_t, 0.));
+    auto *h_fac = builder.CreateSelect(backward, llvm::ConstantFP::get(vec_t, -1.), llvm::ConstantFP::get(vec_t, 1.));
     h = builder.CreateFMul(h_fac, h);
 
     return h;
 }
-
-// Instantiate the required versions of taylor_determine_h().
-template llvm::Value *taylor_determine_h<double>(llvm_state &,
-                                                 const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
-                                                 const std::vector<std::uint32_t> &, llvm::Value *, llvm::Value *,
-                                                 std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t,
-                                                 llvm::Value *);
-
-template llvm::Value *taylor_determine_h<long double>(llvm_state &,
-                                                      const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
-                                                      const std::vector<std::uint32_t> &, llvm::Value *, llvm::Value *,
-                                                      std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t,
-                                                      llvm::Value *);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template llvm::Value *taylor_determine_h<mppp::real128>(llvm_state &,
-                                                        const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
-                                                        const std::vector<std::uint32_t> &, llvm::Value *,
-                                                        llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                                        std::uint32_t, llvm::Value *);
-
-#endif
 
 // Create a global read-only array containing the values in sv_funcs_dc, if any
 // (otherwise, the return value will be null). This is for use in the adaptive steppers
@@ -452,6 +451,9 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
 
     auto &builder = s.builder();
 
+    // Fetch ths type corresponding to T.
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     return std::visit(
         [&](const auto &v) -> llvm::Value * {
             using type = uncvref_t<decltype(v)>;
@@ -469,7 +471,7 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
                 // We have to divide the derivative by order
                 // to get the normalised derivative of the state variable.
                 return builder.CreateFDiv(
-                    ret, vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size));
+                    ret, vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size));
             } else if constexpr (std::is_same_v<type, number> || std::is_same_v<type, param>) {
                 // The first-order derivative is a constant.
                 // If the first-order derivative is being requested,
@@ -478,7 +480,7 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
                 // nonzero value that can be produced here is the first-order
                 // derivative.
                 if (order == 1u) {
-                    return taylor_codegen_numparam<T>(s, v, par_ptr, batch_size);
+                    return taylor_codegen_numparam(s, fp_t, v, par_ptr, batch_size);
                 } else {
                     return llvm::ConstantFP::get(to_llvm_vector_type<T>(s.context(), batch_size), 0.);
                 }
@@ -509,6 +511,9 @@ taylor_c_make_sv_diff_globals(llvm_state &s, const taylor_dc_t &dc, std::uint32_
     auto &builder = s.builder();
     auto &md = s.module();
 
+    // Fetch the type corresponding to T.
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Build iteratively the output values as vectors of constants.
     std::vector<llvm::Constant *> var_indices, vars, num_indices, nums, par_indices, pars;
 
@@ -530,7 +535,7 @@ taylor_c_make_sv_diff_globals(llvm_state &s, const taylor_dc_t &dc, std::uint32_
                     vars.push_back(builder.getInt32(uname_to_index(v.name())));
                 } else if constexpr (std::is_same_v<type, number>) {
                     num_indices.push_back(builder.getInt32(i - n_uvars));
-                    nums.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, v)));
+                    nums.push_back(llvm::cast<llvm::Constant>(llvm_codegen(s, fp_t, v)));
                 } else if constexpr (std::is_same_v<type, param>) {
                     par_indices.push_back(builder.getInt32(i - n_uvars));
                     pars.push_back(builder.getInt32(v.idx()));
@@ -724,6 +729,8 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
     // Log runtime in trace mode.
     spdlog::stopwatch sw;
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Init the return value.
     // NOTE: use maps with name-based comparison for the functions. This ensures that the order in which these
     // functions are invoked in taylor_compute_jet_compact_mode() is always the same. If we used directly pointer
@@ -831,13 +838,13 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
             // Create the g functions for each argument.
             for (const auto &v : vv) {
                 it->second.second.push_back(std::visit(
-                    [&s](const auto &x) {
+                    [&s, fp_t](const auto &x) {
                         using type = uncvref_t<decltype(x)>;
 
                         if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
                             return cm_make_arg_gen_vidx(s, x);
                         } else {
-                            return cm_make_arg_gen_vc<T>(s, x);
+                            return cm_make_arg_gen_vc(s, fp_t, x);
                         }
                     },
                     v));
@@ -1839,7 +1846,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     // the second argument a const float pointer to the pars, the third argument
     // a float pointer to the time. These arrays cannot overlap.
     auto *fp_t = to_llvm_type<T>(context);
-    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_t));
+    const std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE

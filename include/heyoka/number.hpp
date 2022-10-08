@@ -113,6 +113,9 @@ HEYOKA_DLL_PUBLIC number operator/(number, number);
 HEYOKA_DLL_PUBLIC bool operator==(const number &, const number &);
 HEYOKA_DLL_PUBLIC bool operator!=(const number &, const number &);
 
+HEYOKA_DLL_PUBLIC number exp(number);
+HEYOKA_DLL_PUBLIC number binomial(const number &, const number &);
+
 HEYOKA_DLL_PUBLIC double eval_dbl(const number &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);
 HEYOKA_DLL_PUBLIC long double eval_ldbl(const number &, const std::unordered_map<std::string, long double> &,
@@ -135,8 +138,14 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
 
-template <typename>
-HEYOKA_DLL_PUBLIC llvm::Value *codegen(llvm_state &, const number &);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_codegen(llvm_state &, llvm::Type *, const number &);
+
+namespace detail
+{
+
+HEYOKA_DLL_PUBLIC number number_like(llvm_state &, llvm::Type *, double);
+
+} // namespace detail
 
 } // namespace heyoka
 

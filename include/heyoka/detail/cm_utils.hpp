@@ -85,8 +85,7 @@ inline auto vv_transpose(const std::vector<std::variant<T...>> &v)
 
 std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vidx(llvm_state &, const std::vector<std::uint32_t> &);
 
-template <typename>
-std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vc(llvm_state &, const std::vector<number> &);
+std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vc(llvm_state &, llvm::Type *, const std::vector<number> &);
 
 std::string cm_mangle(const variable &);
 std::string cm_mangle(const number &);

@@ -2336,7 +2336,7 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
                     store_vector_to_memory(builder, ptr, eval_arr[u_idx]);
                 } else if constexpr (std::is_same_v<type, number>) {
                     // Codegen the number and store it.
-                    store_vector_to_memory(builder, ptr, vector_splat(builder, codegen<T>(s, v), batch_size));
+                    store_vector_to_memory(builder, ptr, vector_splat(builder, llvm_codegen(s, fp_t, v), batch_size));
                 } else if constexpr (std::is_same_v<type, param>) {
                     // Codegen the parameter and store it.
                     store_vector_to_memory(builder, ptr,
@@ -2471,6 +2471,8 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
     // Log runtime in trace mode.
     spdlog::stopwatch sw;
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Init the return value.
     // NOTE: use maps with name-based comparison for the functions. This ensures that the order in which these
     // functions are invoked is always the same. If we used directly pointer
@@ -2580,13 +2582,13 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
             // Create the g functions for each argument.
             for (const auto &v : vv) {
                 it->second.second.push_back(std::visit(
-                    [&s](const auto &x) {
+                    [&s, fp_t](const auto &x) {
                         using type = uncvref_t<decltype(x)>;
 
                         if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
                             return cm_make_arg_gen_vidx(s, x);
                         } else {
-                            return cm_make_arg_gen_vc<T>(s, x);
+                            return cm_make_arg_gen_vc(s, fp_t, x);
                         }
                     },
                     v));
@@ -2660,6 +2662,9 @@ cfunc_c_make_output_globals(llvm_state &s, const std::vector<expression> &dc, st
     auto &builder = s.builder();
     auto &md = s.module();
 
+    // Fetch the type corresponding to T.
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     // Build iteratively the output values as vectors of constants.
     std::vector<llvm::Constant *> var_indices, vars, num_indices, nums, par_indices, pars;
 
@@ -2680,7 +2685,7 @@ cfunc_c_make_output_globals(llvm_state &s, const std::vector<expression> &dc, st
                     vars.push_back(builder.getInt32(uname_to_index(v.name())));
                 } else if constexpr (std::is_same_v<type, number>) {
                     num_indices.push_back(builder.getInt32(i - nuvars));
-                    nums.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, v)));
+                    nums.push_back(llvm::cast<llvm::Constant>(llvm_codegen(s, fp_t, v)));
                 } else if constexpr (std::is_same_v<type, param>) {
                     par_indices.push_back(builder.getInt32(i - nuvars));
                     pars.push_back(builder.getInt32(v.idx()));

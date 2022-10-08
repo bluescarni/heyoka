@@ -73,39 +73,10 @@ using is_num_param = std::disjunction<std::is_same<T, number>, std::is_same<T, p
 template <typename T>
 inline constexpr bool is_num_param_v = is_num_param<T>::value;
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_dbl(llvm_state &, const number &, llvm::Value *, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_ldbl(llvm_state &, const number &, llvm::Value *, std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_f128(llvm_state &, const number &, llvm::Value *, std::uint32_t);
-
-#endif
-
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_dbl(llvm_state &, const param &, llvm::Value *, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_ldbl(llvm_state &, const param &, llvm::Value *, std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_f128(llvm_state &, const param &, llvm::Value *, std::uint32_t);
-
-#endif
-
-template <typename T, typename U>
-llvm::Value *taylor_codegen_numparam(llvm_state &s, const U &n, llvm::Value *par_ptr, std::uint32_t batch_size)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_codegen_numparam_dbl(s, n, par_ptr, batch_size);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_codegen_numparam_ldbl(s, n, par_ptr, batch_size);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_codegen_numparam_f128(s, n, par_ptr, batch_size);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam(llvm_state &, llvm::Type *, const number &, llvm::Value *,
+                                                       std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam(llvm_state &, llvm::Type *, const param &, llvm::Value *,
+                                                       std::uint32_t);
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &, const number &, llvm::Value *,
                                                               llvm::Value *, std::uint32_t);
@@ -128,8 +99,8 @@ std::uint32_t n_pars_in_dc(const taylor_dc_t &);
 
 llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &, const std::vector<std::uint32_t> &);
 
-template <typename T>
-llvm::Value *taylor_determine_h(llvm_state &, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
+llvm::Value *taylor_determine_h(llvm_state &, llvm::Type *,
+                                const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
                                 const std::vector<std::uint32_t> &, llvm::Value *, llvm::Value *, std::uint32_t,
                                 std::uint32_t, std::uint32_t, std::uint32_t, llvm::Value *);
 

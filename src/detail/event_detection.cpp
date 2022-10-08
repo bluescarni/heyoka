@@ -217,8 +217,7 @@ constexpr bool is_terminal_event_v = is_terminal_event<T>::value;
 // Helper to add a polynomial translation function
 // to the state 's'.
 // NOTE: these event-detection-related LLVM functions are currently not mangled in any way.
-template <typename T>
-llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t batch_size)
+llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint32_t order, std::uint32_t batch_size)
 {
     assert(order > 0u); // LCOV_EXCL_LINE
 
@@ -234,30 +233,27 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // The scalar floating-point type.
-    auto *fp_t = to_llvm_type<T>(context);
-
     // Helper to fetch the (i, j) binomial coefficient from
     // a precomputed global array. The returned value is already
     // splatted.
-    auto get_bc = [&, bc_ptr = llvm_add_bc_array<T>(s, order)](llvm::Value *i, llvm::Value *j) {
-        auto idx = builder.CreateMul(i, builder.getInt32(order + 1u));
+    auto get_bc = [&, bc_ptr = llvm_add_bc_array(s, fp_t, order)](llvm::Value *i, llvm::Value *j) {
+        auto *idx = builder.CreateMul(i, builder.getInt32(order + 1u));
         idx = builder.CreateAdd(idx, j);
 
         assert(llvm_depr_GEP_type_check(bc_ptr, fp_t)); // LCOV_EXCL_LINE
-        auto val = builder.CreateLoad(fp_t, builder.CreateInBoundsGEP(fp_t, bc_ptr, idx));
+        auto *val = builder.CreateLoad(fp_t, builder.CreateInBoundsGEP(fp_t, bc_ptr, idx));
 
         return vector_splat(builder, val, batch_size);
     };
 
     // Fetch the current insertion block.
-    auto orig_bb = builder.GetInsertBlock();
+    auto *orig_bb = builder.GetInsertBlock();
 
     // The function arguments:
     // - the output pointer,
     // - the pointer to the poly coefficients (read-only).
     // No overlap is allowed.
-    std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
+    const std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(fp_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -270,12 +266,12 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
     // LCOV_EXCL_STOP
 
     // Set the names/attributes of the function arguments.
-    auto out_ptr = f->args().begin();
+    auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
     out_ptr->addAttr(llvm::Attribute::NoCapture);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
 
-    auto cf_ptr = f->args().begin() + 1;
+    auto *cf_ptr = f->args().begin() + 1;
     cf_ptr->setName("cf_ptr");
     cf_ptr->addAttr(llvm::Attribute::NoCapture);
     cf_ptr->addAttr(llvm::Attribute::NoAlias);
@@ -289,23 +285,23 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
     // Init the return values as zeroes.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
         assert(llvm_depr_GEP_type_check(out_ptr, fp_t)); // LCOV_EXCL_LINE
-        auto ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.CreateMul(i, builder.getInt32(batch_size)));
+        auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.CreateMul(i, builder.getInt32(batch_size)));
         store_vector_to_memory(builder, ptr, vector_splat(builder, llvm::ConstantFP::get(fp_t, 0.), batch_size));
     });
 
     // Do the translation.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
         assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
-        auto ai = load_vector_from_memory(
+        auto *ai = load_vector_from_memory(
             builder, builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.CreateMul(i, builder.getInt32(batch_size))),
             batch_size);
 
         llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(i, builder.getInt32(1)), [&](llvm::Value *k) {
-            auto tmp = builder.CreateFMul(ai, get_bc(i, k));
+            auto *tmp = builder.CreateFMul(ai, get_bc(i, k));
 
             assert(llvm_depr_GEP_type_check(out_ptr, fp_t)); // LCOV_EXCL_LINE
-            auto ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.CreateMul(k, builder.getInt32(batch_size)));
-            auto new_val = builder.CreateFAdd(load_vector_from_memory(builder, ptr, batch_size), tmp);
+            auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.CreateMul(k, builder.getInt32(batch_size)));
+            auto *new_val = builder.CreateFAdd(load_vector_from_memory(builder, ptr, batch_size), tmp);
             store_vector_to_memory(builder, ptr, new_val);
         });
     });
@@ -314,120 +310,6 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
     builder.CreateRetVoid();
 
     // Verify the function.
-    s.verify_function(f);
-
-    // Restore the original insertion block.
-    builder.SetInsertPoint(orig_bb);
-
-    // NOTE: the optimisation pass will be run outside.
-    return f;
-}
-
-// Add a function that, given an input polynomial of order n represented
-// as an array of coefficients:
-// - reverses it,
-// - translates it by 1,
-// - counts the sign changes in the coefficients
-//   of the resulting polynomial.
-template <typename T>
-llvm::Function *llvm_add_poly_rtscc_impl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    assert(batch_size > 0u); // LCOV_EXCL_LINE
-
-    // Overflow check: we need to be able to index
-    // into the array of coefficients.
-    // LCOV_EXCL_START
-    if (n == std::numeric_limits<std::uint32_t>::max()
-        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
-        throw std::overflow_error("Overflow detected while adding an rtscc function");
-    }
-    // LCOV_EXCL_STOP
-
-    auto &md = s.module();
-    auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Add the translator and the sign changes counting function.
-    auto pt = add_poly_translator_1<T>(s, n, batch_size);
-    auto scc = llvm_add_csc<T>(s, n, batch_size);
-
-    // Fetch the current insertion block.
-    auto orig_bb = builder.GetInsertBlock();
-
-    // The function arguments:
-    // - two poly coefficients output pointers,
-    // - the output pointer to the number of sign changes (write-only),
-    // - the input pointer to the original poly coefficients (read-only).
-    // No overlap is allowed.
-    auto *fp_t = to_llvm_type<T>(context);
-    auto *fp_ptr_t = llvm::PointerType::getUnqual(fp_t);
-    std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, llvm::PointerType::getUnqual(builder.getInt32Ty()), fp_ptr_t};
-    // The function does not return anything.
-    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-    assert(ft != nullptr); // LCOV_EXCL_LINE
-    // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "poly_rtscc", &md);
-    // LCOV_EXCL_START
-    if (f == nullptr) {
-        throw std::invalid_argument("Unable to create an rtscc function");
-    }
-    // LCOV_EXCL_STOP
-
-    // Set the names/attributes of the function arguments.
-    // NOTE: out_ptr1/2 are used both in read and write mode,
-    // even though this function never actually reads from them
-    // (they are just forwarded to other functions reading from them).
-    // Because I am not 100% sure about the writeonly attribute
-    // in this case, let's err on the side of caution and do not
-    // mark them as writeonly.
-    auto out_ptr1 = f->args().begin();
-    out_ptr1->setName("out_ptr1");
-    out_ptr1->addAttr(llvm::Attribute::NoCapture);
-    out_ptr1->addAttr(llvm::Attribute::NoAlias);
-
-    auto out_ptr2 = f->args().begin() + 1;
-    out_ptr2->setName("out_ptr2");
-    out_ptr2->addAttr(llvm::Attribute::NoCapture);
-    out_ptr2->addAttr(llvm::Attribute::NoAlias);
-
-    auto n_sc_ptr = f->args().begin() + 2;
-    n_sc_ptr->setName("n_sc_ptr");
-    n_sc_ptr->addAttr(llvm::Attribute::NoCapture);
-    n_sc_ptr->addAttr(llvm::Attribute::NoAlias);
-    n_sc_ptr->addAttr(llvm::Attribute::WriteOnly);
-
-    auto cf_ptr = f->args().begin() + 3;
-    cf_ptr->setName("cf_ptr");
-    cf_ptr->addAttr(llvm::Attribute::NoCapture);
-    cf_ptr->addAttr(llvm::Attribute::NoAlias);
-    cf_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-    // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
-    assert(bb != nullptr); // LCOV_EXCL_LINE
-    builder.SetInsertPoint(bb);
-
-    // Do the reversion into out_ptr1.
-    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n + 1u), [&](llvm::Value *i) {
-        auto load_idx = builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size));
-        auto store_idx = builder.CreateMul(i, builder.getInt32(batch_size));
-
-        assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
-        auto cur_cf = load_vector_from_memory(builder, builder.CreateInBoundsGEP(fp_t, cf_ptr, load_idx), batch_size);
-        assert(llvm_depr_GEP_type_check(out_ptr1, fp_t)); // LCOV_EXCL_LINE
-        store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_t, out_ptr1, store_idx), cur_cf);
-    });
-
-    // Translate out_ptr1 into out_ptr2.
-    builder.CreateCall(pt, {out_ptr2, out_ptr1});
-
-    // Count the sign changes in out_ptr2.
-    builder.CreateCall(scc, {n_sc_ptr, out_ptr2});
-
-    // Return.
-    builder.CreateRetVoid();
-
-    // Verify.
     s.verify_function(f);
 
     // Restore the original insertion block.
@@ -500,6 +382,119 @@ mppp::real128 taylor_deduce_cooldown(mppp::real128 g_eps, mppp::real128 abs_der)
 }
 
 #endif
+
+// Add a function that, given an input polynomial of order n represented
+// as an array of coefficients:
+// - reverses it,
+// - translates it by 1,
+// - counts the sign changes in the coefficients
+//   of the resulting polynomial.
+llvm::Function *llvm_add_poly_rtscc(llvm_state &s, llvm::Type *fp_t, std::uint32_t n, std::uint32_t batch_size)
+{
+    assert(batch_size > 0u); // LCOV_EXCL_LINE
+
+    // Overflow check: we need to be able to index
+    // into the array of coefficients.
+    // LCOV_EXCL_START
+    if (n == std::numeric_limits<std::uint32_t>::max()
+        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
+        throw std::overflow_error("Overflow detected while adding an rtscc function");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Add the translator and the sign changes counting function.
+    auto *pt = add_poly_translator_1(s, fp_t, n, batch_size);
+    auto *scc = llvm_add_csc(s, fp_t, n, batch_size);
+
+    // Fetch the current insertion block.
+    auto *orig_bb = builder.GetInsertBlock();
+
+    // The function arguments:
+    // - two poly coefficients output pointers,
+    // - the output pointer to the number of sign changes (write-only),
+    // - the input pointer to the original poly coefficients (read-only).
+    // No overlap is allowed.
+    auto *fp_ptr_t = llvm::PointerType::getUnqual(fp_t);
+    const std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, llvm::PointerType::getUnqual(builder.getInt32Ty()),
+                                          fp_ptr_t};
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr); // LCOV_EXCL_LINE
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "poly_rtscc", &md);
+    // LCOV_EXCL_START
+    if (f == nullptr) {
+        throw std::invalid_argument("Unable to create an rtscc function");
+    }
+    // LCOV_EXCL_STOP
+
+    // Set the names/attributes of the function arguments.
+    // NOTE: out_ptr1/2 are used both in read and write mode,
+    // even though this function never actually reads from them
+    // (they are just forwarded to other functions reading from them).
+    // Because I am not 100% sure about the writeonly attribute
+    // in this case, let's err on the side of caution and do not
+    // mark them as writeonly.
+    auto *out_ptr1 = f->args().begin();
+    out_ptr1->setName("out_ptr1");
+    out_ptr1->addAttr(llvm::Attribute::NoCapture);
+    out_ptr1->addAttr(llvm::Attribute::NoAlias);
+
+    auto *out_ptr2 = f->args().begin() + 1;
+    out_ptr2->setName("out_ptr2");
+    out_ptr2->addAttr(llvm::Attribute::NoCapture);
+    out_ptr2->addAttr(llvm::Attribute::NoAlias);
+
+    auto *n_sc_ptr = f->args().begin() + 2;
+    n_sc_ptr->setName("n_sc_ptr");
+    n_sc_ptr->addAttr(llvm::Attribute::NoCapture);
+    n_sc_ptr->addAttr(llvm::Attribute::NoAlias);
+    n_sc_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+    auto *cf_ptr = f->args().begin() + 3;
+    cf_ptr->setName("cf_ptr");
+    cf_ptr->addAttr(llvm::Attribute::NoCapture);
+    cf_ptr->addAttr(llvm::Attribute::NoAlias);
+    cf_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+    assert(bb != nullptr); // LCOV_EXCL_LINE
+    builder.SetInsertPoint(bb);
+
+    // Do the reversion into out_ptr1.
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n + 1u), [&](llvm::Value *i) {
+        auto *load_idx = builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size));
+        auto *store_idx = builder.CreateMul(i, builder.getInt32(batch_size));
+
+        assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
+        auto *cur_cf = load_vector_from_memory(builder, builder.CreateInBoundsGEP(fp_t, cf_ptr, load_idx), batch_size);
+        assert(llvm_depr_GEP_type_check(out_ptr1, fp_t)); // LCOV_EXCL_LINE
+        store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_t, out_ptr1, store_idx), cur_cf);
+    });
+
+    // Translate out_ptr1 into out_ptr2.
+    builder.CreateCall(pt, {out_ptr2, out_ptr1});
+
+    // Count the sign changes in out_ptr2.
+    builder.CreateCall(scc, {n_sc_ptr, out_ptr2});
+
+    // Return.
+    builder.CreateRetVoid();
+
+    // Verify.
+    s.verify_function(f);
+
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
+
+    // NOTE: the optimisation pass will be run outside.
+    return f;
+}
 
 // Add a function implementing fast event exclusion check via the computation
 // of the enclosure of the event equation's Taylor polynomial. The enclosure is computed
@@ -586,7 +581,7 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t
 
     if (use_cs) {
         // Compute the enclosure of the polynomial.
-        std::tie(enc_lo, enc_hi) = llvm_penc_cargo_shisha<T>(s, cf_ptr, n, h, batch_size);
+        std::tie(enc_lo, enc_hi) = llvm_penc_cargo_shisha(s, fp_t, cf_ptr, n, h, batch_size);
     } else {
         // Load back_flag and convert it to a boolean vector.
         auto *back_flag = builder.CreateTrunc(load_vector_from_memory(builder, back_flag_ptr, batch_size),
@@ -598,7 +593,7 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t
         auto *h_hi = builder.CreateSelect(back_flag, llvm::Constant::getNullValue(h->getType()), h);
 
         // Compute the enclosure of the polynomial.
-        std::tie(enc_lo, enc_hi) = llvm_penc_interval<T>(s, cf_ptr, n, h_lo, h_hi, batch_size);
+        std::tie(enc_lo, enc_hi) = llvm_penc_interval(s, fp_t, cf_ptr, n, h_lo, h_hi, batch_size);
     }
 
     // Compute the sign of the components of the accumulator.
@@ -642,25 +637,6 @@ template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<long double>(llvm_
 
 template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<mppp::real128>(llvm_state &, std::uint32_t, std::uint32_t,
                                                                              bool);
-
-#endif
-
-llvm::Function *llvm_add_poly_rtscc_dbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    return llvm_add_poly_rtscc_impl<double>(s, n, batch_size);
-}
-
-llvm::Function *llvm_add_poly_rtscc_ldbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    return llvm_add_poly_rtscc_impl<long double>(s, n, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *llvm_add_poly_rtscc_f128(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    return llvm_add_poly_rtscc_impl<mppp::real128>(s, n, batch_size);
-}
 
 #endif
 
@@ -750,6 +726,9 @@ taylor_adaptive<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vector<nt_
 {
     assert(!m_tes.empty() || !m_ntes.empty()); // LCOV_EXCL_LINE
 
+    // Fetch the scalar FP type.
+    auto *fp_t = detail::to_llvm_type<T>(m_state.context());
+
     // NOTE: the numeric cast will also ensure that we can
     // index into the events using 32-bit ints.
     const auto n_tes = boost::numeric_cast<std::uint32_t>(m_tes.size());
@@ -777,7 +756,7 @@ taylor_adaptive<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vector<nt_
 
     // Add the rtscc function. This will also indirectly
     // add the translator function.
-    detail::llvm_add_poly_rtscc<T>(m_state, order, 1);
+    detail::llvm_add_poly_rtscc(m_state, fp_t, order, 1);
 
     // Add the function for the fast exclusion check.
     detail::llvm_add_fex_check<T>(m_state, order, 1);
@@ -1327,6 +1306,9 @@ taylor_adaptive_batch<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vect
     assert(!m_tes.empty() || !m_ntes.empty()); // LCOV_EXCL_LINE
     assert(batch_size != 0u);                  // LCOV_EXCL_LINE
 
+    // Fetch the scalar FP type.
+    auto *fp_t = detail::to_llvm_type<T>(m_state.context());
+
     // NOTE: the numeric cast will also ensure that we can
     // index into the events using 32-bit ints.
     const auto n_tes = boost::numeric_cast<std::uint32_t>(m_tes.size());
@@ -1380,7 +1362,7 @@ taylor_adaptive_batch<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vect
     // add the translator function.
     // NOTE: keep batch size to 1 because the real-root
     // isolation is scalarised.
-    detail::llvm_add_poly_rtscc<T>(m_state, order, 1);
+    detail::llvm_add_poly_rtscc(m_state, fp_t, order, 1);
 
     // Add the function for the fast exclusion check.
     // NOTE: the fast exclusion check is vectorised.

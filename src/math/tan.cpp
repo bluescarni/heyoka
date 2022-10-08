@@ -207,10 +207,12 @@ llvm::Value *taylor_diff_tan_impl(llvm_state &s, const tan_impl &, const std::ve
                                   const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
                                   std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     if (order == 0u) {
-        return llvm_tan(s, taylor_codegen_numparam<T>(s, num, par_ptr, batch_size));
+        return llvm_tan(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
-        return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+        return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
@@ -224,6 +226,8 @@ llvm::Value *taylor_diff_tan_impl(llvm_state &s, const tan_impl &, const std::ve
     // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
 
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     if (order == 0u) {
         return llvm_tan(s, taylor_fetch_diff(arr, u_idx, 0, n_uvars));
     }
@@ -233,21 +237,21 @@ llvm::Value *taylor_diff_tan_impl(llvm_state &s, const tan_impl &, const std::ve
     for (std::uint32_t j = 1; j <= order; ++j) {
         // NOTE: the only hidden dependency contains the index of the
         // u variable whose definition is tan(var) * tan(var).
-        auto bj = taylor_fetch_diff(arr, u_idx, j, n_uvars);
-        auto cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
+        auto *bj = taylor_fetch_diff(arr, u_idx, j, n_uvars);
+        auto *cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
 
-        auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
+        auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*cnj*bj to the sum.
         sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(cnj, bj)));
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = pairwise_sum(builder, sum);
+    auto *ret_acc = pairwise_sum(builder, sum);
 
     // Divide by order.
-    ret_acc
-        = builder.CreateFDiv(ret_acc, vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size));
+    ret_acc = builder.CreateFDiv(
+        ret_acc, vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size));
 
     // Create and return the result.
     return builder.CreateFAdd(taylor_fetch_diff(arr, u_idx, order, n_uvars), ret_acc);
@@ -344,8 +348,9 @@ llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, const tan_impl &, con
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
     const auto na_pair = taylor_c_diff_func_name_args<T>(context, "tan", n_uvars, batch_size, {var}, 1);
@@ -359,7 +364,7 @@ llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, const tan_impl &, con
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -391,14 +396,14 @@ llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, const tan_impl &, con
             },
             [&]() {
                 // Init the accumulator.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
                     auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
                     auto cnj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
 
-                    auto fac = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+                    auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
                     builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
                                                            builder.CreateFMul(fac, builder.CreateFMul(cnj, bj))),
@@ -406,7 +411,7 @@ llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, const tan_impl &, con
                 });
 
                 // Divide by the order and add to b^[n] to produce the return value.
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
                 builder.CreateStore(builder.CreateFAdd(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx),
                                                        builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_v)),

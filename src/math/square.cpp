@@ -166,10 +166,12 @@ llvm::Value *taylor_diff_square_impl(llvm_state &s, const square_impl &, const U
                                      const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
                                      std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
+    auto *fp_t = to_llvm_type<T>(s.context());
+
     if (order == 0u) {
-        return llvm_square(s, taylor_codegen_numparam<T>(s, num, par_ptr, batch_size));
+        return llvm_square(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
-        return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+        return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
@@ -193,27 +195,27 @@ llvm::Value *taylor_diff_square_impl(llvm_state &s, const square_impl &, const v
     if (order % 2u == 1u) {
         // Odd order.
         for (std::uint32_t j = 0; j <= (order - 1u) / 2u; ++j) {
-            auto v0 = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
-            auto v1 = taylor_fetch_diff(arr, u_idx, j, n_uvars);
+            auto *v0 = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
+            auto *v1 = taylor_fetch_diff(arr, u_idx, j, n_uvars);
 
             sum.push_back(builder.CreateFMul(v0, v1));
         }
 
-        auto ret = pairwise_sum(builder, sum);
+        auto *ret = pairwise_sum(builder, sum);
         return builder.CreateFAdd(ret, ret);
     } else {
         // Even order.
-        auto ak2 = taylor_fetch_diff(arr, u_idx, order / 2u, n_uvars);
-        auto sq_ak2 = builder.CreateFMul(ak2, ak2);
+        auto *ak2 = taylor_fetch_diff(arr, u_idx, order / 2u, n_uvars);
+        auto *sq_ak2 = builder.CreateFMul(ak2, ak2);
 
         for (std::uint32_t j = 0; j <= (order - 2u) / 2u; ++j) {
-            auto v0 = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
-            auto v1 = taylor_fetch_diff(arr, u_idx, j, n_uvars);
+            auto *v0 = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
+            auto *v1 = taylor_fetch_diff(arr, u_idx, j, n_uvars);
 
             sum.push_back(builder.CreateFMul(v0, v1));
         }
 
-        auto ret = pairwise_sum(builder, sum);
+        auto *ret = pairwise_sum(builder, sum);
         return builder.CreateFAdd(builder.CreateFAdd(ret, ret), sq_ak2);
     }
 }
@@ -309,8 +311,9 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl 
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     const auto na_pair = taylor_c_diff_func_name_args<T>(context, "square", n_uvars, batch_size, {var});
     const auto &fname = na_pair.first;
@@ -323,7 +326,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl 
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -354,7 +357,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl 
             },
             [&]() {
                 // Init the accumulator.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Distinguish the odd/even cases for the order.
                 llvm_if_then_else(

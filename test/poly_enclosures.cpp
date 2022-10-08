@@ -92,7 +92,7 @@ TEST_CASE("polynomial enclosures")
 
                 {
                     auto [res_lo, res_hi]
-                        = detail::llvm_penc_interval<fp_t>(s, cf_ptr, order, h_lo_val, h_hi_val, batch_size);
+                        = detail::llvm_penc_interval(s, val_t, cf_ptr, order, h_lo_val, h_hi_val, batch_size);
 
                     // Store the result.
                     detail::store_vector_to_memory(builder, out_lo_ptr, res_lo);
@@ -122,7 +122,7 @@ TEST_CASE("polynomial enclosures")
                 auto *h_val = detail::load_vector_from_memory(builder, h_ptr, batch_size);
 
                 {
-                    auto [res_lo, res_hi] = detail::llvm_penc_cargo_shisha<fp_t>(s, cf_ptr, order, h_val, batch_size);
+                    auto [res_lo, res_hi] = detail::llvm_penc_cargo_shisha(s, val_t, cf_ptr, order, h_val, batch_size);
 
                     // Store the result.
                     detail::store_vector_to_memory(builder, out_lo_ptr, res_lo);

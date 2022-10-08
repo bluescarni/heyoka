@@ -66,7 +66,6 @@
 
 #endif
 
-#include <heyoka/detail/binomial.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
@@ -103,9 +102,7 @@ llvm::Type *int_to_llvm(llvm::LLVMContext &c)
 {
     static_assert(std::is_integral_v<T>);
 
-    auto *ret = llvm::Type::getIntNTy(c, std::numeric_limits<T>::digits);
-    assert(ret != nullptr); // LCOV_EXCL_LINE
-    return ret;
+    return llvm::Type::getIntNTy(c, std::numeric_limits<T>::digits);
 };
 
 // The global type map to associate a C++ type to an LLVM type.
@@ -115,20 +112,12 @@ const auto type_map = []() {
 
     // Try to associate C++ float to LLVM float.
     if (std::numeric_limits<float>::is_iec559 && std::numeric_limits<float>::digits == 24) {
-        retval[typeid(float)] = [](llvm::LLVMContext &c) {
-            auto *ret = llvm::Type::getFloatTy(c);
-            assert(ret != nullptr);
-            return ret;
-        };
+        retval[typeid(float)] = [](llvm::LLVMContext &c) { return llvm::Type::getFloatTy(c); };
     }
 
     // Try to associate C++ double to LLVM double.
     if (std::numeric_limits<double>::is_iec559 && std::numeric_limits<double>::digits == 53) {
-        retval[typeid(double)] = [](llvm::LLVMContext &c) {
-            auto *ret = llvm::Type::getDoubleTy(c);
-            assert(ret != nullptr);
-            return ret;
-        };
+        retval[typeid(double)] = [](llvm::LLVMContext &c) { return llvm::Type::getDoubleTy(c); };
     }
 
     // Try to associate C++ long double to an LLVM fp type.
@@ -136,25 +125,17 @@ const auto type_map = []() {
         if (std::numeric_limits<long double>::digits == 53) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // IEEE double-precision format (this is the case on MSVC for instance).
-                auto *ret = llvm::Type::getDoubleTy(c);
-                assert(ret != nullptr);
-                return ret;
+                return llvm::Type::getDoubleTy(c);
             };
-#if defined(HEYOKA_ARCH_X86)
         } else if (std::numeric_limits<long double>::digits == 64) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // x86 extended precision format.
-                auto *ret = llvm::Type::getX86_FP80Ty(c);
-                assert(ret != nullptr);
-                return ret;
+                return llvm::Type::getX86_FP80Ty(c);
             };
-#endif
         } else if (std::numeric_limits<long double>::digits == 113) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // IEEE quadruple-precision format (e.g., ARM 64).
-                auto *ret = llvm::Type::getFP128Ty(c);
-                assert(ret != nullptr);
-                return ret;
+                return llvm::Type::getFP128Ty(c);
             };
         }
     }
@@ -162,11 +143,7 @@ const auto type_map = []() {
 #if defined(HEYOKA_HAVE_REAL128)
 
     // Associate mppp::real128 to fp128.
-    retval[typeid(mppp::real128)] = [](llvm::LLVMContext &c) {
-        auto *ret = llvm::Type::getFP128Ty(c);
-        assert(ret != nullptr);
-        return ret;
-    };
+    retval[typeid(mppp::real128)] = [](llvm::LLVMContext &c) { return llvm::Type::getFP128Ty(c); };
 
 #endif
 
@@ -184,14 +161,22 @@ const auto type_map = []() {
 
 // Implementation of the function to associate a C++ type to
 // an LLVM type.
-llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp)
+llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp, bool err_throw)
 {
     const auto it = type_map.find(tp);
 
+    const auto *err_msg = "Unable to associate the C++ type '{}' to an LLVM type";
+
     if (it == type_map.end()) {
-        throw std::invalid_argument(fmt::format("Unable to associate the C++ type '{}' to an LLVM type", tp.name()));
+        return err_throw ? throw std::invalid_argument(fmt::format(err_msg, tp.name())) : nullptr;
     } else {
-        return it->second(c);
+        auto *ret = it->second(c);
+
+        if (ret == nullptr) {
+            return err_throw ? throw std::invalid_argument(fmt::format(err_msg, tp.name())) : nullptr;
+        }
+
+        return ret;
     }
 }
 
@@ -1310,8 +1295,7 @@ llvm::Value *llvm_floor(llvm_state &s, llvm::Value *x)
 // Add a function to count the number of sign changes in the coefficients
 // of a polynomial of degree n. The coefficients are SIMD vectors of size batch_size
 // and scalar type T.
-template <typename T>
-llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n, std::uint32_t batch_size)
 {
     assert(batch_size > 0u);
 
@@ -1328,8 +1312,7 @@ llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto *scal_t = to_llvm_type<T>(context);
+    // Fetch the vector floating-point type.
     auto *tp = make_vector_type(scal_t, batch_size);
 
     // Fetch the function name.
@@ -1341,11 +1324,11 @@ llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch
     // NOTE: both pointers are to the scalar counterparts
     // of the vector types, so that we can call this from regular
     // C++ code.
-    std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(builder.getInt32Ty()),
-                                    llvm::PointerType::getUnqual(scal_t)};
+    const std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(builder.getInt32Ty()),
+                                          llvm::PointerType::getUnqual(scal_t)};
 
     // Try to see if we already created the function.
-    auto f = md.getFunction(fname);
+    auto *f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -1360,13 +1343,13 @@ llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
-        auto out_ptr = f->args().begin();
+        auto *out_ptr = f->args().begin();
         out_ptr->setName("out_ptr");
         out_ptr->addAttr(llvm::Attribute::NoCapture);
         out_ptr->addAttr(llvm::Attribute::NoAlias);
         out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
-        auto cf_ptr = f->args().begin() + 1;
+        auto *cf_ptr = f->args().begin() + 1;
         cf_ptr->setName("cf_ptr");
         cf_ptr->addAttr(llvm::Attribute::NoCapture);
         cf_ptr->addAttr(llvm::Attribute::NoAlias);
@@ -1403,7 +1386,7 @@ llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch
         }
 
         // Init the vector of coefficient pointers with the base pointer value.
-        auto cf_ptr_v = vector_splat(builder, cf_ptr, batch_size);
+        auto *cf_ptr_v = vector_splat(builder, cf_ptr, batch_size);
 
         // Init the return value with zero.
         auto *retval = builder.CreateAlloca(last_nz_idx_t);
@@ -1413,7 +1396,7 @@ llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch
         llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *cur_n) {
             // Load the current poly coefficient(s).
             assert(llvm_depr_GEP_type_check(cf_ptr, scal_t)); // LCOV_EXCL_LINE
-            auto cur_cf = load_vector_from_memory(
+            auto *cur_cf = load_vector_from_memory(
                 builder,
                 builder.CreateInBoundsGEP(scal_t, cf_ptr, builder.CreateMul(cur_n, builder.getInt32(batch_size))),
                 batch_size);
@@ -1423,23 +1406,23 @@ llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch
                 offset, builder.CreateMul(builder.CreateLoad(last_nz_idx_t, last_nz_idx),
                                           vector_splat(builder, builder.getInt32(batch_size), batch_size)));
             assert(llvm_depr_GEP_type_check(cf_ptr_v, scal_t)); // LCOV_EXCL_LINE
-            auto last_nz_ptr = builder.CreateInBoundsGEP(scal_t, cf_ptr_v, last_nz_ptr_idx);
-            auto last_nz_cf = gather_vector_from_memory(builder, cur_cf->getType(), last_nz_ptr);
+            auto *last_nz_ptr = builder.CreateInBoundsGEP(scal_t, cf_ptr_v, last_nz_ptr_idx);
+            auto *last_nz_cf = gather_vector_from_memory(builder, cur_cf->getType(), last_nz_ptr);
 
             // Compute the sign of the current coefficient(s).
-            auto cur_sgn = llvm_sgn(s, cur_cf);
+            auto *cur_sgn = llvm_sgn(s, cur_cf);
 
             // Compute the sign of the last nonzero coefficient(s).
-            auto last_nz_sgn = llvm_sgn(s, last_nz_cf);
+            auto *last_nz_sgn = llvm_sgn(s, last_nz_cf);
 
             // Add them and check if the result is zero (this indicates a sign change).
-            auto cmp = builder.CreateICmpEQ(builder.CreateAdd(cur_sgn, last_nz_sgn),
-                                            llvm::Constant::getNullValue(cur_sgn->getType()));
+            auto *cmp = builder.CreateICmpEQ(builder.CreateAdd(cur_sgn, last_nz_sgn),
+                                             llvm::Constant::getNullValue(cur_sgn->getType()));
 
             // We also need to check if last_nz_sgn is zero. If that is the case, it means
             // we haven't found any nonzero coefficient yet for the polynomial and we must
             // not modify retval yet.
-            auto zero_cmp = builder.CreateICmpEQ(last_nz_sgn, llvm::Constant::getNullValue(last_nz_sgn->getType()));
+            auto *zero_cmp = builder.CreateICmpEQ(last_nz_sgn, llvm::Constant::getNullValue(last_nz_sgn->getType()));
             cmp = builder.CreateSelect(zero_cmp, llvm::Constant::getNullValue(cmp->getType()), cmp);
 
             // Update retval.
@@ -1479,17 +1462,6 @@ llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch
     return f;
 }
 
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<double>(llvm_state &, std::uint32_t, std::uint32_t);
-
-template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<long double>(llvm_state &, std::uint32_t, std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<mppp::real128>(llvm_state &, std::uint32_t, std::uint32_t);
-
-#endif
-
 // Compute the enclosure of the polynomial of order n with coefficients stored in cf_ptr
 // over the interval [h_lo, h_hi] using interval arithmetics. The polynomial coefficients
 // are vectors of size batch_size and scalar type T.
@@ -1501,12 +1473,12 @@ template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<mppp::real128>(llvm_stat
 // http://web.mit.edu/hyperbook/Patrikalakis-Maekawa-Cho/node46.html
 // Perhaps another alternative would be to employ FP primitives with explicit rounding modes,
 // which are available in LLVM.
-template <typename T>
-std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::Value *cf_ptr, std::uint32_t n,
-                                                           llvm::Value *h_lo, llvm::Value *h_hi,
+std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::Type *fp_t, llvm::Value *cf_ptr,
+                                                           std::uint32_t n, llvm::Value *h_lo, llvm::Value *h_hi,
                                                            std::uint32_t batch_size)
 {
     // LCOV_EXCL_START
+    assert(fp_t != nullptr);
     assert(batch_size > 0u);
     assert(cf_ptr != nullptr);
     assert(h_lo != nullptr);
@@ -1523,7 +1495,6 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
     // LCOV_EXCL_STOP
 
     auto &builder = s.builder();
-    auto &context = s.context();
 
     // Helper to implement the sum of two intervals.
     // NOTE: see https://en.wikipedia.org/wiki/Interval_arithmetic.
@@ -1556,8 +1527,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
         return std::make_pair(llvm_min(s, cmp1, cmp2), llvm_max(s, cmp3, cmp4));
     };
 
-    // Fetch the scalar and vector types.
-    auto *fp_t = to_llvm_type<T>(context);
+    // Fetch the vector type.
     auto *fp_vec_t = make_vector_type(fp_t, batch_size);
 
     // Create the lo/hi components of the accumulator.
@@ -1598,25 +1568,6 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
     return {builder.CreateLoad(fp_vec_t, acc_lo), builder.CreateLoad(fp_vec_t, acc_hi)};
 }
 
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_interval<float>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *, std::uint32_t);
-
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_interval<double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *, std::uint32_t);
-
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_interval<long double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *,
-                                std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_interval<mppp::real128>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *,
-                                  std::uint32_t);
-
-#endif
-
 // Compute the enclosure of the polynomial of order n with coefficients stored in cf_ptr
 // over an interval using the Cargo-Shisha algorithm. The polynomial coefficients
 // are vectors of size batch_size and scalar type T. The interval of the independent variable
@@ -1624,11 +1575,12 @@ llvm_penc_interval<mppp::real128>(llvm_state &, llvm::Value *, std::uint32_t, ll
 // NOTE: the Cargo-Shisha algorithm produces tighter bounds, but it has quadratic complexity
 // and it seems to be less well-behaved numerically in corner cases. It might still be worth it up to double-precision
 // computations, where the practical slowdown wrt interval arithmetics is smaller.
-template <typename T>
-std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, llvm::Value *cf_ptr, std::uint32_t n,
-                                                               llvm::Value *h, std::uint32_t batch_size)
+std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, llvm::Type *fp_t, llvm::Value *cf_ptr,
+                                                               std::uint32_t n, llvm::Value *h,
+                                                               std::uint32_t batch_size)
 {
     // LCOV_EXCL_START
+    assert(fp_t != nullptr);
     assert(batch_size > 0u);
     assert(cf_ptr != nullptr);
     assert(h != nullptr);
@@ -1644,10 +1596,6 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
     // LCOV_EXCL_STOP
 
     auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the scalar type.
-    auto *fp_t = to_llvm_type<T>(context);
 
     // bj_series will contain the terms of the series
     // for the computation of bj. old_bj_series will be
@@ -1671,8 +1619,12 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
         auto *ptr = builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.getInt32(j * batch_size));
         auto *cur_cf = load_vector_from_memory(builder, ptr, batch_size);
         auto *new_term = builder.CreateFMul(cur_cf, cur_h_pow);
-        new_term
-            = builder.CreateFDiv(new_term, vector_splat(builder, codegen<T>(s, number{binomial<T>(n, j)}), batch_size));
+        new_term = builder.CreateFDiv(new_term,
+                                      vector_splat(builder,
+                                                   llvm_codegen(s, fp_t,
+                                                                binomial(number_like(s, fp_t, static_cast<double>(n)),
+                                                                         number_like(s, fp_t, static_cast<double>(j)))),
+                                                   batch_size));
 
         // Add it to bj_series.
         bj_series.push_back(new_term);
@@ -1680,8 +1632,11 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
         // Update all elements of bj_series (apart from the last one).
         for (std::uint32_t i = 0; i < j; ++i) {
             bj_series[i] = builder.CreateFMul(
-                bj_series[i],
-                vector_splat(builder, codegen<T>(s, number{static_cast<T>(j) / static_cast<T>(j - i)}), batch_size));
+                bj_series[i], vector_splat(builder,
+                                           llvm_codegen(s, fp_t,
+                                                        number_like(s, fp_t, static_cast<double>(j))
+                                                            / number_like(s, fp_t, static_cast<double>(j - i))),
+                                           batch_size));
         }
 
         // Compute the new bj.
@@ -1701,23 +1656,6 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
 
     return {min_bj, max_bj};
 }
-
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_cargo_shisha<float>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
-
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_cargo_shisha<double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
-
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_cargo_shisha<long double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_cargo_shisha<mppp::real128>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
-
-#endif
 
 namespace
 {
@@ -1798,8 +1736,9 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto tp = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(s.context());
+    auto *tp = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name.
     const auto fname = fmt::format("heyoka.inv_kep_E.{}", llvm_mangle_type(tp));
@@ -1807,7 +1746,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
     // The function arguments:
     // - eccentricity,
     // - mean anomaly.
-    std::vector<llvm::Type *> fargs{tp, tp};
+    const std::vector<llvm::Type *> fargs{tp, tp};
 
     // Try to see if we already created the function.
     auto f = md.getFunction(fname);
@@ -1835,7 +1774,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         auto *ecc_is_nan_or_neg = builder.CreateFCmpULT(ecc_arg, llvm::Constant::getNullValue(ecc_arg->getType()));
         // Is the eccentricity >= 1?
         auto *ecc_is_gte1
-            = builder.CreateFCmpOGE(ecc_arg, vector_splat(builder, codegen<T>(s, number{1.}), batch_size));
+            = builder.CreateFCmpOGE(ecc_arg, vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size));
 
         // Is the eccentricity NaN or out of range?
         // NOTE: this is a logical OR.
@@ -1844,7 +1783,8 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
 
         // Replace invalid eccentricity values with quiet NaNs.
         auto *ecc = builder.CreateSelect(
-            ecc_invalid, vector_splat(builder, codegen<T>(s, number{std::numeric_limits<T>::quiet_NaN()}), batch_size),
+            ecc_invalid,
+            vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<T>::quiet_NaN()}), batch_size),
             ecc_arg);
 
         // Create the return value.
@@ -1859,8 +1799,8 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
 
         // Reduce M modulo 2*pi in extended precision.
         auto *M = llvm_dl_modulus(s, M_arg, llvm::Constant::getNullValue(M_arg->getType()),
-                                  vector_splat(builder, codegen<T>(s, number{dl_twopi_hi}), batch_size),
-                                  vector_splat(builder, codegen<T>(s, number{dl_twopi_lo}), batch_size))
+                                  vector_splat(builder, llvm_codegen(s, fp_t, number{dl_twopi_hi}), batch_size),
+                                  vector_splat(builder, llvm_codegen(s, fp_t, number{dl_twopi_lo}), batch_size))
                       .first;
 
         // Compute the initial guess from the usual elliptic expansion
@@ -1877,8 +1817,8 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         auto cos_M_2 = builder.CreateFMul(cos_M, cos_M);
 
         // 3/2 and 1/2 constants.
-        auto c_3_2 = vector_splat(builder, codegen<T>(s, number{static_cast<T>(3) / 2}), batch_size);
-        auto c_1_2 = vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / 2}), batch_size);
+        auto c_3_2 = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(3) / 2}), batch_size);
+        auto c_1_2 = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / 2}), batch_size);
 
         // M + e*sin(M).
         auto tmp1 = builder.CreateFAdd(M, e_sin_M);
@@ -1896,7 +1836,8 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
 
         // Make extra sure the initial guess is in the [0, 2*pi) range.
         auto lb = llvm::ConstantFP::get(tp, 0.);
-        auto ub = vector_splat(builder, codegen<T>(s, number{nextafter(dl_twopi_hi, static_cast<T>(0))}), batch_size);
+        auto ub = vector_splat(builder, llvm_codegen(s, fp_t, number{nextafter(dl_twopi_hi, static_cast<T>(0))}),
+                               batch_size);
         ig = llvm_max(s, ig, lb);
         ig = llvm_min(s, ig, ub);
 
@@ -1939,10 +1880,11 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Define the stopping condition functor.
         // NOTE: hard-code this for the time being.
         auto *max_iter = builder.getInt32(50);
-        auto loop_cond = [&,
-                          // NOTE: tolerance is 4 * eps.
-                          tol = vector_splat(builder, codegen<T>(s, number{std::numeric_limits<T>::epsilon() * 4}),
-                                             batch_size)]() -> llvm::Value * {
+        auto loop_cond
+            = [&,
+               // NOTE: tolerance is 4 * eps.
+               tol = vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<T>::epsilon() * 4}),
+                                  batch_size)]() -> llvm::Value * {
             auto *c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
 
             // Keep on iterating as long as abs(f(E)) > tol.
@@ -1958,46 +1900,49 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         };
 
         // Run the loop.
-        llvm_while_loop(s, loop_cond, [&, one_c = vector_splat(builder, codegen<T>(s, number{1.}), batch_size)]() {
-            // Compute the new value.
-            auto old_val = builder.CreateLoad(tp, retval);
-            auto new_val
-                = builder.CreateFDiv(builder.CreateLoad(tp, fE),
-                                     builder.CreateFSub(one_c, builder.CreateFMul(ecc, builder.CreateLoad(tp, cos_E))));
-            new_val = builder.CreateFSub(old_val, new_val);
+        llvm_while_loop(
+            s, loop_cond, [&, one_c = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size)]() {
+                // Compute the new value.
+                auto old_val = builder.CreateLoad(tp, retval);
+                auto new_val = builder.CreateFDiv(
+                    builder.CreateLoad(tp, fE),
+                    builder.CreateFSub(one_c, builder.CreateFMul(ecc, builder.CreateLoad(tp, cos_E))));
+                new_val = builder.CreateFSub(old_val, new_val);
 
-            // Bisect if new_val > ub.
-            // NOTE: '>' is fine here, ub is the maximum allowed value.
-            auto bcheck = builder.CreateFCmpOGT(new_val, ub);
-            new_val = builder.CreateSelect(
-                bcheck,
-                builder.CreateFMul(vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / 2}), batch_size),
-                                   builder.CreateFAdd(old_val, ub)),
-                new_val);
+                // Bisect if new_val > ub.
+                // NOTE: '>' is fine here, ub is the maximum allowed value.
+                auto bcheck = builder.CreateFCmpOGT(new_val, ub);
+                new_val = builder.CreateSelect(
+                    bcheck,
+                    builder.CreateFMul(
+                        vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / 2}), batch_size),
+                        builder.CreateFAdd(old_val, ub)),
+                    new_val);
 
-            // Bisect if new_val < lb.
-            bcheck = builder.CreateFCmpOLT(new_val, lb);
-            new_val = builder.CreateSelect(
-                bcheck,
-                builder.CreateFMul(vector_splat(builder, codegen<T>(s, number{static_cast<T>(1) / 2}), batch_size),
-                                   builder.CreateFAdd(old_val, lb)),
-                new_val);
+                // Bisect if new_val < lb.
+                bcheck = builder.CreateFCmpOLT(new_val, lb);
+                new_val = builder.CreateSelect(
+                    bcheck,
+                    builder.CreateFMul(
+                        vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / 2}), batch_size),
+                        builder.CreateFAdd(old_val, lb)),
+                    new_val);
 
-            // Store the new value.
-            builder.CreateStore(new_val, retval);
+                // Store the new value.
+                builder.CreateStore(new_val, retval);
 
-            // Update sin_E/cos_E.
-            sin_cos_E = llvm_sincos(s, new_val);
-            builder.CreateStore(sin_cos_E.first, sin_E);
-            builder.CreateStore(sin_cos_E.second, cos_E);
+                // Update sin_E/cos_E.
+                sin_cos_E = llvm_sincos(s, new_val);
+                builder.CreateStore(sin_cos_E.first, sin_E);
+                builder.CreateStore(sin_cos_E.second, cos_E);
 
-            // Update f(E).
-            builder.CreateStore(fE_compute(), fE);
+                // Update f(E).
+                builder.CreateStore(fE_compute(), fE);
 
-            // Update the counter.
-            builder.CreateStore(
-                builder.CreateAdd(builder.CreateLoad(builder.getInt32Ty(), counter), builder.getInt32(1)), counter);
-        });
+                // Update the counter.
+                builder.CreateStore(
+                    builder.CreateAdd(builder.CreateLoad(builder.getInt32Ty(), counter), builder.getInt32(1)), counter);
+            });
 
         // Check the counter.
         llvm_if_then_else(
@@ -2010,7 +1955,8 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
                 auto *old_val = builder.CreateLoad(tp, retval);
                 auto *new_val = builder.CreateSelect(
                     tol_check,
-                    vector_splat(builder, codegen<T>(s, number{std::numeric_limits<T>::quiet_NaN()}), batch_size),
+                    vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<T>::quiet_NaN()}),
+                                 batch_size),
                     old_val);
                 builder.CreateStore(new_val, retval);
 
@@ -2058,15 +2004,11 @@ llvm::Function *llvm_add_inv_kep_E_f128(llvm_state &s, std::uint32_t batch_size)
 
 #endif
 
-namespace
-{
-
 // Helper to create a global const array containing
 // all binomial coefficients up to (n, n). The coefficients are stored
 // as scalars and the return value is a pointer to the first coefficient.
 // The array has shape (n + 1, n + 1) and it is stored in row-major format.
-template <typename T>
-llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
+llvm::Value *llvm_add_bc_array(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
 {
     // Overflow check.
     // LCOV_EXCL_START
@@ -2078,11 +2020,9 @@ llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
 
     auto &md = s.module();
     auto &builder = s.builder();
-    auto &context = s.context();
 
     // Fetch the array type.
-    auto *arr_type
-        = llvm::ArrayType::get(to_llvm_type<T>(context), boost::numeric_cast<std::uint64_t>((n + 1u) * (n + 1u)));
+    auto *arr_type = llvm::ArrayType::get(fp_t, boost::numeric_cast<std::uint64_t>((n + 1u) * (n + 1u)));
 
     // Generate the binomials as constants.
     std::vector<llvm::Constant *> bc_const;
@@ -2090,8 +2030,10 @@ llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
         for (std::uint32_t j = 0; j <= n; ++j) {
             // NOTE: the Boost implementation requires j <= i. We don't care about
             // j > i anyway.
-            const auto val = (j <= i) ? binomial<T>(i, j) : T(0);
-            bc_const.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, number{val})));
+            const auto val = (j <= i) ? binomial(number_like(s, fp_t, static_cast<double>(i)),
+                                                 number_like(s, fp_t, static_cast<double>(j)))
+                                      : number_like(s, fp_t, 0.);
+            bc_const.push_back(llvm::cast<llvm::Constant>(llvm_codegen(s, fp_t, val)));
         }
     }
 
@@ -2105,27 +2047,6 @@ llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
     return builder.CreateInBoundsGEP(bc_const_arr->getType(), g_bc_const_arr,
                                      {builder.getInt32(0), builder.getInt32(0)});
 }
-
-} // namespace
-
-llvm::Value *llvm_add_bc_array_dbl(llvm_state &s, std::uint32_t n)
-{
-    return llvm_add_bc_array_impl<double>(s, n);
-}
-
-llvm::Value *llvm_add_bc_array_ldbl(llvm_state &s, std::uint32_t n)
-{
-    return llvm_add_bc_array_impl<long double>(s, n);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *llvm_add_bc_array_f128(llvm_state &s, std::uint32_t n)
-{
-    return llvm_add_bc_array_impl<mppp::real128>(s, n);
-}
-
-#endif
 
 namespace
 {
