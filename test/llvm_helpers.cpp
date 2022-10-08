@@ -991,7 +991,7 @@ TEST_CASE("csc_scalar")
 
             const auto degree = 4u;
 
-            llvm_add_csc<fp_t>(s, degree, 1);
+            llvm_add_csc(s, to_llvm_type<fp_t>(s.context()), degree, 1);
 
             s.optimise();
 
@@ -1067,7 +1067,7 @@ TEST_CASE("csc_batch")
 
                 const auto degree = 4u;
 
-                llvm_add_csc<fp_t>(s, degree, batch_size);
+                llvm_add_csc(s, to_llvm_type<fp_t>(s.context()), degree, batch_size);
 
                 s.optimise();
 

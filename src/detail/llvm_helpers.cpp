@@ -1295,8 +1295,7 @@ llvm::Value *llvm_floor(llvm_state &s, llvm::Value *x)
 // Add a function to count the number of sign changes in the coefficients
 // of a polynomial of degree n. The coefficients are SIMD vectors of size batch_size
 // and scalar type T.
-template <typename T>
-llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n, std::uint32_t batch_size)
 {
     assert(batch_size > 0u);
 
@@ -1313,8 +1312,7 @@ llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto *scal_t = to_llvm_type<T>(context);
+    // Fetch the vector floating-point type.
     auto *tp = make_vector_type(scal_t, batch_size);
 
     // Fetch the function name.
@@ -1326,11 +1324,11 @@ llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch
     // NOTE: both pointers are to the scalar counterparts
     // of the vector types, so that we can call this from regular
     // C++ code.
-    std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(builder.getInt32Ty()),
-                                    llvm::PointerType::getUnqual(scal_t)};
+    const std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(builder.getInt32Ty()),
+                                          llvm::PointerType::getUnqual(scal_t)};
 
     // Try to see if we already created the function.
-    auto f = md.getFunction(fname);
+    auto *f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -1345,13 +1343,13 @@ llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
-        auto out_ptr = f->args().begin();
+        auto *out_ptr = f->args().begin();
         out_ptr->setName("out_ptr");
         out_ptr->addAttr(llvm::Attribute::NoCapture);
         out_ptr->addAttr(llvm::Attribute::NoAlias);
         out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
-        auto cf_ptr = f->args().begin() + 1;
+        auto *cf_ptr = f->args().begin() + 1;
         cf_ptr->setName("cf_ptr");
         cf_ptr->addAttr(llvm::Attribute::NoCapture);
         cf_ptr->addAttr(llvm::Attribute::NoAlias);
@@ -1388,7 +1386,7 @@ llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch
         }
 
         // Init the vector of coefficient pointers with the base pointer value.
-        auto cf_ptr_v = vector_splat(builder, cf_ptr, batch_size);
+        auto *cf_ptr_v = vector_splat(builder, cf_ptr, batch_size);
 
         // Init the return value with zero.
         auto *retval = builder.CreateAlloca(last_nz_idx_t);
@@ -1398,7 +1396,7 @@ llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch
         llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *cur_n) {
             // Load the current poly coefficient(s).
             assert(llvm_depr_GEP_type_check(cf_ptr, scal_t)); // LCOV_EXCL_LINE
-            auto cur_cf = load_vector_from_memory(
+            auto *cur_cf = load_vector_from_memory(
                 builder,
                 builder.CreateInBoundsGEP(scal_t, cf_ptr, builder.CreateMul(cur_n, builder.getInt32(batch_size))),
                 batch_size);
@@ -1408,23 +1406,23 @@ llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch
                 offset, builder.CreateMul(builder.CreateLoad(last_nz_idx_t, last_nz_idx),
                                           vector_splat(builder, builder.getInt32(batch_size), batch_size)));
             assert(llvm_depr_GEP_type_check(cf_ptr_v, scal_t)); // LCOV_EXCL_LINE
-            auto last_nz_ptr = builder.CreateInBoundsGEP(scal_t, cf_ptr_v, last_nz_ptr_idx);
-            auto last_nz_cf = gather_vector_from_memory(builder, cur_cf->getType(), last_nz_ptr);
+            auto *last_nz_ptr = builder.CreateInBoundsGEP(scal_t, cf_ptr_v, last_nz_ptr_idx);
+            auto *last_nz_cf = gather_vector_from_memory(builder, cur_cf->getType(), last_nz_ptr);
 
             // Compute the sign of the current coefficient(s).
-            auto cur_sgn = llvm_sgn(s, cur_cf);
+            auto *cur_sgn = llvm_sgn(s, cur_cf);
 
             // Compute the sign of the last nonzero coefficient(s).
-            auto last_nz_sgn = llvm_sgn(s, last_nz_cf);
+            auto *last_nz_sgn = llvm_sgn(s, last_nz_cf);
 
             // Add them and check if the result is zero (this indicates a sign change).
-            auto cmp = builder.CreateICmpEQ(builder.CreateAdd(cur_sgn, last_nz_sgn),
-                                            llvm::Constant::getNullValue(cur_sgn->getType()));
+            auto *cmp = builder.CreateICmpEQ(builder.CreateAdd(cur_sgn, last_nz_sgn),
+                                             llvm::Constant::getNullValue(cur_sgn->getType()));
 
             // We also need to check if last_nz_sgn is zero. If that is the case, it means
             // we haven't found any nonzero coefficient yet for the polynomial and we must
             // not modify retval yet.
-            auto zero_cmp = builder.CreateICmpEQ(last_nz_sgn, llvm::Constant::getNullValue(last_nz_sgn->getType()));
+            auto *zero_cmp = builder.CreateICmpEQ(last_nz_sgn, llvm::Constant::getNullValue(last_nz_sgn->getType()));
             cmp = builder.CreateSelect(zero_cmp, llvm::Constant::getNullValue(cmp->getType()), cmp);
 
             // Update retval.
@@ -1463,17 +1461,6 @@ llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch
 
     return f;
 }
-
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<double>(llvm_state &, std::uint32_t, std::uint32_t);
-
-template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<long double>(llvm_state &, std::uint32_t, std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<mppp::real128>(llvm_state &, std::uint32_t, std::uint32_t);
-
-#endif
 
 // Compute the enclosure of the polynomial of order n with coefficients stored in cf_ptr
 // over the interval [h_lo, h_hi] using interval arithmetics. The polynomial coefficients
@@ -2017,15 +2004,11 @@ llvm::Function *llvm_add_inv_kep_E_f128(llvm_state &s, std::uint32_t batch_size)
 
 #endif
 
-namespace
-{
-
 // Helper to create a global const array containing
 // all binomial coefficients up to (n, n). The coefficients are stored
 // as scalars and the return value is a pointer to the first coefficient.
 // The array has shape (n + 1, n + 1) and it is stored in row-major format.
-template <typename T>
-llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
+llvm::Value *llvm_add_bc_array(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
 {
     // Overflow check.
     // LCOV_EXCL_START
@@ -2037,9 +2020,6 @@ llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
 
     auto &md = s.module();
     auto &builder = s.builder();
-    auto &context = s.context();
-
-    auto *fp_t = to_llvm_type<T>(context);
 
     // Fetch the array type.
     auto *arr_type = llvm::ArrayType::get(fp_t, boost::numeric_cast<std::uint64_t>((n + 1u) * (n + 1u)));
@@ -2067,27 +2047,6 @@ llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
     return builder.CreateInBoundsGEP(bc_const_arr->getType(), g_bc_const_arr,
                                      {builder.getInt32(0), builder.getInt32(0)});
 }
-
-} // namespace
-
-llvm::Value *llvm_add_bc_array_dbl(llvm_state &s, std::uint32_t n)
-{
-    return llvm_add_bc_array_impl<double>(s, n);
-}
-
-llvm::Value *llvm_add_bc_array_ldbl(llvm_state &s, std::uint32_t n)
-{
-    return llvm_add_bc_array_impl<long double>(s, n);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *llvm_add_bc_array_f128(llvm_state &s, std::uint32_t n)
-{
-    return llvm_add_bc_array_impl<mppp::real128>(s, n);
-}
-
-#endif
 
 namespace
 {

@@ -204,7 +204,7 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
         // Helper to fetch the (i, j) binomial coefficient from
         // a precomputed global array. The returned value is already
         // splatted.
-        auto get_bc = [&, bc_ptr = llvm_add_bc_array<T>(s, n_const)](llvm::Value *i, llvm::Value *j) {
+        auto get_bc = [&, bc_ptr = llvm_add_bc_array(s, scal_t, n_const)](llvm::Value *i, llvm::Value *j) {
             auto *idx = builder.CreateMul(i, builder.getInt32(n_const + 1u));
             idx = builder.CreateAdd(idx, j);
 
