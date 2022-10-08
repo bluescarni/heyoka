@@ -15,7 +15,6 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
-#include <llvm/IR/Type.h>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
