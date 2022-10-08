@@ -1486,12 +1486,12 @@ template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc<mppp::real128>(llvm_stat
 // http://web.mit.edu/hyperbook/Patrikalakis-Maekawa-Cho/node46.html
 // Perhaps another alternative would be to employ FP primitives with explicit rounding modes,
 // which are available in LLVM.
-template <typename T>
-std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::Value *cf_ptr, std::uint32_t n,
-                                                           llvm::Value *h_lo, llvm::Value *h_hi,
+std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::Type *fp_t, llvm::Value *cf_ptr,
+                                                           std::uint32_t n, llvm::Value *h_lo, llvm::Value *h_hi,
                                                            std::uint32_t batch_size)
 {
     // LCOV_EXCL_START
+    assert(fp_t != nullptr);
     assert(batch_size > 0u);
     assert(cf_ptr != nullptr);
     assert(h_lo != nullptr);
@@ -1508,7 +1508,6 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
     // LCOV_EXCL_STOP
 
     auto &builder = s.builder();
-    auto &context = s.context();
 
     // Helper to implement the sum of two intervals.
     // NOTE: see https://en.wikipedia.org/wiki/Interval_arithmetic.
@@ -1541,8 +1540,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
         return std::make_pair(llvm_min(s, cmp1, cmp2), llvm_max(s, cmp3, cmp4));
     };
 
-    // Fetch the scalar and vector types.
-    auto *fp_t = to_llvm_type<T>(context);
+    // Fetch the vector type.
     auto *fp_vec_t = make_vector_type(fp_t, batch_size);
 
     // Create the lo/hi components of the accumulator.
@@ -1583,25 +1581,6 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
     return {builder.CreateLoad(fp_vec_t, acc_lo), builder.CreateLoad(fp_vec_t, acc_hi)};
 }
 
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_interval<float>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *, std::uint32_t);
-
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_interval<double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *, std::uint32_t);
-
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_interval<long double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *,
-                                std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_interval<mppp::real128>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *,
-                                  std::uint32_t);
-
-#endif
-
 // Compute the enclosure of the polynomial of order n with coefficients stored in cf_ptr
 // over an interval using the Cargo-Shisha algorithm. The polynomial coefficients
 // are vectors of size batch_size and scalar type T. The interval of the independent variable
@@ -1609,11 +1588,12 @@ llvm_penc_interval<mppp::real128>(llvm_state &, llvm::Value *, std::uint32_t, ll
 // NOTE: the Cargo-Shisha algorithm produces tighter bounds, but it has quadratic complexity
 // and it seems to be less well-behaved numerically in corner cases. It might still be worth it up to double-precision
 // computations, where the practical slowdown wrt interval arithmetics is smaller.
-template <typename T>
-std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, llvm::Value *cf_ptr, std::uint32_t n,
-                                                               llvm::Value *h, std::uint32_t batch_size)
+std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, llvm::Type *fp_t, llvm::Value *cf_ptr,
+                                                               std::uint32_t n, llvm::Value *h,
+                                                               std::uint32_t batch_size)
 {
     // LCOV_EXCL_START
+    assert(fp_t != nullptr);
     assert(batch_size > 0u);
     assert(cf_ptr != nullptr);
     assert(h != nullptr);
@@ -1629,10 +1609,6 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
     // LCOV_EXCL_STOP
 
     auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the scalar type.
-    auto *fp_t = to_llvm_type<T>(context);
 
     // bj_series will contain the terms of the series
     // for the computation of bj. old_bj_series will be
@@ -1693,23 +1669,6 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
 
     return {min_bj, max_bj};
 }
-
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_cargo_shisha<float>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
-
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_cargo_shisha<double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
-
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_cargo_shisha<long double>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_cargo_shisha<mppp::real128>(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
-
-#endif
 
 namespace
 {

@@ -586,7 +586,7 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t
 
     if (use_cs) {
         // Compute the enclosure of the polynomial.
-        std::tie(enc_lo, enc_hi) = llvm_penc_cargo_shisha<T>(s, cf_ptr, n, h, batch_size);
+        std::tie(enc_lo, enc_hi) = llvm_penc_cargo_shisha(s, fp_t, cf_ptr, n, h, batch_size);
     } else {
         // Load back_flag and convert it to a boolean vector.
         auto *back_flag = builder.CreateTrunc(load_vector_from_memory(builder, back_flag_ptr, batch_size),
@@ -598,7 +598,7 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t
         auto *h_hi = builder.CreateSelect(back_flag, llvm::Constant::getNullValue(h->getType()), h);
 
         // Compute the enclosure of the polynomial.
-        std::tie(enc_lo, enc_hi) = llvm_penc_interval<T>(s, cf_ptr, n, h_lo, h_hi, batch_size);
+        std::tie(enc_lo, enc_hi) = llvm_penc_interval(s, fp_t, cf_ptr, n, h_lo, h_hi, batch_size);
     }
 
     // Compute the sign of the components of the accumulator.
