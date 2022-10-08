@@ -2228,6 +2228,7 @@ TEST_CASE("dl floor scalar")
     using detail::llvm_dl_floor;
     using detail::to_llvm_type;
     using std::abs;
+    using std::floor;
     using std::trunc;
 
     auto tester = [](auto fp_x) {
@@ -2315,6 +2316,7 @@ TEST_CASE("dl floor batch")
     using detail::llvm_dl_floor;
     using detail::to_llvm_type;
     using std::abs;
+    using std::floor;
     using std::trunc;
 
     auto tester = [](auto fp_x) {
