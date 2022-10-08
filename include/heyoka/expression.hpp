@@ -413,7 +413,7 @@ std::optional<std::vector<expression>::size_type>
 decompose(std::unordered_map<const void *, std::vector<expression>::size_type> &, const expression &,
           std::vector<expression> &);
 
-llvm::Value *cfunc_c_load_eval(llvm_state &, llvm::Value *, llvm::Value *);
+llvm::Value *cfunc_c_load_eval(llvm_state &, llvm::Type *, llvm::Value *, llvm::Value *);
 
 } // namespace detail
 

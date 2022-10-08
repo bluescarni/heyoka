@@ -1296,7 +1296,6 @@ auto taylor_load_values(llvm_state &s, llvm::Type *fp_t, llvm::Value *in, std::u
     for (std::uint32_t i = 0; i < n; ++i) {
         // Fetch the pointer from in.
         // NOTE: overflow checking is done in the parent function.
-        assert(llvm_depr_GEP_type_check(in, pointee_type(in))); // LCOV_EXCL_LINE
         auto *ptr = builder.CreateInBoundsGEP(pointee_type(in), in, builder.getInt32(i * batch_size));
 
         // Load the value in vector mode.
@@ -1532,9 +1531,6 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
                                   builder.CreateMul(cur_order, builder.getInt32(batch_size)));
 
                               // Store into tc_ptr.
-                              // LCOV_EXCL_START
-                              assert(llvm_depr_GEP_type_check(tc_ptr, pointee_type(tc_ptr)));
-                              // LCOV_EXCL_STOP
                               store_vector_to_memory(
                                   builder, builder.CreateInBoundsGEP(pointee_type(tc_ptr), tc_ptr, out_idx), diff_val);
                           });
@@ -1561,9 +1557,6 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
                                                 builder.CreateMul(cur_order, builder.getInt32(batch_size)));
 
                         // Store into tc_ptr.
-                        // LCOV_EXCL_START
-                        assert(llvm_depr_GEP_type_check(tc_ptr, pointee_type(tc_ptr)));
-                        // LCOV_EXCL_STOP
                         store_vector_to_memory(
                             builder, builder.CreateInBoundsGEP(pointee_type(tc_ptr), tc_ptr, out_idx), diff_val);
                     });
@@ -1588,7 +1581,6 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
                 const auto out_idx = (order + 1u) * batch_size * j + cur_order * batch_size;
 
                 // Write to tc_ptr.
-                assert(llvm_depr_GEP_type_check(tc_ptr, pointee_type(tc_ptr))); // LCOV_EXCL_LINE
                 auto *out_ptr = builder.CreateInBoundsGEP(pointee_type(tc_ptr), tc_ptr,
                                                           builder.getInt32(static_cast<std::uint32_t>(out_idx)));
                 store_vector_to_memory(builder, out_ptr, val);

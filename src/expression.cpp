@@ -2618,26 +2618,24 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
     return retval;
 }
 
-void cfunc_c_store_eval(llvm_state &s, llvm::Value *eval_arr, llvm::Value *idx, llvm::Value *val)
+void cfunc_c_store_eval(llvm_state &s, llvm::Type *fp_vec_t, llvm::Value *eval_arr, llvm::Value *idx, llvm::Value *val)
 {
     auto &builder = s.builder();
 
-    assert(llvm_depr_GEP_type_check(eval_arr, pointee_type(eval_arr))); // LCOV_EXCL_LINE
-    auto *ptr = builder.CreateInBoundsGEP(pointee_type(eval_arr), eval_arr, idx);
+    auto *ptr = builder.CreateInBoundsGEP(fp_vec_t, eval_arr, idx);
 
     builder.CreateStore(val, ptr);
 }
 
 } // namespace
 
-llvm::Value *cfunc_c_load_eval(llvm_state &s, llvm::Value *eval_arr, llvm::Value *idx)
+llvm::Value *cfunc_c_load_eval(llvm_state &s, llvm::Type *fp_vec_t, llvm::Value *eval_arr, llvm::Value *idx)
 {
     auto &builder = s.builder();
 
-    assert(llvm_depr_GEP_type_check(eval_arr, pointee_type(eval_arr))); // LCOV_EXCL_LINE
-    auto *ptr = builder.CreateInBoundsGEP(pointee_type(eval_arr), eval_arr, idx);
+    auto *ptr = builder.CreateInBoundsGEP(fp_vec_t, eval_arr, idx);
 
-    return builder.CreateLoad(pointee_type(eval_arr), ptr);
+    return builder.CreateLoad(fp_vec_t, ptr);
 }
 
 namespace
@@ -2798,7 +2796,7 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
                                                                                  {builder.getInt32(0), cur_idx}));
 
         // Fetch from eval_arr the value of the u variable u_idx.
-        auto *ret = cfunc_c_load_eval(s, eval_arr, u_idx);
+        auto *ret = cfunc_c_load_eval(s, fp_vec_t, eval_arr, u_idx);
 
         // Compute the pointer into out_ptr.
         auto *ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
@@ -2905,7 +2903,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
         auto *vec = load_vector_from_memory(builder, fp_type, ptr, batch_size);
 
         // Store into eval_arr.
-        cfunc_c_store_eval(s, eval_arr, cur_var_idx, vec);
+        cfunc_c_store_eval(s, fp_vec_type, eval_arr, cur_var_idx, vec);
     });
 
     // Helper to evaluate a block.
@@ -2937,7 +2935,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
             }
 
             // Evaluate and store the result.
-            cfunc_c_store_eval(s, eval_arr, u_idx, builder.CreateCall(func, args));
+            cfunc_c_store_eval(s, fp_vec_type, eval_arr, u_idx, builder.CreateCall(func, args));
         });
     };
 

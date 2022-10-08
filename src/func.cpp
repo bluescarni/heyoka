@@ -1063,7 +1063,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
                         return vector_splat(builder, cur_f_arg, batch_size);
                     } else if constexpr (std::is_same_v<type, variable>) {
                         // NOTE: for variables, the u index is passed to f.
-                        return cfunc_c_load_eval(s, eval_arr, cur_f_arg);
+                        return cfunc_c_load_eval(s, val_t, eval_arr, cur_f_arg);
                     } else if constexpr (std::is_same_v<type, param>) {
                         // NOTE: for params, we have to load the value from par_ptr.
                         // NOTE: the overflow check is done in add_cfunc_impl().
