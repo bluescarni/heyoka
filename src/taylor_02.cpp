@@ -396,7 +396,7 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
     auto *h = builder.CreateFMul(rho_m, vector_splat(builder, llvm_codegen(s, fp_t, rhofac), batch_size));
 
     // Ensure that the step size does not exceed the limit in absolute value.
-    auto *max_h_vec = load_vector_from_memory(builder, h_ptr, batch_size);
+    auto *max_h_vec = load_vector_from_memory(builder, fp_t, h_ptr, batch_size);
     h = taylor_step_minabs(s, h, max_h_vec);
 
     // Handle backwards propagation.
@@ -946,7 +946,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
             = builder.CreateInBoundsGEP(fp_type, order0, builder.CreateMul(cur_var_idx, builder.getInt32(batch_size)));
 
         // Load as a vector.
-        auto *vec = load_vector_from_memory(builder, ptr, batch_size);
+        auto *vec = load_vector_from_memory(builder, fp_type, ptr, batch_size);
 
         // Store into diff_arr.
         taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx, vec);
@@ -1286,7 +1286,7 @@ namespace
 
 // Given an input pointer 'in', load the first n * batch_size values in it as n vectors
 // with size batch_size. If batch_size is 1, the values will be loaded as scalars.
-auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::uint32_t batch_size)
+auto taylor_load_values(llvm_state &s, llvm::Type *fp_t, llvm::Value *in, std::uint32_t n, std::uint32_t batch_size)
 {
     assert(batch_size > 0u); // LCOV_EXCL_LINE
 
@@ -1300,7 +1300,7 @@ auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::ui
         auto *ptr = builder.CreateInBoundsGEP(pointee_type(in), in, builder.getInt32(i * batch_size));
 
         // Load the value in vector mode.
-        retval.push_back(load_vector_from_memory(builder, ptr, batch_size));
+        retval.push_back(load_vector_from_memory(builder, fp_t, ptr, batch_size));
     }
 
     return retval;
@@ -1334,6 +1334,8 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
     assert(n_eq > 0u);
     assert(order > 0u);
     // LCOV_EXCL_STOP
+
+    auto *fp_t = to_llvm_type<T>(s.context());
 
     // Make sure we can represent n_uvars * (order + 1) as a 32-bit
     // unsigned integer. This is the maximum total number of derivatives we will have to compute
@@ -1377,7 +1379,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         spdlog::stopwatch sw;
 
         // Init the derivatives array with the order 0 of the state variables.
-        auto diff_arr = taylor_load_values(s, order0, n_eq, batch_size);
+        auto diff_arr = taylor_load_values(s, fp_t, order0, n_eq, batch_size);
 
         // Compute the order-0 derivatives of the other u variables.
         for (auto i = n_eq; i < n_uvars; ++i) {

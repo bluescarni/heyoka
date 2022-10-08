@@ -861,7 +861,7 @@ llvm::Value *cfunc_nc_param_codegen(llvm_state &s, const param &p, std::uint32_t
     auto *ptr = builder.CreateInBoundsGEP(fp_t, par_ptr, arr_idx);
 
     // Load and return.
-    return load_vector_from_memory(builder, ptr, batch_size);
+    return load_vector_from_memory(builder, fp_t, ptr, batch_size);
 }
 
 // Helper to implement the llvm_eval_*() methods in the func interface
@@ -1017,8 +1017,9 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     const auto na_pair = llvm_c_eval_func_name_args<T>(context, name, batch_size, fb.args());
     const auto &fname = na_pair.first;
@@ -1075,7 +1076,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
                         auto *ptr = builder.CreateInBoundsGEP(to_llvm_type<T>(context), par_ptr,
                                                               builder.CreateMul(stride, to_size_t(s, cur_f_arg)));
 
-                        return load_vector_from_memory(builder, ptr, batch_size);
+                        return load_vector_from_memory(builder, fp_t, ptr, batch_size);
                     } else {
                         // LCOV_EXCL_START
                         assert(false);

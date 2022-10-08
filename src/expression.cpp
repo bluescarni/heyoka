@@ -2303,7 +2303,7 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
     for (std::uint32_t i = 0; i < nvars; ++i) {
         auto *ptr
             = builder.CreateInBoundsGEP(fp_t, in_ptr, builder.CreateMul(stride, to_size_t(s, builder.getInt32(i))));
-        eval_arr.push_back(load_vector_from_memory(builder, ptr, batch_size));
+        eval_arr.push_back(load_vector_from_memory(builder, fp_t, ptr, batch_size));
     }
 
     // Evaluate the elementary subexpressions in the decomposition.
@@ -2842,7 +2842,7 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
 
         // Load the parameter value from the array.
         auto *ptr = builder.CreateInBoundsGEP(fp_scal_t, par_ptr, builder.CreateMul(stride, to_size_t(s, par_idx)));
-        auto *ret = load_vector_from_memory(builder, ptr, batch_size);
+        auto *ret = load_vector_from_memory(builder, fp_scal_t, ptr, batch_size);
 
         // Compute the pointer into out_ptr.
         ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
@@ -2902,7 +2902,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
         auto *ptr = builder.CreateInBoundsGEP(fp_type, in_ptr, builder.CreateMul(stride, to_size_t(s, cur_var_idx)));
 
         // Load as a vector.
-        auto *vec = load_vector_from_memory(builder, ptr, batch_size);
+        auto *vec = load_vector_from_memory(builder, fp_type, ptr, batch_size);
 
         // Store into eval_arr.
         cfunc_c_store_eval(s, eval_arr, cur_var_idx, vec);

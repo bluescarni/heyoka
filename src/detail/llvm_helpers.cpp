@@ -261,6 +261,36 @@ llvm::GlobalVariable *make_global_zero_array(llvm::Module &m, llvm::ArrayType *t
 
 // Helper to load into a vector of size vector_size the sequential scalar data starting at ptr.
 // If vector_size is 1, a scalar is loaded instead.
+llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Type *tp, llvm::Value *ptr, std::uint32_t vector_size)
+{
+    // LCOV_EXCL_START
+    assert(vector_size > 0u);
+    assert(llvm::isa<llvm::PointerType>(ptr->getType()));
+    assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
+    // LCOV_EXCL_STOP
+
+    if (vector_size == 1u) {
+        // Scalar case.
+        return builder.CreateLoad(tp, ptr);
+    }
+
+    // Create the vector type.
+    auto vector_t = make_vector_type(tp, vector_size);
+    assert(vector_t != nullptr); // LCOV_EXCL_LINE
+
+    // Create the mask (all 1s).
+    auto mask = llvm::ConstantInt::get(make_vector_type(builder.getInt1Ty(), vector_size), 1u);
+
+    // Create the passthrough value. This can stay undefined as it is never used
+    // due to the mask being all 1s.
+    auto passthru = llvm::UndefValue::get(vector_t);
+
+    // Invoke the intrinsic.
+    auto ret = llvm_invoke_intrinsic(builder, "llvm.masked.expandload", {vector_t}, {ptr, mask, passthru});
+
+    return ret;
+}
+
 llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std::uint32_t vector_size)
 {
     // LCOV_EXCL_START
