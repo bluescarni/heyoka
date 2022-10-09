@@ -668,15 +668,6 @@ void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const st
     cur->addIncoming(next, loop_end_bb);
 }
 
-// Given an input pointer value, return the
-// pointed-to type.
-llvm::Type *pointee_type(llvm::Value *ptr)
-{
-    assert(llvm::isa<llvm::PointerType>(ptr->getType())); // LCOV_EXCL_LINE
-
-    return ptr->getType()->getPointerElementType();
-}
-
 // Small helper to fetch a string representation
 // of an LLVM type.
 std::string llvm_type_name(llvm::Type *t)

@@ -94,8 +94,6 @@ HEYOKA_DLL_PUBLIC void llvm_while_loop(llvm_state &, const std::function<llvm::V
 HEYOKA_DLL_PUBLIC void llvm_if_then_else(llvm_state &, llvm::Value *, const std::function<void()> &,
                                          const std::function<void()> &);
 
-HEYOKA_DLL_PUBLIC llvm::Type *pointee_type(llvm::Value *);
-
 HEYOKA_DLL_PUBLIC std::string llvm_type_name(llvm::Type *);
 
 HEYOKA_DLL_PUBLIC bool compare_function_signature(llvm::Function *, llvm::Type *, const std::vector<llvm::Type *> &);

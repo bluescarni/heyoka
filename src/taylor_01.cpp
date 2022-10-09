@@ -258,16 +258,15 @@ llvm::Value *taylor_c_load_diff(llvm_state &s, llvm::Type *val_t, llvm::Value *d
 
 // Store the value val as the derivative of order 'order' of the u variable u_idx
 // into the array of Taylor derivatives diff_arr. n_uvars is the total number of u variables.
-void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
-                         llvm::Value *u_idx, llvm::Value *val)
+void taylor_c_store_diff(llvm_state &s, llvm::Type *val_t, llvm::Value *diff_arr, std::uint32_t n_uvars,
+                         llvm::Value *order, llvm::Value *u_idx, llvm::Value *val)
 {
     auto &builder = s.builder();
 
     // NOTE: overflow check has already been done to ensure that the
     // total size of diff_arr fits in a 32-bit unsigned integer.
-    auto *ptr
-        = builder.CreateInBoundsGEP(pointee_type(diff_arr), diff_arr,
-                                    builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx));
+    auto *ptr = builder.CreateInBoundsGEP(
+        val_t, diff_arr, builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx));
 
     builder.CreateStore(val, ptr);
 }

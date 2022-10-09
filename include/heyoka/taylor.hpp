@@ -88,8 +88,8 @@ HEYOKA_DLL_PUBLIC llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_load_diff(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t,
                                                   llvm::Value *, llvm::Value *);
-HEYOKA_DLL_PUBLIC void taylor_c_store_diff(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *,
-                                           llvm::Value *);
+HEYOKA_DLL_PUBLIC void taylor_c_store_diff(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t, llvm::Value *,
+                                           llvm::Value *, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC std::pair<std::string, std::vector<llvm::Type *>>
 taylor_c_diff_func_name_args_impl(llvm::LLVMContext &, const std::string &, llvm::Type *, std::uint32_t,

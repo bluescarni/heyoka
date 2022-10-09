@@ -657,7 +657,7 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
             ret, vector_splat(builder, builder.CreateUIToFP(order, fp_vec_t->getScalarType()), batch_size));
 
         // Store the derivative.
-        taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx, ret);
+        taylor_c_store_diff(s, fp_vec_t, diff_arr, n_uvars, order, sv_idx, ret);
     });
 
     // Handle the number definitions.
@@ -682,7 +682,7 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
                                          llvm::ConstantFP::get(fp_vec_t, 0.));
 
         // Store the derivative.
-        taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx, ret);
+        taylor_c_store_diff(s, fp_vec_t, diff_arr, n_uvars, order, sv_idx, ret);
     });
 
     // Handle the param definitions.
@@ -707,12 +707,12 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
             [&]() {
                 // Derivative of order 1. Fetch the value from par_ptr.
                 // NOTE: param{0} is unused, its only purpose is type tagging.
-                taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx,
+                taylor_c_store_diff(s, fp_vec_t, diff_arr, n_uvars, order, sv_idx,
                                     taylor_c_diff_numparam_codegen(s, fp_t, param{0}, par_idx, par_ptr, batch_size));
             },
             [&]() {
                 // Derivative of order > 1, return 0.
-                taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx, llvm::ConstantFP::get(fp_vec_t, 0.));
+                taylor_c_store_diff(s, fp_vec_t, diff_arr, n_uvars, order, sv_idx, llvm::ConstantFP::get(fp_vec_t, 0.));
             });
     });
 }
@@ -950,7 +950,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
         auto *vec = load_vector_from_memory(builder, fp_type, ptr, batch_size);
 
         // Store into diff_arr.
-        taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx, vec);
+        taylor_c_store_diff(s, fp_vec_type, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx, vec);
     });
 
     // NOTE: these are used only in parallel mode.
@@ -1048,7 +1048,8 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                     }
 
                     // Calculate the derivative and store the result.
-                    taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
+                    taylor_c_store_diff(s, fp_vec_type, diff_arr, n_uvars, cur_order, u_idx,
+                                        builder.CreateCall(func, args));
                 });
 
                 // Return.
@@ -1118,7 +1119,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
             }
 
             // Calculate the derivative and store the result.
-            taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
+            taylor_c_store_diff(s, fp_vec_type, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
         });
     };
 
