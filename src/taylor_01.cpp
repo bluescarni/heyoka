@@ -243,18 +243,17 @@ llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *> &arr, std::uint3
 
 // Load the derivative of order 'order' of the u variable u_idx from the array of Taylor derivatives diff_arr.
 // n_uvars is the total number of u variables.
-llvm::Value *taylor_c_load_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
-                                llvm::Value *u_idx)
+llvm::Value *taylor_c_load_diff(llvm_state &s, llvm::Type *val_t, llvm::Value *diff_arr, std::uint32_t n_uvars,
+                                llvm::Value *order, llvm::Value *u_idx)
 {
     auto &builder = s.builder();
 
     // NOTE: overflow check has already been done to ensure that the
     // total size of diff_arr fits in a 32-bit unsigned integer.
-    auto *ptr
-        = builder.CreateInBoundsGEP(pointee_type(diff_arr), diff_arr,
-                                    builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx));
+    auto *ptr = builder.CreateInBoundsGEP(
+        val_t, diff_arr, builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx));
 
-    return builder.CreateLoad(pointee_type(diff_arr), ptr);
+    return builder.CreateLoad(val_t, ptr);
 }
 
 // Store the value val as the derivative of order 'order' of the u variable u_idx

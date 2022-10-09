@@ -580,8 +580,9 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &var,
             [&]() {
                 // For order 0, invoke the function on the order 0 of e_idx.
                 builder.CreateStore(
-                    builder.CreateCall(fkep, {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), e_idx),
-                                              taylor_c_diff_numparam_codegen(s, fp_t, n, num_M, par_ptr, batch_size)}),
+                    builder.CreateCall(fkep,
+                                       {taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), e_idx),
+                                        taylor_c_diff_numparam_codegen(s, fp_t, n, num_M, par_ptr, batch_size)}),
                     retval);
             },
             [&]() {
@@ -590,14 +591,14 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &var,
 
                 // Compute the divisor: ord * (1 - c^[0]).
                 auto one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
-                auto divisor
-                    = builder.CreateFSub(one_fp, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
+                auto divisor = builder.CreateFSub(
+                    one_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
                 divisor = builder.CreateFMul(ord_v, divisor);
 
                 // Init the dividend: ord * e^[ord] * d^[0] (M is constant here).
-                auto dividend = builder.CreateFMul(ord_v, taylor_c_load_diff(s, diff_ptr, n_uvars, ord, e_idx));
-                dividend = builder.CreateFMul(dividend,
-                                              taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), d_idx));
+                auto dividend = builder.CreateFMul(ord_v, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, e_idx));
+                dividend = builder.CreateFMul(
+                    dividend, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), d_idx));
 
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
@@ -606,12 +607,12 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &var,
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    auto c_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
-                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
+                    auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
+                    auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
                     auto tmp = builder.CreateFMul(c_nj, aj);
 
-                    auto d_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
-                    auto ej = taylor_c_load_diff(s, diff_ptr, n_uvars, j, e_idx);
+                    auto d_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
+                    auto ej = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, e_idx);
                     tmp = builder.CreateFAdd(builder.CreateFMul(d_nj, ej), tmp);
 
                     tmp = builder.CreateFMul(j_v, tmp);
@@ -705,8 +706,9 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n, const va
             [&]() {
                 // For order 0, invoke the function on the order 0 of M_idx.
                 builder.CreateStore(
-                    builder.CreateCall(fkep, {taylor_c_diff_numparam_codegen(s, fp_t, n, num_e, par_ptr, batch_size),
-                                              taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), M_idx)}),
+                    builder.CreateCall(fkep,
+                                       {taylor_c_diff_numparam_codegen(s, fp_t, n, num_e, par_ptr, batch_size),
+                                        taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), M_idx)}),
                     retval);
             },
             [&]() {
@@ -715,12 +717,12 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n, const va
 
                 // Compute the divisor: ord * (1 - c^[0]).
                 auto one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
-                auto divisor
-                    = builder.CreateFSub(one_fp, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
+                auto divisor = builder.CreateFSub(
+                    one_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
                 divisor = builder.CreateFMul(ord_v, divisor);
 
                 // Init the dividend: ord * M^[n] (e is constant here).
-                auto dividend = builder.CreateFMul(ord_v, taylor_c_load_diff(s, diff_ptr, n_uvars, ord, M_idx));
+                auto dividend = builder.CreateFMul(ord_v, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, M_idx));
 
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
@@ -729,8 +731,8 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n, const va
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    auto c_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
-                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
+                    auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
+                    auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
                     auto tmp = builder.CreateFMul(c_nj, aj);
                     tmp = builder.CreateFMul(j_v, tmp);
 
@@ -823,8 +825,9 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &var0
             [&]() {
                 // For order 0, invoke the function on the order 0 of M_idx/e_idx.
                 builder.CreateStore(
-                    builder.CreateCall(fkep, {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), e_idx),
-                                              taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), M_idx)}),
+                    builder.CreateCall(fkep,
+                                       {taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), e_idx),
+                                        taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), M_idx)}),
                     retval);
             },
             [&]() {
@@ -833,15 +836,15 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &var0
 
                 // Compute the divisor: ord * (1 - c^[0]).
                 auto one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
-                auto divisor
-                    = builder.CreateFSub(one_fp, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
+                auto divisor = builder.CreateFSub(
+                    one_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
                 divisor = builder.CreateFMul(ord_v, divisor);
 
                 // Init the dividend: ord * (e^[ord] * d^[0] + M^[ord]).
                 auto dividend
-                    = builder.CreateFMul(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, e_idx),
-                                         taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), d_idx));
-                dividend = builder.CreateFAdd(dividend, taylor_c_load_diff(s, diff_ptr, n_uvars, ord, M_idx));
+                    = builder.CreateFMul(taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, e_idx),
+                                         taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), d_idx));
+                dividend = builder.CreateFAdd(dividend, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, M_idx));
                 dividend = builder.CreateFMul(ord_v, dividend);
 
                 // Init the accumulator.
@@ -851,12 +854,12 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &var0
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    auto c_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
-                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
+                    auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
+                    auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
                     auto tmp = builder.CreateFMul(c_nj, aj);
 
-                    auto d_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
-                    auto ej = taylor_c_load_diff(s, diff_ptr, n_uvars, j, e_idx);
+                    auto d_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
+                    auto ej = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, e_idx);
                     tmp = builder.CreateFAdd(builder.CreateFMul(d_nj, ej), tmp);
 
                     tmp = builder.CreateFMul(j_v, tmp);

@@ -458,10 +458,10 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of var_idx.
-                builder.CreateStore(llvm_pow(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx),
-                                             taylor_c_diff_numparam_codegen(s, fp_t, n, exponent, par_ptr, batch_size),
-                                             allow_approx),
-                                    retval);
+                builder.CreateStore(
+                    llvm_pow(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx),
+                             taylor_c_diff_numparam_codegen(s, fp_t, n, exponent, par_ptr, batch_size), allow_approx),
+                    retval);
             },
             [&]() {
                 // Create FP vector versions of exponent and order.
@@ -473,8 +473,8 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(0), ord, [&](llvm::Value *j) {
-                    auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
-                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
+                    auto b_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
+                    auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
 
                     // Compute the factor n*alpha-j*(alpha+1).
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
@@ -492,7 +492,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
                 // Finalize the result: acc / (n*b0).
                 builder.CreateStore(
                     builder.CreateFDiv(builder.CreateLoad(val_t, acc),
-                                       builder.CreateFMul(ord_v, taylor_c_load_diff(s, diff_ptr, n_uvars,
+                                       builder.CreateFMul(ord_v, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars,
                                                                                     builder.getInt32(0), var_idx))),
                     retval);
             });

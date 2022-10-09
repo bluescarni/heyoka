@@ -304,7 +304,7 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, const neg_impl &, con
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateFNeg(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx));
+        auto retval = builder.CreateFNeg(taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, var_idx));
 
         // Return the result.
         builder.CreateRet(retval);
