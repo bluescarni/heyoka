@@ -49,6 +49,12 @@ jobs:
       - uses: actions/checkout@v2
       - name: Build
         run: bash tools/gha_conda_coverage.sh
+  conda_llvm14_asan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build
+        run: bash tools/gha_llvm14_conda_asan.sh
   conda_llvm13_asan:
     runs-on: ubuntu-latest
     steps:
