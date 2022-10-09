@@ -1373,7 +1373,6 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
         // The iteration range is [1, n].
         llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *cur_n) {
             // Load the current poly coefficient(s).
-            assert(llvm_depr_GEP_type_check(cf_ptr, scal_t)); // LCOV_EXCL_LINE
             auto *cur_cf = load_vector_from_memory(
                 builder, scal_t,
                 builder.CreateInBoundsGEP(scal_t, cf_ptr, builder.CreateMul(cur_n, builder.getInt32(batch_size))),
@@ -1383,7 +1382,6 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
             auto *last_nz_ptr_idx = builder.CreateAdd(
                 offset, builder.CreateMul(builder.CreateLoad(last_nz_idx_t, last_nz_idx),
                                           vector_splat(builder, builder.getInt32(batch_size), batch_size)));
-            assert(llvm_depr_GEP_type_check(cf_ptr_v, scal_t)); // LCOV_EXCL_LINE
             auto *last_nz_ptr = builder.CreateInBoundsGEP(scal_t, cf_ptr_v, last_nz_ptr_idx);
             auto *last_nz_cf = gather_vector_from_memory(builder, cur_cf->getType(), last_nz_ptr);
 
@@ -1513,7 +1511,6 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
     auto *acc_hi = builder.CreateAlloca(fp_vec_t);
 
     // Init the accumulator's lo/hi components with the highest-order coefficient.
-    assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
     auto *ho_cf = load_vector_from_memory(
         builder, fp_t,
         builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.CreateMul(builder.getInt32(n), builder.getInt32(batch_size))),
@@ -1527,7 +1524,6 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
         // Load the current coefficient.
         // NOTE: we are iterating backwards from the high-order coefficients
         // to the low-order ones.
-        assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
         auto *ptr = builder.CreateInBoundsGEP(
             fp_t, cf_ptr, builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size)));
         auto *cur_cf = load_vector_from_memory(builder, fp_t, ptr, batch_size);
@@ -2021,7 +2017,6 @@ llvm::Value *llvm_add_bc_array(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
                                                     llvm::GlobalVariable::InternalLinkage, bc_const_arr);
 
     // Get out a pointer to the beginning of the array.
-    assert(llvm_depr_GEP_type_check(g_bc_const_arr, bc_const_arr->getType())); // LCOV_EXCL_LINE
     return builder.CreateInBoundsGEP(bc_const_arr->getType(), g_bc_const_arr,
                                      {builder.getInt32(0), builder.getInt32(0)});
 }
@@ -2313,18 +2308,6 @@ llvm::Value *llvm_dl_gt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
     auto cond = builder.CreateSelect(cond1, llvm::ConstantInt::getAllOnesValue(cond4->getType()), cond4);
 
     return cond;
-}
-
-// NOTE: this will check that a pointer ptr passed to
-// a GEP instruction points, after the removal of vector,
-// to a value of type tp. This how the deprecated CreateInBoundsGEP()
-// function is implemented.
-// NOTE: ptr can also be a vector of pointers.
-bool llvm_depr_GEP_type_check(llvm::Value *ptr, llvm::Type *tp)
-{
-    assert(llvm::isa<llvm::PointerType>(ptr->getType()->getScalarType())); // LCOV_EXCL_LINE
-
-    return ptr->getType()->getScalarType()->getPointerElementType() == tp;
 }
 
 // Helper to create a wrapper for kepE() usable from C++ code.

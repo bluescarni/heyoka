@@ -387,9 +387,7 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
         auto new_state = std::get<llvm::Value *>(new_state_var);
 
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-            assert(llvm_depr_GEP_type_check(new_state, fp_vec_t)); // LCOV_EXCL_LINE
             auto val = builder.CreateLoad(fp_vec_t, builder.CreateInBoundsGEP(fp_vec_t, new_state, cur_var_idx));
-            assert(llvm_depr_GEP_type_check(state_ptr, fp_t)); // LCOV_EXCL_LINE
             store_vector_to_memory(builder,
                                    builder.CreateInBoundsGEP(
                                        fp_t, state_ptr, builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))),
@@ -401,7 +399,6 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
         assert(new_state.size() == n_eq);
 
         for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
-            assert(llvm_depr_GEP_type_check(state_ptr, fp_t)); // LCOV_EXCL_LINE
             store_vector_to_memory(builder,
                                    builder.CreateInBoundsGEP(fp_t, state_ptr, builder.getInt32(var_idx * batch_size)),
                                    new_state[var_idx]);

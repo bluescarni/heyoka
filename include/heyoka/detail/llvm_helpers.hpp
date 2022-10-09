@@ -172,10 +172,6 @@ HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper(llvm_state &, std::uint32_t, c
 
 llvm::Value *llvm_add_bc_array(llvm_state &, llvm::Type *, std::uint32_t);
 
-// Helpers to double check the modifications needed
-// by LLVM deprecations.
-bool llvm_depr_GEP_type_check(llvm::Value *, llvm::Type *);
-
 // Primitives for double-length arithmetic.
 
 // Error-free product transform.
