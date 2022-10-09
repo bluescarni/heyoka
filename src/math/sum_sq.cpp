@@ -458,8 +458,9 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
 
                         if constexpr (std::is_same_v<type, variable>) {
                             // Variable.
-                            auto v0 = taylor_c_load_diff(s, diff_arr, n_uvars, builder.CreateSub(order, j), terms + k);
-                            auto v1 = taylor_c_load_diff(s, diff_arr, n_uvars, j, terms + k);
+                            auto v0 = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, builder.CreateSub(order, j),
+                                                         terms + k);
+                            auto v1 = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, j, terms + k);
 
                             // Update the k-th accumulator.
                             builder.CreateStore(
@@ -536,8 +537,9 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
 
                             if constexpr (std::is_same_v<type, variable>) {
                                 // Variable.
-                                auto val = taylor_c_load_diff(
-                                    s, diff_arr, n_uvars, builder.CreateUDiv(order, builder.getInt32(2)), terms + k);
+                                auto val
+                                    = taylor_c_load_diff(s, val_t, diff_arr, n_uvars,
+                                                         builder.CreateUDiv(order, builder.getInt32(2)), terms + k);
                                 return builder.CreateFMul(val, val);
                             } else if constexpr (is_num_param_v<type>) {
                                 // Number/param.
@@ -548,7 +550,8 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
                                     [&]() {
                                         // Order 0, store the num/param.
                                         builder.CreateStore(
-                                            taylor_c_diff_numparam_codegen(s, v, terms + k, par_ptr, batch_size), ret);
+                                            taylor_c_diff_numparam_codegen(s, fp_t, v, terms + k, par_ptr, batch_size),
+                                            ret);
                                     },
                                     [&]() {
                                         // Order 2 or higher, store zero.

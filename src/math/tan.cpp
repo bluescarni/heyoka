@@ -391,8 +391,8 @@ llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, const tan_impl &, con
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of var_idx.
-                builder.CreateStore(llvm_tan(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)),
-                                    retval);
+                builder.CreateStore(
+                    llvm_tan(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx)), retval);
             },
             [&]() {
                 // Init the accumulator.
@@ -400,8 +400,8 @@ llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, const tan_impl &, con
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
-                    auto cnj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
+                    auto bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, var_idx);
+                    auto cnj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
 
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
@@ -413,7 +413,7 @@ llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, const tan_impl &, con
                 // Divide by the order and add to b^[n] to produce the return value.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
-                builder.CreateStore(builder.CreateFAdd(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx),
+                builder.CreateStore(builder.CreateFAdd(taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, var_idx),
                                                        builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_v)),
                                     retval);
             });

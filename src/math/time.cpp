@@ -79,7 +79,7 @@ llvm::Value *time_taylor_diff_impl(llvm_state &s, llvm::Value *time_ptr, std::ui
     // the non-normalised derivatives.
     switch (order) {
         case 0u:
-            return load_vector_from_memory(builder, time_ptr, batch_size);
+            return load_vector_from_memory(builder, fp_t, time_ptr, batch_size);
         case 1u:
             return vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
         default:
@@ -146,7 +146,7 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t n_uvars, st
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -172,7 +172,7 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t n_uvars, st
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // If the order is zero, return the time itself.
-                builder.CreateStore(load_vector_from_memory(builder, t_ptr, batch_size), retval);
+                builder.CreateStore(load_vector_from_memory(builder, fp_t, t_ptr, batch_size), retval);
             },
             [&]() {
                 llvm_if_then_else(

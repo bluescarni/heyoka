@@ -240,7 +240,6 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
         auto *idx = builder.CreateMul(i, builder.getInt32(order + 1u));
         idx = builder.CreateAdd(idx, j);
 
-        assert(llvm_depr_GEP_type_check(bc_ptr, fp_t)); // LCOV_EXCL_LINE
         auto *val = builder.CreateLoad(fp_t, builder.CreateInBoundsGEP(fp_t, bc_ptr, idx));
 
         return vector_splat(builder, val, batch_size);
@@ -284,24 +283,21 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
 
     // Init the return values as zeroes.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
-        assert(llvm_depr_GEP_type_check(out_ptr, fp_t)); // LCOV_EXCL_LINE
         auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.CreateMul(i, builder.getInt32(batch_size)));
         store_vector_to_memory(builder, ptr, vector_splat(builder, llvm::ConstantFP::get(fp_t, 0.), batch_size));
     });
 
     // Do the translation.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
-        assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
         auto *ai = load_vector_from_memory(
-            builder, builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.CreateMul(i, builder.getInt32(batch_size))),
+            builder, fp_t, builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.CreateMul(i, builder.getInt32(batch_size))),
             batch_size);
 
         llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(i, builder.getInt32(1)), [&](llvm::Value *k) {
             auto *tmp = builder.CreateFMul(ai, get_bc(i, k));
 
-            assert(llvm_depr_GEP_type_check(out_ptr, fp_t)); // LCOV_EXCL_LINE
             auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.CreateMul(k, builder.getInt32(batch_size)));
-            auto *new_val = builder.CreateFAdd(load_vector_from_memory(builder, ptr, batch_size), tmp);
+            auto *new_val = builder.CreateFAdd(load_vector_from_memory(builder, fp_t, ptr, batch_size), tmp);
             store_vector_to_memory(builder, ptr, new_val);
         });
     });
@@ -471,9 +467,8 @@ llvm::Function *llvm_add_poly_rtscc(llvm_state &s, llvm::Type *fp_t, std::uint32
         auto *load_idx = builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size));
         auto *store_idx = builder.CreateMul(i, builder.getInt32(batch_size));
 
-        assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
-        auto *cur_cf = load_vector_from_memory(builder, builder.CreateInBoundsGEP(fp_t, cf_ptr, load_idx), batch_size);
-        assert(llvm_depr_GEP_type_check(out_ptr1, fp_t)); // LCOV_EXCL_LINE
+        auto *cur_cf
+            = load_vector_from_memory(builder, fp_t, builder.CreateInBoundsGEP(fp_t, cf_ptr, load_idx), batch_size);
         store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_t, out_ptr1, store_idx), cur_cf);
     });
 
@@ -574,7 +569,7 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t
     builder.SetInsertPoint(bb);
 
     // Load the timestep.
-    auto *h = load_vector_from_memory(builder, h_ptr, batch_size);
+    auto *h = load_vector_from_memory(builder, fp_t, h_ptr, batch_size);
 
     // Init the extrema of the enclosure.
     llvm::Value *enc_lo = nullptr, *enc_hi = nullptr;
@@ -584,8 +579,9 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t
         std::tie(enc_lo, enc_hi) = llvm_penc_cargo_shisha(s, fp_t, cf_ptr, n, h, batch_size);
     } else {
         // Load back_flag and convert it to a boolean vector.
-        auto *back_flag = builder.CreateTrunc(load_vector_from_memory(builder, back_flag_ptr, batch_size),
-                                              make_vector_type(builder.getInt1Ty(), batch_size));
+        auto *back_flag
+            = builder.CreateTrunc(load_vector_from_memory(builder, builder.getInt32Ty(), back_flag_ptr, batch_size),
+                                  make_vector_type(builder.getInt1Ty(), batch_size));
 
         // Compute the components of the interval version of h. If we are integrating
         // forward, the components are (0, h), otherwise they are (h, 0).

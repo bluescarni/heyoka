@@ -320,7 +320,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
                     using type = detail::uncvref_t<decltype(v)>;
 
                     if constexpr (std::is_same_v<type, variable>) {
-                        return taylor_c_load_diff(s, diff_arr, n_uvars, order, terms + i);
+                        return taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, terms + i);
                     } else if constexpr (is_num_param_v<type>) {
                         // Create the return value.
                         auto retval = builder.CreateAlloca(val_t);
@@ -330,7 +330,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
                             [&]() {
                                 // If the order is zero, run the codegen.
                                 builder.CreateStore(
-                                    taylor_c_diff_numparam_codegen(s, v, terms + i, par_ptr, batch_size), retval);
+                                    taylor_c_diff_numparam_codegen(s, fp_t, v, terms + i, par_ptr, batch_size), retval);
                             },
                             [&]() {
                                 // Otherwise, return zero.

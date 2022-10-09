@@ -339,8 +339,8 @@ llvm::Function *taylor_c_diff_func_tanh_impl(llvm_state &s, const tanh_impl &, c
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of b_idx.
-                builder.CreateStore(llvm_tanh(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx)),
-                                    retval);
+                builder.CreateStore(
+                    llvm_tanh(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx)), retval);
             },
             [&]() {
                 // Init the accumulator.
@@ -348,8 +348,8 @@ llvm::Function *taylor_c_diff_func_tanh_impl(llvm_state &s, const tanh_impl &, c
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, b_idx);
-                    auto cnj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
+                    auto bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, b_idx);
+                    auto cnj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
 
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
@@ -361,7 +361,7 @@ llvm::Function *taylor_c_diff_func_tanh_impl(llvm_state &s, const tanh_impl &, c
                 // Divide by the order and subtract from b^[n] to produce the return value.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
-                builder.CreateStore(builder.CreateFSub(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, b_idx),
+                builder.CreateStore(builder.CreateFSub(taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx),
                                                        builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_v)),
                                     retval);
             });

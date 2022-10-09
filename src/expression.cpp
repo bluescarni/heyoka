@@ -2303,7 +2303,7 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
     for (std::uint32_t i = 0; i < nvars; ++i) {
         auto *ptr
             = builder.CreateInBoundsGEP(fp_t, in_ptr, builder.CreateMul(stride, to_size_t(s, builder.getInt32(i))));
-        eval_arr.push_back(load_vector_from_memory(builder, ptr, batch_size));
+        eval_arr.push_back(load_vector_from_memory(builder, fp_t, ptr, batch_size));
     }
 
     // Evaluate the elementary subexpressions in the decomposition.
@@ -2618,26 +2618,24 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
     return retval;
 }
 
-void cfunc_c_store_eval(llvm_state &s, llvm::Value *eval_arr, llvm::Value *idx, llvm::Value *val)
+void cfunc_c_store_eval(llvm_state &s, llvm::Type *fp_vec_t, llvm::Value *eval_arr, llvm::Value *idx, llvm::Value *val)
 {
     auto &builder = s.builder();
 
-    assert(llvm_depr_GEP_type_check(eval_arr, pointee_type(eval_arr))); // LCOV_EXCL_LINE
-    auto *ptr = builder.CreateInBoundsGEP(pointee_type(eval_arr), eval_arr, idx);
+    auto *ptr = builder.CreateInBoundsGEP(fp_vec_t, eval_arr, idx);
 
     builder.CreateStore(val, ptr);
 }
 
 } // namespace
 
-llvm::Value *cfunc_c_load_eval(llvm_state &s, llvm::Value *eval_arr, llvm::Value *idx)
+llvm::Value *cfunc_c_load_eval(llvm_state &s, llvm::Type *fp_vec_t, llvm::Value *eval_arr, llvm::Value *idx)
 {
     auto &builder = s.builder();
 
-    assert(llvm_depr_GEP_type_check(eval_arr, pointee_type(eval_arr))); // LCOV_EXCL_LINE
-    auto *ptr = builder.CreateInBoundsGEP(pointee_type(eval_arr), eval_arr, idx);
+    auto *ptr = builder.CreateInBoundsGEP(fp_vec_t, eval_arr, idx);
 
-    return builder.CreateLoad(pointee_type(eval_arr), ptr);
+    return builder.CreateLoad(fp_vec_t, ptr);
 }
 
 namespace
@@ -2757,7 +2755,7 @@ std::uint32_t cfunc_c_gl_arr_size(llvm::Value *v)
 // Helper to write the outputs of a compiled function in compact mode.
 // cout_gl is the return value of cfunc_c_make_output_globals(), which contains
 // the indices/constants necessary for the computation.
-void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
+void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *out_ptr,
                            const std::pair<std::array<llvm::GlobalVariable *, 6>, bool> &cout_gl, llvm::Value *eval_arr,
                            llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size)
 {
@@ -2776,10 +2774,8 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
     const auto n_nums = cfunc_c_gl_arr_size(out_gl[2]);
     const auto n_pars = cfunc_c_gl_arr_size(out_gl[4]);
 
-    // Fetch the type stored in the evaluation array.
-    auto *fp_vec_t = pointee_type(eval_arr);
-    // Fetch the scalar type corresponding to fp_vec_t.
-    auto *fp_scal_t = fp_vec_t->getScalarType();
+    // Fetch the vector type.
+    auto *fp_vec_t = make_vector_type(fp_scal_t, batch_size);
 
     // Handle the u variable outputs.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_vars), [&](llvm::Value *cur_idx) {
@@ -2787,18 +2783,19 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
         // NOTE: if all outputs are u variables, there's
         // no need to lookup the index in the global array (which will just contain
         // a range).
-        auto *out_idx = all_out_vars ? cur_idx
-                                     : builder.CreateLoad(builder.getInt32Ty(),
-                                                          builder.CreateInBoundsGEP(pointee_type(out_gl[0]), out_gl[0],
-                                                                                    {builder.getInt32(0), cur_idx}));
+        auto *out_idx = all_out_vars
+                            ? cur_idx
+                            : builder.CreateLoad(builder.getInt32Ty(),
+                                                 builder.CreateInBoundsGEP(out_gl[0]->getValueType(), out_gl[0],
+                                                                           {builder.getInt32(0), cur_idx}));
 
         // Fetch the index of the u variable.
         auto *u_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[1]), out_gl[1],
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[1]->getValueType(), out_gl[1],
                                                                                  {builder.getInt32(0), cur_idx}));
 
         // Fetch from eval_arr the value of the u variable u_idx.
-        auto *ret = cfunc_c_load_eval(s, eval_arr, u_idx);
+        auto *ret = cfunc_c_load_eval(s, fp_vec_t, eval_arr, u_idx);
 
         // Compute the pointer into out_ptr.
         auto *ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
@@ -2811,12 +2808,12 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_nums), [&](llvm::Value *cur_idx) {
         // Fetch the index of the output.
         auto *out_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[2]), out_gl[2],
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[2]->getValueType(), out_gl[2],
                                                                                  {builder.getInt32(0), cur_idx}));
 
         // Fetch the constant.
         auto *num = builder.CreateLoad(
-            fp_scal_t, builder.CreateInBoundsGEP(pointee_type(out_gl[3]), out_gl[3], {builder.getInt32(0), cur_idx}));
+            fp_scal_t, builder.CreateInBoundsGEP(out_gl[3]->getValueType(), out_gl[3], {builder.getInt32(0), cur_idx}));
 
         // Splat it out.
         auto *ret = vector_splat(builder, num, batch_size);
@@ -2832,17 +2829,17 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_pars), [&](llvm::Value *cur_idx) {
         // Fetch the index of the output.
         auto *out_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[4]), out_gl[4],
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[4]->getValueType(), out_gl[4],
                                                                                  {builder.getInt32(0), cur_idx}));
 
         // Fetch the index of the param.
         auto *par_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[5]), out_gl[5],
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[5]->getValueType(), out_gl[5],
                                                                                  {builder.getInt32(0), cur_idx}));
 
         // Load the parameter value from the array.
         auto *ptr = builder.CreateInBoundsGEP(fp_scal_t, par_ptr, builder.CreateMul(stride, to_size_t(s, par_idx)));
-        auto *ret = load_vector_from_memory(builder, ptr, batch_size);
+        auto *ret = load_vector_from_memory(builder, fp_scal_t, ptr, batch_size);
 
         // Compute the pointer into out_ptr.
         ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
@@ -2891,21 +2888,19 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
     // This has of course consequences in terms of thread safety, which
     // we will have to document.
     auto eval_arr_gvar = make_global_zero_array(md, array_type);
-    assert(llvm_depr_GEP_type_check(eval_arr_gvar, array_type)); // LCOV_EXCL_LINE
     auto *eval_arr = builder.CreateInBoundsGEP(array_type, eval_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
 
     // Copy over the values of the variables.
     // NOTE: overflow checking is already done in the parent function.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(nvars), [&](llvm::Value *cur_var_idx) {
         // Fetch the pointer from in_ptr.
-        assert(llvm_depr_GEP_type_check(in_ptr, fp_type)); // LCOV_EXCL_LINE
         auto *ptr = builder.CreateInBoundsGEP(fp_type, in_ptr, builder.CreateMul(stride, to_size_t(s, cur_var_idx)));
 
         // Load as a vector.
-        auto *vec = load_vector_from_memory(builder, ptr, batch_size);
+        auto *vec = load_vector_from_memory(builder, fp_type, ptr, batch_size);
 
         // Store into eval_arr.
-        cfunc_c_store_eval(s, eval_arr, cur_var_idx, vec);
+        cfunc_c_store_eval(s, fp_vec_type, eval_arr, cur_var_idx, vec);
     });
 
     // Helper to evaluate a block.
@@ -2937,7 +2932,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
             }
 
             // Evaluate and store the result.
-            cfunc_c_store_eval(s, eval_arr, u_idx, builder.CreateCall(func, args));
+            cfunc_c_store_eval(s, fp_vec_type, eval_arr, u_idx, builder.CreateCall(func, args));
         });
     };
 
@@ -2950,7 +2945,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
     }
 
     // Write the results to the output pointer.
-    cfunc_c_write_outputs(s, out_ptr, cout_gl, eval_arr, par_ptr, stride, batch_size);
+    cfunc_c_write_outputs(s, fp_type, out_ptr, cout_gl, eval_arr, par_ptr, stride, batch_size);
 
     get_logger()->trace("cfunc IR creation compact mode runtime: {}", sw);
 }

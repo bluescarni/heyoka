@@ -365,8 +365,8 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const exp_impl &, con
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of b_idx.
-                builder.CreateStore(llvm_exp(s, {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx)}),
-                                    retval);
+                builder.CreateStore(
+                    llvm_exp(s, {taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx)}), retval);
             },
             [&]() {
                 // Create a vector version of ord.
@@ -377,8 +377,8 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const exp_impl &, con
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-                    auto anj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), a_idx);
-                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, b_idx);
+                    auto anj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), a_idx);
+                    auto bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, b_idx);
 
                     // Compute the factor j.
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
