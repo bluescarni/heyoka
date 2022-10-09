@@ -147,7 +147,7 @@ TEST_CASE("sgn batch")
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
                 // Load the vector from memory.
-                auto v = detail::load_vector_from_memory(builder, x, batch_size);
+                auto v = detail::load_vector_from_memory(builder, val_t, x, batch_size);
 
                 // Create and store the return value.
                 detail::store_vector_to_memory(builder, out, llvm_sgn(s, v));
@@ -277,13 +277,13 @@ TEST_CASE("sincos batch")
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
                 auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sc", &md);
 
-                auto xptr = f->args().begin();
-                auto sptr = f->args().begin() + 1;
-                auto cptr = f->args().begin() + 2;
+                auto *xptr = f->args().begin();
+                auto *sptr = f->args().begin() + 1;
+                auto *cptr = f->args().begin() + 2;
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                auto x = detail::load_vector_from_memory(builder, xptr, batch_size);
+                auto *x = detail::load_vector_from_memory(builder, val_t, xptr, batch_size);
 
                 auto ret = llvm_sincos(s, x);
                 detail::store_vector_to_memory(builder, sptr, ret.first);
@@ -404,14 +404,14 @@ TEST_CASE("modulus batch")
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
                 auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_rem", &md);
 
-                auto ret_ptr = f->args().begin();
-                auto x_ptr = f->args().begin() + 1;
-                auto y_ptr = f->args().begin() + 2;
+                auto *ret_ptr = f->args().begin();
+                auto *x_ptr = f->args().begin() + 1;
+                auto *y_ptr = f->args().begin() + 2;
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                auto ret = llvm_modulus(s, detail::load_vector_from_memory(builder, x_ptr, batch_size),
-                                        detail::load_vector_from_memory(builder, y_ptr, batch_size));
+                auto *ret = llvm_modulus(s, detail::load_vector_from_memory(builder, val_t, x_ptr, batch_size),
+                                         detail::load_vector_from_memory(builder, val_t, y_ptr, batch_size));
 
                 detail::store_vector_to_memory(builder, ret_ptr, ret);
 
@@ -1163,8 +1163,8 @@ TEST_CASE("minmax")
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                auto a = detail::load_vector_from_memory(builder, a_ptr, batch_size);
-                auto b = detail::load_vector_from_memory(builder, b_ptr, batch_size);
+                auto a = detail::load_vector_from_memory(builder, val_t, a_ptr, batch_size);
+                auto b = detail::load_vector_from_memory(builder, val_t, b_ptr, batch_size);
 
                 auto ret = detail::llvm_min(s, a, b);
 
@@ -1185,8 +1185,8 @@ TEST_CASE("minmax")
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                a = detail::load_vector_from_memory(builder, a_ptr, batch_size);
-                b = detail::load_vector_from_memory(builder, b_ptr, batch_size);
+                a = detail::load_vector_from_memory(builder, val_t, a_ptr, batch_size);
+                b = detail::load_vector_from_memory(builder, val_t, b_ptr, batch_size);
 
                 ret = detail::llvm_max(s, a, b);
 
@@ -1207,8 +1207,8 @@ TEST_CASE("minmax")
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                a = detail::load_vector_from_memory(builder, a_ptr, batch_size);
-                b = detail::load_vector_from_memory(builder, b_ptr, batch_size);
+                a = detail::load_vector_from_memory(builder, val_t, a_ptr, batch_size);
+                b = detail::load_vector_from_memory(builder, val_t, b_ptr, batch_size);
 
                 ret = detail::llvm_min_nan(s, a, b);
 
@@ -1229,8 +1229,8 @@ TEST_CASE("minmax")
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                a = detail::load_vector_from_memory(builder, a_ptr, batch_size);
-                b = detail::load_vector_from_memory(builder, b_ptr, batch_size);
+                a = detail::load_vector_from_memory(builder, val_t, a_ptr, batch_size);
+                b = detail::load_vector_from_memory(builder, val_t, b_ptr, batch_size);
 
                 ret = detail::llvm_max_nan(s, a, b);
 
@@ -1439,9 +1439,9 @@ TEST_CASE("fma batch")
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                auto ret = llvm_fma(s, detail::load_vector_from_memory(builder, x_ptr, batch_size),
-                                    detail::load_vector_from_memory(builder, y_ptr, batch_size),
-                                    detail::load_vector_from_memory(builder, z_ptr, batch_size));
+                auto ret = llvm_fma(s, detail::load_vector_from_memory(builder, val_t, x_ptr, batch_size),
+                                    detail::load_vector_from_memory(builder, val_t, y_ptr, batch_size),
+                                    detail::load_vector_from_memory(builder, val_t, z_ptr, batch_size));
 
                 detail::store_vector_to_memory(builder, ret_ptr, ret);
 
@@ -1599,8 +1599,8 @@ TEST_CASE("eft_product batch")
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                auto [x, y] = llvm_eft_product(s, detail::load_vector_from_memory(builder, a_ptr, batch_size),
-                                               detail::load_vector_from_memory(builder, b_ptr, batch_size));
+                auto [x, y] = llvm_eft_product(s, detail::load_vector_from_memory(builder, val_t, a_ptr, batch_size),
+                                               detail::load_vector_from_memory(builder, val_t, b_ptr, batch_size));
 
                 detail::store_vector_to_memory(builder, x_ptr, x);
                 detail::store_vector_to_memory(builder, y_ptr, y);
@@ -1803,10 +1803,10 @@ TEST_CASE("dl mul batch")
 
                     builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                    auto [x, y] = llvm_dl_mul(s, detail::load_vector_from_memory(builder, a_hi_ptr, batch_size),
-                                              detail::load_vector_from_memory(builder, a_lo_ptr, batch_size),
-                                              detail::load_vector_from_memory(builder, b_hi_ptr, batch_size),
-                                              detail::load_vector_from_memory(builder, b_lo_ptr, batch_size));
+                    auto [x, y] = llvm_dl_mul(s, detail::load_vector_from_memory(builder, val_t, a_hi_ptr, batch_size),
+                                              detail::load_vector_from_memory(builder, val_t, a_lo_ptr, batch_size),
+                                              detail::load_vector_from_memory(builder, val_t, b_hi_ptr, batch_size),
+                                              detail::load_vector_from_memory(builder, val_t, b_lo_ptr, batch_size));
 
                     detail::store_vector_to_memory(builder, x_ptr, x);
                     detail::store_vector_to_memory(builder, y_ptr, y);
@@ -2026,10 +2026,10 @@ TEST_CASE("dl div batch")
 
                     builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                    auto [x, y] = llvm_dl_div(s, detail::load_vector_from_memory(builder, a_hi_ptr, batch_size),
-                                              detail::load_vector_from_memory(builder, a_lo_ptr, batch_size),
-                                              detail::load_vector_from_memory(builder, b_hi_ptr, batch_size),
-                                              detail::load_vector_from_memory(builder, b_lo_ptr, batch_size));
+                    auto [x, y] = llvm_dl_div(s, detail::load_vector_from_memory(builder, val_t, a_hi_ptr, batch_size),
+                                              detail::load_vector_from_memory(builder, val_t, a_lo_ptr, batch_size),
+                                              detail::load_vector_from_memory(builder, val_t, b_hi_ptr, batch_size),
+                                              detail::load_vector_from_memory(builder, val_t, b_lo_ptr, batch_size));
 
                     detail::store_vector_to_memory(builder, x_ptr, x);
                     detail::store_vector_to_memory(builder, y_ptr, y);
@@ -2187,7 +2187,7 @@ TEST_CASE("floor batch")
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                auto ret = llvm_floor(s, detail::load_vector_from_memory(builder, x_ptr, batch_size));
+                auto ret = llvm_floor(s, detail::load_vector_from_memory(builder, val_t, x_ptr, batch_size));
 
                 detail::store_vector_to_memory(builder, ret_ptr, ret);
 
@@ -2228,6 +2228,7 @@ TEST_CASE("dl floor scalar")
     using detail::llvm_dl_floor;
     using detail::to_llvm_type;
     using std::abs;
+    using std::floor;
     using std::trunc;
 
     auto tester = [](auto fp_x) {
@@ -2315,6 +2316,7 @@ TEST_CASE("dl floor batch")
     using detail::llvm_dl_floor;
     using detail::to_llvm_type;
     using std::abs;
+    using std::floor;
     using std::trunc;
 
     auto tester = [](auto fp_x) {
@@ -2342,8 +2344,9 @@ TEST_CASE("dl floor batch")
 
                     builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                    auto [x, y] = llvm_dl_floor(s, detail::load_vector_from_memory(builder, a_hi_ptr, batch_size),
-                                                detail::load_vector_from_memory(builder, a_lo_ptr, batch_size));
+                    auto [x, y]
+                        = llvm_dl_floor(s, detail::load_vector_from_memory(builder, val_t, a_hi_ptr, batch_size),
+                                        detail::load_vector_from_memory(builder, val_t, a_lo_ptr, batch_size));
 
                     detail::store_vector_to_memory(builder, x_ptr, x);
                     detail::store_vector_to_memory(builder, y_ptr, y);
@@ -2526,10 +2529,11 @@ TEST_CASE("dl modulus batch")
 
                     builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                    auto [x, y] = llvm_dl_modulus(s, detail::load_vector_from_memory(builder, a_hi_ptr, batch_size),
-                                                  detail::load_vector_from_memory(builder, a_lo_ptr, batch_size),
-                                                  detail::load_vector_from_memory(builder, b_hi_ptr, batch_size),
-                                                  detail::load_vector_from_memory(builder, b_lo_ptr, batch_size));
+                    auto [x, y]
+                        = llvm_dl_modulus(s, detail::load_vector_from_memory(builder, val_t, a_hi_ptr, batch_size),
+                                          detail::load_vector_from_memory(builder, val_t, a_lo_ptr, batch_size),
+                                          detail::load_vector_from_memory(builder, val_t, b_hi_ptr, batch_size),
+                                          detail::load_vector_from_memory(builder, val_t, b_lo_ptr, batch_size));
 
                     detail::store_vector_to_memory(builder, x_ptr, x);
                     detail::store_vector_to_memory(builder, y_ptr, y);
@@ -2668,7 +2672,7 @@ TEST_CASE("to_size_t")
         auto *bb = llvm::BasicBlock::Create(context, "entry", f);
         builder.SetInsertPoint(bb);
 
-        auto *ret = to_size_t(s, load_vector_from_memory(builder, in_val, 4));
+        auto *ret = to_size_t(s, load_vector_from_memory(builder, builder.getInt32Ty(), in_val, 4));
         store_vector_to_memory(builder, out_val, ret);
 
         builder.CreateRetVoid();
@@ -2737,7 +2741,7 @@ TEST_CASE("to_size_t")
         auto *bb = llvm::BasicBlock::Create(context, "entry", f);
         builder.SetInsertPoint(bb);
 
-        auto *ret = to_size_t(s, load_vector_from_memory(builder, in_val, 4));
+        auto *ret = to_size_t(s, load_vector_from_memory(builder, builder.getInt64Ty(), in_val, 4));
         store_vector_to_memory(builder, out_val, ret);
 
         builder.CreateRetVoid();

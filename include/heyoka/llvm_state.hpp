@@ -118,6 +118,8 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::string m_module_name;
 
     // Serialization.
+    // NOTE: serialisation does not preserve the state of the builder
+    // (e.g., wrt fast math flags). This needs to be documented.
     template <typename Archive>
     HEYOKA_DLL_LOCAL void save_impl(Archive &, unsigned) const;
     template <typename Archive>
@@ -190,7 +192,8 @@ public:
                   (sizeof...(KwArgs) > 0u)
                       && (sizeof...(KwArgs) > 1u
                           || std::conjunction_v<std::negation<std::is_same<detail::uncvref_t<KwArgs>, llvm_state>>...>),
-                  int> = 0>
+                  int>
+              = 0>
     explicit llvm_state(KwArgs &&...kw_args) : llvm_state(kw_args_ctor_impl(std::forward<KwArgs>(kw_args)...))
     {
     }

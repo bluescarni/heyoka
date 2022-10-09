@@ -393,8 +393,8 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, const atan_impl &, c
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of b_idx.
-                builder.CreateStore(llvm_atan(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx)),
-                                    retval);
+                builder.CreateStore(
+                    llvm_atan(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx)), retval);
             },
             [&]() {
                 // Create the constant 1 in fp format.
@@ -404,20 +404,20 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, const atan_impl &, c
                 auto ord_fp = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
                 // Compute n*b^[n].
-                auto ret = builder.CreateFMul(ord_fp, taylor_c_load_diff(s, diff_ptr, n_uvars, ord, b_idx));
+                auto ret = builder.CreateFMul(ord_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx));
 
                 // Compute n*(c^[0] + 1).
                 auto n_c0_p1 = builder.CreateFMul(
-                    ord_fp,
-                    builder.CreateFAdd(taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), c_idx), one_fp));
+                    ord_fp, builder.CreateFAdd(
+                                taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx), one_fp));
 
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto c_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
-                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, a_idx);
+                    auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
+                    auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, a_idx);
 
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 

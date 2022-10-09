@@ -340,8 +340,8 @@ llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &, c
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of b_idx.
-                builder.CreateStore(llvm_sinh(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx)),
-                                    retval);
+                builder.CreateStore(
+                    llvm_sinh(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx)), retval);
             },
             [&]() {
                 // Init the accumlator.
@@ -349,8 +349,8 @@ llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &, c
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-                    auto cnj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
-                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, b_idx);
+                    auto cnj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
+                    auto bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, b_idx);
 
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 

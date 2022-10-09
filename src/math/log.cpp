@@ -377,27 +377,27 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const log_impl &, con
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of b_idx.
-                builder.CreateStore(llvm_log(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx)),
-                                    retval);
+                builder.CreateStore(
+                    llvm_log(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx)), retval);
             },
             [&]() {
                 // Create the fp version of the order.
                 auto ord_fp = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
                 // Compute n*b^[0].
-                auto nb0
-                    = builder.CreateFMul(ord_fp, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx));
+                auto nb0 = builder.CreateFMul(
+                    ord_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx));
 
                 // Compute n*b^[n].
-                auto nbn = builder.CreateFMul(ord_fp, taylor_c_load_diff(s, diff_ptr, n_uvars, ord, b_idx));
+                auto nbn = builder.CreateFMul(ord_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx));
 
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto bnj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), b_idx);
-                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, a_idx);
+                    auto bnj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), b_idx);
+                    auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, a_idx);
 
                     // Compute j.
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);

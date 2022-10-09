@@ -386,15 +386,16 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &, c
             [&]() {
                 // For order 0, invoke the function on the order 0 of var_idx.
                 builder.CreateStore(
-                    llvm_sqrt(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)), retval);
+                    llvm_sqrt(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx)),
+                    retval);
             },
             [&]() {
                 // Compute the divisor: 2*a^[0].
-                auto div = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), u_idx);
+                auto div = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), u_idx);
                 div = builder.CreateFAdd(div, div);
 
                 // retval = b^[n].
-                builder.CreateStore(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx), retval);
+                builder.CreateStore(taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, var_idx), retval);
 
                 // Determine the upper index of the summation: (ord - 1)/2 if ord is odd, (ord - 2)/2 otherwise.
                 auto ord_even = builder.CreateICmpEQ(builder.CreateURem(ord, builder.getInt32(2)), builder.getInt32(0));
@@ -406,8 +407,8 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &, c
                 builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
                 llvm_loop_u32(
                     s, builder.getInt32(1), builder.CreateAdd(upper, builder.getInt32(1)), [&](llvm::Value *j) {
-                        auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), u_idx);
-                        auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
+                        auto a_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), u_idx);
+                        auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
 
                         builder.CreateStore(
                             builder.CreateFAdd(builder.CreateLoad(val_t, acc), builder.CreateFMul(a_nj, aj)), acc);
@@ -419,7 +420,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &, c
                     s, ord_even,
                     [&]() {
                         // retval -= (a^[n/2])**2.
-                        auto tmp = taylor_c_load_diff(s, diff_ptr, n_uvars,
+                        auto tmp = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars,
                                                       builder.CreateUDiv(ord, builder.getInt32(2)), u_idx);
                         tmp = builder.CreateFMul(tmp, tmp);
 

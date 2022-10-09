@@ -78,18 +78,18 @@ HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam(llvm_state &, llvm::Type 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam(llvm_state &, llvm::Type *, const param &, llvm::Value *,
                                                        std::uint32_t);
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &, const number &, llvm::Value *,
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &, llvm::Type *, const number &, llvm::Value *,
                                                               llvm::Value *, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &, const param &, llvm::Value *, llvm::Value *,
-                                                              std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &, llvm::Type *, const param &, llvm::Value *,
+                                                              llvm::Value *, std::uint32_t);
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
                                                  std::uint32_t);
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_load_diff(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *,
-                                                  llvm::Value *);
-HEYOKA_DLL_PUBLIC void taylor_c_store_diff(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *,
-                                           llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_load_diff(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t,
+                                                  llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC void taylor_c_store_diff(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t, llvm::Value *,
+                                           llvm::Value *, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC std::pair<std::string, std::vector<llvm::Type *>>
 taylor_c_diff_func_name_args_impl(llvm::LLVMContext &, const std::string &, llvm::Type *, std::uint32_t,
@@ -115,17 +115,17 @@ taylor_compute_jet(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, co
                    const std::vector<std::uint32_t> &, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool,
                    bool, bool);
 
-void taylor_write_tc(llvm_state &, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
+void taylor_write_tc(llvm_state &, llvm::Type *, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
                      const std::vector<std::uint32_t> &, llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t,
                      std::uint32_t, std::uint32_t);
 
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_run_multihorner(llvm_state &, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &, llvm::Value *,
-                       std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool);
+taylor_run_multihorner(llvm_state &, llvm::Type *, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
+                       llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool);
 
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_run_ceval(llvm_state &, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &, llvm::Value *,
-                 std::uint32_t, std::uint32_t, std::uint32_t, bool, bool);
+taylor_run_ceval(llvm_state &, llvm::Type *, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
+                 llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, bool, std::uint32_t, bool);
 
 // NOTE: this function will return a pair containing:
 //

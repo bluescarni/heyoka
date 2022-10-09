@@ -59,7 +59,7 @@ HEYOKA_DLL_PUBLIC llvm::Value *to_size_t(llvm_state &, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC llvm::GlobalVariable *make_global_zero_array(llvm::Module &, llvm::ArrayType *);
 
-HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Type *, llvm::Value *, std::uint32_t);
 HEYOKA_DLL_PUBLIC void store_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *);
 llvm::Value *gather_vector_from_memory(ir_builder &, llvm::Type *, llvm::Value *);
 
@@ -93,8 +93,6 @@ HEYOKA_DLL_PUBLIC void llvm_while_loop(llvm_state &, const std::function<llvm::V
 
 HEYOKA_DLL_PUBLIC void llvm_if_then_else(llvm_state &, llvm::Value *, const std::function<void()> &,
                                          const std::function<void()> &);
-
-HEYOKA_DLL_PUBLIC llvm::Type *pointee_type(llvm::Value *);
 
 HEYOKA_DLL_PUBLIC std::string llvm_type_name(llvm::Type *);
 
@@ -173,10 +171,6 @@ template <typename>
 HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper(llvm_state &, std::uint32_t, const std::string &);
 
 llvm::Value *llvm_add_bc_array(llvm_state &, llvm::Type *, std::uint32_t);
-
-// Helpers to double check the modifications needed
-// by LLVM deprecations.
-bool llvm_depr_GEP_type_check(llvm::Value *, llvm::Type *);
 
 // Primitives for double-length arithmetic.
 

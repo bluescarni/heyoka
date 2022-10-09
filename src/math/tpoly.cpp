@@ -101,7 +101,7 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
     }
 
     // Load the time value.
-    auto *tm = load_vector_from_memory(builder, time_ptr, batch_size);
+    auto *tm = load_vector_from_memory(builder, fp_t, time_ptr, batch_size);
 
     // Init the return value with the highest-order coefficient (scaled by the corresponding
     // binomial coefficient).
@@ -245,13 +245,13 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
             },
             [&]() {
                 // Load the time value.
-                auto tm = load_vector_from_memory(builder, t_ptr, batch_size);
+                auto tm = load_vector_from_memory(builder, scal_t, t_ptr, batch_size);
 
                 // Init the return value with the highest-order coefficient (scaled by the corresponding
                 // binomial coefficient).
                 auto bc = get_bc(n, ord);
                 auto cf = load_vector_from_memory(
-                    builder,
+                    builder, scal_t,
                     builder.CreateInBoundsGEP(scal_t, par_ptr,
                                               {builder.CreateMul(builder.getInt32(batch_size),
                                                                  builder.CreateSub(e_idx, builder.getInt32(1)))}),
@@ -273,7 +273,7 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
                                   auto cf_idx = builder.CreateMul(builder.CreateAdd(builder.CreateAdd(b_idx, i), ord),
                                                                   builder.getInt32(batch_size));
                                   cf = load_vector_from_memory(
-                                      builder, builder.CreateInBoundsGEP(scal_t, par_ptr, cf_idx), batch_size);
+                                      builder, scal_t, builder.CreateInBoundsGEP(scal_t, par_ptr, cf_idx), batch_size);
                                   cf = builder.CreateFMul(cf, bc);
 
                                   // Horner iteration.

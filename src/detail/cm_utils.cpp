@@ -252,7 +252,6 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vidx(llvm_state &s, 
 
     // Return the generator.
     return [&builder, gvar, arr_type](llvm::Value *cur_call_idx) -> llvm::Value * {
-        assert(llvm_depr_GEP_type_check(gvar, arr_type)); // LCOV_EXCL_LINE
         return builder.CreateLoad(builder.getInt32Ty(),
                                   builder.CreateInBoundsGEP(arr_type, gvar, {builder.getInt32(0), cur_call_idx}));
     };
@@ -298,7 +297,6 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vc(llvm_state &s, ll
     return [&s, gvar, arr_type](llvm::Value *cur_call_idx) -> llvm::Value * {
         auto &builder = s.builder();
 
-        assert(llvm_depr_GEP_type_check(gvar, arr_type)); // LCOV_EXCL_LINE
         return builder.CreateLoad(arr_type->getArrayElementType(),
                                   builder.CreateInBoundsGEP(arr_type, gvar, {builder.getInt32(0), cur_call_idx}));
     };

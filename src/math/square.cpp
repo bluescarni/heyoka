@@ -353,7 +353,8 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl 
             [&]() {
                 // For order 0, invoke the function on the order 0 of var_idx.
                 builder.CreateStore(
-                    llvm_square(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)), retval);
+                    llvm_square(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx)),
+                    retval);
             },
             [&]() {
                 // Init the accumulator.
@@ -368,8 +369,9 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl 
                             builder.CreateUDiv(builder.CreateSub(ord, builder.getInt32(1)), builder.getInt32(2)),
                             builder.getInt32(1));
                         llvm_loop_u32(s, builder.getInt32(0), loop_end, [&](llvm::Value *j) {
-                            auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
-                            auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
+                            auto a_nj
+                                = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
+                            auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, var_idx);
 
                             builder.CreateStore(
                                 builder.CreateFAdd(builder.CreateLoad(val_t, acc), builder.CreateFMul(a_nj, aj)), acc);
@@ -383,7 +385,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl 
                         // Even order.
 
                         // Pre-compute the final term.
-                        auto ak2 = taylor_c_load_diff(s, diff_ptr, n_uvars,
+                        auto ak2 = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars,
                                                       builder.CreateUDiv(ord, builder.getInt32(2)), var_idx);
                         auto sq_ak2 = builder.CreateFMul(ak2, ak2);
 
@@ -391,8 +393,9 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl 
                             builder.CreateUDiv(builder.CreateSub(ord, builder.getInt32(2)), builder.getInt32(2)),
                             builder.getInt32(1));
                         llvm_loop_u32(s, builder.getInt32(0), loop_end, [&](llvm::Value *j) {
-                            auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
-                            auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
+                            auto a_nj
+                                = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
+                            auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, var_idx);
 
                             builder.CreateStore(
                                 builder.CreateFAdd(builder.CreateLoad(val_t, acc), builder.CreateFMul(a_nj, aj)), acc);
