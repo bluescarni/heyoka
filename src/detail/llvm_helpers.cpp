@@ -786,7 +786,8 @@ void llvm_if_then_else(llvm_state &s, llvm::Value *cond, const std::function<voi
 // The call will be decomposed into a sequence of calls with scalar arguments,
 // and the return values will be re-assembled as a vector.
 // NOTE: there are some assumptions about valid function attributes
-// in this implementation.
+// in this implementation, need to keep these into account when using
+// this helper.
 llvm::Value *call_extern_vec(llvm_state &s, const std::vector<llvm::Value *> &args, const std::string &fname)
 {
     // LCOV_EXCL_START
