@@ -149,9 +149,8 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &c, const std::string &name, std:
 
 // Add a function for computing the dense output
 // via polynomial evaluation.
-template <typename T>
-void taylor_add_d_out_function(llvm_state &, std::uint32_t, std::uint32_t, std::uint32_t, bool, bool = true,
-                               bool = true);
+void taylor_add_d_out_function(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, std::uint32_t, bool,
+                               bool = true, bool = true);
 
 } // namespace detail
 

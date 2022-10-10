@@ -1613,9 +1613,8 @@ template class t_event_impl<mppp::real128, true>;
 
 // Add a function for computing the dense output
 // via polynomial evaluation.
-template <typename T>
-void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t order, std::uint32_t batch_size,
-                               bool high_accuracy, bool external_linkage, bool optimise)
+void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32_t n_eq, std::uint32_t order,
+                               std::uint32_t batch_size, bool high_accuracy, bool external_linkage, bool optimise)
 {
     // LCOV_EXCL_START
     assert(n_eq > 0u);
@@ -1631,8 +1630,7 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
     // - the pointer to the Taylor coefficients (read-only),
     // - the pointer to the h values (read-only).
     // No overlap is allowed.
-    auto *fp_scal_t = to_llvm_type<T>(context);
-    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_scal_t));
+    const std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_scal_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -1677,9 +1675,9 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
         auto *vector_t = make_vector_type(fp_scal_t, batch_size);
 
         // Create the array for storing the running compensations.
-        auto array_type = llvm::ArrayType::get(vector_t, n_eq);
-        auto comp_arr = builder.CreateInBoundsGEP(array_type, builder.CreateAlloca(array_type),
-                                                  {builder.getInt32(0), builder.getInt32(0)});
+        auto *array_type = llvm::ArrayType::get(vector_t, n_eq);
+        auto *comp_arr = builder.CreateInBoundsGEP(array_type, builder.CreateAlloca(array_type),
+                                                   {builder.getInt32(0), builder.getInt32(0)});
 
         // Start by writing into out_ptr the zero-order coefficients
         // and by filling with zeroes the running compensations.
@@ -1792,18 +1790,6 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
     }
 }
 
-template void taylor_add_d_out_function<double>(llvm_state &, std::uint32_t, std::uint32_t, std::uint32_t, bool, bool,
-                                                bool);
-template void taylor_add_d_out_function<long double>(llvm_state &, std::uint32_t, std::uint32_t, std::uint32_t, bool,
-                                                     bool, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template void taylor_add_d_out_function<mppp::real128>(llvm_state &, std::uint32_t, std::uint32_t, std::uint32_t, bool,
-                                                       bool, bool);
-
-#endif
-
 } // namespace detail
 
 // NOTE: there are situations (e.g., ensemble simulations) in which
@@ -1826,14 +1812,16 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     auto &builder = m_llvm_state.builder();
     auto &context = m_llvm_state.context();
 
+    auto *fp_t = detail::to_llvm_type<T>(context);
+
     // Fetch the current insertion block.
-    auto orig_bb = builder.GetInsertBlock();
+    auto *orig_bb = builder.GetInsertBlock();
 
     // Add the function for the computation of the dense output.
-    detail::taylor_add_d_out_function<T>(m_llvm_state, dim, order, 1, high_accuracy, false, false);
+    detail::taylor_add_d_out_function(m_llvm_state, fp_t, dim, order, 1, high_accuracy, false, false);
 
     // Fetch it.
-    auto d_out_f = md.getFunction("d_out_f");
+    auto *d_out_f = md.getFunction("d_out_f");
     assert(d_out_f != nullptr); // LCOV_EXCL_LINE
 
     // Restore the original insertion block.
@@ -1850,9 +1838,8 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     // - the pointer to the hi times (read-only),
     // - the pointer to the lo times (read-only).
     // No overlap is allowed.
-    auto fp_t = detail::to_llvm_type<T>(context);
     auto ptr_t = llvm::PointerType::getUnqual(fp_t);
-    std::vector<llvm::Type *> fargs{ptr_t, fp_t, ptr_t, ptr_t, ptr_t};
+    const std::vector<llvm::Type *> fargs{ptr_t, fp_t, ptr_t, ptr_t, ptr_t};
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -1865,27 +1852,27 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     // LCOV_EXCL_STOP
 
     // Set the names/attributes of the function arguments.
-    auto out_ptr = f->args().begin();
+    auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
     out_ptr->addAttr(llvm::Attribute::NoCapture);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
 
-    auto tm = f->args().begin() + 1;
+    auto *tm = f->args().begin() + 1;
     tm->setName("tm");
 
-    auto tc_ptr = f->args().begin() + 2;
+    auto *tc_ptr = f->args().begin() + 2;
     tc_ptr->setName("tc_ptr");
     tc_ptr->addAttr(llvm::Attribute::NoCapture);
     tc_ptr->addAttr(llvm::Attribute::NoAlias);
     tc_ptr->addAttr(llvm::Attribute::ReadOnly);
 
-    auto times_ptr_hi = f->args().begin() + 3;
+    auto *times_ptr_hi = f->args().begin() + 3;
     times_ptr_hi->setName("times_ptr_hi");
     times_ptr_hi->addAttr(llvm::Attribute::NoCapture);
     times_ptr_hi->addAttr(llvm::Attribute::NoAlias);
     times_ptr_hi->addAttr(llvm::Attribute::ReadOnly);
 
-    auto times_ptr_lo = f->args().begin() + 4;
+    auto *times_ptr_lo = f->args().begin() + 4;
     times_ptr_lo->setName("times_ptr_lo");
     times_ptr_lo->addAttr(llvm::Attribute::NoCapture);
     times_ptr_lo->addAttr(llvm::Attribute::NoAlias);
@@ -1905,10 +1892,10 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     // a time greater than tm (less than tm in backwards integration).
     // This is essentially an implementation of std::upper_bound:
     // https://en.cppreference.com/w/cpp/algorithm/upper_bound
-    auto tidx = builder.CreateAlloca(builder.getInt32Ty());
-    auto count = builder.CreateAlloca(builder.getInt32Ty());
-    auto step = builder.CreateAlloca(builder.getInt32Ty());
-    auto first = builder.CreateAlloca(builder.getInt32Ty());
+    auto *tidx = builder.CreateAlloca(builder.getInt32Ty());
+    auto *count = builder.CreateAlloca(builder.getInt32Ty());
+    auto *step = builder.CreateAlloca(builder.getInt32Ty());
+    auto *first = builder.CreateAlloca(builder.getInt32Ty());
 
     // count is inited with the size of the range.
     builder.CreateStore(builder.getInt32(static_cast<std::uint32_t>(m_times_hi.size())), count);
@@ -1995,8 +1982,8 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     tc_idx = builder.CreateLoad(builder.getInt32Ty(), first);
 
     // Load the time corresponding to tc_idx.
-    auto start_tm_hi = builder.CreateLoad(fp_t, builder.CreateInBoundsGEP(fp_t, times_ptr_hi, tc_idx));
-    auto start_tm_lo = builder.CreateLoad(fp_t, builder.CreateInBoundsGEP(fp_t, times_ptr_lo, tc_idx));
+    auto *start_tm_hi = builder.CreateLoad(fp_t, builder.CreateInBoundsGEP(fp_t, times_ptr_hi, tc_idx));
+    auto *start_tm_lo = builder.CreateLoad(fp_t, builder.CreateInBoundsGEP(fp_t, times_ptr_lo, tc_idx));
 
     // Compute and store the value of h = tm - start_tm.
     auto [h_hi, h_lo] = detail::llvm_dl_add(m_llvm_state, tm, llvm::ConstantFP::get(fp_t, 0.),
