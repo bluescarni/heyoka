@@ -13,7 +13,6 @@
 #include <cerrno>
 #include <cmath>
 #include <cstdint>
-#include <cstring>
 #include <initializer_list>
 #include <iterator>
 #include <limits>
@@ -105,7 +104,7 @@ void poly_rescale_p2(OutputIt ret, InputIt a, std::uint32_t n)
 template <typename T>
 int sgn(T val)
 {
-    return (T(0) < val) - (val < T(0));
+    return (static_cast<T>(0) < val) - (val < static_cast<T>(0));
 }
 
 // Evaluate the first derivative of a polynomial.
@@ -185,7 +184,7 @@ std::tuple<T, int> bracketed_root_find(const T *poly, std::uint32_t order, T lb,
     if (errno > 0) {
         // Some error condition arose during root finding,
         // return zero and errno.
-        return std::tuple{T(0), errno};
+        return std::tuple{static_cast<T>(0), errno};
     }
 
     if (max_iter < iter_limit) {
@@ -891,6 +890,7 @@ void taylor_adaptive<T>::ed_data::detect_events(T h, std::uint32_t order, std::u
             // detection altogether without a warning. This is ok,
             // and non-finite Taylor coefficients will be caught in the
             // step() implementations anyway.
+            // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
             std::uint32_t fex_check_result;
             m_fex_check(ptr, &h, &back_int, &fex_check_result);
             if (fex_check_result) {
@@ -1125,6 +1125,7 @@ void taylor_adaptive<T>::ed_data::detect_events(T h, std::uint32_t order, std::u
 
                 // Reverse tmp into tmp1, translate tmp1 by 1 with output
                 // in tmp2, and count the sign changes in tmp2.
+                // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
                 std::uint32_t n_sc;
                 m_rtscc(tmp1.v.data(), tmp2.v.data(), &n_sc, tmp.v.data());
 
@@ -1249,9 +1250,9 @@ void taylor_adaptive<T>::ed_data::detect_events(T h, std::uint32_t order, std::u
                         detail::get_logger()->warn(
                             "polynomial root finding during event detection failed due to too many iterations");
                     } else {
-                        detail::get_logger()->warn(
-                            "polynomial root finding during event detection returned a nonzero errno with message '{}'",
-                            std::strerror(cflag));
+                        detail::get_logger()->warn("polynomial root finding during event detection returned a nonzero "
+                                                   "errno with error code {}",
+                                                   cflag);
                     }
                     // LCOV_EXCL_STOP
                 }
@@ -1805,6 +1806,7 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
 
                     // Reverse tmp into tmp1, translate tmp1 by 1 with output
                     // in tmp2, and count the sign changes in tmp2.
+                    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
                     std::uint32_t n_sc;
                     m_rtscc(tmp1.v.data(), tmp2.v.data(), &n_sc, tmp.v.data());
 
@@ -1940,8 +1942,8 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
                         } else {
                             detail::get_logger()->warn(
                                 "polynomial root finding during event detection at the batch index {} "
-                                "returned a nonzero errno with message '{}'",
-                                j, std::strerror(cflag));
+                                "returned a nonzero errno with error code {}",
+                                j, cflag);
                         }
                         // LCOV_EXCL_STOP
                     }
