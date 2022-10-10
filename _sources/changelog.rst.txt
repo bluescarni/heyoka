@@ -1,6 +1,16 @@
 Changelog
 =========
 
+0.20.0 (unreleased)
+-------------------
+
+New
+~~~
+
+- Support LLVM 15
+  (`#274 <https://github.com/bluescarni/heyoka/pull/274>`__).
+
+
 0.19.0 (2022-09-18)
 -------------------
 
