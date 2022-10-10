@@ -352,7 +352,7 @@ llvm::Function *taylor_c_diff_func_asinh_impl(llvm_state &s, const asinh_impl &,
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "asinh", n_uvars, batch_size, {var}, 1);
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "asinh", n_uvars, batch_size, {var}, 1);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 

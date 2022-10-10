@@ -534,7 +534,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &var,
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "kepE", n_uvars, batch_size, {var, n}, 2);
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "kepE", n_uvars, batch_size, {var, n}, 2);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -661,7 +661,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n, const va
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "kepE", n_uvars, batch_size, {n, var}, 2);
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "kepE", n_uvars, batch_size, {n, var}, 2);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -780,7 +780,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &var0
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "kepE", n_uvars, batch_size, {var0, var1}, 2);
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "kepE", n_uvars, batch_size, {var0, var1}, 2);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 

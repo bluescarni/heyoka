@@ -730,7 +730,7 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, const binary_op &bo
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, op_name, n_uvars, batch_size, {n0, n1});
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, op_name, n_uvars, batch_size, {n0, n1});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -834,7 +834,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
 
     // Fetch the function name and arguments.
     const auto na_pair
-        = taylor_c_diff_func_name_args<T>(context, AddOrSub ? "add" : "sub", n_uvars, batch_size, {n, var});
+        = taylor_c_diff_func_name_args(context, fp_t, AddOrSub ? "add" : "sub", n_uvars, batch_size, {n, var});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -925,7 +925,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
 
     // Fetch the function name and arguments.
     const auto na_pair
-        = taylor_c_diff_func_name_args<T>(context, AddOrSub ? "add" : "sub", n_uvars, batch_size, {var, n});
+        = taylor_c_diff_func_name_args(context, fp_t, AddOrSub ? "add" : "sub", n_uvars, batch_size, {var, n});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -936,7 +936,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -1003,12 +1003,13 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the scalar and vector floating-point types.
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
     const auto na_pair
-        = taylor_c_diff_func_name_args<T>(context, AddOrSub ? "add" : "sub", n_uvars, batch_size, {var0, var1});
+        = taylor_c_diff_func_name_args(context, fp_t, AddOrSub ? "add" : "sub", n_uvars, batch_size, {var0, var1});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -1122,7 +1123,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "mul", n_uvars, batch_size, {var, n});
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "mul", n_uvars, batch_size, {var, n});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -1191,7 +1192,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "mul", n_uvars, batch_size, {n, var});
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "mul", n_uvars, batch_size, {n, var});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -1260,7 +1261,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "mul", n_uvars, batch_size, {var0, var1});
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "mul", n_uvars, batch_size, {var0, var1});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -1367,7 +1368,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "div", n_uvars, batch_size, {var, n});
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "div", n_uvars, batch_size, {var, n});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -1436,7 +1437,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "div", n_uvars, batch_size, {n, var});
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "div", n_uvars, batch_size, {n, var});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -1541,7 +1542,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "div", n_uvars, batch_size, {var0, var1});
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "div", n_uvars, batch_size, {var0, var1});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 

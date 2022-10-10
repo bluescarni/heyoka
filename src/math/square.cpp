@@ -315,7 +315,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl 
     auto *fp_t = to_llvm_type<T>(context);
     auto *val_t = make_vector_type(fp_t, batch_size);
 
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "square", n_uvars, batch_size, {var});
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "square", n_uvars, batch_size, {var});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 

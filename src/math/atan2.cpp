@@ -489,7 +489,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "atan2", n_uvars, batch_size, {var, n}, 1);
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "atan2", n_uvars, batch_size, {var, n}, 1);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -607,7 +607,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "atan2", n_uvars, batch_size, {n, var}, 1);
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "atan2", n_uvars, batch_size, {n, var}, 1);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -725,7 +725,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "atan2", n_uvars, batch_size, {var0, var1}, 1);
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "atan2", n_uvars, batch_size, {var0, var1}, 1);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 

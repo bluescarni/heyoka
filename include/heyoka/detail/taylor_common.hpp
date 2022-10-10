@@ -73,7 +73,7 @@ inline llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, std::uint32_t n_
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, name, n_uvars, batch_size, {np...}, n_hidden_deps);
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, name, n_uvars, batch_size, {np...}, n_hidden_deps);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 

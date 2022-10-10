@@ -418,7 +418,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
     auto *fp_t = to_llvm_type<T>(context);
     auto *val_t = make_vector_type(fp_t, batch_size);
 
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, pow_name, n_uvars, batch_size, {var, n});
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, pow_name, n_uvars, batch_size, {var, n});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 

@@ -186,9 +186,9 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
     // Fetch the function name and arguments.
     // NOTE: we mangle on the poly degree as well, so that we will be
     // generating a different function for each polynomial degree.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(
-        context, fmt::format("tpoly_{}", n_const), n_uvars, batch_size,
-        {std::get<param>(tp.args()[0].value()), std::get<param>(tp.args()[1].value())});
+    const auto na_pair
+        = taylor_c_diff_func_name_args(context, scal_t, fmt::format("tpoly_{}", n_const), n_uvars, batch_size,
+                                       {std::get<param>(tp.args()[0].value()), std::get<param>(tp.args()[1].value())});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 

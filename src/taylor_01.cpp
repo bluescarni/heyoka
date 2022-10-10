@@ -84,16 +84,25 @@ namespace heyoka
 namespace detail
 {
 
-// NOTE: precondition on name: must be conforming to LLVM requirements for
-// function names, and must not contain "." (as we use it as a separator in
-// the mangling scheme).
+// NOTE: this function will return a pair containing:
+//
+// - the mangled name and
+// - the list of LLVM argument types
+//
+// for the function implementing the Taylor derivative in compact mode of the mathematical function
+// called "name". The mangled name is assembled from "name", the types of the arguments args, the number
+// of uvars and the scalar or vector floating-point type in use (which depends on T and batch_size).
 std::pair<std::string, std::vector<llvm::Type *>>
-taylor_c_diff_func_name_args_impl(llvm::LLVMContext &context, const std::string &name, llvm::Type *val_t,
-                                  std::uint32_t n_uvars, const std::vector<std::variant<variable, number, param>> &args,
-                                  std::uint32_t n_hidden_deps)
+taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const std::string &name,
+                             std::uint32_t n_uvars, std::uint32_t batch_size,
+                             const std::vector<std::variant<variable, number, param>> &args,
+                             std::uint32_t n_hidden_deps)
 {
-    assert(val_t != nullptr);
+    assert(fp_t != nullptr);
     assert(n_uvars > 0u);
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Init the name.
     auto fname = fmt::format("heyoka.taylor_c_diff.{}.", name);

@@ -406,7 +406,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
     }
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "sum_sq", n_uvars, batch_size, nm_args);
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "sum_sq", n_uvars, batch_size, nm_args);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 

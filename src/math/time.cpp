@@ -135,7 +135,7 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t n_uvars, st
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "time", n_uvars, batch_size, {});
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "time", n_uvars, batch_size, {});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
