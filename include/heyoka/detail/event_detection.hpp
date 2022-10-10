@@ -48,8 +48,8 @@ mppp::real128 taylor_deduce_cooldown(mppp::real128, mppp::real128);
 #endif
 
 // Machinery to add a fast event exclusion check function to an llvm_state.
-template <typename>
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check(llvm_state &, std::uint32_t, std::uint32_t, bool = false);
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t,
+                                                     bool = false);
 
 // Machinery to add a function that, given an input polynomial of order n represented
 // as an array of coefficients:

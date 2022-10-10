@@ -496,8 +496,8 @@ llvm::Function *llvm_add_poly_rtscc(llvm_state &s, llvm::Type *fp_t, std::uint32
 // either via the Cargo-Shisha algorithm (use_cs == true) or
 // via Horner's scheme using interval arithmetic (use_cs == false). The default is the
 // interval arithmetics implementation.
-template <typename T>
-llvm::Function *llvm_add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t batch_size, bool use_cs)
+llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_t n, std::uint32_t batch_size,
+                                   bool use_cs)
 {
     assert(batch_size > 0u); // LCOV_EXCL_LINE
 
@@ -523,10 +523,9 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t
     // - pointer to the int32 flag(s) to signal integration backwards in time (read-only),
     // - output pointer (write-only).
     // No overlap is allowed.
-    auto *fp_t = to_llvm_type<T>(context);
     auto *fp_ptr_t = llvm::PointerType::getUnqual(fp_t);
     auto *int32_ptr_t = llvm::PointerType::getUnqual(builder.getInt32Ty());
-    std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, int32_ptr_t, int32_ptr_t};
+    const std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, int32_ptr_t, int32_ptr_t};
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -620,21 +619,6 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t
     // NOTE: the optimisation pass will be run outside.
     return f;
 }
-
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<float>(llvm_state &, std::uint32_t, std::uint32_t, bool);
-
-template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<double>(llvm_state &, std::uint32_t, std::uint32_t, bool);
-
-template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<long double>(llvm_state &, std::uint32_t, std::uint32_t,
-                                                                           bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<mppp::real128>(llvm_state &, std::uint32_t, std::uint32_t,
-                                                                             bool);
-
-#endif
 
 // A RAII helper to extract polys from a cache and
 // return them to the cache upon destruction.
@@ -755,7 +739,7 @@ taylor_adaptive<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vector<nt_
     detail::llvm_add_poly_rtscc(m_state, fp_t, order, 1);
 
     // Add the function for the fast exclusion check.
-    detail::llvm_add_fex_check<T>(m_state, order, 1);
+    detail::llvm_add_fex_check(m_state, fp_t, order, 1);
 
     // Run the optimisation pass.
     m_state.optimise();
@@ -1362,7 +1346,7 @@ taylor_adaptive_batch<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vect
 
     // Add the function for the fast exclusion check.
     // NOTE: the fast exclusion check is vectorised.
-    detail::llvm_add_fex_check<T>(m_state, order, batch_size);
+    detail::llvm_add_fex_check(m_state, fp_t, order, batch_size);
 
     // Run the optimisation pass.
     m_state.optimise();
