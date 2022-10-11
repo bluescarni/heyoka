@@ -181,13 +181,11 @@ namespace
 {
 
 // Derivative of exp(number).
-template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_exp_impl(llvm_state &s, const exp_impl &, const U &num, const std::vector<llvm::Value *> &,
-                                  llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                  std::uint32_t batch_size)
+template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *taylor_diff_exp_impl(llvm_state &s, llvm::Type *fp_t, const exp_impl &, const U &num,
+                                  const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
+                                  std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
-    auto *fp_t = to_llvm_type<T>(s.context());
-
     if (order == 0u) {
         return llvm_exp(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
@@ -196,14 +194,11 @@ llvm::Value *taylor_diff_exp_impl(llvm_state &s, const exp_impl &, const U &num,
 }
 
 // Derivative of exp(variable).
-template <typename T>
-llvm::Value *taylor_diff_exp_impl(llvm_state &s, const exp_impl &, const variable &var,
+llvm::Value *taylor_diff_exp_impl(llvm_state &s, llvm::Type *fp_t, const exp_impl &, const variable &var,
                                   const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
                                   std::uint32_t order, std::uint32_t a_idx, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
-
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     // Fetch the index of the variable.
     const auto b_idx = uname_to_index(var.name());
@@ -218,7 +213,7 @@ llvm::Value *taylor_diff_exp_impl(llvm_state &s, const exp_impl &, const variabl
         auto *anj = taylor_fetch_diff(arr, a_idx, order - j, n_uvars);
         auto *bj = taylor_fetch_diff(arr, b_idx, j, n_uvars);
 
-        auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
+        auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*anj*bj to the sum.
         sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(anj, bj)));
@@ -234,16 +229,16 @@ llvm::Value *taylor_diff_exp_impl(llvm_state &s, const exp_impl &, const variabl
 }
 
 // All the other cases.
-template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_exp_impl(llvm_state &, const exp_impl &, const U &, const std::vector<llvm::Value *> &,
-                                  llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
+template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
+llvm::Value *taylor_diff_exp_impl(llvm_state &, llvm::Type *, const exp_impl &, const U &,
+                                  const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                  std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of an exponential");
 }
 
-template <typename T>
-llvm::Value *taylor_diff_exp(llvm_state &s, const exp_impl &f, const std::vector<std::uint32_t> &deps,
+llvm::Value *taylor_diff_exp(llvm_state &s, llvm::Type *fp_t, const exp_impl &f, const std::vector<std::uint32_t> &deps,
                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
@@ -258,39 +253,21 @@ llvm::Value *taylor_diff_exp(llvm_state &s, const exp_impl &f, const std::vector
     }
 
     return std::visit(
-        [&](const auto &v) { return taylor_diff_exp_impl<T>(s, f, v, arr, par_ptr, n_uvars, order, idx, batch_size); },
+        [&](const auto &v) {
+            return taylor_diff_exp_impl(s, fp_t, f, v, arr, par_ptr, n_uvars, order, idx, batch_size);
+        },
         f.args()[0].value());
 }
 
 } // namespace
 
-llvm::Value *exp_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                       const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                       std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                       std::uint32_t batch_size, bool) const
+llvm::Value *exp_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                   const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                   std::uint32_t batch_size, bool) const
 {
-    return taylor_diff_exp<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_exp(s, fp_t, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
-
-llvm::Value *exp_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                        std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_exp<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *exp_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                        std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_exp<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
-}
-
-#endif
 
 namespace
 {

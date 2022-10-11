@@ -377,10 +377,10 @@ inline std::array<expression, sizeof...(Args)> make_vars(const Args &...strs)
     return std::array{expression{variable{strs}}...};
 }
 
-template <typename>
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff(llvm_state &, const expression &, const std::vector<std::uint32_t> &,
-                                           const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
-                                           std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const expression &,
+                                           const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
+                                           llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                           std::uint32_t, bool);
 
 template <typename>
 HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func(llvm_state &, const expression &, std::uint32_t, std::uint32_t,

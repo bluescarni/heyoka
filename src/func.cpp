@@ -516,6 +516,47 @@ taylor_dc_t::size_type func::taylor_decompose(std::unordered_map<const void *, t
     return ret;
 }
 
+llvm::Value *func::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                               const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
+                               std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                               bool high_accuracy) const
+{
+    if (fp_t == nullptr) {
+        throw std::invalid_argument(
+            fmt::format("Null floating-point type detected in func::taylor_diff() for the function '{}'", get_name()));
+    }
+
+    if (par_ptr == nullptr) {
+        throw std::invalid_argument(
+            fmt::format("Null par_ptr detected in func::taylor_diff() for the function '{}'", get_name()));
+    }
+
+    if (time_ptr == nullptr) {
+        throw std::invalid_argument(
+            fmt::format("Null time_ptr detected in func::taylor_diff() for the function '{}'", get_name()));
+    }
+
+    if (batch_size == 0u) {
+        throw std::invalid_argument(
+            fmt::format("Zero batch size detected in func::taylor_diff() for the function '{}'", get_name()));
+    }
+
+    if (n_uvars == 0u) {
+        throw std::invalid_argument(fmt::format(
+            "Zero number of u variables detected in func::taylor_diff() for the function '{}'", get_name()));
+    }
+
+    auto *retval
+        = ptr()->taylor_diff(s, fp_t, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size, high_accuracy);
+
+    if (retval == nullptr) {
+        throw std::invalid_argument(
+            fmt::format("Null return value detected in func::taylor_diff() for the function '{}'", get_name()));
+    }
+
+    return retval;
+}
+
 llvm::Value *func::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                    const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,

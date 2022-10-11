@@ -1375,8 +1375,8 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
 
         // Compute the order-0 derivatives of the other u variables.
         for (auto i = n_eq; i < n_uvars; ++i) {
-            diff_arr.push_back(taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars, 0, i,
-                                              batch_size, high_accuracy));
+            diff_arr.push_back(taylor_diff(s, fp_t, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars, 0,
+                                           i, batch_size, high_accuracy));
         }
 
         // Compute the derivatives order by order, starting from 1 to order excluded.
@@ -1393,8 +1393,8 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
 
             // Now the other u variables.
             for (auto i = n_eq; i < n_uvars; ++i) {
-                diff_arr.push_back(taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars,
-                                                  cur_order, i, batch_size, high_accuracy));
+                diff_arr.push_back(taylor_diff(s, fp_t, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars,
+                                               cur_order, i, batch_size, high_accuracy));
             }
         }
 
@@ -1414,8 +1414,8 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         // above, thus we never enter the loop.
         // NOTE: <= because max_svf_idx is an index, not a size.
         for (std::uint32_t i = n_eq; i <= max_svf_idx; ++i) {
-            diff_arr.push_back(taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars, order,
-                                              i, batch_size, high_accuracy));
+            diff_arr.push_back(taylor_diff(s, fp_t, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars,
+                                           order, i, batch_size, high_accuracy));
         }
 
 #if !defined(NDEBUG)

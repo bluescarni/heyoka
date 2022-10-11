@@ -40,8 +40,6 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
     assert(n >= 2u);
 
     if (masses.size() != n) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(fmt::format(
             "Inconsistent sizes detected while creating an N-body system: the vector of masses has a size of "
             "{}, while the number of bodies is {}",
@@ -327,8 +325,6 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::ui
     assert(n >= 2u);
 
     if (n_massive > n) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(fmt::format("The number of massive bodies, {}, cannot be larger than the "
                                                 "total number of bodies, {}",
                                                 n_massive, n));

@@ -66,12 +66,10 @@ std::vector<expression> time_impl::gradient() const
 namespace
 {
 
-template <typename T>
-llvm::Value *time_taylor_diff_impl(llvm_state &s, llvm::Value *time_ptr, std::uint32_t order, std::uint32_t batch_size)
+llvm::Value *time_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, llvm::Value *time_ptr, std::uint32_t order,
+                                   std::uint32_t batch_size)
 {
     auto &builder = s.builder();
-
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     // NOTE: no need for normalisation of the derivative,
     // as the only nonzero retvals are for orders 0 and 1
@@ -89,33 +87,13 @@ llvm::Value *time_taylor_diff_impl(llvm_state &s, llvm::Value *time_ptr, std::ui
 
 } // namespace
 
-llvm::Value *time_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &,
-                                        const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *time_ptr,
-                                        std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
-                                        bool) const
+llvm::Value *time_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &,
+                                    const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *time_ptr,
+                                    std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
+                                    bool) const
 {
-    return time_taylor_diff_impl<double>(s, time_ptr, order, batch_size);
+    return time_taylor_diff_impl(s, fp_t, time_ptr, order, batch_size);
 }
-
-llvm::Value *time_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &,
-                                         const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *time_ptr,
-                                         std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
-                                         bool) const
-{
-    return time_taylor_diff_impl<long double>(s, time_ptr, order, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *time_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &,
-                                         const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *time_ptr,
-                                         std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
-                                         bool) const
-{
-    return time_taylor_diff_impl<mppp::real128>(s, time_ptr, order, batch_size);
-}
-
-#endif
 
 namespace
 {

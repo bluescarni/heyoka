@@ -142,30 +142,7 @@ HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llv
 HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
 llvm_penc_cargo_shisha(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
 
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_dbl(llvm_state &, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_ldbl(llvm_state &, std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_f128(llvm_state &, std::uint32_t);
-
-#endif
-
-template <typename T>
-inline llvm::Function *llvm_add_inv_kep_E(llvm_state &s, std::uint32_t batch_size)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return llvm_add_inv_kep_E_dbl(s, batch_size);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return llvm_add_inv_kep_E_ldbl(s, batch_size);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return llvm_add_inv_kep_E_f128(s, batch_size);
-#endif
-    } else {
-        static_assert(always_false_v<T>, "Unhandled type.");
-    }
-}
+llvm::Function *llvm_add_inv_kep_E(llvm_state &, llvm::Type *, std::uint32_t);
 
 template <typename>
 HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper(llvm_state &, std::uint32_t, const std::string &);

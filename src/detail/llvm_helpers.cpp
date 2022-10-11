@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -31,6 +30,7 @@
 
 #include <fmt/format.h>
 
+#include <llvm/ADT/APFloat.h>
 #include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -1637,82 +1637,149 @@ namespace
 
 #if !defined(NDEBUG)
 
-// Variable template for the constant pi at different levels of precision, used only
-// for debugging.
-template <typename T>
-const auto inv_kep_E_pi = boost::math::constants::pi<T>();
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-const mppp::real128 inv_kep_E_pi<mppp::real128> = mppp::pi_128;
-
-#endif
-
-#endif
-
-// Helper to return a double-length approximation of 2*pi for the given
-// input floating-point type T.
-template <typename T>
-std::pair<T, T> inv_kep_E_dl_twopi()
+// Small helper to compute pi at the precision of the floating-point type tp.
+// Used only for debugging purposes.
+// NOTE: this is a repetition of number_like(), perhaps we can abstract this?
+number inv_kep_E_pi_like(llvm_state &s, llvm::Type *tp)
 {
-    constexpr bool is_ppc =
-#if defined(HEYOKA_ARCH_PPC)
-        true
-#else
-        false
-#endif
-        ;
+    assert(tp != nullptr);
 
-    if constexpr (is_ppc && std::is_same_v<long double, T>) {
-        throw std::invalid_argument("long double is not supported on PPC");
-    } else {
-        namespace bmp = boost::multiprecision;
+    auto &context = s.context();
 
-        // Use 4x the digits of type T for the computation of 2pi.
-        static_assert(std::numeric_limits<T>::digits <= std::numeric_limits<int>::max() / 4);
-        using mp_fp_t = bmp::number<bmp::cpp_bin_float<std::numeric_limits<T>::digits * 4, bmp::digit_base_2>>;
-
-        // Fetch 2pi in extended precision.
-        const auto mp_twopi = 2 * boost::math::constants::pi<mp_fp_t>();
-
-        // Split into two parts.
+    if (tp == to_llvm_type<float>(context, false)) {
+        return number{boost::math::constants::pi<float>()};
+    } else if (tp == to_llvm_type<double>(context, false)) {
+        return number{boost::math::constants::pi<double>()};
+    } else if (tp == to_llvm_type<long double>(context, false)) {
+        return number{boost::math::constants::pi<long double>()};
 #if defined(HEYOKA_HAVE_REAL128)
-        if constexpr (std::is_same_v<T, mppp::real128>) {
-            const auto twopi_hi = static_cast<bmp::float128>(mp_twopi);
-            const auto twopi_lo = static_cast<bmp::float128>(mp_twopi - mp_fp_t(twopi_hi));
-
-            assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
-
-            return {mppp::real128{twopi_hi.backend().value()}, mppp::real128{twopi_lo.backend().value()}};
-        } else {
-#endif
-            const auto twopi_hi = static_cast<T>(mp_twopi);
-            const auto twopi_lo = static_cast<T>(mp_twopi - twopi_hi);
-
-            assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
-
-            return {twopi_hi, twopi_lo};
-#if defined(HEYOKA_HAVE_REAL128)
-        }
+    } else if (tp == to_llvm_type<mppp::real128>(context, false)) {
+        return number{mppp::pi_128};
 #endif
     }
+
+    // LCOV_EXCL_START
+    throw std::invalid_argument(
+        fmt::format("Unable to create a number of type '{}' from the constant pi", llvm_type_name(tp)));
+    // LCOV_EXCL_STOP
 }
 
-// Implementation of the inverse Kepler equation.
-template <typename T>
-llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
-{
-    using std::nextafter;
+#endif
 
+std::pair<number, number> inv_kep_E_dl_twopi_like(llvm_state &s, llvm::Type *fp_t)
+{
+    if (fp_t->isFloatingPointTy() &&
+#if LLVM_VERSION_MAJOR >= 13
+        fp_t->isIEEE()
+#else
+        !fp_t->isPPC_FP128Ty()
+#endif
+    ) {
+        namespace bmp = boost::multiprecision;
+
+        // NOTE: we will be generating the pi constant at 4x the maximum precision possible,
+        // which is currently 113 bits for quadruple precision.
+        constexpr auto ndigits = 113u * 4u;
+
+#if !defined(NDEBUG)
+        // Sanity check.
+        const auto &sem = fp_t->getFltSemantics();
+        const auto prec = llvm::APFloatBase::semanticsPrecision(sem);
+
+        assert(prec <= 113u);
+#endif
+
+        // Fetch 2pi in extended precision.
+        using mp_fp_t = bmp::number<bmp::cpp_bin_float<ndigits, bmp::digit_base_2>>;
+        const auto mp_twopi = 2 * boost::math::constants::pi<mp_fp_t>();
+
+        auto impl = [&](auto val) {
+            using type = decltype(val);
+
+#if defined(HEYOKA_HAVE_REAL128)
+            if constexpr (std::is_same_v<type, mppp::real128>) {
+                const auto twopi_hi = static_cast<bmp::float128>(mp_twopi);
+                const auto twopi_lo = static_cast<bmp::float128>(mp_twopi - mp_fp_t(twopi_hi));
+
+                assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
+
+                return std::make_pair(number{mppp::real128{twopi_hi.backend().value()}},
+                                      number{mppp::real128{twopi_lo.backend().value()}});
+            } else {
+#endif
+                const auto twopi_hi = static_cast<type>(mp_twopi);
+                const auto twopi_lo = static_cast<type>(mp_twopi - twopi_hi);
+
+                assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
+
+                return std::make_pair(number{twopi_hi}, number{twopi_lo});
+#if defined(HEYOKA_HAVE_REAL128)
+            }
+#endif
+        };
+
+        auto &context = s.context();
+
+        if (fp_t == to_llvm_type<float>(context, false)) {
+            return impl(0.f);
+        } else if (fp_t == to_llvm_type<double>(context, false)) {
+            return impl(0.);
+        } else if (fp_t == to_llvm_type<long double>(context, false)) {
+            return impl(0.l);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if (fp_t == to_llvm_type<mppp::real128>(context, false)) {
+            return impl(mppp::real128(0));
+#endif
+        }
+
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format("Cannot generate a double-length 2*pi approximation for the type '{}'",
+                                                detail::llvm_type_name(fp_t)));
+    } else {
+        throw std::invalid_argument(fmt::format("Cannot generate a double-length 2*pi approximation for the type '{}'",
+                                                detail::llvm_type_name(fp_t)));
+    }
+    // LCOV_EXCL_STOP
+}
+
+// Small helper to return the epsilon of the floating-point type tp as a number.
+// NOTE: this is a repetition of number_like(), perhaps we can abstract this?
+number inv_kep_E_eps_like(llvm_state &s, llvm::Type *tp)
+{
+    assert(tp != nullptr);
+
+    auto &context = s.context();
+
+    if (tp == to_llvm_type<float>(context, false)) {
+        return number{std::numeric_limits<float>::epsilon()};
+    } else if (tp == to_llvm_type<double>(context, false)) {
+        return number{std::numeric_limits<double>::epsilon()};
+    } else if (tp == to_llvm_type<long double>(context, false)) {
+        return number{std::numeric_limits<long double>::epsilon()};
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if (tp == to_llvm_type<mppp::real128>(context, false)) {
+        return number{std::numeric_limits<mppp::real128>::epsilon()};
+#endif
+    }
+
+    // LCOV_EXCL_START
+    throw std::invalid_argument(
+        fmt::format("Unable to create a number version of the epsilon for the type '{}'", llvm_type_name(tp)));
+    // LCOV_EXCL_STOP
+}
+
+} // namespace
+
+// Implementation of the inverse Kepler equation.
+llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size)
+{
     assert(batch_size > 0u);
 
     auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the scalar and vector floating-point types.
-    auto *fp_t = to_llvm_type<T>(s.context());
+    // Fetch vector floating-point type.
     auto *tp = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name.
@@ -1759,23 +1826,23 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Replace invalid eccentricity values with quiet NaNs.
         auto *ecc = builder.CreateSelect(
             ecc_invalid,
-            vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<T>::quiet_NaN()}), batch_size),
+            vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<double>::quiet_NaN()}), batch_size),
             ecc_arg);
 
         // Create the return value.
         auto retval = builder.CreateAlloca(tp);
 
         // Fetch 2pi in double-length precision.
-        const auto [dl_twopi_hi, dl_twopi_lo] = inv_kep_E_dl_twopi<T>();
+        const auto [dl_twopi_hi, dl_twopi_lo] = inv_kep_E_dl_twopi_like(s, fp_t);
 
 #if !defined(NDEBUG)
-        assert(dl_twopi_hi == 2 * inv_kep_E_pi<T>); // LCOV_EXCL_LINE
+        assert(dl_twopi_hi == number_like(s, fp_t, 2.) * inv_kep_E_pi_like(s, fp_t)); // LCOV_EXCL_LINE
 #endif
 
         // Reduce M modulo 2*pi in extended precision.
         auto *M = llvm_dl_modulus(s, M_arg, llvm::Constant::getNullValue(M_arg->getType()),
-                                  vector_splat(builder, llvm_codegen(s, fp_t, number{dl_twopi_hi}), batch_size),
-                                  vector_splat(builder, llvm_codegen(s, fp_t, number{dl_twopi_lo}), batch_size))
+                                  vector_splat(builder, llvm_codegen(s, fp_t, dl_twopi_hi), batch_size),
+                                  vector_splat(builder, llvm_codegen(s, fp_t, dl_twopi_lo), batch_size))
                       .first;
 
         // Compute the initial guess from the usual elliptic expansion
@@ -1792,8 +1859,10 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         auto cos_M_2 = builder.CreateFMul(cos_M, cos_M);
 
         // 3/2 and 1/2 constants.
-        auto c_3_2 = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(3) / 2}), batch_size);
-        auto c_1_2 = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / 2}), batch_size);
+        auto c_3_2 = vector_splat(builder, llvm_codegen(s, fp_t, number_like(s, fp_t, 3.) / number_like(s, fp_t, 2.)),
+                                  batch_size);
+        auto c_1_2 = vector_splat(builder, llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
+                                  batch_size);
 
         // M + e*sin(M).
         auto tmp1 = builder.CreateFAdd(M, e_sin_M);
@@ -1811,7 +1880,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
 
         // Make extra sure the initial guess is in the [0, 2*pi) range.
         auto lb = llvm::ConstantFP::get(tp, 0.);
-        auto ub = vector_splat(builder, llvm_codegen(s, fp_t, number{nextafter(dl_twopi_hi, static_cast<T>(0))}),
+        auto ub = vector_splat(builder, llvm_codegen(s, fp_t, nextafter(dl_twopi_hi, number_like(s, fp_t, 0.))),
                                batch_size);
         ig = llvm_max(s, ig, lb);
         ig = llvm_min(s, ig, ub);
@@ -1855,11 +1924,11 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Define the stopping condition functor.
         // NOTE: hard-code this for the time being.
         auto *max_iter = builder.getInt32(50);
-        auto loop_cond
-            = [&,
-               // NOTE: tolerance is 4 * eps.
-               tol = vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<T>::epsilon() * 4}),
-                                  batch_size)]() -> llvm::Value * {
+        auto loop_cond =
+            [&,
+             // NOTE: tolerance is 4 * eps.
+             tol = vector_splat(builder, llvm_codegen(s, fp_t, inv_kep_E_eps_like(s, fp_t) * number_like(s, fp_t, 4.)),
+                                batch_size)]() -> llvm::Value * {
             auto *c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
 
             // Keep on iterating as long as abs(f(E)) > tol.
@@ -1890,7 +1959,9 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
                 new_val = builder.CreateSelect(
                     bcheck,
                     builder.CreateFMul(
-                        vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / 2}), batch_size),
+                        vector_splat(builder,
+                                     llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
+                                     batch_size),
                         builder.CreateFAdd(old_val, ub)),
                     new_val);
 
@@ -1899,7 +1970,9 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
                 new_val = builder.CreateSelect(
                     bcheck,
                     builder.CreateFMul(
-                        vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / 2}), batch_size),
+                        vector_splat(builder,
+                                     llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
+                                     batch_size),
                         builder.CreateFAdd(old_val, lb)),
                     new_val);
 
@@ -1930,7 +2003,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
                 auto *old_val = builder.CreateLoad(tp, retval);
                 auto *new_val = builder.CreateSelect(
                     tol_check,
-                    vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<T>::quiet_NaN()}),
+                    vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<double>::quiet_NaN()}),
                                  batch_size),
                     old_val);
                 builder.CreateStore(new_val, retval);
@@ -1957,27 +2030,6 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
 
     return f;
 }
-
-} // namespace
-
-llvm::Function *llvm_add_inv_kep_E_dbl(llvm_state &s, std::uint32_t batch_size)
-{
-    return llvm_add_inv_kep_E_impl<double>(s, batch_size);
-}
-
-llvm::Function *llvm_add_inv_kep_E_ldbl(llvm_state &s, std::uint32_t batch_size)
-{
-    return llvm_add_inv_kep_E_impl<long double>(s, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *llvm_add_inv_kep_E_f128(llvm_state &s, std::uint32_t batch_size)
-{
-    return llvm_add_inv_kep_E_impl<mppp::real128>(s, batch_size);
-}
-
-#endif
 
 // Helper to create a global const array containing
 // all binomial coefficients up to (n, n). The coefficients are stored
@@ -2329,7 +2381,7 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, std::uint32_t batch_size, const s
     auto scal_t = to_llvm_type<T>(context);
 
     // Add the implementation function.
-    auto *impl_f = llvm_add_inv_kep_E<T>(s, batch_size);
+    auto *impl_f = llvm_add_inv_kep_E(s, scal_t, batch_size);
 
     // The function arguments:
     // - output pointer (write only),

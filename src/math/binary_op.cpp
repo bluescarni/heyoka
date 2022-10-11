@@ -318,14 +318,12 @@ namespace
 {
 
 // Derivative of number +- number.
-template <bool AddOrSub, typename T, typename U, typename V,
+template <bool AddOrSub, typename U, typename V,
           std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
-llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const U &num0, const V &num1, const std::vector<llvm::Value *> &,
-                                        llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                        std::uint32_t batch_size)
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, llvm::Type *fp_t, const U &num0, const V &num1,
+                                        const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
+                                        std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
-    auto *fp_t = to_llvm_type<T>(s.context());
-
     if (order == 0u) {
         auto n0 = taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size);
         auto n1 = taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size);
@@ -337,15 +335,13 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const U &num0, const V &n
 }
 
 // Derivative of number +- var.
-template <bool AddOrSub, typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const U &num, const variable &var,
+template <bool AddOrSub, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, llvm::Type *fp_t, const U &num, const variable &var,
                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
                                         std::uint32_t batch_size)
 {
     auto &builder = s.builder();
-
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     auto *ret = taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
 
@@ -364,14 +360,12 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const U &num, const varia
 }
 
 // Derivative of var +- number.
-template <bool AddOrSub, typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const variable &var, const U &num,
+template <bool AddOrSub, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, llvm::Type *fp_t, const variable &var, const U &num,
                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
                                         std::uint32_t batch_size)
 {
-    auto *fp_t = to_llvm_type<T>(s.context());
-
     auto *ret = taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
 
     if (order == 0u) {
@@ -386,13 +380,13 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const variable &var, cons
 }
 
 // Derivative of var +- var.
-template <bool AddOrSub, typename T>
-llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const variable &var0, const variable &var1,
+template <bool AddOrSub>
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, llvm::Type *, const variable &var0, const variable &var1,
                                         const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
                                         std::uint32_t order, std::uint32_t, std::uint32_t)
 {
-    auto v0 = taylor_fetch_diff(arr, uname_to_index(var0.name()), order, n_uvars);
-    auto v1 = taylor_fetch_diff(arr, uname_to_index(var1.name()), order, n_uvars);
+    auto *v0 = taylor_fetch_diff(arr, uname_to_index(var0.name()), order, n_uvars);
+    auto *v1 = taylor_fetch_diff(arr, uname_to_index(var1.name()), order, n_uvars);
 
     if constexpr (AddOrSub) {
         return s.builder().CreateFAdd(v0, v1);
@@ -403,49 +397,45 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const variable &var0, con
 
 // All the other cases.
 // LCOV_EXCL_START
-template <bool, typename, typename V1, typename V2,
+template <bool, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
-llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
-                                        llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &, llvm::Type *, const V1 &, const V2 &,
+                                        const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                        std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of add()/sub()");
 }
 // LCOV_EXCL_STOP
 
-template <typename T>
-llvm::Value *bo_taylor_diff_add(llvm_state &s, const binary_op &bo, const std::vector<llvm::Value *> &arr,
-                                llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                std::uint32_t batch_size)
+llvm::Value *bo_taylor_diff_add(llvm_state &s, llvm::Type *fp_t, const binary_op &bo,
+                                const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     return std::visit(
         [&](const auto &v1, const auto &v2) {
-            return bo_taylor_diff_addsub_impl<true, T>(s, v1, v2, arr, par_ptr, n_uvars, order, idx, batch_size);
+            return bo_taylor_diff_addsub_impl<true>(s, fp_t, v1, v2, arr, par_ptr, n_uvars, order, idx, batch_size);
         },
         bo.lhs().value(), bo.rhs().value());
 }
 
-template <typename T>
-llvm::Value *bo_taylor_diff_sub(llvm_state &s, const binary_op &bo, const std::vector<llvm::Value *> &arr,
-                                llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                std::uint32_t batch_size)
+llvm::Value *bo_taylor_diff_sub(llvm_state &s, llvm::Type *fp_t, const binary_op &bo,
+                                const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     return std::visit(
         [&](const auto &v1, const auto &v2) {
-            return bo_taylor_diff_addsub_impl<false, T>(s, v1, v2, arr, par_ptr, n_uvars, order, idx, batch_size);
+            return bo_taylor_diff_addsub_impl<false>(s, fp_t, v1, v2, arr, par_ptr, n_uvars, order, idx, batch_size);
         },
         bo.lhs().value(), bo.rhs().value());
 }
 
 // Derivative of number * number.
-template <typename T, typename U, typename V,
-          std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
-llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const U &num0, const V &num1, const std::vector<llvm::Value *> &,
-                                     llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                     std::uint32_t batch_size)
+template <typename U, typename V, std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
+llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *fp_t, const U &num0, const V &num1,
+                                     const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
+                                     std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
-    auto *fp_t = to_llvm_type<T>(s.context());
-
     if (order == 0u) {
         auto n0 = taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size);
         auto n1 = taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size);
@@ -457,13 +447,11 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const U &num0, const V &num1
 }
 
 // Derivative of var * number.
-template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var, const U &num,
+template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *fp_t, const variable &var, const U &num,
                                      const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                                      std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
-    auto *fp_t = to_llvm_type<T>(s.context());
-
     auto &builder = s.builder();
 
     auto *ret = taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
@@ -473,18 +461,17 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var, const U
 }
 
 // Derivative of number * var.
-template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const U &num, const variable &var,
+template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *fp_t, const U &num, const variable &var,
                                      const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                                      std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     // Return the derivative of var * number.
-    return bo_taylor_diff_mul_impl<T>(s, var, num, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return bo_taylor_diff_mul_impl(s, fp_t, var, num, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 // Derivative of var * var.
-template <typename T>
-llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var0, const variable &var1,
+llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *, const variable &var0, const variable &var1,
                                      const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
                                      std::uint32_t order, std::uint32_t, std::uint32_t)
 {
@@ -497,8 +484,8 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var0, const 
     std::vector<llvm::Value *> sum;
     auto &builder = s.builder();
     for (std::uint32_t j = 0; j <= order; ++j) {
-        auto v0 = taylor_fetch_diff(arr, u_idx0, order - j, n_uvars);
-        auto v1 = taylor_fetch_diff(arr, u_idx1, j, n_uvars);
+        auto *v0 = taylor_fetch_diff(arr, u_idx0, order - j, n_uvars);
+        auto *v1 = taylor_fetch_diff(arr, u_idx1, j, n_uvars);
 
         // Add v0*v1 to the sum.
         sum.push_back(builder.CreateFMul(v0, v1));
@@ -509,37 +496,33 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var0, const 
 
 // All the other cases.
 // LCOV_EXCL_START
-template <typename, typename V1, typename V2,
-          std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
-llvm::Value *bo_taylor_diff_mul_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
-                                     llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
+template <typename V1, typename V2, std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
+llvm::Value *bo_taylor_diff_mul_impl(llvm_state &, llvm::Type *, const V1 &, const V2 &,
+                                     const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                     std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of mul()");
 }
 // LCOV_EXCL_STOP
 
-template <typename T>
-llvm::Value *bo_taylor_diff_mul(llvm_state &s, const binary_op &bo, const std::vector<llvm::Value *> &arr,
-                                llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                std::uint32_t batch_size)
+llvm::Value *bo_taylor_diff_mul(llvm_state &s, llvm::Type *fp_t, const binary_op &bo,
+                                const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     return std::visit(
         [&](const auto &v1, const auto &v2) {
-            return bo_taylor_diff_mul_impl<T>(s, v1, v2, arr, par_ptr, n_uvars, order, idx, batch_size);
+            return bo_taylor_diff_mul_impl(s, fp_t, v1, v2, arr, par_ptr, n_uvars, order, idx, batch_size);
         },
         bo.lhs().value(), bo.rhs().value());
 }
 
 // Derivative of number / number.
-template <typename T, typename U, typename V,
-          std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
-llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const U &num0, const V &num1, const std::vector<llvm::Value *> &,
-                                     llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                     std::uint32_t batch_size)
+template <typename U, typename V, std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
+llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &num0, const V &num1,
+                                     const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
+                                     std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
-    auto *fp_t = to_llvm_type<T>(s.context());
-
     if (order == 0u) {
         auto n0 = taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size);
         auto n1 = taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size);
@@ -552,17 +535,15 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const U &num0, const V &num1
 
 // Derivative of variable / variable or number / variable. These two cases
 // are quite similar, so we handle them together.
-template <typename T, typename U,
+template <typename U,
           std::enable_if_t<
               std::disjunction_v<std::is_same<U, number>, std::is_same<U, variable>, std::is_same<U, param>>, int>
           = 0>
-llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const U &nv, const variable &var1,
+llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &nv, const variable &var1,
                                      const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                                      std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
-
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     // Fetch the index of var1.
     const auto u_idx1 = uname_to_index(var1.name());
@@ -584,19 +565,19 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const U &nv, const variable 
     // (i.e., order inclusive).
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
-        auto v0 = taylor_fetch_diff(arr, idx, order - j, n_uvars);
-        auto v1 = taylor_fetch_diff(arr, u_idx1, j, n_uvars);
+        auto *v0 = taylor_fetch_diff(arr, idx, order - j, n_uvars);
+        auto *v1 = taylor_fetch_diff(arr, u_idx1, j, n_uvars);
 
         // Add v0*v1 to the sum.
         sum.push_back(builder.CreateFMul(v0, v1));
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = pairwise_sum(builder, sum);
+    auto *ret_acc = pairwise_sum(builder, sum);
 
     // Load the divisor for the quotient formula.
     // This is the zero-th order derivative of var1.
-    auto div = taylor_fetch_diff(arr, u_idx1, 0, n_uvars);
+    auto *div = taylor_fetch_diff(arr, u_idx1, 0, n_uvars);
 
     if constexpr (std::is_same_v<U, number> || std::is_same_v<U, param>) {
         // nv is a number/param. Negate the accumulator
@@ -613,14 +594,12 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const U &nv, const variable 
 }
 
 // Derivative of variable / number.
-template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const variable &var, const U &num,
+template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const variable &var, const U &num,
                                      const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                                      std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
-
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     auto *ret = taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
     auto div = taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size);
@@ -630,32 +609,31 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const variable &var, const U
 
 // All the other cases.
 // LCOV_EXCL_START
-template <typename, typename V1, typename V2,
-          std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
-llvm::Value *bo_taylor_diff_div_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
-                                     llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
+template <typename V1, typename V2, std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
+llvm::Value *bo_taylor_diff_div_impl(llvm_state &, llvm::Type *, const V1 &, const V2 &,
+                                     const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                     std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of div()");
 }
 // LCOV_EXCL_STOP
 
-template <typename T>
-llvm::Value *bo_taylor_diff_div(llvm_state &s, const binary_op &bo, const std::vector<llvm::Value *> &arr,
-                                llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                std::uint32_t batch_size)
+llvm::Value *bo_taylor_diff_div(llvm_state &s, llvm::Type *fp_t, const binary_op &bo,
+                                const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     return std::visit(
         [&](const auto &v1, const auto &v2) {
-            return bo_taylor_diff_div_impl<T>(s, v1, v2, arr, par_ptr, n_uvars, order, idx, batch_size);
+            return bo_taylor_diff_div_impl(s, fp_t, v1, v2, arr, par_ptr, n_uvars, order, idx, batch_size);
         },
         bo.lhs().value(), bo.rhs().value());
 }
 
-template <typename T>
-llvm::Value *taylor_diff_bo_impl(llvm_state &s, const binary_op &bo, const std::vector<std::uint32_t> &deps,
-                                 const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
-                                 std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+llvm::Value *taylor_diff_bo_impl(llvm_state &s, llvm::Type *fp_t, const binary_op &bo,
+                                 const std::vector<std::uint32_t> &deps, const std::vector<llvm::Value *> &arr,
+                                 llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                 std::uint32_t batch_size)
 {
     assert(bo.args().size() == 2u);
     assert(bo.op() >= binary_op::type::add && bo.op() <= binary_op::type::div);
@@ -669,46 +647,27 @@ llvm::Value *taylor_diff_bo_impl(llvm_state &s, const binary_op &bo, const std::
 
     switch (bo.op()) {
         case binary_op::type::add:
-            return bo_taylor_diff_add<T>(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
+            return bo_taylor_diff_add(s, fp_t, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
         case binary_op::type::sub:
-            return bo_taylor_diff_sub<T>(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
+            return bo_taylor_diff_sub(s, fp_t, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
         case binary_op::type::mul:
-            return bo_taylor_diff_mul<T>(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
+            return bo_taylor_diff_mul(s, fp_t, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
         default:
-            return bo_taylor_diff_div<T>(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
+            assert(bo.op() == binary_op::type::div);
+            return bo_taylor_diff_div(s, fp_t, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
     }
 }
 
 } // namespace
 
-llvm::Value *binary_op::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                        std::uint32_t batch_size, bool) const
+llvm::Value *binary_op::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                    const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                    std::uint32_t batch_size, bool) const
 {
 
-    return taylor_diff_bo_impl<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_bo_impl(s, fp_t, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
-
-llvm::Value *binary_op::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                         std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_bo_impl<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *binary_op::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                         std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_bo_impl<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
-}
-
-#endif
 
 namespace
 {

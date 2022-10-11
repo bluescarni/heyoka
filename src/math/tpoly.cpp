@@ -80,9 +80,8 @@ void tpoly_impl::to_stream(std::ostream &os) const
 namespace
 {
 
-template <typename T>
-llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                                    std::uint32_t order, std::uint32_t batch_size)
+llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, llvm::Type *fp_t, const tpoly_impl &tp, llvm::Value *par_ptr,
+                                    llvm::Value *time_ptr, std::uint32_t order, std::uint32_t batch_size)
 {
     assert(tp.m_e_idx > tp.m_b_idx);
     assert(std::holds_alternative<param>(tp.args()[0].value()));
@@ -91,8 +90,6 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
     const auto n = (tp.m_e_idx - tp.m_b_idx) - 1u;
 
     auto &builder = s.builder();
-
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     // Null retval if the diff order is larger than the
     // polynomial order.
@@ -107,7 +104,7 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
     // binomial coefficient).
     assert(tp.m_e_idx > 0u);
     auto bc = binomial(number_like(s, fp_t, static_cast<double>(n)), number_like(s, fp_t, static_cast<double>(order)));
-    auto ret = taylor_codegen_numparam(s, fp_t, param{tp.m_e_idx - 1u}, par_ptr, batch_size);
+    auto *ret = taylor_codegen_numparam(s, fp_t, param{tp.m_e_idx - 1u}, par_ptr, batch_size);
     ret = builder.CreateFMul(ret, vector_splat(builder, llvm_codegen(s, fp_t, bc), batch_size));
 
     // Horner evaluation of polynomial derivative.
@@ -121,7 +118,7 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
                       number_like(s, fp_t, static_cast<double>(order)));
 
         // Load the poly coefficient from the par array and multiply it by bc.
-        auto cf = taylor_codegen_numparam(s, fp_t, param{tp.m_b_idx + i + order}, par_ptr, batch_size);
+        auto *cf = taylor_codegen_numparam(s, fp_t, param{tp.m_b_idx + i + order}, par_ptr, batch_size);
         cf = builder.CreateFMul(cf, vector_splat(builder, llvm_codegen(s, fp_t, bc), batch_size));
 
         // Horner iteration.
@@ -133,33 +130,13 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
 
 } // namespace
 
-llvm::Value *tpoly_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &,
-                                         const std::vector<llvm::Value *> &, llvm::Value *par_ptr,
-                                         llvm::Value *time_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                         std::uint32_t batch_size, bool) const
+llvm::Value *tpoly_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &,
+                                     const std::vector<llvm::Value *> &, llvm::Value *par_ptr, llvm::Value *time_ptr,
+                                     std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
+                                     bool) const
 {
-    return taylor_diff_tpoly_impl<double>(s, *this, par_ptr, time_ptr, order, batch_size);
+    return taylor_diff_tpoly_impl(s, fp_t, *this, par_ptr, time_ptr, order, batch_size);
 }
-
-llvm::Value *tpoly_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &,
-                                          const std::vector<llvm::Value *> &, llvm::Value *par_ptr,
-                                          llvm::Value *time_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                          std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_tpoly_impl<long double>(s, *this, par_ptr, time_ptr, order, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *tpoly_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &,
-                                          const std::vector<llvm::Value *> &, llvm::Value *par_ptr,
-                                          llvm::Value *time_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                          std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_tpoly_impl<mppp::real128>(s, *this, par_ptr, time_ptr, order, batch_size);
-}
-
-#endif
 
 namespace
 {

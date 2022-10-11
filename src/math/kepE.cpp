@@ -98,7 +98,7 @@ llvm::Value *kepE_llvm_eval_impl(llvm_state &s, const func_base &fb, const std::
 {
     return llvm_eval_helper<T>(
         [&s, batch_size](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
-            auto *kepE_func = llvm_add_inv_kep_E<T>(s, batch_size);
+            auto *kepE_func = llvm_add_inv_kep_E(s, to_llvm_type<T>(s.context()), batch_size);
 
             return s.builder().CreateCall(kepE_func, {args[0], args[1]});
         },
@@ -139,7 +139,7 @@ template <typename T>
     return llvm_c_eval_func_helper<T>(
         "kepE",
         [&s, batch_size](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
-            auto *kepE_func = llvm_add_inv_kep_E<T>(s, batch_size);
+            auto *kepE_func = llvm_add_inv_kep_E(s, to_llvm_type<T>(s.context()), batch_size);
 
             return s.builder().CreateCall(kepE_func, {args[0], args[1]});
         },
@@ -209,15 +209,12 @@ namespace
 {
 
 // Derivative of kepE(number, number).
-template <typename T, typename U, typename V,
-          std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
-llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_t> &, const U &num0, const V &num1,
-                                   const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
-                                   std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+template <typename U, typename V, std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
+llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &, const U &num0,
+                                   const V &num1, const std::vector<llvm::Value *> &, llvm::Value *par_ptr,
+                                   std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
-
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     if (order == 0u) {
         // Do the number codegen.
@@ -225,7 +222,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
         auto M = taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size);
 
         // Create/fetch the Kepler solver.
-        auto fkep = llvm_add_inv_kep_E<T>(s, batch_size);
+        auto *fkep = llvm_add_inv_kep_E(s, fp_t, batch_size);
 
         // Invoke and return.
         return builder.CreateCall(fkep, {e, M});
@@ -235,17 +232,15 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 }
 
 // Derivative of kepE(var, number).
-template <typename T, typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
-llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_t> &deps, const variable &var,
-                                   const U &num, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
-                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+template <typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
+llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                   const variable &var, const U &num, const std::vector<llvm::Value *> &arr,
+                                   llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                    std::uint32_t batch_size)
 {
     assert(deps.size() == 2u);
 
     auto &builder = s.builder();
-
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     // Fetch the index of the e variable argument.
     const auto e_idx = uname_to_index(var.name());
@@ -255,25 +250,25 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 
     if (order == 0u) {
         // Create/fetch the Kepler solver.
-        auto fkep = llvm_add_inv_kep_E<T>(s, batch_size);
+        auto *fkep = llvm_add_inv_kep_E(s, fp_t, batch_size);
 
         // Invoke and return.
         return builder.CreateCall(fkep, {taylor_fetch_diff(arr, e_idx, 0, n_uvars), M});
     }
 
     // Splat the order.
-    auto n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<double>(order)}), batch_size);
+    auto *n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<double>(order)}), batch_size);
 
     // Compute the divisor: n * (1 - c^[0]).
     const auto c_idx = deps[0];
-    auto one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
-    auto divisor = builder.CreateFMul(n, builder.CreateFSub(one_fp, taylor_fetch_diff(arr, c_idx, 0, n_uvars)));
+    auto *one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
+    auto *divisor = builder.CreateFMul(n, builder.CreateFSub(one_fp, taylor_fetch_diff(arr, c_idx, 0, n_uvars)));
 
     // Compute the first part of the dividend: n * e^[n] * d^[0] (the derivative of M is zero because
     // here M is a constant and the order is > 0).
     const auto d_idx = deps[1];
-    auto dividend = builder.CreateFMul(n, builder.CreateFMul(taylor_fetch_diff(arr, e_idx, order, n_uvars),
-                                                             taylor_fetch_diff(arr, d_idx, 0, n_uvars)));
+    auto *dividend = builder.CreateFMul(n, builder.CreateFMul(taylor_fetch_diff(arr, e_idx, order, n_uvars),
+                                                              taylor_fetch_diff(arr, d_idx, 0, n_uvars)));
 
     // Compute the second part of the dividend only for order > 1, in order to avoid
     // an empty summation.
@@ -282,7 +277,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 
         // NOTE: iteration in the [1, order) range.
         for (std::uint32_t j = 1; j < order; ++j) {
-            auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
+            auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
             auto *cnj = taylor_fetch_diff(arr, c_idx, order - j, n_uvars);
             auto *aj = taylor_fetch_diff(arr, idx, j, n_uvars);
@@ -303,17 +298,15 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 }
 
 // Derivative of kepE(number, var).
-template <typename T, typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
-llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_t> &deps, const U &num,
-                                   const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
-                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+template <typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
+llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                   const U &num, const variable &var, const std::vector<llvm::Value *> &arr,
+                                   llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                    std::uint32_t batch_size)
 {
     assert(deps.size() == 2u);
 
     auto &builder = s.builder();
-
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     // Fetch the index of the M variable argument.
     const auto M_idx = uname_to_index(var.name());
@@ -323,23 +316,23 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 
     if (order == 0u) {
         // Create/fetch the Kepler solver.
-        auto fkep = llvm_add_inv_kep_E<T>(s, batch_size);
+        auto *fkep = llvm_add_inv_kep_E(s, fp_t, batch_size);
 
         // Invoke and return.
         return builder.CreateCall(fkep, {e, taylor_fetch_diff(arr, M_idx, 0, n_uvars)});
     }
 
     // Splat the order.
-    auto n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<double>(order)}), batch_size);
+    auto *n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<double>(order)}), batch_size);
 
     // Compute the divisor: n * (1 - c^[0]).
     const auto c_idx = deps[0];
-    auto one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
-    auto divisor = builder.CreateFMul(n, builder.CreateFSub(one_fp, taylor_fetch_diff(arr, c_idx, 0, n_uvars)));
+    auto *one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
+    auto *divisor = builder.CreateFMul(n, builder.CreateFSub(one_fp, taylor_fetch_diff(arr, c_idx, 0, n_uvars)));
 
     // Compute the first part of the dividend: n * M^[n] (the derivative of e is zero because
     // here e is a constant and the order is > 0).
-    auto dividend = builder.CreateFMul(n, taylor_fetch_diff(arr, M_idx, order, n_uvars));
+    auto *dividend = builder.CreateFMul(n, taylor_fetch_diff(arr, M_idx, order, n_uvars));
 
     // Compute the second part of the dividend only for order > 1, in order to avoid
     // an empty summation.
@@ -348,7 +341,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 
         // NOTE: iteration in the [1, order) range.
         for (std::uint32_t j = 1; j < order; ++j) {
-            auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
+            auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
             auto *cnj = taylor_fetch_diff(arr, c_idx, order - j, n_uvars);
             auto *aj = taylor_fetch_diff(arr, idx, j, n_uvars);
@@ -365,17 +358,14 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 }
 
 // Derivative of kepE(var, var).
-template <typename T>
-llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_t> &deps, const variable &var0,
-                                   const variable &var1, const std::vector<llvm::Value *> &arr, llvm::Value *,
-                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                   const variable &var0, const variable &var1, const std::vector<llvm::Value *> &arr,
+                                   llvm::Value *, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                    std::uint32_t batch_size)
 {
     assert(deps.size() == 2u);
 
     auto &builder = s.builder();
-
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     // Fetch the index of the e/M variable arguments.
     const auto e_idx = uname_to_index(var0.name());
@@ -383,7 +373,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 
     if (order == 0u) {
         // Create/fetch the Kepler solver.
-        auto fkep = llvm_add_inv_kep_E<T>(s, batch_size);
+        auto *fkep = llvm_add_inv_kep_E(s, fp_t, batch_size);
 
         // Invoke and return.
         return builder.CreateCall(
@@ -391,12 +381,12 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
     }
 
     // Splat the order.
-    auto n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<double>(order)}), batch_size);
+    auto *n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<double>(order)}), batch_size);
 
     // Compute the divisor: n * (1 - c^[0]).
     const auto c_idx = deps[0];
-    auto one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
-    auto divisor = builder.CreateFMul(n, builder.CreateFSub(one_fp, taylor_fetch_diff(arr, c_idx, 0, n_uvars)));
+    auto *one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
+    auto *divisor = builder.CreateFMul(n, builder.CreateFSub(one_fp, taylor_fetch_diff(arr, c_idx, 0, n_uvars)));
 
     // Compute the first part of the dividend: n * (e^[n] * d^[0] + M^[n]).
     const auto d_idx = deps[1];
@@ -412,7 +402,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 
         // NOTE: iteration in the [1, order) range.
         for (std::uint32_t j = 1; j < order; ++j) {
-            auto fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
+            auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
             auto *cnj = taylor_fetch_diff(arr, c_idx, order - j, n_uvars);
             auto *aj = taylor_fetch_diff(arr, idx, j, n_uvars);
@@ -433,8 +423,8 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, const std::vector<std::uint32_
 }
 
 // All the other cases.
-template <typename T, typename U, typename V, typename... Args>
-llvm::Value *taylor_diff_kepE_impl(llvm_state &, const std::vector<std::uint32_t> &, const U &, const V &,
+template <typename U, typename V, typename... Args>
+llvm::Value *taylor_diff_kepE_impl(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &, const U &, const V &,
                                    const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
                                    std::uint32_t, std::uint32_t, const Args &...)
 {
@@ -442,10 +432,10 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &, const std::vector<std::uint32_t
         "An invalid argument type was encountered while trying to build the Taylor derivative of kepE()");
 }
 
-template <typename T>
-llvm::Value *taylor_diff_kepE(llvm_state &s, const kepE_impl &f, const std::vector<std::uint32_t> &deps,
-                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
-                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+llvm::Value *taylor_diff_kepE(llvm_state &s, llvm::Type *fp_t, const kepE_impl &f,
+                              const std::vector<std::uint32_t> &deps, const std::vector<llvm::Value *> &arr,
+                              llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                              std::uint32_t batch_size)
 {
     assert(f.args().size() == 2u);
 
@@ -459,40 +449,20 @@ llvm::Value *taylor_diff_kepE(llvm_state &s, const kepE_impl &f, const std::vect
 
     return std::visit(
         [&](const auto &v1, const auto &v2) {
-            return taylor_diff_kepE_impl<T>(s, deps, v1, v2, arr, par_ptr, n_uvars, order, idx, batch_size);
+            return taylor_diff_kepE_impl(s, fp_t, deps, v1, v2, arr, par_ptr, n_uvars, order, idx, batch_size);
         },
         f.args()[0].value(), f.args()[1].value());
 }
 
 } // namespace
 
-llvm::Value *kepE_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                        std::uint32_t batch_size, bool) const
+llvm::Value *kepE_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                    const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                    std::uint32_t batch_size, bool) const
 {
-    return taylor_diff_kepE<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_kepE(s, fp_t, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
-
-llvm::Value *kepE_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                         std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_kepE<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *kepE_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                         std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_kepE<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
-}
-
-#endif
 
 namespace
 {
@@ -513,7 +483,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n0, const V
             // LCOV_EXCL_STOP
 
             // Create/fetch the Kepler solver.
-            auto fkep = llvm_add_inv_kep_E<T>(s, batch_size);
+            auto *fkep = llvm_add_inv_kep_E(s, to_llvm_type<T>(s.context()), batch_size);
 
             return s.builder().CreateCall(fkep, args);
         },
@@ -545,7 +515,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &var,
         // The function was not created before, do it now.
 
         // Create/fetch the Kepler solver.
-        auto fkep = llvm_add_inv_kep_E<T>(s, batch_size);
+        auto *fkep = llvm_add_inv_kep_E(s, fp_t, batch_size);
 
         // Fetch the current insertion block.
         auto *orig_bb = builder.GetInsertBlock();
@@ -672,7 +642,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n, const va
         // The function was not created before, do it now.
 
         // Create/fetch the Kepler solver.
-        auto fkep = llvm_add_inv_kep_E<T>(s, batch_size);
+        auto *fkep = llvm_add_inv_kep_E(s, fp_t, batch_size);
 
         // Fetch the current insertion block.
         auto *orig_bb = builder.GetInsertBlock();
@@ -791,10 +761,10 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &var0
         // The function was not created before, do it now.
 
         // Create/fetch the Kepler solver.
-        auto fkep = llvm_add_inv_kep_E<T>(s, batch_size);
+        auto *fkep = llvm_add_inv_kep_E(s, fp_t, batch_size);
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
