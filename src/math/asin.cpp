@@ -301,8 +301,10 @@ template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_asin_impl(llvm_state &s, const asin_impl &, const U &num, std::uint32_t n_uvars,
                                              std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_numpar<T>(
-        s, n_uvars, batch_size, "asin", 1,
+    auto *fp_t = to_llvm_type<T>(s.context());
+
+    return taylor_c_diff_func_numpar(
+        s, fp_t, n_uvars, batch_size, "asin", 1,
         [&s](const auto &args) {
             // LCOV_EXCL_START
             assert(args.size() == 1u);

@@ -431,8 +431,10 @@ template <typename T, typename U, typename V,
 llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n0, const V &n1, std::uint32_t n_uvars,
                                               std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_numpar<T>(
-        s, n_uvars, batch_size, "atan2", 1,
+    auto *fp_t = to_llvm_type<T>(s.context());
+
+    return taylor_c_diff_func_numpar(
+        s, fp_t, n_uvars, batch_size, "atan2", 1,
         [&s](const auto &args) {
             // LCOV_EXCL_START
             assert(args.size() == 2u);

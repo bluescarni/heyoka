@@ -358,8 +358,10 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
     // Create the function name.
     const auto *const pow_name = allow_approx ? "pow_approx" : "pow";
 
-    return taylor_c_diff_func_numpar<T>(
-        s, n_uvars, batch_size, pow_name, 0,
+    auto *fp_t = to_llvm_type<T>(s.context());
+
+    return taylor_c_diff_func_numpar(
+        s, fp_t, n_uvars, batch_size, pow_name, 0,
         [&s, allow_approx](const auto &args) {
             // LCOV_EXCL_START
             assert(args.size() == 2u);
