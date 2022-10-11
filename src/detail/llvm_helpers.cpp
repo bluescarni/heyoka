@@ -2365,8 +2365,7 @@ llvm::Value *llvm_dl_gt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
 
 // Helper to create a wrapper for kepE() usable from C++ code.
 // Input/output is done through pointers.
-template <typename T>
-void llvm_add_inv_kep_E_wrapper(llvm_state &s, std::uint32_t batch_size, const std::string &name)
+void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t batch_size, const std::string &name)
 {
     assert(batch_size > 0u); // LCOV_EXCL_LINE
 
@@ -2376,9 +2375,6 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, std::uint32_t batch_size, const s
 
     // Make sure the function does not exist already.
     assert(md.getFunction(name) == nullptr); // LCOV_EXCL_LINE
-
-    // Fetch the scalar floating-point type.
-    auto scal_t = to_llvm_type<T>(context);
 
     // Add the implementation function.
     auto *impl_f = llvm_add_inv_kep_E(s, scal_t, batch_size);
@@ -2438,19 +2434,6 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, std::uint32_t batch_size, const s
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
 }
-
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper<double>(llvm_state &, std::uint32_t, const std::string &);
-
-template HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper<long double>(llvm_state &, std::uint32_t,
-                                                                        const std::string &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper<mppp::real128>(llvm_state &, std::uint32_t,
-                                                                          const std::string &);
-
-#endif
 
 // Inverse cosine.
 llvm::Value *llvm_acos(llvm_state &s, llvm::Value *x)

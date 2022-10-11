@@ -466,7 +466,7 @@ TEST_CASE("inv_kep_E_scalar")
             llvm_state s{kw::opt_level = opt_level};
 
             // Add the function.
-            llvm_add_inv_kep_E_wrapper<fp_t>(s, 1, "hey_kep");
+            llvm_add_inv_kep_E_wrapper(s, detail::to_llvm_type<fp_t>(s.context()), 1, "hey_kep");
 
             // Run the optimisation pass.
             s.optimise();
@@ -614,7 +614,7 @@ TEST_CASE("inv_kep_E_batch")
                 llvm_state s{kw::opt_level = opt_level};
 
                 // Add the function.
-                llvm_add_inv_kep_E_wrapper<fp_t>(s, batch_size, "hey_kep");
+                llvm_add_inv_kep_E_wrapper(s, detail::to_llvm_type<fp_t>(s.context()), batch_size, "hey_kep");
 
                 // Run the optimisation pass.
                 s.optimise();
