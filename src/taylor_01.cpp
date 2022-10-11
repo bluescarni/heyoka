@@ -1704,7 +1704,7 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
 
             // Zero-init the element in comp_arr.
             builder.CreateStore(llvm::ConstantFP::get(vector_t, 0.),
-                                builder.CreateInBoundsGEP(vector_t, comp_arr, {cur_var_idx}));
+                                builder.CreateInBoundsGEP(vector_t, comp_arr, cur_var_idx));
         });
 
         // Init the running updater for the powers of h.
@@ -1723,7 +1723,7 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
                     = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
                                         builder.CreateMul(builder.getInt32(batch_size), cur_order));
                 auto *cf = load_vector_from_memory(builder, fp_scal_t,
-                                                   builder.CreateInBoundsGEP(fp_scal_t, tc_ptr, {tc_idx}), batch_size);
+                                                   builder.CreateInBoundsGEP(fp_scal_t, tc_ptr, tc_idx), batch_size);
                 auto *tmp = builder.CreateFMul(cf, cur_h_val);
 
                 // Compute the quantities for the compensation.
