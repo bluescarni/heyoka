@@ -440,17 +440,13 @@ namespace
 // is either a u variable or a number/param), n_uvars the number of variables in
 // the decomposition, arr the array containing the derivatives of all u variables
 // up to order - 1.
-template <typename T>
-llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const std::vector<llvm::Value *> &arr,
-                                    llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order,
-                                    std::uint32_t batch_size)
+llvm::Value *taylor_compute_sv_diff(llvm_state &s, llvm::Type *fp_t, const expression &ex,
+                                    const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                    std::uint32_t order, std::uint32_t batch_size)
 {
     assert(order > 0u);
 
     auto &builder = s.builder();
-
-    // Fetch ths type corresponding to T.
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     return std::visit(
         [&](const auto &v) -> llvm::Value * {
@@ -480,7 +476,7 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
                 if (order == 1u) {
                     return taylor_codegen_numparam(s, fp_t, v, par_ptr, batch_size);
                 } else {
-                    return llvm::ConstantFP::get(to_llvm_vector_type<T>(s.context(), batch_size), 0.);
+                    return llvm::ConstantFP::get(make_vector_type(fp_t, batch_size), 0.);
                 }
             } else {
                 assert(false);
@@ -1388,7 +1384,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
             // are at the end of the decomposition vector.
             for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
                 diff_arr.push_back(
-                    taylor_compute_sv_diff<T>(s, dc[i].first, diff_arr, par_ptr, n_uvars, cur_order, batch_size));
+                    taylor_compute_sv_diff(s, fp_t, dc[i].first, diff_arr, par_ptr, n_uvars, cur_order, batch_size));
             }
 
             // Now the other u variables.
@@ -1401,7 +1397,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         // Compute the last-order derivatives for the state variables.
         for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
             diff_arr.push_back(
-                taylor_compute_sv_diff<T>(s, dc[i].first, diff_arr, par_ptr, n_uvars, order, batch_size));
+                taylor_compute_sv_diff(s, fp_t, dc[i].first, diff_arr, par_ptr, n_uvars, order, batch_size));
         }
 
         // If there are sv funcs, we need to compute their last-order derivatives too:
