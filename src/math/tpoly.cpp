@@ -141,8 +141,7 @@ llvm::Value *tpoly_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std:
 namespace
 {
 
-template <typename T>
-llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, llvm::Type *scal_t, const tpoly_impl &tp, std::uint32_t n_uvars,
                                          std::uint32_t batch_size)
 {
     assert(tp.m_e_idx > tp.m_b_idx);
@@ -156,9 +155,8 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point types.
-    auto *scal_t = to_llvm_type<T>(context);
-    auto *val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(scal_t, batch_size);
 
     // Fetch the function name and arguments.
     // NOTE: we mangle on the poly degree as well, so that we will be
@@ -288,27 +286,11 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
 
 } // namespace
 
-llvm::Function *tpoly_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                   bool) const
+llvm::Function *tpoly_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                               std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_tpoly_impl<double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_tpoly_impl(s, fp_t, *this, n_uvars, batch_size);
 }
-
-llvm::Function *tpoly_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                    bool) const
-{
-    return taylor_c_diff_tpoly_impl<long double>(s, *this, n_uvars, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *tpoly_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                    bool) const
-{
-    return taylor_c_diff_tpoly_impl<mppp::real128>(s, *this, n_uvars, batch_size);
-}
-
-#endif
 
 // Small helper to detect if an expression
 // is a tpoly function.

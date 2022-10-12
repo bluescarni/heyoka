@@ -221,8 +221,7 @@ llvm::Value *sum_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::v
 namespace
 {
 
-template <typename T>
-llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, std::uint32_t n_uvars,
+llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, const sum_impl &sf, std::uint32_t n_uvars,
                                             std::uint32_t batch_size)
 {
     // NOTE: this is prevented in the implementation
@@ -233,8 +232,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the scalar and vector floating-point types.
-    auto *fp_t = to_llvm_type<T>(context);
+    // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Build the vector of arguments needed to determine the function name.
@@ -353,27 +351,11 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
 
 } // namespace
 
-llvm::Function *sum_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                 bool) const
+llvm::Function *sum_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                             std::uint32_t batch_size, bool) const
 {
-    return sum_taylor_c_diff_func_impl<double>(s, *this, n_uvars, batch_size);
+    return sum_taylor_c_diff_func_impl(s, fp_t, *this, n_uvars, batch_size);
 }
-
-llvm::Function *sum_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
-{
-    return sum_taylor_c_diff_func_impl<long double>(s, *this, n_uvars, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *sum_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
-{
-    return sum_taylor_c_diff_func_impl<mppp::real128>(s, *this, n_uvars, batch_size);
-}
-
-#endif
 
 } // namespace detail
 

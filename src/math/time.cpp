@@ -101,15 +101,14 @@ namespace
 // NOTE: perhaps later on this can become a generic implementation
 // for nullary functions, in the same mold as
 // taylor_c_diff_func_numpar().
-template <typename T>
-llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_time_impl(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                        std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the scalar and vector floating-point types.
-    auto *fp_t = to_llvm_type<T>(context);
+    // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
@@ -193,33 +192,17 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t n_uvars, st
 
 } // namespace
 
-llvm::Function *time_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
+llvm::Function *time_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                              std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_time_impl<double>(s, n_uvars, batch_size);
+    return taylor_c_diff_time_impl(s, fp_t, n_uvars, batch_size);
 }
-
-llvm::Function *time_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                   bool) const
-{
-    return taylor_c_diff_time_impl<long double>(s, n_uvars, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *time_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                   bool) const
-{
-    return taylor_c_diff_time_impl<mppp::real128>(s, n_uvars, batch_size);
-}
-
-#endif
 
 // Small helper to detect if an expression
 // is a time function.
 bool is_time(const expression &ex)
 {
-    if (auto func_ptr = std::get_if<func>(&ex.value());
+    if (const auto *func_ptr = std::get_if<func>(&ex.value());
         func_ptr != nullptr && func_ptr->extract<time_impl>() != nullptr) {
         return true;
     } else {

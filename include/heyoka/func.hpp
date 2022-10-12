@@ -143,9 +143,13 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
 
     virtual taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) && = 0;
     virtual bool has_taylor_decompose() const = 0;
+
     virtual llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                                      const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
                                      std::uint32_t, std::uint32_t, std::uint32_t, bool) const
+        = 0;
+
+    virtual llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const
         = 0;
 
     virtual llvm::Function *taylor_c_diff_func_dbl(llvm_state &, std::uint32_t, std::uint32_t, bool) const = 0;
@@ -327,6 +331,15 @@ using func_taylor_diff_t = decltype(std::declval<std::add_lvalue_reference_t<con
 
 template <typename T>
 inline constexpr bool func_has_taylor_diff_v = std::is_same_v<detected_t<func_taylor_diff_t, T>, llvm::Value *>;
+
+template <typename T>
+using func_taylor_c_diff_func_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().taylor_c_diff_func(
+    std::declval<llvm_state &>(), std::declval<llvm::Type *>(), std::declval<std::uint32_t>(),
+    std::declval<std::uint32_t>(), std::declval<bool>()));
+
+template <typename T>
+inline constexpr bool func_has_taylor_c_diff_func_v
+    = std::is_same_v<detected_t<func_taylor_c_diff_func_t, T>, llvm::Function *>;
 
 template <typename T>
 using func_taylor_c_diff_func_dbl_t
@@ -624,6 +637,16 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
             throw not_implemented_error("Taylor diff is not implemented for the function '" + get_name() + "'");
         }
     }
+    llvm::Function *taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                       bool high_accuracy) const final
+    {
+        if constexpr (func_has_taylor_c_diff_func_v<T>) {
+            return m_value.taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy);
+        } else {
+            throw not_implemented_error("Taylor diff in compact mode is not implemented for the function '" + get_name()
+                                        + "'");
+        }
+    }
     llvm::Function *taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
                                            bool high_accuracy) const final
     {
@@ -836,6 +859,8 @@ public:
     llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
+    llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
+
     llvm::Function *taylor_c_diff_func_dbl(llvm_state &, std::uint32_t, std::uint32_t, bool) const;
     llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, std::uint32_t, std::uint32_t, bool) const;
 #if defined(HEYOKA_HAVE_REAL128)

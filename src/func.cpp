@@ -557,6 +557,34 @@ llvm::Value *func::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vecto
     return retval;
 }
 
+llvm::Function *func::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                         std::uint32_t batch_size, bool high_accuracy) const
+{
+    if (fp_t == nullptr) {
+        throw std::invalid_argument(fmt::format(
+            "Null floating-point type detected in func::taylor_c_diff_func() for the function '{}'", get_name()));
+    }
+
+    if (batch_size == 0u) {
+        throw std::invalid_argument(
+            fmt::format("Zero batch size detected in func::taylor_c_diff_func() for the function '{}'", get_name()));
+    }
+
+    if (n_uvars == 0u) {
+        throw std::invalid_argument(fmt::format(
+            "Zero number of u variables detected in func::taylor_c_diff_func() for the function '{}'", get_name()));
+    }
+
+    auto *retval = ptr()->taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy);
+
+    if (retval == nullptr) {
+        throw std::invalid_argument(
+            fmt::format("Null return value detected in func::taylor_c_diff_func() for the function '{}'", get_name()));
+    }
+
+    return retval;
+}
+
 llvm::Function *func::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
                                              bool high_accuracy) const
 {

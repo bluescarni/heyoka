@@ -426,13 +426,10 @@ namespace
 {
 
 // Derivative of atan2(number, number).
-template <typename T, typename U, typename V,
-          std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
-llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n0, const V &n1, std::uint32_t n_uvars,
-                                              std::uint32_t batch_size)
+template <typename U, typename V, std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
+llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, const U &n0, const V &n1,
+                                              std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    auto *fp_t = to_llvm_type<T>(s.context());
-
     return taylor_c_diff_func_numpar(
         s, fp_t, n_uvars, batch_size, "atan2", 1,
         [&s](const auto &args) {
@@ -448,16 +445,15 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n0, const 
 }
 
 // Derivative of atan2(var, number).
-template <typename T, typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
-llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var, const U &n, std::uint32_t n_uvars,
-                                              std::uint32_t batch_size)
+template <typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
+llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, const variable &var, const U &n,
+                                              std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the scalar and vector floating-point types.
-    auto *fp_t = to_llvm_type<T>(context);
+    // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
@@ -566,16 +562,15 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
 }
 
 // Derivative of atan2(number, var).
-template <typename T, typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
-llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const variable &var, std::uint32_t n_uvars,
-                                              std::uint32_t batch_size)
+template <typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
+llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, const U &n, const variable &var,
+                                              std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the scalar and vector floating-point types.
-    auto *fp_t = to_llvm_type<T>(context);
+    // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
@@ -684,16 +679,14 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
 }
 
 // Derivative of atan2(var, var).
-template <typename T>
-llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var0, const variable &var1,
-                                              std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, const variable &var0,
+                                              const variable &var1, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the scalar and vector floating-point types.
-    auto *fp_t = to_llvm_type<T>(context);
+    // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
@@ -817,9 +810,9 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
 // LCOV_EXCL_START
 
 // All the other cases.
-template <typename T, typename U, typename V, typename... Args>
-llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &, const U &, const V &, std::uint32_t, std::uint32_t,
-                                              const Args &...)
+template <typename U, typename V, typename... Args>
+llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &, llvm::Type *, const U &, const V &, std::uint32_t,
+                                              std::uint32_t, const Args &...)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of atan2() in compact mode");
@@ -827,40 +820,25 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &, const U &, const V &
 
 // LCOV_EXCL_STOP
 
-template <typename T>
-llvm::Function *taylor_c_diff_func_atan2(llvm_state &s, const atan2_impl &fn, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_atan2(llvm_state &s, llvm::Type *fp_t, const atan2_impl &fn, std::uint32_t n_uvars,
                                          std::uint32_t batch_size)
 {
     assert(fn.args().size() == 2u); // LCOV_EXCL_LINE
 
-    return std::visit([&](const auto &v1,
-                          const auto &v2) { return taylor_c_diff_func_atan2_impl<T>(s, v1, v2, n_uvars, batch_size); },
-                      fn.args()[0].value(), fn.args()[1].value());
+    return std::visit(
+        [&](const auto &v1, const auto &v2) {
+            return taylor_c_diff_func_atan2_impl(s, fp_t, v1, v2, n_uvars, batch_size);
+        },
+        fn.args()[0].value(), fn.args()[1].value());
 }
 
 } // namespace
 
-llvm::Function *atan2_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                   bool) const
+llvm::Function *atan2_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                               std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_atan2<double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_atan2(s, fp_t, *this, n_uvars, batch_size);
 }
-
-llvm::Function *atan2_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                    bool) const
-{
-    return taylor_c_diff_func_atan2<long double>(s, *this, n_uvars, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *atan2_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                    bool) const
-{
-    return taylor_c_diff_func_atan2<mppp::real128>(s, *this, n_uvars, batch_size);
-}
-
-#endif
 
 } // namespace detail
 

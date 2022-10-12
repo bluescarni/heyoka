@@ -746,7 +746,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 
         for (const auto &ex : seg) {
             // Get the function for the computation of the derivative.
-            auto *func = taylor_c_diff_func<T>(s, ex.first, n_uvars, batch_size, high_accuracy);
+            auto *func = taylor_c_diff_func(s, fp_t, ex.first, n_uvars, batch_size, high_accuracy);
 
             // Insert the function into tmp_map.
             const auto [it, is_new_func] = tmp_map.try_emplace(func);

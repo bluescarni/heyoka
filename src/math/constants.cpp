@@ -182,16 +182,14 @@ llvm::Value *constant_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const s
 namespace
 {
 
-template <typename T>
-llvm::Function *taylor_c_diff_constant_impl(const constant_impl &c, llvm_state &s, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_constant_impl(const constant_impl &c, llvm::Type *fp_t, llvm_state &s,
+                                            std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the scalar and vector floating-point types.
-    auto *fp_t = to_llvm_type<T>(context);
+    // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
@@ -265,27 +263,11 @@ llvm::Function *taylor_c_diff_constant_impl(const constant_impl &c, llvm_state &
 
 } // namespace
 
-llvm::Function *constant_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                      bool) const
+llvm::Function *constant_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                                  std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_constant_impl<double>(*this, s, n_uvars, batch_size);
+    return taylor_c_diff_constant_impl(*this, fp_t, s, n_uvars, batch_size);
 }
-
-llvm::Function *constant_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                       bool) const
-{
-    return taylor_c_diff_constant_impl<long double>(*this, s, n_uvars, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *constant_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                       bool) const
-{
-    return taylor_c_diff_constant_impl<mppp::real128>(*this, s, n_uvars, batch_size);
-}
-
-#endif
 
 pi_impl::pi_impl()
     : constant_impl("pi", number(

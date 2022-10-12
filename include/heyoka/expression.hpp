@@ -382,9 +382,8 @@ HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const exp
                                            llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                            std::uint32_t, bool);
 
-template <typename>
-HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func(llvm_state &, const expression &, std::uint32_t, std::uint32_t,
-                                                     bool);
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, const expression &, std::uint32_t,
+                                                     std::uint32_t, bool);
 
 HEYOKA_DLL_PUBLIC std::uint32_t get_param_size(const expression &);
 
