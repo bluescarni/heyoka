@@ -341,7 +341,7 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, llvm::Type *fp_t, con
             [&]() {
                 // For order 0, invoke the function on the order 0 of b_idx.
                 builder.CreateStore(
-                    llvm_exp(s, {taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx)}), retval);
+                    llvm_exp(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx)), retval);
             },
             [&]() {
                 // Create a vector version of ord.
