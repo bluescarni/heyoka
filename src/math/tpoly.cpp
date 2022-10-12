@@ -227,9 +227,9 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, llvm::Type *scal_t, cons
                 auto bc = get_bc(n, ord);
                 auto cf = load_vector_from_memory(
                     builder, scal_t,
-                    builder.CreateInBoundsGEP(scal_t, par_ptr,
-                                              {builder.CreateMul(builder.getInt32(batch_size),
-                                                                 builder.CreateSub(e_idx, builder.getInt32(1)))}),
+                    builder.CreateInBoundsGEP(
+                        scal_t, par_ptr,
+                        builder.CreateMul(builder.getInt32(batch_size), builder.CreateSub(e_idx, builder.getInt32(1)))),
                     batch_size);
                 cf = builder.CreateFMul(cf, bc);
                 builder.CreateStore(cf, retval);
