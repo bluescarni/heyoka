@@ -134,7 +134,7 @@ std::uint32_t taylor_order_from_tol(T tol)
     }
     // LCOV_EXCL_STOP
     // NOTE: min order is 2.
-    order_f = std::max(T(2), order_f);
+    order_f = std::max(static_cast<T>(2), order_f);
 
     // NOTE: cast to double as that ensures that the
     // max of std::uint32_t is exactly representable.
@@ -188,7 +188,7 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     // - pointer to the array of max timesteps (read & write),
     // - pointer to the max_abs_state output variable (write only).
     // These pointers cannot overlap.
-    std::vector<llvm::Type *> fargs(6, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
+    const std::vector<llvm::Type *> fargs(6, llvm::PointerType::getUnqual(fp_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -247,8 +247,8 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     auto *svf_ptr = compact_mode ? taylor_c_make_sv_funcs_arr(s, ev_dc) : nullptr;
 
     // Compute the jet of derivatives at the given order.
-    auto diff_variant = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, ev_dc, n_eq, n_uvars, order,
-                                              batch_size, compact_mode, high_accuracy, parallel_mode);
+    auto diff_variant = taylor_compute_jet(s, fp_t, state_ptr, par_ptr, time_ptr, dc, ev_dc, n_eq, n_uvars, order,
+                                           batch_size, compact_mode, high_accuracy, parallel_mode);
 
     // Determine the integration timestep.
     auto h = taylor_determine_h(s, fp_t, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size,
@@ -367,8 +367,8 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
     builder.SetInsertPoint(bb);
 
     // Compute the jet of derivatives at the given order.
-    auto diff_variant = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, {}, n_eq, n_uvars, order, batch_size,
-                                              compact_mode, high_accuracy, parallel_mode);
+    auto diff_variant = taylor_compute_jet(s, fp_t, state_ptr, par_ptr, time_ptr, dc, {}, n_eq, n_uvars, order,
+                                           batch_size, compact_mode, high_accuracy, parallel_mode);
 
     // Determine the integration timestep.
     auto h = taylor_determine_h(s, fp_t, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size,

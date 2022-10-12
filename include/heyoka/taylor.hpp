@@ -100,14 +100,8 @@ llvm::Value *taylor_determine_h(llvm_state &, llvm::Type *,
                                 const std::vector<std::uint32_t> &, llvm::Value *, llvm::Value *, std::uint32_t,
                                 std::uint32_t, std::uint32_t, std::uint32_t, llvm::Value *);
 
-template <typename T>
-llvm::Value *taylor_compute_jet_compact_mode(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *,
-                                             const taylor_dc_t &, const std::vector<std::uint32_t> &, std::uint32_t,
-                                             std::uint32_t, std::uint32_t, std::uint32_t, bool, bool);
-
-template <typename T>
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_compute_jet(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, const taylor_dc_t &,
+taylor_compute_jet(llvm_state &, llvm::Type *, llvm::Value *, llvm::Value *, llvm::Value *, const taylor_dc_t &,
                    const std::vector<std::uint32_t> &, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool,
                    bool, bool);
 

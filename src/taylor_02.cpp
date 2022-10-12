@@ -713,14 +713,11 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
 // The meaning in this example is that the arity of f is 3 and it will be called with 2 different
 // sets of arguments. The g_i functions are expected to be called with input argument j in [0, 1]
 // to yield the value of the i-th function argument for f at the j-th invocation.
-template <typename T>
-auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s_dc, std::uint32_t n_eq,
-                                std::uint32_t n_uvars, std::uint32_t batch_size, bool high_accuracy)
+auto taylor_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vector<taylor_dc_t> &s_dc,
+                                std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t batch_size, bool high_accuracy)
 {
     // Log runtime in trace mode.
     spdlog::stopwatch sw;
-
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     // Init the return value.
     // NOTE: use maps with name-based comparison for the functions. This ensures that the order in which these
@@ -865,13 +862,10 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
     return retval;
 }
 
-} // namespace
-
 // Helper for the computation of a jet of derivatives in compact mode,
 // used in taylor_compute_jet().
-template <typename T>
-llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr,
-                                             llvm::Value *time_ptr, const taylor_dc_t &dc,
+llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *order0,
+                                             llvm::Value *par_ptr, llvm::Value *time_ptr, const taylor_dc_t &dc,
                                              const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq,
                                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
                                              bool high_accuracy, bool parallel_mode)
@@ -880,13 +874,11 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     auto &context = s.context();
     auto &md = s.module();
 
-    auto *fp_type = to_llvm_type<T>(context);
-
     // Split dc into segments.
     const auto s_dc = taylor_segment_dc(dc, n_eq);
 
     // Generate the function maps.
-    const auto f_maps = taylor_build_function_maps<T>(s, s_dc, n_eq, n_uvars, batch_size, high_accuracy);
+    const auto f_maps = taylor_build_function_maps(s, fp_type, s_dc, n_eq, n_uvars, batch_size, high_accuracy);
 
     // Log the runtime of IR construction in trace mode.
     spdlog::stopwatch sw;
@@ -924,7 +916,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // its size can grow quite large, which can lead to stack overflow issues.
     // This has of course consequences in terms of thread safety, which
     // we will have to document.
-    auto diff_arr_gvar = make_global_zero_array(md, array_type);
+    auto *diff_arr_gvar = make_global_zero_array(md, array_type);
     auto *diff_arr = builder.CreateInBoundsGEP(array_type, diff_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
 
     // Copy over the order-0 derivatives of the state variables.
@@ -948,7 +940,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
     if (parallel_mode) {
         // Fetch the LLVM version of T *.
-        auto *scal_ptr_t = llvm::PointerType::getUnqual(to_llvm_type<T>(context));
+        auto *scal_ptr_t = llvm::PointerType::getUnqual(fp_type);
 
         // NOTE: we will use a global variable with these fields:
         //
@@ -1248,31 +1240,6 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     return diff_arr;
 }
 
-// Explicit instantiations of taylor_compute_jet_compact_mode().
-template llvm::Value *taylor_compute_jet_compact_mode<double>(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *,
-                                                              const taylor_dc_t &, const std::vector<std::uint32_t> &,
-                                                              std::uint32_t, std::uint32_t, std::uint32_t,
-                                                              std::uint32_t, bool, bool);
-
-template llvm::Value *taylor_compute_jet_compact_mode<long double>(llvm_state &, llvm::Value *, llvm::Value *,
-                                                                   llvm::Value *, const taylor_dc_t &,
-                                                                   const std::vector<std::uint32_t> &, std::uint32_t,
-                                                                   std::uint32_t, std::uint32_t, std::uint32_t, bool,
-                                                                   bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template llvm::Value *taylor_compute_jet_compact_mode<mppp::real128>(llvm_state &, llvm::Value *, llvm::Value *,
-                                                                     llvm::Value *, const taylor_dc_t &,
-                                                                     const std::vector<std::uint32_t> &, std::uint32_t,
-                                                                     std::uint32_t, std::uint32_t, std::uint32_t, bool,
-                                                                     bool);
-
-#endif
-
-namespace
-{
-
 // Given an input pointer 'in', load the first n * batch_size values in it as n vectors
 // with size batch_size. If batch_size is 1, the values will be loaded as scalars.
 auto taylor_load_values(llvm_state &s, llvm::Type *fp_t, llvm::Value *in, std::uint32_t n, std::uint32_t batch_size)
@@ -1310,9 +1277,8 @@ auto taylor_load_values(llvm_state &s, llvm::Type *fp_t, llvm::Value *in, std::u
 // - in compact mode, the array containing the derivatives of all u variables,
 // - otherwise, the jet of derivatives of the state variables and sv_funcs
 //   up to order 'order'.
-template <typename T>
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
+taylor_compute_jet(llvm_state &s, llvm::Type *fp_t, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
                    const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq,
                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool compact_mode,
                    bool high_accuracy, bool parallel_mode)
@@ -1322,8 +1288,6 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
     assert(n_eq > 0u);
     assert(order > 0u);
     // LCOV_EXCL_STOP
-
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     // Make sure we can represent n_uvars * (order + 1) as a 32-bit
     // unsigned integer. This is the maximum total number of derivatives we will have to compute
@@ -1360,8 +1324,8 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         }
         // LCOV_EXCL_STOP
 
-        return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
-                                                  batch_size, high_accuracy, parallel_mode);
+        return taylor_compute_jet_compact_mode(s, fp_t, order0, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars,
+                                               order, batch_size, high_accuracy, parallel_mode);
     } else {
         // Log the runtime of IR construction in trace mode.
         spdlog::stopwatch sw;
@@ -1443,26 +1407,6 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         return retval;
     }
 }
-
-// Explicit instantiations of taylor_compute_jet_().
-template std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_compute_jet<double>(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, const taylor_dc_t &,
-                           const std::vector<std::uint32_t> &, std::uint32_t, std::uint32_t, std::uint32_t,
-                           std::uint32_t, bool, bool, bool);
-
-template std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_compute_jet<long double>(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, const taylor_dc_t &,
-                                const std::vector<std::uint32_t> &, std::uint32_t, std::uint32_t, std::uint32_t,
-                                std::uint32_t, bool, bool, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_compute_jet<mppp::real128>(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, const taylor_dc_t &,
-                                  const std::vector<std::uint32_t> &, std::uint32_t, std::uint32_t, std::uint32_t,
-                                  std::uint32_t, bool, bool, bool);
-
-#endif
 
 // Helper to generate the LLVM code to store the Taylor coefficients of the state variables and
 // the sv funcs into an external array. The Taylor polynomials are stored in row-major order,
@@ -1861,8 +1805,8 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     builder.SetInsertPoint(bb);
 
     // Compute the jet of derivatives.
-    auto diff_variant = taylor_compute_jet<T>(s, in_out, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
-                                              batch_size, compact_mode, high_accuracy, parallel_mode);
+    auto diff_variant = taylor_compute_jet(s, fp_t, in_out, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
+                                           batch_size, compact_mode, high_accuracy, parallel_mode);
 
     // Write the derivatives to in_out.
     // NOTE: overflow checking. We need to be able to index into the jet array
