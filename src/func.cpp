@@ -341,6 +341,13 @@ double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::si
     return ptr()->deval_num_dbl(v, i);
 }
 
+llvm::Value *func::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                             llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                             bool high_accuracy) const
+{
+    return ptr()->llvm_eval(s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+}
+
 llvm::Value *func::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
                                  llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
 {
@@ -748,18 +755,14 @@ llvm::Value *cfunc_nc_param_codegen(llvm_state &s, const param &p, std::uint32_t
 
 // Helper to implement the llvm_eval_*() methods in the func interface
 // used to create compiled functions in non-compact mode.
-template <typename T>
 llvm::Value *llvm_eval_helper(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &g,
-                              const func_base &f, llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
-                              llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy)
+                              const func_base &f, llvm_state &s, llvm::Type *fp_t,
+                              const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr, llvm::Value *stride,
+                              std::uint32_t batch_size, bool high_accuracy)
 {
     assert(g);
 
     auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the scalar FP type.
-    auto *fp_t = to_llvm_type<T>(context);
 
     // Codegen the function arguments.
     std::vector<llvm::Value *> llvm_args;
@@ -791,26 +794,6 @@ llvm::Value *llvm_eval_helper(const std::function<llvm::Value *(const std::vecto
     // Run the generator and return the result.
     return g(llvm_args, high_accuracy);
 }
-
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC llvm::Value *
-llvm_eval_helper<double>(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
-                         const func_base &, llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
-                         llvm::Value *, std::uint32_t, bool);
-
-template HEYOKA_DLL_PUBLIC llvm::Value *
-llvm_eval_helper<long double>(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
-                              const func_base &, llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
-                              llvm::Value *, std::uint32_t, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC llvm::Value *
-llvm_eval_helper<mppp::real128>(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
-                                const func_base &, llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
-                                llvm::Value *, std::uint32_t, bool);
-
-#endif
 
 namespace
 {

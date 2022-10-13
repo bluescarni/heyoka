@@ -91,43 +91,27 @@ expression kepE_impl::diff(std::unordered_map<const void *, expression> &func_ma
 namespace
 {
 
-template <typename T>
-llvm::Value *kepE_llvm_eval_impl(llvm_state &s, const func_base &fb, const std::vector<llvm::Value *> &eval_arr,
-                                 llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
-                                 bool high_accuracy)
+llvm::Value *kepE_llvm_eval_impl(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
+                                 const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr, llvm::Value *stride,
+                                 std::uint32_t batch_size, bool high_accuracy)
 {
-    return llvm_eval_helper<T>(
-        [&s, batch_size](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
-            auto *kepE_func = llvm_add_inv_kep_E(s, to_llvm_type<T>(s.context()), batch_size);
+    return llvm_eval_helper(
+        [&s, fp_t, batch_size](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
+            auto *kepE_func = llvm_add_inv_kep_E(s, fp_t, batch_size);
 
             return s.builder().CreateCall(kepE_func, {args[0], args[1]});
         },
-        fb, s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+        fb, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 } // namespace
 
-llvm::Value *kepE_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                      llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Value *kepE_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                                  llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                  bool high_accuracy) const
 {
-    return kepE_llvm_eval_impl<double>(s, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    return kepE_llvm_eval_impl(s, fp_t, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
-
-llvm::Value *kepE_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                       llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return kepE_llvm_eval_impl<long double>(s, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *kepE_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                       llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return kepE_llvm_eval_impl<mppp::real128>(s, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-#endif
 
 namespace
 {

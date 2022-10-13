@@ -109,12 +109,11 @@ expression sum_sq_impl::diff(std::unordered_map<const void *, expression> &func_
 namespace
 {
 
-template <typename T>
-llvm::Value *sum_sq_llvm_eval_impl(llvm_state &s, const func_base &fb, const std::vector<llvm::Value *> &eval_arr,
-                                   llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
-                                   bool high_accuracy)
+llvm::Value *sum_sq_llvm_eval_impl(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
+                                   const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                   llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy)
 {
-    return llvm_eval_helper<T>(
+    return llvm_eval_helper(
         [&s](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
             std::vector<llvm::Value *> sqs;
 
@@ -124,34 +123,17 @@ llvm::Value *sum_sq_llvm_eval_impl(llvm_state &s, const func_base &fb, const std
 
             return pairwise_sum(s.builder(), sqs);
         },
-        fb, s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+        fb, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 } // namespace
 
-llvm::Value *sum_sq_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                        llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Value *sum_sq_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                                    llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                    bool high_accuracy) const
 {
-    return sum_sq_llvm_eval_impl<double>(s, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    return sum_sq_llvm_eval_impl(s, fp_t, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
-
-llvm::Value *sum_sq_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
-                                         llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
-                                         bool high_accuracy) const
-{
-    return sum_sq_llvm_eval_impl<long double>(s, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *sum_sq_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
-                                         llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
-                                         bool high_accuracy) const
-{
-    return sum_sq_llvm_eval_impl<mppp::real128>(s, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-#endif
 
 namespace
 {

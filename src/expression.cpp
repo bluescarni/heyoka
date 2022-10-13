@@ -2250,7 +2250,7 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
         assert(std::holds_alternative<func>(dc[i].value()));
 
         eval_arr.push_back(
-            llvm_eval<T>(std::get<func>(dc[i].value()), s, eval_arr, par_ptr, stride, batch_size, high_accuracy));
+            std::get<func>(dc[i].value()).llvm_eval(s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy));
     }
 
     // Write the outputs.

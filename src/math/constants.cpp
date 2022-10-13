@@ -92,28 +92,11 @@ std::vector<expression> constant_impl::gradient() const
     return {};
 }
 
-llvm::Value *constant_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &, llvm::Value *,
-                                          llvm::Value *, std::uint32_t batch_size, bool) const
+llvm::Value *constant_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &,
+                                      llvm::Value *, llvm::Value *, std::uint32_t batch_size, bool) const
 {
-    return vector_splat(s.builder(), llvm_codegen(s, to_llvm_type<double>(s.context()), get_value()), batch_size);
+    return vector_splat(s.builder(), llvm_codegen(s, fp_t, get_value()), batch_size);
 }
-
-llvm::Value *constant_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &, llvm::Value *,
-                                           llvm::Value *, std::uint32_t batch_size, bool) const
-{
-    return vector_splat(s.builder(), llvm_codegen(s, to_llvm_type<long double>(s.context()), get_value()), batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *constant_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &, llvm::Value *,
-                                           llvm::Value *, std::uint32_t batch_size, bool) const
-{
-    return vector_splat(s.builder(), llvm_codegen(s, to_llvm_type<mppp::real128>(s.context()), get_value()),
-                        batch_size);
-}
-
-#endif
 
 namespace
 {

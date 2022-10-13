@@ -136,36 +136,13 @@ double sigmoid_impl::deval_num_dbl(const std::vector<double> &a, std::vector<dou
     return sigma * (1 - sigma);
 }
 
-llvm::Value *sigmoid_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
-                                         llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
-                                         bool high_accuracy) const
+llvm::Value *sigmoid_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                                     llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                     bool high_accuracy) const
 {
-    return llvm_eval_helper<double>(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_sigmoid(s, args[0]); }, *this, s, eval_arr,
-        par_ptr, stride, batch_size, high_accuracy);
+    return llvm_eval_helper([&s](const std::vector<llvm::Value *> &args, bool) { return llvm_sigmoid(s, args[0]); },
+                            *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
-
-llvm::Value *sigmoid_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
-                                          llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
-                                          bool high_accuracy) const
-{
-    return llvm_eval_helper<long double>(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_sigmoid(s, args[0]); }, *this, s, eval_arr,
-        par_ptr, stride, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *sigmoid_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
-                                          llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
-                                          bool high_accuracy) const
-{
-    return llvm_eval_helper<mppp::real128>(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_sigmoid(s, args[0]); }, *this, s, eval_arr,
-        par_ptr, stride, batch_size, high_accuracy);
-}
-
-#endif
 
 namespace
 {

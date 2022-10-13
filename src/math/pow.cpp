@@ -145,37 +145,14 @@ double pow_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>
     return a[1] * std::pow(a[0], a[1] - 1.) + std::log(a[0]) * std::pow(a[0], a[1]);
 }
 
-llvm::Value *pow_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                     llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Value *pow_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                                 llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                 bool high_accuracy) const
 {
-    return llvm_eval_helper<double>([&s, this](const std::vector<llvm::Value *> &args,
-                                               bool) { return llvm_pow(s, args[0], args[1], pow_allow_approx(*this)); },
-                                    *this, s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    return llvm_eval_helper([&s, this](const std::vector<llvm::Value *> &args,
+                                       bool) { return llvm_pow(s, args[0], args[1], pow_allow_approx(*this)); },
+                            *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
-
-llvm::Value *pow_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                      llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return llvm_eval_helper<long double>(
-        [&s, this](const std::vector<llvm::Value *> &args, bool) {
-            return llvm_pow(s, args[0], args[1], pow_allow_approx(*this));
-        },
-        *this, s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *pow_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                      llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return llvm_eval_helper<mppp::real128>(
-        [&s, this](const std::vector<llvm::Value *> &args, bool) {
-            return llvm_pow(s, args[0], args[1], pow_allow_approx(*this));
-        },
-        *this, s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-#endif
 
 namespace
 {
