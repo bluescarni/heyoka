@@ -818,13 +818,13 @@ namespace
 // NOTE: precondition on name: must be conforming to LLVM requirements for
 // function names, and must not contain "." (as we use it as a separator in
 // the mangling scheme).
-template <typename T>
-std::pair<std::string, std::vector<llvm::Type *>>
-llvm_c_eval_func_name_args(llvm::LLVMContext &c, const std::string &name, std::uint32_t batch_size,
-                           const std::vector<expression> &args)
+std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llvm::LLVMContext &c, llvm::Type *fp_t,
+                                                                             const std::string &name,
+                                                                             std::uint32_t batch_size,
+                                                                             const std::vector<expression> &args)
 {
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(c, batch_size);
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Init the name.
     auto fname = fmt::format("heyoka.llvm_c_eval.{}.", name);
@@ -903,7 +903,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
     auto *fp_t = to_llvm_type<T>(context);
     auto *val_t = make_vector_type(fp_t, batch_size);
 
-    const auto na_pair = llvm_c_eval_func_name_args<T>(context, name, batch_size, fb.args());
+    const auto na_pair = llvm_c_eval_func_name_args(context, fp_t, name, batch_size, fb.args());
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
