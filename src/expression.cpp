@@ -2224,16 +2224,11 @@ namespace detail
 namespace
 {
 
-template <typename T>
-void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
+void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
                        llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars,
                        std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
 {
     auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the scalar FP type.
-    auto *fp_t = to_llvm_type<T>(context);
 
     // The array containing the evaluation of the decomposition.
     std::vector<llvm::Value *> eval_arr;
@@ -3017,7 +3012,7 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     if (compact_mode) {
         add_cfunc_c_mode<T>(s, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
     } else {
-        add_cfunc_nc_mode<T>(s, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
+        add_cfunc_nc_mode(s, fp_t, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
     }
 
     // Finish off the function.
