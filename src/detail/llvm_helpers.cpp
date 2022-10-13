@@ -1523,7 +1523,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
     };
 
     // Helper to implement the product of two intervals.
-    auto ival_prod = [&s, &builder](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
+    auto ival_prod = [&s](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
         auto *tmp1 = llvm_fmul(s, a_lo, b_lo);
         auto *tmp2 = llvm_fmul(s, a_lo, b_hi);
         auto *tmp3 = llvm_fmul(s, a_hi, b_lo);
