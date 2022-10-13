@@ -163,7 +163,7 @@ llvm::Value *taylor_diff_square_impl(llvm_state &s, llvm::Type *, const square_i
         }
 
         auto *ret = pairwise_sum(builder, sum);
-        return builder.CreateFAdd(ret, ret);
+        return llvm_fadd(s, ret, ret);
     } else {
         // Even order.
         auto *ak2 = taylor_fetch_diff(arr, u_idx, order / 2u, n_uvars);
@@ -177,7 +177,7 @@ llvm::Value *taylor_diff_square_impl(llvm_state &s, llvm::Type *, const square_i
         }
 
         auto *ret = pairwise_sum(builder, sum);
-        return builder.CreateFAdd(builder.CreateFAdd(ret, ret), sq_ak2);
+        return llvm_fadd(s, llvm_fadd(s, ret, ret), sq_ak2);
     }
 }
 
@@ -314,12 +314,12 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, 
                             auto *aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, var_idx);
 
                             builder.CreateStore(
-                                builder.CreateFAdd(builder.CreateLoad(val_t, acc), builder.CreateFMul(a_nj, aj)), acc);
+                                llvm_fadd(s, builder.CreateLoad(val_t, acc), builder.CreateFMul(a_nj, aj)), acc);
                         });
 
                         // Return 2 * acc.
                         auto *acc_load = builder.CreateLoad(val_t, acc);
-                        builder.CreateStore(builder.CreateFAdd(acc_load, acc_load), retval);
+                        builder.CreateStore(llvm_fadd(s, acc_load, acc_load), retval);
                     },
                     [&]() {
                         // Even order.
@@ -338,12 +338,12 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, 
                             auto *aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, var_idx);
 
                             builder.CreateStore(
-                                builder.CreateFAdd(builder.CreateLoad(val_t, acc), builder.CreateFMul(a_nj, aj)), acc);
+                                llvm_fadd(s, builder.CreateLoad(val_t, acc), builder.CreateFMul(a_nj, aj)), acc);
                         });
 
                         // Return 2 * acc + ak2 * ak2.
                         auto *acc_load = builder.CreateLoad(val_t, acc);
-                        builder.CreateStore(builder.CreateFAdd(builder.CreateFAdd(acc_load, acc_load), sq_ak2), retval);
+                        builder.CreateStore(llvm_fadd(s, llvm_fadd(s, acc_load, acc_load), sq_ak2), retval);
                     });
             });
 

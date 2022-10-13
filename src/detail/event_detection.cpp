@@ -296,7 +296,7 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
             auto *tmp = builder.CreateFMul(ai, get_bc(i, k));
 
             auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.CreateMul(k, builder.getInt32(batch_size)));
-            auto *new_val = builder.CreateFAdd(load_vector_from_memory(builder, fp_t, ptr, batch_size), tmp);
+            auto *new_val = llvm_fadd(s, load_vector_from_memory(builder, fp_t, ptr, batch_size), tmp);
             store_vector_to_memory(builder, ptr, new_val);
         });
     });

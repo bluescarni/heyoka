@@ -122,7 +122,7 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, llvm::Type *fp_t, const tpoly
         cf = builder.CreateFMul(cf, vector_splat(builder, llvm_codegen(s, fp_t, bc), batch_size));
 
         // Horner iteration.
-        ret = builder.CreateFAdd(cf, builder.CreateFMul(ret, tm));
+        ret = llvm_fadd(s, cf, builder.CreateFMul(ret, tm));
     }
 
     return ret;
@@ -252,8 +252,8 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, llvm::Type *scal_t, cons
                                   cf = builder.CreateFMul(cf, bc);
 
                                   // Horner iteration.
-                                  auto new_val = builder.CreateFAdd(
-                                      cf, builder.CreateFMul(builder.CreateLoad(val_t, retval), tm));
+                                  auto new_val
+                                      = llvm_fadd(s, cf, builder.CreateFMul(builder.CreateLoad(val_t, retval), tm));
 
                                   // Update retval.
                                   builder.CreateStore(new_val, retval);

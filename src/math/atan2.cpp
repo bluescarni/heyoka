@@ -211,7 +211,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::
         }
 
         // Update the dividend.
-        dividend = builder.CreateFAdd(dividend, pairwise_sum(builder, sum));
+        dividend = llvm_fadd(s, dividend, pairwise_sum(builder, sum));
     }
 
     return builder.CreateFDiv(dividend, divisor);
@@ -268,7 +268,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::
         }
 
         // Update the dividend.
-        dividend = builder.CreateFAdd(dividend, pairwise_sum(builder, sum));
+        dividend = llvm_fadd(s, dividend, pairwise_sum(builder, sum));
     }
 
     return builder.CreateFDiv(dividend, divisor);
@@ -335,7 +335,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::
         }
 
         // Update the dividend.
-        dividend = builder.CreateFAdd(dividend, pairwise_sum(builder, sum));
+        dividend = llvm_fadd(s, dividend, pairwise_sum(builder, sum));
     }
 
     return builder.CreateFDiv(dividend, divisor);
@@ -496,7 +496,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
 
                     tmp = builder.CreateFMul(j_v, tmp);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc), tmp), acc);
+                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), tmp), acc);
                 });
 
                 // Write the result.
@@ -613,7 +613,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
 
                     tmp = builder.CreateFMul(j_v, tmp);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc), tmp), acc);
+                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), tmp), acc);
                 });
 
                 // Write the result.
@@ -742,12 +742,12 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
                     auto tmp = builder.CreateFSub(builder.CreateFSub(tmp1, tmp2), tmp3);
                     tmp = builder.CreateFMul(j_v, tmp);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc), tmp), acc);
+                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), tmp), acc);
                 });
 
                 // Write the result.
-                builder.CreateStore(
-                    builder.CreateFDiv(builder.CreateFAdd(dividend, builder.CreateLoad(val_t, acc)), divisor), retval);
+                builder.CreateStore(builder.CreateFDiv(llvm_fadd(s, dividend, builder.CreateLoad(val_t, acc)), divisor),
+                                    retval);
             });
 
         // Return the result.

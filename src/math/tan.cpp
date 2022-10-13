@@ -217,7 +217,7 @@ llvm::Value *taylor_diff_tan_impl(llvm_state &s, llvm::Type *fp_t, const tan_imp
         ret_acc, vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size));
 
     // Create and return the result.
-    return builder.CreateFAdd(taylor_fetch_diff(arr, u_idx, order, n_uvars), ret_acc);
+    return llvm_fadd(s, taylor_fetch_diff(arr, u_idx, order, n_uvars), ret_acc);
 }
 
 // All the other cases.
@@ -345,16 +345,16 @@ llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, llvm::Type *fp_t, con
 
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
-                                                           builder.CreateFMul(fac, builder.CreateFMul(cnj, bj))),
+                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc),
+                                                  builder.CreateFMul(fac, builder.CreateFMul(cnj, bj))),
                                         acc);
                 });
 
                 // Divide by the order and add to b^[n] to produce the return value.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
-                builder.CreateStore(builder.CreateFAdd(taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, var_idx),
-                                                       builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_v)),
+                builder.CreateStore(llvm_fadd(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, var_idx),
+                                              builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_v)),
                                     retval);
             });
 

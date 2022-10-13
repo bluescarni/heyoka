@@ -294,8 +294,8 @@ llvm::Function *taylor_c_diff_func_cosh_impl(llvm_state &s, llvm::Type *fp_t, co
 
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
-                                                           builder.CreateFMul(j_v, builder.CreateFMul(snj, bj))),
+                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc),
+                                                  builder.CreateFMul(j_v, builder.CreateFMul(snj, bj))),
                                         acc);
                 });
 

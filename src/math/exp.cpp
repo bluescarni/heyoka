@@ -325,8 +325,8 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, llvm::Type *fp_t, con
                     // Compute the factor j.
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
-                                                           builder.CreateFMul(fac, builder.CreateFMul(anj, bj))),
+                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc),
+                                                  builder.CreateFMul(fac, builder.CreateFMul(anj, bj))),
                                         acc);
                 });
 

@@ -256,12 +256,12 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::v
             auto *ej = taylor_fetch_diff(arr, e_idx, j, n_uvars);
 
             auto *tmp = builder.CreateFMul(dnj, ej);
-            tmp = builder.CreateFAdd(builder.CreateFMul(cnj, aj), tmp);
+            tmp = llvm_fadd(s, builder.CreateFMul(cnj, aj), tmp);
             sum.push_back(builder.CreateFMul(fac, tmp));
         }
 
         // Update the dividend.
-        dividend = builder.CreateFAdd(dividend, pairwise_sum(builder, sum));
+        dividend = llvm_fadd(s, dividend, pairwise_sum(builder, sum));
     }
 
     return builder.CreateFDiv(dividend, divisor);
@@ -321,7 +321,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::v
         }
 
         // Update the dividend.
-        dividend = builder.CreateFAdd(dividend, pairwise_sum(builder, sum));
+        dividend = llvm_fadd(s, dividend, pairwise_sum(builder, sum));
     }
 
     return builder.CreateFDiv(dividend, divisor);
@@ -362,7 +362,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::v
     const auto d_idx = deps[1];
     auto *dividend
         = builder.CreateFMul(taylor_fetch_diff(arr, e_idx, order, n_uvars), taylor_fetch_diff(arr, d_idx, 0, n_uvars));
-    dividend = builder.CreateFAdd(dividend, taylor_fetch_diff(arr, M_idx, order, n_uvars));
+    dividend = llvm_fadd(s, dividend, taylor_fetch_diff(arr, M_idx, order, n_uvars));
     dividend = builder.CreateFMul(n, dividend);
 
     // Compute the second part of the dividend only for order > 1, in order to avoid
@@ -381,12 +381,12 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::v
             auto *ej = taylor_fetch_diff(arr, e_idx, j, n_uvars);
 
             auto *tmp = builder.CreateFMul(dnj, ej);
-            tmp = builder.CreateFAdd(builder.CreateFMul(cnj, aj), tmp);
+            tmp = llvm_fadd(s, builder.CreateFMul(cnj, aj), tmp);
             sum.push_back(builder.CreateFMul(fac, tmp));
         }
 
         // Update the dividend.
-        dividend = builder.CreateFAdd(dividend, pairwise_sum(builder, sum));
+        dividend = llvm_fadd(s, dividend, pairwise_sum(builder, sum));
     }
 
     return builder.CreateFDiv(dividend, divisor);
@@ -551,16 +551,16 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
 
                     auto d_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
                     auto ej = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, e_idx);
-                    tmp = builder.CreateFAdd(builder.CreateFMul(d_nj, ej), tmp);
+                    tmp = llvm_fadd(s, builder.CreateFMul(d_nj, ej), tmp);
 
                     tmp = builder.CreateFMul(j_v, tmp);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc), tmp), acc);
+                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), tmp), acc);
                 });
 
                 // Write the result.
-                builder.CreateStore(
-                    builder.CreateFDiv(builder.CreateFAdd(dividend, builder.CreateLoad(val_t, acc)), divisor), retval);
+                builder.CreateStore(builder.CreateFDiv(llvm_fadd(s, dividend, builder.CreateLoad(val_t, acc)), divisor),
+                                    retval);
             });
 
         // Return the result.
@@ -673,12 +673,12 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
                     auto tmp = builder.CreateFMul(c_nj, aj);
                     tmp = builder.CreateFMul(j_v, tmp);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc), tmp), acc);
+                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), tmp), acc);
                 });
 
                 // Write the result.
-                builder.CreateStore(
-                    builder.CreateFDiv(builder.CreateFAdd(dividend, builder.CreateLoad(val_t, acc)), divisor), retval);
+                builder.CreateStore(builder.CreateFDiv(llvm_fadd(s, dividend, builder.CreateLoad(val_t, acc)), divisor),
+                                    retval);
             });
 
         // Return the result.
@@ -779,7 +779,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
                 auto dividend
                     = builder.CreateFMul(taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, e_idx),
                                          taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), d_idx));
-                dividend = builder.CreateFAdd(dividend, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, M_idx));
+                dividend = llvm_fadd(s, dividend, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, M_idx));
                 dividend = builder.CreateFMul(ord_v, dividend);
 
                 // Init the accumulator.
@@ -795,16 +795,16 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
 
                     auto d_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
                     auto ej = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, e_idx);
-                    tmp = builder.CreateFAdd(builder.CreateFMul(d_nj, ej), tmp);
+                    tmp = llvm_fadd(s, builder.CreateFMul(d_nj, ej), tmp);
 
                     tmp = builder.CreateFMul(j_v, tmp);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc), tmp), acc);
+                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), tmp), acc);
                 });
 
                 // Write the result.
-                builder.CreateStore(
-                    builder.CreateFDiv(builder.CreateFAdd(dividend, builder.CreateLoad(val_t, acc)), divisor), retval);
+                builder.CreateStore(builder.CreateFDiv(llvm_fadd(s, dividend, builder.CreateLoad(val_t, acc)), divisor),
+                                    retval);
             });
 
         // Return the result.

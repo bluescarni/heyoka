@@ -177,7 +177,7 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, llvm::Type *, const sqrt_impl 
 
     // Compute the divisor: 2*a^[0].
     auto *div = taylor_fetch_diff(arr, idx, 0, n_uvars);
-    div = builder.CreateFAdd(div, div);
+    div = llvm_fadd(s, div, div);
 
     // Init the factor: b^[n].
     auto *fac = taylor_fetch_diff(arr, u_idx, order, n_uvars);
@@ -209,7 +209,7 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, llvm::Type *, const sqrt_impl 
     // Avoid summing if the sum is empty.
     if (!sum.empty()) {
         auto *tmp = pairwise_sum(builder, sum);
-        tmp = builder.CreateFAdd(tmp, tmp);
+        tmp = llvm_fadd(s, tmp, tmp);
 
         fac = builder.CreateFSub(fac, tmp);
     }
@@ -336,7 +336,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
             [&]() {
                 // Compute the divisor: 2*a^[0].
                 auto *div = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), u_idx);
-                div = builder.CreateFAdd(div, div);
+                div = llvm_fadd(s, div, div);
 
                 // retval = b^[n].
                 builder.CreateStore(taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, var_idx), retval);
@@ -355,11 +355,10 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
                         auto *a_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), u_idx);
                         auto *aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
 
-                        builder.CreateStore(
-                            builder.CreateFAdd(builder.CreateLoad(val_t, acc), builder.CreateFMul(a_nj, aj)), acc);
+                        builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), builder.CreateFMul(a_nj, aj)),
+                                            acc);
                     });
-                builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc), builder.CreateLoad(val_t, acc)),
-                                    acc);
+                builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), builder.CreateLoad(val_t, acc)), acc);
 
                 llvm_if_then_else(
                     s, ord_even,

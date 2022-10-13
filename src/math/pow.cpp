@@ -243,7 +243,7 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
                 auto *onevec = vector_splat(builder, llvm_codegen(s, fp_t, number(1.)), batch_size);
 
                 auto tmp1 = builder.CreateFMul(ordvec, pc);
-                auto tmp2 = builder.CreateFMul(jvec, builder.CreateFAdd(pc, onevec));
+                auto tmp2 = builder.CreateFMul(jvec, llvm_fadd(s, pc, onevec));
 
                 return builder.CreateFSub(tmp1, tmp2);
             }
@@ -415,11 +415,11 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
                     auto fac = builder.CreateFSub(
                         builder.CreateFMul(ord_v, alpha_v),
                         builder.CreateFMul(
-                            j_v, builder.CreateFAdd(
-                                     alpha_v, vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size))));
+                            j_v, llvm_fadd(s, alpha_v,
+                                           vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size))));
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
-                                                           builder.CreateFMul(fac, builder.CreateFMul(b_nj, aj))),
+                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc),
+                                                  builder.CreateFMul(fac, builder.CreateFMul(b_nj, aj))),
                                         acc);
                 });
 

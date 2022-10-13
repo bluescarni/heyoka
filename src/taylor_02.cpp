@@ -1569,8 +1569,8 @@ taylor_run_multihorner(llvm_state &s, llvm::Type *fp_t,
 
                     // Accumulate in res_arr.
                     auto *res_ptr = builder.CreateInBoundsGEP(fp_vec_t, res_arr, cur_var_idx);
-                    builder.CreateStore(
-                        builder.CreateFAdd(cf, builder.CreateFMul(builder.CreateLoad(fp_vec_t, res_ptr), h)), res_ptr);
+                    builder.CreateStore(llvm_fadd(s, cf, builder.CreateFMul(builder.CreateLoad(fp_vec_t, res_ptr), h)),
+                                        res_ptr);
                 });
             });
 
@@ -1589,7 +1589,7 @@ taylor_run_multihorner(llvm_state &s, llvm::Type *fp_t,
         // Run the Horner scheme simultaneously for all polynomials.
         for (std::uint32_t i = 1; i <= order; ++i) {
             for (std::uint32_t j = 0; j < n_eq; ++j) {
-                res_arr[j] = builder.CreateFAdd(diff_arr[(order - i) * n_eq + j], builder.CreateFMul(res_arr[j], h));
+                res_arr[j] = llvm_fadd(s, diff_arr[(order - i) * n_eq + j], builder.CreateFMul(res_arr[j], h));
             }
         }
 
@@ -1653,7 +1653,7 @@ taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
                 auto *res_ptr = builder.CreateInBoundsGEP(fp_vec_t, res_arr, cur_var_idx);
                 auto *y = builder.CreateFSub(tmp, builder.CreateLoad(fp_vec_t, comp_ptr));
                 auto *cur_res = builder.CreateLoad(fp_vec_t, res_ptr);
-                auto *t = builder.CreateFAdd(cur_res, y);
+                auto *t = llvm_fadd(s, cur_res, y);
 
                 // Update the compensation and the return value.
                 builder.CreateStore(builder.CreateFSub(builder.CreateFSub(t, cur_res), y), comp_ptr);
@@ -1686,7 +1686,7 @@ taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
 
                 // Compute the quantities for the compensation.
                 auto *y = builder.CreateFSub(tmp, comp_arr[j]);
-                auto *t = builder.CreateFAdd(res_arr[j], y);
+                auto *t = llvm_fadd(s, res_arr[j], y);
 
                 // Update the compensation and the return value.
                 comp_arr[j] = builder.CreateFSub(builder.CreateFSub(t, res_arr[j]), y);

@@ -246,7 +246,7 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_
         pairwise_sum(builder, tmp);
 
         // Multiply by 2 and return.
-        return builder.CreateFAdd(tmp[0], tmp[0]);
+        return llvm_fadd(s, tmp[0], tmp[0]);
     } else {
         // Even order.
         for (std::uint32_t j = 0; order > 0u && j <= (order - 2u) / 2u; ++j) {
@@ -291,9 +291,9 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_
             if (order > 0u) {
                 auto *p_sum = pairwise_sum(builder, v_sums[k]);
                 // Muliply the pairwise sum by 2.
-                p_sum = builder.CreateFAdd(p_sum, p_sum);
+                p_sum = llvm_fadd(s, p_sum, p_sum);
                 // Add it to the term outside the sum.
-                tmp.back() = builder.CreateFAdd(p_sum, tmp.back());
+                tmp.back() = llvm_fadd(s, p_sum, tmp.back());
             }
         }
 
@@ -408,7 +408,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
 
                             // Update the k-th accumulator.
                             builder.CreateStore(
-                                builder.CreateFAdd(builder.CreateLoad(val_t, v_accs[k]), builder.CreateFMul(v0, v1)),
+                                llvm_fadd(s, builder.CreateLoad(val_t, v_accs[k]), builder.CreateFMul(v0, v1)),
                                 v_accs[k]);
                         } else if constexpr (is_num_param_v<type>) {
                             // Number/param: nothing to do, leave the accumulator to zero.
@@ -447,7 +447,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
                 auto ret = pairwise_sum(builder, tmp);
 
                 // Return 2 * ret.
-                builder.CreateStore(builder.CreateFAdd(ret, ret), retval);
+                builder.CreateStore(llvm_fadd(s, ret, ret), retval);
             },
             [&]() {
                 // Even order.
@@ -472,7 +472,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
                 for (decltype(sf.args().size()) k = 0; k < sf.args().size(); ++k) {
                     // Load the current accumulator and multiply it by 2.
                     auto acc_val = builder.CreateLoad(val_t, v_accs[k]);
-                    auto acc2 = builder.CreateFAdd(acc_val, acc_val);
+                    auto acc2 = llvm_fadd(s, acc_val, acc_val);
 
                     // Load the external term.
                     auto ex_term = std::visit( // LCOV_EXCL_LINE
@@ -517,7 +517,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
                         sf.args()[k].value());
 
                     // Compute the Taylor derivative for the current argument.
-                    tmp.push_back(builder.CreateFAdd(acc2, ex_term));
+                    tmp.push_back(llvm_fadd(s, acc2, ex_term));
                 }
 
                 // Return the pairwise sum.

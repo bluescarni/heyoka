@@ -374,7 +374,7 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, llvm::Type *fp_t,
                     auto tmp2 = builder.CreateFMul(tmp1, bj);
                     auto tmp3 = builder.CreateFMul(tmp2, fac);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc), tmp3), acc);
+                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), tmp3), acc);
                 });
 
                 // Divide by the order to produce the return value.

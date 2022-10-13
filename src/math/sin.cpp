@@ -347,8 +347,8 @@ llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, llvm::Type *fp_t, con
 
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
-                                                           builder.CreateFMul(j_v, builder.CreateFMul(a_nj, cj))),
+                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc),
+                                                  builder.CreateFMul(j_v, builder.CreateFMul(a_nj, cj))),
                                         acc);
                 });
 

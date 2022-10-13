@@ -101,6 +101,7 @@ HEYOKA_DLL_PUBLIC bool compare_function_signature(llvm::Function *, llvm::Type *
 HEYOKA_DLL_PUBLIC llvm::Value *call_extern_vec(llvm_state &, const std::vector<llvm::Value *> &, const std::string &);
 
 // Math helpers.
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fadd(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_modulus(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_abs(llvm_state &, llvm::Value *);

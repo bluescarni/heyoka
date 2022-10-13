@@ -212,7 +212,7 @@ llvm::Value *taylor_diff_atanh_impl(llvm_state &s, llvm::Type *fp_t, const atanh
     }
 
     // Update ret.
-    ret = builder.CreateFAdd(ret, pairwise_sum(builder, sum));
+    ret = llvm_fadd(s, ret, pairwise_sum(builder, sum));
 
     // Divide by n*(1 - c^[0]) and return.
     return builder.CreateFDiv(ret, n_c0_p1);
@@ -359,13 +359,13 @@ llvm::Function *taylor_c_diff_func_atanh_impl(llvm_state &s, llvm::Type *fp_t, c
 
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
-                                                           builder.CreateFMul(fac, builder.CreateFMul(c_nj, aj))),
+                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc),
+                                                  builder.CreateFMul(fac, builder.CreateFMul(c_nj, aj))),
                                         acc);
                 });
 
                 // Update ret.
-                ret = builder.CreateFAdd(ret, builder.CreateLoad(val_t, acc));
+                ret = llvm_fadd(s, ret, builder.CreateLoad(val_t, acc));
 
                 // Divide by n*(1 - c^[0]).
                 ret = builder.CreateFDiv(ret, n_c0_p1);

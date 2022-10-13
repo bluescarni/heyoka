@@ -919,6 +919,17 @@ void llvm_while_loop(llvm_state &s, const std::function<llvm::Value *()> &cond, 
     cur->addIncoming(cmp, loop_end_bb);
 }
 
+llvm::Value *llvm_fadd(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    return s.builder().CreateFAdd(a, b);
+}
+
 // Helper to compute sin and cos simultaneously.
 std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *x)
 {
@@ -1475,8 +1486,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
 
     // Helper to implement the sum of two intervals.
     // NOTE: see https://en.wikipedia.org/wiki/Interval_arithmetic.
-    auto ival_sum = [&builder](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
-        return std::make_pair(builder.CreateFAdd(a_lo, b_lo), builder.CreateFAdd(a_hi, b_hi));
+    auto ival_sum = [&s](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
+        return std::make_pair(llvm_fadd(s, a_lo, b_lo), llvm_fadd(s, a_hi, b_hi));
     };
 
     // Helper to implement the product of two intervals.
@@ -1865,7 +1876,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
                                   batch_size);
 
         // M + e*sin(M).
-        auto tmp1 = builder.CreateFAdd(M, e_sin_M);
+        auto tmp1 = llvm_fadd(s, M, e_sin_M);
         // e**2*sin(M)*cos(M).
         auto tmp2 = builder.CreateFMul(e_sin_M, e_cos_M);
         // e**3*sin(M).
@@ -1874,9 +1885,9 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         auto tmp4 = builder.CreateFSub(builder.CreateFMul(c_3_2, cos_M_2), c_1_2);
 
         // Put it together.
-        auto ig1 = builder.CreateFAdd(tmp1, tmp2);
+        auto ig1 = llvm_fadd(s, tmp1, tmp2);
         auto ig2 = builder.CreateFMul(tmp3, tmp4);
-        auto ig = builder.CreateFAdd(ig1, ig2);
+        auto ig = llvm_fadd(s, ig1, ig2);
 
         // Make extra sure the initial guess is in the [0, 2*pi) range.
         auto lb = llvm::ConstantFP::get(tp, 0.);
@@ -1962,7 +1973,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
                         vector_splat(builder,
                                      llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
                                      batch_size),
-                        builder.CreateFAdd(old_val, ub)),
+                        llvm_fadd(s, old_val, ub)),
                     new_val);
 
                 // Bisect if new_val < lb.
@@ -1973,7 +1984,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
                         vector_splat(builder,
                                      llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
                                      batch_size),
-                        builder.CreateFAdd(old_val, lb)),
+                        llvm_fadd(s, old_val, lb)),
                     new_val);
 
                 // Store the new value.
@@ -2139,30 +2150,30 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &state, llvm::Val
     // Temporarily disable the fast math flags.
     fmf_disabler fd(builder);
 
-    auto S = builder.CreateFAdd(x_hi, y_hi);
-    auto T = builder.CreateFAdd(x_lo, y_lo);
+    auto S = llvm_fadd(state, x_hi, y_hi);
+    auto T = llvm_fadd(state, x_lo, y_lo);
     auto e = builder.CreateFSub(S, x_hi);
     auto f = builder.CreateFSub(T, x_lo);
 
     auto t1 = builder.CreateFSub(S, e);
     t1 = builder.CreateFSub(x_hi, t1);
     auto s = builder.CreateFSub(y_hi, e);
-    s = builder.CreateFAdd(s, t1);
+    s = llvm_fadd(state, s, t1);
 
     t1 = builder.CreateFSub(T, f);
     t1 = builder.CreateFSub(x_lo, t1);
     auto t = builder.CreateFSub(y_lo, f);
-    t = builder.CreateFAdd(t, t1);
+    t = llvm_fadd(state, t, t1);
 
-    s = builder.CreateFAdd(s, T);
-    auto H = builder.CreateFAdd(S, s);
+    s = llvm_fadd(state, s, T);
+    auto H = llvm_fadd(state, S, s);
     auto h = builder.CreateFSub(S, H);
-    h = builder.CreateFAdd(h, s);
+    h = llvm_fadd(state, h, s);
 
-    h = builder.CreateFAdd(h, t);
-    e = builder.CreateFAdd(H, h);
+    h = llvm_fadd(state, h, t);
+    e = llvm_fadd(state, H, h);
     f = builder.CreateFSub(H, e);
-    f = builder.CreateFAdd(f, h);
+    f = llvm_fadd(state, f, h);
 
     return {e, f};
 }
@@ -2172,24 +2183,24 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &state, llvm::Val
 // https://link.springer.com/content/pdf/10.1007/BF01397083.pdf
 // The mul12() function is replaced with the FMA-based llvm_eft_product().
 // NOTE: the code in NTL looks identical to Dekker's.
-std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &s, llvm::Value *x_hi, llvm::Value *x_lo,
                                                     llvm::Value *y_hi, llvm::Value *y_lo)
 {
-    auto &builder = state.builder();
+    auto &builder = s.builder();
 
     // Temporarily disable the fast math flags.
     fmf_disabler fd(builder);
 
-    auto [c, cc] = llvm_eft_product(state, x_hi, y_hi);
+    auto [c, cc] = llvm_eft_product(s, x_hi, y_hi);
 
     // cc = x*yy + xx*y + cc.
     auto x_yy = builder.CreateFMul(x_hi, y_lo);
     auto xx_y = builder.CreateFMul(x_lo, y_hi);
-    cc = builder.CreateFAdd(builder.CreateFAdd(x_yy, xx_y), cc);
+    cc = llvm_fadd(s, llvm_fadd(s, x_yy, xx_y), cc);
 
     // The normalisation step.
-    auto z = builder.CreateFAdd(c, cc);
-    auto zz = builder.CreateFAdd(builder.CreateFSub(c, z), cc);
+    auto z = llvm_fadd(s, c, cc);
+    auto zz = llvm_fadd(s, builder.CreateFSub(c, z), cc);
 
     return {z, zz};
 }
@@ -2199,28 +2210,28 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &state, llvm::Val
 // https://link.springer.com/content/pdf/10.1007/BF01397083.pdf
 // The mul12() function is replaced with the FMA-based llvm_eft_product().
 // NOTE: the code in NTL looks identical to Dekker's.
-std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &s, llvm::Value *x_hi, llvm::Value *x_lo,
                                                     llvm::Value *y_hi, llvm::Value *y_lo)
 {
-    auto &builder = state.builder();
+    auto &builder = s.builder();
 
     // Temporarily disable the fast math flags.
     fmf_disabler fd(builder);
 
     auto *c = builder.CreateFDiv(x_hi, y_hi);
 
-    auto [u, uu] = llvm_eft_product(state, c, y_hi);
+    auto [u, uu] = llvm_eft_product(s, c, y_hi);
 
     // cc = (x_hi - u - uu + x_lo - c * y_lo) / y_hi.
     auto *cc = builder.CreateFSub(x_hi, u);
     cc = builder.CreateFSub(cc, uu);
-    cc = builder.CreateFAdd(cc, x_lo);
+    cc = llvm_fadd(s, cc, x_lo);
     cc = builder.CreateFSub(cc, builder.CreateFMul(c, y_lo));
     cc = builder.CreateFDiv(cc, y_hi);
 
     // The normalisation step.
-    auto z = builder.CreateFAdd(c, cc);
-    auto zz = builder.CreateFAdd(builder.CreateFSub(c, z), cc);
+    auto z = llvm_fadd(s, c, cc);
+    auto zz = llvm_fadd(s, builder.CreateFSub(c, z), cc);
 
     return {z, zz};
 }
@@ -2228,7 +2239,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &state, llvm::Val
 // Floor.
 // NOTE: code taken from NTL:
 // https://github.com/libntl/ntl/blob/main/src/quad_float1.cpp#L239
-std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo)
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &s, llvm::Value *x_hi, llvm::Value *x_lo)
 {
     // LCOV_EXCL_START
     assert(x_hi != nullptr);
@@ -2237,7 +2248,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &state, llvm::V
     assert(x_hi->getType() == x_lo->getType());
     // LCOV_EXCL_STOP
 
-    auto &builder = state.builder();
+    auto &builder = s.builder();
 
     auto fp_t = x_hi->getType();
 
@@ -2245,7 +2256,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &state, llvm::V
     fmf_disabler fd(builder);
 
     // Floor x_hi.
-    auto *fhi = llvm_floor(state, x_hi);
+    auto *fhi = llvm_floor(s, x_hi);
 
     // NOTE: we want to distinguish the scalar/vector codepaths, as the vectorised implementation
     // does more work.
@@ -2256,17 +2267,17 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &state, llvm::V
         auto *ret_lo_ptr = builder.CreateAlloca(fp_t);
 
         llvm_if_then_else(
-            state, builder.CreateFCmpOEQ(fhi, x_hi),
+            s, builder.CreateFCmpOEQ(fhi, x_hi),
             [&]() {
                 // floor(x_hi) == x_hi, that is, x_hi is already
                 // an integral value.
 
                 // Floor the low part.
-                auto *flo = llvm_floor(state, x_lo);
+                auto *flo = llvm_floor(s, x_lo);
 
                 // Normalise.
-                auto z = builder.CreateFAdd(fhi, flo);
-                auto zz = builder.CreateFAdd(builder.CreateFSub(fhi, z), flo);
+                auto z = llvm_fadd(s, fhi, flo);
+                auto zz = llvm_fadd(s, builder.CreateFSub(fhi, z), flo);
 
                 // Store.
                 builder.CreateStore(z, ret_hi_ptr);
@@ -2284,14 +2295,14 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &state, llvm::V
         auto *zero_vec = llvm::Constant::getNullValue(fp_t);
 
         // Floor the low part.
-        auto *flo = llvm_floor(state, x_lo);
+        auto *flo = llvm_floor(s, x_lo);
 
         // Select flo or zero_vec, depending on fhi == x_hi.
         auto *ret_lo = builder.CreateSelect(builder.CreateFCmpOEQ(fhi, x_hi), flo, zero_vec);
 
         // Normalise.
-        auto z = builder.CreateFAdd(fhi, ret_lo);
-        auto zz = builder.CreateFAdd(builder.CreateFSub(fhi, z), ret_lo);
+        auto z = llvm_fadd(s, fhi, ret_lo);
+        auto zz = llvm_fadd(s, builder.CreateFSub(fhi, z), ret_lo);
 
         return {z, zz};
     }
@@ -3044,7 +3055,7 @@ llvm::Value *llvm_sigmoid(llvm_state &s, llvm::Value *x)
     auto *e_m_x = llvm_exp(s, m_x);
 
     // Return 1 / (1 + e_m_arg).
-    return builder.CreateFDiv(one_fp, builder.CreateFAdd(one_fp, e_m_x));
+    return builder.CreateFDiv(one_fp, llvm_fadd(s, one_fp, e_m_x));
 }
 
 // Hyperbolic sine.
