@@ -2398,14 +2398,11 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
     return s_dc;
 }
 
-template <typename T>
-auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expression>> &s_dc, std::uint32_t nvars,
-                               std::uint32_t batch_size, bool high_accuracy)
+auto cfunc_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vector<std::vector<expression>> &s_dc,
+                               std::uint32_t nvars, std::uint32_t batch_size, bool high_accuracy)
 {
     // Log runtime in trace mode.
     spdlog::stopwatch sw;
-
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     // Init the return value.
     // NOTE: use maps with name-based comparison for the functions. This ensures that the order in which these
@@ -2586,16 +2583,12 @@ namespace
 // - the indices of the params.
 // The second part of the return value is a boolean flag that will be true if
 // all outputs are u variables, false otherwise.
-template <typename T>
 std::pair<std::array<llvm::GlobalVariable *, 6>, bool>
-cfunc_c_make_output_globals(llvm_state &s, const std::vector<expression> &dc, std::uint32_t nuvars)
+cfunc_c_make_output_globals(llvm_state &s, llvm::Type *fp_t, const std::vector<expression> &dc, std::uint32_t nuvars)
 {
     auto &context = s.context();
     auto &builder = s.builder();
     auto &md = s.module();
-
-    // Fetch the type corresponding to T.
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     // Build iteratively the output values as vectors of constants.
     std::vector<llvm::Constant *> var_indices, vars, num_indices, nums, par_indices, pars;
@@ -2657,8 +2650,7 @@ cfunc_c_make_output_globals(llvm_state &s, const std::vector<expression> &dc, st
     auto *g_num_indices = new llvm::GlobalVariable(md, num_indices_arr->getType(), true,
                                                    llvm::GlobalVariable::InternalLinkage, num_indices_arr);
 
-    auto nums_arr_type
-        = llvm::ArrayType::get(to_llvm_type<T>(context), boost::numeric_cast<std::uint64_t>(nums.size()));
+    auto nums_arr_type = llvm::ArrayType::get(fp_t, boost::numeric_cast<std::uint64_t>(nums.size()));
     auto nums_arr = llvm::ConstantArray::get(nums_arr_type, nums);
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     auto *g_nums
@@ -2783,27 +2775,25 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
     });
 }
 
-template <typename T>
-void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
-                      llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars, std::uint32_t nuvars,
-                      std::uint32_t batch_size, bool high_accuracy)
+void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, llvm::Value *in_ptr,
+                      llvm::Value *par_ptr, llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars,
+                      std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
 {
     auto &builder = s.builder();
-    auto &context = s.context();
     auto &md = s.module();
 
     // Split dc into segments.
     const auto s_dc = function_segment_dc(dc, nvars, nuvars);
 
     // Generate the function maps.
-    const auto f_maps = cfunc_build_function_maps<T>(s, s_dc, nvars, batch_size, high_accuracy);
+    const auto f_maps = cfunc_build_function_maps(s, fp_type, s_dc, nvars, batch_size, high_accuracy);
 
     // Log the runtime of IR construction in trace mode.
     spdlog::stopwatch sw;
 
     // Generate the global arrays used to write the outputs at the
     // end of the computation.
-    const auto cout_gl = cfunc_c_make_output_globals<T>(s, dc, nuvars);
+    const auto cout_gl = cfunc_c_make_output_globals(s, fp_type, dc, nuvars);
 
     // Prepare the array that will contain the evaluation of all the
     // elementary subexpressions.
@@ -2812,7 +2802,6 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
     // NOTE: fp_type is the original, scalar floating-point type.
     // It will be turned into a vector type (if necessary) by
     // make_vector_type() below.
-    auto *fp_type = to_llvm_type<T>(context);
     auto *fp_vec_type = make_vector_type(fp_type, batch_size);
     auto *array_type = llvm::ArrayType::get(fp_vec_type, nuvars);
 
@@ -2821,7 +2810,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
     // its size can grow quite large, which can lead to stack overflow issues.
     // This has of course consequences in terms of thread safety, which
     // we will have to document.
-    auto eval_arr_gvar = make_global_zero_array(md, array_type);
+    auto *eval_arr_gvar = make_global_zero_array(md, array_type);
     auto *eval_arr = builder.CreateInBoundsGEP(array_type, eval_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
 
     // Copy over the values of the variables.
@@ -3010,7 +2999,7 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     builder.SetInsertPoint(bb);
 
     if (compact_mode) {
-        add_cfunc_c_mode<T>(s, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
+        add_cfunc_c_mode(s, fp_t, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
     } else {
         add_cfunc_nc_mode(s, fp_t, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
     }
