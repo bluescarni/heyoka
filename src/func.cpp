@@ -348,28 +348,6 @@ llvm::Value *func::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<
     return ptr()->llvm_eval(s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
-llvm::Value *func::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                 llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return ptr()->llvm_eval_dbl(s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-llvm::Value *func::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                  llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return ptr()->llvm_eval_ldbl(s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *func::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                  llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return ptr()->llvm_eval_f128(s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-#endif
-
 llvm::Function *func::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
 {
     return ptr()->llvm_c_eval_func_dbl(s, batch_size, high_accuracy);

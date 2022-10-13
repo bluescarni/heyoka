@@ -65,6 +65,8 @@ TEST_CASE("func minimal")
 
     llvm_state s;
 
+    auto *fp_t = s.builder().getDoubleTy();
+
     std::unordered_map<const void *, expression> func_map;
     REQUIRE_THROWS_MATCHES(f.diff(func_map, ""), not_implemented_error,
                            Message("Cannot compute the derivative of the function 'f' with respect to a variable, "
@@ -94,14 +96,8 @@ TEST_CASE("func minimal")
     REQUIRE_THROWS_MATCHES(f.deval_num_dbl({1., 1.}, 2), std::invalid_argument,
                            Message("Invalid index supplied to the double numerical evaluation of the derivative of "
                                    "function 'f': index 2 was supplied, but the number of arguments is only 2"));
-    REQUIRE_THROWS_MATCHES(f.llvm_eval_dbl(s, {}, nullptr, nullptr, 1, false), not_implemented_error,
-                           Message("llvm_eval_dbl() is not implemented for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.llvm_eval_ldbl(s, {}, nullptr, nullptr, 1, false), not_implemented_error,
-                           Message("llvm_eval_ldbl() is not implemented for the function 'f'"));
-#if defined(HEYOKA_HAVE_REAL128)
-    REQUIRE_THROWS_MATCHES(f.llvm_eval_f128(s, {}, nullptr, nullptr, 1, false), not_implemented_error,
-                           Message("llvm_eval_f128() is not implemented for the function 'f'"));
-#endif
+    REQUIRE_THROWS_MATCHES(f.llvm_eval(s, fp_t, {}, nullptr, nullptr, 1, false), not_implemented_error,
+                           Message("llvm_eval() is not implemented for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.llvm_c_eval_func_dbl(s, 1, false), not_implemented_error,
                            Message("llvm_c_eval_func_dbl() is not implemented for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.llvm_c_eval_func_ldbl(s, 1, false), not_implemented_error,
@@ -133,7 +129,6 @@ TEST_CASE("func minimal")
 
     auto a = 0;
     auto fake_ptr = reinterpret_cast<llvm::Value *>(&a);
-    auto *fp_t = s.builder().getDoubleTy();
     REQUIRE_THROWS_MATCHES(f.taylor_diff(s, nullptr, {}, {nullptr, nullptr}, nullptr, nullptr, 2, 2, 2, 0, false),
                            std::invalid_argument,
                            Message("Null floating-point type detected in func::taylor_diff() for the function 'f'"));
