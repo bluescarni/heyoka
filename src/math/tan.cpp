@@ -210,7 +210,7 @@ llvm::Value *taylor_diff_tan_impl(llvm_state &s, llvm::Type *fp_t, const tan_imp
     }
 
     // Init the return value as the result of the sum.
-    auto *ret_acc = pairwise_sum(builder, sum);
+    auto *ret_acc = pairwise_sum(s, sum);
 
     // Divide by order.
     ret_acc = builder.CreateFDiv(

@@ -162,7 +162,7 @@ llvm::Value *taylor_diff_square_impl(llvm_state &s, llvm::Type *, const square_i
             sum.push_back(builder.CreateFMul(v0, v1));
         }
 
-        auto *ret = pairwise_sum(builder, sum);
+        auto *ret = pairwise_sum(s, sum);
         return llvm_fadd(s, ret, ret);
     } else {
         // Even order.
@@ -176,7 +176,7 @@ llvm::Value *taylor_diff_square_impl(llvm_state &s, llvm::Type *, const square_i
             sum.push_back(builder.CreateFMul(v0, v1));
         }
 
-        auto *ret = pairwise_sum(builder, sum);
+        auto *ret = pairwise_sum(s, sum);
         return llvm_fadd(s, llvm_fadd(s, ret, ret), sq_ak2);
     }
 }

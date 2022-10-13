@@ -211,7 +211,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::
         }
 
         // Update the dividend.
-        dividend = llvm_fadd(s, dividend, pairwise_sum(builder, sum));
+        dividend = llvm_fadd(s, dividend, pairwise_sum(s, sum));
     }
 
     return builder.CreateFDiv(dividend, divisor);
@@ -268,7 +268,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::
         }
 
         // Update the dividend.
-        dividend = llvm_fadd(s, dividend, pairwise_sum(builder, sum));
+        dividend = llvm_fadd(s, dividend, pairwise_sum(s, sum));
     }
 
     return builder.CreateFDiv(dividend, divisor);
@@ -335,7 +335,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::
         }
 
         // Update the dividend.
-        dividend = llvm_fadd(s, dividend, pairwise_sum(builder, sum));
+        dividend = llvm_fadd(s, dividend, pairwise_sum(s, sum));
     }
 
     return builder.CreateFDiv(dividend, divisor);

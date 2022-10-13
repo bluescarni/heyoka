@@ -162,7 +162,7 @@ llvm::Value *taylor_diff_sinh_impl(llvm_state &s, llvm::Type *fp_t, const sinh_i
     }
 
     // Init the return value as the result of the sum.
-    auto *ret_acc = pairwise_sum(builder, sum);
+    auto *ret_acc = pairwise_sum(s, sum);
 
     // Compute and return the result: ret_acc / order
     auto *div = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);

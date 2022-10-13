@@ -232,7 +232,7 @@ llvm::Value *taylor_diff_sigmoid_impl(llvm_state &s, llvm::Type *fp_t, const sig
     }
 
     // Init the return value as the result of the sum.
-    auto *ret_acc = pairwise_sum(builder, sum);
+    auto *ret_acc = pairwise_sum(s, sum);
 
     // Finalise the return value: ret_acc / n.
     auto *div = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);

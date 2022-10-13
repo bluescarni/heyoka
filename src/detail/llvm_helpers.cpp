@@ -479,10 +479,9 @@ llvm::Value *pairwise_reduce(std::vector<llvm::Value *> &vals,
 
 // Pairwise summation of a vector of LLVM values.
 // https://en.wikipedia.org/wiki/Pairwise_summation
-llvm::Value *pairwise_sum(ir_builder &builder, std::vector<llvm::Value *> &sum)
+llvm::Value *pairwise_sum(llvm_state &s, std::vector<llvm::Value *> &sum)
 {
-    return pairwise_reduce(
-        sum, [&builder](llvm::Value *a, llvm::Value *b) -> llvm::Value * { return builder.CreateFAdd(a, b); });
+    return pairwise_reduce(sum, [&s](llvm::Value *a, llvm::Value *b) -> llvm::Value * { return llvm_fadd(s, a, b); });
 }
 
 // Helper to invoke an intrinsic function with arguments 'args'. 'types' are the argument type(s) for
@@ -1627,7 +1626,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
 
         // Compute the new bj.
         old_bj_series = bj_series;
-        auto *cur_bj = pairwise_sum(builder, bj_series);
+        auto *cur_bj = pairwise_sum(s, bj_series);
         old_bj_series.swap(bj_series);
 
         // Update min/max_bj.

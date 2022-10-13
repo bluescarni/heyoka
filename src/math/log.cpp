@@ -201,7 +201,7 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, llvm::Type *fp_t, const log_imp
         }
 
         // Compute the result of the summation and subtract it from ret.
-        ret = builder.CreateFSub(ret, pairwise_sum(builder, sum));
+        ret = builder.CreateFSub(ret, pairwise_sum(s, sum));
     }
 
     // Divide by n*b[0] and return.

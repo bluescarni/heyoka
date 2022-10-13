@@ -218,7 +218,7 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, llvm::Type *fp_t, const erf_imp
     }
 
     // Create ret with the sum.
-    auto *ret = pairwise_sum(builder, sum);
+    auto *ret = pairwise_sum(s, sum);
 
     // Generate the factor n * sqrt(pi) / 2.
     auto fac = number_like(s, fp_t, static_cast<double>(order)) * sqrt_pi_2_like(s, fp_t);

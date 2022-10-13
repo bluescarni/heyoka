@@ -212,7 +212,7 @@ llvm::Value *taylor_diff_asinh_impl(llvm_state &s, llvm::Type *fp_t, const asinh
     }
 
     // Update ret.
-    ret = builder.CreateFSub(ret, pairwise_sum(builder, sum));
+    ret = builder.CreateFSub(ret, pairwise_sum(s, sum));
 
     // Divide by n*c^[0] and return.
     return builder.CreateFDiv(ret, n_c0);

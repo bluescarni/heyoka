@@ -93,8 +93,8 @@ llvm::Value *sum_llvm_eval_impl(llvm_state &s, llvm::Type *fp_t, const func_base
                                 std::uint32_t batch_size, bool high_accuracy)
 {
     return llvm_eval_helper(
-        [&s](std::vector<llvm::Value *> args, bool) -> llvm::Value * { return pairwise_sum(s.builder(), args); }, fb, s,
-        fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+        [&s](std::vector<llvm::Value *> args, bool) -> llvm::Value * { return pairwise_sum(s, args); }, fb, s, fp_t,
+        eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 } // namespace
@@ -113,8 +113,8 @@ namespace
                                               std::uint32_t batch_size, bool high_accuracy)
 {
     return llvm_c_eval_func_helper(
-        "sum", [&s](std::vector<llvm::Value *> args, bool) { return pairwise_sum(s.builder(), args); }, fb, s, fp_t,
-        batch_size, high_accuracy);
+        "sum", [&s](std::vector<llvm::Value *> args, bool) { return pairwise_sum(s, args); }, fb, s, fp_t, batch_size,
+        high_accuracy);
 }
 
 } // namespace
@@ -176,7 +176,7 @@ llvm::Value *sum_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_imp
             arg.value());
     }
 
-    return pairwise_sum(builder, vals);
+    return pairwise_sum(s, vals);
 }
 
 } // namespace
@@ -297,7 +297,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, con
                 sf.args()[i].value()));
         }
 
-        builder.CreateRet(pairwise_sum(builder, vals));
+        builder.CreateRet(pairwise_sum(s, vals));
 
         // Verify.
         s.verify_function(f);

@@ -212,7 +212,7 @@ llvm::Value *taylor_diff_acos_impl(llvm_state &s, llvm::Type *fp_t, const acos_i
     }
 
     // Update ret.
-    ret = llvm_fadd(s, ret, pairwise_sum(builder, sum));
+    ret = llvm_fadd(s, ret, pairwise_sum(s, sum));
 
     // Divide by -n*c^[0] and return.
     return builder.CreateFDiv(ret, n_c0);

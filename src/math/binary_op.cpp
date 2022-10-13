@@ -458,7 +458,7 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *, const variable
         sum.push_back(builder.CreateFMul(v0, v1));
     }
 
-    return pairwise_sum(builder, sum);
+    return pairwise_sum(s, sum);
 }
 
 // All the other cases.
@@ -540,7 +540,7 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &n
     }
 
     // Init the return value as the result of the sum.
-    auto *ret_acc = pairwise_sum(builder, sum);
+    auto *ret_acc = pairwise_sum(s, sum);
 
     // Load the divisor for the quotient formula.
     // This is the zero-th order derivative of var1.

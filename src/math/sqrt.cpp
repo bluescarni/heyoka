@@ -208,7 +208,7 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, llvm::Type *, const sqrt_impl 
 
     // Avoid summing if the sum is empty.
     if (!sum.empty()) {
-        auto *tmp = pairwise_sum(builder, sum);
+        auto *tmp = pairwise_sum(s, sum);
         tmp = llvm_fadd(s, tmp, tmp);
 
         fac = builder.CreateFSub(fac, tmp);

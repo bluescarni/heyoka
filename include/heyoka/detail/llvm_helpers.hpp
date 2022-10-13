@@ -71,7 +71,7 @@ HEYOKA_DLL_PUBLIC llvm::Value *scalars_to_vector(ir_builder &, const std::vector
 
 HEYOKA_DLL_PUBLIC llvm::Value *pairwise_reduce(std::vector<llvm::Value *> &,
                                                const std::function<llvm::Value *(llvm::Value *, llvm::Value *)> &);
-HEYOKA_DLL_PUBLIC llvm::Value *pairwise_sum(ir_builder &, std::vector<llvm::Value *> &);
+HEYOKA_DLL_PUBLIC llvm::Value *pairwise_sum(llvm_state &, std::vector<llvm::Value *> &);
 
 HEYOKA_DLL_PUBLIC llvm::CallInst *llvm_invoke_intrinsic(ir_builder &, const std::string &,
                                                         const std::vector<llvm::Type *> &,

@@ -121,7 +121,7 @@ llvm::Value *sum_sq_llvm_eval_impl(llvm_state &s, llvm::Type *fp_t, const func_b
                 sqs.push_back(llvm_square(s, val));
             }
 
-            return pairwise_sum(s.builder(), sqs);
+            return pairwise_sum(s, sqs);
         },
         fb, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
@@ -150,7 +150,7 @@ namespace
                 sqs.push_back(llvm_square(s, val));
             }
 
-            return pairwise_sum(s.builder(), sqs);
+            return pairwise_sum(s, sqs);
         },
         fb, s, fp_t, batch_size, high_accuracy);
 }
@@ -239,11 +239,11 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_
         std::vector<llvm::Value *> tmp;
         tmp.reserve(boost::numeric_cast<decltype(tmp.size())>(v_sums.size()));
         for (auto &v_sum : v_sums) {
-            tmp.push_back(pairwise_sum(builder, v_sum));
+            tmp.push_back(pairwise_sum(s, v_sum));
         }
 
         // Sum the sums.
-        pairwise_sum(builder, tmp);
+        pairwise_sum(s, tmp);
 
         // Multiply by 2 and return.
         return llvm_fadd(s, tmp[0], tmp[0]);
@@ -289,7 +289,7 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_
             // the items in v_sums are all empty and tmp.back() contains only the term
             // outside the summation.
             if (order > 0u) {
-                auto *p_sum = pairwise_sum(builder, v_sums[k]);
+                auto *p_sum = pairwise_sum(s, v_sums[k]);
                 // Muliply the pairwise sum by 2.
                 p_sum = llvm_fadd(s, p_sum, p_sum);
                 // Add it to the term outside the sum.
@@ -298,7 +298,7 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_
         }
 
         // Sum the sums and return.
-        return pairwise_sum(builder, tmp);
+        return pairwise_sum(s, tmp);
     }
 }
 
@@ -444,7 +444,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
                 for (auto &acc : v_accs) {
                     tmp.push_back(builder.CreateLoad(val_t, acc));
                 }
-                auto ret = pairwise_sum(builder, tmp);
+                auto ret = pairwise_sum(s, tmp);
 
                 // Return 2 * ret.
                 builder.CreateStore(llvm_fadd(s, ret, ret), retval);
@@ -521,7 +521,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
                 }
 
                 // Return the pairwise sum.
-                builder.CreateStore(pairwise_sum(builder, tmp), retval);
+                builder.CreateStore(pairwise_sum(s, tmp), retval);
             });
 
         // Create the return value.
