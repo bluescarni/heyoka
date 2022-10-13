@@ -157,40 +157,26 @@ llvm::Value *pow_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vec
 namespace
 {
 
-template <typename T>
-[[nodiscard]] llvm::Function *pow_llvm_c_eval(llvm_state &s, const pow_impl &pimpl, std::uint32_t batch_size,
-                                              bool high_accuracy)
+[[nodiscard]] llvm::Function *pow_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const pow_impl &pimpl,
+                                              std::uint32_t batch_size, bool high_accuracy)
 {
     const auto allow_approx = pow_allow_approx(pimpl);
 
-    return llvm_c_eval_func_helper<T>(
+    return llvm_c_eval_func_helper(
         allow_approx ? "pow_approx" : "pow",
         [&s, allow_approx](const std::vector<llvm::Value *> &args, bool) {
             return llvm_pow(s, args[0], args[1], allow_approx);
         },
-        pimpl, s, batch_size, high_accuracy);
+        pimpl, s, fp_t, batch_size, high_accuracy);
 }
 
 } // namespace
 
-llvm::Function *pow_impl::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Function *pow_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                           bool high_accuracy) const
 {
-    return pow_llvm_c_eval<double>(s, *this, batch_size, high_accuracy);
+    return pow_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy);
 }
-
-llvm::Function *pow_impl::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return pow_llvm_c_eval<long double>(s, *this, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *pow_impl::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return pow_llvm_c_eval<mppp::real128>(s, *this, batch_size, high_accuracy);
-}
-
-#endif
 
 namespace
 {

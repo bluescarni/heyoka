@@ -127,6 +127,7 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
                                                  llvm::Value *, llvm::Value *, std::uint32_t, bool) const
         = 0;
 
+    [[nodiscard]] virtual llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const = 0;
     [[nodiscard]] virtual llvm::Function *llvm_c_eval_func_dbl(llvm_state &, std::uint32_t, bool) const = 0;
     [[nodiscard]] virtual llvm::Function *llvm_c_eval_func_ldbl(llvm_state &, std::uint32_t, bool) const = 0;
 #if defined(HEYOKA_HAVE_REAL128)
@@ -249,6 +250,14 @@ using func_llvm_eval_t = decltype(std::declval<std::add_lvalue_reference_t<const
 
 template <typename T>
 inline constexpr bool func_has_llvm_eval_v = std::is_same_v<detected_t<func_llvm_eval_t, T>, llvm::Value *>;
+
+template <typename T>
+using func_llvm_c_eval_func_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_c_eval_func(
+    std::declval<llvm_state &>(), std::declval<llvm::Type *>(), std::declval<std::uint32_t>(), std::declval<bool>()));
+
+template <typename T>
+inline constexpr bool func_has_llvm_c_eval_func_v
+    = std::is_same_v<detected_t<func_llvm_c_eval_func_t, T>, llvm::Function *>;
 
 template <typename T>
 using func_llvm_c_eval_func_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_c_eval_func_dbl(
@@ -486,6 +495,16 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         }
     }
 
+    [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                                   bool high_accuracy) const final
+    {
+        if constexpr (func_has_llvm_c_eval_func_v<T>) {
+            return m_value.llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
+        } else {
+            throw not_implemented_error("llvm_c_eval_func() is not implemented for the function '" + get_name() + "'");
+        }
+    }
+
     [[nodiscard]] llvm::Function *llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size,
                                                        bool high_accuracy) const final
     {
@@ -717,6 +736,7 @@ public:
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, std::uint32_t, bool) const;
 
+    [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
     [[nodiscard]] llvm::Function *llvm_c_eval_func_dbl(llvm_state &, std::uint32_t, bool) const;
     [[nodiscard]] llvm::Function *llvm_c_eval_func_ldbl(llvm_state &, std::uint32_t, bool) const;
 #if defined(HEYOKA_HAVE_REAL128)
@@ -768,30 +788,12 @@ llvm_eval_helper(const std::function<llvm::Value *(const std::vector<llvm::Value
                  llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
                  std::uint32_t, bool);
 
-template <typename>
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *
 llvm_c_eval_func_helper(const std::string &,
                         const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
-                        const func_base &, llvm_state &, std::uint32_t, bool);
+                        const func_base &, llvm_state &, llvm::Type *, std::uint32_t, bool);
 
 } // namespace detail
-
-template <typename T>
-[[nodiscard]] inline llvm::Function *llvm_c_eval_func(const func &f, llvm_state &s, std::uint32_t batch_size,
-                                                      bool high_accuracy)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return f.llvm_c_eval_func_dbl(s, batch_size, high_accuracy);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return f.llvm_c_eval_func_ldbl(s, batch_size, high_accuracy);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return f.llvm_c_eval_func_f128(s, batch_size, high_accuracy);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
 
 } // namespace heyoka
 

@@ -348,6 +348,12 @@ llvm::Value *func::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<
     return ptr()->llvm_eval(s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
+llvm::Function *func::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                       bool high_accuracy) const
+{
+    return ptr()->llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
+}
+
 llvm::Function *func::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
 {
     return ptr()->llvm_c_eval_func_dbl(s, batch_size, high_accuracy);
@@ -845,10 +851,9 @@ std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llv
 
 } // namespace
 
-template <typename T>
 llvm::Function *llvm_c_eval_func_helper(const std::string &name,
                                         const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &g,
-                                        const func_base &fb, llvm_state &s, std::uint32_t batch_size,
+                                        const func_base &fb, llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
                                         bool high_accuracy)
 {
     // LCOV_EXCL_START
@@ -860,8 +865,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the scalar and vector floating-point types.
-    auto *fp_t = to_llvm_type<T>(context);
+    // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     const auto na_pair = llvm_c_eval_func_name_args(context, fp_t, name, batch_size, fb.args());
@@ -898,7 +902,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
                 [&](const auto &v) -> llvm::Value * {
                     using type = detail::uncvref_t<decltype(v)>;
 
-                    const auto cur_f_arg = f->args().begin() + 4 + i;
+                    auto *const cur_f_arg = f->args().begin() + 4 + i;
 
                     if constexpr (std::is_same_v<type, number>) {
                         // NOTE: number arguments are passed directly as
@@ -916,7 +920,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
                         assert(!llvm::cast<llvm::PointerType>(par_ptr->getType())->isVectorTy());
                         // LCOV_EXCL_STOP
 
-                        auto *ptr = builder.CreateInBoundsGEP(to_llvm_type<T>(context), par_ptr,
+                        auto *ptr = builder.CreateInBoundsGEP(fp_t, par_ptr,
                                                               builder.CreateMul(stride, to_size_t(s, cur_f_arg)));
 
                         return load_vector_from_memory(builder, fp_t, ptr, batch_size);
@@ -959,25 +963,6 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
 
     return f;
 }
-
-template HEYOKA_DLL_PUBLIC llvm::Function *
-llvm_c_eval_func_helper<double>(const std::string &,
-                                const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
-                                const func_base &, llvm_state &, std::uint32_t, bool);
-
-template HEYOKA_DLL_PUBLIC llvm::Function *
-llvm_c_eval_func_helper<long double>(const std::string &,
-                                     const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
-                                     const func_base &, llvm_state &, std::uint32_t, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC llvm::Function *
-llvm_c_eval_func_helper<mppp::real128>(const std::string &,
-                                       const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
-                                       const func_base &, llvm_state &, std::uint32_t, bool);
-
-#endif
 
 } // namespace detail
 

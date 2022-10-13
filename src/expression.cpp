@@ -2431,7 +2431,7 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
 
         for (const auto &ex : seg) {
             // Get the evaluation function.
-            auto *func = llvm_c_eval_func<T>(std::get<heyoka::func>(ex.value()), s, batch_size, high_accuracy);
+            auto *func = std::get<heyoka::func>(ex.value()).llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
 
             // Insert the function into tmp_map.
             const auto [it, is_new_func] = tmp_map.try_emplace(func);

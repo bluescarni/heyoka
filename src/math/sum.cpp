@@ -109,35 +109,21 @@ llvm::Value *sum_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vec
 namespace
 {
 
-template <typename T>
-[[nodiscard]] llvm::Function *sum_llvm_c_eval(llvm_state &s, const func_base &fb, std::uint32_t batch_size,
-                                              bool high_accuracy)
+[[nodiscard]] llvm::Function *sum_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
+                                              std::uint32_t batch_size, bool high_accuracy)
 {
-    return llvm_c_eval_func_helper<T>(
-        "sum", [&s](std::vector<llvm::Value *> args, bool) { return pairwise_sum(s.builder(), args); }, fb, s,
+    return llvm_c_eval_func_helper(
+        "sum", [&s](std::vector<llvm::Value *> args, bool) { return pairwise_sum(s.builder(), args); }, fb, s, fp_t,
         batch_size, high_accuracy);
 }
 
 } // namespace
 
-llvm::Function *sum_impl::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Function *sum_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                           bool high_accuracy) const
 {
-    return sum_llvm_c_eval<double>(s, *this, batch_size, high_accuracy);
+    return sum_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy);
 }
-
-llvm::Function *sum_impl::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return sum_llvm_c_eval<long double>(s, *this, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *sum_impl::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return sum_llvm_c_eval<mppp::real128>(s, *this, batch_size, high_accuracy);
-}
-
-#endif
 
 namespace
 {
