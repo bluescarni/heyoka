@@ -354,25 +354,6 @@ llvm::Function *func::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uin
     return ptr()->llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
 }
 
-llvm::Function *func::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return ptr()->llvm_c_eval_func_dbl(s, batch_size, high_accuracy);
-}
-
-llvm::Function *func::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return ptr()->llvm_c_eval_func_ldbl(s, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *func::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return ptr()->llvm_c_eval_func_f128(s, batch_size, high_accuracy);
-}
-
-#endif
-
 namespace detail
 {
 

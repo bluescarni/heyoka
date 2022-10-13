@@ -128,11 +128,6 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
         = 0;
 
     [[nodiscard]] virtual llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const = 0;
-    [[nodiscard]] virtual llvm::Function *llvm_c_eval_func_dbl(llvm_state &, std::uint32_t, bool) const = 0;
-    [[nodiscard]] virtual llvm::Function *llvm_c_eval_func_ldbl(llvm_state &, std::uint32_t, bool) const = 0;
-#if defined(HEYOKA_HAVE_REAL128)
-    [[nodiscard]] virtual llvm::Function *llvm_c_eval_func_f128(llvm_state &, std::uint32_t, bool) const = 0;
-#endif
 
     virtual taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) && = 0;
     virtual bool has_taylor_decompose() const = 0;
@@ -258,36 +253,6 @@ using func_llvm_c_eval_func_t = decltype(std::declval<std::add_lvalue_reference_
 template <typename T>
 inline constexpr bool func_has_llvm_c_eval_func_v
     = std::is_same_v<detected_t<func_llvm_c_eval_func_t, T>, llvm::Function *>;
-
-template <typename T>
-using func_llvm_c_eval_func_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_c_eval_func_dbl(
-    std::declval<llvm_state &>(), std::declval<std::uint32_t>(), std::declval<bool>()));
-
-template <typename T>
-inline constexpr bool func_has_llvm_c_eval_func_dbl_v
-    = std::is_same_v<detected_t<func_llvm_c_eval_func_dbl_t, T>, llvm::Function *>;
-
-template <typename T>
-using func_llvm_c_eval_func_ldbl_t
-    = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_c_eval_func_ldbl(
-        std::declval<llvm_state &>(), std::declval<std::uint32_t>(), std::declval<bool>()));
-
-template <typename T>
-inline constexpr bool func_has_llvm_c_eval_func_ldbl_v
-    = std::is_same_v<detected_t<func_llvm_c_eval_func_ldbl_t, T>, llvm::Function *>;
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <typename T>
-using func_llvm_c_eval_func_f128_t
-    = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_c_eval_func_f128(
-        std::declval<llvm_state &>(), std::declval<std::uint32_t>(), std::declval<bool>()));
-
-template <typename T>
-inline constexpr bool func_has_llvm_c_eval_func_f128_v
-    = std::is_same_v<detected_t<func_llvm_c_eval_func_f128_t, T>, llvm::Function *>;
-
-#endif
 
 template <typename T>
 using func_taylor_decompose_t
@@ -505,39 +470,6 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         }
     }
 
-    [[nodiscard]] llvm::Function *llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size,
-                                                       bool high_accuracy) const final
-    {
-        if constexpr (func_has_llvm_c_eval_func_dbl_v<T>) {
-            return m_value.llvm_c_eval_func_dbl(s, batch_size, high_accuracy);
-        } else {
-            throw not_implemented_error("llvm_c_eval_func_dbl() is not implemented for the function '" + get_name()
-                                        + "'");
-        }
-    }
-    [[nodiscard]] llvm::Function *llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size,
-                                                        bool high_accuracy) const final
-    {
-        if constexpr (func_has_llvm_c_eval_func_ldbl_v<T>) {
-            return m_value.llvm_c_eval_func_ldbl(s, batch_size, high_accuracy);
-        } else {
-            throw not_implemented_error("llvm_c_eval_func_ldbl() is not implemented for the function '" + get_name()
-                                        + "'");
-        }
-    }
-#if defined(HEYOKA_HAVE_REAL128)
-    [[nodiscard]] llvm::Function *llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size,
-                                                        bool high_accuracy) const final
-    {
-        if constexpr (func_has_llvm_c_eval_func_f128_v<T>) {
-            return m_value.llvm_c_eval_func_f128(s, batch_size, high_accuracy);
-        } else {
-            throw not_implemented_error("llvm_c_eval_func_f128() is not implemented for the function '" + get_name()
-                                        + "'");
-        }
-    }
-#endif
-
     // Taylor.
     taylor_dc_t::size_type taylor_decompose(taylor_dc_t &dc) && final
     {
@@ -737,11 +669,6 @@ public:
                                          llvm::Value *, std::uint32_t, bool) const;
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
-    [[nodiscard]] llvm::Function *llvm_c_eval_func_dbl(llvm_state &, std::uint32_t, bool) const;
-    [[nodiscard]] llvm::Function *llvm_c_eval_func_ldbl(llvm_state &, std::uint32_t, bool) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    [[nodiscard]] llvm::Function *llvm_c_eval_func_f128(llvm_state &, std::uint32_t, bool) const;
-#endif
 
     std::vector<expression>::size_type decompose(std::unordered_map<const void *, std::vector<expression>::size_type> &,
                                                  std::vector<expression> &) const;

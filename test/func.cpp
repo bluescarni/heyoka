@@ -98,14 +98,8 @@ TEST_CASE("func minimal")
                                    "function 'f': index 2 was supplied, but the number of arguments is only 2"));
     REQUIRE_THROWS_MATCHES(f.llvm_eval(s, fp_t, {}, nullptr, nullptr, 1, false), not_implemented_error,
                            Message("llvm_eval() is not implemented for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.llvm_c_eval_func_dbl(s, 1, false), not_implemented_error,
-                           Message("llvm_c_eval_func_dbl() is not implemented for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.llvm_c_eval_func_ldbl(s, 1, false), not_implemented_error,
-                           Message("llvm_c_eval_func_ldbl() is not implemented for the function 'f'"));
-#if defined(HEYOKA_HAVE_REAL128)
-    REQUIRE_THROWS_MATCHES(f.llvm_c_eval_func_f128(s, 1, false), not_implemented_error,
-                           Message("llvm_c_eval_func_f128() is not implemented for the function 'f'"));
-#endif
+    REQUIRE_THROWS_MATCHES(f.llvm_c_eval_func(s, fp_t, 1, false), not_implemented_error,
+                           Message("llvm_c_eval_func() is not implemented for the function 'f'"));
 
     REQUIRE(!std::is_constructible_v<func, func_01>);
 
