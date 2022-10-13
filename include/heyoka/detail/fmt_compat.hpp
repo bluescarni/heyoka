@@ -9,6 +9,8 @@
 #ifndef HEYOKA_DETAIL_FMT_COMPAT_HPP
 #define HEYOKA_DETAIL_FMT_COMPAT_HPP
 
+#include <stdexcept>
+
 #include <fmt/core.h>
 
 #if FMT_VERSION >= 90000L
@@ -36,6 +38,12 @@ struct ostream_formatter {
     template <typename ParseContext>
     constexpr auto parse(ParseContext &ctx)
     {
+        if (ctx.begin() != ctx.end()) {
+            // LCOV_EXCL_START
+            throw std::invalid_argument("The ostream formatter does not accept any format string");
+            // LCOV_EXCL_STOP
+        }
+
         return ctx.begin();
     }
 

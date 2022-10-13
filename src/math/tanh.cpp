@@ -68,66 +68,32 @@ std::vector<expression> tanh_impl::gradient() const
     return {1_dbl - square(tanh(args()[0]))};
 }
 
-llvm::Value *tanh_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                      llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Value *tanh_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                                  llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                  bool high_accuracy) const
 {
-    return llvm_eval_helper<double>(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_tanh(s, args[0]); }, *this, s, eval_arr,
-        par_ptr, stride, batch_size, high_accuracy);
+    return llvm_eval_helper([&s](const std::vector<llvm::Value *> &args, bool) { return llvm_tanh(s, args[0]); }, *this,
+                            s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
-
-llvm::Value *tanh_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                       llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return llvm_eval_helper<long double>(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_tanh(s, args[0]); }, *this, s, eval_arr,
-        par_ptr, stride, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *tanh_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                       llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return llvm_eval_helper<mppp::real128>(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_tanh(s, args[0]); }, *this, s, eval_arr,
-        par_ptr, stride, batch_size, high_accuracy);
-}
-
-#endif
 
 namespace
 {
 
-template <typename T>
-[[nodiscard]] llvm::Function *tanh_llvm_c_eval(llvm_state &s, const func_base &fb, std::uint32_t batch_size,
-                                               bool high_accuracy)
+[[nodiscard]] llvm::Function *tanh_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
+                                               std::uint32_t batch_size, bool high_accuracy)
 {
-    return llvm_c_eval_func_helper<T>(
-        "tanh", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_tanh(s, args[0]); }, fb, s, batch_size,
-        high_accuracy);
+    return llvm_c_eval_func_helper(
+        "tanh", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_tanh(s, args[0]); }, fb, s, fp_t,
+        batch_size, high_accuracy);
 }
 
 } // namespace
 
-llvm::Function *tanh_impl::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Function *tanh_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                            bool high_accuracy) const
 {
-    return tanh_llvm_c_eval<double>(s, *this, batch_size, high_accuracy);
+    return tanh_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy);
 }
-
-llvm::Function *tanh_impl::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return tanh_llvm_c_eval<long double>(s, *this, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *tanh_impl::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return tanh_llvm_c_eval<mppp::real128>(s, *this, batch_size, high_accuracy);
-}
-
-#endif
 
 taylor_dc_t::size_type tanh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
@@ -150,13 +116,12 @@ namespace
 {
 
 // Derivative of tanh(number).
-template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_tanh_impl(llvm_state &s, const tanh_impl &, const std::vector<std::uint32_t> &, const U &num,
-                                   const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
-                                   std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *taylor_diff_tanh_impl(llvm_state &s, llvm::Type *fp_t, const tanh_impl &,
+                                   const std::vector<std::uint32_t> &, const U &num, const std::vector<llvm::Value *> &,
+                                   llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
+                                   std::uint32_t batch_size)
 {
-    auto *fp_t = to_llvm_type<T>(s.context());
-
     if (order == 0u) {
         return llvm_tanh(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
@@ -164,17 +129,15 @@ llvm::Value *taylor_diff_tanh_impl(llvm_state &s, const tanh_impl &, const std::
     }
 }
 
-template <typename T>
-llvm::Value *taylor_diff_tanh_impl(llvm_state &s, const tanh_impl &, const std::vector<std::uint32_t> &deps,
-                                   const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *,
-                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+llvm::Value *taylor_diff_tanh_impl(llvm_state &s, llvm::Type *fp_t, const tanh_impl &,
+                                   const std::vector<std::uint32_t> &deps, const variable &var,
+                                   const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
+                                   std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
     // Fetch the index of the variable.
     const auto b_idx = uname_to_index(var.name());
-
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     if (order == 0u) {
         return llvm_tanh(s, taylor_fetch_diff(arr, b_idx, 0, n_uvars));
@@ -191,34 +154,34 @@ llvm::Value *taylor_diff_tanh_impl(llvm_state &s, const tanh_impl &, const std::
         auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*cnj*bj to the sum.
-        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(cnj, bj)));
+        sum.push_back(llvm_fmul(s, fac, llvm_fmul(s, cnj, bj)));
     }
 
     // Init the return value as the result of the sum.
-    auto *ret_acc = pairwise_sum(builder, sum);
+    auto *ret_acc = pairwise_sum(s, sum);
 
     // Divide by order.
-    ret_acc = builder.CreateFDiv(
-        ret_acc, vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size));
+    ret_acc = llvm_fdiv(s, ret_acc,
+                        vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size));
 
     // Create and return the result.
-    return builder.CreateFSub(taylor_fetch_diff(arr, b_idx, order, n_uvars), ret_acc);
+    return llvm_fsub(s, taylor_fetch_diff(arr, b_idx, order, n_uvars), ret_acc);
 }
 
 // All the other cases.
-template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_tanh_impl(llvm_state &, const tanh_impl &, const std::vector<std::uint32_t> &, const U &,
-                                   const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
-                                   std::uint32_t, std::uint32_t)
+template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
+llvm::Value *taylor_diff_tanh_impl(llvm_state &, llvm::Type *, const tanh_impl &, const std::vector<std::uint32_t> &,
+                                   const U &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+                                   std::uint32_t, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a hyperbolic tangent");
 }
 
-template <typename T>
-llvm::Value *taylor_diff_tanh(llvm_state &s, const tanh_impl &f, const std::vector<std::uint32_t> &deps,
-                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
-                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+llvm::Value *taylor_diff_tanh(llvm_state &s, llvm::Type *fp_t, const tanh_impl &f,
+                              const std::vector<std::uint32_t> &deps, const std::vector<llvm::Value *> &arr,
+                              llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                              std::uint32_t batch_size)
 {
     assert(f.args().size() == 1u);
 
@@ -231,51 +194,31 @@ llvm::Value *taylor_diff_tanh(llvm_state &s, const tanh_impl &f, const std::vect
 
     return std::visit(
         [&](const auto &v) {
-            return taylor_diff_tanh_impl<T>(s, f, deps, v, arr, par_ptr, n_uvars, order, idx, batch_size);
+            return taylor_diff_tanh_impl(s, fp_t, f, deps, v, arr, par_ptr, n_uvars, order, idx, batch_size);
         },
         f.args()[0].value());
 }
 
 } // namespace
 
-llvm::Value *tanh_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                        std::uint32_t batch_size, bool) const
+llvm::Value *tanh_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                    const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                    std::uint32_t batch_size, bool) const
 {
-    return taylor_diff_tanh<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_tanh(s, fp_t, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
-
-llvm::Value *tanh_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                         std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_tanh<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *tanh_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                         std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_tanh<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
-}
-
-#endif
 
 namespace
 {
 
 // Derivative of tanh(number).
-template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_tanh_impl(llvm_state &s, const tanh_impl &, const U &num, std::uint32_t n_uvars,
-                                             std::uint32_t batch_size)
+template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Function *taylor_c_diff_func_tanh_impl(llvm_state &s, llvm::Type *fp_t, const tanh_impl &, const U &num,
+                                             std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_numpar<T>(
-        s, n_uvars, batch_size, "tanh", 1,
+    return taylor_c_diff_func_numpar(
+        s, fp_t, n_uvars, batch_size, "tanh", 1,
         [&s](const auto &args) {
             // LCOV_EXCL_START
             assert(args.size() == 1u);
@@ -288,20 +231,18 @@ llvm::Function *taylor_c_diff_func_tanh_impl(llvm_state &s, const tanh_impl &, c
 }
 
 // Derivative of tanh(variable).
-template <typename T>
-llvm::Function *taylor_c_diff_func_tanh_impl(llvm_state &s, const tanh_impl &, const variable &var,
+llvm::Function *taylor_c_diff_func_tanh_impl(llvm_state &s, llvm::Type *fp_t, const tanh_impl &, const variable &var,
                                              std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the scalar and vector floating-point types.
-    auto *fp_t = to_llvm_type<T>(context);
+    // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "tanh", n_uvars, batch_size, {var}, 1);
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "tanh", n_uvars, batch_size, {var}, 1);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -353,16 +294,15 @@ llvm::Function *taylor_c_diff_func_tanh_impl(llvm_state &s, const tanh_impl &, c
 
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
-                                                           builder.CreateFMul(fac, builder.CreateFMul(cnj, bj))),
-                                        acc);
+                    builder.CreateStore(
+                        llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, cnj, bj))), acc);
                 });
 
                 // Divide by the order and subtract from b^[n] to produce the return value.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
-                builder.CreateStore(builder.CreateFSub(taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx),
-                                                       builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_v)),
+                builder.CreateStore(llvm_fsub(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx),
+                                              llvm_fdiv(s, builder.CreateLoad(val_t, acc), ord_v)),
                                     retval);
             });
 
@@ -389,46 +329,30 @@ llvm::Function *taylor_c_diff_func_tanh_impl(llvm_state &s, const tanh_impl &, c
 }
 
 // All the other cases.
-template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_tanh_impl(llvm_state &, const tanh_impl &, const U &, std::uint32_t, std::uint32_t)
+template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
+llvm::Function *taylor_c_diff_func_tanh_impl(llvm_state &, llvm::Type *, const tanh_impl &, const U &, std::uint32_t,
+                                             std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a hyperbolic tangent in compact mode");
 }
 
-template <typename T>
-llvm::Function *taylor_c_diff_func_tanh(llvm_state &s, const tanh_impl &fn, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_tanh(llvm_state &s, llvm::Type *fp_t, const tanh_impl &fn, std::uint32_t n_uvars,
                                         std::uint32_t batch_size)
 {
     assert(fn.args().size() == 1u);
 
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_tanh_impl<T>(s, fn, v, n_uvars, batch_size); },
+    return std::visit([&](const auto &v) { return taylor_c_diff_func_tanh_impl(s, fp_t, fn, v, n_uvars, batch_size); },
                       fn.args()[0].value());
 }
 
 } // namespace
 
-llvm::Function *tanh_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
+llvm::Function *tanh_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                              std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_tanh<double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_tanh(s, fp_t, *this, n_uvars, batch_size);
 }
-
-llvm::Function *tanh_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                   bool) const
-{
-    return taylor_c_diff_func_tanh<long double>(s, *this, n_uvars, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *tanh_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                   bool) const
-{
-    return taylor_c_diff_func_tanh<mppp::real128>(s, *this, n_uvars, batch_size);
-}
-
-#endif
 
 } // namespace detail
 

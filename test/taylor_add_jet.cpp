@@ -360,8 +360,6 @@ TEST_CASE("nbody")
     std::vector<expression> x_vars, y_vars, z_vars, vx_vars, vy_vars, vz_vars;
 
     for (auto i = 0; i < 6; ++i) {
-        using namespace fmt::literals;
-
         x_vars.emplace_back(fmt::format("x_{}", i));
         y_vars.emplace_back(fmt::format("y_{}", i));
         z_vars.emplace_back(fmt::format("z_{}", i));

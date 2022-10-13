@@ -1299,27 +1299,13 @@ taylor_dc_t::size_type taylor_decompose(const expression &ex, taylor_dc_t &dc)
     return detail::taylor_decompose(func_map, ex, dc);
 }
 
-template <typename T>
-llvm::Value *taylor_diff(llvm_state &s, const expression &ex, const std::vector<std::uint32_t> &deps,
+llvm::Value *taylor_diff(llvm_state &s, llvm::Type *fp_t, const expression &ex, const std::vector<std::uint32_t> &deps,
                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
                          std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
                          bool high_accuracy)
 {
     if (const auto *fptr = std::get_if<func>(&ex.value())) {
-        if constexpr (std::is_same_v<T, double>) {
-            return fptr->taylor_diff_dbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
-                                         high_accuracy);
-        } else if constexpr (std::is_same_v<T, long double>) {
-            return fptr->taylor_diff_ldbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
-                                          high_accuracy);
-#if defined(HEYOKA_HAVE_REAL128)
-        } else if constexpr (std::is_same_v<T, mppp::real128>) {
-            return fptr->taylor_diff_f128(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
-                                          high_accuracy);
-#endif
-        } else {
-            static_assert(detail::always_false_v<T>, "Unhandled type.");
-        }
+        return fptr->taylor_diff(s, fp_t, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size, high_accuracy);
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument("Taylor derivatives can be computed only for functions");
@@ -1327,64 +1313,17 @@ llvm::Value *taylor_diff(llvm_state &s, const expression &ex, const std::vector<
     }
 }
 
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff<double>(llvm_state &, const expression &,
-                                                            const std::vector<std::uint32_t> &,
-                                                            const std::vector<llvm::Value *> &, llvm::Value *,
-                                                            llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                                            std::uint32_t, bool);
-
-template HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff<long double>(llvm_state &, const expression &,
-                                                                 const std::vector<std::uint32_t> &,
-                                                                 const std::vector<llvm::Value *> &, llvm::Value *,
-                                                                 llvm::Value *, std::uint32_t, std::uint32_t,
-                                                                 std::uint32_t, std::uint32_t, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff<mppp::real128>(llvm_state &, const expression &,
-                                                                   const std::vector<std::uint32_t> &,
-                                                                   const std::vector<llvm::Value *> &, llvm::Value *,
-                                                                   llvm::Value *, std::uint32_t, std::uint32_t,
-                                                                   std::uint32_t, std::uint32_t, bool);
-#endif
-
-template <typename T>
-llvm::Function *taylor_c_diff_func(llvm_state &s, const expression &ex, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                   bool high_accuracy)
+llvm::Function *taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, const expression &ex, std::uint32_t n_uvars,
+                                   std::uint32_t batch_size, bool high_accuracy)
 {
     if (const auto *fptr = std::get_if<func>(&ex.value())) {
-        if constexpr (std::is_same_v<T, double>) {
-            return fptr->taylor_c_diff_func_dbl(s, n_uvars, batch_size, high_accuracy);
-        } else if constexpr (std::is_same_v<T, long double>) {
-            return fptr->taylor_c_diff_func_ldbl(s, n_uvars, batch_size, high_accuracy);
-#if defined(HEYOKA_HAVE_REAL128)
-        } else if constexpr (std::is_same_v<T, mppp::real128>) {
-            return fptr->taylor_c_diff_func_f128(s, n_uvars, batch_size, high_accuracy);
-#endif
-        } else {
-            static_assert(detail::always_false_v<T>, "Unhandled type.");
-        }
+        return fptr->taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy);
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument("Taylor derivatives in compact mode can be computed only for functions");
         // LCOV_EXCL_STOP
     }
 }
-
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func<double>(llvm_state &, const expression &, std::uint32_t,
-                                                                      std::uint32_t, bool);
-
-template HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func<long double>(llvm_state &, const expression &,
-                                                                           std::uint32_t, std::uint32_t, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func<mppp::real128>(llvm_state &, const expression &,
-                                                                             std::uint32_t, std::uint32_t, bool);
-
-#endif
 
 namespace detail
 {
@@ -2285,16 +2224,11 @@ namespace detail
 namespace
 {
 
-template <typename T>
-void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
+void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
                        llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars,
                        std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
 {
     auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the scalar FP type.
-    auto *fp_t = to_llvm_type<T>(context);
 
     // The array containing the evaluation of the decomposition.
     std::vector<llvm::Value *> eval_arr;
@@ -2311,7 +2245,7 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
         assert(std::holds_alternative<func>(dc[i].value()));
 
         eval_arr.push_back(
-            llvm_eval<T>(std::get<func>(dc[i].value()), s, eval_arr, par_ptr, stride, batch_size, high_accuracy));
+            std::get<func>(dc[i].value()).llvm_eval(s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy));
     }
 
     // Write the outputs.
@@ -2464,14 +2398,11 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
     return s_dc;
 }
 
-template <typename T>
-auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expression>> &s_dc, std::uint32_t nvars,
-                               std::uint32_t batch_size, bool high_accuracy)
+auto cfunc_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vector<std::vector<expression>> &s_dc,
+                               std::uint32_t nvars, std::uint32_t batch_size, bool high_accuracy)
 {
     // Log runtime in trace mode.
     spdlog::stopwatch sw;
-
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     // Init the return value.
     // NOTE: use maps with name-based comparison for the functions. This ensures that the order in which these
@@ -2497,7 +2428,7 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
 
         for (const auto &ex : seg) {
             // Get the evaluation function.
-            auto *func = llvm_c_eval_func<T>(std::get<heyoka::func>(ex.value()), s, batch_size, high_accuracy);
+            auto *func = std::get<heyoka::func>(ex.value()).llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
 
             // Insert the function into tmp_map.
             const auto [it, is_new_func] = tmp_map.try_emplace(func);
@@ -2652,16 +2583,12 @@ namespace
 // - the indices of the params.
 // The second part of the return value is a boolean flag that will be true if
 // all outputs are u variables, false otherwise.
-template <typename T>
 std::pair<std::array<llvm::GlobalVariable *, 6>, bool>
-cfunc_c_make_output_globals(llvm_state &s, const std::vector<expression> &dc, std::uint32_t nuvars)
+cfunc_c_make_output_globals(llvm_state &s, llvm::Type *fp_t, const std::vector<expression> &dc, std::uint32_t nuvars)
 {
     auto &context = s.context();
     auto &builder = s.builder();
     auto &md = s.module();
-
-    // Fetch the type corresponding to T.
-    auto *fp_t = to_llvm_type<T>(s.context());
 
     // Build iteratively the output values as vectors of constants.
     std::vector<llvm::Constant *> var_indices, vars, num_indices, nums, par_indices, pars;
@@ -2723,8 +2650,7 @@ cfunc_c_make_output_globals(llvm_state &s, const std::vector<expression> &dc, st
     auto *g_num_indices = new llvm::GlobalVariable(md, num_indices_arr->getType(), true,
                                                    llvm::GlobalVariable::InternalLinkage, num_indices_arr);
 
-    auto nums_arr_type
-        = llvm::ArrayType::get(to_llvm_type<T>(context), boost::numeric_cast<std::uint64_t>(nums.size()));
+    auto nums_arr_type = llvm::ArrayType::get(fp_t, boost::numeric_cast<std::uint64_t>(nums.size()));
     auto nums_arr = llvm::ConstantArray::get(nums_arr_type, nums);
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     auto *g_nums
@@ -2849,27 +2775,25 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
     });
 }
 
-template <typename T>
-void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
-                      llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars, std::uint32_t nuvars,
-                      std::uint32_t batch_size, bool high_accuracy)
+void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, llvm::Value *in_ptr,
+                      llvm::Value *par_ptr, llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars,
+                      std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
 {
     auto &builder = s.builder();
-    auto &context = s.context();
     auto &md = s.module();
 
     // Split dc into segments.
     const auto s_dc = function_segment_dc(dc, nvars, nuvars);
 
     // Generate the function maps.
-    const auto f_maps = cfunc_build_function_maps<T>(s, s_dc, nvars, batch_size, high_accuracy);
+    const auto f_maps = cfunc_build_function_maps(s, fp_type, s_dc, nvars, batch_size, high_accuracy);
 
     // Log the runtime of IR construction in trace mode.
     spdlog::stopwatch sw;
 
     // Generate the global arrays used to write the outputs at the
     // end of the computation.
-    const auto cout_gl = cfunc_c_make_output_globals<T>(s, dc, nuvars);
+    const auto cout_gl = cfunc_c_make_output_globals(s, fp_type, dc, nuvars);
 
     // Prepare the array that will contain the evaluation of all the
     // elementary subexpressions.
@@ -2878,7 +2802,6 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
     // NOTE: fp_type is the original, scalar floating-point type.
     // It will be turned into a vector type (if necessary) by
     // make_vector_type() below.
-    auto *fp_type = to_llvm_type<T>(context);
     auto *fp_vec_type = make_vector_type(fp_type, batch_size);
     auto *array_type = llvm::ArrayType::get(fp_vec_type, nuvars);
 
@@ -2887,7 +2810,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
     // its size can grow quite large, which can lead to stack overflow issues.
     // This has of course consequences in terms of thread safety, which
     // we will have to document.
-    auto eval_arr_gvar = make_global_zero_array(md, array_type);
+    auto *eval_arr_gvar = make_global_zero_array(md, array_type);
     auto *eval_arr = builder.CreateInBoundsGEP(array_type, eval_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
 
     // Copy over the values of the variables.
@@ -3076,9 +2999,9 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     builder.SetInsertPoint(bb);
 
     if (compact_mode) {
-        add_cfunc_c_mode<T>(s, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
+        add_cfunc_c_mode(s, fp_t, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
     } else {
-        add_cfunc_nc_mode<T>(s, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
+        add_cfunc_nc_mode(s, fp_t, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
     }
 
     // Finish off the function.

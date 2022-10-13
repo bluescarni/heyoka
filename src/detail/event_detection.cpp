@@ -13,7 +13,6 @@
 #include <cerrno>
 #include <cmath>
 #include <cstdint>
-#include <cstring>
 #include <initializer_list>
 #include <iterator>
 #include <limits>
@@ -105,7 +104,7 @@ void poly_rescale_p2(OutputIt ret, InputIt a, std::uint32_t n)
 template <typename T>
 int sgn(T val)
 {
-    return (T(0) < val) - (val < T(0));
+    return (static_cast<T>(0) < val) - (val < static_cast<T>(0));
 }
 
 // Evaluate the first derivative of a polynomial.
@@ -185,7 +184,7 @@ std::tuple<T, int> bracketed_root_find(const T *poly, std::uint32_t order, T lb,
     if (errno > 0) {
         // Some error condition arose during root finding,
         // return zero and errno.
-        return std::tuple{T(0), errno};
+        return std::tuple{static_cast<T>(0), errno};
     }
 
     if (max_iter < iter_limit) {
@@ -294,10 +293,10 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
             batch_size);
 
         llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(i, builder.getInt32(1)), [&](llvm::Value *k) {
-            auto *tmp = builder.CreateFMul(ai, get_bc(i, k));
+            auto *tmp = llvm_fmul(s, ai, get_bc(i, k));
 
             auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.CreateMul(k, builder.getInt32(batch_size)));
-            auto *new_val = builder.CreateFAdd(load_vector_from_memory(builder, fp_t, ptr, batch_size), tmp);
+            auto *new_val = llvm_fadd(s, load_vector_from_memory(builder, fp_t, ptr, batch_size), tmp);
             store_vector_to_memory(builder, ptr, new_val);
         });
     });
@@ -496,8 +495,8 @@ llvm::Function *llvm_add_poly_rtscc(llvm_state &s, llvm::Type *fp_t, std::uint32
 // either via the Cargo-Shisha algorithm (use_cs == true) or
 // via Horner's scheme using interval arithmetic (use_cs == false). The default is the
 // interval arithmetics implementation.
-template <typename T>
-llvm::Function *llvm_add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t batch_size, bool use_cs)
+llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_t n, std::uint32_t batch_size,
+                                   bool use_cs)
 {
     assert(batch_size > 0u); // LCOV_EXCL_LINE
 
@@ -523,10 +522,9 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t
     // - pointer to the int32 flag(s) to signal integration backwards in time (read-only),
     // - output pointer (write-only).
     // No overlap is allowed.
-    auto *fp_t = to_llvm_type<T>(context);
     auto *fp_ptr_t = llvm::PointerType::getUnqual(fp_t);
     auto *int32_ptr_t = llvm::PointerType::getUnqual(builder.getInt32Ty());
-    std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, int32_ptr_t, int32_ptr_t};
+    const std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, int32_ptr_t, int32_ptr_t};
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -620,21 +618,6 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t
     // NOTE: the optimisation pass will be run outside.
     return f;
 }
-
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<float>(llvm_state &, std::uint32_t, std::uint32_t, bool);
-
-template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<double>(llvm_state &, std::uint32_t, std::uint32_t, bool);
-
-template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<long double>(llvm_state &, std::uint32_t, std::uint32_t,
-                                                                           bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check<mppp::real128>(llvm_state &, std::uint32_t, std::uint32_t,
-                                                                             bool);
-
-#endif
 
 // A RAII helper to extract polys from a cache and
 // return them to the cache upon destruction.
@@ -755,7 +738,7 @@ taylor_adaptive<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vector<nt_
     detail::llvm_add_poly_rtscc(m_state, fp_t, order, 1);
 
     // Add the function for the fast exclusion check.
-    detail::llvm_add_fex_check<T>(m_state, order, 1);
+    detail::llvm_add_fex_check(m_state, fp_t, order, 1);
 
     // Run the optimisation pass.
     m_state.optimise();
@@ -907,6 +890,7 @@ void taylor_adaptive<T>::ed_data::detect_events(T h, std::uint32_t order, std::u
             // detection altogether without a warning. This is ok,
             // and non-finite Taylor coefficients will be caught in the
             // step() implementations anyway.
+            // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
             std::uint32_t fex_check_result;
             m_fex_check(ptr, &h, &back_int, &fex_check_result);
             if (fex_check_result) {
@@ -1141,6 +1125,7 @@ void taylor_adaptive<T>::ed_data::detect_events(T h, std::uint32_t order, std::u
 
                 // Reverse tmp into tmp1, translate tmp1 by 1 with output
                 // in tmp2, and count the sign changes in tmp2.
+                // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
                 std::uint32_t n_sc;
                 m_rtscc(tmp1.v.data(), tmp2.v.data(), &n_sc, tmp.v.data());
 
@@ -1265,9 +1250,9 @@ void taylor_adaptive<T>::ed_data::detect_events(T h, std::uint32_t order, std::u
                         detail::get_logger()->warn(
                             "polynomial root finding during event detection failed due to too many iterations");
                     } else {
-                        detail::get_logger()->warn(
-                            "polynomial root finding during event detection returned a nonzero errno with message '{}'",
-                            std::strerror(cflag));
+                        detail::get_logger()->warn("polynomial root finding during event detection returned a nonzero "
+                                                   "errno with error code {}",
+                                                   cflag);
                     }
                     // LCOV_EXCL_STOP
                 }
@@ -1362,7 +1347,7 @@ taylor_adaptive_batch<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vect
 
     // Add the function for the fast exclusion check.
     // NOTE: the fast exclusion check is vectorised.
-    detail::llvm_add_fex_check<T>(m_state, order, batch_size);
+    detail::llvm_add_fex_check(m_state, fp_t, order, batch_size);
 
     // Run the optimisation pass.
     m_state.optimise();
@@ -1821,6 +1806,7 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
 
                     // Reverse tmp into tmp1, translate tmp1 by 1 with output
                     // in tmp2, and count the sign changes in tmp2.
+                    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
                     std::uint32_t n_sc;
                     m_rtscc(tmp1.v.data(), tmp2.v.data(), &n_sc, tmp.v.data());
 
@@ -1956,8 +1942,8 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
                         } else {
                             detail::get_logger()->warn(
                                 "polynomial root finding during event detection at the batch index {} "
-                                "returned a nonzero errno with message '{}'",
-                                j, std::strerror(cflag));
+                                "returned a nonzero errno with error code {}",
+                                j, cflag);
                         }
                         // LCOV_EXCL_STOP
                     }

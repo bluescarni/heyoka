@@ -226,7 +226,7 @@ number operator+(number n1, number n2)
                 return number{std::forward<decltype(arg1)>(arg1) + std::forward<decltype(arg2)>(arg2)};
             } else {
                 // LCOV_EXCL_START
-                throw std::invalid_argument(fmt::format("Cannot add an object of type {} to an object of type {}",
+                throw std::invalid_argument(fmt::format("Cannot add an object of type '{}' to an object of type '{}'",
                                                         boost::core::demangle(typeid(arg1).name()),
                                                         boost::core::demangle(typeid(arg2).name())));
                 // LCOV_EXCL_STOP
@@ -244,7 +244,7 @@ number operator-(number n1, number n2)
             } else {
                 // LCOV_EXCL_START
                 throw std::invalid_argument(fmt::format(
-                    "Cannot subtract an object of type {} from an object of type {}",
+                    "Cannot subtract an object of type '{}' from an object of type '{}'",
                     boost::core::demangle(typeid(arg2).name()), boost::core::demangle(typeid(arg1).name())));
                 // LCOV_EXCL_STOP
             }
@@ -260,9 +260,9 @@ number operator*(number n1, number n2)
                 return number{std::forward<decltype(arg1)>(arg1) * std::forward<decltype(arg2)>(arg2)};
             } else {
                 // LCOV_EXCL_START
-                throw std::invalid_argument(fmt::format("Cannot multiply an object of type {} by an object of type {}",
-                                                        boost::core::demangle(typeid(arg1).name()),
-                                                        boost::core::demangle(typeid(arg2).name())));
+                throw std::invalid_argument(fmt::format(
+                    "Cannot multiply an object of type '{}' by an object of type '{}'",
+                    boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
                 // LCOV_EXCL_STOP
             }
         },
@@ -277,9 +277,9 @@ number operator/(number n1, number n2)
                 return number{std::forward<decltype(arg1)>(arg1) / std::forward<decltype(arg2)>(arg2)};
             } else {
                 // LCOV_EXCL_START
-                throw std::invalid_argument(fmt::format("Cannot divide an object of type {} by an object of type {}",
-                                                        boost::core::demangle(typeid(arg1).name()),
-                                                        boost::core::demangle(typeid(arg2).name())));
+                throw std::invalid_argument(fmt::format(
+                    "Cannot divide an object of type '{}' by an object of type '{}'",
+                    boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
                 // LCOV_EXCL_STOP
             }
         },
@@ -306,9 +306,9 @@ bool operator==(const number &n1, const number &n2)
                 }
             } else {
                 // LCOV_EXCL_START
-                throw std::invalid_argument(fmt::format("Cannot compare an object of type {} to an object of type {}",
-                                                        boost::core::demangle(typeid(v1).name()),
-                                                        boost::core::demangle(typeid(v2).name())));
+                throw std::invalid_argument(
+                    fmt::format("Cannot compare an object of type '{}' to an object of type '{}'",
+                                boost::core::demangle(typeid(v1).name()), boost::core::demangle(typeid(v2).name())));
                 // LCOV_EXCL_STOP
             }
         },
@@ -379,6 +379,24 @@ number binomial(const number &i, const number &j)
         i.value(), j.value());
 }
 
+number nextafter(const number &from, const number &to)
+{
+    return std::visit(
+        [](const auto &v1, const auto &v2) -> number {
+            using type1 = detail::uncvref_t<decltype(v1)>;
+            using type2 = detail::uncvref_t<decltype(v2)>;
+
+            if constexpr (!std::is_same_v<type1, type2>) {
+                throw std::invalid_argument("Cannot invoke nextafter() on two numbers of different type");
+            } else {
+                using std::nextafter;
+
+                return number{nextafter(v1, v2)};
+            }
+        },
+        from.value(), to.value());
+}
+
 namespace detail
 {
 
@@ -394,9 +412,9 @@ To number_eval_impl(const number &n)
                 return static_cast<To>(v);
             } else {
                 // LCOV_EXCL_START
-                throw std::invalid_argument(fmt::format("Cannot convert an object of type {} to an object of type {}",
-                                                        boost::core::demangle(typeid(v).name()),
-                                                        boost::core::demangle(typeid(To).name())));
+                throw std::invalid_argument(
+                    fmt::format("Cannot convert an object of type '{}' to an object of type '{}'",
+                                boost::core::demangle(typeid(v).name()), boost::core::demangle(typeid(To).name())));
                 // LCOV_EXCL_STOP
             }
         },
@@ -531,7 +549,7 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
         return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, str_rep));
     } else {
         throw std::invalid_argument(
-            fmt::format("Cannot generate an LLVM constant of type {}", detail::llvm_type_name(tp)));
+            fmt::format("Cannot generate an LLVM constant of type '{}'", detail::llvm_type_name(tp)));
     }
 }
 

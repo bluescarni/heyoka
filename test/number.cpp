@@ -789,3 +789,21 @@ TEST_CASE("binomial")
     REQUIRE_THROWS_MATCHES(binomial(number(4.), number(3.1)), std::invalid_argument,
                            Message("Cannot compute the binomial coefficient non-integral values"));
 }
+
+TEST_CASE("nextafter")
+{
+    using Catch::Matchers::Message;
+
+    using std::nextafter;
+
+    REQUIRE(nextafter(number(1.f), number(0.f)) == number(nextafter(1.f, 0.f)));
+    REQUIRE(nextafter(number(1.), number(0.)) == number(nextafter(1., 0.)));
+    REQUIRE(nextafter(number(1.l), number(0.l)) == number(nextafter(1.l, 0.l)));
+
+#if defined(HEYOKA_HAVE_REAL128)
+    REQUIRE(nextafter(number(1._rq), number(0._rq)) == number(nextafter(1._rq, 0._rq)));
+#endif
+
+    REQUIRE_THROWS_MATCHES(nextafter(number(4.), number(2.f)), std::invalid_argument,
+                           Message("Cannot invoke nextafter() on two numbers of different type"));
+}

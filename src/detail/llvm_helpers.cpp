@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -31,6 +30,7 @@
 
 #include <fmt/format.h>
 
+#include <llvm/ADT/APFloat.h>
 #include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -479,10 +479,9 @@ llvm::Value *pairwise_reduce(std::vector<llvm::Value *> &vals,
 
 // Pairwise summation of a vector of LLVM values.
 // https://en.wikipedia.org/wiki/Pairwise_summation
-llvm::Value *pairwise_sum(ir_builder &builder, std::vector<llvm::Value *> &sum)
+llvm::Value *pairwise_sum(llvm_state &s, std::vector<llvm::Value *> &sum)
 {
-    return pairwise_reduce(
-        sum, [&builder](llvm::Value *a, llvm::Value *b) -> llvm::Value * { return builder.CreateFAdd(a, b); });
+    return pairwise_reduce(sum, [&s](llvm::Value *a, llvm::Value *b) -> llvm::Value * { return llvm_fadd(s, a, b); });
 }
 
 // Helper to invoke an intrinsic function with arguments 'args'. 'types' are the argument type(s) for
@@ -786,7 +785,8 @@ void llvm_if_then_else(llvm_state &s, llvm::Value *cond, const std::function<voi
 // The call will be decomposed into a sequence of calls with scalar arguments,
 // and the return values will be re-assembled as a vector.
 // NOTE: there are some assumptions about valid function attributes
-// in this implementation.
+// in this implementation, need to keep these into account when using
+// this helper.
 llvm::Value *call_extern_vec(llvm_state &s, const std::vector<llvm::Value *> &args, const std::string &fname)
 {
     // LCOV_EXCL_START
@@ -918,6 +918,50 @@ void llvm_while_loop(llvm_state &s, const std::function<llvm::Value *()> &cond, 
     cur->addIncoming(cmp, loop_end_bb);
 }
 
+llvm::Value *llvm_fadd(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    return s.builder().CreateFAdd(a, b);
+}
+
+llvm::Value *llvm_fsub(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    return s.builder().CreateFSub(a, b);
+}
+
+llvm::Value *llvm_fmul(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    return s.builder().CreateFMul(a, b);
+}
+
+llvm::Value *llvm_fdiv(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    return s.builder().CreateFDiv(a, b);
+}
+
 // Helper to compute sin and cos simultaneously.
 std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *x)
 {
@@ -1038,10 +1082,10 @@ llvm::Value *llvm_modulus(llvm_state &s, llvm::Value *x, llvm::Value *y)
         return call_extern_vec(s, {x, y}, "heyoka_modulus128");
     } else {
 #endif
-        auto quo = builder.CreateFDiv(x, y);
+        auto quo = llvm_fdiv(s, x, y);
         auto fl_quo = llvm_invoke_intrinsic(builder, "llvm.floor", {quo->getType()}, {quo});
 
-        return builder.CreateFSub(x, builder.CreateFMul(y, fl_quo));
+        return llvm_fsub(s, x, llvm_fmul(s, y, fl_quo));
 #if defined(HEYOKA_HAVE_REAL128)
     }
 #endif
@@ -1474,16 +1518,16 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
 
     // Helper to implement the sum of two intervals.
     // NOTE: see https://en.wikipedia.org/wiki/Interval_arithmetic.
-    auto ival_sum = [&builder](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
-        return std::make_pair(builder.CreateFAdd(a_lo, b_lo), builder.CreateFAdd(a_hi, b_hi));
+    auto ival_sum = [&s](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
+        return std::make_pair(llvm_fadd(s, a_lo, b_lo), llvm_fadd(s, a_hi, b_hi));
     };
 
     // Helper to implement the product of two intervals.
-    auto ival_prod = [&s, &builder](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
-        auto *tmp1 = builder.CreateFMul(a_lo, b_lo);
-        auto *tmp2 = builder.CreateFMul(a_lo, b_hi);
-        auto *tmp3 = builder.CreateFMul(a_hi, b_lo);
-        auto *tmp4 = builder.CreateFMul(a_hi, b_hi);
+    auto ival_prod = [&s](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
+        auto *tmp1 = llvm_fmul(s, a_lo, b_lo);
+        auto *tmp2 = llvm_fmul(s, a_lo, b_hi);
+        auto *tmp3 = llvm_fmul(s, a_hi, b_lo);
+        auto *tmp4 = llvm_fmul(s, a_hi, b_hi);
 
         // NOTE: here we are not correctly propagating NaNs,
         // for which we would need to use llvm_min/max_nan(),
@@ -1592,30 +1636,30 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
         // Compute the new term of the series.
         auto *ptr = builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.getInt32(j * batch_size));
         auto *cur_cf = load_vector_from_memory(builder, fp_t, ptr, batch_size);
-        auto *new_term = builder.CreateFMul(cur_cf, cur_h_pow);
-        new_term = builder.CreateFDiv(new_term,
-                                      vector_splat(builder,
-                                                   llvm_codegen(s, fp_t,
-                                                                binomial(number_like(s, fp_t, static_cast<double>(n)),
-                                                                         number_like(s, fp_t, static_cast<double>(j)))),
-                                                   batch_size));
+        auto *new_term = llvm_fmul(s, cur_cf, cur_h_pow);
+        new_term = llvm_fdiv(s, new_term,
+                             vector_splat(builder,
+                                          llvm_codegen(s, fp_t,
+                                                       binomial(number_like(s, fp_t, static_cast<double>(n)),
+                                                                number_like(s, fp_t, static_cast<double>(j)))),
+                                          batch_size));
 
         // Add it to bj_series.
         bj_series.push_back(new_term);
 
         // Update all elements of bj_series (apart from the last one).
         for (std::uint32_t i = 0; i < j; ++i) {
-            bj_series[i] = builder.CreateFMul(
-                bj_series[i], vector_splat(builder,
-                                           llvm_codegen(s, fp_t,
-                                                        number_like(s, fp_t, static_cast<double>(j))
-                                                            / number_like(s, fp_t, static_cast<double>(j - i))),
-                                           batch_size));
+            bj_series[i] = llvm_fmul(s, bj_series[i],
+                                     vector_splat(builder,
+                                                  llvm_codegen(s, fp_t,
+                                                               number_like(s, fp_t, static_cast<double>(j))
+                                                                   / number_like(s, fp_t, static_cast<double>(j - i))),
+                                                  batch_size));
         }
 
         // Compute the new bj.
         old_bj_series = bj_series;
-        auto *cur_bj = pairwise_sum(builder, bj_series);
+        auto *cur_bj = pairwise_sum(s, bj_series);
         old_bj_series.swap(bj_series);
 
         // Update min/max_bj.
@@ -1624,7 +1668,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
 
         // Update cur_h_pow, if we are not at the last iteration.
         if (j != n) {
-            cur_h_pow = builder.CreateFMul(cur_h_pow, h);
+            cur_h_pow = llvm_fmul(s, cur_h_pow, h);
         }
     }
 
@@ -1636,82 +1680,149 @@ namespace
 
 #if !defined(NDEBUG)
 
-// Variable template for the constant pi at different levels of precision, used only
-// for debugging.
-template <typename T>
-const auto inv_kep_E_pi = boost::math::constants::pi<T>();
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-const mppp::real128 inv_kep_E_pi<mppp::real128> = mppp::pi_128;
-
-#endif
-
-#endif
-
-// Helper to return a double-length approximation of 2*pi for the given
-// input floating-point type T.
-template <typename T>
-std::pair<T, T> inv_kep_E_dl_twopi()
+// Small helper to compute pi at the precision of the floating-point type tp.
+// Used only for debugging purposes.
+// NOTE: this is a repetition of number_like(), perhaps we can abstract this?
+number inv_kep_E_pi_like(llvm_state &s, llvm::Type *tp)
 {
-    constexpr bool is_ppc =
-#if defined(HEYOKA_ARCH_PPC)
-        true
-#else
-        false
-#endif
-        ;
+    assert(tp != nullptr);
 
-    if constexpr (is_ppc && std::is_same_v<long double, T>) {
-        throw std::invalid_argument("long double is not supported on PPC");
-    } else {
-        namespace bmp = boost::multiprecision;
+    auto &context = s.context();
 
-        // Use 4x the digits of type T for the computation of 2pi.
-        static_assert(std::numeric_limits<T>::digits <= std::numeric_limits<int>::max() / 4);
-        using mp_fp_t = bmp::number<bmp::cpp_bin_float<std::numeric_limits<T>::digits * 4, bmp::digit_base_2>>;
-
-        // Fetch 2pi in extended precision.
-        const auto mp_twopi = 2 * boost::math::constants::pi<mp_fp_t>();
-
-        // Split into two parts.
+    if (tp == to_llvm_type<float>(context, false)) {
+        return number{boost::math::constants::pi<float>()};
+    } else if (tp == to_llvm_type<double>(context, false)) {
+        return number{boost::math::constants::pi<double>()};
+    } else if (tp == to_llvm_type<long double>(context, false)) {
+        return number{boost::math::constants::pi<long double>()};
 #if defined(HEYOKA_HAVE_REAL128)
-        if constexpr (std::is_same_v<T, mppp::real128>) {
-            const auto twopi_hi = static_cast<bmp::float128>(mp_twopi);
-            const auto twopi_lo = static_cast<bmp::float128>(mp_twopi - mp_fp_t(twopi_hi));
-
-            assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
-
-            return {mppp::real128{twopi_hi.backend().value()}, mppp::real128{twopi_lo.backend().value()}};
-        } else {
-#endif
-            const auto twopi_hi = static_cast<T>(mp_twopi);
-            const auto twopi_lo = static_cast<T>(mp_twopi - twopi_hi);
-
-            assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
-
-            return {twopi_hi, twopi_lo};
-#if defined(HEYOKA_HAVE_REAL128)
-        }
+    } else if (tp == to_llvm_type<mppp::real128>(context, false)) {
+        return number{mppp::pi_128};
 #endif
     }
+
+    // LCOV_EXCL_START
+    throw std::invalid_argument(
+        fmt::format("Unable to create a number of type '{}' from the constant pi", llvm_type_name(tp)));
+    // LCOV_EXCL_STOP
 }
 
-// Implementation of the inverse Kepler equation.
-template <typename T>
-llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
-{
-    using std::nextafter;
+#endif
 
+std::pair<number, number> inv_kep_E_dl_twopi_like(llvm_state &s, llvm::Type *fp_t)
+{
+    if (fp_t->isFloatingPointTy() &&
+#if LLVM_VERSION_MAJOR >= 13
+        fp_t->isIEEE()
+#else
+        !fp_t->isPPC_FP128Ty()
+#endif
+    ) {
+        namespace bmp = boost::multiprecision;
+
+        // NOTE: we will be generating the pi constant at 4x the maximum precision possible,
+        // which is currently 113 bits for quadruple precision.
+        constexpr auto ndigits = 113u * 4u;
+
+#if !defined(NDEBUG)
+        // Sanity check.
+        const auto &sem = fp_t->getFltSemantics();
+        const auto prec = llvm::APFloatBase::semanticsPrecision(sem);
+
+        assert(prec <= 113u);
+#endif
+
+        // Fetch 2pi in extended precision.
+        using mp_fp_t = bmp::number<bmp::cpp_bin_float<ndigits, bmp::digit_base_2>>;
+        const auto mp_twopi = 2 * boost::math::constants::pi<mp_fp_t>();
+
+        auto impl = [&](auto val) {
+            using type = decltype(val);
+
+#if defined(HEYOKA_HAVE_REAL128)
+            if constexpr (std::is_same_v<type, mppp::real128>) {
+                const auto twopi_hi = static_cast<bmp::float128>(mp_twopi);
+                const auto twopi_lo = static_cast<bmp::float128>(mp_twopi - mp_fp_t(twopi_hi));
+
+                assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
+
+                return std::make_pair(number{mppp::real128{twopi_hi.backend().value()}},
+                                      number{mppp::real128{twopi_lo.backend().value()}});
+            } else {
+#endif
+                const auto twopi_hi = static_cast<type>(mp_twopi);
+                const auto twopi_lo = static_cast<type>(mp_twopi - twopi_hi);
+
+                assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
+
+                return std::make_pair(number{twopi_hi}, number{twopi_lo});
+#if defined(HEYOKA_HAVE_REAL128)
+            }
+#endif
+        };
+
+        auto &context = s.context();
+
+        if (fp_t == to_llvm_type<float>(context, false)) {
+            return impl(0.f);
+        } else if (fp_t == to_llvm_type<double>(context, false)) {
+            return impl(0.);
+        } else if (fp_t == to_llvm_type<long double>(context, false)) {
+            return impl(0.l);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if (fp_t == to_llvm_type<mppp::real128>(context, false)) {
+            return impl(mppp::real128(0));
+#endif
+        }
+
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format("Cannot generate a double-length 2*pi approximation for the type '{}'",
+                                                detail::llvm_type_name(fp_t)));
+    } else {
+        throw std::invalid_argument(fmt::format("Cannot generate a double-length 2*pi approximation for the type '{}'",
+                                                detail::llvm_type_name(fp_t)));
+    }
+    // LCOV_EXCL_STOP
+}
+
+// Small helper to return the epsilon of the floating-point type tp as a number.
+// NOTE: this is a repetition of number_like(), perhaps we can abstract this?
+number inv_kep_E_eps_like(llvm_state &s, llvm::Type *tp)
+{
+    assert(tp != nullptr);
+
+    auto &context = s.context();
+
+    if (tp == to_llvm_type<float>(context, false)) {
+        return number{std::numeric_limits<float>::epsilon()};
+    } else if (tp == to_llvm_type<double>(context, false)) {
+        return number{std::numeric_limits<double>::epsilon()};
+    } else if (tp == to_llvm_type<long double>(context, false)) {
+        return number{std::numeric_limits<long double>::epsilon()};
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if (tp == to_llvm_type<mppp::real128>(context, false)) {
+        return number{std::numeric_limits<mppp::real128>::epsilon()};
+#endif
+    }
+
+    // LCOV_EXCL_START
+    throw std::invalid_argument(
+        fmt::format("Unable to create a number version of the epsilon for the type '{}'", llvm_type_name(tp)));
+    // LCOV_EXCL_STOP
+}
+
+} // namespace
+
+// Implementation of the inverse Kepler equation.
+llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size)
+{
     assert(batch_size > 0u);
 
     auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the scalar and vector floating-point types.
-    auto *fp_t = to_llvm_type<T>(s.context());
+    // Fetch vector floating-point type.
     auto *tp = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name.
@@ -1758,23 +1869,23 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Replace invalid eccentricity values with quiet NaNs.
         auto *ecc = builder.CreateSelect(
             ecc_invalid,
-            vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<T>::quiet_NaN()}), batch_size),
+            vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<double>::quiet_NaN()}), batch_size),
             ecc_arg);
 
         // Create the return value.
         auto retval = builder.CreateAlloca(tp);
 
         // Fetch 2pi in double-length precision.
-        const auto [dl_twopi_hi, dl_twopi_lo] = inv_kep_E_dl_twopi<T>();
+        const auto [dl_twopi_hi, dl_twopi_lo] = inv_kep_E_dl_twopi_like(s, fp_t);
 
 #if !defined(NDEBUG)
-        assert(dl_twopi_hi == 2 * inv_kep_E_pi<T>); // LCOV_EXCL_LINE
+        assert(dl_twopi_hi == number_like(s, fp_t, 2.) * inv_kep_E_pi_like(s, fp_t)); // LCOV_EXCL_LINE
 #endif
 
         // Reduce M modulo 2*pi in extended precision.
         auto *M = llvm_dl_modulus(s, M_arg, llvm::Constant::getNullValue(M_arg->getType()),
-                                  vector_splat(builder, llvm_codegen(s, fp_t, number{dl_twopi_hi}), batch_size),
-                                  vector_splat(builder, llvm_codegen(s, fp_t, number{dl_twopi_lo}), batch_size))
+                                  vector_splat(builder, llvm_codegen(s, fp_t, dl_twopi_hi), batch_size),
+                                  vector_splat(builder, llvm_codegen(s, fp_t, dl_twopi_lo), batch_size))
                       .first;
 
         // Compute the initial guess from the usual elliptic expansion
@@ -1782,35 +1893,37 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // E = M + e*sin(M) + e**2*sin(M)*cos(M) + e**3*sin(M)*(3/2*cos(M)**2 - 1/2) + ...
         auto [sin_M, cos_M] = llvm_sincos(s, M);
         // e*sin(M).
-        auto e_sin_M = builder.CreateFMul(ecc, sin_M);
+        auto e_sin_M = llvm_fmul(s, ecc, sin_M);
         // e*cos(M).
-        auto e_cos_M = builder.CreateFMul(ecc, cos_M);
+        auto e_cos_M = llvm_fmul(s, ecc, cos_M);
         // e**2.
-        auto e2 = builder.CreateFMul(ecc, ecc);
+        auto e2 = llvm_fmul(s, ecc, ecc);
         // cos(M)**2.
-        auto cos_M_2 = builder.CreateFMul(cos_M, cos_M);
+        auto cos_M_2 = llvm_fmul(s, cos_M, cos_M);
 
         // 3/2 and 1/2 constants.
-        auto c_3_2 = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(3) / 2}), batch_size);
-        auto c_1_2 = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / 2}), batch_size);
+        auto c_3_2 = vector_splat(builder, llvm_codegen(s, fp_t, number_like(s, fp_t, 3.) / number_like(s, fp_t, 2.)),
+                                  batch_size);
+        auto c_1_2 = vector_splat(builder, llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
+                                  batch_size);
 
         // M + e*sin(M).
-        auto tmp1 = builder.CreateFAdd(M, e_sin_M);
+        auto tmp1 = llvm_fadd(s, M, e_sin_M);
         // e**2*sin(M)*cos(M).
-        auto tmp2 = builder.CreateFMul(e_sin_M, e_cos_M);
+        auto tmp2 = llvm_fmul(s, e_sin_M, e_cos_M);
         // e**3*sin(M).
-        auto tmp3 = builder.CreateFMul(e2, e_sin_M);
+        auto tmp3 = llvm_fmul(s, e2, e_sin_M);
         // 3/2*cos(M)**2 - 1/2.
-        auto tmp4 = builder.CreateFSub(builder.CreateFMul(c_3_2, cos_M_2), c_1_2);
+        auto tmp4 = llvm_fsub(s, llvm_fmul(s, c_3_2, cos_M_2), c_1_2);
 
         // Put it together.
-        auto ig1 = builder.CreateFAdd(tmp1, tmp2);
-        auto ig2 = builder.CreateFMul(tmp3, tmp4);
-        auto ig = builder.CreateFAdd(ig1, ig2);
+        auto ig1 = llvm_fadd(s, tmp1, tmp2);
+        auto ig2 = llvm_fmul(s, tmp3, tmp4);
+        auto ig = llvm_fadd(s, ig1, ig2);
 
         // Make extra sure the initial guess is in the [0, 2*pi) range.
         auto lb = llvm::ConstantFP::get(tp, 0.);
-        auto ub = vector_splat(builder, llvm_codegen(s, fp_t, number{nextafter(dl_twopi_hi, static_cast<T>(0))}),
+        auto ub = vector_splat(builder, llvm_codegen(s, fp_t, nextafter(dl_twopi_hi, number_like(s, fp_t, 0.))),
                                batch_size);
         ig = llvm_max(s, ig, lb);
         ig = llvm_min(s, ig, ub);
@@ -1835,9 +1948,9 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         auto fE = builder.CreateAlloca(tp);
         // Helper to compute f(E).
         auto fE_compute = [&]() {
-            auto ret = builder.CreateFMul(ecc, builder.CreateLoad(tp, sin_E));
-            ret = builder.CreateFSub(builder.CreateLoad(tp, retval), ret);
-            return builder.CreateFSub(ret, M);
+            auto ret = llvm_fmul(s, ecc, builder.CreateLoad(tp, sin_E));
+            ret = llvm_fsub(s, builder.CreateLoad(tp, retval), ret);
+            return llvm_fsub(s, ret, M);
         };
         // Compute and store the initial value of f(E).
         builder.CreateStore(fE_compute(), fE);
@@ -1854,11 +1967,11 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Define the stopping condition functor.
         // NOTE: hard-code this for the time being.
         auto *max_iter = builder.getInt32(50);
-        auto loop_cond
-            = [&,
-               // NOTE: tolerance is 4 * eps.
-               tol = vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<T>::epsilon() * 4}),
-                                  batch_size)]() -> llvm::Value * {
+        auto loop_cond =
+            [&,
+             // NOTE: tolerance is 4 * eps.
+             tol = vector_splat(builder, llvm_codegen(s, fp_t, inv_kep_E_eps_like(s, fp_t) * number_like(s, fp_t, 4.)),
+                                batch_size)]() -> llvm::Value * {
             auto *c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
 
             // Keep on iterating as long as abs(f(E)) > tol.
@@ -1878,28 +1991,31 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
             s, loop_cond, [&, one_c = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size)]() {
                 // Compute the new value.
                 auto old_val = builder.CreateLoad(tp, retval);
-                auto new_val = builder.CreateFDiv(
-                    builder.CreateLoad(tp, fE),
-                    builder.CreateFSub(one_c, builder.CreateFMul(ecc, builder.CreateLoad(tp, cos_E))));
-                new_val = builder.CreateFSub(old_val, new_val);
+                auto new_val = llvm_fdiv(s, builder.CreateLoad(tp, fE),
+                                         llvm_fsub(s, one_c, llvm_fmul(s, ecc, builder.CreateLoad(tp, cos_E))));
+                new_val = llvm_fsub(s, old_val, new_val);
 
                 // Bisect if new_val > ub.
                 // NOTE: '>' is fine here, ub is the maximum allowed value.
                 auto bcheck = builder.CreateFCmpOGT(new_val, ub);
                 new_val = builder.CreateSelect(
                     bcheck,
-                    builder.CreateFMul(
-                        vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / 2}), batch_size),
-                        builder.CreateFAdd(old_val, ub)),
+                    llvm_fmul(s,
+                              vector_splat(builder,
+                                           llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
+                                           batch_size),
+                              llvm_fadd(s, old_val, ub)),
                     new_val);
 
                 // Bisect if new_val < lb.
                 bcheck = builder.CreateFCmpOLT(new_val, lb);
                 new_val = builder.CreateSelect(
                     bcheck,
-                    builder.CreateFMul(
-                        vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<T>(1) / 2}), batch_size),
-                        builder.CreateFAdd(old_val, lb)),
+                    llvm_fmul(s,
+                              vector_splat(builder,
+                                           llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
+                                           batch_size),
+                              llvm_fadd(s, old_val, lb)),
                     new_val);
 
                 // Store the new value.
@@ -1929,7 +2045,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
                 auto *old_val = builder.CreateLoad(tp, retval);
                 auto *new_val = builder.CreateSelect(
                     tol_check,
-                    vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<T>::quiet_NaN()}),
+                    vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<double>::quiet_NaN()}),
                                  batch_size),
                     old_val);
                 builder.CreateStore(new_val, retval);
@@ -1956,27 +2072,6 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
 
     return f;
 }
-
-} // namespace
-
-llvm::Function *llvm_add_inv_kep_E_dbl(llvm_state &s, std::uint32_t batch_size)
-{
-    return llvm_add_inv_kep_E_impl<double>(s, batch_size);
-}
-
-llvm::Function *llvm_add_inv_kep_E_ldbl(llvm_state &s, std::uint32_t batch_size)
-{
-    return llvm_add_inv_kep_E_impl<long double>(s, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *llvm_add_inv_kep_E_f128(llvm_state &s, std::uint32_t batch_size)
-{
-    return llvm_add_inv_kep_E_impl<mppp::real128>(s, batch_size);
-}
-
-#endif
 
 // Helper to create a global const array containing
 // all binomial coefficients up to (n, n). The coefficients are stored
@@ -2069,7 +2164,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &s, llvm::Va
     // Temporarily disable the fast math flags.
     fmf_disabler fd(builder);
 
-    auto x = builder.CreateFMul(a, b);
+    auto x = llvm_fmul(s, a, b);
     auto y = llvm_fma(s, a, b, builder.CreateFNeg(x));
 
     return {x, y};
@@ -2086,30 +2181,30 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &state, llvm::Val
     // Temporarily disable the fast math flags.
     fmf_disabler fd(builder);
 
-    auto S = builder.CreateFAdd(x_hi, y_hi);
-    auto T = builder.CreateFAdd(x_lo, y_lo);
-    auto e = builder.CreateFSub(S, x_hi);
-    auto f = builder.CreateFSub(T, x_lo);
+    auto S = llvm_fadd(state, x_hi, y_hi);
+    auto T = llvm_fadd(state, x_lo, y_lo);
+    auto e = llvm_fsub(state, S, x_hi);
+    auto f = llvm_fsub(state, T, x_lo);
 
-    auto t1 = builder.CreateFSub(S, e);
-    t1 = builder.CreateFSub(x_hi, t1);
-    auto s = builder.CreateFSub(y_hi, e);
-    s = builder.CreateFAdd(s, t1);
+    auto t1 = llvm_fsub(state, S, e);
+    t1 = llvm_fsub(state, x_hi, t1);
+    auto s = llvm_fsub(state, y_hi, e);
+    s = llvm_fadd(state, s, t1);
 
-    t1 = builder.CreateFSub(T, f);
-    t1 = builder.CreateFSub(x_lo, t1);
-    auto t = builder.CreateFSub(y_lo, f);
-    t = builder.CreateFAdd(t, t1);
+    t1 = llvm_fsub(state, T, f);
+    t1 = llvm_fsub(state, x_lo, t1);
+    auto t = llvm_fsub(state, y_lo, f);
+    t = llvm_fadd(state, t, t1);
 
-    s = builder.CreateFAdd(s, T);
-    auto H = builder.CreateFAdd(S, s);
-    auto h = builder.CreateFSub(S, H);
-    h = builder.CreateFAdd(h, s);
+    s = llvm_fadd(state, s, T);
+    auto H = llvm_fadd(state, S, s);
+    auto h = llvm_fsub(state, S, H);
+    h = llvm_fadd(state, h, s);
 
-    h = builder.CreateFAdd(h, t);
-    e = builder.CreateFAdd(H, h);
-    f = builder.CreateFSub(H, e);
-    f = builder.CreateFAdd(f, h);
+    h = llvm_fadd(state, h, t);
+    e = llvm_fadd(state, H, h);
+    f = llvm_fsub(state, H, e);
+    f = llvm_fadd(state, f, h);
 
     return {e, f};
 }
@@ -2119,24 +2214,24 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &state, llvm::Val
 // https://link.springer.com/content/pdf/10.1007/BF01397083.pdf
 // The mul12() function is replaced with the FMA-based llvm_eft_product().
 // NOTE: the code in NTL looks identical to Dekker's.
-std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &s, llvm::Value *x_hi, llvm::Value *x_lo,
                                                     llvm::Value *y_hi, llvm::Value *y_lo)
 {
-    auto &builder = state.builder();
+    auto &builder = s.builder();
 
     // Temporarily disable the fast math flags.
     fmf_disabler fd(builder);
 
-    auto [c, cc] = llvm_eft_product(state, x_hi, y_hi);
+    auto [c, cc] = llvm_eft_product(s, x_hi, y_hi);
 
     // cc = x*yy + xx*y + cc.
-    auto x_yy = builder.CreateFMul(x_hi, y_lo);
-    auto xx_y = builder.CreateFMul(x_lo, y_hi);
-    cc = builder.CreateFAdd(builder.CreateFAdd(x_yy, xx_y), cc);
+    auto x_yy = llvm_fmul(s, x_hi, y_lo);
+    auto xx_y = llvm_fmul(s, x_lo, y_hi);
+    cc = llvm_fadd(s, llvm_fadd(s, x_yy, xx_y), cc);
 
     // The normalisation step.
-    auto z = builder.CreateFAdd(c, cc);
-    auto zz = builder.CreateFAdd(builder.CreateFSub(c, z), cc);
+    auto z = llvm_fadd(s, c, cc);
+    auto zz = llvm_fadd(s, llvm_fsub(s, c, z), cc);
 
     return {z, zz};
 }
@@ -2146,28 +2241,28 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &state, llvm::Val
 // https://link.springer.com/content/pdf/10.1007/BF01397083.pdf
 // The mul12() function is replaced with the FMA-based llvm_eft_product().
 // NOTE: the code in NTL looks identical to Dekker's.
-std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &s, llvm::Value *x_hi, llvm::Value *x_lo,
                                                     llvm::Value *y_hi, llvm::Value *y_lo)
 {
-    auto &builder = state.builder();
+    auto &builder = s.builder();
 
     // Temporarily disable the fast math flags.
     fmf_disabler fd(builder);
 
-    auto *c = builder.CreateFDiv(x_hi, y_hi);
+    auto *c = llvm_fdiv(s, x_hi, y_hi);
 
-    auto [u, uu] = llvm_eft_product(state, c, y_hi);
+    auto [u, uu] = llvm_eft_product(s, c, y_hi);
 
     // cc = (x_hi - u - uu + x_lo - c * y_lo) / y_hi.
-    auto *cc = builder.CreateFSub(x_hi, u);
-    cc = builder.CreateFSub(cc, uu);
-    cc = builder.CreateFAdd(cc, x_lo);
-    cc = builder.CreateFSub(cc, builder.CreateFMul(c, y_lo));
-    cc = builder.CreateFDiv(cc, y_hi);
+    auto *cc = llvm_fsub(s, x_hi, u);
+    cc = llvm_fsub(s, cc, uu);
+    cc = llvm_fadd(s, cc, x_lo);
+    cc = llvm_fsub(s, cc, llvm_fmul(s, c, y_lo));
+    cc = llvm_fdiv(s, cc, y_hi);
 
     // The normalisation step.
-    auto z = builder.CreateFAdd(c, cc);
-    auto zz = builder.CreateFAdd(builder.CreateFSub(c, z), cc);
+    auto z = llvm_fadd(s, c, cc);
+    auto zz = llvm_fadd(s, llvm_fsub(s, c, z), cc);
 
     return {z, zz};
 }
@@ -2175,7 +2270,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &state, llvm::Val
 // Floor.
 // NOTE: code taken from NTL:
 // https://github.com/libntl/ntl/blob/main/src/quad_float1.cpp#L239
-std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo)
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &s, llvm::Value *x_hi, llvm::Value *x_lo)
 {
     // LCOV_EXCL_START
     assert(x_hi != nullptr);
@@ -2184,7 +2279,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &state, llvm::V
     assert(x_hi->getType() == x_lo->getType());
     // LCOV_EXCL_STOP
 
-    auto &builder = state.builder();
+    auto &builder = s.builder();
 
     auto fp_t = x_hi->getType();
 
@@ -2192,7 +2287,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &state, llvm::V
     fmf_disabler fd(builder);
 
     // Floor x_hi.
-    auto *fhi = llvm_floor(state, x_hi);
+    auto *fhi = llvm_floor(s, x_hi);
 
     // NOTE: we want to distinguish the scalar/vector codepaths, as the vectorised implementation
     // does more work.
@@ -2203,17 +2298,17 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &state, llvm::V
         auto *ret_lo_ptr = builder.CreateAlloca(fp_t);
 
         llvm_if_then_else(
-            state, builder.CreateFCmpOEQ(fhi, x_hi),
+            s, builder.CreateFCmpOEQ(fhi, x_hi),
             [&]() {
                 // floor(x_hi) == x_hi, that is, x_hi is already
                 // an integral value.
 
                 // Floor the low part.
-                auto *flo = llvm_floor(state, x_lo);
+                auto *flo = llvm_floor(s, x_lo);
 
                 // Normalise.
-                auto z = builder.CreateFAdd(fhi, flo);
-                auto zz = builder.CreateFAdd(builder.CreateFSub(fhi, z), flo);
+                auto z = llvm_fadd(s, fhi, flo);
+                auto zz = llvm_fadd(s, llvm_fsub(s, fhi, z), flo);
 
                 // Store.
                 builder.CreateStore(z, ret_hi_ptr);
@@ -2231,14 +2326,14 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &state, llvm::V
         auto *zero_vec = llvm::Constant::getNullValue(fp_t);
 
         // Floor the low part.
-        auto *flo = llvm_floor(state, x_lo);
+        auto *flo = llvm_floor(s, x_lo);
 
         // Select flo or zero_vec, depending on fhi == x_hi.
         auto *ret_lo = builder.CreateSelect(builder.CreateFCmpOEQ(fhi, x_hi), flo, zero_vec);
 
         // Normalise.
-        auto z = builder.CreateFAdd(fhi, ret_lo);
-        auto zz = builder.CreateFAdd(builder.CreateFSub(fhi, z), ret_lo);
+        auto z = llvm_fadd(s, fhi, ret_lo);
+        auto zz = llvm_fadd(s, llvm_fsub(s, fhi, z), ret_lo);
 
         return {z, zz};
     }
@@ -2312,8 +2407,7 @@ llvm::Value *llvm_dl_gt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
 
 // Helper to create a wrapper for kepE() usable from C++ code.
 // Input/output is done through pointers.
-template <typename T>
-void llvm_add_inv_kep_E_wrapper(llvm_state &s, std::uint32_t batch_size, const std::string &name)
+void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t batch_size, const std::string &name)
 {
     assert(batch_size > 0u); // LCOV_EXCL_LINE
 
@@ -2324,11 +2418,8 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, std::uint32_t batch_size, const s
     // Make sure the function does not exist already.
     assert(md.getFunction(name) == nullptr); // LCOV_EXCL_LINE
 
-    // Fetch the scalar floating-point type.
-    auto scal_t = to_llvm_type<T>(context);
-
     // Add the implementation function.
-    auto *impl_f = llvm_add_inv_kep_E<T>(s, batch_size);
+    auto *impl_f = llvm_add_inv_kep_E(s, scal_t, batch_size);
 
     // The function arguments:
     // - output pointer (write only),
@@ -2385,19 +2476,6 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, std::uint32_t batch_size, const s
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
 }
-
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper<double>(llvm_state &, std::uint32_t, const std::string &);
-
-template HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper<long double>(llvm_state &, std::uint32_t,
-                                                                        const std::string &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper<mppp::real128>(llvm_state &, std::uint32_t,
-                                                                          const std::string &);
-
-#endif
 
 // Inverse cosine.
 llvm::Value *llvm_acos(llvm_state &s, llvm::Value *x)
@@ -3008,7 +3086,7 @@ llvm::Value *llvm_sigmoid(llvm_state &s, llvm::Value *x)
     auto *e_m_x = llvm_exp(s, m_x);
 
     // Return 1 / (1 + e_m_arg).
-    return builder.CreateFDiv(one_fp, builder.CreateFAdd(one_fp, e_m_x));
+    return llvm_fdiv(s, one_fp, llvm_fadd(s, one_fp, e_m_x));
 }
 
 // Hyperbolic sine.

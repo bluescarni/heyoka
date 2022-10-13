@@ -115,6 +115,7 @@ HEYOKA_DLL_PUBLIC bool operator!=(const number &, const number &);
 
 HEYOKA_DLL_PUBLIC number exp(number);
 HEYOKA_DLL_PUBLIC number binomial(const number &, const number &);
+HEYOKA_DLL_PUBLIC number nextafter(const number &, const number &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const number &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);

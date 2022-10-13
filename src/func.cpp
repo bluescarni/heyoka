@@ -341,46 +341,18 @@ double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::si
     return ptr()->deval_num_dbl(v, i);
 }
 
-llvm::Value *func::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                 llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Value *func::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                             llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                             bool high_accuracy) const
 {
-    return ptr()->llvm_eval_dbl(s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    return ptr()->llvm_eval(s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
-llvm::Value *func::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                  llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Function *func::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                       bool high_accuracy) const
 {
-    return ptr()->llvm_eval_ldbl(s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    return ptr()->llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
 }
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *func::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                  llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return ptr()->llvm_eval_f128(s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-#endif
-
-llvm::Function *func::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return ptr()->llvm_c_eval_func_dbl(s, batch_size, high_accuracy);
-}
-
-llvm::Function *func::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return ptr()->llvm_c_eval_func_ldbl(s, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *func::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return ptr()->llvm_c_eval_func_f128(s, batch_size, high_accuracy);
-}
-
-#endif
 
 namespace detail
 {
@@ -516,192 +488,74 @@ taylor_dc_t::size_type func::taylor_decompose(std::unordered_map<const void *, t
     return ret;
 }
 
-llvm::Value *func::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                   const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                   std::uint32_t batch_size, bool high_accuracy) const
+llvm::Value *func::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                               const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
+                               std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                               bool high_accuracy) const
 {
+    if (fp_t == nullptr) {
+        throw std::invalid_argument(
+            fmt::format("Null floating-point type detected in func::taylor_diff() for the function '{}'", get_name()));
+    }
+
     if (par_ptr == nullptr) {
         throw std::invalid_argument(
-            fmt::format("Null par_ptr detected in func::taylor_diff_dbl() for the function '{}'", get_name()));
+            fmt::format("Null par_ptr detected in func::taylor_diff() for the function '{}'", get_name()));
     }
 
     if (time_ptr == nullptr) {
         throw std::invalid_argument(
-            fmt::format("Null time_ptr detected in func::taylor_diff_dbl() for the function '{}'", get_name()));
+            fmt::format("Null time_ptr detected in func::taylor_diff() for the function '{}'", get_name()));
     }
 
     if (batch_size == 0u) {
         throw std::invalid_argument(
-            fmt::format("Zero batch size detected in func::taylor_diff_dbl() for the function '{}'", get_name()));
+            fmt::format("Zero batch size detected in func::taylor_diff() for the function '{}'", get_name()));
     }
 
     if (n_uvars == 0u) {
         throw std::invalid_argument(fmt::format(
-            "Zero number of u variables detected in func::taylor_diff_dbl() for the function '{}'", get_name()));
+            "Zero number of u variables detected in func::taylor_diff() for the function '{}'", get_name()));
     }
 
-    auto retval
-        = ptr()->taylor_diff_dbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size, high_accuracy);
+    auto *retval
+        = ptr()->taylor_diff(s, fp_t, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size, high_accuracy);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
-            fmt::format("Null return value detected in func::taylor_diff_dbl() for the function '{}'", get_name()));
+            fmt::format("Null return value detected in func::taylor_diff() for the function '{}'", get_name()));
     }
 
     return retval;
 }
 
-llvm::Value *func::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                    const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                    std::uint32_t batch_size, bool high_accuracy) const
+llvm::Function *func::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                         std::uint32_t batch_size, bool high_accuracy) const
 {
-    if (par_ptr == nullptr) {
-        throw std::invalid_argument(
-            fmt::format("Null par_ptr detected in func::taylor_diff_ldbl() for the function '{}'", get_name()));
-    }
-
-    if (time_ptr == nullptr) {
-        throw std::invalid_argument(
-            fmt::format("Null time_ptr detected in func::taylor_diff_ldbl() for the function '{}'", get_name()));
+    if (fp_t == nullptr) {
+        throw std::invalid_argument(fmt::format(
+            "Null floating-point type detected in func::taylor_c_diff_func() for the function '{}'", get_name()));
     }
 
     if (batch_size == 0u) {
         throw std::invalid_argument(
-            fmt::format("Zero batch size detected in func::taylor_diff_ldbl() for the function '{}'", get_name()));
+            fmt::format("Zero batch size detected in func::taylor_c_diff_func() for the function '{}'", get_name()));
     }
 
     if (n_uvars == 0u) {
         throw std::invalid_argument(fmt::format(
-            "Zero number of u variables detected in func::taylor_diff_ldbl() for the function '{}'", get_name()));
+            "Zero number of u variables detected in func::taylor_c_diff_func() for the function '{}'", get_name()));
     }
 
-    auto retval
-        = ptr()->taylor_diff_ldbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size, high_accuracy);
+    auto *retval = ptr()->taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
-            fmt::format("Null return value detected in func::taylor_diff_ldbl() for the function '{}'", get_name()));
+            fmt::format("Null return value detected in func::taylor_c_diff_func() for the function '{}'", get_name()));
     }
 
     return retval;
 }
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                    const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                    std::uint32_t batch_size, bool high_accuracy) const
-{
-    if (par_ptr == nullptr) {
-        throw std::invalid_argument(
-            fmt::format("Null par_ptr detected in func::taylor_diff_f128() for the function '{}'", get_name()));
-    }
-
-    if (time_ptr == nullptr) {
-        throw std::invalid_argument(
-            fmt::format("Null time_ptr detected in func::taylor_diff_f128() for the function '{}'", get_name()));
-    }
-
-    if (batch_size == 0u) {
-        throw std::invalid_argument(
-            fmt::format("Zero batch size detected in func::taylor_diff_f128() for the function '{}'", get_name()));
-    }
-
-    if (n_uvars == 0u) {
-        throw std::invalid_argument(fmt::format(
-            "Zero number of u variables detected in func::taylor_diff_f128() for the function '{}'", get_name()));
-    }
-
-    auto retval
-        = ptr()->taylor_diff_f128(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size, high_accuracy);
-
-    if (retval == nullptr) {
-        throw std::invalid_argument(
-            fmt::format("Null return value detected in func::taylor_diff_f128() for the function '{}'", get_name()));
-    }
-
-    return retval;
-}
-
-#endif
-
-llvm::Function *func::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                             bool high_accuracy) const
-{
-    if (batch_size == 0u) {
-        throw std::invalid_argument(fmt::format(
-            "Zero batch size detected in func::taylor_c_diff_func_dbl() for the function '{}'", get_name()));
-    }
-
-    if (n_uvars == 0u) {
-        throw std::invalid_argument(fmt::format(
-            "Zero number of u variables detected in func::taylor_c_diff_func_dbl() for the function '{}'", get_name()));
-    }
-
-    auto retval = ptr()->taylor_c_diff_func_dbl(s, n_uvars, batch_size, high_accuracy);
-
-    if (retval == nullptr) {
-        throw std::invalid_argument(fmt::format(
-            "Null return value detected in func::taylor_c_diff_func_dbl() for the function '{}'", get_name()));
-    }
-
-    return retval;
-}
-
-llvm::Function *func::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                              bool high_accuracy) const
-{
-    if (batch_size == 0u) {
-        throw std::invalid_argument(fmt::format(
-            "Zero batch size detected in func::taylor_c_diff_func_ldbl() for the function '{}'", get_name()));
-    }
-
-    if (n_uvars == 0u) {
-        throw std::invalid_argument(
-            fmt::format("Zero number of u variables detected in func::taylor_c_diff_func_ldbl() for the function '{}'",
-                        get_name()));
-    }
-
-    auto retval = ptr()->taylor_c_diff_func_ldbl(s, n_uvars, batch_size, high_accuracy);
-
-    if (retval == nullptr) {
-        throw std::invalid_argument(fmt::format(
-            "Null return value detected in func::taylor_c_diff_func_ldbl() for the function '{}'", get_name()));
-    }
-
-    return retval;
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *func::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                              bool high_accuracy) const
-{
-    if (batch_size == 0u) {
-        throw std::invalid_argument(fmt::format(
-            "Zero batch size detected in func::taylor_c_diff_func_f128() for the function '{}'", get_name()));
-    }
-
-    if (n_uvars == 0u) {
-        throw std::invalid_argument(
-            fmt::format("Zero number of u variables detected in func::taylor_c_diff_func_f128() for the function '{}'",
-                        get_name()));
-    }
-
-    auto retval = ptr()->taylor_c_diff_func_f128(s, n_uvars, batch_size, high_accuracy);
-
-    if (retval == nullptr) {
-        throw std::invalid_argument(fmt::format(
-            "Null return value detected in func::taylor_c_diff_func_f128() for the function '{}'", get_name()));
-    }
-
-    return retval;
-}
-
-#endif
 
 void swap(func &a, func &b) noexcept
 {
@@ -866,18 +720,14 @@ llvm::Value *cfunc_nc_param_codegen(llvm_state &s, const param &p, std::uint32_t
 
 // Helper to implement the llvm_eval_*() methods in the func interface
 // used to create compiled functions in non-compact mode.
-template <typename T>
 llvm::Value *llvm_eval_helper(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &g,
-                              const func_base &f, llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
-                              llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy)
+                              const func_base &f, llvm_state &s, llvm::Type *fp_t,
+                              const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr, llvm::Value *stride,
+                              std::uint32_t batch_size, bool high_accuracy)
 {
     assert(g);
 
     auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the scalar FP type.
-    auto *fp_t = to_llvm_type<T>(context);
 
     // Codegen the function arguments.
     std::vector<llvm::Value *> llvm_args;
@@ -910,39 +760,19 @@ llvm::Value *llvm_eval_helper(const std::function<llvm::Value *(const std::vecto
     return g(llvm_args, high_accuracy);
 }
 
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC llvm::Value *
-llvm_eval_helper<double>(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
-                         const func_base &, llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
-                         llvm::Value *, std::uint32_t, bool);
-
-template HEYOKA_DLL_PUBLIC llvm::Value *
-llvm_eval_helper<long double>(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
-                              const func_base &, llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
-                              llvm::Value *, std::uint32_t, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC llvm::Value *
-llvm_eval_helper<mppp::real128>(const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
-                                const func_base &, llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *,
-                                llvm::Value *, std::uint32_t, bool);
-
-#endif
-
 namespace
 {
 
 // NOTE: precondition on name: must be conforming to LLVM requirements for
 // function names, and must not contain "." (as we use it as a separator in
 // the mangling scheme).
-template <typename T>
-std::pair<std::string, std::vector<llvm::Type *>>
-llvm_c_eval_func_name_args(llvm::LLVMContext &c, const std::string &name, std::uint32_t batch_size,
-                           const std::vector<expression> &args)
+std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llvm::LLVMContext &c, llvm::Type *fp_t,
+                                                                             const std::string &name,
+                                                                             std::uint32_t batch_size,
+                                                                             const std::vector<expression> &args)
 {
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(c, batch_size);
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Init the name.
     auto fname = fmt::format("heyoka.llvm_c_eval.{}.", name);
@@ -1002,10 +832,9 @@ llvm_c_eval_func_name_args(llvm::LLVMContext &c, const std::string &name, std::u
 
 } // namespace
 
-template <typename T>
 llvm::Function *llvm_c_eval_func_helper(const std::string &name,
                                         const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &g,
-                                        const func_base &fb, llvm_state &s, std::uint32_t batch_size,
+                                        const func_base &fb, llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
                                         bool high_accuracy)
 {
     // LCOV_EXCL_START
@@ -1017,11 +846,10 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the scalar and vector floating-point types.
-    auto *fp_t = to_llvm_type<T>(context);
+    // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
-    const auto na_pair = llvm_c_eval_func_name_args<T>(context, name, batch_size, fb.args());
+    const auto na_pair = llvm_c_eval_func_name_args(context, fp_t, name, batch_size, fb.args());
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -1055,7 +883,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
                 [&](const auto &v) -> llvm::Value * {
                     using type = detail::uncvref_t<decltype(v)>;
 
-                    const auto cur_f_arg = f->args().begin() + 4 + i;
+                    auto *const cur_f_arg = f->args().begin() + 4 + i;
 
                     if constexpr (std::is_same_v<type, number>) {
                         // NOTE: number arguments are passed directly as
@@ -1073,7 +901,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
                         assert(!llvm::cast<llvm::PointerType>(par_ptr->getType())->isVectorTy());
                         // LCOV_EXCL_STOP
 
-                        auto *ptr = builder.CreateInBoundsGEP(to_llvm_type<T>(context), par_ptr,
+                        auto *ptr = builder.CreateInBoundsGEP(fp_t, par_ptr,
                                                               builder.CreateMul(stride, to_size_t(s, cur_f_arg)));
 
                         return load_vector_from_memory(builder, fp_t, ptr, batch_size);
@@ -1116,25 +944,6 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
 
     return f;
 }
-
-template HEYOKA_DLL_PUBLIC llvm::Function *
-llvm_c_eval_func_helper<double>(const std::string &,
-                                const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
-                                const func_base &, llvm_state &, std::uint32_t, bool);
-
-template HEYOKA_DLL_PUBLIC llvm::Function *
-llvm_c_eval_func_helper<long double>(const std::string &,
-                                     const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
-                                     const func_base &, llvm_state &, std::uint32_t, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC llvm::Function *
-llvm_c_eval_func_helper<mppp::real128>(const std::string &,
-                                       const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
-                                       const func_base &, llvm_state &, std::uint32_t, bool);
-
-#endif
 
 } // namespace detail
 
