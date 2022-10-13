@@ -185,7 +185,7 @@ llvm::Value *taylor_diff_atanh_impl(llvm_state &s, llvm::Type *fp_t, const atanh
         // Special-case the first-order derivative, in order
         // to avoid an empty summation below.
         return builder.CreateFDiv(taylor_fetch_diff(arr, b_idx, 1, n_uvars),
-                                  builder.CreateFSub(one_fp, taylor_fetch_diff(arr, deps[0], 0, n_uvars)));
+                                  llvm_fsub(s, one_fp, taylor_fetch_diff(arr, deps[0], 0, n_uvars)));
     }
 
     // Create the fp version of the order.
@@ -195,7 +195,7 @@ llvm::Value *taylor_diff_atanh_impl(llvm_state &s, llvm::Type *fp_t, const atanh
     auto *ret = builder.CreateFMul(ord_fp, taylor_fetch_diff(arr, b_idx, order, n_uvars));
 
     // Compute n*(1 - c^[0]).
-    auto *n_c0_p1 = builder.CreateFMul(ord_fp, builder.CreateFSub(one_fp, taylor_fetch_diff(arr, deps[0], 0, n_uvars)));
+    auto *n_c0_p1 = builder.CreateFMul(ord_fp, llvm_fsub(s, one_fp, taylor_fetch_diff(arr, deps[0], 0, n_uvars)));
 
     // NOTE: iteration in the [1, order) range.
     std::vector<llvm::Value *> sum;
@@ -346,8 +346,8 @@ llvm::Function *taylor_c_diff_func_atanh_impl(llvm_state &s, llvm::Type *fp_t, c
 
                 // Compute n*(1 - c^[0]).
                 auto n_c0_p1 = builder.CreateFMul(
-                    ord_fp, builder.CreateFSub(
-                                one_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx)));
+                    ord_fp,
+                    llvm_fsub(s, one_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx)));
 
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);

@@ -224,7 +224,7 @@ llvm::Value *taylor_diff_sigmoid_impl(llvm_state &s, llvm::Type *fp_t, const sig
         auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*(anj-cnj)*bj to the sum.
-        auto *tmp1 = builder.CreateFSub(anj, cnj);
+        auto *tmp1 = llvm_fsub(s, anj, cnj);
         auto *tmp2 = builder.CreateFMul(tmp1, bj);
         auto *tmp3 = builder.CreateFMul(tmp2, fac);
 
@@ -370,7 +370,7 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, llvm::Type *fp_t,
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
                     // Add  j*(anj-cnj)*bj into the sum.
-                    auto tmp1 = builder.CreateFSub(anj, cnj);
+                    auto tmp1 = llvm_fsub(s, anj, cnj);
                     auto tmp2 = builder.CreateFMul(tmp1, bj);
                     auto tmp3 = builder.CreateFMul(tmp2, fac);
 

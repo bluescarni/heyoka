@@ -303,8 +303,9 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::
     // Compute the first part of the dividend: n * (c^[0] * b^[n] - b^[0] * c^[n]).
     auto *dividend
         = builder.CreateFMul(taylor_fetch_diff(arr, x_idx, 0, n_uvars), taylor_fetch_diff(arr, y_idx, order, n_uvars));
-    dividend = builder.CreateFSub(dividend, builder.CreateFMul(taylor_fetch_diff(arr, y_idx, 0, n_uvars),
-                                                               taylor_fetch_diff(arr, x_idx, order, n_uvars)));
+    dividend = llvm_fsub(
+        s, dividend,
+        builder.CreateFMul(taylor_fetch_diff(arr, y_idx, 0, n_uvars), taylor_fetch_diff(arr, x_idx, order, n_uvars)));
     dividend = builder.CreateFMul(n, dividend);
 
     // Compute the second part of the dividend only for order > 1, in order to avoid
@@ -328,7 +329,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::
             auto *tmp1 = builder.CreateFMul(cnj, bj);
             auto *tmp2 = builder.CreateFMul(bnj, cj);
             auto *tmp3 = builder.CreateFMul(dnj, aj);
-            auto *tmp = builder.CreateFSub(builder.CreateFSub(tmp1, tmp2), tmp3);
+            auto *tmp = llvm_fsub(s, llvm_fsub(s, tmp1, tmp2), tmp3);
 
             tmp = builder.CreateFMul(fac, tmp);
             sum.push_back(tmp);
@@ -500,8 +501,8 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
                 });
 
                 // Write the result.
-                builder.CreateStore(
-                    builder.CreateFDiv(builder.CreateFSub(dividend, builder.CreateLoad(val_t, acc)), divisor), retval);
+                builder.CreateStore(builder.CreateFDiv(llvm_fsub(s, dividend, builder.CreateLoad(val_t, acc)), divisor),
+                                    retval);
             });
 
         // Return the result.
@@ -617,8 +618,8 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
                 });
 
                 // Write the result.
-                builder.CreateStore(
-                    builder.CreateFDiv(builder.CreateFSub(dividend, builder.CreateLoad(val_t, acc)), divisor), retval);
+                builder.CreateStore(builder.CreateFDiv(llvm_fsub(s, dividend, builder.CreateLoad(val_t, acc)), divisor),
+                                    retval);
             });
 
         // Return the result.
@@ -717,7 +718,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
                 auto div2
                     = builder.CreateFMul(taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), y_idx),
                                          taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, x_idx));
-                auto dividend = builder.CreateFSub(div1, div2);
+                auto dividend = llvm_fsub(s, div1, div2);
                 dividend = builder.CreateFMul(ord_v, dividend);
 
                 // Init the accumulator.
@@ -739,7 +740,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
                     auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
                     auto tmp3 = builder.CreateFMul(d_nj, aj);
 
-                    auto tmp = builder.CreateFSub(builder.CreateFSub(tmp1, tmp2), tmp3);
+                    auto tmp = llvm_fsub(s, llvm_fsub(s, tmp1, tmp2), tmp3);
                     tmp = builder.CreateFMul(j_v, tmp);
 
                     builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), tmp), acc);

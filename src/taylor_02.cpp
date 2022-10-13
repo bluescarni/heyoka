@@ -1651,12 +1651,12 @@ taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
                 // Compute the quantities for the compensation.
                 auto *comp_ptr = builder.CreateInBoundsGEP(fp_vec_t, comp_arr, cur_var_idx);
                 auto *res_ptr = builder.CreateInBoundsGEP(fp_vec_t, res_arr, cur_var_idx);
-                auto *y = builder.CreateFSub(tmp, builder.CreateLoad(fp_vec_t, comp_ptr));
+                auto *y = llvm_fsub(s, tmp, builder.CreateLoad(fp_vec_t, comp_ptr));
                 auto *cur_res = builder.CreateLoad(fp_vec_t, res_ptr);
                 auto *t = llvm_fadd(s, cur_res, y);
 
                 // Update the compensation and the return value.
-                builder.CreateStore(builder.CreateFSub(builder.CreateFSub(t, cur_res), y), comp_ptr);
+                builder.CreateStore(llvm_fsub(s, llvm_fsub(s, t, cur_res), y), comp_ptr);
                 builder.CreateStore(t, res_ptr);
             });
 
@@ -1685,11 +1685,11 @@ taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
                 auto *tmp = builder.CreateFMul(diff_arr[i * n_eq + j], cur_h);
 
                 // Compute the quantities for the compensation.
-                auto *y = builder.CreateFSub(tmp, comp_arr[j]);
+                auto *y = llvm_fsub(s, tmp, comp_arr[j]);
                 auto *t = llvm_fadd(s, res_arr[j], y);
 
                 // Update the compensation and the return value.
-                comp_arr[j] = builder.CreateFSub(builder.CreateFSub(t, res_arr[j]), y);
+                comp_arr[j] = llvm_fsub(s, llvm_fsub(s, t, res_arr[j]), y);
                 res_arr[j] = t;
             }
 

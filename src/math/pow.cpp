@@ -245,7 +245,7 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
                 auto tmp1 = builder.CreateFMul(ordvec, pc);
                 auto tmp2 = builder.CreateFMul(jvec, llvm_fadd(s, pc, onevec));
 
-                return builder.CreateFSub(tmp1, tmp2);
+                return llvm_fsub(s, tmp1, tmp2);
             }
         }();
 
@@ -412,8 +412,8 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
 
                     // Compute the factor n*alpha-j*(alpha+1).
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
-                    auto fac = builder.CreateFSub(
-                        builder.CreateFMul(ord_v, alpha_v),
+                    auto fac = llvm_fsub(
+                        s, builder.CreateFMul(ord_v, alpha_v),
                         builder.CreateFMul(
                             j_v, llvm_fadd(s, alpha_v,
                                            vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size))));

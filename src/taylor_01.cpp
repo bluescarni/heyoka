@@ -1730,12 +1730,12 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
                 auto *comp_ptr = builder.CreateInBoundsGEP(vector_t, comp_arr, cur_var_idx);
                 auto *out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
                 auto *res_ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, out_idx);
-                auto *y = builder.CreateFSub(tmp, builder.CreateLoad(vector_t, comp_ptr));
+                auto *y = llvm_fsub(s, tmp, builder.CreateLoad(vector_t, comp_ptr));
                 auto *cur_res = load_vector_from_memory(builder, fp_scal_t, res_ptr, batch_size);
                 auto *t = llvm_fadd(s, cur_res, y);
 
                 // Update the compensation and the return value.
-                builder.CreateStore(builder.CreateFSub(builder.CreateFSub(t, cur_res), y), comp_ptr);
+                builder.CreateStore(llvm_fsub(s, llvm_fsub(s, t, cur_res), y), comp_ptr);
                 store_vector_to_memory(builder, res_ptr, t);
             });
 
@@ -2555,12 +2555,13 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
                         auto *comp_ptr = builder.CreateInBoundsGEP(fp_vec_t, comp_arr, cur_var_idx);
                         auto *out_idx = builder.CreateMul(builder.getInt32(m_batch_size), cur_var_idx);
                         auto *res_ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, out_idx);
-                        auto *y = builder.CreateFSub(tmp, builder.CreateLoad(fp_vec_t, comp_ptr));
+                        auto *y = detail::llvm_fsub(m_llvm_state, tmp, builder.CreateLoad(fp_vec_t, comp_ptr));
                         auto *cur_res = detail::load_vector_from_memory(builder, fp_t, res_ptr, m_batch_size);
                         auto *t = detail::llvm_fadd(m_llvm_state, cur_res, y);
 
                         // Update the compensation and the return value.
-                        builder.CreateStore(builder.CreateFSub(builder.CreateFSub(t, cur_res), y), comp_ptr);
+                        builder.CreateStore(
+                            detail::llvm_fsub(m_llvm_state, detail::llvm_fsub(m_llvm_state, t, cur_res), y), comp_ptr);
                         detail::store_vector_to_memory(builder, res_ptr, t);
                     });
 

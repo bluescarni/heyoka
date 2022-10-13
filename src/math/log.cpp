@@ -201,7 +201,7 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, llvm::Type *fp_t, const log_imp
         }
 
         // Compute the result of the summation and subtract it from ret.
-        ret = builder.CreateFSub(ret, pairwise_sum(s, sum));
+        ret = llvm_fsub(s, ret, pairwise_sum(s, sum));
     }
 
     // Divide by n*b[0] and return.
@@ -350,8 +350,7 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, llvm::Type *fp_t, con
                 });
 
                 // ret = (n*b^[n] - acc) / (n*b^[0]).
-                builder.CreateStore(builder.CreateFDiv(builder.CreateFSub(nbn, builder.CreateLoad(val_t, acc)), nb0),
-                                    retval);
+                builder.CreateStore(builder.CreateFDiv(llvm_fsub(s, nbn, builder.CreateLoad(val_t, acc)), nb0), retval);
             });
 
         // Return the result.

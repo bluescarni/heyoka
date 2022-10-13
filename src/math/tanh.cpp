@@ -165,7 +165,7 @@ llvm::Value *taylor_diff_tanh_impl(llvm_state &s, llvm::Type *fp_t, const tanh_i
         ret_acc, vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size));
 
     // Create and return the result.
-    return builder.CreateFSub(taylor_fetch_diff(arr, b_idx, order, n_uvars), ret_acc);
+    return llvm_fsub(s, taylor_fetch_diff(arr, b_idx, order, n_uvars), ret_acc);
 }
 
 // All the other cases.
@@ -302,8 +302,8 @@ llvm::Function *taylor_c_diff_func_tanh_impl(llvm_state &s, llvm::Type *fp_t, co
                 // Divide by the order and subtract from b^[n] to produce the return value.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
-                builder.CreateStore(builder.CreateFSub(taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx),
-                                                       builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_v)),
+                builder.CreateStore(llvm_fsub(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx),
+                                              builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_v)),
                                     retval);
             });
 

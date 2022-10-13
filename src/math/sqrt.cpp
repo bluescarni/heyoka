@@ -203,7 +203,7 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, llvm::Type *, const sqrt_impl 
         auto *tmp = taylor_fetch_diff(arr, idx, order / 2u, n_uvars);
         tmp = builder.CreateFMul(tmp, tmp);
 
-        fac = builder.CreateFSub(fac, tmp);
+        fac = llvm_fsub(s, fac, tmp);
     }
 
     // Avoid summing if the sum is empty.
@@ -211,7 +211,7 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, llvm::Type *, const sqrt_impl 
         auto *tmp = pairwise_sum(s, sum);
         tmp = llvm_fadd(s, tmp, tmp);
 
-        fac = builder.CreateFSub(fac, tmp);
+        fac = llvm_fsub(s, fac, tmp);
     }
 
     return builder.CreateFDiv(fac, div);
@@ -368,13 +368,13 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
                                                        builder.CreateUDiv(ord, builder.getInt32(2)), u_idx);
                         tmp = builder.CreateFMul(tmp, tmp);
 
-                        builder.CreateStore(builder.CreateFSub(builder.CreateLoad(val_t, retval), tmp), retval);
+                        builder.CreateStore(llvm_fsub(s, builder.CreateLoad(val_t, retval), tmp), retval);
                     },
                     []() {});
 
                 // retval -= acc.
-                builder.CreateStore(
-                    builder.CreateFSub(builder.CreateLoad(val_t, retval), builder.CreateLoad(val_t, acc)), retval);
+                builder.CreateStore(llvm_fsub(s, builder.CreateLoad(val_t, retval), builder.CreateLoad(val_t, acc)),
+                                    retval);
 
                 // retval /= div.
                 builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(val_t, retval), div), retval);

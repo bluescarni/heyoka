@@ -214,7 +214,7 @@ llvm::Value *taylor_diff_atan_impl(llvm_state &s, llvm::Type *fp_t, const atan_i
     }
 
     // Update ret.
-    ret = builder.CreateFSub(ret, pairwise_sum(s, sum));
+    ret = llvm_fsub(s, ret, pairwise_sum(s, sum));
 
     // Divide by n*(c^[0] + 1) and return.
     return builder.CreateFDiv(ret, n_c0_p1);
@@ -367,7 +367,7 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, llvm::Type *fp_t, co
                 });
 
                 // Update ret.
-                ret = builder.CreateFSub(ret, builder.CreateLoad(val_t, acc));
+                ret = llvm_fsub(s, ret, builder.CreateLoad(val_t, acc));
 
                 // Divide by n*(c^[0] + 1).
                 ret = builder.CreateFDiv(ret, n_c0_p1);

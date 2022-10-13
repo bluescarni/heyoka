@@ -929,6 +929,17 @@ llvm::Value *llvm_fadd(llvm_state &s, llvm::Value *a, llvm::Value *b)
     return s.builder().CreateFAdd(a, b);
 }
 
+llvm::Value *llvm_fsub(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    return s.builder().CreateFSub(a, b);
+}
+
 // Helper to compute sin and cos simultaneously.
 std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *x)
 {
@@ -1052,7 +1063,7 @@ llvm::Value *llvm_modulus(llvm_state &s, llvm::Value *x, llvm::Value *y)
         auto quo = builder.CreateFDiv(x, y);
         auto fl_quo = llvm_invoke_intrinsic(builder, "llvm.floor", {quo->getType()}, {quo});
 
-        return builder.CreateFSub(x, builder.CreateFMul(y, fl_quo));
+        return llvm_fsub(s, x, builder.CreateFMul(y, fl_quo));
 #if defined(HEYOKA_HAVE_REAL128)
     }
 #endif
@@ -1881,7 +1892,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         // e**3*sin(M).
         auto tmp3 = builder.CreateFMul(e2, e_sin_M);
         // 3/2*cos(M)**2 - 1/2.
-        auto tmp4 = builder.CreateFSub(builder.CreateFMul(c_3_2, cos_M_2), c_1_2);
+        auto tmp4 = llvm_fsub(s, builder.CreateFMul(c_3_2, cos_M_2), c_1_2);
 
         // Put it together.
         auto ig1 = llvm_fadd(s, tmp1, tmp2);
@@ -1916,8 +1927,8 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         // Helper to compute f(E).
         auto fE_compute = [&]() {
             auto ret = builder.CreateFMul(ecc, builder.CreateLoad(tp, sin_E));
-            ret = builder.CreateFSub(builder.CreateLoad(tp, retval), ret);
-            return builder.CreateFSub(ret, M);
+            ret = llvm_fsub(s, builder.CreateLoad(tp, retval), ret);
+            return llvm_fsub(s, ret, M);
         };
         // Compute and store the initial value of f(E).
         builder.CreateStore(fE_compute(), fE);
@@ -1958,10 +1969,10 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
             s, loop_cond, [&, one_c = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size)]() {
                 // Compute the new value.
                 auto old_val = builder.CreateLoad(tp, retval);
-                auto new_val = builder.CreateFDiv(
-                    builder.CreateLoad(tp, fE),
-                    builder.CreateFSub(one_c, builder.CreateFMul(ecc, builder.CreateLoad(tp, cos_E))));
-                new_val = builder.CreateFSub(old_val, new_val);
+                auto new_val
+                    = builder.CreateFDiv(builder.CreateLoad(tp, fE),
+                                         llvm_fsub(s, one_c, builder.CreateFMul(ecc, builder.CreateLoad(tp, cos_E))));
+                new_val = llvm_fsub(s, old_val, new_val);
 
                 // Bisect if new_val > ub.
                 // NOTE: '>' is fine here, ub is the maximum allowed value.
@@ -2151,27 +2162,27 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &state, llvm::Val
 
     auto S = llvm_fadd(state, x_hi, y_hi);
     auto T = llvm_fadd(state, x_lo, y_lo);
-    auto e = builder.CreateFSub(S, x_hi);
-    auto f = builder.CreateFSub(T, x_lo);
+    auto e = llvm_fsub(state, S, x_hi);
+    auto f = llvm_fsub(state, T, x_lo);
 
-    auto t1 = builder.CreateFSub(S, e);
-    t1 = builder.CreateFSub(x_hi, t1);
-    auto s = builder.CreateFSub(y_hi, e);
+    auto t1 = llvm_fsub(state, S, e);
+    t1 = llvm_fsub(state, x_hi, t1);
+    auto s = llvm_fsub(state, y_hi, e);
     s = llvm_fadd(state, s, t1);
 
-    t1 = builder.CreateFSub(T, f);
-    t1 = builder.CreateFSub(x_lo, t1);
-    auto t = builder.CreateFSub(y_lo, f);
+    t1 = llvm_fsub(state, T, f);
+    t1 = llvm_fsub(state, x_lo, t1);
+    auto t = llvm_fsub(state, y_lo, f);
     t = llvm_fadd(state, t, t1);
 
     s = llvm_fadd(state, s, T);
     auto H = llvm_fadd(state, S, s);
-    auto h = builder.CreateFSub(S, H);
+    auto h = llvm_fsub(state, S, H);
     h = llvm_fadd(state, h, s);
 
     h = llvm_fadd(state, h, t);
     e = llvm_fadd(state, H, h);
-    f = builder.CreateFSub(H, e);
+    f = llvm_fsub(state, H, e);
     f = llvm_fadd(state, f, h);
 
     return {e, f};
@@ -2199,7 +2210,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &s, llvm::Value *
 
     // The normalisation step.
     auto z = llvm_fadd(s, c, cc);
-    auto zz = llvm_fadd(s, builder.CreateFSub(c, z), cc);
+    auto zz = llvm_fadd(s, llvm_fsub(s, c, z), cc);
 
     return {z, zz};
 }
@@ -2222,15 +2233,15 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &s, llvm::Value *
     auto [u, uu] = llvm_eft_product(s, c, y_hi);
 
     // cc = (x_hi - u - uu + x_lo - c * y_lo) / y_hi.
-    auto *cc = builder.CreateFSub(x_hi, u);
-    cc = builder.CreateFSub(cc, uu);
+    auto *cc = llvm_fsub(s, x_hi, u);
+    cc = llvm_fsub(s, cc, uu);
     cc = llvm_fadd(s, cc, x_lo);
-    cc = builder.CreateFSub(cc, builder.CreateFMul(c, y_lo));
+    cc = llvm_fsub(s, cc, builder.CreateFMul(c, y_lo));
     cc = builder.CreateFDiv(cc, y_hi);
 
     // The normalisation step.
     auto z = llvm_fadd(s, c, cc);
-    auto zz = llvm_fadd(s, builder.CreateFSub(c, z), cc);
+    auto zz = llvm_fadd(s, llvm_fsub(s, c, z), cc);
 
     return {z, zz};
 }
@@ -2276,7 +2287,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &s, llvm::Value
 
                 // Normalise.
                 auto z = llvm_fadd(s, fhi, flo);
-                auto zz = llvm_fadd(s, builder.CreateFSub(fhi, z), flo);
+                auto zz = llvm_fadd(s, llvm_fsub(s, fhi, z), flo);
 
                 // Store.
                 builder.CreateStore(z, ret_hi_ptr);
@@ -2301,7 +2312,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &s, llvm::Value
 
         // Normalise.
         auto z = llvm_fadd(s, fhi, ret_lo);
-        auto zz = llvm_fadd(s, builder.CreateFSub(fhi, z), ret_lo);
+        auto zz = llvm_fadd(s, llvm_fsub(s, fhi, z), ret_lo);
 
         return {z, zz};
     }

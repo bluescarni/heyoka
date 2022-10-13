@@ -232,7 +232,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::v
     // Compute the divisor: n * (1 - c^[0]).
     const auto c_idx = deps[0];
     auto *one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
-    auto *divisor = builder.CreateFMul(n, builder.CreateFSub(one_fp, taylor_fetch_diff(arr, c_idx, 0, n_uvars)));
+    auto *divisor = builder.CreateFMul(n, llvm_fsub(s, one_fp, taylor_fetch_diff(arr, c_idx, 0, n_uvars)));
 
     // Compute the first part of the dividend: n * e^[n] * d^[0] (the derivative of M is zero because
     // here M is a constant and the order is > 0).
@@ -298,7 +298,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::v
     // Compute the divisor: n * (1 - c^[0]).
     const auto c_idx = deps[0];
     auto *one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
-    auto *divisor = builder.CreateFMul(n, builder.CreateFSub(one_fp, taylor_fetch_diff(arr, c_idx, 0, n_uvars)));
+    auto *divisor = builder.CreateFMul(n, llvm_fsub(s, one_fp, taylor_fetch_diff(arr, c_idx, 0, n_uvars)));
 
     // Compute the first part of the dividend: n * M^[n] (the derivative of e is zero because
     // here e is a constant and the order is > 0).
@@ -356,7 +356,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::v
     // Compute the divisor: n * (1 - c^[0]).
     const auto c_idx = deps[0];
     auto *one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
-    auto *divisor = builder.CreateFMul(n, builder.CreateFSub(one_fp, taylor_fetch_diff(arr, c_idx, 0, n_uvars)));
+    auto *divisor = builder.CreateFMul(n, llvm_fsub(s, one_fp, taylor_fetch_diff(arr, c_idx, 0, n_uvars)));
 
     // Compute the first part of the dividend: n * (e^[n] * d^[0] + M^[n]).
     const auto d_idx = deps[1];
@@ -529,8 +529,8 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
 
                 // Compute the divisor: ord * (1 - c^[0]).
                 auto one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
-                auto divisor = builder.CreateFSub(
-                    one_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
+                auto divisor
+                    = llvm_fsub(s, one_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
                 divisor = builder.CreateFMul(ord_v, divisor);
 
                 // Init the dividend: ord * e^[ord] * d^[0] (M is constant here).
@@ -654,8 +654,8 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
 
                 // Compute the divisor: ord * (1 - c^[0]).
                 auto one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
-                auto divisor = builder.CreateFSub(
-                    one_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
+                auto divisor
+                    = llvm_fsub(s, one_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
                 divisor = builder.CreateFMul(ord_v, divisor);
 
                 // Init the dividend: ord * M^[n] (e is constant here).
@@ -771,8 +771,8 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
 
                 // Compute the divisor: ord * (1 - c^[0]).
                 auto one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
-                auto divisor = builder.CreateFSub(
-                    one_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
+                auto divisor
+                    = llvm_fsub(s, one_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
                 divisor = builder.CreateFMul(ord_v, divisor);
 
                 // Init the dividend: ord * (e^[ord] * d^[0] + M^[ord]).
