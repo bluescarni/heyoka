@@ -234,10 +234,10 @@ namespace
         case binary_op::type::sub:
             return llvm_fsub(s, args[0], args[1]);
         case binary_op::type::mul:
-            return s.builder().CreateFMul(args[0], args[1]);
+            return llvm_fmul(s, args[0], args[1]);
         default:
             assert(op == binary_op::type::div);
-            return s.builder().CreateFDiv(args[0], args[1]);
+            return llvm_fdiv(s, args[0], args[1]);
     }
 }
 
@@ -405,7 +405,7 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *fp_t, const U &n
         auto n0 = taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size);
         auto n1 = taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size);
 
-        return s.builder().CreateFMul(n0, n1);
+        return llvm_fmul(s, n0, n1);
     } else {
         return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
@@ -417,12 +417,10 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *fp_t, const vari
                                      const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                                      std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
-    auto &builder = s.builder();
-
     auto *ret = taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
     auto mul = taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size);
 
-    return builder.CreateFMul(mul, ret);
+    return llvm_fmul(s, mul, ret);
 }
 
 // Derivative of number * var.
@@ -447,13 +445,12 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *, const variable
     // NOTE: iteration in the [0, order] range
     // (i.e., order inclusive).
     std::vector<llvm::Value *> sum;
-    auto &builder = s.builder();
     for (std::uint32_t j = 0; j <= order; ++j) {
         auto *v0 = taylor_fetch_diff(arr, u_idx0, order - j, n_uvars);
         auto *v1 = taylor_fetch_diff(arr, u_idx1, j, n_uvars);
 
         // Add v0*v1 to the sum.
-        sum.push_back(builder.CreateFMul(v0, v1));
+        sum.push_back(llvm_fmul(s, v0, v1));
     }
 
     return pairwise_sum(s, sum);
@@ -492,7 +489,7 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &n
         auto n0 = taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size);
         auto n1 = taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size);
 
-        return s.builder().CreateFDiv(n0, n1);
+        return llvm_fdiv(s, n0, n1);
     } else {
         return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
@@ -523,7 +520,7 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &n
             }
         }();
 
-        return builder.CreateFDiv(numerator, taylor_fetch_diff(arr, u_idx1, 0, n_uvars));
+        return llvm_fdiv(s, numerator, taylor_fetch_diff(arr, u_idx1, 0, n_uvars));
     }
 
     // NOTE: iteration in the [1, order] range
@@ -534,7 +531,7 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &n
         auto *v1 = taylor_fetch_diff(arr, u_idx1, j, n_uvars);
 
         // Add v0*v1 to the sum.
-        sum.push_back(builder.CreateFMul(v0, v1));
+        sum.push_back(llvm_fmul(s, v0, v1));
     }
 
     // Init the return value as the result of the sum.
@@ -547,14 +544,14 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &n
     if constexpr (std::is_same_v<U, number> || std::is_same_v<U, param>) {
         // nv is a number/param. Negate the accumulator
         // and divide it by the divisor.
-        return builder.CreateFDiv(builder.CreateFNeg(ret_acc), div);
+        return llvm_fdiv(s, builder.CreateFNeg(ret_acc), div);
     } else {
         // nv is a variable. We need to fetch its
         // derivative of order 'order' from the array of derivatives.
         auto diff_nv_v = taylor_fetch_diff(arr, uname_to_index(nv.name()), order, n_uvars);
 
         // Produce the result: (diff_nv_v - ret_acc) / div.
-        return builder.CreateFDiv(llvm_fsub(s, diff_nv_v, ret_acc), div);
+        return llvm_fdiv(s, llvm_fsub(s, diff_nv_v, ret_acc), div);
     }
 }
 
@@ -564,12 +561,10 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const vari
                                      const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                                      std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
-    auto &builder = s.builder();
-
     auto *ret = taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
     auto div = taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size);
 
-    return builder.CreateFDiv(ret, div);
+    return llvm_fdiv(s, ret, div);
 }
 
 // All the other cases.
@@ -699,10 +694,10 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, llvm::Type *fp_t, c
                         builder.CreateStore(llvm_fsub(s, vnum0, vnum1), retval);
                         break;
                     case binary_op::type::mul:
-                        builder.CreateStore(builder.CreateFMul(vnum0, vnum1), retval);
+                        builder.CreateStore(llvm_fmul(s, vnum0, vnum1), retval);
                         break;
                     default:
-                        builder.CreateStore(builder.CreateFDiv(vnum0, vnum1), retval);
+                        builder.CreateStore(llvm_fdiv(s, vnum0, vnum1), retval);
                 }
             },
             [&]() {
@@ -1072,8 +1067,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
         auto ret = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, var_idx);
 
         // Create the return value.
-        builder.CreateRet(
-            builder.CreateFMul(ret, taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size)));
+        builder.CreateRet(llvm_fmul(s, ret, taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size)));
 
         // Verify.
         s.verify_function(f);
@@ -1140,8 +1134,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
         auto ret = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, var_idx);
 
         // Create the return value.
-        builder.CreateRet(
-            builder.CreateFMul(ret, taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size)));
+        builder.CreateRet(llvm_fmul(s, ret, taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size)));
 
         // Verify.
         s.verify_function(f);
@@ -1210,7 +1203,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
         llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
             auto b_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), idx0);
             auto cj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, idx1);
-            builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), builder.CreateFMul(b_nj, cj)), acc);
+            builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, b_nj, cj)), acc);
         });
 
         // Create the return value.
@@ -1310,8 +1303,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, 
         auto ret = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, var_idx);
 
         // Create the return value.
-        builder.CreateRet(
-            builder.CreateFDiv(ret, taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size)));
+        builder.CreateRet(llvm_fdiv(s, ret, taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size)));
 
         // Verify.
         s.verify_function(f);
@@ -1391,7 +1383,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, 
                 auto num_vec = taylor_c_diff_numparam_codegen(s, fp_t, n, num, par_ptr, batch_size);
                 auto ret = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx);
 
-                builder.CreateStore(builder.CreateFDiv(num_vec, ret), retval);
+                builder.CreateStore(llvm_fdiv(s, num_vec, ret), retval);
             },
             [&]() {
                 // Init the accumulator.
@@ -1401,17 +1393,16 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, 
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
                     auto cj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, var_idx);
                     auto a_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), u_idx);
-                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), builder.CreateFMul(cj, a_nj)),
-                                        acc);
+                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, cj, a_nj)), acc);
                 });
 
                 // Negate the loop summation.
                 auto ret = builder.CreateFNeg(builder.CreateLoad(val_t, acc));
 
                 // Divide and return.
-                builder.CreateStore(builder.CreateFDiv(ret, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars,
-                                                                               builder.getInt32(0), var_idx)),
-                                    retval);
+                builder.CreateStore(
+                    llvm_fdiv(s, ret, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx)),
+                    retval);
             });
 
         // Return the result.
@@ -1485,7 +1476,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, 
         llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
             auto *cj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, var_idx1);
             auto *a_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), u_idx);
-            builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), builder.CreateFMul(cj, a_nj)), acc);
+            builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, cj, a_nj)), acc);
         });
 
         auto *ret = llvm_fsub(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, var_idx0),
@@ -1493,7 +1484,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, 
 
         // Divide and return.
         builder.CreateRet(
-            builder.CreateFDiv(ret, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx1)));
+            llvm_fdiv(s, ret, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx1)));
 
         // Verify.
         s.verify_function(f);

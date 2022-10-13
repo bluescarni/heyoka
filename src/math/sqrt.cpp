@@ -166,8 +166,6 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, llvm::Type *, const sqrt_impl 
                                    const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
                                    std::uint32_t order, std::uint32_t idx, std::uint32_t)
 {
-    auto &builder = s.builder();
-
     // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
 
@@ -189,7 +187,7 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, llvm::Type *, const sqrt_impl 
             auto *v0 = taylor_fetch_diff(arr, idx, order - j, n_uvars);
             auto *v1 = taylor_fetch_diff(arr, idx, j, n_uvars);
 
-            sum.push_back(builder.CreateFMul(v0, v1));
+            sum.push_back(llvm_fmul(s, v0, v1));
         }
     } else {
         // Even order.
@@ -197,11 +195,11 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, llvm::Type *, const sqrt_impl 
             auto *v0 = taylor_fetch_diff(arr, idx, order - j, n_uvars);
             auto *v1 = taylor_fetch_diff(arr, idx, j, n_uvars);
 
-            sum.push_back(builder.CreateFMul(v0, v1));
+            sum.push_back(llvm_fmul(s, v0, v1));
         }
 
         auto *tmp = taylor_fetch_diff(arr, idx, order / 2u, n_uvars);
-        tmp = builder.CreateFMul(tmp, tmp);
+        tmp = llvm_fmul(s, tmp, tmp);
 
         fac = llvm_fsub(s, fac, tmp);
     }
@@ -214,7 +212,7 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, llvm::Type *, const sqrt_impl 
         fac = llvm_fsub(s, fac, tmp);
     }
 
-    return builder.CreateFDiv(fac, div);
+    return llvm_fdiv(s, fac, div);
 }
 
 // All the other cases.
@@ -355,8 +353,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
                         auto *a_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), u_idx);
                         auto *aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
 
-                        builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), builder.CreateFMul(a_nj, aj)),
-                                            acc);
+                        builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, a_nj, aj)), acc);
                     });
                 builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), builder.CreateLoad(val_t, acc)), acc);
 
@@ -366,7 +363,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
                         // retval -= (a^[n/2])**2.
                         auto *tmp = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars,
                                                        builder.CreateUDiv(ord, builder.getInt32(2)), u_idx);
-                        tmp = builder.CreateFMul(tmp, tmp);
+                        tmp = llvm_fmul(s, tmp, tmp);
 
                         builder.CreateStore(llvm_fsub(s, builder.CreateLoad(val_t, retval), tmp), retval);
                     },
@@ -377,7 +374,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
                                     retval);
 
                 // retval /= div.
-                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(val_t, retval), div), retval);
+                builder.CreateStore(llvm_fdiv(s, builder.CreateLoad(val_t, retval), div), retval);
             });
 
         // Return the result.

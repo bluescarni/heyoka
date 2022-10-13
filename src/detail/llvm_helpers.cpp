@@ -940,6 +940,28 @@ llvm::Value *llvm_fsub(llvm_state &s, llvm::Value *a, llvm::Value *b)
     return s.builder().CreateFSub(a, b);
 }
 
+llvm::Value *llvm_fmul(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    return s.builder().CreateFMul(a, b);
+}
+
+llvm::Value *llvm_fdiv(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    return s.builder().CreateFDiv(a, b);
+}
+
 // Helper to compute sin and cos simultaneously.
 std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *x)
 {
@@ -1060,10 +1082,10 @@ llvm::Value *llvm_modulus(llvm_state &s, llvm::Value *x, llvm::Value *y)
         return call_extern_vec(s, {x, y}, "heyoka_modulus128");
     } else {
 #endif
-        auto quo = builder.CreateFDiv(x, y);
+        auto quo = llvm_fdiv(s, x, y);
         auto fl_quo = llvm_invoke_intrinsic(builder, "llvm.floor", {quo->getType()}, {quo});
 
-        return llvm_fsub(s, x, builder.CreateFMul(y, fl_quo));
+        return llvm_fsub(s, x, llvm_fmul(s, y, fl_quo));
 #if defined(HEYOKA_HAVE_REAL128)
     }
 #endif
@@ -1502,10 +1524,10 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
 
     // Helper to implement the product of two intervals.
     auto ival_prod = [&s, &builder](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
-        auto *tmp1 = builder.CreateFMul(a_lo, b_lo);
-        auto *tmp2 = builder.CreateFMul(a_lo, b_hi);
-        auto *tmp3 = builder.CreateFMul(a_hi, b_lo);
-        auto *tmp4 = builder.CreateFMul(a_hi, b_hi);
+        auto *tmp1 = llvm_fmul(s, a_lo, b_lo);
+        auto *tmp2 = llvm_fmul(s, a_lo, b_hi);
+        auto *tmp3 = llvm_fmul(s, a_hi, b_lo);
+        auto *tmp4 = llvm_fmul(s, a_hi, b_hi);
 
         // NOTE: here we are not correctly propagating NaNs,
         // for which we would need to use llvm_min/max_nan(),
@@ -1614,25 +1636,25 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
         // Compute the new term of the series.
         auto *ptr = builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.getInt32(j * batch_size));
         auto *cur_cf = load_vector_from_memory(builder, fp_t, ptr, batch_size);
-        auto *new_term = builder.CreateFMul(cur_cf, cur_h_pow);
-        new_term = builder.CreateFDiv(new_term,
-                                      vector_splat(builder,
-                                                   llvm_codegen(s, fp_t,
-                                                                binomial(number_like(s, fp_t, static_cast<double>(n)),
-                                                                         number_like(s, fp_t, static_cast<double>(j)))),
-                                                   batch_size));
+        auto *new_term = llvm_fmul(s, cur_cf, cur_h_pow);
+        new_term = llvm_fdiv(s, new_term,
+                             vector_splat(builder,
+                                          llvm_codegen(s, fp_t,
+                                                       binomial(number_like(s, fp_t, static_cast<double>(n)),
+                                                                number_like(s, fp_t, static_cast<double>(j)))),
+                                          batch_size));
 
         // Add it to bj_series.
         bj_series.push_back(new_term);
 
         // Update all elements of bj_series (apart from the last one).
         for (std::uint32_t i = 0; i < j; ++i) {
-            bj_series[i] = builder.CreateFMul(
-                bj_series[i], vector_splat(builder,
-                                           llvm_codegen(s, fp_t,
-                                                        number_like(s, fp_t, static_cast<double>(j))
-                                                            / number_like(s, fp_t, static_cast<double>(j - i))),
-                                           batch_size));
+            bj_series[i] = llvm_fmul(s, bj_series[i],
+                                     vector_splat(builder,
+                                                  llvm_codegen(s, fp_t,
+                                                               number_like(s, fp_t, static_cast<double>(j))
+                                                                   / number_like(s, fp_t, static_cast<double>(j - i))),
+                                                  batch_size));
         }
 
         // Compute the new bj.
@@ -1646,7 +1668,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
 
         // Update cur_h_pow, if we are not at the last iteration.
         if (j != n) {
-            cur_h_pow = builder.CreateFMul(cur_h_pow, h);
+            cur_h_pow = llvm_fmul(s, cur_h_pow, h);
         }
     }
 
@@ -1871,13 +1893,13 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         // E = M + e*sin(M) + e**2*sin(M)*cos(M) + e**3*sin(M)*(3/2*cos(M)**2 - 1/2) + ...
         auto [sin_M, cos_M] = llvm_sincos(s, M);
         // e*sin(M).
-        auto e_sin_M = builder.CreateFMul(ecc, sin_M);
+        auto e_sin_M = llvm_fmul(s, ecc, sin_M);
         // e*cos(M).
-        auto e_cos_M = builder.CreateFMul(ecc, cos_M);
+        auto e_cos_M = llvm_fmul(s, ecc, cos_M);
         // e**2.
-        auto e2 = builder.CreateFMul(ecc, ecc);
+        auto e2 = llvm_fmul(s, ecc, ecc);
         // cos(M)**2.
-        auto cos_M_2 = builder.CreateFMul(cos_M, cos_M);
+        auto cos_M_2 = llvm_fmul(s, cos_M, cos_M);
 
         // 3/2 and 1/2 constants.
         auto c_3_2 = vector_splat(builder, llvm_codegen(s, fp_t, number_like(s, fp_t, 3.) / number_like(s, fp_t, 2.)),
@@ -1888,15 +1910,15 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         // M + e*sin(M).
         auto tmp1 = llvm_fadd(s, M, e_sin_M);
         // e**2*sin(M)*cos(M).
-        auto tmp2 = builder.CreateFMul(e_sin_M, e_cos_M);
+        auto tmp2 = llvm_fmul(s, e_sin_M, e_cos_M);
         // e**3*sin(M).
-        auto tmp3 = builder.CreateFMul(e2, e_sin_M);
+        auto tmp3 = llvm_fmul(s, e2, e_sin_M);
         // 3/2*cos(M)**2 - 1/2.
-        auto tmp4 = llvm_fsub(s, builder.CreateFMul(c_3_2, cos_M_2), c_1_2);
+        auto tmp4 = llvm_fsub(s, llvm_fmul(s, c_3_2, cos_M_2), c_1_2);
 
         // Put it together.
         auto ig1 = llvm_fadd(s, tmp1, tmp2);
-        auto ig2 = builder.CreateFMul(tmp3, tmp4);
+        auto ig2 = llvm_fmul(s, tmp3, tmp4);
         auto ig = llvm_fadd(s, ig1, ig2);
 
         // Make extra sure the initial guess is in the [0, 2*pi) range.
@@ -1926,7 +1948,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         auto fE = builder.CreateAlloca(tp);
         // Helper to compute f(E).
         auto fE_compute = [&]() {
-            auto ret = builder.CreateFMul(ecc, builder.CreateLoad(tp, sin_E));
+            auto ret = llvm_fmul(s, ecc, builder.CreateLoad(tp, sin_E));
             ret = llvm_fsub(s, builder.CreateLoad(tp, retval), ret);
             return llvm_fsub(s, ret, M);
         };
@@ -1969,9 +1991,8 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
             s, loop_cond, [&, one_c = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size)]() {
                 // Compute the new value.
                 auto old_val = builder.CreateLoad(tp, retval);
-                auto new_val
-                    = builder.CreateFDiv(builder.CreateLoad(tp, fE),
-                                         llvm_fsub(s, one_c, builder.CreateFMul(ecc, builder.CreateLoad(tp, cos_E))));
+                auto new_val = llvm_fdiv(s, builder.CreateLoad(tp, fE),
+                                         llvm_fsub(s, one_c, llvm_fmul(s, ecc, builder.CreateLoad(tp, cos_E))));
                 new_val = llvm_fsub(s, old_val, new_val);
 
                 // Bisect if new_val > ub.
@@ -1979,22 +2000,22 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
                 auto bcheck = builder.CreateFCmpOGT(new_val, ub);
                 new_val = builder.CreateSelect(
                     bcheck,
-                    builder.CreateFMul(
-                        vector_splat(builder,
-                                     llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
-                                     batch_size),
-                        llvm_fadd(s, old_val, ub)),
+                    llvm_fmul(s,
+                              vector_splat(builder,
+                                           llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
+                                           batch_size),
+                              llvm_fadd(s, old_val, ub)),
                     new_val);
 
                 // Bisect if new_val < lb.
                 bcheck = builder.CreateFCmpOLT(new_val, lb);
                 new_val = builder.CreateSelect(
                     bcheck,
-                    builder.CreateFMul(
-                        vector_splat(builder,
-                                     llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
-                                     batch_size),
-                        llvm_fadd(s, old_val, lb)),
+                    llvm_fmul(s,
+                              vector_splat(builder,
+                                           llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
+                                           batch_size),
+                              llvm_fadd(s, old_val, lb)),
                     new_val);
 
                 // Store the new value.
@@ -2143,7 +2164,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &s, llvm::Va
     // Temporarily disable the fast math flags.
     fmf_disabler fd(builder);
 
-    auto x = builder.CreateFMul(a, b);
+    auto x = llvm_fmul(s, a, b);
     auto y = llvm_fma(s, a, b, builder.CreateFNeg(x));
 
     return {x, y};
@@ -2204,8 +2225,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &s, llvm::Value *
     auto [c, cc] = llvm_eft_product(s, x_hi, y_hi);
 
     // cc = x*yy + xx*y + cc.
-    auto x_yy = builder.CreateFMul(x_hi, y_lo);
-    auto xx_y = builder.CreateFMul(x_lo, y_hi);
+    auto x_yy = llvm_fmul(s, x_hi, y_lo);
+    auto xx_y = llvm_fmul(s, x_lo, y_hi);
     cc = llvm_fadd(s, llvm_fadd(s, x_yy, xx_y), cc);
 
     // The normalisation step.
@@ -2228,7 +2249,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &s, llvm::Value *
     // Temporarily disable the fast math flags.
     fmf_disabler fd(builder);
 
-    auto *c = builder.CreateFDiv(x_hi, y_hi);
+    auto *c = llvm_fdiv(s, x_hi, y_hi);
 
     auto [u, uu] = llvm_eft_product(s, c, y_hi);
 
@@ -2236,8 +2257,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &s, llvm::Value *
     auto *cc = llvm_fsub(s, x_hi, u);
     cc = llvm_fsub(s, cc, uu);
     cc = llvm_fadd(s, cc, x_lo);
-    cc = llvm_fsub(s, cc, builder.CreateFMul(c, y_lo));
-    cc = builder.CreateFDiv(cc, y_hi);
+    cc = llvm_fsub(s, cc, llvm_fmul(s, c, y_lo));
+    cc = llvm_fdiv(s, cc, y_hi);
 
     // The normalisation step.
     auto z = llvm_fadd(s, c, cc);
@@ -3065,7 +3086,7 @@ llvm::Value *llvm_sigmoid(llvm_state &s, llvm::Value *x)
     auto *e_m_x = llvm_exp(s, m_x);
 
     // Return 1 / (1 + e_m_arg).
-    return builder.CreateFDiv(one_fp, llvm_fadd(s, one_fp, e_m_x));
+    return llvm_fdiv(s, one_fp, llvm_fadd(s, one_fp, e_m_x));
 }
 
 // Hyperbolic sine.

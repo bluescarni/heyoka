@@ -242,15 +242,15 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
                     = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
                 auto *onevec = vector_splat(builder, llvm_codegen(s, fp_t, number(1.)), batch_size);
 
-                auto tmp1 = builder.CreateFMul(ordvec, pc);
-                auto tmp2 = builder.CreateFMul(jvec, llvm_fadd(s, pc, onevec));
+                auto tmp1 = llvm_fmul(s, ordvec, pc);
+                auto tmp2 = llvm_fmul(s, jvec, llvm_fadd(s, pc, onevec));
 
                 return llvm_fsub(s, tmp1, tmp2);
             }
         }();
 
         // Add scal_f*v0*v1 to the sum.
-        sum.push_back(builder.CreateFMul(scal_f, builder.CreateFMul(v0, v1)));
+        sum.push_back(llvm_fmul(s, scal_f, llvm_fmul(s, v0, v1)));
     }
 
     // Init the return value as the result of the sum.
@@ -259,10 +259,10 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
     // Compute the final divisor: order * (zero-th derivative of u_idx).
     auto *ord_f = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
     auto *b0 = taylor_fetch_diff(arr, u_idx, 0, n_uvars);
-    auto *div = builder.CreateFMul(ord_f, b0);
+    auto *div = llvm_fmul(s, ord_f, b0);
 
     // Compute and return the result: ret_acc / div.
-    return builder.CreateFDiv(ret_acc, div);
+    return llvm_fdiv(s, ret_acc, div);
 }
 
 // All the other cases.
@@ -413,21 +413,20 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
                     // Compute the factor n*alpha-j*(alpha+1).
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
                     auto fac = llvm_fsub(
-                        s, builder.CreateFMul(ord_v, alpha_v),
-                        builder.CreateFMul(
-                            j_v, llvm_fadd(s, alpha_v,
-                                           vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size))));
+                        s, llvm_fmul(s, ord_v, alpha_v),
+                        llvm_fmul(s, j_v,
+                                  llvm_fadd(s, alpha_v,
+                                            vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size))));
 
-                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc),
-                                                  builder.CreateFMul(fac, builder.CreateFMul(b_nj, aj))),
-                                        acc);
+                    builder.CreateStore(
+                        llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, b_nj, aj))), acc);
                 });
 
                 // Finalize the result: acc / (n*b0).
                 builder.CreateStore(
-                    builder.CreateFDiv(builder.CreateLoad(val_t, acc),
-                                       builder.CreateFMul(ord_v, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars,
-                                                                                    builder.getInt32(0), var_idx))),
+                    llvm_fdiv(s, builder.CreateLoad(val_t, acc),
+                              llvm_fmul(s, ord_v,
+                                        taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx))),
                     retval);
             });
 

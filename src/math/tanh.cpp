@@ -154,15 +154,15 @@ llvm::Value *taylor_diff_tanh_impl(llvm_state &s, llvm::Type *fp_t, const tanh_i
         auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*cnj*bj to the sum.
-        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(cnj, bj)));
+        sum.push_back(llvm_fmul(s, fac, llvm_fmul(s, cnj, bj)));
     }
 
     // Init the return value as the result of the sum.
     auto *ret_acc = pairwise_sum(s, sum);
 
     // Divide by order.
-    ret_acc = builder.CreateFDiv(
-        ret_acc, vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size));
+    ret_acc = llvm_fdiv(s, ret_acc,
+                        vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size));
 
     // Create and return the result.
     return llvm_fsub(s, taylor_fetch_diff(arr, b_idx, order, n_uvars), ret_acc);
@@ -294,16 +294,15 @@ llvm::Function *taylor_c_diff_func_tanh_impl(llvm_state &s, llvm::Type *fp_t, co
 
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc),
-                                                  builder.CreateFMul(fac, builder.CreateFMul(cnj, bj))),
-                                        acc);
+                    builder.CreateStore(
+                        llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, cnj, bj))), acc);
                 });
 
                 // Divide by the order and subtract from b^[n] to produce the return value.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
                 builder.CreateStore(llvm_fsub(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx),
-                                              builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_v)),
+                                              llvm_fdiv(s, builder.CreateLoad(val_t, acc), ord_v)),
                                     retval);
             });
 

@@ -214,7 +214,7 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, llvm::Type *fp_t, const erf_imp
         auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*cnj*bj to the sum vector.
-        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(cnj, bj)));
+        sum.push_back(llvm_fmul(s, fac, llvm_fmul(s, cnj, bj)));
     }
 
     // Create ret with the sum.
@@ -225,7 +225,7 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, llvm::Type *fp_t, const erf_imp
     auto *fac_s = vector_splat(builder, llvm_codegen(s, fp_t, fac), batch_size);
 
     // Multiply and return.
-    return builder.CreateFDiv(ret, fac_s);
+    return llvm_fdiv(s, ret, fac_s);
 }
 
 // All the other cases.
@@ -356,17 +356,16 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, llvm::Type *fp_t, con
 
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc),
-                                                  builder.CreateFMul(fac, builder.CreateFMul(c_nj, bj))),
-                                        acc);
+                    builder.CreateStore(
+                        llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, c_nj, bj))), acc);
                 });
 
                 // Generate the factor n * sqrt(pi) /2
                 auto t1_llvm = vector_splat(builder, llvm_codegen(s, fp_t, sqrt_pi_2_like(s, fp_t)), batch_size);
-                auto fac = builder.CreateFMul(t1_llvm, ord_fp);
+                auto fac = llvm_fmul(s, t1_llvm, ord_fp);
 
                 // Store into retval.
-                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(val_t, acc), fac), retval);
+                builder.CreateStore(llvm_fdiv(s, builder.CreateLoad(val_t, acc), fac), retval);
             });
 
         // Return the result.

@@ -225,8 +225,8 @@ llvm::Value *taylor_diff_sigmoid_impl(llvm_state &s, llvm::Type *fp_t, const sig
 
         // Add j*(anj-cnj)*bj to the sum.
         auto *tmp1 = llvm_fsub(s, anj, cnj);
-        auto *tmp2 = builder.CreateFMul(tmp1, bj);
-        auto *tmp3 = builder.CreateFMul(tmp2, fac);
+        auto *tmp2 = llvm_fmul(s, tmp1, bj);
+        auto *tmp3 = llvm_fmul(s, tmp2, fac);
 
         sum.push_back(tmp3);
     }
@@ -237,7 +237,7 @@ llvm::Value *taylor_diff_sigmoid_impl(llvm_state &s, llvm::Type *fp_t, const sig
     // Finalise the return value: ret_acc / n.
     auto *div = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
 
-    return builder.CreateFDiv(ret_acc, div);
+    return llvm_fdiv(s, ret_acc, div);
 }
 
 // All the other cases.
@@ -371,8 +371,8 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, llvm::Type *fp_t,
 
                     // Add  j*(anj-cnj)*bj into the sum.
                     auto tmp1 = llvm_fsub(s, anj, cnj);
-                    auto tmp2 = builder.CreateFMul(tmp1, bj);
-                    auto tmp3 = builder.CreateFMul(tmp2, fac);
+                    auto tmp2 = llvm_fmul(s, tmp1, bj);
+                    auto tmp3 = llvm_fmul(s, tmp2, fac);
 
                     builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), tmp3), acc);
                 });
@@ -380,7 +380,7 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, llvm::Type *fp_t,
                 // Divide by the order to produce the return value.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
-                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_v), retval);
+                builder.CreateStore(llvm_fdiv(s, builder.CreateLoad(val_t, acc), ord_v), retval);
             });
 
         // Return the result.

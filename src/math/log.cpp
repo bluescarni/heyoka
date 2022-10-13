@@ -180,10 +180,10 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, llvm::Type *fp_t, const log_imp
     auto *ord_fp = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
 
     // Compute n*b^[0].
-    auto *nb0 = builder.CreateFMul(ord_fp, taylor_fetch_diff(arr, b_idx, 0, n_uvars));
+    auto *nb0 = llvm_fmul(s, ord_fp, taylor_fetch_diff(arr, b_idx, 0, n_uvars));
 
     // Init ret with n*b^[n].
-    auto *ret = builder.CreateFMul(ord_fp, taylor_fetch_diff(arr, b_idx, order, n_uvars));
+    auto *ret = llvm_fmul(s, ord_fp, taylor_fetch_diff(arr, b_idx, order, n_uvars));
 
     // Run the summation only if order is > 1, otherwise
     // pairwise_sum() will error out.
@@ -197,7 +197,7 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, llvm::Type *fp_t, const log_imp
             auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
             // Add j*bnj*aj to the sum.
-            sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(bnj, aj)));
+            sum.push_back(llvm_fmul(s, fac, llvm_fmul(s, bnj, aj)));
         }
 
         // Compute the result of the summation and subtract it from ret.
@@ -205,7 +205,7 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, llvm::Type *fp_t, const log_imp
     }
 
     // Divide by n*b[0] and return.
-    return builder.CreateFDiv(ret, nb0);
+    return llvm_fdiv(s, ret, nb0);
 }
 
 // All the other cases.
@@ -327,11 +327,11 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, llvm::Type *fp_t, con
                 auto ord_fp = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
                 // Compute n*b^[0].
-                auto nb0 = builder.CreateFMul(
-                    ord_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx));
+                auto nb0
+                    = llvm_fmul(s, ord_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx));
 
                 // Compute n*b^[n].
-                auto nbn = builder.CreateFMul(ord_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx));
+                auto nbn = llvm_fmul(s, ord_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx));
 
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
@@ -344,13 +344,12 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, llvm::Type *fp_t, con
                     // Compute j.
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc),
-                                                  builder.CreateFMul(fac, builder.CreateFMul(bnj, aj))),
-                                        acc);
+                    builder.CreateStore(
+                        llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, bnj, aj))), acc);
                 });
 
                 // ret = (n*b^[n] - acc) / (n*b^[0]).
-                builder.CreateStore(builder.CreateFDiv(llvm_fsub(s, nbn, builder.CreateLoad(val_t, acc)), nb0), retval);
+                builder.CreateStore(llvm_fdiv(s, llvm_fsub(s, nbn, builder.CreateLoad(val_t, acc)), nb0), retval);
             });
 
         // Return the result.

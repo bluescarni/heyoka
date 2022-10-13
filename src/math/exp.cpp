@@ -183,7 +183,7 @@ llvm::Value *taylor_diff_exp_impl(llvm_state &s, llvm::Type *fp_t, const exp_imp
         auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*anj*bj to the sum.
-        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(anj, bj)));
+        sum.push_back(llvm_fmul(s, fac, llvm_fmul(s, anj, bj)));
     }
 
     // Init the return value as the result of the sum.
@@ -192,7 +192,7 @@ llvm::Value *taylor_diff_exp_impl(llvm_state &s, llvm::Type *fp_t, const exp_imp
     // Finalise the return value: ret_acc / n.
     auto *div = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
 
-    return builder.CreateFDiv(ret_acc, div);
+    return llvm_fdiv(s, ret_acc, div);
 }
 
 // All the other cases.
@@ -325,13 +325,12 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, llvm::Type *fp_t, con
                     // Compute the factor j.
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc),
-                                                  builder.CreateFMul(fac, builder.CreateFMul(anj, bj))),
-                                        acc);
+                    builder.CreateStore(
+                        llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, anj, bj))), acc);
                 });
 
                 // Return acc / n.
-                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_fp), retval);
+                builder.CreateStore(llvm_fdiv(s, builder.CreateLoad(val_t, acc), ord_fp), retval);
             });
 
         // Return the result.

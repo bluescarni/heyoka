@@ -207,7 +207,7 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_
                         auto v0 = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
                         auto v1 = taylor_fetch_diff(arr, u_idx, j, n_uvars);
 
-                        v_sums[k].push_back(builder.CreateFMul(v0, v1));
+                        v_sums[k].push_back(llvm_fmul(s, v0, v1));
                     } else if constexpr (is_num_param_v<type>) {
                         // Number/param.
 
@@ -266,12 +266,12 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_
                     if constexpr (std::is_same_v<type, variable>) {
                         // Variable.
                         auto val = taylor_fetch_diff(arr, uname_to_index(v.name()), order / 2u, n_uvars);
-                        return builder.CreateFMul(val, val);
+                        return llvm_fmul(s, val, val);
                     } else if constexpr (is_num_param_v<type>) {
                         // Number/param.
                         if (order == 0u) {
                             auto val = taylor_codegen_numparam(s, fp_t, v, par_ptr, batch_size);
-                            return builder.CreateFMul(val, val);
+                            return llvm_fmul(s, val, val);
                         } else {
                             return vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
                         }
@@ -408,8 +408,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
 
                             // Update the k-th accumulator.
                             builder.CreateStore(
-                                llvm_fadd(s, builder.CreateLoad(val_t, v_accs[k]), builder.CreateFMul(v0, v1)),
-                                v_accs[k]);
+                                llvm_fadd(s, builder.CreateLoad(val_t, v_accs[k]), llvm_fmul(s, v0, v1)), v_accs[k]);
                         } else if constexpr (is_num_param_v<type>) {
                             // Number/param: nothing to do, leave the accumulator to zero.
                         } else {
@@ -484,7 +483,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
                                 auto val
                                     = taylor_c_load_diff(s, val_t, diff_arr, n_uvars,
                                                          builder.CreateUDiv(order, builder.getInt32(2)), terms + k);
-                                return builder.CreateFMul(val, val);
+                                return llvm_fmul(s, val, val);
                             } else if constexpr (is_num_param_v<type>) {
                                 // Number/param.
                                 auto ret = builder.CreateAlloca(val_t);
@@ -505,7 +504,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
 
                                 auto val = builder.CreateLoad(val_t, ret);
 
-                                return builder.CreateFMul(val, val);
+                                return llvm_fmul(s, val, val);
                             } else {
                                 // LCOV_EXCL_START
                                 throw std::invalid_argument(

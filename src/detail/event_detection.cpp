@@ -293,7 +293,7 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
             batch_size);
 
         llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(i, builder.getInt32(1)), [&](llvm::Value *k) {
-            auto *tmp = builder.CreateFMul(ai, get_bc(i, k));
+            auto *tmp = llvm_fmul(s, ai, get_bc(i, k));
 
             auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.CreateMul(k, builder.getInt32(batch_size)));
             auto *new_val = llvm_fadd(s, load_vector_from_memory(builder, fp_t, ptr, batch_size), tmp);

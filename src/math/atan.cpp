@@ -186,18 +186,18 @@ llvm::Value *taylor_diff_atan_impl(llvm_state &s, llvm::Type *fp_t, const atan_i
     if (order == 1u) {
         // Special-case the first-order derivative, in order
         // to avoid an empty summation below.
-        return builder.CreateFDiv(taylor_fetch_diff(arr, b_idx, 1, n_uvars),
-                                  llvm_fadd(s, taylor_fetch_diff(arr, deps[0], 0, n_uvars), one_fp));
+        return llvm_fdiv(s, taylor_fetch_diff(arr, b_idx, 1, n_uvars),
+                         llvm_fadd(s, taylor_fetch_diff(arr, deps[0], 0, n_uvars), one_fp));
     }
 
     // Create the fp version of the order.
     auto *ord_fp = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
 
     // Assemble the first part of the result: n*b^[n].
-    auto *ret = builder.CreateFMul(ord_fp, taylor_fetch_diff(arr, b_idx, order, n_uvars));
+    auto *ret = llvm_fmul(s, ord_fp, taylor_fetch_diff(arr, b_idx, order, n_uvars));
 
     // Compute n*(c^[0] + 1).
-    auto *n_c0_p1 = builder.CreateFMul(ord_fp, llvm_fadd(s, taylor_fetch_diff(arr, deps[0], 0, n_uvars), one_fp));
+    auto *n_c0_p1 = llvm_fmul(s, ord_fp, llvm_fadd(s, taylor_fetch_diff(arr, deps[0], 0, n_uvars), one_fp));
 
     // NOTE: iteration in the [1, order) range.
     std::vector<llvm::Value *> sum;
@@ -210,14 +210,14 @@ llvm::Value *taylor_diff_atan_impl(llvm_state &s, llvm::Type *fp_t, const atan_i
         auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*cnj*aj to the sum.
-        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(cnj, aj)));
+        sum.push_back(llvm_fmul(s, fac, llvm_fmul(s, cnj, aj)));
     }
 
     // Update ret.
     ret = llvm_fsub(s, ret, pairwise_sum(s, sum));
 
     // Divide by n*(c^[0] + 1) and return.
-    return builder.CreateFDiv(ret, n_c0_p1);
+    return llvm_fdiv(s, ret, n_c0_p1);
 }
 
 // All the other cases.
@@ -344,11 +344,11 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, llvm::Type *fp_t, co
                 auto ord_fp = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
 
                 // Compute n*b^[n].
-                auto ret = builder.CreateFMul(ord_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx));
+                auto ret = llvm_fmul(s, ord_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx));
 
                 // Compute n*(c^[0] + 1).
-                auto n_c0_p1 = builder.CreateFMul(
-                    ord_fp,
+                auto n_c0_p1 = llvm_fmul(
+                    s, ord_fp,
                     llvm_fadd(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx), one_fp));
 
                 // Init the accumulator.
@@ -361,16 +361,15 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, llvm::Type *fp_t, co
 
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc),
-                                                  builder.CreateFMul(fac, builder.CreateFMul(c_nj, aj))),
-                                        acc);
+                    builder.CreateStore(
+                        llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, c_nj, aj))), acc);
                 });
 
                 // Update ret.
                 ret = llvm_fsub(s, ret, builder.CreateLoad(val_t, acc));
 
                 // Divide by n*(c^[0] + 1).
-                ret = builder.CreateFDiv(ret, n_c0_p1);
+                ret = llvm_fdiv(s, ret, n_c0_p1);
 
                 // Store into retval.
                 builder.CreateStore(ret, retval);

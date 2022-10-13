@@ -105,7 +105,7 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, llvm::Type *fp_t, const tpoly
     assert(tp.m_e_idx > 0u);
     auto bc = binomial(number_like(s, fp_t, static_cast<double>(n)), number_like(s, fp_t, static_cast<double>(order)));
     auto *ret = taylor_codegen_numparam(s, fp_t, param{tp.m_e_idx - 1u}, par_ptr, batch_size);
-    ret = builder.CreateFMul(ret, vector_splat(builder, llvm_codegen(s, fp_t, bc), batch_size));
+    ret = llvm_fmul(s, ret, vector_splat(builder, llvm_codegen(s, fp_t, bc), batch_size));
 
     // Horner evaluation of polynomial derivative.
     for (std::uint32_t i_ = 1; i_ <= n - order; ++i_) {
@@ -119,10 +119,10 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, llvm::Type *fp_t, const tpoly
 
         // Load the poly coefficient from the par array and multiply it by bc.
         auto *cf = taylor_codegen_numparam(s, fp_t, param{tp.m_b_idx + i + order}, par_ptr, batch_size);
-        cf = builder.CreateFMul(cf, vector_splat(builder, llvm_codegen(s, fp_t, bc), batch_size));
+        cf = llvm_fmul(s, cf, vector_splat(builder, llvm_codegen(s, fp_t, bc), batch_size));
 
         // Horner iteration.
-        ret = llvm_fadd(s, cf, builder.CreateFMul(ret, tm));
+        ret = llvm_fadd(s, cf, llvm_fmul(s, ret, tm));
     }
 
     return ret;
@@ -231,7 +231,7 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, llvm::Type *scal_t, cons
                         scal_t, par_ptr,
                         builder.CreateMul(builder.getInt32(batch_size), builder.CreateSub(e_idx, builder.getInt32(1)))),
                     batch_size);
-                cf = builder.CreateFMul(cf, bc);
+                cf = llvm_fmul(s, cf, bc);
                 builder.CreateStore(cf, retval);
 
                 // Horner evaluation of polynomial derivative.
@@ -249,11 +249,10 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, llvm::Type *scal_t, cons
                                                                   builder.getInt32(batch_size));
                                   cf = load_vector_from_memory(
                                       builder, scal_t, builder.CreateInBoundsGEP(scal_t, par_ptr, cf_idx), batch_size);
-                                  cf = builder.CreateFMul(cf, bc);
+                                  cf = llvm_fmul(s, cf, bc);
 
                                   // Horner iteration.
-                                  auto new_val
-                                      = llvm_fadd(s, cf, builder.CreateFMul(builder.CreateLoad(val_t, retval), tm));
+                                  auto new_val = llvm_fadd(s, cf, llvm_fmul(s, builder.CreateLoad(val_t, retval), tm));
 
                                   // Update retval.
                                   builder.CreateStore(new_val, retval);

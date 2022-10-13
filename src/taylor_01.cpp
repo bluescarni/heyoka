@@ -1724,7 +1724,7 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
                                         builder.CreateMul(builder.getInt32(batch_size), cur_order));
                 auto *cf = load_vector_from_memory(builder, fp_scal_t,
                                                    builder.CreateInBoundsGEP(fp_scal_t, tc_ptr, tc_idx), batch_size);
-                auto *tmp = builder.CreateFMul(cf, cur_h_val);
+                auto *tmp = llvm_fmul(s, cf, cur_h_val);
 
                 // Compute the quantities for the compensation.
                 auto *comp_ptr = builder.CreateInBoundsGEP(vector_t, comp_arr, cur_var_idx);
@@ -1740,7 +1740,7 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
             });
 
             // Update the value of h.
-            builder.CreateStore(builder.CreateFMul(cur_h_val, h), cur_h);
+            builder.CreateStore(llvm_fmul(s, cur_h_val, h), cur_h);
         });
     } else {
         // Start by writing into out_ptr the coefficients of the highest-degree
@@ -1781,7 +1781,7 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
                               auto *out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
                               auto *out_p = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, out_idx);
                               auto *cur_out = load_vector_from_memory(builder, fp_scal_t, out_p, batch_size);
-                              store_vector_to_memory(builder, out_p, llvm_fadd(s, tc, builder.CreateFMul(cur_out, h)));
+                              store_vector_to_memory(builder, out_p, llvm_fadd(s, tc, llvm_fmul(s, cur_out, h)));
                           });
                       });
     }
@@ -2549,7 +2549,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
                             builder.CreateMul(builder.getInt32(m_batch_size), cur_order));
                         auto *cf = detail::gather_vector_from_memory(
                             builder, fp_vec_t, builder.CreateInBoundsGEP(fp_t, tc_ptrs, load_idx));
-                        auto *tmp = builder.CreateFMul(cf, cur_h_val);
+                        auto *tmp = detail::llvm_fmul(m_llvm_state, cf, cur_h_val);
 
                         // Compute the quantities for the compensation.
                         auto *comp_ptr = builder.CreateInBoundsGEP(fp_vec_t, comp_arr, cur_var_idx);
@@ -2566,7 +2566,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
                     });
 
                 // Update the value of h.
-                builder.CreateStore(builder.CreateFMul(cur_h_val, h), cur_h);
+                builder.CreateStore(detail::llvm_fmul(m_llvm_state, cur_h_val, h), cur_h);
             });
     } else {
         // Start by writing into out_ptr the coefficients of the highest-degree
@@ -2610,7 +2610,8 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
                         auto *out_p = builder.CreateInBoundsGEP(fp_t, out_ptr, out_idx);
                         auto *cur_out = detail::load_vector_from_memory(builder, fp_t, out_p, m_batch_size);
                         detail::store_vector_to_memory(
-                            builder, out_p, detail::llvm_fadd(m_llvm_state, tcs, builder.CreateFMul(cur_out, h)));
+                            builder, out_p,
+                            detail::llvm_fadd(m_llvm_state, tcs, detail::llvm_fmul(m_llvm_state, cur_out, h)));
                     });
             });
     }

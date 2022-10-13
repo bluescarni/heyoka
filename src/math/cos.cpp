@@ -210,7 +210,7 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &s, llvm::Type *fp_t, const cos_imp
         auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*v0*v1 to the sum.
-        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
+        sum.push_back(llvm_fmul(s, fac, llvm_fmul(s, v0, v1)));
     }
 
     // Init the return value as the result of the sum.
@@ -219,7 +219,7 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &s, llvm::Type *fp_t, const cos_imp
     // Compute and return the result: -ret_acc / order
     auto *div = vector_splat(builder, llvm_codegen(s, fp_t, number(-static_cast<double>(order))), batch_size);
 
-    return builder.CreateFDiv(ret_acc, div);
+    return llvm_fdiv(s, ret_acc, div);
 }
 
 // All the other cases.
@@ -347,15 +347,13 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, llvm::Type *fp_t, con
 
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc),
-                                                  builder.CreateFMul(j_v, builder.CreateFMul(b_nj, cj))),
-                                        acc);
+                    builder.CreateStore(
+                        llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, j_v, llvm_fmul(s, b_nj, cj))), acc);
                 });
 
                 // Divide by the order and negate to produce the return value.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
-                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(val_t, acc), builder.CreateFNeg(ord_v)),
-                                    retval);
+                builder.CreateStore(llvm_fdiv(s, builder.CreateLoad(val_t, acc), builder.CreateFNeg(ord_v)), retval);
             });
 
         // Return the result.

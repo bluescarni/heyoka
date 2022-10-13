@@ -374,12 +374,12 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
     // NOTE: it is fine here to static_cast<double>(order), as order is a 32-bit integer
     // and double is a IEEE double-precision type (i.e., 53 bits).
     auto *rho_o = llvm_pow(
-        s, builder.CreateFDiv(num_rho, max_abs_diff_o),
+        s, llvm_fdiv(s, num_rho, max_abs_diff_o),
         vector_splat(builder,
                      llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, static_cast<double>(order))),
                      batch_size));
     auto *rho_om1 = llvm_pow(
-        s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
+        s, llvm_fdiv(s, num_rho, max_abs_diff_om1),
         vector_splat(
             builder,
             llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, static_cast<double>(order - 1u))),
@@ -392,7 +392,7 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
     const auto rhofac = taylor_determine_h_rhofac(s, fp_t, order);
 
     // Determine the step size in absolute value.
-    auto *h = builder.CreateFMul(rho_m, vector_splat(builder, llvm_codegen(s, fp_t, rhofac), batch_size));
+    auto *h = llvm_fmul(s, rho_m, vector_splat(builder, llvm_codegen(s, fp_t, rhofac), batch_size));
 
     // Ensure that the step size does not exceed the limit in absolute value.
     auto *max_h_vec = load_vector_from_memory(builder, fp_t, h_ptr, batch_size);
@@ -401,7 +401,7 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
     // Handle backwards propagation.
     auto *backward = builder.CreateFCmpOLT(max_h_vec, llvm::ConstantFP::get(vec_t, 0.));
     auto *h_fac = builder.CreateSelect(backward, llvm::ConstantFP::get(vec_t, -1.), llvm::ConstantFP::get(vec_t, 1.));
-    h = builder.CreateFMul(h_fac, h);
+    h = llvm_fmul(s, h_fac, h);
 
     return h;
 }
@@ -464,8 +464,9 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, llvm::Type *fp_t, const expre
 
                 // We have to divide the derivative by order
                 // to get the normalised derivative of the state variable.
-                return builder.CreateFDiv(
-                    ret, vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size));
+                return llvm_fdiv(
+                    s, ret,
+                    vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size));
             } else if constexpr (std::is_same_v<type, number> || std::is_same_v<type, param>) {
                 // The first-order derivative is a constant.
                 // If the first-order derivative is being requested,
@@ -642,8 +643,8 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
 
         // We have to divide the derivative by 'order' in order
         // to get the normalised derivative of the state variable.
-        ret = builder.CreateFDiv(
-            ret, vector_splat(builder, builder.CreateUIToFP(order, fp_vec_t->getScalarType()), batch_size));
+        ret = llvm_fdiv(s, ret,
+                        vector_splat(builder, builder.CreateUIToFP(order, fp_vec_t->getScalarType()), batch_size));
 
         // Store the derivative.
         taylor_c_store_diff(s, fp_vec_t, diff_arr, n_uvars, order, sv_idx, ret);
@@ -1557,22 +1558,22 @@ taylor_run_multihorner(llvm_state &s, llvm::Type *fp_t,
         });
 
         // Run the evaluation.
-        llvm_loop_u32(
-            s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
-            [&](llvm::Value *cur_order) {
-                llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-                    // Load the current poly coeff from diff_arr.
-                    // NOTE: we are loading the coefficients backwards wrt the order, hence
-                    // we specify order - cur_order.
-                    auto *cf = taylor_c_load_diff(s, fp_vec_t, diff_arr, n_uvars,
-                                                  builder.CreateSub(builder.getInt32(order), cur_order), cur_var_idx);
+        llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+                      [&](llvm::Value *cur_order) {
+                          llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+                              // Load the current poly coeff from diff_arr.
+                              // NOTE: we are loading the coefficients backwards wrt the order, hence
+                              // we specify order - cur_order.
+                              auto *cf = taylor_c_load_diff(s, fp_vec_t, diff_arr, n_uvars,
+                                                            builder.CreateSub(builder.getInt32(order), cur_order),
+                                                            cur_var_idx);
 
-                    // Accumulate in res_arr.
-                    auto *res_ptr = builder.CreateInBoundsGEP(fp_vec_t, res_arr, cur_var_idx);
-                    builder.CreateStore(llvm_fadd(s, cf, builder.CreateFMul(builder.CreateLoad(fp_vec_t, res_ptr), h)),
-                                        res_ptr);
-                });
-            });
+                              // Accumulate in res_arr.
+                              auto *res_ptr = builder.CreateInBoundsGEP(fp_vec_t, res_arr, cur_var_idx);
+                              builder.CreateStore(
+                                  llvm_fadd(s, cf, llvm_fmul(s, builder.CreateLoad(fp_vec_t, res_ptr), h)), res_ptr);
+                          });
+                      });
 
         return res_arr;
     } else {
@@ -1589,7 +1590,7 @@ taylor_run_multihorner(llvm_state &s, llvm::Type *fp_t,
         // Run the Horner scheme simultaneously for all polynomials.
         for (std::uint32_t i = 1; i <= order; ++i) {
             for (std::uint32_t j = 0; j < n_eq; ++j) {
-                res_arr[j] = llvm_fadd(s, diff_arr[(order - i) * n_eq + j], builder.CreateFMul(res_arr[j], h));
+                res_arr[j] = llvm_fadd(s, diff_arr[(order - i) * n_eq + j], llvm_fmul(s, res_arr[j], h));
             }
         }
 
@@ -1646,7 +1647,7 @@ taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
             llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
                 // Evaluate the current monomial.
                 auto *cf = taylor_c_load_diff(s, fp_vec_t, diff_arr, n_uvars, cur_order, cur_var_idx);
-                auto *tmp = builder.CreateFMul(cf, cur_h_val);
+                auto *tmp = llvm_fmul(s, cf, cur_h_val);
 
                 // Compute the quantities for the compensation.
                 auto *comp_ptr = builder.CreateInBoundsGEP(fp_vec_t, comp_arr, cur_var_idx);
@@ -1661,7 +1662,7 @@ taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
             });
 
             // Update the value of h.
-            builder.CreateStore(builder.CreateFMul(cur_h_val, h), cur_h);
+            builder.CreateStore(llvm_fmul(s, cur_h_val, h), cur_h);
         });
 
         return res_arr;
@@ -1682,7 +1683,7 @@ taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
         for (std::uint32_t i = 1; i <= order; ++i) {
             for (std::uint32_t j = 0; j < n_eq; ++j) {
                 // Evaluate the current monomial.
-                auto *tmp = builder.CreateFMul(diff_arr[i * n_eq + j], cur_h);
+                auto *tmp = llvm_fmul(s, diff_arr[i * n_eq + j], cur_h);
 
                 // Compute the quantities for the compensation.
                 auto *y = llvm_fsub(s, tmp, comp_arr[j]);
@@ -1694,7 +1695,7 @@ taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
             }
 
             // Update the power of h.
-            cur_h = builder.CreateFMul(cur_h, h);
+            cur_h = llvm_fmul(s, cur_h, h);
         }
 
         return res_arr;

@@ -156,7 +156,7 @@ llvm::Value *taylor_diff_cosh_impl(llvm_state &s, llvm::Type *fp_t, const cosh_i
         auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*snj*bj to the sum.
-        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(snj, bj)));
+        sum.push_back(llvm_fmul(s, fac, llvm_fmul(s, snj, bj)));
     }
 
     // Init the return value as the result of the sum.
@@ -165,7 +165,7 @@ llvm::Value *taylor_diff_cosh_impl(llvm_state &s, llvm::Type *fp_t, const cosh_i
     // Compute and return the result: ret_acc / order
     auto *div = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
 
-    return builder.CreateFDiv(ret_acc, div);
+    return llvm_fdiv(s, ret_acc, div);
 }
 
 // All the other cases.
@@ -294,14 +294,13 @@ llvm::Function *taylor_c_diff_func_cosh_impl(llvm_state &s, llvm::Type *fp_t, co
 
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
 
-                    builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc),
-                                                  builder.CreateFMul(j_v, builder.CreateFMul(snj, bj))),
-                                        acc);
+                    builder.CreateStore(
+                        llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, j_v, llvm_fmul(s, snj, bj))), acc);
                 });
 
                 // Divide by the order to produce the return value.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
-                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_v), retval);
+                builder.CreateStore(llvm_fdiv(s, builder.CreateLoad(val_t, acc), ord_v), retval);
             });
 
         // Return the result.
