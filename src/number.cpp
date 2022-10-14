@@ -269,11 +269,7 @@ bool operator==(const number &n1, const number &n2)
             if constexpr (std::is_same_v<type1, type2>) {
                 return v1 == v2;
             } else {
-                // LCOV_EXCL_START
-                throw std::invalid_argument(
-                    fmt::format("Cannot compare an object of type '{}' to an object of type '{}'",
-                                boost::core::demangle(typeid(v1).name()), boost::core::demangle(typeid(v2).name())));
-                // LCOV_EXCL_STOP
+                return false;
             }
         },
         n1.value(), n2.value());

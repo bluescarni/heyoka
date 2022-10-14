@@ -400,11 +400,11 @@ expression operator+(expression e)
 
 expression operator-(expression e)
 {
-    if (auto num_ptr = std::get_if<number>(&e.value())) {
+    if (auto *num_ptr = std::get_if<number>(&e.value())) {
         // Simplify -number to its numerical value.
         return expression{-std::move(*num_ptr)};
     } else {
-        if (auto fptr = detail::is_neg(e)) {
+        if (auto *fptr = detail::is_neg(e)) {
             // Simplify -(-x) to x.
             assert(!fptr->args().empty()); // LCOV_EXCL_LINE
             return fptr->args()[0];
@@ -417,7 +417,7 @@ expression operator-(expression e)
 expression operator+(expression e1, expression e2)
 {
     // Simplify x + neg(y) to x - y.
-    if (auto fptr = detail::is_neg(e2)) {
+    if (auto *fptr = detail::is_neg(e2)) {
         assert(!fptr->args().empty()); // LCOV_EXCL_LINE
         return std::move(e1) - fptr->args()[0];
     }
@@ -460,7 +460,7 @@ expression operator+(expression e1, expression e2)
 expression operator-(expression e1, expression e2)
 {
     // Simplify x - (-y) to x + y.
-    if (auto fptr = detail::is_neg(e2)) {
+    if (auto *fptr = detail::is_neg(e2)) {
         assert(!fptr->args().empty()); // LCOV_EXCL_LINE
         return std::move(e1) + fptr->args()[0];
     }
@@ -494,8 +494,8 @@ expression operator-(expression e1, expression e2)
 
 expression operator*(expression e1, expression e2)
 {
-    auto fptr1 = detail::is_neg(e1);
-    auto fptr2 = detail::is_neg(e2);
+    auto *fptr1 = detail::is_neg(e1);
+    auto *fptr2 = detail::is_neg(e2);
 
     if (fptr1 != nullptr && fptr2 != nullptr) {
         // Simplify (-x) * (-y) into x*y.
@@ -560,8 +560,8 @@ expression operator*(expression e1, expression e2)
 
 expression operator/(expression e1, expression e2)
 {
-    auto fptr1 = detail::is_neg(e1);
-    auto fptr2 = detail::is_neg(e2);
+    auto *fptr1 = detail::is_neg(e1);
+    auto *fptr2 = detail::is_neg(e2);
 
     if (fptr1 != nullptr && fptr2 != nullptr) {
         // Simplify (-x) / (-y) into x/y.
