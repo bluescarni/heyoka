@@ -55,6 +55,7 @@ real_prec_t llvm_is_real(llvm::Type *);
 #endif
 
 HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Type *llvm_ext_type(llvm::Type *);
 
 // Helper to construct an LLVM vector type of size batch_size with elements
 // of the LLVM type tp corresponding to the C++ type T. If batch_size is 1, tp

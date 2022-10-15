@@ -3634,6 +3634,24 @@ real_prec_t llvm_is_real(llvm::Type *t)
 
 #endif
 
+// Compute the LLVM data type to be used for loading external data
+// into an LLVM variable of type fp_t.
+llvm::Type *llvm_ext_type(llvm::Type *fp_t)
+{
+    if (fp_t->isFloatingPointTy()) {
+        return fp_t;
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return to_llvm_type<mppp::real>(fp_t->getContext());
+#endif
+        // LCOV_EXCL_START
+    } else {
+        throw std::invalid_argument(
+            fmt::format("Cannot compute the external type for the LLVM type '{}'", llvm_type_name(fp_t)));
+    }
+    // LCOV_EXCL_STOP
+}
+
 } // namespace heyoka::detail
 
 // NOTE: this function will be called by the LLVM implementation
