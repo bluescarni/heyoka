@@ -38,6 +38,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -2764,3 +2770,50 @@ TEST_CASE("to_size_t")
         REQUIRE(out[3] == static_cast<std::size_t>(std::numeric_limits<std::uint64_t>::max()));
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("real_ext_load")
+{
+    llvm_state s{kw::opt_level = 3u};
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    auto *real_t = detail::to_llvm_type<mppp::real>(context);
+
+    const auto real_pi_257 = mppp::real_pi(257);
+
+    auto *ft = llvm::FunctionType::get(
+        builder.getVoidTy(), {llvm::PointerType::getUnqual(real_t), llvm::PointerType::getUnqual(real_t)}, false);
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+    // Load the input from the first pointer.
+    auto *real_val
+        = detail::ext_load_vector_from_memory(s, detail::llvm_type_like(context, real_pi_257), f->arg_begin(), 1);
+
+    // Write it out.
+    detail::ext_store_vector_to_memory(s, f->arg_begin() + 1, real_val);
+
+    builder.CreateRetVoid();
+
+    s.verify_function(f);
+
+    s.optimise();
+
+    s.compile();
+
+    auto f_ptr = reinterpret_cast<void (*)(mppp::real *, mppp::real *)>(s.jit_lookup("test"));
+
+    mppp::real in{"1.1", 257}, out{0, 257};
+
+    f_ptr(&in, &out);
+
+    REQUIRE(out == mppp::real{"1.1", 257});
+    REQUIRE(out.get_prec() == 257);
+}
+
+#endif

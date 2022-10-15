@@ -324,6 +324,77 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Type *tp, llvm::
     return ret;
 }
 
+llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Value *ptr, std::uint32_t vector_size)
+{
+    auto &builder = s.builder();
+
+#if defined(HEYOKA_HAVE_REAL)
+    if (const auto real_prec = llvm_is_real(tp->getScalarType())) {
+        // LCOV_EXCL_START
+        if (tp->isVectorTy()) {
+            throw std::invalid_argument("Cannot load a vector of reals");
+        }
+        // LCOV_EXCL_STOP
+
+        auto &context = s.context();
+
+        // Fetch the limb type.
+        auto *limb_t = to_llvm_type<real_limb_t>(context);
+
+        // Fetch the external real struct type.
+        auto *real_t = to_llvm_type<mppp::real>(context);
+
+        // Compute the number of limbs in the internal real type.
+        const auto nlimbs = mppp::prec_to_nlimbs(real_prec);
+
+#if !defined(NDEBUG)
+        // In debug mode, we want to assert that the precision of the internal
+        // type matches exactly the precision of the external variable.
+
+        // Load the precision from the external value.
+        auto *prec_t = to_llvm_type<real_prec_t>(context);
+        auto *prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
+        auto *prec = builder.CreateLoad(prec_t, prec_ptr);
+
+        llvm_invoke_external(
+            s, "heyoka_assert_real_match_precs", builder.getVoidTy(),
+            {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
+#endif
+
+        // Init the return value.
+        llvm::Value *ret = llvm::UndefValue::get(tp);
+
+        // Read and insert the sign.
+        auto *sign_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(1)});
+        auto *sign = builder.CreateLoad(to_llvm_type<real_sign_t>(context), sign_ptr);
+        ret = builder.CreateInsertValue(ret, sign, {0u});
+
+        // Read and insert the exponent.
+        auto *exp_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(2)});
+        auto *exp = builder.CreateLoad(to_llvm_type<real_exp_t>(context), exp_ptr);
+        ret = builder.CreateInsertValue(ret, exp, {1u});
+
+        // Load in a local variable the input pointer to the limbs.
+        auto *limb_ptr_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(3)});
+        auto *limb_ptr = builder.CreateLoad(llvm::PointerType::getUnqual(limb_t), limb_ptr_ptr);
+
+        // Load and insert the limbs.
+        for (std::size_t i = 0; i < nlimbs; ++i) {
+            auto *ptr
+                = builder.CreateInBoundsGEP(limb_t, limb_ptr, builder.getInt32(boost::numeric_cast<std::uint32_t>(i)));
+            auto *limb = builder.CreateLoad(limb_t, ptr);
+            ret = builder.CreateInsertValue(ret, limb, {2u, boost::numeric_cast<std::uint32_t>(i)});
+        }
+
+        return ret;
+    } else {
+#endif
+        return load_vector_from_memory(builder, tp, ptr, vector_size);
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
+}
+
 // Helper to store the content of vector vec to the pointer ptr. If vec is not a vector,
 // a plain store will be performed.
 void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *vec)
@@ -1788,7 +1859,6 @@ namespace
 {
 
 #if !defined(NDEBUG)
-
 // Small helper to compute pi at the precision of the floating-point type tp.
 // Used only for debugging purposes.
 // NOTE: this is a repetition of number_like(), perhaps we can abstract this?
@@ -2227,7 +2297,6 @@ llvm::Value *llvm_add_bc_array(llvm_state &s, llvm::Type *fp_t, std::uint32_t n)
 
 namespace
 {
-
 // RAII helper to temporarily disable fast
 // math flags in a builder.
 class fmf_disabler
