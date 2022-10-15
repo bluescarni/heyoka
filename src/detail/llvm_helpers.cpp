@@ -102,7 +102,10 @@ llvm::Type *int_to_llvm(llvm::LLVMContext &c)
 {
     static_assert(std::is_integral_v<T>);
 
-    return llvm::Type::getIntNTy(c, std::numeric_limits<T>::digits);
+    // NOTE: need to add +1 to the digits for signed integers,
+    // as ::digits does not account for the sign bit.
+    return llvm::Type::getIntNTy(c, static_cast<unsigned>(std::numeric_limits<T>::digits)
+                                        + static_cast<unsigned>(std::is_signed_v<T>));
 };
 
 // The global type map to associate a C++ type to an LLVM type.
