@@ -23,6 +23,11 @@ using real_sign_t = decltype(std::declval<mppp::mpfr_struct_t>()._mpfr_sign);
 using real_exp_t = decltype(std::declval<mppp::mpfr_struct_t>()._mpfr_exp);
 using real_limb_t = std::remove_pointer_t<decltype(std::declval<mppp::mpfr_struct_t>()._mpfr_exp)>;
 
+// NOTE: mpfr_rnd_t is part of the MPFR API, so technically this introduces
+// a direct dependency on MPFR. On the other hand, perhaps we can guarantee that
+// including real.hpp includes transitively mpfr.h and leave it at that?
+using real_rnd_t = std::underlying_type_t<mpfr_rnd_t>;
+
 } // namespace heyoka::detail
 
 #endif

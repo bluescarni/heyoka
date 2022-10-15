@@ -22,8 +22,10 @@ namespace heyoka::detail
 static_assert(sizeof(mppp::real) == sizeof(mppp::mpfr_struct_t));
 static_assert(alignof(mppp::real) == alignof(mppp::mpfr_struct_t));
 static_assert(mppp::real_prec_min() > 0);
-static_assert(std::is_signed_v<detail::real_sign_t>);
-static_assert(std::is_signed_v<detail::real_exp_t>);
+static_assert(std::is_signed_v<real_sign_t>);
+static_assert(std::is_signed_v<real_exp_t>);
+static_assert(std::is_signed_v<real_exp_t>);
+static_assert(std::is_signed_v<real_rnd_t>);
 
 } // namespace heyoka::detail
 
