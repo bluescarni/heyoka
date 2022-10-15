@@ -708,14 +708,17 @@ llvm::Value *cfunc_nc_param_codegen(llvm_state &s, const param &p, std::uint32_t
 {
     auto &builder = s.builder();
 
+    // Fetch the type for external loading.
+    auto *ext_fp_t = llvm_ext_type(fp_t);
+
     // Determine the index into the parameter array.
     auto *arr_idx = builder.CreateMul(stride, to_size_t(s, builder.getInt32(p.idx())));
 
     // Compute the pointer to load from.
-    auto *ptr = builder.CreateInBoundsGEP(fp_t, par_ptr, arr_idx);
+    auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, par_ptr, arr_idx);
 
     // Load and return.
-    return load_vector_from_memory(builder, fp_t, ptr, batch_size);
+    return ext_load_vector_from_memory(s, fp_t, ptr, batch_size);
 }
 
 // Helper to implement the llvm_eval_*() methods in the func interface

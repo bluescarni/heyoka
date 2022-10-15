@@ -22,6 +22,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/binary_op.hpp>
@@ -238,3 +244,34 @@ TEST_CASE("cfunc")
         }
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("cfunc_mp")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    // TODO compact mode testing?
+    const auto compact_mode = false;
+    const auto prec = 237u;
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        llvm_state s{kw::opt_level = opt_level};
+
+        add_cfunc<mppp::real>(s, "cfunc", {x + y}, kw::compact_mode = compact_mode, kw::prec = prec);
+
+        s.compile();
+
+        auto *cf_ptr
+            = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(s.jit_lookup("cfunc"));
+
+        const std::vector inputs{mppp::real{"1.1", prec}, mppp::real{"2.1", prec}};
+        mppp::real output{0, prec};
+
+        cf_ptr(&output, inputs.data(), nullptr);
+
+        REQUIRE(output.get_prec() == prec);
+        REQUIRE(output == inputs[0] + inputs[1]);
+    }
+}
+
+#endif

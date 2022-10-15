@@ -61,6 +61,13 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <heyoka/detail/mpfr_helpers.hpp>
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -2233,11 +2240,14 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, ll
     // The array containing the evaluation of the decomposition.
     std::vector<llvm::Value *> eval_arr;
 
+    // Fetch the type for external loading.
+    auto *ext_fp_t = llvm_ext_type(fp_t);
+
     // Init it by loading the input values from in_ptr.
     for (std::uint32_t i = 0; i < nvars; ++i) {
         auto *ptr
-            = builder.CreateInBoundsGEP(fp_t, in_ptr, builder.CreateMul(stride, to_size_t(s, builder.getInt32(i))));
-        eval_arr.push_back(load_vector_from_memory(builder, fp_t, ptr, batch_size));
+            = builder.CreateInBoundsGEP(ext_fp_t, in_ptr, builder.CreateMul(stride, to_size_t(s, builder.getInt32(i))));
+        eval_arr.push_back(ext_load_vector_from_memory(s, fp_t, ptr, batch_size));
     }
 
     // Evaluate the elementary subexpressions in the decomposition.
@@ -2254,7 +2264,7 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, ll
         const auto out_idx = static_cast<std::uint32_t>(i - nuvars);
 
         // Compute the pointer to write to.
-        auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr,
+        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr,
                                               builder.CreateMul(stride, to_size_t(s, builder.getInt32(out_idx))));
 
         std::visit(
@@ -2267,14 +2277,13 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, ll
                     assert(u_idx < eval_arr.size());
 
                     // Fetch the corresponding value from eval_arr and store it.
-                    store_vector_to_memory(builder, ptr, eval_arr[u_idx]);
+                    ext_store_vector_to_memory(s, ptr, eval_arr[u_idx]);
                 } else if constexpr (std::is_same_v<type, number>) {
                     // Codegen the number and store it.
-                    store_vector_to_memory(builder, ptr, vector_splat(builder, llvm_codegen(s, fp_t, v), batch_size));
+                    ext_store_vector_to_memory(s, ptr, vector_splat(builder, llvm_codegen(s, fp_t, v), batch_size));
                 } else if constexpr (std::is_same_v<type, param>) {
                     // Codegen the parameter and store it.
-                    store_vector_to_memory(builder, ptr,
-                                           cfunc_nc_param_codegen(s, v, batch_size, fp_t, par_ptr, stride));
+                    ext_store_vector_to_memory(s, ptr, cfunc_nc_param_codegen(s, v, batch_size, fp_t, par_ptr, stride));
                 } else {
                     assert(false); // LCOV_EXCL_LINE
                 }
@@ -2889,7 +2898,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
 // [0, 1], [3, 4], [6, 7], [9, 10], ... in the input array.
 template <typename T, typename F>
 auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::uint32_t batch_size, bool high_accuracy,
-                    bool compact_mode, bool parallel_mode)
+                    bool compact_mode, bool parallel_mode, [[maybe_unused]] unsigned prec)
 {
     if (s.is_compiled()) {
         throw std::invalid_argument("A compiled function cannot be added to an llvm_state after compilation");
@@ -2911,6 +2920,20 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     if constexpr (std::is_same_v<T, long double>) {
         throw not_implemented_error("'long double' computations are not supported on PowerPC");
     }
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        const auto sprec = boost::numeric_cast<real_prec_t>(prec);
+
+        if (sprec < mppp::real_prec_min() || sprec > mppp::real_prec_max()) {
+            throw std::invalid_argument(fmt::format("An invalid precision value of {} was passed to add_cfunc() (the "
+                                                    "value must be in the [{}, {}] range)",
+                                                    sprec, mppp::real_prec_min(), mppp::real_prec_max()));
+        }
+    }
+
 #endif
 
     // Decompose the function and cache the number of vars and outputs.
@@ -2954,8 +2977,19 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // - the fourth argument is the stride.
     //
     // The pointer arguments cannot overlap.
-    auto *fp_t = to_llvm_type<T>(context);
-    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_t));
+    auto *fp_t = [&]() {
+#if defined(HEYOKA_HAVE_REAL)
+        if constexpr (std::is_same_v<T, mppp::real>) {
+            return llvm_type_like(context, mppp::real{0, static_cast<real_prec_t>(prec)});
+        } else {
+#endif
+            return to_llvm_type<T>(context);
+#if defined(HEYOKA_HAVE_REAL)
+        }
+#endif
+    }();
+    auto *ext_fp_t = llvm_ext_type(fp_t);
+    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(ext_fp_t));
     fargs.push_back(to_llvm_type<std::size_t>(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -3069,45 +3103,59 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
 
 template <typename T>
 std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &v_ex,
-                                  std::uint32_t batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode)
+                                  std::uint32_t batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode,
+                                  unsigned prec)
 {
-    return detail::add_cfunc_impl<T>(s, name, v_ex, batch_size, high_accuracy, compact_mode, parallel_mode);
+    return detail::add_cfunc_impl<T>(s, name, v_ex, batch_size, high_accuracy, compact_mode, parallel_mode, prec);
 }
 
 template <typename T>
 std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &v_ex,
                                   const std::vector<expression> &vars, std::uint32_t batch_size, bool high_accuracy,
-                                  bool compact_mode, bool parallel_mode)
+                                  bool compact_mode, bool parallel_mode, unsigned prec)
 {
     return detail::add_cfunc_impl<T>(s, name, std::make_pair(std::cref(v_ex), std::cref(vars)), batch_size,
-                                     high_accuracy, compact_mode, parallel_mode);
+                                     high_accuracy, compact_mode, parallel_mode, prec);
 }
 
 // Explicit instantiations.
-template HEYOKA_DLL_PUBLIC std::vector<expression>
-add_cfunc<double>(llvm_state &, const std::string &, const std::vector<expression> &, std::uint32_t, bool, bool, bool);
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<double>(llvm_state &, const std::string &,
+                                                                     const std::vector<expression> &, std::uint32_t,
+                                                                     bool, bool, bool, unsigned);
 template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<double>(llvm_state &, const std::string &,
                                                                      const std::vector<expression> &,
                                                                      const std::vector<expression> &, std::uint32_t,
-                                                                     bool, bool, bool);
+                                                                     bool, bool, bool, unsigned);
 
 template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<long double>(llvm_state &, const std::string &,
                                                                           const std::vector<expression> &,
-                                                                          std::uint32_t, bool, bool, bool);
+                                                                          std::uint32_t, bool, bool, bool, unsigned);
 template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<long double>(llvm_state &, const std::string &,
                                                                           const std::vector<expression> &,
                                                                           const std::vector<expression> &,
-                                                                          std::uint32_t, bool, bool, bool);
+                                                                          std::uint32_t, bool, bool, bool, unsigned);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real128>(llvm_state &, const std::string &,
                                                                             const std::vector<expression> &,
-                                                                            std::uint32_t, bool, bool, bool);
+                                                                            std::uint32_t, bool, bool, bool, unsigned);
 template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real128>(llvm_state &, const std::string &,
                                                                             const std::vector<expression> &,
                                                                             const std::vector<expression> &,
-                                                                            std::uint32_t, bool, bool, bool);
+                                                                            std::uint32_t, bool, bool, bool, unsigned);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real>(llvm_state &, const std::string &,
+                                                                         const std::vector<expression> &, std::uint32_t,
+                                                                         bool, bool, bool, unsigned);
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real>(llvm_state &, const std::string &,
+                                                                         const std::vector<expression> &,
+                                                                         const std::vector<expression> &, std::uint32_t,
+                                                                         bool, bool, bool, unsigned);
 
 #endif
 

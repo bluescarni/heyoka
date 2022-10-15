@@ -1101,7 +1101,128 @@ llvm::Value *llvm_fadd(llvm_state &s, llvm::Value *a, llvm::Value *b)
     assert(a->getType() == b->getType());
     // LCOV_EXCL_STOP
 
-    return s.builder().CreateFAdd(a, b);
+    auto &builder = s.builder();
+
+    auto *fp_t = a->getType();
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return builder.CreateFAdd(a, b);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (const auto real_prec = llvm_is_real(fp_t)) {
+        auto &md = s.module();
+        auto &context = s.context();
+
+        const auto fname = fmt::format("heyoka.real.{}.fadd", real_prec);
+
+        auto *f = md.getFunction(fname);
+
+        if (f == nullptr) {
+            auto *orig_bb = builder.GetInsertBlock();
+
+            // Fetch the LLVM version of the MPFR_RNDN constant.
+            // NOTE: MPFR_RNDN is part of the MPFR API, so technically this introduces
+            // a direct dependency on MPFR. On the other hand, perhaps we can guarantee that
+            // including real.hpp includes transitively mpfr.h and leave it at that?
+            auto *rnd_nearest
+                = llvm::ConstantInt::getSigned(to_llvm_type<real_rnd_t>(context),
+                                               boost::numeric_cast<std::int64_t>(static_cast<real_rnd_t>(MPFR_RNDN)));
+
+            // Codegen the precision as an LLVM constant.
+            auto *prec_const = llvm::ConstantInt::getSigned(to_llvm_type<real_prec_t>(context),
+                                                            boost::numeric_cast<std::int64_t>(real_prec));
+
+            auto *ft = llvm::FunctionType::get(fp_t, {fp_t, fp_t}, false);
+            f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+            f->addFnAttr(llvm::Attribute::NoUnwind);
+            f->addFnAttr(llvm::Attribute::Speculatable);
+            f->addFnAttr(llvm::Attribute::WillReturn);
+
+            assert(f != nullptr);
+
+            builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+            auto *a_arg = f->args().begin();
+            auto *b_arg = f->args().begin() + 1;
+
+            // Store the limbs array of a and b into local arrays, so that we can
+            // take addresses to them. Prepare also a limb array for the result.
+            // NOTE: the limb array for the result will contain undefined values,
+            // under the assumption that the MPFR functions only care about the
+            // precision of the result (and not sign, exponent and significand).
+            // If that turns out not to be true, we can always codegen a zero real
+            // constant with appropriate precision and use its data, instead of leaving
+            // things undefined.
+            auto *struct_fp_t = llvm::cast<llvm::StructType>(fp_t);
+            auto *limb_arr_t = struct_fp_t->getElementType(2u);
+            auto *limb_arr_a = builder.CreateAlloca(limb_arr_t);
+            auto *limb_arr_b = builder.CreateAlloca(limb_arr_t);
+            auto *limb_arr_res = builder.CreateAlloca(limb_arr_t);
+            builder.CreateStore(builder.CreateExtractValue(a_arg, {2u}), limb_arr_a);
+            builder.CreateStore(builder.CreateExtractValue(b_arg, {2u}), limb_arr_b);
+
+            // Create real instances pointing to the data in the limb arrays.
+            auto *real_t = to_llvm_type<mppp::real>(context);
+            auto *real_a = builder.CreateAlloca(real_t);
+            auto *real_b = builder.CreateAlloca(real_t);
+            auto *real_res = builder.CreateAlloca(real_t);
+
+            // Set the precisions.
+            builder.CreateStore(prec_const,
+                                builder.CreateInBoundsGEP(real_t, real_a, {builder.getInt32(0), builder.getInt32(0)}));
+            builder.CreateStore(prec_const,
+                                builder.CreateInBoundsGEP(real_t, real_b, {builder.getInt32(0), builder.getInt32(0)}));
+            builder.CreateStore(
+                prec_const, builder.CreateInBoundsGEP(real_t, real_res, {builder.getInt32(0), builder.getInt32(0)}));
+
+            // Signs.
+            builder.CreateStore(builder.CreateExtractValue(a_arg, {0u}),
+                                builder.CreateInBoundsGEP(real_t, real_a, {builder.getInt32(0), builder.getInt32(1)}));
+            builder.CreateStore(builder.CreateExtractValue(b_arg, {0u}),
+                                builder.CreateInBoundsGEP(real_t, real_b, {builder.getInt32(0), builder.getInt32(1)}));
+
+            // Exponents.
+            builder.CreateStore(builder.CreateExtractValue(a_arg, {1u}),
+                                builder.CreateInBoundsGEP(real_t, real_a, {builder.getInt32(0), builder.getInt32(2)}));
+            builder.CreateStore(builder.CreateExtractValue(b_arg, {1u}),
+                                builder.CreateInBoundsGEP(real_t, real_b, {builder.getInt32(0), builder.getInt32(2)}));
+
+            // Limb array pointers.
+            builder.CreateStore(
+                builder.CreateInBoundsGEP(limb_arr_t, limb_arr_a, {builder.getInt32(0), builder.getInt32(0)}),
+                builder.CreateInBoundsGEP(real_t, real_a, {builder.getInt32(0), builder.getInt32(3)}));
+            builder.CreateStore(
+                builder.CreateInBoundsGEP(limb_arr_t, limb_arr_b, {builder.getInt32(0), builder.getInt32(0)}),
+                builder.CreateInBoundsGEP(real_t, real_b, {builder.getInt32(0), builder.getInt32(3)}));
+            builder.CreateStore(
+                builder.CreateInBoundsGEP(limb_arr_t, limb_arr_res, {builder.getInt32(0), builder.getInt32(0)}),
+                builder.CreateInBoundsGEP(real_t, real_res, {builder.getInt32(0), builder.getInt32(3)}));
+
+            // Invoke the MPFR primitive.
+            llvm_invoke_external(s, "mpfr_add", builder.getVoidTy(), {real_res, real_a, real_b, rnd_nearest},
+                                 {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+
+            // Assemble the result.
+            llvm::Value *res = llvm::UndefValue::get(fp_t);
+            auto *out_sign_ptr
+                = builder.CreateInBoundsGEP(real_t, real_res, {builder.getInt32(0), builder.getInt32(1)});
+            res = builder.CreateInsertValue(res, builder.CreateLoad(struct_fp_t->getElementType(0u), out_sign_ptr),
+                                            {0});
+            auto *out_exp_ptr = builder.CreateInBoundsGEP(real_t, real_res, {builder.getInt32(0), builder.getInt32(2)});
+            res = builder.CreateInsertValue(res, builder.CreateLoad(struct_fp_t->getElementType(1u), out_exp_ptr), {1});
+            res = builder.CreateInsertValue(res, builder.CreateLoad(limb_arr_t, limb_arr_res), {2});
+
+            builder.CreateRet(res);
+
+            s.verify_function(f);
+
+            builder.SetInsertPoint(orig_bb);
+        }
+
+        return builder.CreateCall(f, {a, b});
+#endif
+    } else {
+        throw std::invalid_argument(fmt::format("Unable to fadd values of type '{}'", llvm_type_name(fp_t)));
+    }
 }
 
 llvm::Value *llvm_fsub(llvm_state &s, llvm::Value *a, llvm::Value *b)
