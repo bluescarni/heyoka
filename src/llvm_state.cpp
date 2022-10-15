@@ -10,6 +10,7 @@
 
 #include <cassert>
 #include <charconv>
+#include <cstddef>
 #include <cstdint>
 #include <fstream>
 #include <initializer_list>
@@ -49,6 +50,7 @@
 #include <llvm/ExecutionEngine/Orc/ObjectTransformLayer.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/IR/Attributes.h>
+#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstrTypes.h>
@@ -58,6 +60,7 @@
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
+#include <llvm/Support/Casting.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/SmallVectorMemoryBuffer.h>
 #include <llvm/Support/SourceMgr.h>
@@ -120,7 +123,14 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
@@ -371,6 +381,23 @@ struct llvm_state::jit {
         // we would like th throw here but I am not sure whether throwing
         // here would disrupt LLVM's cleanup actions?
         // https://llvm.org/doxygen/classllvm_1_1orc_1_1ExecutionSession.html
+
+#if defined(HEYOKA_HAVE_REAL) && !defined(NDEBUG)
+
+        // Run several checks to ensure that real_t matches the layout of mppp::real/mpfr_struct_t.
+        // NOTE: these checks need access to the data layout, so we put them here for convenience.
+        const auto &dl = m_lljit->getDataLayout();
+        const auto *slo
+            = dl.getStructLayout(llvm::cast<llvm::StructType>(detail::to_llvm_type<mppp::real>(*m_ctx->getContext())));
+        assert(slo->getSizeInBytes() == sizeof(mppp::real));
+        assert(slo->getAlignment().value() == alignof(mppp::real));
+        assert(slo->getElementOffset(0) == offsetof(mppp::mpfr_struct_t, _mpfr_prec));
+        assert(slo->getElementOffset(1) == offsetof(mppp::mpfr_struct_t, _mpfr_sign));
+        assert(slo->getElementOffset(2) == offsetof(mppp::mpfr_struct_t, _mpfr_exp));
+        assert(slo->getElementOffset(3) == offsetof(mppp::mpfr_struct_t, _mpfr_d));
+        assert(slo->getMemberOffsets().size() == 4u);
+
+#endif
     }
 
     jit(const jit &) = delete;

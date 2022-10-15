@@ -348,17 +348,21 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
         const auto nlimbs = mppp::prec_to_nlimbs(real_prec);
 
 #if !defined(NDEBUG)
+
         // In debug mode, we want to assert that the precision of the internal
         // type matches exactly the precision of the external variable.
 
-        // Load the precision from the external value.
-        auto *prec_t = to_llvm_type<real_prec_t>(context);
-        auto *prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
-        auto *prec = builder.CreateLoad(prec_t, prec_ptr);
+        if (s.opt_level() == 0u) {
+            // Load the precision from the external value.
+            auto *prec_t = to_llvm_type<real_prec_t>(context);
+            auto *prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
+            auto *prec = builder.CreateLoad(prec_t, prec_ptr);
 
-        llvm_invoke_external(
-            s, "heyoka_assert_real_match_precs", builder.getVoidTy(),
-            {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
+            llvm_invoke_external(
+                s, "heyoka_assert_real_match_precs", builder.getVoidTy(),
+                {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
+        }
+
 #endif
 
         // Init the return value.
@@ -443,30 +447,21 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
         const auto nlimbs = mppp::prec_to_nlimbs(real_prec);
 
 #if !defined(NDEBUG)
+
         // In debug mode, we want to assert that the precision of the internal
         // type matches exactly the precision of the external variable.
 
-        // Load the precision from the external value.
-        auto *prec_t = to_llvm_type<real_prec_t>(context);
-        auto *out_prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
-        auto *prec = builder.CreateLoad(prec_t, out_prec_ptr);
+        if (s.opt_level() == 0u) {
+            // Load the precision from the external value.
+            auto *prec_t = to_llvm_type<real_prec_t>(context);
+            auto *out_prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
+            auto *prec = builder.CreateLoad(prec_t, out_prec_ptr);
 
-        llvm_invoke_external(
-            s, "heyoka_assert_real_match_precs", builder.getVoidTy(),
-            {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
+            llvm_invoke_external(
+                s, "heyoka_assert_real_match_precs", builder.getVoidTy(),
+                {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
+        }
 
-        // Run several checks to ensure that real_t matches the layout of mppp::real/mpfr_struct_t.
-        // NOTE: these check should really go in to_llvm_type(), but it seems like there's no
-        // way of fetching the data layout from a context, thus we run the checks here instead.
-        const auto &dl = s.module().getDataLayout();
-        auto *slo = dl.getStructLayout(llvm::cast<llvm::StructType>(real_t));
-        assert(slo->getSizeInBytes() == sizeof(mppp::real));
-        assert(slo->getAlignment().value() == alignof(mppp::real));
-        assert(slo->getElementOffset(0) == offsetof(mppp::mpfr_struct_t, _mpfr_prec));
-        assert(slo->getElementOffset(1) == offsetof(mppp::mpfr_struct_t, _mpfr_sign));
-        assert(slo->getElementOffset(2) == offsetof(mppp::mpfr_struct_t, _mpfr_exp));
-        assert(slo->getElementOffset(3) == offsetof(mppp::mpfr_struct_t, _mpfr_d));
-        assert(slo->getMemberOffsets().size() == 4u);
 #endif
 
         // Store the sign.
