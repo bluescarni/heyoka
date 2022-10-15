@@ -2955,9 +2955,8 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     //
     // The pointer arguments cannot overlap.
     auto *fp_t = to_llvm_type<T>(context);
-    auto *lst = to_llvm_type<std::size_t>(context);
     std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_t));
-    fargs.push_back(lst);
+    fargs.push_back(to_llvm_type<std::size_t>(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
