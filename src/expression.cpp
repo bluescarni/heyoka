@@ -2709,6 +2709,9 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
     const auto n_nums = cfunc_c_gl_arr_size(out_gl[2]);
     const auto n_pars = cfunc_c_gl_arr_size(out_gl[4]);
 
+    // Fetch the type for external loading.
+    auto *ext_fp_t = llvm_ext_type(fp_scal_t);
+
     // Fetch the vector type.
     auto *fp_vec_t = make_vector_type(fp_scal_t, batch_size);
 
@@ -2733,10 +2736,10 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
         auto *ret = cfunc_c_load_eval(s, fp_vec_t, eval_arr, u_idx);
 
         // Compute the pointer into out_ptr.
-        auto *ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
+        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
 
         // Store ret.
-        store_vector_to_memory(builder, ptr, ret);
+        ext_store_vector_to_memory(s, ptr, ret);
     });
 
     // Handle the number definitions.
@@ -2754,10 +2757,10 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
         auto *ret = vector_splat(builder, num, batch_size);
 
         // Compute the pointer into out_ptr.
-        auto *ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
+        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
 
         // Store ret.
-        store_vector_to_memory(builder, ptr, ret);
+        ext_store_vector_to_memory(s, ptr, ret);
     });
 
     // Handle the param definitions.
@@ -2777,10 +2780,10 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
         auto *ret = load_vector_from_memory(builder, fp_scal_t, ptr, batch_size);
 
         // Compute the pointer into out_ptr.
-        ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
+        ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
 
         // Store ret.
-        store_vector_to_memory(builder, ptr, ret);
+        ext_store_vector_to_memory(s, ptr, ret);
     });
 }
 
@@ -2790,6 +2793,9 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
 {
     auto &builder = s.builder();
     auto &md = s.module();
+
+    // Fetch the type for external loading.
+    auto *ext_fp_t = llvm_ext_type(fp_type);
 
     // Split dc into segments.
     const auto s_dc = function_segment_dc(dc, nvars, nuvars);
@@ -2826,10 +2832,10 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
     // NOTE: overflow checking is already done in the parent function.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(nvars), [&](llvm::Value *cur_var_idx) {
         // Fetch the pointer from in_ptr.
-        auto *ptr = builder.CreateInBoundsGEP(fp_type, in_ptr, builder.CreateMul(stride, to_size_t(s, cur_var_idx)));
+        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, in_ptr, builder.CreateMul(stride, to_size_t(s, cur_var_idx)));
 
         // Load as a vector.
-        auto *vec = load_vector_from_memory(builder, fp_type, ptr, batch_size);
+        auto *vec = ext_load_vector_from_memory(s, fp_type, ptr, batch_size);
 
         // Store into eval_arr.
         cfunc_c_store_eval(s, fp_vec_type, eval_arr, cur_var_idx, vec);

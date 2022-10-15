@@ -251,26 +251,27 @@ TEST_CASE("cfunc_mp")
 {
     auto [x, y] = make_vars("x", "y");
 
-    // TODO compact mode testing?
-    const auto compact_mode = false;
     const auto prec = 237u;
-    for (auto opt_level : {0u, 1u, 2u, 3u}) {
-        llvm_state s{kw::opt_level = opt_level};
 
-        add_cfunc<mppp::real>(s, "cfunc", {x + y}, kw::compact_mode = compact_mode, kw::prec = prec);
+    for (auto compact_mode : {false, true}) {
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
 
-        s.compile();
+            add_cfunc<mppp::real>(s, "cfunc", {x + y}, kw::compact_mode = compact_mode, kw::prec = prec);
 
-        auto *cf_ptr
-            = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(s.jit_lookup("cfunc"));
+            s.compile();
 
-        const std::vector inputs{mppp::real{"1.1", prec}, mppp::real{"2.1", prec}};
-        mppp::real output{0, prec};
+            auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(
+                s.jit_lookup("cfunc"));
 
-        cf_ptr(&output, inputs.data(), nullptr);
+            const std::vector inputs{mppp::real{"1.1", prec}, mppp::real{"2.1", prec}};
+            mppp::real output{0, prec};
 
-        REQUIRE(output.get_prec() == prec);
-        REQUIRE(output == inputs[0] + inputs[1]);
+            cf_ptr(&output, inputs.data(), nullptr);
+
+            REQUIRE(output.get_prec() == prec);
+            REQUIRE(output == inputs[0] + inputs[1]);
+        }
     }
 }
 
