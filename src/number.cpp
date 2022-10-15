@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -34,7 +35,9 @@
 
 #include <llvm/ADT/APFloat.h>
 #include <llvm/Config/llvm-config.h>
+#include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
@@ -45,6 +48,12 @@
 
 #include <mp++/integer.hpp>
 #include <mp++/real128.hpp>
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
 
 #endif
 
@@ -71,6 +80,12 @@ number::number(long double x) : m_value(x) {}
 #if defined(HEYOKA_HAVE_REAL128)
 
 number::number(mppp::real128 x) : m_value(x) {}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+number::number(mppp::real x) : m_value(std::move(x)) {}
 
 #endif
 
@@ -106,33 +121,74 @@ std::size_t hash(const number &n)
 
 std::ostream &operator<<(std::ostream &os, const number &n)
 {
-    // NOTE: we make sure to print all digits
-    // necessary for short-circuiting. Make also
-    // sure to always print the decimal point and to
-    // use the C locale.
-    std::ostringstream oss;
-    oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-    oss.imbue(std::locale::classic());
-    oss << std::showpoint;
-
     std::visit(
-        [&oss](const auto &arg) {
-            oss.precision(std::numeric_limits<detail::uncvref_t<decltype(arg)>>::max_digits10);
-            oss << arg;
+        [&os](const auto &arg) {
+            using type = detail::uncvref_t<decltype(arg)>;
+
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<type, mppp::real>) {
+                os << arg.to_string();
+            } else {
+#endif
+                // NOTE: we make sure to print all digits
+                // necessary for short-circuiting. Make also
+                // sure to always print the decimal point and to
+                // use the C locale.
+                std::ostringstream oss;
+                oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+
+                oss.imbue(std::locale::classic());
+                oss << std::showpoint;
+
+                oss.precision(std::numeric_limits<type>::max_digits10);
+                oss << arg;
+
+                os << oss.str();
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
         },
         n.value());
 
-    return os << oss.str();
+    return os;
 }
 
 bool is_zero(const number &n)
 {
-    return std::visit([](const auto &arg) { return arg == 0; }, n.value());
+    return std::visit(
+        [](const auto &arg) {
+            using type [[maybe_unused]] = detail::uncvref_t<decltype(arg)>;
+
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<type, mppp::real>) {
+                return arg.zero_p();
+            } else {
+#endif
+                return arg == 0;
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
+        },
+        n.value());
 }
 
 bool is_one(const number &n)
 {
-    return std::visit([](const auto &arg) { return arg == 1; }, n.value());
+    return std::visit(
+        [](const auto &arg) {
+            using type [[maybe_unused]] = detail::uncvref_t<decltype(arg)>;
+
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<type, mppp::real>) {
+                return arg.is_one();
+            } else {
+#endif
+                return arg == 1;
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
+        },
+        n.value());
 }
 
 bool is_negative_one(const number &n)
@@ -328,6 +384,16 @@ number binomial(const number &i, const number &j)
                     return number{
                         detail::binomial<type1>(static_cast<std::uint32_t>(n1), static_cast<std::uint32_t>(n2))};
 #endif
+#if defined(HEYOKA_HAVE_REAL)
+                } else if constexpr (std::is_same_v<type1, mppp::real>) {
+                    // For real, we transform the input arguments into mppp::integer,
+                    // invoke binomial and then convert back to real.
+                    const auto n1 = static_cast<mppp::integer<1>>(v1);
+                    const auto n2 = static_cast<mppp::integer<1>>(v2);
+
+                    // NOTE: do the conversion using the maximum precision among the operands, as usual.
+                    return number{mppp::real{binomial(n1, n2), std::max(v1.get_prec(), v2.get_prec())}};
+#endif
                     // LCOV_EXCL_START
                 } else {
                     throw std::invalid_argument(fmt::format("Arguments of type '{}' are not supported by binomial()",
@@ -507,6 +573,32 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
         // NOTE: llvm will deduce the correct type for the codegen from the supplied
         // floating-point semantics.
         return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, str_rep));
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (const auto real_prec = detail::llvm_is_real(tp)) {
+        // From the number, generate a real with the desired precition.
+        const auto r = std::visit([real_prec](const auto &v) { return mppp::real{v, real_prec}; }, n.value());
+
+        // Generate the limb array in LLVM.
+        auto *struct_tp = llvm::cast<llvm::StructType>(tp);
+        auto *limb_array_t = llvm::cast<llvm::ArrayType>(struct_tp->elements()[2]);
+
+        std::vector<llvm::Constant *> limbs;
+        for (std::size_t i = 0; i < r.get_nlimbs(); ++i) {
+            limbs.push_back(llvm::ConstantInt::get(limb_array_t->getElementType(),
+                                                   boost::numeric_cast<std::uint64_t>(r.get_mpfr_t()->_mpfr_d[i])));
+        }
+
+        auto *limb_arr = llvm::ConstantArray::get(limb_array_t, limbs);
+
+        // Generate sign and exponent.
+        auto *sign = llvm::ConstantInt::getSigned(struct_tp->elements()[0],
+                                                  boost::numeric_cast<std::int64_t>(r.get_mpfr_t()->_mpfr_sign));
+        auto *exp = llvm::ConstantInt::getSigned(struct_tp->elements()[1],
+                                                 boost::numeric_cast<std::int64_t>(r.get_mpfr_t()->_mpfr_exp));
+
+        // Generate the struct.
+        return llvm::ConstantStruct::get(struct_tp, {sign, exp, limb_arr});
+#endif
     } else {
         throw std::invalid_argument(
             fmt::format("Cannot generate an LLVM constant of type '{}'", detail::llvm_type_name(tp)));

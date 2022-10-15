@@ -30,6 +30,12 @@
 
 #endif
 
+#if defined(MPPP_WITH_MPFR)
+
+#define HEYOKA_HAVE_REAL
+
+#endif
+
 #endif
 
 #if defined(_ARCH_PPC) || defined(_M_PPC)

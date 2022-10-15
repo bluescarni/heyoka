@@ -21,6 +21,13 @@
 #include <utility>
 #include <vector>
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <heyoka/detail/mpfr_helpers.hpp>
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -37,6 +44,15 @@ inline llvm::Type *to_llvm_type(llvm::LLVMContext &c, bool err_throw = true)
 {
     return to_llvm_type_impl(c, typeid(T), err_throw);
 }
+
+template <typename T>
+HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like(llvm::LLVMContext &, const T &);
+
+#if defined(HEYOKA_HAVE_REAL)
+
+real_prec_t llvm_is_real(llvm::Type *);
+
+#endif
 
 HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
 
@@ -60,8 +76,11 @@ HEYOKA_DLL_PUBLIC llvm::Value *to_size_t(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::GlobalVariable *make_global_zero_array(llvm::Module &, llvm::ArrayType *);
 
 HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Type *, llvm::Value *, std::uint32_t);
-HEYOKA_DLL_PUBLIC void store_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *);
+
 llvm::Value *gather_vector_from_memory(ir_builder &, llvm::Type *, llvm::Value *);
+
+HEYOKA_DLL_PUBLIC void store_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC void ext_store_vector_to_memory(llvm_state &, llvm::Value *, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC llvm::Value *vector_splat(ir_builder &, llvm::Value *, std::uint32_t);
 

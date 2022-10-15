@@ -38,6 +38,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -66,6 +72,13 @@ TEST_CASE("number basic")
 #if defined(HEYOKA_HAVE_REAL128)
 
     REQUIRE(std::holds_alternative<mppp::real128>(number{1.1_rq}.value()));
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(std::holds_alternative<mppp::real>(number{mppp::real{1.1, 23}}.value()));
+    REQUIRE(std::get<mppp::real>(number{mppp::real{1.1, 23}}.value()).get_prec() == 23);
 
 #endif
 }
@@ -302,6 +315,17 @@ TEST_CASE("number ostream")
 
         REQUIRE(oss.str() == cmp);
     }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    {
+        std::ostringstream oss;
+        oss << number{mppp::real{1.1, 23}};
+
+        REQUIRE(oss.str() == std::get<mppp::real>(number{mppp::real{1.1, 23}}.value()).to_string());
+    }
+
+#endif
 }
 
 TEST_CASE("number fmt")
@@ -655,6 +679,76 @@ TEST_CASE("llvm_codegen")
 
         REQUIRE(f_ptr() == boost::math::constants::pi<float>());
     }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    // Codegen high-precision pi real to double.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = detail::to_llvm_type<double>(context);
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{mppp::real_pi(256)}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == boost::math::constants::pi<double>());
+    }
+
+    // Codegen high-precision pi real to real256 and store in output variable.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *real_t = detail::to_llvm_type<mppp::real>(context);
+
+        const auto real_pi_256 = mppp::real_pi(256);
+
+        auto *ft = llvm::FunctionType::get(builder.getVoidTy(), {llvm::PointerType::getUnqual(real_t)}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *real_val = llvm_codegen(s, detail::llvm_type_like(context, real_pi_256), number{real_pi_256});
+
+        detail::ext_store_vector_to_memory(s, f->arg_begin(), real_val);
+
+        builder.CreateRetVoid();
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<void (*)(mppp::real *)>(s.jit_lookup("test"));
+
+        mppp::real out{0, 256};
+        f_ptr(&out);
+
+        REQUIRE(out == real_pi_256);
+        REQUIRE(out.get_prec() == real_pi_256.get_prec());
+    }
+
+#endif
 }
 
 TEST_CASE("number_like")
@@ -746,6 +840,27 @@ TEST_CASE("binomial")
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+    using namespace mppp::literals;
+
+    n = binomial(number(4._r128), number(2._r128));
+    REQUIRE(n == number(6._r128));
+    REQUIRE(std::holds_alternative<mppp::real>(n.value()));
+    REQUIRE(std::get<mppp::real>(n.value()).get_prec() == 128);
+
+    n = binomial(number(4._r128), number(2._r256));
+    REQUIRE(n == number(6._r256));
+    REQUIRE(std::holds_alternative<mppp::real>(n.value()));
+    REQUIRE(std::get<mppp::real>(n.value()).get_prec() == 256);
+
+    n = binomial(number(4._r256), number(2._r128));
+    REQUIRE(n == number(6._r256));
+    REQUIRE(std::holds_alternative<mppp::real>(n.value()));
+    REQUIRE(std::get<mppp::real>(n.value()).get_prec() == 256);
+
+#endif
+
     REQUIRE_THROWS_MATCHES(binomial(number(4.), number(2.f)), std::invalid_argument,
                            Message("Cannot compute the binomial coefficient of two numbers of different type"));
 
@@ -772,4 +887,43 @@ TEST_CASE("nextafter")
 
     REQUIRE_THROWS_MATCHES(nextafter(number(4.), number(2.f)), std::invalid_argument,
                            Message("Cannot invoke nextafter() on two numbers of different type"));
+}
+
+TEST_CASE("is_zero")
+{
+    REQUIRE(is_zero(number{0.}));
+    REQUIRE(!is_zero(number{1.}));
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(is_zero(number{mppp::real{0.}}));
+    REQUIRE(!is_zero(number{mppp::real{1.}}));
+
+#endif
+}
+
+TEST_CASE("is_one")
+{
+    REQUIRE(!is_one(number{0.}));
+    REQUIRE(is_one(number{1.}));
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(!is_one(number{mppp::real{0.}}));
+    REQUIRE(is_one(number{mppp::real{1.}}));
+
+#endif
+}
+
+TEST_CASE("is_negative_one")
+{
+    REQUIRE(!is_negative_one(number{0.}));
+    REQUIRE(is_negative_one(number{-1.}));
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(!is_negative_one(number{mppp::real{0.}}));
+    REQUIRE(is_negative_one(-number{mppp::real{1.}}));
+
+#endif
 }

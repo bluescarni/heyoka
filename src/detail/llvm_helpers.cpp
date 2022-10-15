@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -17,6 +18,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
@@ -63,6 +65,13 @@
 #include <boost/multiprecision/float128.hpp>
 
 #include <mp++/real128.hpp>
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <heyoka/detail/mpfr_helpers.hpp>
+#include <mp++/real.hpp>
 
 #endif
 
@@ -150,12 +159,33 @@ const auto type_map = []() {
 
 #endif
 
-    // Associate a few unsigned integral types
-    // with the goal of associating common implementations
-    // of std::size_t.
+#if defined(HEYOKA_HAVE_REAL)
+
+    retval[typeid(mppp::real)] = [](llvm::LLVMContext &c) -> llvm::Type * {
+        if (auto *ptr = llvm::StructType::getTypeByName(c, "heyoka.real")) {
+            return ptr;
+        }
+
+        auto *ret = llvm::StructType::create({to_llvm_type<real_prec_t>(c), to_llvm_type<real_sign_t>(c),
+                                              to_llvm_type<real_exp_t>(c),
+                                              llvm::PointerType::getUnqual(to_llvm_type<real_limb_t>(c))},
+                                             "heyoka.real");
+
+        assert(ret != nullptr);
+        assert(llvm::StructType::getTypeByName(c, "heyoka.real") == ret);
+
+        return ret;
+    };
+
+#endif
+
+    // Associate a few unsigned/signed integral types.
     retval[typeid(unsigned)] = int_to_llvm<unsigned>;
     retval[typeid(unsigned long)] = int_to_llvm<unsigned long>;
     retval[typeid(unsigned long long)] = int_to_llvm<unsigned long long>;
+    retval[typeid(int)] = int_to_llvm<int>;
+    retval[typeid(long)] = int_to_llvm<long>;
+    retval[typeid(long long)] = int_to_llvm<long long>;
 
     return retval;
 }();
@@ -316,6 +346,82 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
         // Not a vector, store vec directly.
         builder.CreateStore(vec, ptr);
     }
+}
+
+void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *vec)
+{
+    auto &builder = s.builder();
+
+#if defined(HEYOKA_HAVE_REAL)
+    if (const auto real_prec = llvm_is_real(vec->getType()->getScalarType())) {
+        // LCOV_EXCL_START
+        if (vec->getType()->isVectorTy()) {
+            throw std::invalid_argument("Cannot store a vector of reals");
+        }
+        // LCOV_EXCL_STOP
+
+        auto &context = s.context();
+
+        // Fetch the limb type.
+        auto *limb_t = to_llvm_type<real_limb_t>(context);
+
+        // Fetch the external real struct type.
+        auto *real_t = to_llvm_type<mppp::real>(context);
+
+        // Compute the number of limbs in the internal real type.
+        const auto nlimbs = mppp::prec_to_nlimbs(real_prec);
+
+#if !defined(NDEBUG)
+        // In debug mode, we want to assert that the precision of the internal
+        // type matches exactly the precision of the external variable.
+
+        // Load the precision from the external value.
+        auto *prec_t = to_llvm_type<real_prec_t>(context);
+        auto *out_prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
+        auto *prec = builder.CreateLoad(prec_t, out_prec_ptr);
+
+        llvm_invoke_external(
+            s, "heyoka_assert_real_match_precs", builder.getVoidTy(),
+            {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
+
+        // Run several checks to ensure that real_t matches the layout of mppp::real/mpfr_struct_t.
+        // NOTE: these check should really go in to_llvm_type(), but it seems like there's no
+        // way of fetching the data layout from a context, thus we run the checks here instead.
+        const auto &dl = s.module().getDataLayout();
+        auto *slo = dl.getStructLayout(llvm::cast<llvm::StructType>(real_t));
+        assert(slo->getSizeInBytes() == sizeof(mppp::real));
+        assert(slo->getAlignment().value() == alignof(mppp::real));
+        assert(slo->getElementOffset(0) == offsetof(mppp::mpfr_struct_t, _mpfr_prec));
+        assert(slo->getElementOffset(1) == offsetof(mppp::mpfr_struct_t, _mpfr_sign));
+        assert(slo->getElementOffset(2) == offsetof(mppp::mpfr_struct_t, _mpfr_exp));
+        assert(slo->getElementOffset(3) == offsetof(mppp::mpfr_struct_t, _mpfr_d));
+        assert(slo->getMemberOffsets().size() == 4u);
+#endif
+
+        // Store the sign.
+        auto *out_sign_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(1)});
+        builder.CreateStore(builder.CreateExtractValue(vec, {0u}), out_sign_ptr);
+
+        // Store the exponent.
+        auto *out_exp_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(2)});
+        builder.CreateStore(builder.CreateExtractValue(vec, {1u}), out_exp_ptr);
+
+        // Load in a local variable the output pointer to the limbs.
+        auto *out_limb_ptr_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(3)});
+        auto *out_limb_ptr = builder.CreateLoad(llvm::PointerType::getUnqual(limb_t), out_limb_ptr_ptr);
+
+        // Store the limbs.
+        for (std::size_t i = 0; i < nlimbs; ++i) {
+            auto *ptr = builder.CreateInBoundsGEP(limb_t, out_limb_ptr,
+                                                  builder.getInt32(boost::numeric_cast<std::uint32_t>(i)));
+            builder.CreateStore(builder.CreateExtractValue(vec, {2u, boost::numeric_cast<std::uint32_t>(i)}), ptr);
+        }
+    } else {
+#endif
+        store_vector_to_memory(builder, ptr, vec);
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
 }
 
 // Gather a vector of type vec_tp from ptrs. If vec_tp is a vector type, then ptrs
@@ -3370,6 +3476,95 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_
 #endif
 }
 
+template <typename T>
+llvm::Type *llvm_type_like(llvm::LLVMContext &c, const T &x)
+{
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        const auto name = fmt::format("heyoka.real.{}", x.get_prec());
+
+        if (auto *ptr = llvm::StructType::getTypeByName(c, name)) {
+            return ptr;
+        }
+
+        // Fetch the limb array type.
+        auto *limb_arr_t
+            = llvm::ArrayType::get(to_llvm_type<real_limb_t>(c), boost::numeric_cast<std::uint64_t>(x.get_nlimbs()));
+
+        auto *ret
+            = llvm::StructType::create({to_llvm_type<real_sign_t>(c), to_llvm_type<real_exp_t>(c), limb_arr_t}, name);
+
+        assert(ret != nullptr);
+        assert(llvm::StructType::getTypeByName(c, name) == ret);
+
+        return ret;
+    } else {
+#endif
+        return to_llvm_type<T>(c);
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
+}
+
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<float>(llvm::LLVMContext &, const float &);
+
+template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<double>(llvm::LLVMContext &, const double &);
+
+template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<long double>(llvm::LLVMContext &, const long double &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<mppp::real128>(llvm::LLVMContext &, const mppp::real128 &);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<mppp::real>(llvm::LLVMContext &, const mppp::real &);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+real_prec_t llvm_is_real(llvm::Type *t)
+{
+    if (auto *ptr = llvm::dyn_cast<llvm::StructType>(t)) {
+        const auto sname = ptr->getStructName();
+
+        if (sname.startswith("heyoka.real.")) {
+            // LCOV_EXCL_START
+            if (sname.size() <= 12u) {
+                throw std::invalid_argument(fmt::format(
+                    "Invalid name detected for an LLVM type corresponding to mppp::real: '{}'", std::string(sname)));
+            }
+            // LCOV_EXCL_STOP
+
+            real_prec_t value = 0;
+
+            const auto ret = std::from_chars(sname.data() + 12, sname.data() + sname.size(), value);
+
+            // LCOV_EXCL_START
+            if (ret.ec != std::errc{}) {
+                throw std::invalid_argument("The determination of the precision of an LLVM type corresponding to "
+                                            "mppp::real resulted in an error condition");
+            }
+
+            if (value < mppp::real_prec_min() || value > mppp::real_prec_max()) {
+                throw std::invalid_argument(fmt::format(
+                    "An invalid precision of {} was determined for an LLVM type corresponding to mppp::real", value));
+            }
+            // LCOV_EXCL_STOP
+
+            return value;
+        }
+    }
+
+    return 0;
+}
+
+#endif
+
 } // namespace heyoka::detail
 
 // NOTE: this function will be called by the LLVM implementation
@@ -3379,6 +3574,20 @@ extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter() noexcept
 {
     heyoka::detail::get_logger()->warn("iteration limit exceeded while solving the elliptic inverse Kepler equation");
 }
+
+#if !defined(NDEBUG)
+
+#if defined(HEYOKA_HAVE_REAL)
+
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs(heyoka::detail::real_prec_t p1,
+                                                                 heyoka::detail::real_prec_t p2) noexcept
+{
+    assert(p1 == p2);
+}
+
+#endif
+
+#endif
 
 #if defined(__GNUC__) && (__GNUC__ >= 11)
 

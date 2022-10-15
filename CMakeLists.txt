@@ -269,6 +269,8 @@ set(HEYOKA_SRC_FILES
     # NOTE: sleef.cpp needs to be compiled even if we are not
     # building with sleef support on.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
+    # Same with mppp::real.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/mpfr_helpers.cpp"
 )
 
 if(HEYOKA_WITH_SLEEF)
