@@ -9,8 +9,6 @@
 #ifndef HEYOKA_DETAIL_LLVM_HELPERS_HPP
 #define HEYOKA_DETAIL_LLVM_HELPERS_HPP
 
-#include <heyoka/config.hpp>
-
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -20,13 +18,6 @@
 #include <typeinfo>
 #include <utility>
 #include <vector>
-
-#if defined(HEYOKA_HAVE_REAL)
-
-#include <heyoka/detail/mpfr_helpers.hpp>
-#include <mp++/real.hpp>
-
-#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -47,12 +38,6 @@ inline llvm::Type *to_llvm_type(llvm::LLVMContext &c, bool err_throw = true)
 
 template <typename T>
 HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like(llvm::LLVMContext &, const T &);
-
-#if defined(HEYOKA_HAVE_REAL)
-
-real_prec_t llvm_is_real(llvm::Type *);
-
-#endif
 
 HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Type *llvm_ext_type(llvm::Type *);

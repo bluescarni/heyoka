@@ -55,6 +55,8 @@
 
 #include <mp++/real.hpp>
 
+#include <heyoka/detail/real_helpers.hpp>
+
 #endif
 
 #include <heyoka/detail/binomial.hpp>

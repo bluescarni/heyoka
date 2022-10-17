@@ -63,8 +63,9 @@
 
 #if defined(HEYOKA_HAVE_REAL)
 
-#include <heyoka/detail/mpfr_helpers.hpp>
 #include <mp++/real.hpp>
+
+#include <heyoka/detail/real_helpers.hpp>
 
 #endif
 
