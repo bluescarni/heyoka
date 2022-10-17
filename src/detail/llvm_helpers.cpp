@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -18,7 +17,6 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
-#include <system_error>
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
@@ -70,8 +68,9 @@
 
 #if defined(HEYOKA_HAVE_REAL)
 
-#include <heyoka/detail/mpfr_helpers.hpp>
 #include <mp++/real.hpp>
+
+#include <heyoka/detail/real_helpers.hpp>
 
 #endif
 
@@ -351,7 +350,6 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
 
         // In debug mode, we want to assert that the precision of the internal
         // type matches exactly the precision of the external variable.
-
         if (s.opt_level() == 0u) {
             // Load the precision from the external value.
             auto *prec_t = to_llvm_type<real_prec_t>(context);
@@ -359,7 +357,7 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
             auto *prec = builder.CreateLoad(prec_t, prec_ptr);
 
             llvm_invoke_external(
-                s, "heyoka_assert_real_match_precs", builder.getVoidTy(),
+                s, "heyoka_assert_real_match_precs_ext_load", builder.getVoidTy(),
                 {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
         }
 
@@ -450,7 +448,6 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
 
         // In debug mode, we want to assert that the precision of the internal
         // type matches exactly the precision of the external variable.
-
         if (s.opt_level() == 0u) {
             // Load the precision from the external value.
             auto *prec_t = to_llvm_type<real_prec_t>(context);
@@ -458,7 +455,7 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
             auto *prec = builder.CreateLoad(prec_t, out_prec_ptr);
 
             llvm_invoke_external(
-                s, "heyoka_assert_real_match_precs", builder.getVoidTy(),
+                s, "heyoka_assert_real_match_precs_ext_store", builder.getVoidTy(),
                 {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
         }
 
@@ -3766,46 +3763,6 @@ template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<mppp::real>(llvm::LLVMCont
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL)
-
-real_prec_t llvm_is_real(llvm::Type *t)
-{
-    if (auto *ptr = llvm::dyn_cast<llvm::StructType>(t)) {
-        const auto sname = ptr->getStructName();
-
-        if (sname.startswith("heyoka.real.")) {
-            // LCOV_EXCL_START
-            if (sname.size() <= 12u) {
-                throw std::invalid_argument(fmt::format(
-                    "Invalid name detected for an LLVM type corresponding to mppp::real: '{}'", std::string(sname)));
-            }
-            // LCOV_EXCL_STOP
-
-            real_prec_t value = 0;
-
-            const auto ret = std::from_chars(sname.data() + 12, sname.data() + sname.size(), value);
-
-            // LCOV_EXCL_START
-            if (ret.ec != std::errc{}) {
-                throw std::invalid_argument("The determination of the precision of an LLVM type corresponding to "
-                                            "mppp::real resulted in an error condition");
-            }
-
-            if (value < mppp::real_prec_min() || value > mppp::real_prec_max()) {
-                throw std::invalid_argument(fmt::format(
-                    "An invalid precision of {} was determined for an LLVM type corresponding to mppp::real", value));
-            }
-            // LCOV_EXCL_STOP
-
-            return value;
-        }
-    }
-
-    return 0;
-}
-
-#endif
-
 // Compute the LLVM data type to be used for loading external data
 // into an LLVM variable of type fp_t.
 llvm::Type *llvm_ext_type(llvm::Type *fp_t)
@@ -3838,8 +3795,14 @@ extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter() noexcept
 
 #if defined(HEYOKA_HAVE_REAL)
 
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs(heyoka::detail::real_prec_t p1,
-                                                                 heyoka::detail::real_prec_t p2) noexcept
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_load(heyoka::detail::real_prec_t p1,
+                                                                          heyoka::detail::real_prec_t p2) noexcept
+{
+    assert(p1 == p2);
+}
+
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_store(heyoka::detail::real_prec_t p1,
+                                                                           heyoka::detail::real_prec_t p2) noexcept
 {
     assert(p1 == p2);
 }
