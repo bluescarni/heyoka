@@ -24,10 +24,14 @@
 
 #include <fmt/format.h>
 
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
@@ -246,6 +250,66 @@ llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst
 }
 
 } // namespace
+
+// Helper to construct a binary LLVM function corresponding to the MPFR primitive 'mpfr_name'.
+// The operands will be of type 'fp_t' (which must be a heyoka.real.N). The name of the function
+// will be built from pname.
+llvm::Function *real_binary_op(llvm_state &s, llvm::Type *fp_t, const std::string &pname, const std::string &mpfr_name)
+{
+    auto &md = s.module();
+    auto &context = s.context();
+    auto &builder = s.builder();
+
+    const auto real_prec = llvm_is_real(fp_t);
+
+    assert(real_prec > 0);
+
+    const auto fname = fmt::format("heyoka.real.{}.{}", real_prec, pname);
+
+    auto *f = md.getFunction(fname);
+
+    if (f == nullptr) {
+        auto *orig_bb = builder.GetInsertBlock();
+
+        // Fetch the LLVM version of the MPFR_RNDN constant.
+        auto *rnd_nearest = llvm_mpfr_rndn(s);
+
+        // Create the function type and the function.
+        auto *ft = llvm::FunctionType::get(fp_t, {fp_t, fp_t}, false);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        assert(f != nullptr);
+        f->addFnAttr(llvm::Attribute::NoUnwind);
+        f->addFnAttr(llvm::Attribute::Speculatable);
+        f->addFnAttr(llvm::Attribute::WillReturn);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *a_arg = f->args().begin();
+        auto *b_arg = f->args().begin() + 1;
+
+        // Create mpfr views for the input arguments.
+        auto [real_a, limb_arr_a] = llvm_real_to_mpfr_view(s, a_arg);
+        auto [real_b, limb_arr_b] = llvm_real_to_mpfr_view(s, b_arg);
+
+        // Create an undef value for the result.
+        auto [real_res, limb_arr_res] = llvm_undef_mpfr_view(s, fp_t);
+
+        // Invoke the MPFR primitive.
+        llvm_invoke_external(s, mpfr_name, builder.getVoidTy(), {real_res, real_a, real_b, rnd_nearest},
+                             {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+
+        // Assemble the result.
+        auto *res = llvm_mpfr_view_to_real(s, real_res, limb_arr_res, fp_t);
+
+        builder.CreateRet(res);
+
+        s.verify_function(f);
+
+        builder.SetInsertPoint(orig_bb);
+    }
+
+    return f;
+}
 
 } // namespace heyoka::detail
 
