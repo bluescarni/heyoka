@@ -1105,7 +1105,7 @@ llvm::Value *llvm_fadd(llvm_state &s, llvm::Value *a, llvm::Value *b)
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFAdd(a, b);
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(fp_t)) {
+    } else if (llvm_is_real(fp_t) != 0) {
         auto *f = real_nary_op(s, fp_t, "fadd", "mpfr_add", 2u);
 
         return builder.CreateCall(f, {a, b});
@@ -1130,7 +1130,7 @@ llvm::Value *llvm_fsub(llvm_state &s, llvm::Value *a, llvm::Value *b)
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFSub(a, b);
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(fp_t)) {
+    } else if (llvm_is_real(fp_t) != 0) {
         auto *f = real_nary_op(s, fp_t, "fsub", "mpfr_sub", 2u);
 
         return builder.CreateCall(f, {a, b});
@@ -1155,7 +1155,7 @@ llvm::Value *llvm_fmul(llvm_state &s, llvm::Value *a, llvm::Value *b)
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFMul(a, b);
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(fp_t)) {
+    } else if (llvm_is_real(fp_t) != 0) {
         auto *f = real_nary_op(s, fp_t, "fmul", "mpfr_mul", 2u);
 
         return builder.CreateCall(f, {a, b});
@@ -1180,13 +1180,29 @@ llvm::Value *llvm_fdiv(llvm_state &s, llvm::Value *a, llvm::Value *b)
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         return builder.CreateFDiv(a, b);
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(fp_t)) {
+    } else if (llvm_is_real(fp_t) != 0) {
         auto *f = real_nary_op(s, fp_t, "fdiv", "mpfr_div", 2u);
 
         return builder.CreateCall(f, {a, b});
 #endif
     } else {
         throw std::invalid_argument(fmt::format("Unable to fdiv values of type '{}'", llvm_type_name(fp_t)));
+    }
+}
+
+// Create a floating-point constant of type fp_t containing
+// the value val.
+llvm::Constant *llvm_constantfp(llvm_state &s, llvm::Type *fp_t, double val)
+{
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return llvm::ConstantFP::get(fp_t, val);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm::cast<llvm::Constant>(llvm_codegen(s, fp_t, number{val}));
+#endif
+    } else {
+        throw std::invalid_argument(
+            fmt::format("Unable to generate a floating-point constant of type '{}'", llvm_type_name(fp_t)));
     }
 }
 
@@ -1907,6 +1923,7 @@ namespace
 {
 
 #if !defined(NDEBUG)
+
 // Small helper to compute pi at the precision of the floating-point type tp.
 // Used only for debugging purposes.
 // NOTE: this is a repetition of number_like(), perhaps we can abstract this?
@@ -2083,7 +2100,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Is the eccentricity a quiet NaN or less than 0?
-        auto *ecc_is_nan_or_neg = builder.CreateFCmpULT(ecc_arg, llvm::Constant::getNullValue(ecc_arg->getType()));
+        auto *ecc_is_nan_or_neg = builder.CreateFCmpULT(ecc_arg, llvm_constantfp(s, ecc_arg->getType(), 0.));
         // Is the eccentricity >= 1?
         auto *ecc_is_gte1
             = builder.CreateFCmpOGE(ecc_arg, vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size));
@@ -2110,7 +2127,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
 #endif
 
         // Reduce M modulo 2*pi in extended precision.
-        auto *M = llvm_dl_modulus(s, M_arg, llvm::Constant::getNullValue(M_arg->getType()),
+        auto *M = llvm_dl_modulus(s, M_arg, llvm_constantfp(s, M_arg->getType(), 0.),
                                   vector_splat(builder, llvm_codegen(s, fp_t, dl_twopi_hi), batch_size),
                                   vector_splat(builder, llvm_codegen(s, fp_t, dl_twopi_lo), batch_size))
                       .first;
@@ -2748,7 +2765,7 @@ llvm::Value *llvm_acos(llvm_state &s, llvm::Value *x)
 #endif
             );
 #if defined(HEYOKA_HAVE_REAL)
-        } else if (llvm_is_real(x->getType())) {
+        } else if (llvm_is_real(x->getType()) != 0) {
             auto *f = real_nary_op(s, x->getType(), "acos", "mpfr_acos", 1u);
 
             return s.builder().CreateCall(f, {x});
@@ -3431,7 +3448,7 @@ llvm::Value *llvm_square(llvm_state &s, llvm::Value *x)
     // LCOV_EXCL_STOP
 
 #if defined(HEYOKA_HAVE_REAL)
-    if (llvm_is_real(x->getType())) {
+    if (llvm_is_real(x->getType()) != 0) {
         auto *f = real_nary_op(s, x->getType(), "square", "mpfr_sqr", 1u);
 
         return s.builder().CreateCall(f, {x});
@@ -3610,7 +3627,7 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_
 
             return ret;
 #if defined(HEYOKA_HAVE_REAL)
-        } else if (llvm_is_real(x->getType())) {
+        } else if (llvm_is_real(x->getType()) != 0) {
             auto *f = real_nary_op(s, x->getType(), "pow", "mpfr_pow", 2u);
 
             return s.builder().CreateCall(f, {x, y});

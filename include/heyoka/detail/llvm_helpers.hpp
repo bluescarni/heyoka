@@ -111,6 +111,7 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_fadd(llvm_state &, llvm::Value *, llvm::Valu
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fsub(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fmul(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fdiv(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Constant *llvm_constantfp(llvm_state &, llvm::Type *, double);
 HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_modulus(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_abs(llvm_state &, llvm::Value *);
