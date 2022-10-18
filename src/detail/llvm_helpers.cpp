@@ -3628,6 +3628,8 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_
             return ret;
 #if defined(HEYOKA_HAVE_REAL)
         } else if (llvm_is_real(x->getType()) != 0) {
+            // NOTE: there is a convenient mpfr_rec_sqrt() function which looks very handy
+            // for possibly optimising the case of exponent == -3/2.
             auto *f = real_nary_op(s, x->getType(), "pow", "mpfr_pow", 2u);
 
             return s.builder().CreateCall(f, {x, y});
