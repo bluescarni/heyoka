@@ -494,7 +494,7 @@ namespace
 // It will special-case for e == 0, 1, 2, 3, 4 and 0.5.
 expression pow_wrapper_impl(expression b, expression e)
 {
-    if (auto num_ptr = std::get_if<number>(&e.value())) {
+    if (auto *num_ptr = std::get_if<number>(&e.value())) {
         if (is_zero(*num_ptr)) {
             return 1_dbl;
         }

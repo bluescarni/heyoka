@@ -34,7 +34,7 @@ using real_rnd_t = std::underlying_type_t<mpfr_rnd_t>;
 
 real_prec_t llvm_is_real(llvm::Type *);
 
-llvm::Function *real_binary_op(llvm_state &, llvm::Type *, const std::string &, const std::string &);
+llvm::Function *real_nary_op(llvm_state &, llvm::Type *, const std::string &, const std::string &, unsigned);
 
 } // namespace heyoka::detail
 

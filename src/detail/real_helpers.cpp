@@ -19,6 +19,7 @@
 #include <system_error>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
 
@@ -185,6 +186,9 @@ std::pair<llvm::Value *, llvm::Value *> llvm_undef_mpfr_view(llvm_state &s, llvm
     // If that turns out not to be true, we can always codegen a zero real
     // constant with appropriate precision and use its data, instead of leaving
     // things undefined.
+    // NOTE: currently the mpfr_custom_init_set() macro sets something for sign and
+    // exponent, in addition to the precision. Perhaps we could invoke it here and
+    // then pick up the sign/exponent values as compile-time constants?
     auto *limb_arr = builder.CreateAlloca(limb_arr_t);
 
     // Create the mpfr_struct_t.
@@ -251,11 +255,14 @@ llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst
 
 } // namespace
 
-// Helper to construct a binary LLVM function corresponding to the MPFR primitive 'mpfr_name'.
+// Helper to construct an n-ary LLVM function corresponding to the MPFR primitive 'mpfr_name'.
 // The operands will be of type 'fp_t' (which must be a heyoka.real.N). The name of the function
 // will be built from pname.
-llvm::Function *real_binary_op(llvm_state &s, llvm::Type *fp_t, const std::string &pname, const std::string &mpfr_name)
+llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string &pname, const std::string &mpfr_name,
+                             unsigned nargs)
 {
+    assert(nargs > 0u);
+
     auto &md = s.module();
     auto &context = s.context();
     auto &builder = s.builder();
@@ -271,11 +278,9 @@ llvm::Function *real_binary_op(llvm_state &s, llvm::Type *fp_t, const std::strin
     if (f == nullptr) {
         auto *orig_bb = builder.GetInsertBlock();
 
-        // Fetch the LLVM version of the MPFR_RNDN constant.
-        auto *rnd_nearest = llvm_mpfr_rndn(s);
-
         // Create the function type and the function.
-        auto *ft = llvm::FunctionType::get(fp_t, {fp_t, fp_t}, false);
+        const std::vector<llvm::Type *> fargs(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(nargs), fp_t);
+        auto *ft = llvm::FunctionType::get(fp_t, fargs, false);
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
         assert(f != nullptr);
         f->addFnAttr(llvm::Attribute::NoUnwind);
@@ -284,18 +289,21 @@ llvm::Function *real_binary_op(llvm_state &s, llvm::Type *fp_t, const std::strin
 
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-        auto *a_arg = f->args().begin();
-        auto *b_arg = f->args().begin() + 1;
-
-        // Create mpfr views for the input arguments.
-        auto [real_a, limb_arr_a] = llvm_real_to_mpfr_view(s, a_arg);
-        auto [real_b, limb_arr_b] = llvm_real_to_mpfr_view(s, b_arg);
-
-        // Create an undef value for the result.
+        // Create an undef value for the result and add it as first function argument.
         auto [real_res, limb_arr_res] = llvm_undef_mpfr_view(s, fp_t);
+        std::vector<llvm::Value *> mpfr_args;
+        mpfr_args.push_back(real_res);
+
+        // Create the mpfr views for the input arguments and add them as function arguments.
+        for (auto i = 0u; i < nargs; ++i) {
+            mpfr_args.push_back(llvm_real_to_mpfr_view(s, f->args().begin() + i).first);
+        }
+
+        // Add the rounding mode.
+        mpfr_args.push_back(llvm_mpfr_rndn(s));
 
         // Invoke the MPFR primitive.
-        llvm_invoke_external(s, mpfr_name, builder.getVoidTy(), {real_res, real_a, real_b, rnd_nearest},
+        llvm_invoke_external(s, mpfr_name, builder.getVoidTy(), mpfr_args,
                              {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
 
         // Assemble the result.
