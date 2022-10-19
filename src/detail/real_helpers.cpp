@@ -274,7 +274,7 @@ llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst
 
 // Helper to construct an n-ary LLVM function corresponding to the MPFR primitive 'mpfr_name'.
 // The operands will be of type 'fp_t' (which must be a heyoka.real.N). The name of the function
-// will be built from pname.
+// will be built from pname. The return type of the MPFR primitive is assumed to be int.
 llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string &pname, const std::string &mpfr_name,
                              unsigned nargs)
 {
@@ -320,7 +320,7 @@ llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string 
         mpfr_args.push_back(llvm_mpfr_rndn(s));
 
         // Invoke the MPFR primitive.
-        llvm_invoke_external(s, mpfr_name, builder.getVoidTy(), mpfr_args,
+        llvm_invoke_external(s, mpfr_name, to_llvm_type<int>(context), mpfr_args,
                              {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
 
         // Assemble the result.
@@ -382,7 +382,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &s, llvm::Va
         mpfr_args.push_back(llvm_mpfr_rndn(s));
 
         // Invoke the MPFR primitive.
-        llvm_invoke_external(s, "mpfr_sin_cos", builder.getVoidTy(), mpfr_args,
+        llvm_invoke_external(s, "mpfr_sin_cos", to_llvm_type<int>(context), mpfr_args,
                              {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
 
         // Assemble the result.
