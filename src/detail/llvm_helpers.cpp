@@ -1229,6 +1229,52 @@ llvm::Constant *llvm_constantfp(llvm_state &s, llvm::Type *fp_t, double val)
     }
 }
 
+llvm::Value *llvm_fcmp_ult(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    auto *fp_t = a->getType();
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return builder.CreateFCmpULT(a, b);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm_real_fcmp_ult(s, a, b);
+#endif
+    } else {
+        throw std::invalid_argument(fmt::format("Unable to fcmp_ult values of type '{}'", llvm_type_name(fp_t)));
+    }
+}
+
+llvm::Value *llvm_fcmp_oge(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    auto *fp_t = a->getType();
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return builder.CreateFCmpOGE(a, b);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm_real_fcmp_oge(s, a, b);
+#endif
+    } else {
+        throw std::invalid_argument(fmt::format("Unable to fcmp_oge values of type '{}'", llvm_type_name(fp_t)));
+    }
+}
+
 // Helper to compute sin and cos simultaneously.
 std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *x)
 {
@@ -2127,10 +2173,10 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Is the eccentricity a quiet NaN or less than 0?
-        auto *ecc_is_nan_or_neg = builder.CreateFCmpULT(ecc_arg, llvm_constantfp(s, tp, 0.));
+        auto *ecc_is_nan_or_neg = llvm_fcmp_ult(s, ecc_arg, llvm_constantfp(s, tp, 0.));
         // Is the eccentricity >= 1?
         auto *ecc_is_gte1
-            = builder.CreateFCmpOGE(ecc_arg, vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size));
+            = llvm_fcmp_oge(s, ecc_arg, vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size));
 
         // Is the eccentricity NaN or out of range?
         // NOTE: this is a logical OR.

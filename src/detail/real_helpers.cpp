@@ -405,6 +405,96 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &s, llvm::Va
     return {builder.CreateExtractValue(ret, {0}), builder.CreateExtractValue(ret, {1})};
 }
 
+namespace
+{
+
+// Helper to construct an n-ary LLVM function corresponding to the MPFR comparison primitive 'mpfr_name'.
+// The operands will be of type 'fp_t' (which must be a heyoka.real.N), the return type is bool. The name of the
+// function will be built from pname. The MPFR primitive must not require a rounding mode argument and it must
+// return an int.
+llvm::Function *real_nary_cmp(llvm_state &s, llvm::Type *fp_t, const std::string &pname, const std::string &mpfr_name,
+                              unsigned nargs)
+{
+    assert(nargs > 0u);
+
+    auto &md = s.module();
+    auto &context = s.context();
+    auto &builder = s.builder();
+
+    const auto real_prec = llvm_is_real(fp_t);
+
+    assert(real_prec > 0);
+
+    const auto fname = fmt::format("heyoka.real.{}.{}", real_prec, pname);
+
+    auto *f = md.getFunction(fname);
+
+    if (f == nullptr) {
+        auto *orig_bb = builder.GetInsertBlock();
+
+        // Create the function type and the function.
+        const std::vector<llvm::Type *> fargs(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(nargs), fp_t);
+        auto *ft = llvm::FunctionType::get(builder.getInt1Ty(), fargs, false);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        assert(f != nullptr);
+        f->addFnAttr(llvm::Attribute::NoUnwind);
+        f->addFnAttr(llvm::Attribute::Speculatable);
+        f->addFnAttr(llvm::Attribute::WillReturn);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Create the mpfr views for the input arguments and add them as function arguments.
+        std::vector<llvm::Value *> mpfr_args;
+        mpfr_args.reserve(boost::numeric_cast<decltype(mpfr_args.size())>(nargs));
+        for (auto i = 0u; i < nargs; ++i) {
+            mpfr_args.push_back(llvm_real_to_mpfr_view(s, f->args().begin() + i).first);
+        }
+
+        // Invoke the MPFR primitive.
+        auto *cmp_ret = llvm_invoke_external(s, mpfr_name, to_llvm_type<int>(context), mpfr_args,
+                                             {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+
+        // Truncate the result to a boolean and return.
+        builder.CreateRet(builder.CreateTrunc(cmp_ret, builder.getInt1Ty()));
+
+        s.verify_function(f);
+
+        builder.SetInsertPoint(orig_bb);
+    }
+
+    return f;
+}
+
+} // namespace
+
+// NOTE: fcmp ULT means that it must return true if either operand is nan, or if a < b.
+llvm::Value *llvm_real_fcmp_ult(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto *f = real_nary_cmp(s, a->getType(), "fcmp_ult", "heyoka_mpfr_fcmp_ult", 2u);
+
+    return s.builder().CreateCall(f, {a, b});
+}
+
+// NOTE: fcmp OGE means that it will return true if neither operand is nan and a >= b.
+llvm::Value *llvm_real_fcmp_oge(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto *f = real_nary_cmp(s, a->getType(), "fcmp_oge", "mpfr_greaterequal_p", 2u);
+
+    return s.builder().CreateCall(f, {a, b});
+}
+
 } // namespace heyoka::detail
 
 #if !defined(NDEBUG)
@@ -417,5 +507,19 @@ heyoka_assert_real_match_precs_mpfr_view_to_real(heyoka::detail::real_prec_t p1,
 }
 
 #endif
+
+extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ult(const mppp::mpfr_struct_t *a,
+                                                      const mppp::mpfr_struct_t *b) noexcept
+{
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(mpfr_get_prec(a) == mpfr_get_prec(b));
+
+    if (mpfr_nan_p(a) != 0 || mpfr_nan_p(b) != 0) {
+        return 1;
+    } else {
+        return ::mpfr_less_p(a, b);
+    }
+}
 
 #endif
