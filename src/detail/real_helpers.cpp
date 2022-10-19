@@ -319,6 +319,75 @@ llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string 
     return f;
 }
 
+// Compute sin/cos at the same time.
+// NOTE: this needs a custom implementation due to the double
+// return value in the MPFR primitive.
+std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &s, llvm::Value *x)
+{
+    auto &md = s.module();
+    auto &context = s.context();
+    auto &builder = s.builder();
+
+    auto *fp_t = x->getType();
+
+    const auto real_prec = llvm_is_real(fp_t);
+
+    assert(real_prec > 0);
+
+    const auto fname = fmt::format("heyoka.real.{}.sincos", real_prec);
+
+    auto *f = md.getFunction(fname);
+
+    if (f == nullptr) {
+        auto *orig_bb = builder.GetInsertBlock();
+
+        // Create the function type and the function.
+        auto *ret_t = llvm::ArrayType::get(fp_t, 2);
+        auto *ft = llvm::FunctionType::get(ret_t, {fp_t}, false);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        assert(f != nullptr);
+        f->addFnAttr(llvm::Attribute::NoUnwind);
+        f->addFnAttr(llvm::Attribute::Speculatable);
+        f->addFnAttr(llvm::Attribute::WillReturn);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Create undef values for the results and add them as initial function arguments.
+        auto [real_res_sin, limb_arr_res_sin] = llvm_undef_mpfr_view(s, fp_t);
+        auto [real_res_cos, limb_arr_res_cos] = llvm_undef_mpfr_view(s, fp_t);
+
+        std::vector<llvm::Value *> mpfr_args{real_res_sin, real_res_cos};
+
+        // Create the mpfr view for the input argument and add it to the function arguments.
+        mpfr_args.push_back(llvm_real_to_mpfr_view(s, f->args().begin()).first);
+
+        // Add the rounding mode.
+        mpfr_args.push_back(llvm_mpfr_rndn(s));
+
+        // Invoke the MPFR primitive.
+        llvm_invoke_external(s, "mpfr_sin_cos", builder.getVoidTy(), mpfr_args,
+                             {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+
+        // Assemble the result.
+        auto *res_sin = llvm_mpfr_view_to_real(s, real_res_sin, limb_arr_res_sin, fp_t);
+        auto *res_cos = llvm_mpfr_view_to_real(s, real_res_cos, limb_arr_res_cos, fp_t);
+
+        llvm::Value *res = llvm::UndefValue::get(ret_t);
+        res = builder.CreateInsertValue(res, res_sin, {0});
+        res = builder.CreateInsertValue(res, res_cos, {1});
+
+        builder.CreateRet(res);
+
+        s.verify_function(f);
+
+        builder.SetInsertPoint(orig_bb);
+    }
+
+    auto *ret = builder.CreateCall(f, {x});
+
+    return {builder.CreateExtractValue(ret, {0}), builder.CreateExtractValue(ret, {1})};
+}
+
 } // namespace heyoka::detail
 
 #if !defined(NDEBUG)

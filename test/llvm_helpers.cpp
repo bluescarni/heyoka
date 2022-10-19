@@ -329,6 +329,67 @@ TEST_CASE("sincos batch")
     tuple_for_each(fp_types, tester);
 }
 
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("sincos mp")
+{
+    using detail::llvm_sincos;
+    using detail::to_llvm_type;
+    using std::cos;
+    using std::sin;
+
+    const auto prec = 237u;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        llvm_state s{kw::opt_level = opt_level};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *real_t = to_llvm_type<mppp::real>(context);
+        auto *fp_t = detail::llvm_type_like(context, mppp::real{0, prec});
+
+        const std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(real_t));
+        auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sc", &md);
+
+        auto *sptr = f->args().begin();
+        auto *cptr = f->args().begin() + 1;
+        auto *x = f->args().begin() + 2;
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *in_val = detail::ext_load_vector_from_memory(s, fp_t, x, 1);
+        auto [ret_sin, ret_cos] = llvm_sincos(s, in_val);
+
+        detail::ext_store_vector_to_memory(s, sptr, ret_sin);
+        detail::ext_store_vector_to_memory(s, cptr, ret_cos);
+
+        // Create the return value.
+        builder.CreateRetVoid();
+
+        // Verify.
+        s.verify_function(f);
+
+        // Run the optimisation pass.
+        s.optimise();
+
+        // Compile.
+        s.compile();
+
+        // Fetch the function pointer.
+        auto f_ptr = reinterpret_cast<void (*)(mppp::real *, mppp::real *, mppp::real *)>(s.jit_lookup("sc"));
+
+        mppp::real sn{0, prec}, cs{0, prec}, arg{"2.1", prec};
+        f_ptr(&sn, &cs, &arg);
+        REQUIRE(sn == sin(arg));
+        REQUIRE(cs == cos(arg));
+    }
+}
+
+#endif
+
 TEST_CASE("modulus scalar")
 {
     using detail::llvm_modulus;

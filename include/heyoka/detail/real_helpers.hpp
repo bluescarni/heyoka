@@ -35,6 +35,7 @@ using real_rnd_t = std::underlying_type_t<mpfr_rnd_t>;
 real_prec_t llvm_is_real(llvm::Type *);
 
 llvm::Function *real_nary_op(llvm_state &, llvm::Type *, const std::string &, const std::string &, unsigned);
+std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &, llvm::Value *);
 
 } // namespace heyoka::detail
 

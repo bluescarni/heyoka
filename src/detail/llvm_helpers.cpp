@@ -1241,6 +1241,10 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
 
         // Reconstruct the return value as a vector.
         return {scalars_to_vector(builder, res_sin), scalars_to_vector(builder, res_cos)};
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(x->getType()) != 0) {
+        return llvm_real_sincos(s, x);
+#endif
     } else {
 #endif
         if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
