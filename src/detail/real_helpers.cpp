@@ -482,6 +482,7 @@ llvm::Value *llvm_real_fcmp_ult(llvm_state &s, llvm::Value *a, llvm::Value *b)
 }
 
 // NOTE: fcmp OGE means that it will return true if neither operand is nan and a >= b.
+// This corresponds to the semantics of the mpfr_greaterequal_p() function.
 llvm::Value *llvm_real_fcmp_oge(llvm_state &s, llvm::Value *a, llvm::Value *b)
 {
     // LCOV_EXCL_START
@@ -508,6 +509,7 @@ heyoka_assert_real_match_precs_mpfr_view_to_real(heyoka::detail::real_prec_t p1,
 
 #endif
 
+// Wrapper to implement ULT comparison semantics for real types.
 extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ult(const mppp::mpfr_struct_t *a,
                                                       const mppp::mpfr_struct_t *b) noexcept
 {
