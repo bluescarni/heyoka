@@ -94,6 +94,23 @@ real_prec_t llvm_is_real(llvm::Type *t)
     return 0;
 }
 
+// Negation.
+llvm::Value *llvm_real_fneg(llvm_state &s, llvm ::Value *x)
+{
+    assert(x != nullptr);
+    assert(llvm_is_real(x->getType()) != 0);
+
+    auto &builder = s.builder();
+
+    // NOTE: the current implementation of mpfr_neg() just flips
+    // the sign of the _mpfr_sign member (see the MPFR_CHANGE_SIGN()
+    // macro in the MPFR source tree). Thus, we do the same thing.
+    auto *orig_sign = builder.CreateExtractValue(x, {0});
+    auto *new_sign = builder.CreateNeg(orig_sign);
+
+    return builder.CreateInsertValue(x, new_sign, {0});
+}
+
 namespace
 {
 

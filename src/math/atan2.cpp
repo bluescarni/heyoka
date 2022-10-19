@@ -247,7 +247,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::
     auto *divisor = llvm_fmul(s, n, taylor_fetch_diff(arr, d_idx, 0, n_uvars));
 
     // Compute the first part of the dividend: -n * b^[0] * c^[n].
-    auto dividend = llvm_fmul(s, builder.CreateFNeg(n), llvm_fmul(s, y, taylor_fetch_diff(arr, x_idx, order, n_uvars)));
+    auto dividend = llvm_fmul(s, llvm_fneg(s, n), llvm_fmul(s, y, taylor_fetch_diff(arr, x_idx, order, n_uvars)));
 
     // Compute the second part of the dividend only for order > 1, in order to avoid
     // an empty summation.
@@ -596,7 +596,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
                 divisor = llvm_fmul(s, ord_v, divisor);
 
                 // Init the dividend: -ord * b^[0] * c^[n].
-                auto dividend = llvm_fmul(s, builder.CreateFNeg(ord_v),
+                auto dividend = llvm_fmul(s, llvm_fneg(s, ord_v),
                                           taylor_c_diff_numparam_codegen(s, fp_t, n, num_y, par_ptr, batch_size));
                 dividend = llvm_fmul(s, dividend, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, x_idx));
 

@@ -1995,7 +1995,8 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
 
     // Compute and store the value of h = tm - start_tm.
     auto [h_hi, h_lo] = detail::llvm_dl_add(m_llvm_state, tm, llvm::ConstantFP::get(fp_t, 0.),
-                                            builder.CreateFNeg(start_tm_hi), builder.CreateFNeg(start_tm_lo));
+                                            detail::llvm_fneg(m_llvm_state, start_tm_hi),
+                                            detail::llvm_fneg(m_llvm_state, start_tm_lo));
     builder.CreateStore(h_hi, h_ptr);
 
     // Compute the index into the Taylor coefficients array.
@@ -2490,8 +2491,8 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
                                                          builder.CreateInBoundsGEP(fp_t, times_ptr_lo_vec, tc_l_idx));
 
     // Compute the value of h = tm - start_tm.
-    auto h = detail::llvm_dl_add(m_llvm_state, tm, zero_vec_fp, builder.CreateFNeg(start_tm_hi),
-                                 builder.CreateFNeg(start_tm_lo))
+    auto h = detail::llvm_dl_add(m_llvm_state, tm, zero_vec_fp, detail::llvm_fneg(m_llvm_state, start_tm_hi),
+                                 detail::llvm_fneg(m_llvm_state, start_tm_lo))
                  .first;
 
     // Compute the base pointers in the array of TC for the computation

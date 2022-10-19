@@ -353,7 +353,7 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, llvm::Type *fp_t, con
 
                 // Divide by the order and negate to produce the return value.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
-                builder.CreateStore(llvm_fdiv(s, builder.CreateLoad(val_t, acc), builder.CreateFNeg(ord_v)), retval);
+                builder.CreateStore(llvm_fdiv(s, builder.CreateLoad(val_t, acc), llvm_fneg(s, ord_v)), retval);
             });
 
         // Return the result.

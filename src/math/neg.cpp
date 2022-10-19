@@ -99,7 +99,7 @@ llvm::Value *neg_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vec
                                  llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
                                  bool high_accuracy) const
 {
-    return llvm_eval_helper([&s](const std::vector<llvm::Value *> &args, bool) { return llvm_neg(s, args[0]); }, *this,
+    return llvm_eval_helper([&s](const std::vector<llvm::Value *> &args, bool) { return llvm_fneg(s, args[0]); }, *this,
                             s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
@@ -110,7 +110,7 @@ namespace
                                               std::uint32_t batch_size, bool high_accuracy)
 {
     return llvm_c_eval_func_helper(
-        "neg", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_neg(s, args[0]); }, fb, s, fp_t,
+        "neg", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_fneg(s, args[0]); }, fb, s, fp_t,
         batch_size, high_accuracy);
 }
 
@@ -132,7 +132,7 @@ llvm::Value *taylor_diff_neg_impl(llvm_state &s, llvm::Type *fp_t, const neg_imp
                                   std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     if (order == 0u) {
-        return s.builder().CreateFNeg(taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
+        return llvm_fneg(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
         return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
@@ -143,7 +143,7 @@ llvm::Value *taylor_diff_neg_impl(llvm_state &s, llvm::Type *, const neg_impl &,
                                   const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
                                   std::uint32_t order, std::uint32_t, std::uint32_t)
 {
-    return s.builder().CreateFNeg(taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars));
+    return llvm_fneg(s, taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars));
 }
 
 // All the other cases.
@@ -203,7 +203,7 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, llvm::Type *fp_t, con
             assert(args[0] != nullptr);
             // LCOV_EXCL_STOP
 
-            return llvm_neg(s, args[0]);
+            return llvm_fneg(s, args[0]);
         },
         num);
 }
@@ -247,7 +247,7 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, llvm::Type *fp_t, con
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateFNeg(taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, var_idx));
+        auto retval = llvm_fneg(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, var_idx));
 
         // Return the result.
         builder.CreateRet(retval);

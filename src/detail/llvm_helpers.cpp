@@ -1190,11 +1190,34 @@ llvm::Value *llvm_fdiv(llvm_state &s, llvm::Value *a, llvm::Value *b)
     }
 }
 
+llvm::Value *llvm_fneg(llvm_state &s, llvm::Value *a)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    auto *fp_t = a->getType();
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return builder.CreateFNeg(a);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm_real_fneg(s, a);
+#endif
+    } else {
+        throw std::invalid_argument(fmt::format("Unable to fneg values of type '{}'", llvm_type_name(fp_t)));
+    }
+}
+
 // Create a floating-point constant of type fp_t containing
 // the value val.
 llvm::Constant *llvm_constantfp(llvm_state &s, llvm::Type *fp_t, double val)
 {
     if (fp_t->getScalarType()->isFloatingPointTy()) {
+        // NOTE: if fp_t is a vector type, the constant value
+        // will be splatted in the return value.
         return llvm::ConstantFP::get(fp_t, val);
 #if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
@@ -2412,7 +2435,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &s, llvm::Va
     fmf_disabler fd(builder);
 
     auto x = llvm_fmul(s, a, b);
-    auto y = llvm_fma(s, a, b, builder.CreateFNeg(x));
+    auto y = llvm_fma(s, a, b, llvm_fneg(s, x));
 
     return {x, y};
 }
@@ -2611,7 +2634,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_modulus(llvm_state &s, llvm::Val
     auto [fl_hi, fl_lo] = llvm_dl_floor(s, xoy_hi, xoy_lo);
     auto [prod_hi, prod_lo] = llvm_dl_mul(s, y_hi, y_lo, fl_hi, fl_lo);
 
-    return llvm_dl_add(s, x_hi, x_lo, builder.CreateFNeg(prod_hi), builder.CreateFNeg(prod_lo));
+    return llvm_dl_add(s, x_hi, x_lo, llvm_fneg(s, prod_hi), llvm_fneg(s, prod_lo));
 }
 
 // Less-than.
@@ -3304,17 +3327,6 @@ llvm::Value *llvm_log(llvm_state &s, llvm::Value *x)
 #endif
 }
 
-// Negation.
-llvm::Value *llvm_neg(llvm_state &s, llvm::Value *x)
-{
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    assert(x->getType()->getScalarType()->isFloatingPointTy());
-    // LCOV_EXCL_STOP
-
-    return s.builder().CreateFNeg(x);
-}
-
 // Sigmoid.
 llvm::Value *llvm_sigmoid(llvm_state &s, llvm::Value *x)
 {
@@ -3332,7 +3344,7 @@ llvm::Value *llvm_sigmoid(llvm_state &s, llvm::Value *x)
     auto *one_fp = vector_splat(builder, llvm::ConstantFP::get(x->getType()->getScalarType(), 1.), batch_size);
 
     // Compute -x.
-    auto *m_x = builder.CreateFNeg(x);
+    auto *m_x = llvm_fneg(s, x);
 
     // Compute e^(-x).
     auto *e_m_x = llvm_exp(s, m_x);

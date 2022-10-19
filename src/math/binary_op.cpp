@@ -308,8 +308,6 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, llvm::Type *fp_t, const U
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
                                         std::uint32_t batch_size)
 {
-    auto &builder = s.builder();
-
     auto *ret = taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
 
     if (order == 0u) {
@@ -321,7 +319,7 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, llvm::Type *fp_t, const U
             return ret;
         } else {
             // Negate if we are doing a subtraction.
-            return builder.CreateFNeg(ret);
+            return llvm_fneg(s, ret);
         }
     }
 }
@@ -505,8 +503,6 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &n
                                      const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                                      std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
-    auto &builder = s.builder();
-
     // Fetch the index of var1.
     const auto u_idx1 = uname_to_index(var1.name());
 
@@ -544,7 +540,7 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &n
     if constexpr (std::is_same_v<U, number> || std::is_same_v<U, param>) {
         // nv is a number/param. Negate the accumulator
         // and divide it by the divisor.
-        return llvm_fdiv(s, builder.CreateFNeg(ret_acc), div);
+        return llvm_fdiv(s, llvm_fneg(s, ret_acc), div);
     } else {
         // nv is a variable. We need to fetch its
         // derivative of order 'order' from the array of derivatives.
@@ -762,7 +758,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -797,7 +793,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_
                 auto ret = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, var_idx);
 
                 if constexpr (!AddOrSub) {
-                    ret = builder.CreateFNeg(ret);
+                    ret = llvm_fneg(s, ret);
                 }
 
                 // Create the return value.
@@ -1397,7 +1393,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, 
                 });
 
                 // Negate the loop summation.
-                auto ret = builder.CreateFNeg(builder.CreateLoad(val_t, acc));
+                auto *ret = llvm_fneg(s, builder.CreateLoad(val_t, acc));
 
                 // Divide and return.
                 builder.CreateStore(
