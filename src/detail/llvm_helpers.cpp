@@ -2127,7 +2127,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Is the eccentricity a quiet NaN or less than 0?
-        auto *ecc_is_nan_or_neg = builder.CreateFCmpULT(ecc_arg, llvm_constantfp(s, ecc_arg->getType(), 0.));
+        auto *ecc_is_nan_or_neg = builder.CreateFCmpULT(ecc_arg, llvm_constantfp(s, tp, 0.));
         // Is the eccentricity >= 1?
         auto *ecc_is_gte1
             = builder.CreateFCmpOGE(ecc_arg, vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size));
@@ -2154,7 +2154,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
 #endif
 
         // Reduce M modulo 2*pi in extended precision.
-        auto *M = llvm_dl_modulus(s, M_arg, llvm_constantfp(s, M_arg->getType(), 0.),
+        auto *M = llvm_dl_modulus(s, M_arg, llvm_constantfp(s, tp, 0.),
                                   vector_splat(builder, llvm_codegen(s, fp_t, dl_twopi_hi), batch_size),
                                   vector_splat(builder, llvm_codegen(s, fp_t, dl_twopi_lo), batch_size))
                       .first;
@@ -2193,7 +2193,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         auto ig = llvm_fadd(s, ig1, ig2);
 
         // Make extra sure the initial guess is in the [0, 2*pi) range.
-        auto lb = llvm::ConstantFP::get(tp, 0.);
+        auto lb = llvm_constantfp(s, tp, 0.);
         auto ub = vector_splat(builder, llvm_codegen(s, fp_t, nextafter(dl_twopi_hi, number_like(s, fp_t, 0.))),
                                batch_size);
         ig = llvm_max(s, ig, lb);
@@ -3335,13 +3335,8 @@ llvm::Value *llvm_sigmoid(llvm_state &s, llvm::Value *x)
     assert(x->getType()->getScalarType()->isFloatingPointTy());
     // LCOV_EXCL_STOP
 
-    auto &builder = s.builder();
-
-    // Fetch the batch size.
-    const auto batch_size = get_vector_size(x);
-
     // Create the 1 constant.
-    auto *one_fp = vector_splat(builder, llvm::ConstantFP::get(x->getType()->getScalarType(), 1.), batch_size);
+    auto *one_fp = llvm_constantfp(s, x->getType(), 1.);
 
     // Compute -x.
     auto *m_x = llvm_fneg(s, x);

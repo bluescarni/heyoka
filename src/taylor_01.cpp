@@ -1703,7 +1703,7 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
             store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_scal_t, out_ptr, out_idx), tc);
 
             // Zero-init the element in comp_arr.
-            builder.CreateStore(llvm::ConstantFP::get(vector_t, 0.),
+            builder.CreateStore(llvm_constantfp(s, vector_t, 0.),
                                 builder.CreateInBoundsGEP(vector_t, comp_arr, cur_var_idx));
         });
 
@@ -1931,7 +1931,7 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
                 fp_t, builder.CreateInBoundsGEP(fp_t, times_ptr_hi, builder.CreateLoad(builder.getInt32Ty(), tidx)));
             auto tidx_val_lo = builder.CreateLoad(
                 fp_t, builder.CreateInBoundsGEP(fp_t, times_ptr_lo, builder.CreateLoad(builder.getInt32Ty(), tidx)));
-            auto zero_val = llvm::ConstantFP::get(fp_t, 0.);
+            auto zero_val = detail::llvm_constantfp(m_llvm_state, fp_t, 0.);
             auto cond = dir ? detail::llvm_dl_lt(m_llvm_state, tm, zero_val, tidx_val_hi, tidx_val_lo)
                             : detail::llvm_dl_gt(m_llvm_state, tm, zero_val, tidx_val_hi, tidx_val_lo);
             cond = builder.CreateNot(cond);
@@ -1994,7 +1994,7 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     auto *start_tm_lo = builder.CreateLoad(fp_t, builder.CreateInBoundsGEP(fp_t, times_ptr_lo, tc_idx));
 
     // Compute and store the value of h = tm - start_tm.
-    auto [h_hi, h_lo] = detail::llvm_dl_add(m_llvm_state, tm, llvm::ConstantFP::get(fp_t, 0.),
+    auto [h_hi, h_lo] = detail::llvm_dl_add(m_llvm_state, tm, detail::llvm_constantfp(m_llvm_state, fp_t, 0.),
                                             detail::llvm_fneg(m_llvm_state, start_tm_hi),
                                             detail::llvm_fneg(m_llvm_state, start_tm_lo));
     builder.CreateStore(h_hi, h_ptr);
@@ -2376,7 +2376,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     auto times_ptr_lo_vec = detail::vector_splat(builder, times_ptr_lo, m_batch_size);
 
     // fp vector of zeroes.
-    auto zero_vec_fp = detail::vector_splat(builder, llvm::ConstantFP::get(fp_t, 0.), m_batch_size);
+    auto *zero_vec_fp = detail::llvm_constantfp(m_llvm_state, fp_vec_t, 0.);
 
     // Vector of i32 ones.
     auto one_vec_i32 = detail::vector_splat(builder, builder.getInt32(1), m_batch_size);

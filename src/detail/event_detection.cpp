@@ -283,7 +283,7 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
     // Init the return values as zeroes.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
         auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.CreateMul(i, builder.getInt32(batch_size)));
-        store_vector_to_memory(builder, ptr, vector_splat(builder, llvm::ConstantFP::get(fp_t, 0.), batch_size));
+        store_vector_to_memory(builder, ptr, vector_splat(builder, llvm_constantfp(s, fp_t, 0.), batch_size));
     });
 
     // Do the translation.

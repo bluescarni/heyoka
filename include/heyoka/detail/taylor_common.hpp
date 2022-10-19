@@ -115,7 +115,7 @@ inline llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, llvm::Type *fp_t
             },
             [&]() {
                 // Otherwise, return zero.
-                builder.CreateStore(llvm::ConstantFP::get(val_t, 0.), retval);
+                builder.CreateStore(llvm_constantfp(s, val_t, 0.), retval);
             });
 
         // Return the result.
