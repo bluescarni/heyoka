@@ -39,6 +39,10 @@ llvm::Function *real_nary_op(llvm_state &, llvm::Type *, const std::string &, co
 std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &, llvm::Value *);
 llvm::Value *llvm_real_fcmp_ult(llvm_state &, llvm::Value *, llvm::Value *);
 llvm::Value *llvm_real_fcmp_oge(llvm_state &, llvm::Value *, llvm::Value *);
+llvm::Value *llvm_real_fcmp_ole(llvm_state &, llvm::Value *, llvm::Value *);
+llvm::Value *llvm_real_fcmp_olt(llvm_state &, llvm::Value *, llvm::Value *);
+llvm::Value *llvm_real_fcmp_ogt(llvm_state &, llvm::Value *, llvm::Value *);
+llvm::Value *llvm_real_fcmp_oeq(llvm_state &, llvm::Value *, llvm::Value *);
 
 } // namespace heyoka::detail
 

@@ -112,21 +112,29 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_fsub(llvm_state &, llvm::Value *, llvm::Valu
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fmul(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fdiv(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fneg(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fma(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_square(llvm_state &, llvm::Value *);
+
 HEYOKA_DLL_PUBLIC llvm::Constant *llvm_constantfp(llvm_state &, llvm::Type *, double);
+
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_ult(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_oge(llvm_state &, llvm::Value *, llvm::Value *);
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_modulus(llvm_state &, llvm::Value *, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_abs(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_ole(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_olt(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_oeq(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_min(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_max(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_min_nan(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_max_nan(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_sgn(llvm_state &, llvm::Value *);
+
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_modulus(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_abs(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_floor(llvm_state &, llvm::Value *);
+
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_atan2(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_exp(llvm_state &, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_fma(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_floor(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_acos(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_acosh(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_asin(llvm_state &, llvm::Value *);
@@ -141,7 +149,6 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_log(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_sigmoid(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_sinh(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_sqrt(llvm_state &, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_square(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_tan(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_tanh(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_pow(llvm_state &, llvm::Value *, llvm::Value *, bool = false);

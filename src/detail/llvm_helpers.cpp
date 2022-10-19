@@ -1275,6 +1275,98 @@ llvm::Value *llvm_fcmp_oge(llvm_state &s, llvm::Value *a, llvm::Value *b)
     }
 }
 
+llvm::Value *llvm_fcmp_ole(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    auto *fp_t = a->getType();
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return builder.CreateFCmpOLE(a, b);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm_real_fcmp_ole(s, a, b);
+#endif
+    } else {
+        throw std::invalid_argument(fmt::format("Unable to fcmp_ole values of type '{}'", llvm_type_name(fp_t)));
+    }
+}
+
+llvm::Value *llvm_fcmp_olt(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    auto *fp_t = a->getType();
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return builder.CreateFCmpOLT(a, b);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm_real_fcmp_olt(s, a, b);
+#endif
+    } else {
+        throw std::invalid_argument(fmt::format("Unable to fcmp_olt values of type '{}'", llvm_type_name(fp_t)));
+    }
+}
+
+llvm::Value *llvm_fcmp_ogt(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    auto *fp_t = a->getType();
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return builder.CreateFCmpOGT(a, b);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm_real_fcmp_ogt(s, a, b);
+#endif
+    } else {
+        throw std::invalid_argument(fmt::format("Unable to fcmp_ogt values of type '{}'", llvm_type_name(fp_t)));
+    }
+}
+
+llvm::Value *llvm_fcmp_oeq(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    auto *fp_t = a->getType();
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return builder.CreateFCmpOEQ(a, b);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm_real_fcmp_oeq(s, a, b);
+#endif
+    } else {
+        throw std::invalid_argument(fmt::format("Unable to fcmp_oeq values of type '{}'", llvm_type_name(fp_t)));
+    }
+}
+
 // Helper to compute sin and cos simultaneously.
 std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *x)
 {
@@ -1414,7 +1506,7 @@ llvm::Value *llvm_min(llvm_state &s, llvm::Value *a, llvm::Value *b)
 {
     auto &builder = s.builder();
 
-    return builder.CreateSelect(builder.CreateFCmpOLT(b, a), b, a);
+    return builder.CreateSelect(llvm_fcmp_olt(s, b, a), b, a);
 }
 
 // Maximum value, floating-point arguments. Implemented as std::max():
@@ -1423,7 +1515,7 @@ llvm::Value *llvm_max(llvm_state &s, llvm::Value *a, llvm::Value *b)
 {
     auto &builder = s.builder();
 
-    return builder.CreateSelect(builder.CreateFCmpOLT(a, b), b, a);
+    return builder.CreateSelect(llvm_fcmp_olt(s, a, b), b, a);
 }
 
 // Same as llvm_min(), but returns NaN if any operand is NaN:
@@ -1432,8 +1524,8 @@ llvm::Value *llvm_min_nan(llvm_state &s, llvm::Value *a, llvm::Value *b)
 {
     auto &builder = s.builder();
 
-    auto b_not_nan = builder.CreateFCmpOEQ(b, b);
-    auto b_lt_a = builder.CreateFCmpOLT(b, a);
+    auto b_not_nan = llvm_fcmp_oeq(s, b, b);
+    auto b_lt_a = llvm_fcmp_olt(s, b, a);
 
     return builder.CreateSelect(b_not_nan, builder.CreateSelect(b_lt_a, b, a), b);
 }
@@ -1444,8 +1536,8 @@ llvm::Value *llvm_max_nan(llvm_state &s, llvm::Value *a, llvm::Value *b)
 {
     auto &builder = s.builder();
 
-    auto b_not_nan = builder.CreateFCmpOEQ(b, b);
-    auto a_lt_b = builder.CreateFCmpOLT(a, b);
+    auto b_not_nan = llvm_fcmp_oeq(s, b, b);
+    auto a_lt_b = llvm_fcmp_olt(s, a, b);
 
     return builder.CreateSelect(b_not_nan, builder.CreateSelect(a_lt_b, b, a), b);
 }
@@ -1463,8 +1555,8 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
     auto zero = llvm::Constant::getNullValue(val->getType());
 
     // Run the comparisons.
-    auto cmp0 = builder.CreateFCmpOLT(zero, val);
-    auto cmp1 = builder.CreateFCmpOLT(val, zero);
+    auto cmp0 = llvm_fcmp_olt(s, zero, val);
+    auto cmp1 = llvm_fcmp_olt(s, val, zero);
 
     // Convert to int32.
     llvm::Type *int_type;
@@ -2293,7 +2385,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
 
             // Keep on iterating as long as abs(f(E)) > tol.
             // NOTE: need reduction only in batch mode.
-            auto tol_check = builder.CreateFCmpOGT(llvm_abs(s, builder.CreateLoad(tp, fE)), tol);
+            auto tol_check = llvm_fcmp_ogt(s, llvm_abs(s, builder.CreateLoad(tp, fE)), tol);
             auto tol_cond = (batch_size == 1u) ? tol_check : builder.CreateOrReduce(tol_check);
 
             // Store the result of the tolerance check.
@@ -2314,7 +2406,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
 
                 // Bisect if new_val > ub.
                 // NOTE: '>' is fine here, ub is the maximum allowed value.
-                auto bcheck = builder.CreateFCmpOGT(new_val, ub);
+                auto bcheck = llvm_fcmp_ogt(s, new_val, ub);
                 new_val = builder.CreateSelect(
                     bcheck,
                     llvm_fmul(s,
@@ -2325,7 +2417,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
                     new_val);
 
                 // Bisect if new_val < lb.
-                bcheck = builder.CreateFCmpOLT(new_val, lb);
+                bcheck = llvm_fcmp_olt(s, new_val, lb);
                 new_val = builder.CreateSelect(
                     bcheck,
                     llvm_fmul(s,
@@ -2614,7 +2706,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &s, llvm::Value
         auto *ret_lo_ptr = builder.CreateAlloca(fp_t);
 
         llvm_if_then_else(
-            s, builder.CreateFCmpOEQ(fhi, x_hi),
+            s, llvm_fcmp_oeq(s, fhi, x_hi),
             [&]() {
                 // floor(x_hi) == x_hi, that is, x_hi is already
                 // an integral value.
@@ -2645,7 +2737,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &s, llvm::Value
         auto *flo = llvm_floor(s, x_lo);
 
         // Select flo or zero_vec, depending on fhi == x_hi.
-        auto *ret_lo = builder.CreateSelect(builder.CreateFCmpOEQ(fhi, x_hi), flo, zero_vec);
+        auto *ret_lo = builder.CreateSelect(llvm_fcmp_oeq(s, fhi, x_hi), flo, zero_vec);
 
         // Normalise.
         auto z = llvm_fadd(s, fhi, ret_lo);
@@ -2691,9 +2783,9 @@ llvm::Value *llvm_dl_lt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
     // Temporarily disable the fast math flags.
     fmf_disabler fd(builder);
 
-    auto cond1 = builder.CreateFCmpOLT(x_hi, y_hi);
-    auto cond2 = builder.CreateFCmpOEQ(x_hi, y_hi);
-    auto cond3 = builder.CreateFCmpOLT(x_lo, y_lo);
+    auto cond1 = llvm_fcmp_olt(state, x_hi, y_hi);
+    auto cond2 = llvm_fcmp_oeq(state, x_hi, y_hi);
+    auto cond3 = llvm_fcmp_olt(state, x_lo, y_lo);
     // NOTE: this is a logical AND.
     auto cond4 = builder.CreateSelect(cond2, cond3, llvm::ConstantInt::getNullValue(cond3->getType()));
     // NOTE: this is a logical OR.
@@ -2710,9 +2802,9 @@ llvm::Value *llvm_dl_gt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
     // Temporarily disable the fast math flags.
     fmf_disabler fd(builder);
 
-    auto cond1 = builder.CreateFCmpOGT(x_hi, y_hi);
-    auto cond2 = builder.CreateFCmpOEQ(x_hi, y_hi);
-    auto cond3 = builder.CreateFCmpOGT(x_lo, y_lo);
+    auto cond1 = llvm_fcmp_ogt(state, x_hi, y_hi);
+    auto cond2 = llvm_fcmp_oeq(state, x_hi, y_hi);
+    auto cond3 = llvm_fcmp_ogt(state, x_lo, y_lo);
     // NOTE: this is a logical AND.
     auto cond4 = builder.CreateSelect(cond2, cond3, llvm::ConstantInt::getNullValue(cond3->getType()));
     // NOTE: this is a logical OR.

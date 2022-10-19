@@ -366,7 +366,7 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
     }
 
     // Determine if we are in absolute or relative tolerance mode.
-    auto *abs_or_rel = builder.CreateFCmpOLE(max_abs_state, llvm_constantfp(s, vec_t, 1.));
+    auto *abs_or_rel = llvm_fcmp_ole(s, max_abs_state, llvm_constantfp(s, vec_t, 1.));
 
     // Estimate rho at orders order - 1 and order.
     auto *num_rho = builder.CreateSelect(abs_or_rel, llvm_constantfp(s, vec_t, 1.), max_abs_state);
@@ -399,7 +399,7 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
     h = taylor_step_minabs(s, h, max_h_vec);
 
     // Handle backwards propagation.
-    auto *backward = builder.CreateFCmpOLT(max_h_vec, llvm_constantfp(s, vec_t, 0.));
+    auto *backward = llvm_fcmp_olt(s, max_h_vec, llvm_constantfp(s, vec_t, 0.));
     auto *h_fac = builder.CreateSelect(backward, llvm_constantfp(s, vec_t, -1.), llvm_constantfp(s, vec_t, 1.));
     h = llvm_fmul(s, h_fac, h);
 

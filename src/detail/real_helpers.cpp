@@ -496,6 +496,66 @@ llvm::Value *llvm_real_fcmp_oge(llvm_state &s, llvm::Value *a, llvm::Value *b)
     return s.builder().CreateCall(f, {a, b});
 }
 
+// NOTE: fcmp OLE means that it will return true if neither operand is nan and a <= b.
+// This corresponds to the semantics of the mpfr_lessequal_p() function.
+llvm::Value *llvm_real_fcmp_ole(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto *f = real_nary_cmp(s, a->getType(), "fcmp_ole", "mpfr_lessequal_p", 2u);
+
+    return s.builder().CreateCall(f, {a, b});
+}
+
+// NOTE: fcmp OLT means that it will return true if neither operand is nan and a < b.
+// This corresponds to the semantics of the mpfr_less_p() function.
+llvm::Value *llvm_real_fcmp_olt(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto *f = real_nary_cmp(s, a->getType(), "fcmp_olt", "mpfr_less_p", 2u);
+
+    return s.builder().CreateCall(f, {a, b});
+}
+
+// NOTE: fcmp OGT means that it will return true if neither operand is nan and a > b.
+// This corresponds to the semantics of the mpfr_greater_p() function.
+llvm::Value *llvm_real_fcmp_ogt(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto *f = real_nary_cmp(s, a->getType(), "fcmp_ogt", "mpfr_greater_p", 2u);
+
+    return s.builder().CreateCall(f, {a, b});
+}
+
+// NOTE: fcmp OEQ means that it will return true if neither operand is nan and a == b.
+// This corresponds to the semantics of the mpfr_equal_p() function.
+llvm::Value *llvm_real_fcmp_oeq(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto *f = real_nary_cmp(s, a->getType(), "fcmp_oeq", "mpfr_equal_p", 2u);
+
+    return s.builder().CreateCall(f, {a, b});
+}
+
 } // namespace heyoka::detail
 
 #if !defined(NDEBUG)
