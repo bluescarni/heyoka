@@ -2289,7 +2289,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
                                          ecc_arg);
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(tp);
+        auto *retval = builder.CreateAlloca(tp);
 
         // Fetch 2pi in double-length precision.
         const auto [dl_twopi_hi, dl_twopi_lo] = inv_kep_E_dl_twopi_like(s, fp_t);
@@ -2309,38 +2309,40 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         // E = M + e*sin(M) + e**2*sin(M)*cos(M) + e**3*sin(M)*(3/2*cos(M)**2 - 1/2) + ...
         auto [sin_M, cos_M] = llvm_sincos(s, M);
         // e*sin(M).
-        auto e_sin_M = llvm_fmul(s, ecc, sin_M);
+        auto *e_sin_M = llvm_fmul(s, ecc, sin_M);
         // e*cos(M).
-        auto e_cos_M = llvm_fmul(s, ecc, cos_M);
+        auto *e_cos_M = llvm_fmul(s, ecc, cos_M);
         // e**2.
-        auto e2 = llvm_fmul(s, ecc, ecc);
+        auto *e2 = llvm_fmul(s, ecc, ecc);
         // cos(M)**2.
-        auto cos_M_2 = llvm_fmul(s, cos_M, cos_M);
+        auto *cos_M_2 = llvm_fmul(s, cos_M, cos_M);
 
         // 3/2 and 1/2 constants.
-        auto c_3_2 = vector_splat(builder, llvm_codegen(s, fp_t, number_like(s, fp_t, 3.) / number_like(s, fp_t, 2.)),
-                                  batch_size);
-        auto c_1_2 = vector_splat(builder, llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
-                                  batch_size);
+        auto *c_3_2 = vector_splat(builder, llvm_codegen(s, fp_t, number_like(s, fp_t, 3.) / number_like(s, fp_t, 2.)),
+                                   batch_size);
+        auto *c_1_2 = vector_splat(builder, llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
+                                   batch_size);
 
         // M + e*sin(M).
-        auto tmp1 = llvm_fadd(s, M, e_sin_M);
+        auto *tmp1 = llvm_fadd(s, M, e_sin_M);
         // e**2*sin(M)*cos(M).
-        auto tmp2 = llvm_fmul(s, e_sin_M, e_cos_M);
+        auto *tmp2 = llvm_fmul(s, e_sin_M, e_cos_M);
         // e**3*sin(M).
-        auto tmp3 = llvm_fmul(s, e2, e_sin_M);
+        auto *tmp3 = llvm_fmul(s, e2, e_sin_M);
         // 3/2*cos(M)**2 - 1/2.
-        auto tmp4 = llvm_fsub(s, llvm_fmul(s, c_3_2, cos_M_2), c_1_2);
+        auto *tmp4 = llvm_fsub(s, llvm_fmul(s, c_3_2, cos_M_2), c_1_2);
 
         // Put it together.
-        auto ig1 = llvm_fadd(s, tmp1, tmp2);
-        auto ig2 = llvm_fmul(s, tmp3, tmp4);
-        auto ig = llvm_fadd(s, ig1, ig2);
+        auto *ig1 = llvm_fadd(s, tmp1, tmp2);
+        auto *ig2 = llvm_fmul(s, tmp3, tmp4);
+        auto *ig = llvm_fadd(s, ig1, ig2);
 
         // Make extra sure the initial guess is in the [0, 2*pi) range.
-        auto lb = llvm_constantfp(s, tp, 0.);
-        auto ub = vector_splat(builder, llvm_codegen(s, fp_t, nextafter(dl_twopi_hi, number_like(s, fp_t, 0.))),
-                               batch_size);
+        auto *lb = llvm_constantfp(s, tp, 0.);
+        auto *ub = vector_splat(builder, llvm_codegen(s, fp_t, nextafter(dl_twopi_hi, number_like(s, fp_t, 0.))),
+                                batch_size);
+        // NOTE: perhaps a dedicated clamp() primitive could give better
+        // performance for real?
         ig = llvm_max(s, ig, lb);
         ig = llvm_min(s, ig, ub);
 
@@ -2352,8 +2354,8 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         builder.CreateStore(builder.getInt32(0), counter);
 
         // Variables to store sin(E) and cos(E).
-        auto sin_E = builder.CreateAlloca(tp);
-        auto cos_E = builder.CreateAlloca(tp);
+        auto *sin_E = builder.CreateAlloca(tp);
+        auto *cos_E = builder.CreateAlloca(tp);
 
         // Write the initial values for sin_E and cos_E.
         auto sin_cos_E = llvm_sincos(s, builder.CreateLoad(tp, retval));
@@ -2361,7 +2363,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         builder.CreateStore(sin_cos_E.second, cos_E);
 
         // Variable to hold the value of f(E) = E - e*sin(E) - M.
-        auto fE = builder.CreateAlloca(tp);
+        auto *fE = builder.CreateAlloca(tp);
         // Helper to compute f(E).
         auto fE_compute = [&]() {
             auto ret = llvm_fmul(s, ecc, builder.CreateLoad(tp, sin_E));
@@ -2392,8 +2394,8 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
 
             // Keep on iterating as long as abs(f(E)) > tol.
             // NOTE: need reduction only in batch mode.
-            auto tol_check = llvm_fcmp_ogt(s, llvm_abs(s, builder.CreateLoad(tp, fE)), tol);
-            auto tol_cond = (batch_size == 1u) ? tol_check : builder.CreateOrReduce(tol_check);
+            auto *tol_check = llvm_fcmp_ogt(s, llvm_abs(s, builder.CreateLoad(tp, fE)), tol);
+            auto *tol_cond = (batch_size == 1u) ? tol_check : builder.CreateOrReduce(tol_check);
 
             // Store the result of the tolerance check.
             builder.CreateStore(tol_check, tol_check_ptr);
@@ -2405,14 +2407,14 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         // Run the loop.
         llvm_while_loop(s, loop_cond, [&, one_c = llvm_constantfp(s, tp, 1.)]() {
             // Compute the new value.
-            auto old_val = builder.CreateLoad(tp, retval);
-            auto new_val = llvm_fdiv(s, builder.CreateLoad(tp, fE),
-                                     llvm_fsub(s, one_c, llvm_fmul(s, ecc, builder.CreateLoad(tp, cos_E))));
+            auto *old_val = builder.CreateLoad(tp, retval);
+            auto *new_val = llvm_fdiv(s, builder.CreateLoad(tp, fE),
+                                      llvm_fsub(s, one_c, llvm_fmul(s, ecc, builder.CreateLoad(tp, cos_E))));
             new_val = llvm_fsub(s, old_val, new_val);
 
             // Bisect if new_val > ub.
             // NOTE: '>' is fine here, ub is the maximum allowed value.
-            auto bcheck = llvm_fcmp_ogt(s, new_val, ub);
+            auto *bcheck = llvm_fcmp_ogt(s, new_val, ub);
             new_val = builder.CreateSelect(
                 bcheck,
                 llvm_fmul(s,
@@ -2832,11 +2834,14 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t
     // Add the implementation function.
     auto *impl_f = llvm_add_inv_kep_E(s, scal_t, batch_size);
 
+    // Fetch the external type.
+    auto *ext_fp_t = llvm_ext_type(scal_t);
+
     // The function arguments:
     // - output pointer (write only),
     // - input ecc and mean anomaly pointers (read only).
     // No overlap allowed.
-    std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(scal_t));
+    std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(ext_fp_t));
     // The return type is void.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     // Create the function
@@ -2869,14 +2874,14 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t
     builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
     // Load the data from the pointers.
-    auto *ecc = load_vector_from_memory(builder, scal_t, ecc_ptr, batch_size);
-    auto *M = load_vector_from_memory(builder, scal_t, M_ptr, batch_size);
+    auto *ecc = ext_load_vector_from_memory(s, scal_t, ecc_ptr, batch_size);
+    auto *M = ext_load_vector_from_memory(s, scal_t, M_ptr, batch_size);
 
     // Invoke the implementation function.
     auto *ret = builder.CreateCall(impl_f, {ecc, M});
 
     // Store the result.
-    store_vector_to_memory(builder, out_ptr, ret);
+    ext_store_vector_to_memory(s, out_ptr, ret);
 
     // Return.
     builder.CreateRetVoid();
