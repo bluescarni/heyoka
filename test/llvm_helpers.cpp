@@ -1550,6 +1550,74 @@ TEST_CASE("fma batch")
     tuple_for_each(fp_types, tester);
 }
 
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("fma scalar mp")
+{
+    using detail::llvm_fma;
+    using detail::to_llvm_type;
+    using std::fma;
+
+    using fp_t = mppp::real;
+
+    const auto prec = 237u;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        llvm_state s{kw::opt_level = opt_level};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *real_t = to_llvm_type<fp_t>(context);
+        auto *fp_t = detail::llvm_type_like(context, mppp::real{0, prec});
+
+        const std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(real_t));
+        auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_fma", &md);
+
+        auto *ret = f->args().begin();
+        auto *x = f->args().begin() + 1;
+        auto *y = f->args().begin() + 2;
+        auto *z = f->args().begin() + 3;
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *res = llvm_fma(s, detail::ext_load_vector_from_memory(s, fp_t, x, 1),
+                             detail::ext_load_vector_from_memory(s, fp_t, y, 1),
+                             detail::ext_load_vector_from_memory(s, fp_t, z, 1));
+
+        detail::ext_store_vector_to_memory(s, ret, res);
+
+        builder.CreateRetVoid();
+
+        // Verify.
+        s.verify_function(f);
+
+        // Run the optimisation pass.
+        s.optimise();
+
+        // Compile.
+        s.compile();
+
+        // Fetch the function pointer.
+        auto f_ptr
+            = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
+                s.jit_lookup("hey_fma"));
+
+        auto a = mppp::real("1.1", prec);
+        auto b = mppp::real("2.1", prec);
+        auto c = mppp::real("-6.1", prec);
+        auto out = mppp::real(0, prec);
+
+        f_ptr(&out, &a, &b, &c);
+
+        REQUIRE(out == mppp::fma(a, b, c));
+    }
+}
+
+#endif
+
 TEST_CASE("eft_product scalar")
 {
     using detail::llvm_eft_product;

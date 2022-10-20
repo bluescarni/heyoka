@@ -1682,23 +1682,33 @@ llvm::Value *llvm_fma(llvm_state &s, llvm::Value *x, llvm::Value *y, llvm::Value
     assert(x != nullptr);
     assert(y != nullptr);
     assert(z != nullptr);
-    assert(x->getType()->getScalarType()->isFloatingPointTy());
     assert(x->getType() == y->getType());
     assert(x->getType() == z->getType());
     // LCOV_EXCL_STOP
 
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of x, y and z.
     auto *x_t = x->getType()->getScalarType();
 
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        return call_extern_vec(s, {x, y, z}, "fmaq");
-    } else {
-#endif
-        return llvm_invoke_intrinsic(s.builder(), "llvm.fma", {x->getType()}, {x, y, z});
+    if (x_t->isFloatingPointTy()) {
 #if defined(HEYOKA_HAVE_REAL128)
-    }
+        if (x_t == llvm::Type::getFP128Ty(s.context())) {
+            return call_extern_vec(s, {x, y, z}, "fmaq");
+        } else {
 #endif
+            return llvm_invoke_intrinsic(s.builder(), "llvm.fma", {x->getType()}, {x, y, z});
+#if defined(HEYOKA_HAVE_REAL128)
+        }
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(x->getType()) != 0) {
+        auto *f = real_nary_op(s, x->getType(), "fma", "mpfr_fma", 3u);
+
+        return s.builder().CreateCall(f, {x, y, z});
+#endif
+        // LCOV_EXCL_START
+    } else {
+        throw std::invalid_argument(fmt::format("Unable to fma values of type '{}'", llvm_type_name(x->getType())));
+    }
+    // LCOV_EXCL_STOP
 }
 
 // Floor.
