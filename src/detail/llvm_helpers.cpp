@@ -1552,7 +1552,7 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
     auto &builder = s.builder();
 
     // Build the zero constant.
-    auto zero = llvm::Constant::getNullValue(val->getType());
+    auto zero = llvm_constantfp(s, val->getType(), 0.);
 
     // Run the comparisons.
     auto cmp0 = llvm_fcmp_olt(s, zero, val);
@@ -2735,13 +2735,13 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &s, llvm::Value
             [&]() {
                 // floor(x_hi) != x_hi. Just need to set the low part to zero.
                 builder.CreateStore(fhi, ret_hi_ptr);
-                builder.CreateStore(llvm::Constant::getNullValue(fp_t), ret_lo_ptr);
+                builder.CreateStore(llvm_constantfp(s, fp_t, 0.), ret_lo_ptr);
             });
 
         return {builder.CreateLoad(fp_t, ret_hi_ptr), builder.CreateLoad(fp_t, ret_lo_ptr)};
     } else {
         // Get a vector of zeroes.
-        auto *zero_vec = llvm::Constant::getNullValue(fp_t);
+        auto *zero_vec = llvm_constantfp(s, fp_t, 0.);
 
         // Floor the low part.
         auto *flo = llvm_floor(s, x_lo);
