@@ -1491,8 +1491,8 @@ llvm::Value *llvm_modulus(llvm_state &s, llvm::Value *x, llvm::Value *y)
         return call_extern_vec(s, {x, y}, "heyoka_modulus128");
     } else {
 #endif
-        auto quo = llvm_fdiv(s, x, y);
-        auto fl_quo = llvm_invoke_intrinsic(builder, "llvm.floor", {quo->getType()}, {quo});
+        auto *quo = llvm_fdiv(s, x, y);
+        auto *fl_quo = llvm_invoke_intrinsic(builder, "llvm.floor", {quo->getType()}, {quo});
 
         return llvm_fsub(s, x, llvm_fmul(s, y, fl_quo));
 #if defined(HEYOKA_HAVE_REAL128)
@@ -1524,8 +1524,8 @@ llvm::Value *llvm_min_nan(llvm_state &s, llvm::Value *a, llvm::Value *b)
 {
     auto &builder = s.builder();
 
-    auto b_not_nan = llvm_fcmp_oeq(s, b, b);
-    auto b_lt_a = llvm_fcmp_olt(s, b, a);
+    auto *b_not_nan = llvm_fcmp_oeq(s, b, b);
+    auto *b_lt_a = llvm_fcmp_olt(s, b, a);
 
     return builder.CreateSelect(b_not_nan, builder.CreateSelect(b_lt_a, b, a), b);
 }
@@ -1536,8 +1536,8 @@ llvm::Value *llvm_max_nan(llvm_state &s, llvm::Value *a, llvm::Value *b)
 {
     auto &builder = s.builder();
 
-    auto b_not_nan = llvm_fcmp_oeq(s, b, b);
-    auto a_lt_b = llvm_fcmp_olt(s, a, b);
+    auto *b_not_nan = llvm_fcmp_oeq(s, b, b);
+    auto *a_lt_b = llvm_fcmp_olt(s, a, b);
 
     return builder.CreateSelect(b_not_nan, builder.CreateSelect(a_lt_b, b, a), b);
 }
@@ -1552,11 +1552,11 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
     auto &builder = s.builder();
 
     // Build the zero constant.
-    auto zero = llvm_constantfp(s, val->getType(), 0.);
+    auto *zero = llvm_constantfp(s, val->getType(), 0.);
 
     // Run the comparisons.
-    auto cmp0 = llvm_fcmp_olt(s, zero, val);
-    auto cmp1 = llvm_fcmp_olt(s, val, zero);
+    auto *cmp0 = llvm_fcmp_olt(s, zero, val);
+    auto *cmp1 = llvm_fcmp_olt(s, val, zero);
 
     // Convert to int32.
     llvm::Type *int_type;
@@ -1565,8 +1565,8 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
     } else {
         int_type = builder.getInt32Ty();
     }
-    auto icmp0 = builder.CreateZExt(cmp0, int_type);
-    auto icmp1 = builder.CreateZExt(cmp1, int_type);
+    auto *icmp0 = builder.CreateZExt(cmp0, int_type);
+    auto *icmp1 = builder.CreateZExt(cmp1, int_type);
 
     // Compute and return the result.
     return builder.CreateSub(icmp0, icmp1);
