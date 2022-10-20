@@ -1804,7 +1804,7 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
 
         // The initial last nz idx is zero for all batch elements.
         auto *last_nz_idx = builder.CreateAlloca(last_nz_idx_t);
-        builder.CreateStore(llvm::Constant::getNullValue(last_nz_idx_t), last_nz_idx);
+        builder.CreateStore(llvm::ConstantInt::get(last_nz_idx_t, 0u), last_nz_idx);
 
         // NOTE: last_nz_idx is an index into the poly coefficient vector. Thus, in batch
         // mode, when loading from a vector of indices, we will have to apply an offset.
@@ -1831,7 +1831,7 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
 
         // Init the return value with zero.
         auto *retval = builder.CreateAlloca(last_nz_idx_t);
-        builder.CreateStore(llvm::Constant::getNullValue(last_nz_idx_t), retval);
+        builder.CreateStore(llvm::ConstantInt::get(last_nz_idx_t, 0u), retval);
 
         // The iteration range is [1, n].
         llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *cur_n) {
@@ -1856,13 +1856,13 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
 
             // Add them and check if the result is zero (this indicates a sign change).
             auto *cmp = builder.CreateICmpEQ(builder.CreateAdd(cur_sgn, last_nz_sgn),
-                                             llvm::Constant::getNullValue(cur_sgn->getType()));
+                                             llvm::ConstantInt::get(cur_sgn->getType(), 0u));
 
             // We also need to check if last_nz_sgn is zero. If that is the case, it means
             // we haven't found any nonzero coefficient yet for the polynomial and we must
             // not modify retval yet.
-            auto *zero_cmp = builder.CreateICmpEQ(last_nz_sgn, llvm::Constant::getNullValue(last_nz_sgn->getType()));
-            cmp = builder.CreateSelect(zero_cmp, llvm::Constant::getNullValue(cmp->getType()), cmp);
+            auto *zero_cmp = builder.CreateICmpEQ(last_nz_sgn, llvm::ConstantInt::get(last_nz_sgn->getType(), 0u));
+            cmp = builder.CreateSelect(zero_cmp, llvm::ConstantInt::get(cmp->getType(), 0u), cmp);
 
             // Update retval.
             builder.CreateStore(
@@ -1871,7 +1871,7 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
 
             // Update last_nz_idx.
             builder.CreateStore(
-                builder.CreateSelect(builder.CreateICmpEQ(cur_sgn, llvm::Constant::getNullValue(cur_sgn->getType())),
+                builder.CreateSelect(builder.CreateICmpEQ(cur_sgn, llvm::ConstantInt::get(cur_sgn->getType(), 0u)),
                                      builder.CreateLoad(last_nz_idx_t, last_nz_idx),
                                      vector_splat(builder, cur_n, batch_size)),
                 last_nz_idx);
@@ -2402,7 +2402,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
             builder.CreateStore(tol_check, tol_check_ptr);
 
             // NOTE: this is a way of creating a logical AND.
-            return builder.CreateSelect(c_cond, tol_cond, llvm::Constant::getNullValue(tol_cond->getType()));
+            return builder.CreateSelect(c_cond, tol_cond, llvm::ConstantInt::get(tol_cond->getType(), 0u));
         };
 
         // Run the loop.
