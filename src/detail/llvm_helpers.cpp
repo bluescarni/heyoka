@@ -2277,8 +2277,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         // Is the eccentricity a quiet NaN or less than 0?
         auto *ecc_is_nan_or_neg = llvm_fcmp_ult(s, ecc_arg, llvm_constantfp(s, tp, 0.));
         // Is the eccentricity >= 1?
-        auto *ecc_is_gte1
-            = llvm_fcmp_oge(s, ecc_arg, vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size));
+        auto *ecc_is_gte1 = llvm_fcmp_oge(s, ecc_arg, llvm_constantfp(s, tp, 1.));
 
         // Is the eccentricity NaN or out of range?
         // NOTE: this is a logical OR.
@@ -2286,10 +2285,8 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
             ecc_is_nan_or_neg, llvm::ConstantInt::getAllOnesValue(ecc_is_nan_or_neg->getType()), ecc_is_gte1);
 
         // Replace invalid eccentricity values with quiet NaNs.
-        auto *ecc = builder.CreateSelect(
-            ecc_invalid,
-            vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<double>::quiet_NaN()}), batch_size),
-            ecc_arg);
+        auto *ecc = builder.CreateSelect(ecc_invalid, llvm_constantfp(s, tp, std::numeric_limits<double>::quiet_NaN()),
+                                         ecc_arg);
 
         // Create the return value.
         auto retval = builder.CreateAlloca(tp);
@@ -2406,52 +2403,51 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         };
 
         // Run the loop.
-        llvm_while_loop(
-            s, loop_cond, [&, one_c = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size)]() {
-                // Compute the new value.
-                auto old_val = builder.CreateLoad(tp, retval);
-                auto new_val = llvm_fdiv(s, builder.CreateLoad(tp, fE),
-                                         llvm_fsub(s, one_c, llvm_fmul(s, ecc, builder.CreateLoad(tp, cos_E))));
-                new_val = llvm_fsub(s, old_val, new_val);
+        llvm_while_loop(s, loop_cond, [&, one_c = llvm_constantfp(s, tp, 1.)]() {
+            // Compute the new value.
+            auto old_val = builder.CreateLoad(tp, retval);
+            auto new_val = llvm_fdiv(s, builder.CreateLoad(tp, fE),
+                                     llvm_fsub(s, one_c, llvm_fmul(s, ecc, builder.CreateLoad(tp, cos_E))));
+            new_val = llvm_fsub(s, old_val, new_val);
 
-                // Bisect if new_val > ub.
-                // NOTE: '>' is fine here, ub is the maximum allowed value.
-                auto bcheck = llvm_fcmp_ogt(s, new_val, ub);
-                new_val = builder.CreateSelect(
-                    bcheck,
-                    llvm_fmul(s,
-                              vector_splat(builder,
-                                           llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
-                                           batch_size),
-                              llvm_fadd(s, old_val, ub)),
-                    new_val);
+            // Bisect if new_val > ub.
+            // NOTE: '>' is fine here, ub is the maximum allowed value.
+            auto bcheck = llvm_fcmp_ogt(s, new_val, ub);
+            new_val = builder.CreateSelect(
+                bcheck,
+                llvm_fmul(s,
+                          vector_splat(builder,
+                                       llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
+                                       batch_size),
+                          llvm_fadd(s, old_val, ub)),
+                new_val);
 
-                // Bisect if new_val < lb.
-                bcheck = llvm_fcmp_olt(s, new_val, lb);
-                new_val = builder.CreateSelect(
-                    bcheck,
-                    llvm_fmul(s,
-                              vector_splat(builder,
-                                           llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
-                                           batch_size),
-                              llvm_fadd(s, old_val, lb)),
-                    new_val);
+            // Bisect if new_val < lb.
+            bcheck = llvm_fcmp_olt(s, new_val, lb);
+            new_val = builder.CreateSelect(
+                bcheck,
+                llvm_fmul(s,
+                          vector_splat(builder,
+                                       llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, 2.)),
+                                       batch_size),
+                          llvm_fadd(s, old_val, lb)),
+                new_val);
 
-                // Store the new value.
-                builder.CreateStore(new_val, retval);
+            // Store the new value.
+            builder.CreateStore(new_val, retval);
 
-                // Update sin_E/cos_E.
-                sin_cos_E = llvm_sincos(s, new_val);
-                builder.CreateStore(sin_cos_E.first, sin_E);
-                builder.CreateStore(sin_cos_E.second, cos_E);
+            // Update sin_E/cos_E.
+            sin_cos_E = llvm_sincos(s, new_val);
+            builder.CreateStore(sin_cos_E.first, sin_E);
+            builder.CreateStore(sin_cos_E.second, cos_E);
 
-                // Update f(E).
-                builder.CreateStore(fE_compute(), fE);
+            // Update f(E).
+            builder.CreateStore(fE_compute(), fE);
 
-                // Update the counter.
-                builder.CreateStore(
-                    builder.CreateAdd(builder.CreateLoad(builder.getInt32Ty(), counter), builder.getInt32(1)), counter);
-            });
+            // Update the counter.
+            builder.CreateStore(
+                builder.CreateAdd(builder.CreateLoad(builder.getInt32Ty(), counter), builder.getInt32(1)), counter);
+        });
 
         // Check the counter.
         llvm_if_then_else(
@@ -2463,10 +2459,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
                 // Set to quiet NaN in the return value all the lanes for which tol_check is 1.
                 auto *old_val = builder.CreateLoad(tp, retval);
                 auto *new_val = builder.CreateSelect(
-                    tol_check,
-                    vector_splat(builder, llvm_codegen(s, fp_t, number{std::numeric_limits<double>::quiet_NaN()}),
-                                 batch_size),
-                    old_val);
+                    tol_check, llvm_constantfp(s, tp, std::numeric_limits<double>::quiet_NaN()), old_val);
                 builder.CreateStore(new_val, retval);
 
                 llvm_invoke_external(s, "heyoka_inv_kep_E_max_iter", builder.getVoidTy(), {},
