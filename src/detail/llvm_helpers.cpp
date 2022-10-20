@@ -2140,6 +2140,10 @@ number inv_kep_E_pi_like(llvm_state &s, llvm::Type *tp)
     } else if (tp == to_llvm_type<mppp::real128>(context, false)) {
         return number{mppp::pi_128};
 #endif
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (const auto prec = llvm_is_real(tp)) {
+        return number{mppp::real_pi(prec)};
+#endif
     }
 
     // LCOV_EXCL_START
@@ -2219,6 +2223,27 @@ std::pair<number, number> inv_kep_E_dl_twopi_like(llvm_state &s, llvm::Type *fp_
         // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Cannot generate a double-length 2*pi approximation for the type '{}'",
                                                 detail::llvm_type_name(fp_t)));
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (const auto prec = llvm_is_real(fp_t)) {
+        // Overflow check.
+        // LCOV_EXCL_START
+        if (prec > std::numeric_limits<real_prec_t>::max() / 4) {
+            throw std::overflow_error("Overflow detected in inv_kep_E_dl_twopi_like()");
+        }
+        // LCOV_EXCL_STOP
+
+        // Generate the 2*pi constant with prec * 4 precision.
+        auto twopi = mppp::real_pi(prec * 4);
+        mppp::mul_2ui(twopi, twopi, 1ul);
+
+        // Fetch the hi/lo components in precision prec.
+        auto twopi_hi = mppp::real{twopi, prec};
+        auto twopi_lo = mppp::real{std::move(twopi) - twopi_hi, prec};
+
+        assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
+
+        return std::make_pair(number(std::move(twopi_hi)), number(std::move(twopi_lo)));
+#endif
     } else {
         throw std::invalid_argument(fmt::format("Cannot generate a double-length 2*pi approximation for the type '{}'",
                                                 detail::llvm_type_name(fp_t)));
@@ -2243,6 +2268,13 @@ number inv_kep_E_eps_like(llvm_state &s, llvm::Type *tp)
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (tp == to_llvm_type<mppp::real128>(context, false)) {
         return number{std::numeric_limits<mppp::real128>::epsilon()};
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (const auto prec = llvm_is_real(tp)) {
+        // NOTE: for consistency with the epsilons returned for the other
+        // types, we return here 2**-(prec - 1). See:
+        // https://en.wikipedia.org/wiki/Machine_epsilon
+        return number(mppp::real{1ul, boost::numeric_cast<mpfr_exp_t>(-(prec - 1)), prec});
 #endif
     }
 
@@ -2590,7 +2622,6 @@ std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &s, llvm::Va
     // LCOV_EXCL_START
     assert(a != nullptr);
     assert(b != nullptr);
-    assert(a->getType()->getScalarType()->isFloatingPointTy());
     assert(a->getType() == b->getType());
     // LCOV_EXCL_STOP
 
@@ -2710,7 +2741,6 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &s, llvm::Value
     // LCOV_EXCL_START
     assert(x_hi != nullptr);
     assert(x_lo != nullptr);
-    assert(x_hi->getType()->getScalarType()->isFloatingPointTy());
     assert(x_hi->getType() == x_lo->getType());
     // LCOV_EXCL_STOP
 
@@ -2784,7 +2814,6 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_modulus(llvm_state &s, llvm::Val
     assert(x_lo != nullptr);
     assert(y_hi != nullptr);
     assert(y_lo != nullptr);
-    assert(x_hi->getType()->getScalarType()->isFloatingPointTy());
     assert(x_hi->getType() == x_lo->getType());
     assert(x_hi->getType() == y_hi->getType());
     assert(x_hi->getType() == y_lo->getType());

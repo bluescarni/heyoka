@@ -905,6 +905,155 @@ TEST_CASE("inv_kep_E_batch")
     tuple_for_each(fp_types, tester);
 }
 
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("inv_kep_E_scalar mp")
+{
+    using detail::llvm_add_inv_kep_E_wrapper;
+    using std::cos;
+    using std::isnan;
+    using std::sin;
+
+    const auto prec = 237u;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        llvm_state s{kw::opt_level = opt_level};
+
+        auto *fp_t = detail::llvm_type_like(s.context(), mppp::real{0, prec});
+
+        // Add the function.
+        llvm_add_inv_kep_E_wrapper(s, fp_t, 1, "hey_kep");
+
+        // Run the optimisation pass.
+        s.optimise();
+
+        // Compile.
+        s.compile();
+
+        // Fetch the function pointer.
+        auto f_ptr
+            = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(s.jit_lookup("hey_kep"));
+
+        std::uniform_real_distribution<double> e_dist(0., 1.), M_dist(0., 2 * boost::math::constants::pi<double>());
+
+        // First set of tests with zero eccentricity.
+        for (auto i = 0; i < ntrials; ++i) {
+            const mppp::real M{M_dist(rng), prec};
+            const mppp::real e{0, prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(M == approximately(E));
+        }
+
+        // Non-zero eccentricities.
+        for (auto i = 0; i < ntrials * 10; ++i) {
+            const mppp::real M{M_dist(rng), prec};
+            const mppp::real e{e_dist(rng), prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(M == approximately(E - e * sin(E), mppp::real(10000)));
+        }
+
+        // Try a very high eccentricity.
+        {
+            const mppp::real M{0, prec};
+            auto e = mppp::real{1, prec} - mppp::real{1ul, -(static_cast<int>(prec) - 1), prec} * mppp::real{4, prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(M == approximately(E - e * sin(E), mppp::real(10000)));
+        }
+
+        // Test invalid inputs.
+        {
+            const mppp::real M{"1.23", prec};
+            const mppp::real e{"-.1", prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+
+        {
+            const mppp::real M{"1.23", prec};
+            const mppp::real e{1, prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+
+        {
+            const mppp::real M{"1.23", prec};
+            const mppp::real e{"inf", prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+
+        {
+            const mppp::real M{"1.23", prec};
+            const mppp::real e{"-inf", prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+
+        {
+            const mppp::real M{"1.23", prec};
+            const mppp::real e{"nan", prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+
+        {
+            const mppp::real M{"inf", prec};
+            const mppp::real e{".1", prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+
+        {
+            const mppp::real M{"-inf", prec};
+            const mppp::real e{".2", prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+
+        {
+            const mppp::real M{"nan", prec};
+            const mppp::real e{".1", prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+    }
+}
+
+#endif
+
 TEST_CASE("while_loop")
 {
     using detail::llvm_while_loop;

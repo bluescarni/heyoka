@@ -628,6 +628,10 @@ number number_like(llvm_state &s, llvm::Type *tp, double val)
     } else if (tp == to_llvm_type<mppp::real128>(context, false)) {
         return number{static_cast<mppp::real128>(val)};
 #endif
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (const auto real_prec = llvm_is_real(tp)) {
+        return number{mppp::real{val, real_prec}};
+#endif
     }
 
     throw std::invalid_argument(
