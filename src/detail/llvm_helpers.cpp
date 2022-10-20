@@ -1454,25 +1454,36 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
 }
 
 // Helper to compute abs(x_v).
-llvm::Value *llvm_abs(llvm_state &s, llvm::Value *x_v)
+llvm::Value *llvm_abs(llvm_state &s, llvm::Value *x)
 {
     // LCOV_EXCL_START
-    assert(x_v != nullptr);
-    assert(x_v->getType()->getScalarType()->isFloatingPointTy());
+    assert(x != nullptr);
     // LCOV_EXCL_STOP
 
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of the vector argument.
-    auto *x_t = x_v->getType()->getScalarType();
+    // Determine the scalar type of x.
+    auto *x_t = x->getType()->getScalarType();
 
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        return call_extern_vec(s, {x_v}, "fabsq");
-    } else {
-#endif
-        return llvm_invoke_intrinsic(s.builder(), "llvm.fabs", {x_v->getType()}, {x_v});
+    if (x_t->isFloatingPointTy()) {
 #if defined(HEYOKA_HAVE_REAL128)
-    }
+        if (x_t == llvm::Type::getFP128Ty(s.context())) {
+            return call_extern_vec(s, {x}, "fabsq");
+        } else {
 #endif
+            return llvm_invoke_intrinsic(s.builder(), "llvm.fabs", {x->getType()}, {x});
+#if defined(HEYOKA_HAVE_REAL128)
+        }
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(x->getType()) != 0) {
+        auto *f = real_nary_op(s, x->getType(), "abs", "mpfr_abs", 1u);
+
+        return s.builder().CreateCall(f, {x});
+#endif
+        // LCOV_EXCL_START
+    } else {
+        throw std::invalid_argument(fmt::format("Unable to abs values of type '{}'", llvm_type_name(x->getType())));
+    }
+    // LCOV_EXCL_STOP
 }
 
 // Helper to reduce x modulo y, that is, to compute:
@@ -1716,21 +1727,32 @@ llvm::Value *llvm_floor(llvm_state &s, llvm::Value *x)
 {
     // LCOV_EXCL_START
     assert(x != nullptr);
-    assert(x->getType()->getScalarType()->isFloatingPointTy());
     // LCOV_EXCL_STOP
 
-#if defined(HEYOKA_HAVE_REAL128)
     // Determine the scalar type of x.
     auto *x_t = x->getType()->getScalarType();
 
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        return call_extern_vec(s, {x}, "floorq");
-    } else {
-#endif
-        return llvm_invoke_intrinsic(s.builder(), "llvm.floor", {x->getType()}, {x});
+    if (x_t->isFloatingPointTy()) {
 #if defined(HEYOKA_HAVE_REAL128)
-    }
+        if (x_t == llvm::Type::getFP128Ty(s.context())) {
+            return call_extern_vec(s, {x}, "floorq");
+        } else {
 #endif
+            return llvm_invoke_intrinsic(s.builder(), "llvm.floor", {x->getType()}, {x});
+#if defined(HEYOKA_HAVE_REAL128)
+        }
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(x->getType()) != 0) {
+        auto *f = real_nary_op(s, x->getType(), "floor", "mpfr_floor", 1u);
+
+        return s.builder().CreateCall(f, {x});
+#endif
+        // LCOV_EXCL_START
+    } else {
+        throw std::invalid_argument(fmt::format("Unable to floor values of type '{}'", llvm_type_name(x->getType())));
+    }
+    // LCOV_EXCL_STOP
 }
 
 // Add a function to count the number of sign changes in the coefficients
