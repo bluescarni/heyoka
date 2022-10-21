@@ -1213,7 +1213,7 @@ llvm::Value *llvm_fneg(llvm_state &s, llvm::Value *a)
 
 // Create a floating-point constant of type fp_t containing
 // the value val.
-llvm::Constant *llvm_constantfp(llvm_state &s, llvm::Type *fp_t, double val)
+llvm::Constant *llvm_constantfp([[maybe_unused]] llvm_state &s, llvm::Type *fp_t, double val)
 {
     if (fp_t->getScalarType()->isFloatingPointTy()) {
         // NOTE: if fp_t is a vector type, the constant value
@@ -3853,7 +3853,7 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_
 }
 
 template <typename T>
-llvm::Type *llvm_type_like(llvm::LLVMContext &c, const T &x)
+llvm::Type *llvm_type_like(llvm::LLVMContext &c, [[maybe_unused]] const T &x)
 {
 #if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {

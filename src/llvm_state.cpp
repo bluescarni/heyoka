@@ -382,7 +382,7 @@ struct llvm_state::jit {
         // here would disrupt LLVM's cleanup actions?
         // https://llvm.org/doxygen/classllvm_1_1orc_1_1ExecutionSession.html
 
-#if defined(HEYOKA_HAVE_REAL) && !defined(NDEBUG)
+#if defined(HEYOKA_HAVE_REAL) && !defined(NDEBUG) && LLVM_VERSION_MAJOR >= 13
 
         // Run several checks to ensure that real_t matches the layout of mppp::real/mpfr_struct_t.
         // NOTE: these checks need access to the data layout, so we put them here for convenience.
