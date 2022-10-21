@@ -37,7 +37,7 @@ inline llvm::Type *to_llvm_type(llvm::LLVMContext &c, bool err_throw = true)
 }
 
 template <typename T>
-HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like(llvm::LLVMContext &, const T &);
+HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like(llvm_state &, const T &);
 
 HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Type *llvm_ext_type(llvm::Type *);

@@ -161,6 +161,7 @@ const auto type_map = []() {
 #if defined(HEYOKA_HAVE_REAL)
 
     retval[typeid(mppp::real)] = [](llvm::LLVMContext &c) -> llvm::Type * {
+#if LLVM_VERSION_MAJOR >= 12
         if (auto *ptr = llvm::StructType::getTypeByName(c, "heyoka.real")) {
             return ptr;
         }
@@ -174,6 +175,16 @@ const auto type_map = []() {
         assert(llvm::StructType::getTypeByName(c, "heyoka.real") == ret);
 
         return ret;
+#else
+        // NOTE: in earlier LLVM versions, make this an unnamed struct.
+        auto *ret = llvm::StructType::get(c, {to_llvm_type<real_prec_t>(c), to_llvm_type<real_sign_t>(c),
+                                              to_llvm_type<real_exp_t>(c),
+                                              llvm::PointerType::getUnqual(to_llvm_type<real_limb_t>(c))});
+
+        assert(ret != nullptr);
+
+        return ret;
+#endif
     };
 
 #endif
@@ -3853,15 +3864,23 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_
 }
 
 template <typename T>
-llvm::Type *llvm_type_like(llvm::LLVMContext &c, [[maybe_unused]] const T &x)
+llvm::Type *llvm_type_like(llvm_state &s, [[maybe_unused]] const T &x)
 {
+    auto &c = s.context();
+
 #if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         const auto name = fmt::format("heyoka.real.{}", x.get_prec());
 
+#if LLVM_VERSION_MAJOR >= 12
         if (auto *ptr = llvm::StructType::getTypeByName(c, name)) {
             return ptr;
         }
+#else
+        if (auto *ptr = s.module().getTypeByName(name)) {
+            return ptr;
+        }
+#endif
 
         // Fetch the limb array type.
         auto *limb_arr_t
@@ -3883,21 +3902,21 @@ llvm::Type *llvm_type_like(llvm::LLVMContext &c, [[maybe_unused]] const T &x)
 }
 
 // Explicit instantiations.
-template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<float>(llvm::LLVMContext &, const float &);
+template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<float>(llvm_state &, const float &);
 
-template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<double>(llvm::LLVMContext &, const double &);
+template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<double>(llvm_state &, const double &);
 
-template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<long double>(llvm::LLVMContext &, const long double &);
+template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<long double>(llvm_state &, const long double &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<mppp::real128>(llvm::LLVMContext &, const mppp::real128 &);
+template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<mppp::real128>(llvm_state &, const mppp::real128 &);
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<mppp::real>(llvm::LLVMContext &, const mppp::real &);
+template HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like<mppp::real>(llvm_state &, const mppp::real &);
 
 #endif
 

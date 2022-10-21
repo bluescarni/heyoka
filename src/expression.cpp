@@ -2987,7 +2987,7 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     auto *fp_t = [&]() {
 #if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
-            return llvm_type_like(context, mppp::real{0, static_cast<real_prec_t>(prec)});
+            return llvm_type_like(s, mppp::real{0, static_cast<real_prec_t>(prec)});
         } else {
 #endif
             return to_llvm_type<T>(context);

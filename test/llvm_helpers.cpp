@@ -348,7 +348,7 @@ TEST_CASE("sincos mp")
         auto &context = s.context();
 
         auto *real_t = to_llvm_type<mppp::real>(context);
-        auto *fp_t = detail::llvm_type_like(context, mppp::real{0, prec});
+        auto *fp_t = detail::llvm_type_like(s, mppp::real{0, prec});
 
         const std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(real_t));
         auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -919,7 +919,7 @@ TEST_CASE("inv_kep_E_scalar mp")
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
         llvm_state s{kw::opt_level = opt_level};
 
-        auto *fp_t = detail::llvm_type_like(s.context(), mppp::real{0, prec});
+        auto *fp_t = detail::llvm_type_like(s, mppp::real{0, prec});
 
         // Add the function.
         llvm_add_inv_kep_E_wrapper(s, fp_t, 1, "hey_kep");
@@ -1719,7 +1719,7 @@ TEST_CASE("fma scalar mp")
         auto &context = s.context();
 
         auto *real_t = to_llvm_type<fp_t>(context);
-        auto *fp_t = detail::llvm_type_like(context, mppp::real{0, prec});
+        auto *fp_t = detail::llvm_type_like(s, mppp::real{0, prec});
 
         const std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(real_t));
         auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -3070,8 +3070,7 @@ TEST_CASE("real_ext_load")
     builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
     // Load the input from the first pointer.
-    auto *real_val
-        = detail::ext_load_vector_from_memory(s, detail::llvm_type_like(context, real_pi_257), f->arg_begin(), 1);
+    auto *real_val = detail::ext_load_vector_from_memory(s, detail::llvm_type_like(s, real_pi_257), f->arg_begin(), 1);
 
     // Write it out.
     detail::ext_store_vector_to_memory(s, f->arg_begin() + 1, real_val);

@@ -727,7 +727,7 @@ TEST_CASE("llvm_codegen")
 
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-        auto *real_val = llvm_codegen(s, detail::llvm_type_like(context, real_pi_256), number{real_pi_256});
+        auto *real_val = llvm_codegen(s, detail::llvm_type_like(s, real_pi_256), number{real_pi_256});
 
         detail::ext_store_vector_to_memory(s, f->arg_begin(), real_val);
 
