@@ -3890,7 +3890,11 @@ llvm::Type *llvm_type_like(llvm_state &s, [[maybe_unused]] const T &x)
             = llvm::StructType::create({to_llvm_type<real_sign_t>(c), to_llvm_type<real_exp_t>(c), limb_arr_t}, name);
 
         assert(ret != nullptr);
+#if LLVM_VERSION_MAJOR >= 12
         assert(llvm::StructType::getTypeByName(c, name) == ret);
+#else
+        assert(s.module().getTypeByName(name) == ret);
+#endif
 
         return ret;
     } else {
