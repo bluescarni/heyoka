@@ -2777,8 +2777,8 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
                                                                                  {builder.getInt32(0), cur_idx}));
 
         // Load the parameter value from the array.
-        auto *ptr = builder.CreateInBoundsGEP(fp_scal_t, par_ptr, builder.CreateMul(stride, to_size_t(s, par_idx)));
-        auto *ret = load_vector_from_memory(builder, fp_scal_t, ptr, batch_size);
+        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, par_ptr, builder.CreateMul(stride, to_size_t(s, par_idx)));
+        auto *ret = ext_load_vector_from_memory(s, fp_scal_t, ptr, batch_size);
 
         // Compute the pointer into out_ptr.
         ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
