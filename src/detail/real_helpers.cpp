@@ -37,6 +37,7 @@
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
 
+#include <mp++/integer.hpp>
 #include <mp++/real.hpp>
 
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -55,6 +56,10 @@ static_assert(std::is_signed_v<real_sign_t>);
 static_assert(std::is_signed_v<real_exp_t>);
 static_assert(std::is_signed_v<real_exp_t>);
 static_assert(std::is_signed_v<real_rnd_t>);
+static_assert(std::is_same_v<real_prec_t, mpfr_prec_t>);
+static_assert(std::is_same_v<real_sign_t, mpfr_sign_t>);
+static_assert(std::is_same_v<real_exp_t, mpfr_exp_t>);
+static_assert(std::is_same_v<real_limb_t, mp_limb_t>);
 
 // Determine if the input type is heyoka.real.N,
 // and, in such case, return N. Otherwise, return 0.

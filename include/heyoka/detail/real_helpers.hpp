@@ -25,7 +25,7 @@ namespace heyoka::detail
 using real_prec_t = decltype(std::declval<mppp::mpfr_struct_t>()._mpfr_prec);
 using real_sign_t = decltype(std::declval<mppp::mpfr_struct_t>()._mpfr_sign);
 using real_exp_t = decltype(std::declval<mppp::mpfr_struct_t>()._mpfr_exp);
-using real_limb_t = std::remove_pointer_t<decltype(std::declval<mppp::mpfr_struct_t>()._mpfr_exp)>;
+using real_limb_t = std::remove_pointer_t<decltype(std::declval<mppp::mpfr_struct_t>()._mpfr_d)>;
 
 // NOTE: mpfr_rnd_t is part of the MPFR API, so technically this introduces
 // a direct dependency on MPFR. On the other hand, perhaps we can guarantee that
