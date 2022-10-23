@@ -24,6 +24,7 @@
 #include <utility>
 #include <vector>
 
+#include <boost/core/demangle.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 #include <boost/numeric/conversion/cast.hpp>
@@ -211,12 +212,14 @@ llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp, bo
     const auto *err_msg = "Unable to associate the C++ type '{}' to an LLVM type";
 
     if (it == type_map.end()) {
-        return err_throw ? throw std::invalid_argument(fmt::format(err_msg, tp.name())) : nullptr;
+        return err_throw ? throw std::invalid_argument(fmt::format(err_msg, boost::core::demangle(tp.name())))
+                         : nullptr;
     } else {
         auto *ret = it->second(c);
 
         if (ret == nullptr) {
-            return err_throw ? throw std::invalid_argument(fmt::format(err_msg, tp.name())) : nullptr;
+            return err_throw ? throw std::invalid_argument(fmt::format(err_msg, boost::core::demangle(tp.name())))
+                             : nullptr;
         }
 
         return ret;
