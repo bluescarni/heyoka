@@ -512,9 +512,9 @@ auto llvm_state_ir_to_module(std::string &&ir, llvm::LLVMContext &ctx)
 
 } // namespace detail
 
-llvm_state::llvm_state(std::tuple<std::string, unsigned, bool> &&tup)
+llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool> &&tup)
     : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_fast_math(std::get<2>(tup)),
-      m_module_name(std::move(std::get<0>(tup)))
+      m_force_avx512(std::get<3>(tup)), m_module_name(std::move(std::get<0>(tup)))
 {
     // Create the module.
     m_module = std::make_unique<llvm::Module>(m_module_name, context());
@@ -538,7 +538,7 @@ llvm_state::llvm_state(const llvm_state &other)
     // - creating a new jit,
     // - copying over the options from other.
     : m_jitter(std::make_unique<jit>()), m_opt_level(other.m_opt_level), m_fast_math(other.m_fast_math),
-      m_module_name(other.m_module_name)
+      m_force_avx512(other.m_force_avx512), m_module_name(other.m_module_name)
 {
     if (other.is_compiled() && other.m_jitter->m_object_file) {
         // 'other' was compiled and code was generated.
@@ -602,6 +602,7 @@ llvm_state &llvm_state::operator=(llvm_state &&other) noexcept
         m_opt_level = other.m_opt_level;
         m_ir_snapshot = std::move(other.m_ir_snapshot);
         m_fast_math = other.m_fast_math;
+        m_force_avx512 = other.m_force_avx512;
         m_module_name = std::move(other.m_module_name);
     }
 
@@ -631,6 +632,7 @@ void llvm_state::save_impl(Archive &ar, unsigned) const
     // Store the config options.
     ar << m_opt_level;
     ar << m_fast_math;
+    ar << m_force_avx512;
     ar << m_module_name;
 
     // Store the IR.
@@ -673,6 +675,14 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
     bool fast_math{};
     ar >> fast_math;
 
+    bool force_avx512 = false;
+    // NOTE: before archive version 2, there was
+    // no force_avx512 flag. The behaviour was
+    // equivalent to force_avx512 == false.
+    if (version >= 2u) {
+        ar >> force_avx512;
+    }
+
     std::string module_name;
     ar >> module_name;
 
@@ -700,6 +710,7 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
         // Set the config options.
         m_opt_level = opt_level;
         m_fast_math = fast_math;
+        m_force_avx512 = force_avx512;
         m_module_name = module_name;
 
         // Reset module and builder to the def-cted state.
@@ -926,18 +937,12 @@ void llvm_state::optimise()
         }
 #endif
 
-        // NOTE: currently LLVM forces 256-bit vector
-        // width when AVX-512 is available, due to clock
-        // frequency scaling concerns. We used to have the following
-        // code here:
-        // for (auto &f : *m_module) {
-        //     f.addFnAttr("prefer-vector-width", "512");
-        // }
-        // in order to force 512-bit vector width, but it looks
-        // like this can hurt performance in scalar mode.
-        // Let's keep this in mind for the future, perhaps
-        // we could consider enabling 512-bit vector width
-        // only in batch mode?
+        // Force usage of AVX512 registers, if requested.
+        if (m_force_avx512 && detail::get_target_features().avx512f) {
+            for (auto &f : module()) {
+                 f.addFnAttr("prefer-vector-width", "512");
+            }
+        }
 
 #if defined(HEYOKA_USE_NEW_LLVM_PASS_MANAGER)
 
@@ -1179,7 +1184,7 @@ const std::string &llvm_state::module_name() const
 // but with no code defined in it.
 llvm_state llvm_state::make_similar() const
 {
-    return llvm_state(kw::mname = m_module_name, kw::opt_level = m_opt_level, kw::fast_math = m_fast_math);
+    return llvm_state(kw::mname = m_module_name, kw::opt_level = m_opt_level, kw::fast_math = m_fast_math, kw::force_avx512 = m_force_avx512);
 }
 
 std::ostream &operator<<(std::ostream &os, const llvm_state &s)
@@ -1190,6 +1195,7 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
     oss << "Module name        : " << s.m_module_name << '\n';
     oss << "Compiled           : " << s.is_compiled() << '\n';
     oss << "Fast math          : " << s.m_fast_math << '\n';
+    oss << "Force AVX512       : " << s.m_force_avx512 << '\n';
     oss << "Optimisation level : " << s.m_opt_level << '\n';
     oss << "Target triple      : " << s.m_jitter->get_target_triple().str() << '\n';
     oss << "Target CPU         : " << s.m_jitter->get_target_cpu() << '\n';
