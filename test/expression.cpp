@@ -19,6 +19,10 @@
 #include <variant>
 #include <vector>
 
+#include <boost/numeric/conversion/cast.hpp>
+
+#include <fmt/format.h>
+
 #include <heyoka/celmec/vsop2013.hpp>
 #include <heyoka/config.hpp>
 #include <heyoka/exceptions.hpp>
@@ -1091,6 +1095,103 @@ TEST_CASE("cfunc nbody")
     }
 }
 
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("cfunc nbody mp")
+{
+    using std::pow;
+
+    const auto prec = 237u;
+
+    auto masses
+        = std::vector{mppp::real{1.00000597682, prec}, mppp::real{1 / 1047.355, prec}, mppp::real{1 / 3501.6, prec},
+                      mppp::real{1 / 22869., prec},    mppp::real{1 / 19314., prec},   mppp::real{7.4074074e-09, prec}};
+
+    const auto G = mppp::real{0.01720209895 * 0.01720209895 * 365 * 365, prec};
+
+    auto sys = make_nbody_sys(6, kw::masses = masses, kw::Gconst = G);
+    std::vector<expression> exs;
+    for (const auto &p : sys) {
+        exs.push_back(p.second);
+    }
+
+    std::vector<mppp::real> outs, ins;
+
+    std::uniform_real_distribution<double> rdist(-1., 1.);
+
+    auto gen = [&rdist]() { return mppp::real{rdist(rng), static_cast<int>(prec)}; };
+
+    const auto batch_size = 1u;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        for (auto cm : {false, true}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            outs.resize(36u * batch_size);
+            ins.resize(36u * batch_size);
+
+            std::generate(ins.begin(), ins.end(), gen);
+            std::generate(outs.begin(), outs.end(), gen);
+
+            add_cfunc<mppp::real>(s, "cfunc", exs, kw::prec = prec, kw::compact_mode = cm);
+
+            s.compile();
+
+            auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(
+                s.jit_lookup("cfunc"));
+
+            cf_ptr(outs.data(), ins.data(), nullptr);
+
+            for (auto i = 0u; i < 6u; ++i) {
+                for (auto j = 0u; j < batch_size; ++j) {
+                    // x_i' == vx_i.
+                    REQUIRE(outs[i * batch_size * 6u + j] == approximately(ins[i * batch_size + j], mppp::real{100.}));
+                    // y_i' == vy_i.
+                    REQUIRE(outs[i * batch_size * 6u + batch_size + j]
+                            == approximately(ins[i * batch_size + batch_size * 6u + j], mppp::real{100.}));
+                    // z_i' == vz_i.
+                    REQUIRE(outs[i * batch_size * 6u + batch_size * 2u + j]
+                            == approximately(ins[i * batch_size + batch_size * 6u * 2u + j], mppp::real{100.}));
+
+                    // Accelerations.
+                    mppp::real acc_x{0., prec}, acc_y{0., prec}, acc_z{0., prec};
+
+                    const auto xi = ins[18u * batch_size + i * batch_size + j];
+                    const auto yi = ins[24u * batch_size + i * batch_size + j];
+                    const auto zi = ins[30u * batch_size + i * batch_size + j];
+
+                    for (auto k = 0u; k < 6u; ++k) {
+                        if (k == i) {
+                            continue;
+                        }
+
+                        const auto xk = ins[18u * batch_size + k * batch_size + j];
+                        const auto dx = xk - xi;
+
+                        const auto yk = ins[24u * batch_size + k * batch_size + j];
+                        const auto dy = yk - yi;
+
+                        const auto zk = ins[30u * batch_size + k * batch_size + j];
+                        const auto dz = zk - zi;
+
+                        const auto rm3 = pow(dx * dx + dy * dy + dz * dz, mppp::real{-3 / 2., prec});
+
+                        acc_x += dx * G * masses[k] * rm3;
+                        acc_y += dy * G * masses[k] * rm3;
+                        acc_z += dz * G * masses[k] * rm3;
+                    }
+
+                    REQUIRE(outs[i * batch_size * 6u + batch_size * 3u + j] == approximately(acc_x, mppp::real{100.}));
+                    REQUIRE(outs[i * batch_size * 6u + batch_size * 4u + j] == approximately(acc_y, mppp::real{100.}));
+                    REQUIRE(outs[i * batch_size * 6u + batch_size * 5u + j] == approximately(acc_z, mppp::real{100.}));
+                }
+            }
+        }
+    }
+}
+
+#endif
+
 // cfunc N-body with parametric masses.
 TEST_CASE("cfunc nbody par")
 {
@@ -1258,6 +1359,182 @@ TEST_CASE("cfunc nbody par")
         }
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("cfunc nbody par mp")
+{
+    using std::pow;
+
+    const auto prec = 237u;
+
+    auto masses = std::vector{1.00000597682, 1 / 1047.355, 1 / 3501.6, 1 / 22869., 1 / 19314., 7.4074074e-09};
+
+    const auto G = mppp::real{0.01720209895 * 0.01720209895 * 365 * 365, prec};
+
+    auto sys = make_nbody_par_sys(6, kw::Gconst = G);
+    std::vector<expression> exs;
+    for (const auto &p : sys) {
+        exs.push_back(p.second);
+    }
+
+    std::vector<mppp::real> outs, ins, pars;
+
+    std::uniform_real_distribution<double> rdist(-1., 1.);
+
+    auto gen = [&rdist]() { return mppp::real{rdist(rng), static_cast<int>(prec)}; };
+
+    const auto batch_size = 1u;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        for (auto cm : {false, true}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            outs.resize(36u * batch_size);
+            ins.resize(36u * batch_size);
+            pars.resize(6u * batch_size);
+
+            for (auto i = 0u; i < 6u; ++i) {
+                for (auto j = 0u; j < batch_size; ++j) {
+                    pars[i * batch_size + j] = mppp::real{masses[i], prec};
+                }
+            }
+
+            std::generate(ins.begin(), ins.end(), gen);
+            std::generate(outs.begin(), outs.end(), gen);
+
+            add_cfunc<mppp::real>(s, "cfunc", exs, kw::prec = prec, kw::compact_mode = cm);
+
+            s.compile();
+
+            auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(
+                s.jit_lookup("cfunc"));
+
+            cf_ptr(outs.data(), ins.data(), pars.data());
+
+            for (auto i = 0u; i < 6u; ++i) {
+                for (auto j = 0u; j < batch_size; ++j) {
+                    // x_i' == vx_i.
+                    REQUIRE(outs[i * batch_size * 6u + j] == approximately(ins[i * batch_size + j], mppp::real{100.}));
+                    // y_i' == vy_i.
+                    REQUIRE(outs[i * batch_size * 6u + batch_size + j]
+                            == approximately(ins[i * batch_size + batch_size * 6u + j], mppp::real{100.}));
+                    // z_i' == vz_i.
+                    REQUIRE(outs[i * batch_size * 6u + batch_size * 2u + j]
+                            == approximately(ins[i * batch_size + batch_size * 6u * 2u + j], mppp::real{100.}));
+
+                    // Accelerations.
+                    mppp::real acc_x{0., prec}, acc_y{0., prec}, acc_z{0., prec};
+
+                    const auto xi = ins[18u * batch_size + i * batch_size + j];
+                    const auto yi = ins[24u * batch_size + i * batch_size + j];
+                    const auto zi = ins[30u * batch_size + i * batch_size + j];
+
+                    for (auto k = 0u; k < 6u; ++k) {
+                        if (k == i) {
+                            continue;
+                        }
+
+                        const auto xk = ins[18u * batch_size + k * batch_size + j];
+                        const auto dx = xk - xi;
+
+                        const auto yk = ins[24u * batch_size + k * batch_size + j];
+                        const auto dy = yk - yi;
+
+                        const auto zk = ins[30u * batch_size + k * batch_size + j];
+                        const auto dz = zk - zi;
+
+                        const auto rm3 = pow(dx * dx + dy * dy + dz * dz, mppp::real{-3 / 2., prec});
+
+                        acc_x += dx * G * masses[k] * rm3;
+                        acc_y += dy * G * masses[k] * rm3;
+                        acc_z += dz * G * masses[k] * rm3;
+                    }
+
+                    REQUIRE(outs[i * batch_size * 6u + batch_size * 3u + j] == approximately(acc_x, mppp::real{1000.}));
+                    REQUIRE(outs[i * batch_size * 6u + batch_size * 4u + j] == approximately(acc_y, mppp::real{1000.}));
+                    REQUIRE(outs[i * batch_size * 6u + batch_size * 5u + j] == approximately(acc_z, mppp::real{1000.}));
+                }
+            }
+
+            // Run the test on the strided function too.
+            const std::size_t extra_stride = 3;
+            outs.resize(36u * (batch_size + extra_stride));
+            ins.resize(36u * (batch_size + extra_stride));
+            pars.resize(6u * (batch_size + extra_stride));
+
+            for (auto i = 0u; i < 6u; ++i) {
+                for (auto j = 0u; j < batch_size; ++j) {
+                    pars[i * (batch_size + extra_stride) + j] = mppp::real{masses[i], prec};
+                }
+            }
+
+            std::generate(ins.begin(), ins.end(), gen);
+            std::generate(outs.begin(), outs.end(), gen);
+
+            auto *cfs_ptr
+                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, std::size_t)>(
+                    s.jit_lookup("cfunc.strided"));
+
+            cfs_ptr(outs.data(), ins.data(), pars.data(), batch_size + extra_stride);
+
+            for (auto i = 0u; i < 6u; ++i) {
+                for (auto j = 0u; j < batch_size; ++j) {
+                    // x_i' == vx_i.
+                    REQUIRE(outs[i * (batch_size + extra_stride) * 6u + j]
+                            == approximately(ins[i * (batch_size + extra_stride) + j], mppp::real{100.}));
+                    // y_i' == vy_i.
+                    REQUIRE(
+                        outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) + j]
+                        == approximately(ins[i * (batch_size + extra_stride) + (batch_size + extra_stride) * 6u + j],
+                                         mppp::real{100.}));
+                    // z_i' == vz_i.
+                    REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 2u + j]
+                            == approximately(
+                                ins[i * (batch_size + extra_stride) + (batch_size + extra_stride) * 6u * 2u + j],
+                                mppp::real{100.}));
+
+                    // Accelerations.
+                    mppp::real acc_x{0., prec}, acc_y{0., prec}, acc_z{0., prec};
+
+                    const auto xi = ins[18u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
+                    const auto yi = ins[24u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
+                    const auto zi = ins[30u * (batch_size + extra_stride) + i * (batch_size + extra_stride) + j];
+
+                    for (auto k = 0u; k < 6u; ++k) {
+                        if (k == i) {
+                            continue;
+                        }
+
+                        const auto xk = ins[18u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
+                        const auto dx = xk - xi;
+
+                        const auto yk = ins[24u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
+                        const auto dy = yk - yi;
+
+                        const auto zk = ins[30u * (batch_size + extra_stride) + k * (batch_size + extra_stride) + j];
+                        const auto dz = zk - zi;
+
+                        const auto rm3 = pow(dx * dx + dy * dy + dz * dz, mppp::real{-3 / 2., prec});
+
+                        acc_x += dx * G * masses[k] * rm3;
+                        acc_y += dy * G * masses[k] * rm3;
+                        acc_z += dz * G * masses[k] * rm3;
+                    }
+
+                    REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 3u + j]
+                            == approximately(acc_x, mppp::real{1000.}));
+                    REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 4u + j]
+                            == approximately(acc_y, mppp::real{1000.}));
+                    REQUIRE(outs[i * (batch_size + extra_stride) * 6u + (batch_size + extra_stride) * 5u + j]
+                            == approximately(acc_z, mppp::real{1000.}));
+                }
+            }
+        }
+    }
+}
+
+#endif
 
 // A test in which all outputs are equal to numbers or params.
 TEST_CASE("cfunc numparams")
@@ -1498,6 +1775,19 @@ TEST_CASE("cfunc failure modes")
         REQUIRE_THROWS_MATCHES(add_cfunc<long double>(s, "cfunc", {1_dbl, par[0]}), not_implemented_error,
                                Message("'long double' computations are not supported on PowerPC"));
     }
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    {
+        llvm_state s;
+
+        REQUIRE_THROWS_MATCHES(add_cfunc<mppp::real>(s, "cfunc", {1_dbl, par[0]}), std::invalid_argument,
+                               Message(fmt::format("An invalid precision value of 0 was passed to add_cfunc() (the "
+                                                   "value must be in the [{}, {}] range)",
+                                                   mppp::real_prec_min(), mppp::real_prec_max())));
+    }
+
 #endif
 }
 

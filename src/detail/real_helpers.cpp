@@ -92,6 +92,9 @@ real_prec_t llvm_is_real(llvm::Type *t)
             }
             // LCOV_EXCL_STOP
 
+            // Double check the limb array size is consistent with the precision value.
+            assert(mppp::prec_to_nlimbs(value) == ptr->elements()[2]->getArrayNumElements());
+
             return value;
         }
     }
