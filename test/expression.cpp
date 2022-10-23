@@ -1325,7 +1325,7 @@ TEST_CASE("cfunc numparams mp")
 
     std::uniform_real_distribution<double> rdist(-1., 1.);
 
-    auto gen = [&]() { return mppp::real{rdist(rng), prec}; };
+    auto gen = [&]() { return mppp::real{rdist(rng), static_cast<int>(prec)}; };
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
         for (auto cm : {false, true}) {
