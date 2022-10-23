@@ -1119,7 +1119,7 @@ TEST_CASE("cfunc nbody mp")
 
     std::uniform_real_distribution<double> rdist(-1., 1.);
 
-    auto gen = [&rdist]() { return mppp::real{rdist(rng), static_cast<int>(prec)}; };
+    auto gen = [&]() { return mppp::real{rdist(rng), static_cast<int>(prec)}; };
 
     const auto batch_size = 1u;
 
@@ -1382,7 +1382,7 @@ TEST_CASE("cfunc nbody par mp")
 
     std::uniform_real_distribution<double> rdist(-1., 1.);
 
-    auto gen = [&rdist]() { return mppp::real{rdist(rng), static_cast<int>(prec)}; };
+    auto gen = [&]() { return mppp::real{rdist(rng), static_cast<int>(prec)}; };
 
     const auto batch_size = 1u;
 
