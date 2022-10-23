@@ -38,6 +38,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include "catch.hpp"
 #include "test_utils.hpp"
 
@@ -1306,6 +1312,73 @@ TEST_CASE("cfunc numparams")
         }
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("cfunc numparams mp")
+{
+    const auto prec = 237u;
+
+    const auto batch_size = 1u;
+
+    std::vector<mppp::real> outs, pars;
+
+    std::uniform_real_distribution<double> rdist(-1., 1.);
+
+    auto gen = [&]() { return mppp::real{rdist(rng), prec}; };
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        for (auto cm : {false, true}) {
+
+            llvm_state s{kw::opt_level = opt_level};
+
+            outs.resize(4u * batch_size);
+            pars.resize(2u * batch_size);
+
+            std::generate(pars.begin(), pars.end(), gen);
+            std::generate(outs.begin(), outs.end(), gen);
+
+            add_cfunc<mppp::real>(s, "cfunc", {1_dbl, par[0], par[1], -2_dbl}, kw::prec = prec, kw::compact_mode = cm);
+
+            s.compile();
+
+            auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(
+                s.jit_lookup("cfunc"));
+
+            cf_ptr(outs.data(), nullptr, pars.data());
+
+            for (auto j = 0u; j < batch_size; ++j) {
+                REQUIRE(outs[j] == 1);
+                REQUIRE(outs[j + batch_size] == pars[j]);
+                REQUIRE(outs[j + 2u * batch_size] == pars[j + 1u]);
+                REQUIRE(outs[j + 3u * batch_size] == -2);
+            }
+
+            // Run the test on the strided function too.
+            const std::size_t extra_stride = 3;
+            outs.resize(4u * (batch_size + extra_stride));
+            pars.resize(2u * (batch_size + extra_stride));
+
+            std::generate(pars.begin(), pars.end(), gen);
+            std::generate(outs.begin(), outs.end(), gen);
+
+            auto *cfs_ptr
+                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, std::size_t)>(
+                    s.jit_lookup("cfunc.strided"));
+
+            cfs_ptr(outs.data(), nullptr, pars.data(), batch_size + extra_stride);
+
+            for (auto j = 0u; j < batch_size; ++j) {
+                REQUIRE(outs[j] == 1);
+                REQUIRE(outs[j + batch_size + extra_stride] == pars[j]);
+                REQUIRE(outs[j + 2u * (batch_size + extra_stride)] == pars[j + batch_size + extra_stride]);
+                REQUIRE(outs[j + 3u * (batch_size + extra_stride)] == -2);
+            }
+        }
+    }
+}
+
+#endif
 
 // A test with explicit variable list.
 TEST_CASE("cfunc explicit")
