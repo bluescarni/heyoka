@@ -396,9 +396,9 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
 
         // Load and insert the limbs.
         for (std::size_t i = 0; i < nlimbs; ++i) {
-            auto *ptr
+            auto *cur_limb_ptr
                 = builder.CreateInBoundsGEP(limb_t, limb_ptr, builder.getInt32(boost::numeric_cast<std::uint32_t>(i)));
-            auto *limb = builder.CreateLoad(limb_t, ptr);
+            auto *limb = builder.CreateLoad(limb_t, cur_limb_ptr);
             ret = builder.CreateInsertValue(ret, limb, {2u, boost::numeric_cast<std::uint32_t>(i)});
         }
 
