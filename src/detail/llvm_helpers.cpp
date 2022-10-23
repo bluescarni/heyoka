@@ -1384,44 +1384,17 @@ llvm::Value *llvm_fcmp_oeq(llvm_state &s, llvm::Value *a, llvm::Value *b)
 // Helper to compute sin and cos simultaneously.
 std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *x)
 {
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    // LCOV_EXCL_STOP
+
     auto &context = s.context();
     auto &builder = s.builder();
 
-#if defined(HEYOKA_HAVE_REAL128)
     // Determine the scalar type of the vector arguments.
     auto *x_t = x->getType()->getScalarType();
 
-    if (x_t == llvm::Type::getFP128Ty(context)) {
-        // NOTE: for __float128 we cannot use the intrinsics, we need
-        // to call an external function.
-
-        // Convert the vector argument to scalars.
-        auto x_scalars = vector_to_scalars(builder, x);
-
-        // Execute the sincosq() function on the scalar values and store
-        // the results in res_scalars.
-        // NOTE: need temp storage because sincosq uses pointers
-        // for output values.
-        auto s_all = builder.CreateAlloca(x_t);
-        auto c_all = builder.CreateAlloca(x_t);
-        std::vector<llvm::Value *> res_sin, res_cos;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            llvm_invoke_external(
-                s, "sincosq", builder.getVoidTy(), {x_scalars[i], s_all, c_all},
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
-
-            res_sin.emplace_back(builder.CreateLoad(x_t, s_all));
-            res_cos.emplace_back(builder.CreateLoad(x_t, c_all));
-        }
-
-        // Reconstruct the return value as a vector.
-        return {scalars_to_vector(builder, res_sin), scalars_to_vector(builder, res_cos)};
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        return llvm_real_sincos(s, x);
-#endif
-    } else {
-#endif
+    if (x_t == to_llvm_type<double>(context, false) || x_t == to_llvm_type<long double>(context, false)) {
         if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
             // NOTE: although there exists a SLEEF function for computing sin/cos
             // at the same time, we cannot use it directly because it returns a pair
@@ -1463,8 +1436,41 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
 
         return {sin_x, cos_x};
 #if defined(HEYOKA_HAVE_REAL128)
-    }
+    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
+        // NOTE: for __float128 we cannot use the intrinsics, we need
+        // to call an external function.
+
+        // Convert the vector argument to scalars.
+        auto x_scalars = vector_to_scalars(builder, x);
+
+        // Execute the sincosq() function on the scalar values and store
+        // the results in res_scalars.
+        // NOTE: need temp storage because sincosq uses pointers
+        // for output values.
+        auto s_all = builder.CreateAlloca(x_t);
+        auto c_all = builder.CreateAlloca(x_t);
+        std::vector<llvm::Value *> res_sin, res_cos;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            llvm_invoke_external(s, "sincosq", builder.getVoidTy(), {x_scalars[i], s_all, c_all},
+                                 {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+
+            res_sin.emplace_back(builder.CreateLoad(x_t, s_all));
+            res_cos.emplace_back(builder.CreateLoad(x_t, c_all));
+        }
+
+        // Reconstruct the return value as a vector.
+        return {scalars_to_vector(builder, res_sin), scalars_to_vector(builder, res_cos)};
 #endif
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(x->getType()) != 0) {
+        return llvm_real_sincos(s, x);
+#endif
+    } else {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of sincos()",
+                                                llvm_type_name(x->getType())));
+        // LCOV_EXCL_STOP
+    }
 }
 
 // Helper to compute abs(x_v).
