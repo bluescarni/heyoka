@@ -2970,52 +2970,48 @@ llvm::Value *llvm_acos(llvm_state &s, llvm::Value *x)
     // Determine the scalar type of the argument.
     auto *x_t = x->getType()->getScalarType();
 
-#if defined(HEYOKA_HAVE_REAL128)
-    if (x_t == llvm::Type::getFP128Ty(context)) {
-        return call_extern_vec(s, {x}, "acosq");
-    } else {
-#endif
-        if (x_t == to_llvm_type<double>(context)) {
-            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-                if (const auto sfn = sleef_function_name(context, "acos", x_t,
-                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                    !sfn.empty()) {
-                    return llvm_invoke_external(
-                        s, sfn, vec_t, {x},
-                        // NOTE: in theory we may add ReadNone here as well,
-                        // but for some reason, at least up to LLVM 10,
-                        // this causes strange codegen issues. Revisit
-                        // in the future.
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
-                }
+    if (x_t == to_llvm_type<double>(context, false)) {
+        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+            if (const auto sfn = sleef_function_name(context, "acos", x_t,
+                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                !sfn.empty()) {
+                return llvm_invoke_external(
+                    s, sfn, vec_t, {x},
+                    // NOTE: in theory we may add ReadNone here as well,
+                    // but for some reason, at least up to LLVM 10,
+                    // this causes strange codegen issues. Revisit
+                    // in the future.
+                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
             }
+        }
 
-            return call_extern_vec(s, {x}, "acos");
-        } else if (x_t == to_llvm_type<long double>(context)) {
-            return call_extern_vec(s, {x},
+        return call_extern_vec(s, {x}, "acos");
+    } else if (x_t == to_llvm_type<long double>(context, false)) {
+        return call_extern_vec(s, {x},
 #if defined(_MSC_VER)
-                                   // NOTE: it seems like the MSVC stdlib does not have an acos function,
-                                   // because LLVM complains about the symbol "acosl" not being
-                                   // defined. Hence, use our own wrapper instead.
-                                   "heyoka_acosl"
+                               // NOTE: it seems like the MSVC stdlib does not have an acos function,
+                               // because LLVM complains about the symbol "acosl" not being
+                               // defined. Hence, use our own wrapper instead.
+                               "heyoka_acosl"
 #else
                                "acosl"
 #endif
-            );
-#if defined(HEYOKA_HAVE_REAL)
-        } else if (llvm_is_real(x->getType()) != 0) {
-            auto *f = real_nary_op(s, x->getType(), "acos", "mpfr_acos", 1u);
-
-            return s.builder().CreateCall(f, {x});
-#endif
-            // LCOV_EXCL_START
-        } else {
-            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of acos()");
-        }
-        // LCOV_EXCL_STOP
+        );
 #if defined(HEYOKA_HAVE_REAL128)
-    }
+    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
+        return call_extern_vec(s, {x}, "acosq");
 #endif
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(x->getType()) != 0) {
+        auto *f = real_nary_op(s, x->getType(), "acos", "mpfr_acos", 1u);
+        return s.builder().CreateCall(f, {x});
+#endif
+    } else {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of acos()",
+                                                llvm_type_name(x->getType())));
+        // LCOV_EXCL_STOP
+    }
 }
 
 // Inverse hyperbolic cosine.
@@ -3807,8 +3803,32 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_
     // Determine the scalar type of the arguments.
     auto *x_t = x->getType()->getScalarType();
 
+    if (x_t == to_llvm_type<double>(context, false) || x_t == to_llvm_type<long double>(context, false)) {
+        // NOTE: we want to try the SLEEF route only if we are *not* allowing
+        // an approximated implementation.
+        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType()); !allow_approx && vec_t != nullptr) {
+            if (const auto sfn
+                = sleef_function_name(context, "pow", x_t, boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                !sfn.empty()) {
+                return llvm_invoke_external(
+                    s, sfn, vec_t, {x, y},
+                    // NOTE: in theory we may add ReadNone here as well,
+                    // but for some reason, at least up to LLVM 10,
+                    // this causes strange codegen issues. Revisit
+                    // in the future.
+                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+            }
+        }
+
+        auto *ret = llvm_invoke_intrinsic(s.builder(), "llvm.pow", {x->getType()}, {x, y});
+
+        if (allow_approx) {
+            ret->setHasApproxFunc(true);
+        }
+
+        return ret;
 #if defined(HEYOKA_HAVE_REAL128)
-    if (x_t == llvm::Type::getFP128Ty(context)) {
+    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
         // NOTE: in principle we can detect here if y is a (vector) constant,
         // e.g., -3/2, and in such case we could do something like replacing
         // powq with sqrtq + mul/div. However the accuracy implications of this
@@ -3822,48 +3842,20 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_
         //
         // The same applies to the real implementation.
         return call_extern_vec(s, {x, y}, "powq");
-    } else {
 #endif
-        if (x_t == to_llvm_type<double>(context) || x_t == to_llvm_type<long double>(context)) {
-            // NOTE: we want to try the SLEEF route only if we are *not* allowing
-            // an approximated implementation.
-            if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType()); !allow_approx && vec_t != nullptr) {
-                if (const auto sfn = sleef_function_name(context, "pow", x_t,
-                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                    !sfn.empty()) {
-                    return llvm_invoke_external(
-                        s, sfn, vec_t, {x, y},
-                        // NOTE: in theory we may add ReadNone here as well,
-                        // but for some reason, at least up to LLVM 10,
-                        // this causes strange codegen issues. Revisit
-                        // in the future.
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
-                }
-            }
-
-            auto *ret = llvm_invoke_intrinsic(s.builder(), "llvm.pow", {x->getType()}, {x, y});
-
-            if (allow_approx) {
-                ret->setHasApproxFunc(true);
-            }
-
-            return ret;
 #if defined(HEYOKA_HAVE_REAL)
-        } else if (llvm_is_real(x->getType()) != 0) {
-            // NOTE: there is a convenient mpfr_rec_sqrt() function which looks very handy
-            // for possibly optimising the case of exponent == -3/2.
-            auto *f = real_nary_op(s, x->getType(), "pow", "mpfr_pow", 2u);
-
-            return s.builder().CreateCall(f, {x, y});
+    } else if (llvm_is_real(x->getType()) != 0) {
+        // NOTE: there is a convenient mpfr_rec_sqrt() function which looks very handy
+        // for possibly optimising the case of exponent == -3/2.
+        auto *f = real_nary_op(s, x->getType(), "pow", "mpfr_pow", 2u);
+        return s.builder().CreateCall(f, {x, y});
 #endif
-            // LCOV_EXCL_START
-        } else {
-            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of pow()");
-        }
+    } else {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of pow()",
+                                                llvm_type_name(x->getType())));
         // LCOV_EXCL_STOP
-#if defined(HEYOKA_HAVE_REAL128)
     }
-#endif
 }
 
 template <typename T>
