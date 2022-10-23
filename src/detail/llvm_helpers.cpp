@@ -489,9 +489,10 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
 
         // Store the limbs.
         for (std::size_t i = 0; i < nlimbs; ++i) {
-            auto *ptr = builder.CreateInBoundsGEP(limb_t, out_limb_ptr,
-                                                  builder.getInt32(boost::numeric_cast<std::uint32_t>(i)));
-            builder.CreateStore(builder.CreateExtractValue(vec, {2u, boost::numeric_cast<std::uint32_t>(i)}), ptr);
+            auto *cur_limb_ptr = builder.CreateInBoundsGEP(limb_t, out_limb_ptr,
+                                                           builder.getInt32(boost::numeric_cast<std::uint32_t>(i)));
+            builder.CreateStore(builder.CreateExtractValue(vec, {2u, boost::numeric_cast<std::uint32_t>(i)}),
+                                cur_limb_ptr);
         }
     } else {
 #endif
