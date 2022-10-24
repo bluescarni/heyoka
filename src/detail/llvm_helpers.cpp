@@ -212,14 +212,18 @@ llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp, bo
     const auto *err_msg = "Unable to associate the C++ type '{}' to an LLVM type";
 
     if (it == type_map.end()) {
+        // LCOV_EXCL_START
         return err_throw ? throw std::invalid_argument(fmt::format(err_msg, boost::core::demangle(tp.name())))
                          : nullptr;
+        // LCOV_EXCL_STOP
     } else {
         auto *ret = it->second(c);
 
         if (ret == nullptr) {
+            // LCOV_EXCL_START
             return err_throw ? throw std::invalid_argument(fmt::format(err_msg, boost::core::demangle(tp.name())))
                              : nullptr;
+            // LCOV_EXCL_STOP
         }
 
         return ret;
