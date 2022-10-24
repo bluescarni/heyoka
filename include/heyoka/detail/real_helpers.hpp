@@ -43,6 +43,7 @@ llvm::Value *llvm_real_fcmp_ole(llvm_state &, llvm::Value *, llvm::Value *);
 llvm::Value *llvm_real_fcmp_olt(llvm_state &, llvm::Value *, llvm::Value *);
 llvm::Value *llvm_real_fcmp_ogt(llvm_state &, llvm::Value *, llvm::Value *);
 llvm::Value *llvm_real_fcmp_oeq(llvm_state &, llvm::Value *, llvm::Value *);
+llvm::Value *llvm_real_ui_to_fp(llvm_state &, llvm::Value *, llvm::Type *);
 
 } // namespace heyoka::detail
 

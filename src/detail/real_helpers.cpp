@@ -14,6 +14,7 @@
 #include <charconv>
 #include <cstdint>
 #include <initializer_list>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -562,6 +563,85 @@ llvm::Value *llvm_real_fcmp_oeq(llvm_state &s, llvm::Value *a, llvm::Value *b)
     auto *f = real_nary_cmp(s, a->getType(), "fcmp_oeq", "mpfr_equal_p", 2u);
 
     return s.builder().CreateCall(f, {a, b});
+}
+
+// Convert the input unsigned integral value n to the real type fp_t.
+llvm::Value *llvm_real_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
+{
+    assert(n != nullptr);
+    assert(fp_t != nullptr);
+
+    auto &md = s.module();
+    auto &context = s.context();
+    auto &builder = s.builder();
+
+    const auto real_prec = llvm_is_real(fp_t);
+    assert(real_prec > 0);
+
+    // Fetch the integral type and its bit width.
+    auto *llvm_int_t = llvm::cast<llvm::IntegerType>(n->getType());
+    const auto source_int_width = llvm_int_t->getBitWidth();
+
+    // We will be using mpfr_set_ui(), which takes an unsigned long
+    // as input. If the source integer type is wider than unsigned long, we
+    // need to error out.
+    constexpr auto ul_width = static_cast<unsigned>(std::numeric_limits<unsigned long>::digits);
+    if (source_int_width > ul_width) {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(
+            fmt::format("Cannot convert an LLVM integer of type '{}' to a real: the bit width is too large",
+                        llvm_type_name(llvm_int_t)));
+        // LCOV_EXCL_STOP
+    }
+
+    const auto fname = fmt::format("heyoka.real.{}.ui_{}_to_fp", real_prec, source_int_width);
+
+    auto *f = md.getFunction(fname);
+
+    if (f == nullptr) {
+        auto *orig_bb = builder.GetInsertBlock();
+
+        // Create the function type and the function.
+        const std::vector<llvm::Type *> fargs{llvm_int_t};
+        auto *ft = llvm::FunctionType::get(fp_t, fargs, false);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        assert(f != nullptr);
+        f->addFnAttr(llvm::Attribute::NoUnwind);
+        f->addFnAttr(llvm::Attribute::Speculatable);
+        f->addFnAttr(llvm::Attribute::WillReturn);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Create an undef value for the result and add it as first function argument.
+        auto [real_res, limb_arr_res] = llvm_undef_mpfr_view(s, fp_t);
+        std::vector<llvm::Value *> mpfr_args;
+        mpfr_args.push_back(real_res);
+
+        // Add the input unsigned integer value, extended to unsigned long if necessary.
+        if (source_int_width == ul_width) {
+            mpfr_args.push_back(f->args().begin());
+        } else {
+            mpfr_args.push_back(builder.CreateZExt(f->args().begin(), to_llvm_type<unsigned long>(context)));
+        }
+
+        // Add the rounding mode.
+        mpfr_args.push_back(llvm_mpfr_rndn(s));
+
+        // Invoke the MPFR primitive.
+        llvm_invoke_external(s, "mpfr_set_ui", to_llvm_type<int>(context), mpfr_args,
+                             {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+
+        // Assemble the result.
+        auto *res = llvm_mpfr_view_to_real(s, real_res, limb_arr_res, fp_t);
+
+        builder.CreateRet(res);
+
+        s.verify_function(f);
+
+        builder.SetInsertPoint(orig_bb);
+    }
+
+    return builder.CreateCall(f, n);
 }
 
 } // namespace heyoka::detail

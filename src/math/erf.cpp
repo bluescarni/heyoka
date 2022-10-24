@@ -344,7 +344,7 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, llvm::Type *fp_t, con
             },
             [&]() {
                 // Compute the fp version of the order.
-                auto ord_fp = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
+                auto ord_fp = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
@@ -354,7 +354,7 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, llvm::Type *fp_t, con
                     auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
                     auto bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, b_idx);
 
-                    auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
+                    auto fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     builder.CreateStore(
                         llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, c_nj, bj))), acc);

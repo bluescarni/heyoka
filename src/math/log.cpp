@@ -324,7 +324,7 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, llvm::Type *fp_t, con
             },
             [&]() {
                 // Create the fp version of the order.
-                auto ord_fp = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
+                auto ord_fp = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Compute n*b^[0].
                 auto nb0
@@ -342,7 +342,7 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, llvm::Type *fp_t, con
                     auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, a_idx);
 
                     // Compute j.
-                    auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
+                    auto fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     builder.CreateStore(
                         llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, bnj, aj))), acc);

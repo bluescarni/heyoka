@@ -292,14 +292,14 @@ llvm::Function *taylor_c_diff_func_tanh_impl(llvm_state &s, llvm::Type *fp_t, co
                     auto bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, b_idx);
                     auto cnj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
 
-                    auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
+                    auto fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     builder.CreateStore(
                         llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, cnj, bj))), acc);
                 });
 
                 // Divide by the order and subtract from b^[n] to produce the return value.
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
+                auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 builder.CreateStore(llvm_fsub(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx),
                                               llvm_fdiv(s, builder.CreateLoad(val_t, acc), ord_v)),

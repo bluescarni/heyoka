@@ -3977,6 +3977,29 @@ llvm::Type *llvm_ext_type(llvm::Type *fp_t)
     // LCOV_EXCL_STOP
 }
 
+// Convert the input unsigned integral value n to the floating-point type fp_t.
+// Vector types/values are not supported.
+llvm::Value *llvm_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
+{
+    assert(n != nullptr);
+    assert(fp_t != nullptr);
+    assert(!n->getType()->isVectorTy());
+    assert(!fp_t->isVectorTy());
+
+    if (fp_t->isFloatingPointTy()) {
+        return s.builder().CreateUIToFP(n, fp_t);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm_real_ui_to_fp(s, n, fp_t);
+#endif
+    } else {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(
+            fmt::format("Cannot convert an unsigned integral value to the LLVM type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
+    }
+}
+
 } // namespace heyoka::detail
 
 // NOTE: this function will be called by the LLVM implementation

@@ -643,8 +643,7 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
 
         // We have to divide the derivative by 'order' in order
         // to get the normalised derivative of the state variable.
-        ret = llvm_fdiv(s, ret,
-                        vector_splat(builder, builder.CreateUIToFP(order, fp_vec_t->getScalarType()), batch_size));
+        ret = llvm_fdiv(s, ret, vector_splat(builder, llvm_ui_to_fp(s, order, fp_vec_t->getScalarType()), batch_size));
 
         // Store the derivative.
         taylor_c_store_diff(s, fp_vec_t, diff_arr, n_uvars, order, sv_idx, ret);
