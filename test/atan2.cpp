@@ -30,6 +30,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -289,3 +295,43 @@ TEST_CASE("cfunc")
         }
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("cfunc_mp")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    const auto prec = 237u;
+
+    for (auto compact_mode : {false, true}) {
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            add_cfunc<mppp::real>(
+                s, "cfunc",
+                {atan2(x, y), atan2(x, par[0]), atan2(par[0], x), atan2(x, 3. / 2_dbl), atan2(3. / 2_dbl, x)},
+                kw::compact_mode = compact_mode, kw::prec = prec);
+
+            s.compile();
+
+            auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(
+                s.jit_lookup("cfunc"));
+
+            const std::vector ins{mppp::real{"1.1", prec}, mppp::real{"2.1", prec}};
+            const std::vector pars{mppp::real{"3.1", prec}};
+            std::vector<mppp::real> outs(5u, mppp::real{0, prec});
+
+            cf_ptr(outs.data(), ins.data(), pars.data());
+
+            auto i = 0u;
+            REQUIRE(outs[i] == atan2(ins[i], ins[i + 1u]));
+            REQUIRE(outs[i + 1u] == atan2(ins[i], pars[i]));
+            REQUIRE(outs[i + 2u * 1u] == atan2(pars[i], ins[i]));
+            REQUIRE(outs[i + 3u * 1u] == atan2(ins[i], 3. / 2));
+            REQUIRE(outs[i + 4u * 1u] == atan2(3. / 2, ins[i]));
+        }
+    }
+}
+
+#endif
