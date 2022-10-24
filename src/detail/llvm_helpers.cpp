@@ -1132,7 +1132,9 @@ llvm::Value *llvm_fadd(llvm_state &s, llvm::Value *a, llvm::Value *b)
         return builder.CreateCall(f, {a, b});
 #endif
     } else {
+        // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fadd values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -1157,7 +1159,9 @@ llvm::Value *llvm_fsub(llvm_state &s, llvm::Value *a, llvm::Value *b)
         return builder.CreateCall(f, {a, b});
 #endif
     } else {
+        // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fsub values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -1182,7 +1186,9 @@ llvm::Value *llvm_fmul(llvm_state &s, llvm::Value *a, llvm::Value *b)
         return builder.CreateCall(f, {a, b});
 #endif
     } else {
+        // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fmul values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -1207,7 +1213,9 @@ llvm::Value *llvm_fdiv(llvm_state &s, llvm::Value *a, llvm::Value *b)
         return builder.CreateCall(f, {a, b});
 #endif
     } else {
+        // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fdiv values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -1228,7 +1236,9 @@ llvm::Value *llvm_fneg(llvm_state &s, llvm::Value *a)
         return llvm_real_fneg(s, a);
 #endif
     } else {
+        // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fneg values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -1245,8 +1255,10 @@ llvm::Constant *llvm_constantfp([[maybe_unused]] llvm_state &s, llvm::Type *fp_t
         return llvm::cast<llvm::Constant>(llvm_codegen(s, fp_t, number{val}));
 #endif
     } else {
+        // LCOV_EXCL_START
         throw std::invalid_argument(
             fmt::format("Unable to generate a floating-point constant of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -1269,7 +1281,9 @@ llvm::Value *llvm_fcmp_ult(llvm_state &s, llvm::Value *a, llvm::Value *b)
         return llvm_real_fcmp_ult(s, a, b);
 #endif
     } else {
+        // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_ult values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -1292,7 +1306,9 @@ llvm::Value *llvm_fcmp_oge(llvm_state &s, llvm::Value *a, llvm::Value *b)
         return llvm_real_fcmp_oge(s, a, b);
 #endif
     } else {
+        // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_oge values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -1315,7 +1331,9 @@ llvm::Value *llvm_fcmp_ole(llvm_state &s, llvm::Value *a, llvm::Value *b)
         return llvm_real_fcmp_ole(s, a, b);
 #endif
     } else {
+        // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_ole values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -1338,7 +1356,9 @@ llvm::Value *llvm_fcmp_olt(llvm_state &s, llvm::Value *a, llvm::Value *b)
         return llvm_real_fcmp_olt(s, a, b);
 #endif
     } else {
+        // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_olt values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -1361,7 +1381,9 @@ llvm::Value *llvm_fcmp_ogt(llvm_state &s, llvm::Value *a, llvm::Value *b)
         return llvm_real_fcmp_ogt(s, a, b);
 #endif
     } else {
+        // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_ogt values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -1384,7 +1406,9 @@ llvm::Value *llvm_fcmp_oeq(llvm_state &s, llvm::Value *a, llvm::Value *b)
         return llvm_real_fcmp_oeq(s, a, b);
 #endif
     } else {
+        // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to fcmp_oeq values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -1506,11 +1530,11 @@ llvm::Value *llvm_abs(llvm_state &s, llvm::Value *x)
 
         return s.builder().CreateCall(f, {x});
 #endif
-        // LCOV_EXCL_START
     } else {
+        // LCOV_EXCL_START
         throw std::invalid_argument(fmt::format("Unable to abs values of type '{}'", llvm_type_name(x->getType())));
+        // LCOV_EXCL_STOP
     }
-    // LCOV_EXCL_STOP
 }
 
 // Helper to reduce x modulo y, that is, to compute:
