@@ -337,6 +337,9 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Type *tp, llvm::
     return ret;
 }
 
+// This is like load_vector_from_memory(), except that the pointee of ptr might differ from the type of the loaded
+// value (e.g., in the case of real). This is supposed to be used when loading data created outside the LLVM
+// JIT world.
 llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Value *ptr, std::uint32_t vector_size)
 {
     auto &builder = s.builder();
@@ -435,6 +438,9 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
     }
 }
 
+// This is like store_vector_to_memory(), except that the pointee of ptr might differ from the type of the value to
+// be stored (e.g., in the case of real). This is supposed to be used when storing data created created inside LLVM into
+// a pointer that will then be used by code outside the LLVM realm.
 void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *vec)
 {
     auto &builder = s.builder();
@@ -1486,7 +1492,7 @@ llvm::Value *llvm_abs(llvm_state &s, llvm::Value *x)
 
     if (x_t->isFloatingPointTy()) {
 #if defined(HEYOKA_HAVE_REAL128)
-        if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        if (x_t == to_llvm_type<mppp::real128>(s.context(), false)) {
             return call_extern_vec(s, {x}, "fabsq");
         } else {
 #endif
@@ -1722,7 +1728,7 @@ llvm::Value *llvm_fma(llvm_state &s, llvm::Value *x, llvm::Value *y, llvm::Value
 
     if (x_t->isFloatingPointTy()) {
 #if defined(HEYOKA_HAVE_REAL128)
-        if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        if (x_t == to_llvm_type<mppp::real128>(s.context(), false)) {
             return call_extern_vec(s, {x, y, z}, "fmaq");
         } else {
 #endif
@@ -1733,7 +1739,6 @@ llvm::Value *llvm_fma(llvm_state &s, llvm::Value *x, llvm::Value *y, llvm::Value
 #if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(x->getType()) != 0) {
         auto *f = real_nary_op(s, x->getType(), "fma", "mpfr_fma", 3u);
-
         return s.builder().CreateCall(f, {x, y, z});
 #endif
         // LCOV_EXCL_START
@@ -1755,7 +1760,7 @@ llvm::Value *llvm_floor(llvm_state &s, llvm::Value *x)
 
     if (x_t->isFloatingPointTy()) {
 #if defined(HEYOKA_HAVE_REAL128)
-        if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        if (x_t == to_llvm_type<mppp::real128>(s.context(), false)) {
             return call_extern_vec(s, {x}, "floorq");
         } else {
 #endif

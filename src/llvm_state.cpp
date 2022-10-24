@@ -150,6 +150,13 @@ static_assert(std::is_same_v<ir_builder, llvm::IRBuilder<>>, "Inconsistent defin
 
 // LCOV_EXCL_START
 
+// Regex to match the PowerPC ISA version from the
+// CPU string.
+// NOTE: the pattern reported by LLVM here seems to be pwrN
+// (sample size of 1, on travis...).
+// NOLINTNEXTLINE(cert-err58-cpp)
+const std::regex ppc_regex_pattern("pwr([1-9]*)");
+
 // Helper function to detect specific features
 // on the host machine via LLVM's machinery.
 target_features get_target_features_impl()
@@ -197,12 +204,9 @@ target_features get_target_features_impl()
         // instruction set from the CPU string.
         const auto target_cpu = std::string{(*tm)->getTargetCPU()};
 
-        // NOTE: the pattern reported by LLVM here seems to be pwrN
-        // (sample size of 1, on travis...).
-        std::regex pattern("pwr([1-9]*)");
         std::cmatch m;
 
-        if (std::regex_match(target_cpu.c_str(), m, pattern)) {
+        if (std::regex_match(target_cpu.c_str(), m, ppc_regex_pattern)) {
             if (m.size() == 2u) {
                 // The CPU name matches and contains a subgroup.
                 // Extract the N from "pwrN".
@@ -244,6 +248,7 @@ target_features get_target_features_impl()
 
 // Machinery to initialise the native target in
 // LLVM. This needs to be done only once.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 std::once_flag nt_inited;
 
 void init_native_target()
@@ -387,8 +392,8 @@ struct llvm_state::jit {
         // Run several checks to ensure that real_t matches the layout of mppp::real/mpfr_struct_t.
         // NOTE: these checks need access to the data layout, so we put them here for convenience.
         const auto &dl = m_lljit->getDataLayout();
-        const auto *slo
-            = dl.getStructLayout(llvm::cast<llvm::StructType>(detail::to_llvm_type<mppp::real>(*m_ctx->getContext())));
+        auto *real_t = llvm::cast<llvm::StructType>(detail::to_llvm_type<mppp::real>(*m_ctx->getContext()));
+        const auto *slo = dl.getStructLayout(real_t);
         assert(slo->getSizeInBytes() == sizeof(mppp::real));
         assert(slo->getAlignment().value() == alignof(mppp::real));
         assert(slo->getElementOffset(0) == offsetof(mppp::mpfr_struct_t, _mpfr_prec));
