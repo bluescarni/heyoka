@@ -1613,29 +1613,42 @@ llvm::Value *llvm_max_nan(llvm_state &s, llvm::Value *a, llvm::Value *b)
 llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
 {
     assert(val != nullptr);
-    assert(val->getType()->getScalarType()->isFloatingPointTy());
 
     auto &builder = s.builder();
 
-    // Build the zero constant.
-    auto *zero = llvm_constantfp(s, val->getType(), 0.);
+    auto *x_t = val->getType()->getScalarType();
 
-    // Run the comparisons.
-    auto *cmp0 = llvm_fcmp_olt(s, zero, val);
-    auto *cmp1 = llvm_fcmp_olt(s, val, zero);
+    if (x_t->isFloatingPointTy()) {
+        // Build the zero constant.
+        auto *zero = llvm_constantfp(s, val->getType(), 0.);
 
-    // Convert to int32.
-    llvm::Type *int_type;
-    if (auto *v_t = llvm::dyn_cast<llvm_vector_type>(cmp0->getType())) {
-        int_type = make_vector_type(builder.getInt32Ty(), boost::numeric_cast<std::uint32_t>(v_t->getNumElements()));
+        // Run the comparisons.
+        auto *cmp0 = llvm_fcmp_olt(s, zero, val);
+        auto *cmp1 = llvm_fcmp_olt(s, val, zero);
+
+        // Convert to int32.
+        llvm::Type *int_type;
+        if (auto *v_t = llvm::dyn_cast<llvm_vector_type>(cmp0->getType())) {
+            int_type
+                = make_vector_type(builder.getInt32Ty(), boost::numeric_cast<std::uint32_t>(v_t->getNumElements()));
+        } else {
+            int_type = builder.getInt32Ty();
+        }
+        auto *icmp0 = builder.CreateZExt(cmp0, int_type);
+        auto *icmp1 = builder.CreateZExt(cmp1, int_type);
+
+        // Compute and return the result.
+        return builder.CreateSub(icmp0, icmp1);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(val->getType()) != 0) {
+        return llvm_real_sgn(s, val);
+#endif
     } else {
-        int_type = builder.getInt32Ty();
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of sgn()",
+                                                llvm_type_name(val->getType())));
+        // LCOV_EXCL_STOP
     }
-    auto *icmp0 = builder.CreateZExt(cmp0, int_type);
-    auto *icmp1 = builder.CreateZExt(cmp1, int_type);
-
-    // Compute and return the result.
-    return builder.CreateSub(icmp0, icmp1);
 }
 
 // Two-argument arctan.

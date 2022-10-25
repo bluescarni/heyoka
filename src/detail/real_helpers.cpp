@@ -644,6 +644,74 @@ llvm::Value *llvm_real_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
     return builder.CreateCall(f, n);
 }
 
+// Sign function.
+// NOTE: this is implemented on top of mpfr_sgn(), which behaves consistently with the branchless
+// sign function (0 < x) - (x < 0) used for the basic floating-point types. In particular, mpfr_sgn()
+// returns 0 if x is NaN.
+llvm::Value *llvm_real_sgn(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    // LCOV_EXCL_STOP
+
+    auto *fp_t = x->getType();
+
+    const auto real_prec = llvm_is_real(fp_t);
+
+    assert(real_prec > 0);
+
+    // NOTE: this needs to behave like llvm_sgn() - in particular, it needs to return a 32-bit
+    // integer value of either 1, 0 or -1. Hence we cannot rely directly on real_nary_cmp(),
+    // which ends up returning a bool instead.
+
+    auto &md = s.module();
+    auto &context = s.context();
+    auto &builder = s.builder();
+
+    const auto fname = fmt::format("heyoka.real.{}.sgn", real_prec);
+
+    auto *f = md.getFunction(fname);
+
+    if (f == nullptr) {
+        auto *orig_bb = builder.GetInsertBlock();
+
+        // Create the function type and the function.
+        const std::vector<llvm::Type *> fargs{fp_t};
+        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), fargs, false);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        assert(f != nullptr);
+        f->addFnAttr(llvm::Attribute::NoUnwind);
+        f->addFnAttr(llvm::Attribute::Speculatable);
+        f->addFnAttr(llvm::Attribute::WillReturn);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Create the mpfr view for the input argument and add it as function argument.
+        const std::vector<llvm::Value *> mpfr_args{llvm_real_to_mpfr_view(s, f->args().begin()).first};
+
+        // Invoke the MPFR primitive.
+        auto *int_t = to_llvm_type<int>(context);
+        auto *cmp_ret = llvm_invoke_external(s, "heyoka_mpfr_sgn", int_t, mpfr_args,
+                                             {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+
+        // Compute the int32 return value: cmp_ret == 0 ? 0 : (cmp_ret < 0 ? -1 : 1).
+        auto *int32_t = builder.getInt32Ty();
+        auto *cmp_ret_zero = builder.CreateICmpEQ(cmp_ret, llvm::ConstantInt::get(int_t, 0u));
+        auto *cmp_ret_neg = builder.CreateICmpSLT(cmp_ret, llvm::ConstantInt::get(int_t, 0u));
+        auto *ret = builder.CreateSelect(cmp_ret_zero, builder.getInt32(0),
+                                         builder.CreateSelect(cmp_ret_neg, llvm::ConstantInt::getSigned(int32_t, -1),
+                                                              llvm::ConstantInt::getSigned(int32_t, 1)));
+
+        builder.CreateRet(ret);
+
+        s.verify_function(f);
+
+        builder.SetInsertPoint(orig_bb);
+    }
+
+    return builder.CreateCall(f, x);
+}
+
 } // namespace heyoka::detail
 
 #if !defined(NDEBUG)
@@ -670,6 +738,12 @@ extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_fcmp_ult(const mppp::mpfr_struct_t 
     } else {
         return ::mpfr_less_p(a, b);
     }
+}
+
+// Wrapper to invoke the mpfr_sgn() macro.
+extern "C" HEYOKA_DLL_PUBLIC int heyoka_mpfr_sgn(const mppp::mpfr_struct_t *x) noexcept
+{
+    return mpfr_sgn(x);
 }
 
 #endif

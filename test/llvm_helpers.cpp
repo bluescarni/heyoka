@@ -117,6 +117,68 @@ TEST_CASE("sgn scalar")
     tuple_for_each(fp_types, tester);
 }
 
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("sgn scalar mp")
+{
+    using detail::llvm_sgn;
+    using detail::to_llvm_type;
+
+    using fp_t = mppp::real;
+
+    const auto prec = 237u;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        llvm_state s{kw::opt_level = opt_level};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *val_t = to_llvm_type<fp_t>(context);
+        auto *real_t = detail::llvm_type_like(s, mppp::real{0, prec});
+
+        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {llvm::PointerType::getUnqual(val_t)}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sgn", &md);
+
+        auto *xptr = f->args().begin();
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *x = detail::ext_load_vector_from_memory(s, real_t, xptr, 1u);
+
+        // Create the return value.
+        builder.CreateRet(llvm_sgn(s, x));
+
+        // Verify.
+        s.verify_function(f);
+
+        // Run the optimisation pass.
+        s.optimise();
+
+        // Compile.
+        s.compile();
+
+        // Fetch the function pointer.
+        auto f_ptr = reinterpret_cast<std::int32_t (*)(const fp_t *)>(s.jit_lookup("sgn"));
+
+        mppp::real arg{0, prec};
+        REQUIRE(f_ptr(&arg) == 0);
+        arg = mppp::real{-123, prec};
+        REQUIRE(f_ptr(&arg) == -1);
+        arg = mppp::real{123, prec};
+        REQUIRE(f_ptr(&arg) == 1);
+        arg = mppp::real{"inf", prec};
+        REQUIRE(f_ptr(&arg) == 1);
+        arg = mppp::real{"-inf", prec};
+        REQUIRE(f_ptr(&arg) == -1);
+        arg = mppp::real{"nan", prec};
+        REQUIRE(f_ptr(&arg) == 0);
+    }
+}
+
+#endif
+
 // Generic branchless sign function.
 template <typename T>
 int sgn(T val)
@@ -1707,8 +1769,6 @@ TEST_CASE("fma scalar mp")
     using detail::to_llvm_type;
     using std::fma;
 
-    using fp_t = mppp::real;
-
     const auto prec = 237u;
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
@@ -1718,7 +1778,7 @@ TEST_CASE("fma scalar mp")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto *real_t = to_llvm_type<fp_t>(context);
+        auto *real_t = to_llvm_type<mppp::real>(context);
         auto *fp_t = detail::llvm_type_like(s, mppp::real{0, prec});
 
         const std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(real_t));
