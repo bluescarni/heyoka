@@ -664,6 +664,15 @@ expression operator+(expression ex, mppp::real128 x)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator+(expression ex, mppp::real x)
+{
+    return std::move(ex) + expression{std::move(x)};
+}
+
+#endif
+
 expression operator+(double x, expression ex)
 {
     return expression{x} + std::move(ex);
@@ -679,6 +688,15 @@ expression operator+(long double x, expression ex)
 expression operator+(mppp::real128 x, expression ex)
 {
     return expression{x} + std::move(ex);
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator+(mppp::real x, expression ex)
+{
+    return expression{std::move(x)} + std::move(ex);
 }
 
 #endif
@@ -702,6 +720,15 @@ expression operator-(expression ex, mppp::real128 x)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator-(expression ex, mppp::real x)
+{
+    return std::move(ex) - expression{std::move(x)};
+}
+
+#endif
+
 expression operator-(double x, expression ex)
 {
     return expression{x} - std::move(ex);
@@ -717,6 +744,15 @@ expression operator-(long double x, expression ex)
 expression operator-(mppp::real128 x, expression ex)
 {
     return expression{x} - std::move(ex);
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator-(mppp::real x, expression ex)
+{
+    return expression{std::move(x)} - std::move(ex);
 }
 
 #endif
@@ -740,6 +776,15 @@ expression operator*(expression ex, mppp::real128 x)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator*(expression ex, mppp::real x)
+{
+    return std::move(ex) * expression{std::move(x)};
+}
+
+#endif
+
 expression operator*(double x, expression ex)
 {
     return expression{x} * std::move(ex);
@@ -755,6 +800,15 @@ expression operator*(long double x, expression ex)
 expression operator*(mppp::real128 x, expression ex)
 {
     return expression{x} * std::move(ex);
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator*(mppp::real x, expression ex)
+{
+    return expression{std::move(x)} * std::move(ex);
 }
 
 #endif
@@ -778,6 +832,15 @@ expression operator/(expression ex, mppp::real128 x)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator/(expression ex, mppp::real x)
+{
+    return std::move(ex) / expression{std::move(x)};
+}
+
+#endif
+
 expression operator/(double x, expression ex)
 {
     return expression{x} / std::move(ex);
@@ -793,6 +856,15 @@ expression operator/(long double x, expression ex)
 expression operator/(mppp::real128 x, expression ex)
 {
     return expression{x} / std::move(ex);
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator/(mppp::real x, expression ex)
+{
+    return expression{std::move(x)} / std::move(ex);
 }
 
 #endif
@@ -836,6 +908,15 @@ expression &operator+=(expression &ex, mppp::real128 x)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression &operator+=(expression &ex, mppp::real x)
+{
+    return ex += expression{std::move(x)};
+}
+
+#endif
+
 expression &operator-=(expression &ex, double x)
 {
     return ex -= expression{x};
@@ -851,6 +932,15 @@ expression &operator-=(expression &ex, long double x)
 expression &operator-=(expression &ex, mppp::real128 x)
 {
     return ex -= expression{x};
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression &operator-=(expression &ex, mppp::real x)
+{
+    return ex -= expression{std::move(x)};
 }
 
 #endif
@@ -874,6 +964,15 @@ expression &operator*=(expression &ex, mppp::real128 x)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression &operator*=(expression &ex, mppp::real x)
+{
+    return ex *= expression{std::move(x)};
+}
+
+#endif
+
 expression &operator/=(expression &ex, double x)
 {
     return ex /= expression{x};
@@ -889,6 +988,15 @@ expression &operator/=(expression &ex, long double x)
 expression &operator/=(expression &ex, mppp::real128 x)
 {
     return ex /= expression{x};
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression &operator/=(expression &ex, mppp::real x)
+{
+    return ex /= expression{std::move(x)};
 }
 
 #endif

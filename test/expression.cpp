@@ -1824,3 +1824,52 @@ TEST_CASE("cfunc vsop2013")
     REQUIRE(out[1] == approximately(ta.get_state()[1], 100.));
     REQUIRE(out[2] == approximately(ta.get_state()[2], 100.));
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("mp interop")
+{
+    using namespace mppp::literals;
+
+    auto [x] = make_vars("x");
+
+    REQUIRE(std::get<mppp::real>(std::get<number>(expression{1.1_r256}.value()).value()) == 1.1_r256);
+
+    REQUIRE(x + 1.1_r256 == x + expression{1.1_r256});
+    REQUIRE(1.1_r256 + x == expression{1.1_r256} + x);
+
+    REQUIRE(x - 1.1_r256 == x - expression{1.1_r256});
+    REQUIRE(1.1_r256 - x == expression{1.1_r256} - x);
+
+    REQUIRE(x * 1.1_r256 == x * expression{1.1_r256});
+    REQUIRE(1.1_r256 * x == expression{1.1_r256} * x);
+
+    REQUIRE(x / 1.1_r256 == x / expression{1.1_r256});
+    REQUIRE(1.1_r256 / x == expression{1.1_r256} / x);
+
+    x = expression{"x"};
+    auto x2 = expression{"x"};
+    x += 1.1_r256;
+    x2 += expression{1.1_r256};
+    REQUIRE(x == x2);
+
+    x = expression{"x"};
+    x2 = expression{"x"};
+    x -= 1.1_r256;
+    x2 -= expression{1.1_r256};
+    REQUIRE(x == x2);
+
+    x = expression{"x"};
+    x2 = expression{"x"};
+    x *= 1.1_r256;
+    x2 *= expression{1.1_r256};
+    REQUIRE(x == x2);
+
+    x = expression{"x"};
+    x2 = expression{"x"};
+    x /= 1.1_r256;
+    x2 /= expression{1.1_r256};
+    REQUIRE(x == x2);
+}
+
+#endif
