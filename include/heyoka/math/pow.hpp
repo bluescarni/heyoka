@@ -22,6 +22,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -85,6 +91,12 @@ HEYOKA_DLL_PUBLIC expression pow(expression, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 
 HEYOKA_DLL_PUBLIC expression pow(expression, mppp::real128);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_DLL_PUBLIC expression pow(expression, mppp::real);
 
 #endif
 

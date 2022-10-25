@@ -50,7 +50,7 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-#if defined(HEYOKA_HAVE_REAL128)
+#if defined(HEYOKA_HAVE_REAL128) || defined(HEYOKA_HAVE_REAL)
 
 using namespace mppp::literals;
 
@@ -204,6 +204,13 @@ TEST_CASE("pow expo 4")
 #if defined(HEYOKA_HAVE_REAL128)
 
     REQUIRE(heyoka::pow(x, 41._rq) != square(x) * square(x));
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(heyoka::pow(x, 1.1_r256) != square(x) * square(x));
+    REQUIRE(heyoka::pow(x, 1.1_r256) == heyoka::pow(x, expression{1.1_r256}));
 
 #endif
 }

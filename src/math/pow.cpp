@@ -42,6 +42,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/sleef.hpp>
@@ -547,6 +553,15 @@ expression pow(expression b, long double e)
 expression pow(expression b, mppp::real128 e)
 {
     return detail::pow_wrapper_impl(std::move(b), expression{e});
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression pow(expression b, mppp::real e)
+{
+    return detail::pow_wrapper_impl(std::move(b), expression{std::move(e)});
 }
 
 #endif

@@ -37,6 +37,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -56,6 +62,12 @@ static std::mt19937 rng;
 
 using namespace heyoka;
 using namespace heyoka_test;
+
+#if defined(HEYOKA_HAVE_REAL128) || defined(HEYOKA_HAVE_REAL)
+
+using namespace mppp::literals;
+
+#endif
 
 const auto fp_types = std::tuple<double
 #if !defined(HEYOKA_ARCH_PPC)
@@ -195,6 +207,12 @@ TEST_CASE("kepE overloads")
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{mppp::real128{"1.1"}});
 #endif
 
+#if defined(HEYOKA_HAVE_REAL128)
+    k = kepE("x"_var, 1.1_r256);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1_r256});
+#endif
+
     k = kepE(1.1, "x"_var);
     REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{1.1});
@@ -207,6 +225,12 @@ TEST_CASE("kepE overloads")
     k = kepE(mppp::real128{"1.1"}, "x"_var);
     REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{mppp::real128{"1.1"}});
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+    k = kepE(1.1_r256, "x"_var);
+    REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{1.1_r256});
 #endif
 }
 

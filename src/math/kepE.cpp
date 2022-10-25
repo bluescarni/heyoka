@@ -38,6 +38,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -883,6 +889,15 @@ expression kepE(expression e, mppp::real128 M)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression kepE(expression e, mppp::real M)
+{
+    return kepE(std::move(e), expression(std::move(M)));
+}
+
+#endif
+
 expression kepE(double e, expression M)
 {
     return kepE(expression(e), std::move(M));
@@ -898,6 +913,15 @@ expression kepE(long double e, expression M)
 expression kepE(mppp::real128 e, expression M)
 {
     return kepE(expression(e), std::move(M));
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression kepE(mppp::real e, expression M)
+{
+    return kepE(expression(std::move(e)), std::move(M));
 }
 
 #endif
