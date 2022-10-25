@@ -379,3 +379,56 @@ TEST_CASE("cfunc")
         }
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("cfunc mp")
+{
+    using fp_t = mppp::real;
+
+    const auto prec = 237u;
+
+    auto [x, y] = make_vars("x", "y");
+
+    std::uniform_real_distribution<double> rdist(0., 0.9);
+
+    auto gen = [&]() { return mppp::real(rdist(rng), static_cast<int>(prec)); };
+
+    std::vector<fp_t> outs, ins, pars;
+
+    outs.resize(5u);
+    ins.resize(2u);
+    pars.resize(1u);
+
+    for (auto compact_mode : {false, true}) {
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            std::generate(ins.begin(), ins.end(), gen);
+            std::generate(outs.begin(), outs.end(), gen);
+            std::generate(pars.begin(), pars.end(), gen);
+
+            llvm_state s{kw::opt_level = opt_level};
+
+            add_cfunc<fp_t>(s, "cfunc",
+                            {kepE(x, y), kepE(x, par[0]), kepE(x, .5_dbl), kepE(par[0], y), kepE(.5_dbl, y)},
+                            kw::prec = prec, kw::compact_mode = compact_mode);
+
+            if (opt_level == 0u && compact_mode) {
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.kepE."));
+            }
+
+            s.compile();
+
+            auto *cf_ptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
+
+            cf_ptr(outs.data(), ins.data(), pars.data());
+
+            REQUIRE(outs[0] - ins[0] * sin(outs[0]) == approximately(ins[1], fp_t(1000)));
+            REQUIRE(outs[1] - ins[0] * sin(outs[1]) == approximately(pars[0], fp_t(1000)));
+            REQUIRE(outs[2] - ins[0] * sin(outs[2]) == approximately(mppp::real{0.5, prec}, fp_t(1000)));
+            REQUIRE(outs[3] - pars[0] * sin(outs[3]) == approximately(ins[1], fp_t(1000)));
+            REQUIRE(outs[4] - mppp::real{0.5, prec} * sin(outs[4]) == approximately(ins[1], fp_t(1000)));
+        }
+    }
+}
+
+#endif
