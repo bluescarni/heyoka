@@ -10,6 +10,7 @@
 
 #include <cassert>
 #include <charconv>
+#include <cstddef>
 #include <cstdint>
 #include <fstream>
 #include <initializer_list>
@@ -49,6 +50,7 @@
 #include <llvm/ExecutionEngine/Orc/ObjectTransformLayer.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/IR/Attributes.h>
+#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstrTypes.h>
@@ -58,6 +60,7 @@
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
+#include <llvm/Support/Casting.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/SmallVectorMemoryBuffer.h>
 #include <llvm/Support/SourceMgr.h>
@@ -120,7 +123,14 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
@@ -139,6 +149,13 @@ namespace
 static_assert(std::is_same_v<ir_builder, llvm::IRBuilder<>>, "Inconsistent definition of the ir_builder type.");
 
 // LCOV_EXCL_START
+
+// Regex to match the PowerPC ISA version from the
+// CPU string.
+// NOTE: the pattern reported by LLVM here seems to be pwrN
+// (sample size of 1, on travis...).
+// NOLINTNEXTLINE(cert-err58-cpp)
+const std::regex ppc_regex_pattern("pwr([1-9]*)");
 
 // Helper function to detect specific features
 // on the host machine via LLVM's machinery.
@@ -187,12 +204,9 @@ target_features get_target_features_impl()
         // instruction set from the CPU string.
         const auto target_cpu = std::string{(*tm)->getTargetCPU()};
 
-        // NOTE: the pattern reported by LLVM here seems to be pwrN
-        // (sample size of 1, on travis...).
-        std::regex pattern("pwr([1-9]*)");
         std::cmatch m;
 
-        if (std::regex_match(target_cpu.c_str(), m, pattern)) {
+        if (std::regex_match(target_cpu.c_str(), m, ppc_regex_pattern)) {
             if (m.size() == 2u) {
                 // The CPU name matches and contains a subgroup.
                 // Extract the N from "pwrN".
@@ -234,6 +248,7 @@ target_features get_target_features_impl()
 
 // Machinery to initialise the native target in
 // LLVM. This needs to be done only once.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 std::once_flag nt_inited;
 
 void init_native_target()
@@ -371,6 +386,23 @@ struct llvm_state::jit {
         // we would like th throw here but I am not sure whether throwing
         // here would disrupt LLVM's cleanup actions?
         // https://llvm.org/doxygen/classllvm_1_1orc_1_1ExecutionSession.html
+
+#if defined(HEYOKA_HAVE_REAL) && !defined(NDEBUG) && LLVM_VERSION_MAJOR >= 13
+
+        // Run several checks to ensure that real_t matches the layout of mppp::real/mpfr_struct_t.
+        // NOTE: these checks need access to the data layout, so we put them here for convenience.
+        const auto &dl = m_lljit->getDataLayout();
+        auto *real_t = llvm::cast<llvm::StructType>(detail::to_llvm_type<mppp::real>(*m_ctx->getContext()));
+        const auto *slo = dl.getStructLayout(real_t);
+        assert(slo->getSizeInBytes() == sizeof(mppp::real));
+        assert(slo->getAlignment().value() == alignof(mppp::real));
+        assert(slo->getElementOffset(0) == offsetof(mppp::mpfr_struct_t, _mpfr_prec));
+        assert(slo->getElementOffset(1) == offsetof(mppp::mpfr_struct_t, _mpfr_sign));
+        assert(slo->getElementOffset(2) == offsetof(mppp::mpfr_struct_t, _mpfr_exp));
+        assert(slo->getElementOffset(3) == offsetof(mppp::mpfr_struct_t, _mpfr_d));
+        assert(slo->getMemberOffsets().size() == 4u);
+
+#endif
     }
 
     jit(const jit &) = delete;

@@ -293,14 +293,14 @@ llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, llvm::Type *fp_t, co
                     auto cnj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
                     auto bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, b_idx);
 
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
+                    auto j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     builder.CreateStore(
                         llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, j_v, llvm_fmul(s, cnj, bj))), acc);
                 });
 
                 // Divide by the order to produce the return value.
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
+                auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
                 builder.CreateStore(llvm_fdiv(s, builder.CreateLoad(val_t, acc), ord_v), retval);
             });
 

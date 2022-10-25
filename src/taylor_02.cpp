@@ -366,10 +366,10 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
     }
 
     // Determine if we are in absolute or relative tolerance mode.
-    auto *abs_or_rel = builder.CreateFCmpOLE(max_abs_state, llvm::ConstantFP::get(vec_t, 1.));
+    auto *abs_or_rel = llvm_fcmp_ole(s, max_abs_state, llvm_constantfp(s, vec_t, 1.));
 
     // Estimate rho at orders order - 1 and order.
-    auto *num_rho = builder.CreateSelect(abs_or_rel, llvm::ConstantFP::get(vec_t, 1.), max_abs_state);
+    auto *num_rho = builder.CreateSelect(abs_or_rel, llvm_constantfp(s, vec_t, 1.), max_abs_state);
 
     // NOTE: it is fine here to static_cast<double>(order), as order is a 32-bit integer
     // and double is a IEEE double-precision type (i.e., 53 bits).
@@ -399,8 +399,8 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
     h = taylor_step_minabs(s, h, max_h_vec);
 
     // Handle backwards propagation.
-    auto *backward = builder.CreateFCmpOLT(max_h_vec, llvm::ConstantFP::get(vec_t, 0.));
-    auto *h_fac = builder.CreateSelect(backward, llvm::ConstantFP::get(vec_t, -1.), llvm::ConstantFP::get(vec_t, 1.));
+    auto *backward = llvm_fcmp_olt(s, max_h_vec, llvm_constantfp(s, vec_t, 0.));
+    auto *h_fac = builder.CreateSelect(backward, llvm_constantfp(s, vec_t, -1.), llvm_constantfp(s, vec_t, 1.));
     h = llvm_fmul(s, h_fac, h);
 
     return h;
@@ -477,7 +477,7 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, llvm::Type *fp_t, const expre
                 if (order == 1u) {
                     return taylor_codegen_numparam(s, fp_t, v, par_ptr, batch_size);
                 } else {
-                    return llvm::ConstantFP::get(make_vector_type(fp_t, batch_size), 0.);
+                    return llvm_constantfp(s, make_vector_type(fp_t, batch_size), 0.);
                 }
             } else {
                 assert(false);
@@ -643,8 +643,7 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
 
         // We have to divide the derivative by 'order' in order
         // to get the normalised derivative of the state variable.
-        ret = llvm_fdiv(s, ret,
-                        vector_splat(builder, builder.CreateUIToFP(order, fp_vec_t->getScalarType()), batch_size));
+        ret = llvm_fdiv(s, ret, vector_splat(builder, llvm_ui_to_fp(s, order, fp_vec_t->getScalarType()), batch_size));
 
         // Store the derivative.
         taylor_c_store_diff(s, fp_vec_t, diff_arr, n_uvars, order, sv_idx, ret);
@@ -668,8 +667,8 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
         // nonzero value that can be produced here is the first-order
         // derivative.
         auto *cmp_cond = builder.CreateICmpEQ(order, builder.getInt32(1));
-        auto *ret = builder.CreateSelect(cmp_cond, vector_splat(builder, num, batch_size),
-                                         llvm::ConstantFP::get(fp_vec_t, 0.));
+        auto *ret
+            = builder.CreateSelect(cmp_cond, vector_splat(builder, num, batch_size), llvm_constantfp(s, fp_vec_t, 0.));
 
         // Store the derivative.
         taylor_c_store_diff(s, fp_vec_t, diff_arr, n_uvars, order, sv_idx, ret);
@@ -702,7 +701,7 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
             },
             [&]() {
                 // Derivative of order > 1, return 0.
-                taylor_c_store_diff(s, fp_vec_t, diff_arr, n_uvars, order, sv_idx, llvm::ConstantFP::get(fp_vec_t, 0.));
+                taylor_c_store_diff(s, fp_vec_t, diff_arr, n_uvars, order, sv_idx, llvm_constantfp(s, fp_vec_t, 0.));
             });
     });
 }
@@ -1631,7 +1630,7 @@ taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
             builder.CreateStore(val, builder.CreateInBoundsGEP(fp_vec_t, res_arr, cur_var_idx));
 
             // Zero-init the element in comp_arr.
-            builder.CreateStore(llvm::ConstantFP::get(fp_vec_t, 0.),
+            builder.CreateStore(llvm_constantfp(s, fp_vec_t, 0.),
                                 builder.CreateInBoundsGEP(fp_vec_t, comp_arr, cur_var_idx));
         });
 
@@ -1675,7 +1674,7 @@ taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
         std::vector<llvm::Value *> res_arr, comp_arr;
         for (std::uint32_t i = 0; i < n_eq; ++i) {
             res_arr.push_back(diff_arr[i]);
-            comp_arr.push_back(llvm::ConstantFP::get(diff_arr[i]->getType(), 0.));
+            comp_arr.push_back(llvm_constantfp(s, diff_arr[i]->getType(), 0.));
         }
 
         // Evaluate and sum.

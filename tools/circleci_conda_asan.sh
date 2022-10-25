@@ -16,7 +16,7 @@ export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 conda config --add channels conda-forge
 conda config --set channel_priority strict
-conda create -y -q -p $deps_dir c-compiler cxx-compiler cmake llvmdev tbb-devel tbb boost-cpp 'mppp>=0.23' sleef xtensor xtensor-blas blas blas-devel 'fmt=8.1.*' 'spdlog=1.10.*' sphinx sphinxcontrib-bibtex sphinx-book-theme
+conda create -y -q -p $deps_dir c-compiler cxx-compiler cmake llvmdev tbb-devel tbb boost-cpp 'mppp>=0.27' sleef xtensor xtensor-blas blas blas-devel fmt spdlog sphinx sphinxcontrib-bibtex sphinx-book-theme
 source activate $deps_dir
 
 # Create the build dir and cd into it.

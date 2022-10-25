@@ -283,7 +283,7 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
     // Init the return values as zeroes.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
         auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.CreateMul(i, builder.getInt32(batch_size)));
-        store_vector_to_memory(builder, ptr, vector_splat(builder, llvm::ConstantFP::get(fp_t, 0.), batch_size));
+        store_vector_to_memory(builder, ptr, vector_splat(builder, llvm_constantfp(s, fp_t, 0.), batch_size));
     });
 
     // Do the translation.
@@ -583,8 +583,8 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_
 
         // Compute the components of the interval version of h. If we are integrating
         // forward, the components are (0, h), otherwise they are (h, 0).
-        auto *h_lo = builder.CreateSelect(back_flag, h, llvm::Constant::getNullValue(h->getType()));
-        auto *h_hi = builder.CreateSelect(back_flag, llvm::Constant::getNullValue(h->getType()), h);
+        auto *h_lo = builder.CreateSelect(back_flag, h, llvm_constantfp(s, h->getType(), 0.));
+        auto *h_hi = builder.CreateSelect(back_flag, llvm_constantfp(s, h->getType(), 0.), h);
 
         // Compute the enclosure of the polynomial.
         std::tie(enc_lo, enc_hi) = llvm_penc_interval(s, fp_t, cf_ptr, n, h_lo, h_hi, batch_size);
@@ -596,10 +596,10 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_
 
     // Check if the signs are equal and the low sign is nonzero.
     auto *cmp1 = builder.CreateICmpEQ(s_lo, s_hi);
-    auto *cmp2 = builder.CreateICmpNE(s_lo, llvm::Constant::getNullValue(s_lo->getType()));
+    auto *cmp2 = builder.CreateICmpNE(s_lo, llvm::ConstantInt::get(s_lo->getType(), 0u));
     // NOTE: this is a way of creating a logical AND between cmp1 and cmp2. LLVM 13 has a specific
     // function for this.
-    auto *cmp = builder.CreateSelect(cmp1, cmp2, llvm::Constant::getNullValue(cmp1->getType()));
+    auto *cmp = builder.CreateSelect(cmp1, cmp2, llvm::ConstantInt::get(cmp1->getType(), 0u));
     // Extend cmp to int32_t.
     auto *retval = builder.CreateZExt(cmp, make_vector_type(builder.getInt32Ty(), batch_size));
 

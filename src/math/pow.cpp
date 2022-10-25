@@ -42,6 +42,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/sleef.hpp>
@@ -400,7 +406,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
             [&]() {
                 // Create FP vector versions of exponent and order.
                 auto alpha_v = taylor_c_diff_numparam_codegen(s, fp_t, n, exponent, par_ptr, batch_size);
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
+                auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
@@ -411,7 +417,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
                     auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
 
                     // Compute the factor n*alpha-j*(alpha+1).
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
+                    auto j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
                     auto fac = llvm_fsub(
                         s, llvm_fmul(s, ord_v, alpha_v),
                         llvm_fmul(s, j_v,
@@ -494,7 +500,7 @@ namespace
 // It will special-case for e == 0, 1, 2, 3, 4 and 0.5.
 expression pow_wrapper_impl(expression b, expression e)
 {
-    if (auto num_ptr = std::get_if<number>(&e.value())) {
+    if (auto *num_ptr = std::get_if<number>(&e.value())) {
         if (is_zero(*num_ptr)) {
             return 1_dbl;
         }
@@ -547,6 +553,15 @@ expression pow(expression b, long double e)
 expression pow(expression b, mppp::real128 e)
 {
     return detail::pow_wrapper_impl(std::move(b), expression{e});
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression pow(expression b, mppp::real e)
+{
+    return detail::pow_wrapper_impl(std::move(b), expression{std::move(e)});
 }
 
 #endif

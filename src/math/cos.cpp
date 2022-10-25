@@ -345,15 +345,15 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, llvm::Type *fp_t, con
                     auto b_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
                     auto cj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, var_idx);
 
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
+                    auto j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     builder.CreateStore(
                         llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, j_v, llvm_fmul(s, b_nj, cj))), acc);
                 });
 
                 // Divide by the order and negate to produce the return value.
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
-                builder.CreateStore(llvm_fdiv(s, builder.CreateLoad(val_t, acc), builder.CreateFNeg(ord_v)), retval);
+                auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
+                builder.CreateStore(llvm_fdiv(s, builder.CreateLoad(val_t, acc), llvm_fneg(s, ord_v)), retval);
             });
 
         // Return the result.

@@ -35,6 +35,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/fmt_compat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
@@ -74,6 +80,9 @@ public:
     explicit expression(long double);
 #if defined(HEYOKA_HAVE_REAL128)
     explicit expression(mppp::real128);
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+    explicit expression(mppp::real);
 #endif
     explicit expression(std::string);
 
@@ -218,10 +227,16 @@ HEYOKA_DLL_PUBLIC expression operator+(expression, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator+(expression, mppp::real128);
 #endif
+#if defined(HEYOKA_HAVE_REAL)
+HEYOKA_DLL_PUBLIC expression operator+(expression, mppp::real);
+#endif
 HEYOKA_DLL_PUBLIC expression operator+(double, expression);
 HEYOKA_DLL_PUBLIC expression operator+(long double, expression);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator+(mppp::real128, expression);
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+HEYOKA_DLL_PUBLIC expression operator+(mppp::real, expression);
 #endif
 
 HEYOKA_DLL_PUBLIC expression operator-(expression, expression);
@@ -230,10 +245,16 @@ HEYOKA_DLL_PUBLIC expression operator-(expression, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator-(expression, mppp::real128);
 #endif
+#if defined(HEYOKA_HAVE_REAL)
+HEYOKA_DLL_PUBLIC expression operator-(expression, mppp::real);
+#endif
 HEYOKA_DLL_PUBLIC expression operator-(double, expression);
 HEYOKA_DLL_PUBLIC expression operator-(long double, expression);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator-(mppp::real128, expression);
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+HEYOKA_DLL_PUBLIC expression operator-(mppp::real, expression);
 #endif
 
 HEYOKA_DLL_PUBLIC expression operator*(expression, expression);
@@ -242,10 +263,16 @@ HEYOKA_DLL_PUBLIC expression operator*(expression, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator*(expression, mppp::real128);
 #endif
+#if defined(HEYOKA_HAVE_REAL)
+HEYOKA_DLL_PUBLIC expression operator*(expression, mppp::real);
+#endif
 HEYOKA_DLL_PUBLIC expression operator*(double, expression);
 HEYOKA_DLL_PUBLIC expression operator*(long double, expression);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator*(mppp::real128, expression);
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+HEYOKA_DLL_PUBLIC expression operator*(mppp::real, expression);
 #endif
 
 HEYOKA_DLL_PUBLIC expression operator/(expression, expression);
@@ -254,10 +281,16 @@ HEYOKA_DLL_PUBLIC expression operator/(expression, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator/(expression, mppp::real128);
 #endif
+#if defined(HEYOKA_HAVE_REAL)
+HEYOKA_DLL_PUBLIC expression operator/(expression, mppp::real);
+#endif
 HEYOKA_DLL_PUBLIC expression operator/(double, expression);
 HEYOKA_DLL_PUBLIC expression operator/(long double, expression);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator/(mppp::real128, expression);
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+HEYOKA_DLL_PUBLIC expression operator/(mppp::real, expression);
 #endif
 
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, expression);
@@ -266,12 +299,18 @@ HEYOKA_DLL_PUBLIC expression &operator+=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, mppp::real128);
 #endif
+#if defined(HEYOKA_HAVE_REAL)
+HEYOKA_DLL_PUBLIC expression &operator+=(expression &, mppp::real);
+#endif
 
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, expression);
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, double);
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, mppp::real128);
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+HEYOKA_DLL_PUBLIC expression &operator-=(expression &, mppp::real);
 #endif
 
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, expression);
@@ -280,12 +319,18 @@ HEYOKA_DLL_PUBLIC expression &operator*=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, mppp::real128);
 #endif
+#if defined(HEYOKA_HAVE_REAL)
+HEYOKA_DLL_PUBLIC expression &operator*=(expression &, mppp::real);
+#endif
 
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, expression);
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, double);
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, mppp::real128);
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+HEYOKA_DLL_PUBLIC expression &operator/=(expression &, mppp::real);
 #endif
 
 HEYOKA_DLL_PUBLIC bool operator==(const expression &, const expression &);
@@ -436,11 +481,12 @@ namespace detail
 
 template <typename>
 HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
-                                                    std::uint32_t, bool, bool, bool);
+                                                    std::uint32_t, bool, bool, bool, unsigned);
 
 template <typename>
 HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
-                                                    const std::vector<expression> &, std::uint32_t, bool, bool, bool);
+                                                    const std::vector<expression> &, std::uint32_t, bool, bool, bool,
+                                                    unsigned);
 
 } // namespace detail
 
@@ -497,10 +543,20 @@ inline std::vector<expression> add_cfunc(llvm_state &s, const std::string &name,
             }
         }();
 
+        // Precision (defaults to zero).
+        const auto prec = [&p]() -> unsigned {
+            if constexpr (p.has(kw::prec)) {
+                return std::forward<decltype(p(kw::prec))>(p(kw::prec));
+            } else {
+                return 0;
+            }
+        }();
+
         if (vars) {
-            return detail::add_cfunc<T>(s, name, fn, *vars, batch_size, high_accuracy, compact_mode, parallel_mode);
+            return detail::add_cfunc<T>(s, name, fn, *vars, batch_size, high_accuracy, compact_mode, parallel_mode,
+                                        prec);
         } else {
-            return detail::add_cfunc<T>(s, name, fn, batch_size, high_accuracy, compact_mode, parallel_mode);
+            return detail::add_cfunc<T>(s, name, fn, batch_size, high_accuracy, compact_mode, parallel_mode, prec);
         }
     }
 }

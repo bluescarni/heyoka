@@ -312,7 +312,7 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, llvm::Type *fp_t, con
             },
             [&]() {
                 // Create a vector version of ord.
-                auto ord_fp = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
+                auto ord_fp = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
@@ -323,7 +323,7 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, llvm::Type *fp_t, con
                     auto bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, b_idx);
 
                     // Compute the factor j.
-                    auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
+                    auto fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     builder.CreateStore(
                         llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, anj, bj))), acc);

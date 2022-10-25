@@ -38,6 +38,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -247,7 +253,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::
     auto *divisor = llvm_fmul(s, n, taylor_fetch_diff(arr, d_idx, 0, n_uvars));
 
     // Compute the first part of the dividend: -n * b^[0] * c^[n].
-    auto dividend = llvm_fmul(s, builder.CreateFNeg(n), llvm_fmul(s, y, taylor_fetch_diff(arr, x_idx, order, n_uvars)));
+    auto dividend = llvm_fmul(s, llvm_fneg(s, n), llvm_fmul(s, y, taylor_fetch_diff(arr, x_idx, order, n_uvars)));
 
     // Compute the second part of the dividend only for order > 1, in order to avoid
     // an empty summation.
@@ -472,7 +478,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
             },
             [&]() {
                 // Create FP vector version of the order.
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
+                auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Compute the divisor: ord * d^[0].
                 auto divisor = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), d_idx);
@@ -488,7 +494,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
+                    auto j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     auto d_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
                     auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
@@ -589,14 +595,14 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
             },
             [&]() {
                 // Create FP vector version of the order.
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
+                auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Compute the divisor: ord * d^[0].
                 auto divisor = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), d_idx);
                 divisor = llvm_fmul(s, ord_v, divisor);
 
                 // Init the dividend: -ord * b^[0] * c^[n].
-                auto dividend = llvm_fmul(s, builder.CreateFNeg(ord_v),
+                auto dividend = llvm_fmul(s, llvm_fneg(s, ord_v),
                                           taylor_c_diff_numparam_codegen(s, fp_t, n, num_y, par_ptr, batch_size));
                 dividend = llvm_fmul(s, dividend, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, x_idx));
 
@@ -605,7 +611,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
+                    auto j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     auto d_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
                     auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
@@ -704,7 +710,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
             },
             [&]() {
                 // Create FP vector version of the order.
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
+                auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Compute the divisor: ord * d^[0].
                 auto divisor = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), d_idx);
@@ -723,7 +729,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
+                    auto j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), x_idx);
                     auto bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, y_idx);
@@ -831,6 +837,15 @@ expression atan2(expression y, mppp::real128 x)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression atan2(expression y, mppp::real x)
+{
+    return atan2(std::move(y), expression(std::move(x)));
+}
+
+#endif
+
 expression atan2(double y, expression x)
 {
     return atan2(expression(y), std::move(x));
@@ -846,6 +861,15 @@ expression atan2(long double y, expression x)
 expression atan2(mppp::real128 y, expression x)
 {
     return atan2(expression(y), std::move(x));
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression atan2(mppp::real y, expression x)
+{
+    return atan2(expression(std::move(y)), std::move(x));
 }
 
 #endif

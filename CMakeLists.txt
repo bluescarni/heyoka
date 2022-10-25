@@ -15,7 +15,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 0.19.0 LANGUAGES CXX C)
+project(heyoka VERSION 0.20.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -167,6 +167,9 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/cm_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
+    # NOTE: this will be an empty file in case we are not
+    # building with support for real.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ensemble_propagate.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/func.cpp"
@@ -287,8 +290,8 @@ if(HEYOKA_BUILD_STATIC_LIBRARY)
 else()
     # Setup of the heyoka shared library.
     add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
-    set_property(TARGET heyoka PROPERTY VERSION "19.0")
-    set_property(TARGET heyoka PROPERTY SOVERSION 19)
+    set_property(TARGET heyoka PROPERTY VERSION "20.0")
+    set_property(TARGET heyoka PROPERTY SOVERSION 20)
     set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
 endif()
@@ -398,7 +401,7 @@ target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 
 # Optional dependency on mp++.
 # NOTE: put this into a separate variable for reuse later.
-set(_HEYOKA_MIN_MPPP_VERSION "0.23")
+set(_HEYOKA_MIN_MPPP_VERSION "0.27")
 if(HEYOKA_WITH_MPPP)
     find_package(mp++ REQUIRED CONFIG)
     if(${mp++_VERSION} VERSION_LESS ${_HEYOKA_MIN_MPPP_VERSION})

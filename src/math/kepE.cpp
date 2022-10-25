@@ -38,6 +38,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -525,7 +531,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
             },
             [&]() {
                 // Create FP vector version of the order.
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
+                auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Compute the divisor: ord * (1 - c^[0]).
                 auto one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
@@ -543,7 +549,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
+                    auto j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
                     auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
@@ -650,7 +656,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
             },
             [&]() {
                 // Create FP vector versions of the order.
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
+                auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Compute the divisor: ord * (1 - c^[0]).
                 auto one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
@@ -666,7 +672,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
+                    auto j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
                     auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
@@ -767,7 +773,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
             },
             [&]() {
                 // Create FP vector version of the order.
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
+                auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Compute the divisor: ord * (1 - c^[0]).
                 auto one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
@@ -786,7 +792,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
+                    auto j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
                     auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
@@ -883,6 +889,15 @@ expression kepE(expression e, mppp::real128 M)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression kepE(expression e, mppp::real M)
+{
+    return kepE(std::move(e), expression(std::move(M)));
+}
+
+#endif
+
 expression kepE(double e, expression M)
 {
     return kepE(expression(e), std::move(M));
@@ -898,6 +913,15 @@ expression kepE(long double e, expression M)
 expression kepE(mppp::real128 e, expression M)
 {
     return kepE(expression(e), std::move(M));
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression kepE(mppp::real e, expression M)
+{
+    return kepE(expression(std::move(e)), std::move(M));
 }
 
 #endif

@@ -29,6 +29,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -300,3 +306,59 @@ TEST_CASE("cfunc")
         }
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("cfunc mp")
+{
+    using fp_t = mppp::real;
+
+    const auto prec = 237u;
+
+    auto [x, y] = make_vars("x", "y");
+
+    std::uniform_real_distribution<double> rdist(-10., 10.);
+
+    auto gen = [&]() { return mppp::real(rdist(rng), prec); };
+
+    std::vector<fp_t> outs, ins, pars;
+
+    const auto batch_size = 1u;
+
+    outs.resize(3u);
+    ins.resize(2u);
+    pars.resize(1u);
+
+    for (auto high_accuracy : {false, true}) {
+        for (auto compact_mode : {false, true}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                std::generate(ins.begin(), ins.end(), gen);
+                std::generate(outs.begin(), outs.end(), gen);
+                std::generate(pars.begin(), pars.end(), gen);
+
+                llvm_state s{kw::opt_level = opt_level};
+
+                add_cfunc<fp_t>(s, "cfunc", {sum({x, y}), sum({x, expression{fp_t(.5)}}), sum({par[0], y})},
+                                kw::prec = prec, kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
+
+                if (opt_level == 0u && compact_mode) {
+                    REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.sum."));
+                }
+
+                s.compile();
+
+                auto *cf_ptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
+
+                cf_ptr(outs.data(), ins.data(), pars.data());
+
+                for (auto i = 0u; i < batch_size; ++i) {
+                    REQUIRE(outs[i] == approximately(ins[i] + ins[i + batch_size], fp_t(100)));
+                    REQUIRE(outs[i + batch_size] == approximately(ins[i] + static_cast<fp_t>(.5), fp_t(100)));
+                    REQUIRE(outs[i + 2u * batch_size] == approximately(pars[i] + ins[i + batch_size], fp_t(100)));
+                }
+            }
+        }
+    }
+}
+
+#endif

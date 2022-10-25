@@ -184,8 +184,8 @@ llvm::Value *taylor_diff_acos_impl(llvm_state &s, llvm::Type *fp_t, const acos_i
     if (order == 1u) {
         // Special-case the first-order derivative, in order
         // to avoid an empty summation below.
-        return builder.CreateFNeg(
-            llvm_fdiv(s, taylor_fetch_diff(arr, b_idx, 1, n_uvars), taylor_fetch_diff(arr, deps[0], 0, n_uvars)));
+        return llvm_fneg(
+            s, llvm_fdiv(s, taylor_fetch_diff(arr, b_idx, 1, n_uvars), taylor_fetch_diff(arr, deps[0], 0, n_uvars)));
     }
 
     // Create the fp version of the order.
@@ -195,7 +195,7 @@ llvm::Value *taylor_diff_acos_impl(llvm_state &s, llvm::Type *fp_t, const acos_i
     auto *ret = llvm_fmul(s, ord_fp, taylor_fetch_diff(arr, b_idx, order, n_uvars));
 
     // Compute -n*c^[0].
-    auto *n_c0 = builder.CreateFNeg(llvm_fmul(s, ord_fp, taylor_fetch_diff(arr, deps[0], 0, n_uvars)));
+    auto *n_c0 = llvm_fneg(s, llvm_fmul(s, ord_fp, taylor_fetch_diff(arr, deps[0], 0, n_uvars)));
 
     // NOTE: iteration in the [1, order) range.
     std::vector<llvm::Value *> sum;
@@ -336,13 +336,14 @@ llvm::Function *taylor_c_diff_func_acos_impl(llvm_state &s, llvm::Type *fp_t, co
             },
             [&]() {
                 // Compute the fp version of the order.
-                auto *ord_fp = vector_splat(builder, builder.CreateUIToFP(ord, fp_t), batch_size);
+                auto *ord_fp = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Compute n*b^[n].
                 auto *ret = llvm_fmul(s, ord_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx));
 
                 // Compute -n*c^[0].
-                auto *n_c0 = builder.CreateFNeg(
+                auto *n_c0 = llvm_fneg(
+                    s,
                     llvm_fmul(s, ord_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx)));
 
                 // Init the accumulator.
@@ -353,7 +354,7 @@ llvm::Function *taylor_c_diff_func_acos_impl(llvm_state &s, llvm::Type *fp_t, co
                     auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
                     auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, a_idx);
 
-                    auto fac = vector_splat(builder, builder.CreateUIToFP(j, fp_t), batch_size);
+                    auto fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     builder.CreateStore(
                         llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, c_nj, aj))), acc);

@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -34,7 +35,9 @@
 
 #include <llvm/ADT/APFloat.h>
 #include <llvm/Config/llvm-config.h>
+#include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
@@ -45,6 +48,14 @@
 
 #include <mp++/integer.hpp>
 #include <mp++/real128.hpp>
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#include <heyoka/detail/real_helpers.hpp>
 
 #endif
 
@@ -74,6 +85,12 @@ number::number(mppp::real128 x) : m_value(x) {}
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+number::number(mppp::real x) : m_value(std::move(x)) {}
+
+#endif
+
 number::number(const number &) = default;
 
 number::number(number &&) noexcept = default;
@@ -99,64 +116,81 @@ void swap(number &n0, number &n1) noexcept
     std::swap(n0.value(), n1.value());
 }
 
-// NOTE: for consistency with the equality operator,
-// we want to ensure that:
-// - all nan values hash to the same value,
-// - two numbers with the same value hash to the same value,
-//   even if they are of different types.
-// The strategy is then to cast the value to the largest
-// floating-point type (which ensures that the original
-// value is preserved exactly) and then hash on that.
 std::size_t hash(const number &n)
 {
-    return std::visit(
-        [](const auto &v) -> std::size_t {
-#if defined(HEYOKA_HAVE_REAL128)
-            // NOTE: mppp::hash() already ensures that
-            // all nans hash to the same value.
-            return mppp::hash(static_cast<mppp::real128>(v));
-#else
-            if (std::isnan(v)) {
-                // Make sure all nan values
-                // have the same hash.
-                return 0;
+    return std::visit([](const auto &v) { return std::hash<detail::uncvref_t<decltype(v)>>{}(v); }, n.value());
+}
+
+std::ostream &operator<<(std::ostream &os, const number &n)
+{
+    std::visit(
+        [&os](const auto &arg) {
+            using type = detail::uncvref_t<decltype(arg)>;
+
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<type, mppp::real>) {
+                os << arg.to_string();
             } else {
-                return std::hash<long double>{}(static_cast<long double>(v));
+#endif
+                // NOTE: we make sure to print all digits
+                // necessary for short-circuiting. Make also
+                // sure to always print the decimal point and to
+                // use the C locale.
+                std::ostringstream oss;
+                oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+
+                oss.imbue(std::locale::classic());
+                oss << std::showpoint;
+
+                oss.precision(std::numeric_limits<type>::max_digits10);
+                oss << arg;
+
+                os << oss.str();
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
+        },
+        n.value());
+
+    return os;
+}
+
+bool is_zero(const number &n)
+{
+    return std::visit(
+        [](const auto &arg) {
+            using type [[maybe_unused]] = detail::uncvref_t<decltype(arg)>;
+
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<type, mppp::real>) {
+                return arg.zero_p();
+            } else {
+#endif
+                return arg == 0;
+#if defined(HEYOKA_HAVE_REAL)
             }
 #endif
         },
         n.value());
 }
 
-std::ostream &operator<<(std::ostream &os, const number &n)
-{
-    // NOTE: we make sure to print all digits
-    // necessary for short-circuiting. Make also
-    // sure to always print the decimal point and to
-    // use the C locale.
-    std::ostringstream oss;
-    oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-    oss.imbue(std::locale::classic());
-    oss << std::showpoint;
-
-    std::visit(
-        [&oss](const auto &arg) {
-            oss.precision(std::numeric_limits<detail::uncvref_t<decltype(arg)>>::max_digits10);
-            oss << arg;
-        },
-        n.value());
-
-    return os << oss.str();
-}
-
-bool is_zero(const number &n)
-{
-    return std::visit([](const auto &arg) { return arg == 0; }, n.value());
-}
-
 bool is_one(const number &n)
 {
-    return std::visit([](const auto &arg) { return arg == 1; }, n.value());
+    return std::visit(
+        [](const auto &arg) {
+            using type [[maybe_unused]] = detail::uncvref_t<decltype(arg)>;
+
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<type, mppp::real>) {
+                return arg.is_one();
+            } else {
+#endif
+                return arg == 1;
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
+        },
+        n.value());
 }
 
 bool is_negative_one(const number &n)
@@ -205,14 +239,6 @@ using div_t = decltype(std::declval<T>() / std::declval<U>());
 template <typename T, typename U = T>
 using is_divisible = std::conjunction<is_detected<div_t, T, U>, is_detected<div_t, U, T>,
                                       std::is_same<detected_t<div_t, T, U>, detected_t<div_t, U, T>>>;
-
-template <typename T, typename U>
-using eq_t = decltype(std::declval<T>() == std::declval<U>());
-
-template <typename T, typename U = T>
-using is_equality_comparable = std::conjunction<is_detected<eq_t, T, U>, is_detected<eq_t, U, T>,
-                                                std::is_same<detected_t<eq_t, T, U>, detected_t<eq_t, U, T>>,
-                                                std::is_convertible<detected_t<eq_t, U, T>, bool>>;
 
 } // namespace
 
@@ -286,30 +312,22 @@ number operator/(number n1, number n2)
         std::move(n1.value()), std::move(n2.value()));
 }
 
+// NOTE: in order for equality to be consistent with hashing,
+// we want to make sure that two numbers of different type
+// are always considered different (were they considered equal,
+// we would have then to ensure that they both hash to the same
+// value, which would be quite hard to do).
 bool operator==(const number &n1, const number &n2)
 {
     return std::visit(
         [](const auto &v1, const auto &v2) -> bool {
-            if constexpr (detail::is_equality_comparable<decltype(v1), decltype(v2)>::value) {
-                using std::isnan;
+            using type1 = detail::uncvref_t<decltype(v1)>;
+            using type2 = detail::uncvref_t<decltype(v2)>;
 
-                if (isnan(v1) && isnan(v2)) {
-                    // NOTE: make nan compare equal, for consistency
-                    // with hashing.
-                    return true;
-                } else {
-                    // NOTE: this covers the following cases:
-                    // - neither v1 nor v2 is nan,
-                    // - v1 is nan and v2 is not,
-                    // - v2 is nan and v1 is not.
-                    return v1 == v2;
-                }
+            if constexpr (std::is_same_v<type1, type2>) {
+                return v1 == v2;
             } else {
-                // LCOV_EXCL_START
-                throw std::invalid_argument(
-                    fmt::format("Cannot compare an object of type '{}' to an object of type '{}'",
-                                boost::core::demangle(typeid(v1).name()), boost::core::demangle(typeid(v2).name())));
-                // LCOV_EXCL_STOP
+                return false;
             }
         },
         n1.value(), n2.value());
@@ -367,6 +385,16 @@ number binomial(const number &i, const number &j)
 
                     return number{
                         detail::binomial<type1>(static_cast<std::uint32_t>(n1), static_cast<std::uint32_t>(n2))};
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+                } else if constexpr (std::is_same_v<type1, mppp::real>) {
+                    // For real, we transform the input arguments into mppp::integer,
+                    // invoke binomial and then convert back to real.
+                    const auto n1 = static_cast<mppp::integer<1>>(v1);
+                    const auto n2 = static_cast<mppp::integer<1>>(v2);
+
+                    // NOTE: do the conversion using the maximum precision among the operands, as usual.
+                    return number{mppp::real{binomial(n1, n2), std::max(v1.get_prec(), v2.get_prec())}};
 #endif
                     // LCOV_EXCL_START
                 } else {
@@ -547,6 +575,32 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
         // NOTE: llvm will deduce the correct type for the codegen from the supplied
         // floating-point semantics.
         return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, str_rep));
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (const auto real_prec = detail::llvm_is_real(tp)) {
+        // From the number, generate a real with the desired precition.
+        const auto r = std::visit([real_prec](const auto &v) { return mppp::real{v, real_prec}; }, n.value());
+
+        // Generate the limb array in LLVM.
+        auto *struct_tp = llvm::cast<llvm::StructType>(tp);
+        auto *limb_array_t = llvm::cast<llvm::ArrayType>(struct_tp->elements()[2]);
+
+        std::vector<llvm::Constant *> limbs;
+        for (std::size_t i = 0; i < r.get_nlimbs(); ++i) {
+            limbs.push_back(llvm::ConstantInt::get(limb_array_t->getElementType(),
+                                                   boost::numeric_cast<std::uint64_t>(r.get_mpfr_t()->_mpfr_d[i])));
+        }
+
+        auto *limb_arr = llvm::ConstantArray::get(limb_array_t, limbs);
+
+        // Generate sign and exponent.
+        auto *sign = llvm::ConstantInt::getSigned(struct_tp->elements()[0],
+                                                  boost::numeric_cast<std::int64_t>(r.get_mpfr_t()->_mpfr_sign));
+        auto *exp = llvm::ConstantInt::getSigned(struct_tp->elements()[1],
+                                                 boost::numeric_cast<std::int64_t>(r.get_mpfr_t()->_mpfr_exp));
+
+        // Generate the struct.
+        return llvm::ConstantStruct::get(struct_tp, {sign, exp, limb_arr});
+#endif
     } else {
         throw std::invalid_argument(
             fmt::format("Cannot generate an LLVM constant of type '{}'", detail::llvm_type_name(tp)));
@@ -573,6 +627,10 @@ number number_like(llvm_state &s, llvm::Type *tp, double val)
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (tp == to_llvm_type<mppp::real128>(context, false)) {
         return number{static_cast<mppp::real128>(val)};
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (const auto real_prec = llvm_is_real(tp)) {
+        return number{mppp::real{val, real_prec}};
 #endif
     }
 

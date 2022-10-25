@@ -22,6 +22,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/binary_op.hpp>
@@ -238,3 +244,45 @@ TEST_CASE("cfunc")
         }
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("cfunc_mp")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    const auto prec = 237u;
+
+    for (auto compact_mode : {false, true}) {
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            add_cfunc<mppp::real>(s, "cfunc",
+                                  {x + y, x - y, x * y, x / y, x + par[0], x - 3_dbl, par[0] * y, 1_dbl / y},
+                                  kw::compact_mode = compact_mode, kw::prec = prec);
+
+            s.compile();
+
+            auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(
+                s.jit_lookup("cfunc"));
+
+            const std::vector ins{mppp::real{"1.1", prec}, mppp::real{"2.1", prec}};
+            const std::vector pars{mppp::real{"-.1", prec}};
+            std::vector<mppp::real> outs(8u, mppp::real{0, prec});
+
+            cf_ptr(outs.data(), ins.data(), pars.data());
+
+            auto i = 0u;
+            REQUIRE(outs[i] == ins[i] + ins[i + 1u]);
+            REQUIRE(outs[i + 1u] == ins[i] - ins[i + 1u]);
+            REQUIRE(outs[i + 2u * 1u] == ins[i] * ins[i + 1u]);
+            REQUIRE(outs[i + 3u * 1u] == ins[i] / ins[i + 1u]);
+            REQUIRE(outs[i + 4u * 1u] == ins[i] + pars[i]);
+            REQUIRE(outs[i + 5u * 1u] == ins[i] - 3.);
+            REQUIRE(outs[i + 6u * 1u] == pars[i] * ins[i + 1u]);
+            REQUIRE(outs[i + 7u * 1u] == 1. / ins[i + 1u]);
+        }
+    }
+}
+
+#endif

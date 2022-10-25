@@ -38,6 +38,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -68,6 +74,13 @@ TEST_CASE("number basic")
     REQUIRE(std::holds_alternative<mppp::real128>(number{1.1_rq}.value()));
 
 #endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(std::holds_alternative<mppp::real>(number{mppp::real{1.1, 23}}.value()));
+    REQUIRE(std::get<mppp::real>(number{mppp::real{1.1, 23}}.value()).get_prec() == 23);
+
+#endif
 }
 
 TEST_CASE("number hash eq")
@@ -77,37 +90,27 @@ TEST_CASE("number hash eq")
     REQUIRE(number{1.1} == number{1.1});
     REQUIRE(number{1.1} != number{1.2});
 
-    REQUIRE(number{1.} == number{1.l});
-    REQUIRE(number{1.l} == number{1.});
-    REQUIRE(number{0.} == number{-0.l});
-    REQUIRE(number{0.l} == number{-0.});
+    REQUIRE(number{1.} != number{1.l});
+    REQUIRE(number{1.l} != number{1.});
+    REQUIRE(number{0.} != number{-0.l});
+    REQUIRE(number{0.l} != number{-0.});
     REQUIRE(number{1.1} != number{1.2l});
     REQUIRE(number{1.2l} != number{1.1});
-    REQUIRE(number{1.} == number{1.f});
-    REQUIRE(number{1.f} == number{1.});
-    REQUIRE(number{0.} == number{-0.f});
-    REQUIRE(number{0.f} == number{-0.});
+    REQUIRE(number{1.} != number{1.f});
+    REQUIRE(number{1.f} != number{1.});
+    REQUIRE(number{0.} != number{-0.f});
+    REQUIRE(number{0.f} != number{-0.});
     REQUIRE(number{1.1} != number{1.2f});
     REQUIRE(number{1.2f} != number{1.1});
-    REQUIRE(hash_number(number{1.l}) == hash_number(number{1.}));
-    REQUIRE(hash_number(number{0.l}) == hash_number(number{-0.}));
-    REQUIRE(hash_number(number{1.f}) == hash_number(number{1.}));
-    REQUIRE(hash_number(number{0.f}) == hash_number(number{-0.l}));
 
-    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} == number{std::numeric_limits<double>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<float>::quiet_NaN()} == number{std::numeric_limits<float>::quiet_NaN()});
+    REQUIRE(hash_number(number{1.1f}) == std::hash<float>{}(1.1f));
+    REQUIRE(hash_number(number{1.1}) == std::hash<double>{}(1.1));
+    REQUIRE(hash_number(number{1.1l}) == std::hash<long double>{}(1.1l));
+
+    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{std::numeric_limits<double>::quiet_NaN()});
+    REQUIRE(number{std::numeric_limits<float>::quiet_NaN()} != number{std::numeric_limits<float>::quiet_NaN()});
     REQUIRE(number{std::numeric_limits<long double>::quiet_NaN()}
-            == number{std::numeric_limits<long double>::quiet_NaN()});
-
-    REQUIRE(number{std::numeric_limits<long double>::quiet_NaN()} == number{std::numeric_limits<double>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} == number{std::numeric_limits<long double>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} == number{std::numeric_limits<float>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<float>::quiet_NaN()} == number{std::numeric_limits<double>::quiet_NaN()});
-
-    REQUIRE(hash_number(number{std::numeric_limits<long double>::quiet_NaN()})
-            == hash_number(number{std::numeric_limits<double>::quiet_NaN()}));
-    REQUIRE(hash_number(number{std::numeric_limits<long double>::quiet_NaN()})
-            == hash_number(number{std::numeric_limits<float>::quiet_NaN()}));
+            != number{std::numeric_limits<long double>::quiet_NaN()});
 
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{0.l});
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{0.f});
@@ -124,44 +127,28 @@ TEST_CASE("number hash eq")
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-    REQUIRE(number{1.} == number{1._rq});
-    REQUIRE(number{1.f} == number{1._rq});
-    REQUIRE(number{1._rq} == number{1.});
-    REQUIRE(number{1._rq} == number{1.f});
-    REQUIRE(number{0.} == number{-0._rq});
-    REQUIRE(number{0.f} == number{-0._rq});
-    REQUIRE(number{0._rq} == number{-0.});
-    REQUIRE(number{0._rq} == number{-0.f});
+    REQUIRE(number{1.} != number{1._rq});
+    REQUIRE(number{1.f} != number{1._rq});
+    REQUIRE(number{1._rq} != number{1.});
+    REQUIRE(number{1._rq} != number{1.f});
+    REQUIRE(number{0.} != number{-0._rq});
+    REQUIRE(number{0.f} != number{-0._rq});
+    REQUIRE(number{0._rq} != number{-0.});
+    REQUIRE(number{0._rq} != number{-0.f});
     REQUIRE(number{1.1} != number{1.2_rq});
     REQUIRE(number{1.1f} != number{1.2_rq});
     REQUIRE(number{1.2_rq} != number{1.1});
     REQUIRE(number{1.2_rq} != number{1.1f});
-    REQUIRE(hash_number(number{1._rq}) == hash_number(number{1.}));
-    REQUIRE(hash_number(number{1._rq}) == hash_number(number{1.f}));
-    REQUIRE(hash_number(number{0._rq}) == hash_number(number{-0.}));
-    REQUIRE(hash_number(number{0._rq}) == hash_number(number{-0.f}));
 
     REQUIRE(number{1.1} != number{1.1_rq});
     REQUIRE(number{1.1f} != number{1.1_rq});
     REQUIRE(number{1.1_rq} != number{1.1});
     REQUIRE(number{1.1_rq} != number{1.1f});
 
-    REQUIRE(number{std::numeric_limits<mppp::real128>::quiet_NaN()}
-            == number{std::numeric_limits<mppp::real128>::quiet_NaN()});
+    REQUIRE(hash_number(number{1.1_rq}) == std::hash<mppp::real128>{}(1.1_rq));
 
     REQUIRE(number{std::numeric_limits<mppp::real128>::quiet_NaN()}
-            == number{std::numeric_limits<double>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<mppp::real128>::quiet_NaN()}
-            == number{std::numeric_limits<double>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<mppp::real128>::quiet_NaN()} == number{std::numeric_limits<float>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()}
-            == number{std::numeric_limits<mppp::real128>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<float>::quiet_NaN()} == number{std::numeric_limits<mppp::real128>::quiet_NaN()});
-
-    REQUIRE(hash_number(number{std::numeric_limits<mppp::real128>::quiet_NaN()})
-            == hash_number(number{std::numeric_limits<double>::quiet_NaN()}));
-    REQUIRE(hash_number(number{std::numeric_limits<mppp::real128>::quiet_NaN()})
-            == hash_number(number{std::numeric_limits<float>::quiet_NaN()}));
+            != number{std::numeric_limits<mppp::real128>::quiet_NaN()});
 
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{0._rq});
     REQUIRE(number{std::numeric_limits<float>::quiet_NaN()} != number{0._rq});
@@ -180,7 +167,7 @@ TEST_CASE("number hash eq")
 
     // Verify that subexpressions which differ only
     // by the type of the constants (but not their values)
-    // are correctly simplified.
+    // are not simplified.
     auto [x, y] = make_vars("x", "y");
 
     {
@@ -188,11 +175,7 @@ TEST_CASE("number hash eq")
 
         auto dc = taylor_add_jet<double>(s, "jet", {prime(x) = (y + 1.) + (y + 1.l), prime(y) = x}, 1, 1, false, true);
 
-        REQUIRE(dc.size() == 6u);
-
-        // Make sure the vector of constants has been
-        // optimised out because both constants are 1.
-        REQUIRE(!boost::contains(s.get_ir(), "internal constant [2 x double]"));
+        REQUIRE(dc.size() == 7u);
     }
 
     {
@@ -201,11 +184,7 @@ TEST_CASE("number hash eq")
         auto dc = taylor_add_jet<double>(s, "jet", {prime(x) = (y + 1.) + (y + expression{number{1.f}}), prime(y) = x},
                                          1, 1, false, true);
 
-        REQUIRE(dc.size() == 6u);
-
-        // Make sure the vector of constants has been
-        // optimised out because both constants are 1.
-        REQUIRE(!boost::contains(s.get_ir(), "internal constant [2 x double]"));
+        REQUIRE(dc.size() == 7u);
     }
 }
 
@@ -336,6 +315,17 @@ TEST_CASE("number ostream")
 
         REQUIRE(oss.str() == cmp);
     }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    {
+        std::ostringstream oss;
+        oss << number{mppp::real{1.1, 23}};
+
+        REQUIRE(oss.str() == std::get<mppp::real>(number{mppp::real{1.1, 23}}.value()).to_string());
+    }
+
+#endif
 }
 
 TEST_CASE("number fmt")
@@ -689,6 +679,76 @@ TEST_CASE("llvm_codegen")
 
         REQUIRE(f_ptr() == boost::math::constants::pi<float>());
     }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    // Codegen high-precision pi real to double.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *fp_t = detail::to_llvm_type<double>(context);
+
+        auto *ft = llvm::FunctionType::get(fp_t, {}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        builder.CreateRet(llvm_codegen(s, fp_t, number{mppp::real_pi(256)}));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<double (*)()>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr() == boost::math::constants::pi<double>());
+    }
+
+    // Codegen high-precision pi real to real256 and store in output variable.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *real_t = detail::to_llvm_type<mppp::real>(context);
+
+        const auto real_pi_256 = mppp::real_pi(256);
+
+        auto *ft = llvm::FunctionType::get(builder.getVoidTy(), {llvm::PointerType::getUnqual(real_t)}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *real_val = llvm_codegen(s, detail::llvm_type_like(s, real_pi_256), number{real_pi_256});
+
+        detail::ext_store_vector_to_memory(s, f->arg_begin(), real_val);
+
+        builder.CreateRetVoid();
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<void (*)(mppp::real *)>(s.jit_lookup("test"));
+
+        mppp::real out{0, 256};
+        f_ptr(&out);
+
+        REQUIRE(out == real_pi_256);
+        REQUIRE(out.get_prec() == real_pi_256.get_prec());
+    }
+
+#endif
 }
 
 TEST_CASE("number_like")
@@ -780,6 +840,27 @@ TEST_CASE("binomial")
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+    using namespace mppp::literals;
+
+    n = binomial(number(4._r128), number(2._r128));
+    REQUIRE(n == number(6._r128));
+    REQUIRE(std::holds_alternative<mppp::real>(n.value()));
+    REQUIRE(std::get<mppp::real>(n.value()).get_prec() == 128);
+
+    n = binomial(number(4._r128), number(2._r256));
+    REQUIRE(n == number(6._r256));
+    REQUIRE(std::holds_alternative<mppp::real>(n.value()));
+    REQUIRE(std::get<mppp::real>(n.value()).get_prec() == 256);
+
+    n = binomial(number(4._r256), number(2._r128));
+    REQUIRE(n == number(6._r256));
+    REQUIRE(std::holds_alternative<mppp::real>(n.value()));
+    REQUIRE(std::get<mppp::real>(n.value()).get_prec() == 256);
+
+#endif
+
     REQUIRE_THROWS_MATCHES(binomial(number(4.), number(2.f)), std::invalid_argument,
                            Message("Cannot compute the binomial coefficient of two numbers of different type"));
 
@@ -806,4 +887,43 @@ TEST_CASE("nextafter")
 
     REQUIRE_THROWS_MATCHES(nextafter(number(4.), number(2.f)), std::invalid_argument,
                            Message("Cannot invoke nextafter() on two numbers of different type"));
+}
+
+TEST_CASE("is_zero")
+{
+    REQUIRE(is_zero(number{0.}));
+    REQUIRE(!is_zero(number{1.}));
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(is_zero(number{mppp::real{0.}}));
+    REQUIRE(!is_zero(number{mppp::real{1.}}));
+
+#endif
+}
+
+TEST_CASE("is_one")
+{
+    REQUIRE(!is_one(number{0.}));
+    REQUIRE(is_one(number{1.}));
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(!is_one(number{mppp::real{0.}}));
+    REQUIRE(is_one(number{mppp::real{1.}}));
+
+#endif
+}
+
+TEST_CASE("is_negative_one")
+{
+    REQUIRE(!is_negative_one(number{0.}));
+    REQUIRE(is_negative_one(number{-1.}));
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(!is_negative_one(number{mppp::real{0.}}));
+    REQUIRE(is_negative_one(-number{mppp::real{1.}}));
+
+#endif
 }
