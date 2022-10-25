@@ -35,6 +35,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/fmt_compat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
@@ -74,6 +80,9 @@ public:
     explicit expression(long double);
 #if defined(HEYOKA_HAVE_REAL128)
     explicit expression(mppp::real128);
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+    explicit expression(mppp::real);
 #endif
     explicit expression(std::string);
 

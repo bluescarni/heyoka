@@ -120,6 +120,12 @@ expression::expression(mppp::real128 x) : expression(number{x}) {}
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression::expression(mppp::real x) : expression(number{std::move(x)}) {}
+
+#endif
+
 expression::expression(std::string s) : expression(variable{std::move(s)}) {}
 
 expression::expression(number n) : m_value(std::move(n)) {}
