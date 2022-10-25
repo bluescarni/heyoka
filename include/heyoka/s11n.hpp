@@ -101,10 +101,7 @@ inline void s11n_variant_load_impl(Archive &ar, std::variant<Args...> &var, std:
 // from Boost. We should drop these if/when they become available
 // in Boost.
 
-namespace boost
-{
-
-namespace serialization
+namespace boost::serialization
 {
 
 // NOTE: inspired by the boost::variant implementation.
@@ -122,7 +119,7 @@ template <typename Archive, typename... Args>
 inline void load(Archive &ar, std::variant<Args...> &var, unsigned)
 {
     // Recover the variant index.
-    std::size_t idx;
+    std::size_t idx{};
     ar >> idx;
 
     // LCOV_EXCL_START
@@ -195,8 +192,6 @@ inline void serialize(Archive &ar, std::optional<T> &opt, unsigned v)
     split_free(ar, opt, v);
 }
 
-} // namespace serialization
-
-} // namespace boost
+} // namespace boost::serialization
 
 #endif
