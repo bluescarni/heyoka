@@ -24,7 +24,8 @@ compilation via `LLVM <https://llvm.org/>`__. Notable features include:
 * high-precision zero-cost dense output,
 * accurate and reliable event detection,
 * batch mode integration to harness the power of modern
-  `SIMD <https://en.wikipedia.org/wiki/SIMD>`__ instruction sets,
+  `SIMD <https://en.wikipedia.org/wiki/SIMD>`__ instruction sets
+  (including AVX/AVX2/AVX-512/Neon/VSX),
 * ensemble simulations and automatic parallelisation.
 
 If you prefer using Python rather than C++, heyoka can be used from Python via
