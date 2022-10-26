@@ -256,7 +256,7 @@ struct tracking_level<heyoka::detail::callable_inner<T, R, Args...>> {
     inline const char *guid<heyoka::detail::callable_inner<__VA_ARGS__>>()                                             \
     {                                                                                                                  \
         /* NOTE: the stringize here will produce a name enclosed by brackets. */                                       \
-        return BOOST_PP_STRINGIZE((heyoka::detail::callable_inner<__VA_ARGS__>));                                    \
+        return BOOST_PP_STRINGIZE((heyoka::detail::callable_inner<__VA_ARGS__>));                                      \
     }                                                                                                                  \
     }                                                                                                                  \
     }
