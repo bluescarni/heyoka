@@ -30,6 +30,8 @@ namespace heyoka
 namespace detail
 {
 
+// This is the null string function, used in the default
+// constructor of the constant class.
 class HEYOKA_DLL_PUBLIC null_constant_func
 {
     friend class boost::serialization::access;
@@ -42,6 +44,7 @@ public:
     std::string operator()(unsigned) const;
 };
 
+// Implementation of the pi string function.
 class HEYOKA_DLL_PUBLIC pi_constant_func
 {
     friend class boost::serialization::access;

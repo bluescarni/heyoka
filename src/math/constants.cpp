@@ -145,6 +145,9 @@ constant::constant(std::string name, str_func_t f, std::optional<std::string> re
     }
 }
 
+// Fetch the internal type of the string
+// function. This is intended to help discriminating
+// different constants.
 std::type_index constant::get_str_func_t() const
 {
     return m_str_func.get_type_index();
@@ -165,6 +168,8 @@ std::vector<expression> constant::gradient() const
     return {};
 }
 
+// This is a thin wrapper around m_str_func that checks
+// the input prec value and validates the returned string.
 std::string constant::operator()(unsigned prec) const
 {
     if (prec == 0u) {
@@ -183,9 +188,12 @@ std::string constant::operator()(unsigned prec) const
     return ret;
 }
 
+// Helper to generate the LLVM version of the constant for the type tp.
+// tp is supposed to be a scalar type.
 llvm::Constant *constant::make_llvm_const(llvm_state &s, llvm::Type *tp) const
 {
     assert(tp != nullptr);
+    assert(!tp->isVectorTy());
 
     // NOTE: isIEEE() is only available since LLVM 13.
     // For earlier versions of LLVM, we check that
