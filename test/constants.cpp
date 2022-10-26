@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <functional>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -102,6 +103,13 @@ TEST_CASE("basic")
     oss.str("");
     oss << expression{func{c1}};
     REQUIRE(oss.str() == "pippo");
+
+    // Test equality.
+    REQUIRE(pi == pi);
+    REQUIRE(pi != expression{func{constant{}}});
+    REQUIRE(std::hash<expression>{}(pi) == std::hash<expression>{}(pi));
+    // Of course, not guaranteed, but hopefully very likely.
+    REQUIRE(std::hash<expression>{}(pi) != std::hash<expression>{}(expression{func{constant{}}}));
 
     // Error modes.
     REQUIRE_THROWS_MATCHES(constant("foo", {}), std::invalid_argument,

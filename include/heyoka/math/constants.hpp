@@ -56,6 +56,10 @@ public:
 
 } // namespace detail
 
+// NOTE: no need to define custom equality and hashing here,
+// as the default equality/hashing primitives for func
+// take into account the constant name. Thus, under the assumption
+// that different constants have different names, this will be enough.
 class HEYOKA_DLL_PUBLIC constant : public func_base
 {
 public:
