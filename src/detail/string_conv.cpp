@@ -23,6 +23,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -50,6 +56,10 @@ std::string fp_to_string(const T &x)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
         return x.to_string();
 #endif
+#if defined(HEYOKA_HAVE_REAL)
+    } else if constexpr (std::is_same_v<T, mppp::real>) {
+        return x.to_string();
+#endif
     } else {
         static_assert(always_false_v<T>, "Unhandled type.");
     }
@@ -62,6 +72,12 @@ template HEYOKA_DLL_PUBLIC std::string fp_to_string<long double>(const long doub
 #if defined(HEYOKA_HAVE_REAL128)
 
 template HEYOKA_DLL_PUBLIC std::string fp_to_string<mppp::real128>(const mppp::real128 &);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template HEYOKA_DLL_PUBLIC std::string fp_to_string<mppp::real>(const mppp::real &);
 
 #endif
 
