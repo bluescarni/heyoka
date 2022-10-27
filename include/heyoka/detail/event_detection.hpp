@@ -20,6 +20,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -44,6 +50,13 @@ long double taylor_deduce_cooldown(long double, long double);
 
 template <>
 mppp::real128 taylor_deduce_cooldown(mppp::real128, mppp::real128);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+mppp::real taylor_deduce_cooldown(mppp::real, mppp::real);
 
 #endif
 

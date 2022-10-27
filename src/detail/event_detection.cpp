@@ -34,6 +34,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <fmt/format.h>
 
 #include <llvm/IR/Attributes.h>
@@ -339,7 +345,7 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
     // - 2 factor to deal with the common case of event equation
     //   flipping around after the event (e.g., for collisions).
     // The rest is additional safety.
-    auto ret = g_eps / abs_der * 10;
+    auto ret = std::move(g_eps) / std::move(abs_der) * 10;
 
     if (isfinite(ret)) {
         return ret;
@@ -374,6 +380,16 @@ template <>
 mppp::real128 taylor_deduce_cooldown(mppp::real128 g_eps, mppp::real128 abs_der)
 {
     return taylor_deduce_cooldown_impl(g_eps, abs_der);
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+mppp::real taylor_deduce_cooldown(mppp::real g_eps, mppp::real abs_der)
+{
+    return taylor_deduce_cooldown_impl(std::move(g_eps), std::move(abs_der));
 }
 
 #endif
