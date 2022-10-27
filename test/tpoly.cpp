@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <functional>
 #include <sstream>
 #include <stdexcept>
 
@@ -17,7 +18,7 @@
 
 using namespace heyoka;
 
-TEST_CASE("tpoly ctors")
+TEST_CASE("tpoly basics")
 {
     using Catch::Matchers::Message;
 
@@ -40,6 +41,12 @@ TEST_CASE("tpoly ctors")
         REQUIRE(tp.args()[0] == par[10]);
         REQUIRE(tp.args()[1] == par[12]);
     }
+
+    // Verify equality/hashing.
+    REQUIRE(tpoly(par[0], par[10]) == tpoly(par[0], par[10]));
+    REQUIRE(tpoly(par[0], par[10]) != tpoly(par[10], par[20]));
+    REQUIRE(std::hash<expression>{}(tpoly(par[0], par[10])) == std::hash<expression>{}(tpoly(par[0], par[10])));
+    REQUIRE(std::hash<expression>{}(tpoly(par[0], par[10])) != std::hash<expression>{}(tpoly(par[10], par[20])));
 
     REQUIRE_THROWS_MATCHES(tpoly(par[10], par[9]), std::invalid_argument,
                            Message("Cannot construct a time polynomial from param indices 10 and 9: the first index is "

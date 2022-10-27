@@ -10,18 +10,18 @@
 #define HEYOKA_MATH_CONSTANTS_HPP
 
 #include <cstdint>
+#include <optional>
 #include <ostream>
 #include <string>
-#include <unordered_map>
+#include <typeindex>
 #include <vector>
 
-#include <heyoka/config.hpp>
+#include <heyoka/callable.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
-#include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 
 namespace heyoka
@@ -30,61 +30,92 @@ namespace heyoka
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC constant_impl : public func_base
+// This is the null string function, used in the default
+// constructor of the constant class.
+class HEYOKA_DLL_PUBLIC null_constant_func
 {
-    number m_value;
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
+
+public:
+    std::string operator()(unsigned) const;
+};
+
+// Implementation of the pi string function.
+class HEYOKA_DLL_PUBLIC pi_constant_func
+{
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
+
+public:
+    std::string operator()(unsigned) const;
+};
+
+} // namespace detail
+
+// NOTE: no need to define custom equality and hashing here,
+// as the default equality/hashing primitives for func
+// take into account the constant name. Thus, under the assumption
+// that different constants have different names, this will be enough.
+class HEYOKA_DLL_PUBLIC constant : public func_base
+{
+public:
+    using str_func_t = callable<std::string(unsigned)>;
+
+private:
+    str_func_t m_str_func;
+    std::optional<std::string> m_repr;
 
     friend class boost::serialization::access;
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
         ar &boost::serialization::base_object<func_base>(*this);
-        ar &m_value;
+        ar &m_str_func;
+        ar &m_repr;
     }
 
-public:
-    constant_impl();
-    explicit constant_impl(std::string, number);
+    [[nodiscard]] HEYOKA_DLL_LOCAL llvm::Constant *make_llvm_const(llvm_state &, llvm::Type *) const;
 
-    const number &get_value() const;
+public:
+    constant();
+    explicit constant(std::string, str_func_t, std::optional<std::string> = {});
+
+    [[nodiscard]] std::type_index get_str_func_t() const;
+
+    [[nodiscard]] std::string operator()(unsigned) const;
 
     void to_stream(std::ostream &) const;
 
-    std::vector<expression> gradient() const;
+    [[nodiscard]] std::vector<expression> gradient() const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, std::uint32_t, bool) const;
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 
-    llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
-                             const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
-                             std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
+    [[nodiscard]] llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
+                                           const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
+                                           std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
 
-    llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
+    [[nodiscard]] llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t,
+                                                     bool) const;
 };
-
-class HEYOKA_DLL_PUBLIC pi_impl : public constant_impl
-{
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar &boost::serialization::base_object<constant_impl>(*this);
-    }
-
-public:
-    pi_impl();
-
-    void to_stream(std::ostream &) const;
-};
-
-} // namespace detail
 
 HEYOKA_DLL_PUBLIC extern const expression pi;
 
 } // namespace heyoka
 
-HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::pi_impl)
+HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::null_constant_func, std::string, unsigned)
+
+HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::pi_constant_func, std::string, unsigned)
+
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::constant)
 
 #endif
