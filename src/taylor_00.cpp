@@ -49,6 +49,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -437,6 +443,17 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
 }
 
 } // namespace
+
+#if defined(HEYOKA_HAVE_REAL)
+
+unsigned taylor_adaptive_base<mppp::real>::get_prec() const
+{
+    assert(m_prec > 0u);
+
+    return m_prec;
+}
+
+#endif
 
 } // namespace detail
 
@@ -1583,6 +1600,21 @@ taylor_adaptive<mppp::real128>::finalise_ctor_impl(const std::vector<expression>
 template HEYOKA_DLL_PUBLIC void taylor_adaptive<mppp::real128>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, mppp::real128, mppp::real128,
     bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template class taylor_adaptive<mppp::real>;
+
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive<mppp::real>::finalise_ctor_impl(const std::vector<expression> &, std::vector<mppp::real>, mppp::real,
+                                                mppp::real, bool, bool, std::vector<mppp::real>, std::vector<t_event_t>,
+                                                std::vector<nt_event_t>, bool);
+
+template HEYOKA_DLL_PUBLIC void taylor_adaptive<mppp::real>::finalise_ctor_impl(
+    const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real>, mppp::real, mppp::real, bool, bool,
+    std::vector<mppp::real>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 #endif
 

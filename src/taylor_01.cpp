@@ -64,6 +64,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
@@ -1620,6 +1626,13 @@ template class t_event_impl<mppp::real128, true>;
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+template class nt_event_impl<mppp::real, false>;
+template class t_event_impl<mppp::real, false>;
+
+#endif
+
 // Add a function for computing the dense output
 // via polynomial evaluation.
 void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32_t n_eq, std::uint32_t order,
@@ -2145,12 +2158,19 @@ std::size_t continuous_output<T>::get_n_steps() const
     return boost::numeric_cast<std::size_t>(m_times_hi.size() - 1u);
 }
 
+// Explicit instantiations.
 template class continuous_output<double>;
 template class continuous_output<long double>;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template class continuous_output<mppp::real128>;
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template class continuous_output<mppp::real>;
 
 #endif
 
@@ -2202,6 +2222,16 @@ std::ostream &operator<<(std::ostream &os, const continuous_output<long double> 
 
 template <>
 std::ostream &operator<<(std::ostream &os, const continuous_output<mppp::real128> &co)
+{
+    return detail::c_out_stream_impl(os, co);
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+std::ostream &operator<<(std::ostream &os, const continuous_output<mppp::real> &co)
 {
     return detail::c_out_stream_impl(os, co);
 }
@@ -2855,6 +2885,7 @@ std::size_t continuous_output_batch<T>::get_n_steps() const
     return boost::numeric_cast<std::size_t>(m_times_hi.size() / m_batch_size - 2u);
 }
 
+// Explicit instantiations.
 template class continuous_output_batch<double>;
 template class continuous_output_batch<long double>;
 

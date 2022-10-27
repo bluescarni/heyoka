@@ -40,6 +40,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/callable.hpp>
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/fmt_compat.hpp>
@@ -636,6 +642,13 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_outp
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<mppp::real> &);
+
+#endif
+
 template <typename>
 class HEYOKA_DLL_PUBLIC continuous_output_batch;
 
@@ -837,6 +850,28 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_base
     {
     }
 };
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+class HEYOKA_DLL_PUBLIC taylor_adaptive_base<mppp::real>
+{
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &m_prec;
+    }
+
+protected:
+    // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes,misc-non-private-member-variables-in-classes)
+    unsigned m_prec = 0;
+
+public:
+    [[nodiscard]] unsigned get_prec() const;
+};
+
+#endif
 
 } // namespace detail
 

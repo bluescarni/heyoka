@@ -207,6 +207,17 @@ std::tuple<T, int> bracketed_root_find(const T *poly, std::uint32_t order, T lb,
     }
 }
 
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+std::tuple<mppp::real, int> bracketed_root_find<mppp::real>(const mppp::real *, std::uint32_t, mppp::real, mppp::real)
+{
+    // TODO implement.
+    throw;
+}
+
+#endif
+
 // Helper to detect events of terminal type.
 template <typename>
 struct is_terminal_event : std::false_type {
@@ -1288,6 +1299,12 @@ template struct taylor_adaptive<long double>::ed_data;
 #if defined(HEYOKA_HAVE_REAL128)
 
 template struct taylor_adaptive<mppp::real128>::ed_data;
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template struct taylor_adaptive<mppp::real>::ed_data;
 
 #endif
 
