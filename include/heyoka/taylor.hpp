@@ -829,7 +829,7 @@ inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
 // Base class to contain data specific to integrators of type
 // T. By default this is just an empty class.
 template <typename T>
-class taylor_adaptive_base
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_base
 {
     friend class boost::serialization::access;
     template <typename Archive>
