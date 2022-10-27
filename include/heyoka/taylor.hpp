@@ -826,10 +826,22 @@ inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
     }
 }
 
+// Base class to contain data specific to integrators of type
+// T. By default this is just an empty class.
+template <typename T>
+class taylor_adaptive_base
+{
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
+};
+
 } // namespace detail
 
 template <typename T>
-class HEYOKA_DLL_PUBLIC taylor_adaptive
+class HEYOKA_DLL_PUBLIC taylor_adaptive : public detail::taylor_adaptive_base<T>
 {
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
 
@@ -1805,5 +1817,22 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive
 #endif
 
 } // namespace heyoka
+
+// NOTE: copy the implementation of the BOOST_CLASS_VERSION macro, as it does
+// not support class templates.
+// Version history:
+// - 1: added base class to taylor_adaptive.
+namespace boost::serialization
+{
+
+template <typename T>
+struct version<heyoka::taylor_adaptive<T>> {
+    typedef mpl::int_<1> type;
+    typedef mpl::integral_c_tag tag;
+    BOOST_STATIC_CONSTANT(int, value = version::type::value);
+    BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<1>, boost::mpl::int_<256>>));
+};
+
+} // namespace boost::serialization
 
 #endif

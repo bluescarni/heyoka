@@ -641,6 +641,8 @@ template <typename T>
 template <typename Archive>
 void taylor_adaptive<T>::save_impl(Archive &ar, unsigned) const
 {
+    ar << boost::serialization::base_object<detail::taylor_adaptive_base<T>>(*this);
+
     ar << m_state;
     ar << m_time;
     ar << m_llvm;
@@ -668,6 +670,8 @@ void taylor_adaptive<T>::load_impl(Archive &ar, unsigned version)
                                                 version));
     }
     // LCOV_EXCL_STOP
+
+    ar >> boost::serialization::base_object<detail::taylor_adaptive_base<T>>(*this);
 
     ar >> m_state;
     ar >> m_time;
