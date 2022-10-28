@@ -375,16 +375,15 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
 
         // In debug mode, we want to assert that the precision of the internal
         // type matches exactly the precision of the external variable.
-        if (s.opt_level() == 0u) {
-            // Load the precision from the external value.
-            auto *prec_t = to_llvm_type<real_prec_t>(context);
-            auto *prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
-            auto *prec = builder.CreateLoad(prec_t, prec_ptr);
 
-            llvm_invoke_external(
-                s, "heyoka_assert_real_match_precs_ext_load", builder.getVoidTy(),
-                {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
-        }
+        // Load the precision from the external value.
+        auto *prec_t = to_llvm_type<real_prec_t>(context);
+        auto *prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
+        auto *prec = builder.CreateLoad(prec_t, prec_ptr);
+
+        llvm_invoke_external(
+            s, "heyoka_assert_real_match_precs_ext_load", builder.getVoidTy(),
+            {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
 
 #endif
 
@@ -476,16 +475,15 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
 
         // In debug mode, we want to assert that the precision of the internal
         // type matches exactly the precision of the external variable.
-        if (s.opt_level() == 0u) {
-            // Load the precision from the external value.
-            auto *prec_t = to_llvm_type<real_prec_t>(context);
-            auto *out_prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
-            auto *prec = builder.CreateLoad(prec_t, out_prec_ptr);
 
-            llvm_invoke_external(
-                s, "heyoka_assert_real_match_precs_ext_store", builder.getVoidTy(),
-                {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
-        }
+        // Load the precision from the external value.
+        auto *prec_t = to_llvm_type<real_prec_t>(context);
+        auto *out_prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
+        auto *prec = builder.CreateLoad(prec_t, out_prec_ptr);
+
+        llvm_invoke_external(
+            s, "heyoka_assert_real_match_precs_ext_store", builder.getVoidTy(),
+            {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
 
 #endif
 

@@ -253,18 +253,16 @@ llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst
 
     // In debug mode, double check that the precision in the view matches
     // the precision of fp_t.
-    if (s.opt_level() == 0u) {
-        auto *prec_t = to_llvm_type<real_prec_t>(s.context());
 
-        // Load the precision value from the view.
-        auto *prec_ptr
-            = builder.CreateInBoundsGEP(real_t, mpfr_struct_inst, {builder.getInt32(0), builder.getInt32(0)});
-        auto *prec_value = builder.CreateLoad(prec_t, prec_ptr);
+    auto *prec_t = to_llvm_type<real_prec_t>(s.context());
 
-        // Check that it matches the precision of fp_t.
-        llvm_invoke_external(s, "heyoka_assert_real_match_precs_mpfr_view_to_real", builder.getVoidTy(),
-                             {prec_value, llvm_mpfr_prec(s, llvm_is_real(fp_t))});
-    }
+    // Load the precision value from the view.
+    auto *prec_ptr = builder.CreateInBoundsGEP(real_t, mpfr_struct_inst, {builder.getInt32(0), builder.getInt32(0)});
+    auto *prec_value = builder.CreateLoad(prec_t, prec_ptr);
+
+    // Check that it matches the precision of fp_t.
+    llvm_invoke_external(s, "heyoka_assert_real_match_precs_mpfr_view_to_real", builder.getVoidTy(),
+                         {prec_value, llvm_mpfr_prec(s, llvm_is_real(fp_t))});
 
 #endif
 
