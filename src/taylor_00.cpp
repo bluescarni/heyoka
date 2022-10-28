@@ -1369,7 +1369,7 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
         // fall within the time range of the last step.
         while (true) {
             // Fetch the current time target.
-            const auto cur_tt = grid[cur_grid_idx];
+            const auto &cur_tt = grid[cur_grid_idx];
 
             // NOTE: we force processing of all remaining grid points
             // if we are at the last timestep. We do this in order to avoid
