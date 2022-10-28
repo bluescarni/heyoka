@@ -879,6 +879,7 @@ template <typename T>
 class HEYOKA_DLL_PUBLIC taylor_adaptive : public detail::taylor_adaptive_base<T, taylor_adaptive<T>>
 {
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
+    friend class HEYOKA_DLL_PUBLIC detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
 
 public:
     using nt_event_t = nt_event<T>;
