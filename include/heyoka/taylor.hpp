@@ -841,8 +841,8 @@ inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
 
 // Base class to contain data specific to integrators of type
 // T. By default this is just an empty class.
-template <typename T>
-class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_base
+template <typename T, typename Derived>
+class HEYOKA_DLL_PUBLIC taylor_adaptive_base
 {
     friend class boost::serialization::access;
     template <typename Archive>
@@ -853,8 +853,8 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_base
 
 #if defined(HEYOKA_HAVE_REAL)
 
-template <>
-class HEYOKA_DLL_PUBLIC taylor_adaptive_base<mppp::real>
+template <typename Derived>
+class HEYOKA_DLL_PUBLIC taylor_adaptive_base<mppp::real, Derived>
 {
     friend class boost::serialization::access;
     template <typename Archive>
@@ -876,7 +876,7 @@ public:
 } // namespace detail
 
 template <typename T>
-class HEYOKA_DLL_PUBLIC taylor_adaptive : public detail::taylor_adaptive_base<T>
+class HEYOKA_DLL_PUBLIC taylor_adaptive : public detail::taylor_adaptive_base<T, taylor_adaptive<T>>
 {
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
 

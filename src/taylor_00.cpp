@@ -446,7 +446,8 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
 
 #if defined(HEYOKA_HAVE_REAL)
 
-unsigned taylor_adaptive_base<mppp::real>::get_prec() const
+template <typename Derived>
+unsigned taylor_adaptive_base<mppp::real, Derived>::get_prec() const
 {
     assert(m_prec > 0u);
 
@@ -609,7 +610,8 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
 }
 
 template <typename T>
-taylor_adaptive<T>::taylor_adaptive() : taylor_adaptive({prime("x"_var) = 0_dbl}, {T(0)}, kw::tol = T(1e-1))
+taylor_adaptive<T>::taylor_adaptive()
+    : taylor_adaptive({prime("x"_var) = 0_dbl}, {static_cast<T>(0)}, kw::tol = static_cast<T>(1e-1))
 {
 }
 
@@ -658,7 +660,7 @@ template <typename T>
 template <typename Archive>
 void taylor_adaptive<T>::save_impl(Archive &ar, unsigned) const
 {
-    ar << boost::serialization::base_object<detail::taylor_adaptive_base<T>>(*this);
+    ar << boost::serialization::base_object<detail::taylor_adaptive_base<T, taylor_adaptive>>(*this);
 
     ar << m_state;
     ar << m_time;
@@ -688,7 +690,7 @@ void taylor_adaptive<T>::load_impl(Archive &ar, unsigned version)
     }
     // LCOV_EXCL_STOP
 
-    ar >> boost::serialization::base_object<detail::taylor_adaptive_base<T>>(*this);
+    ar >> boost::serialization::base_object<detail::taylor_adaptive_base<T, taylor_adaptive>>(*this);
 
     ar >> m_state;
     ar >> m_time;
@@ -1564,6 +1566,28 @@ const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
 // Explicit instantiation of the implementation classes/functions.
 // NOTE: on Windows apparently it is necessary to declare that
 // these instantiations are meant to be dll-exported.
+
+namespace detail
+{
+
+template class taylor_adaptive_base<double, taylor_adaptive<double>>;
+
+template class taylor_adaptive_base<long double, taylor_adaptive<long double>>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template class taylor_adaptive_base<mppp::real128, taylor_adaptive<mppp::real128>>;
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template class taylor_adaptive_base<mppp::real, taylor_adaptive<mppp::real>>;
+
+#endif
+
+} // namespace detail
+
 template class taylor_adaptive<double>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive<double>::finalise_ctor_impl(const std::vector<expression> &,
