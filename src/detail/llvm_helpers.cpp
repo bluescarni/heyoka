@@ -3920,6 +3920,13 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_
     }
 }
 
+// This helper returns the type to be used for the internal LLVM representation
+// of the input value x.
+// NOTE: it is not really clear from the naming of this function that
+// this returns the *internal* representation, as opposed to to_llvm_type()
+// which instead returns the representation used to communicate between
+// LLVM and the external world. Perhaps we should consider renaming
+// for clarity.
 template <typename T>
 llvm::Type *llvm_type_like(llvm_state &s, [[maybe_unused]] const T &x)
 {
