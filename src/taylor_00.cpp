@@ -124,6 +124,10 @@ struct opt_disabler {
 
 // Helper to determine the optimal Taylor order for a given tolerance,
 // following Jorba's prescription.
+// NOTE: when T is mppp::real and tol has a low precision, the use
+// of integer operands in these computations might bump up the working
+// precision due to the way precision propagation works in mp++. I don't
+// think there's any negative consequence here.
 template <typename T>
 std::uint32_t taylor_order_from_tol(T tol)
 {
@@ -157,7 +161,7 @@ std::uint32_t taylor_order_from_tol(T tol)
 // propagate the state of the system. Instead, its output will be the jet of derivatives
 // of all state variables and event equations, and the deduced timestep value(s).
 template <typename T, typename U>
-auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name, const U &sys, T tol,
+auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name, const U &sys, const T &tol,
                                           std::uint32_t batch_size, bool, bool compact_mode,
                                           const std::vector<expression> &evs, bool high_accuracy, bool parallel_mode)
 {
@@ -290,8 +294,8 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
 // in the integrators' ctors.
 // NOTE: document this eventually.
 template <typename T, typename U>
-auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &sys, T tol, std::uint32_t batch_size,
-                              bool high_accuracy, bool compact_mode, bool parallel_mode)
+auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &sys, const T &tol,
+                              std::uint32_t batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode)
 {
     using std::isfinite;
 
@@ -325,9 +329,13 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
     // - pointer to the array of max timesteps (read & write),
     // - pointer to the Taylor coefficients output (write only).
     // These pointers cannot overlap.
-    auto *fp_t = to_llvm_type<T>(context);
+    auto *ext_fp_t = to_llvm_type<T>(context);
+    // NOTE: in case of mppp::real, before calling taylor_add_adaptive_step(), we ensured
+    // that the tolerance value has the inferred precision, so that llvm_type_like()
+    // will yield the correct internal type.
+    auto *fp_t = llvm_type_like(s, tol);
     auto *fp_vec_t = make_vector_type(fp_t, batch_size);
-    const std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(fp_t));
+    const std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(ext_fp_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -377,8 +385,8 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
                                            batch_size, compact_mode, high_accuracy, parallel_mode);
 
     // Determine the integration timestep.
-    auto h = taylor_determine_h(s, fp_t, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size,
-                                nullptr);
+    auto *h = taylor_determine_h(s, fp_t, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size,
+                                 nullptr);
 
     // Evaluate the Taylor polynomials, producing the updated state of the system.
     auto new_state_var = high_accuracy ? taylor_run_ceval(s, fp_t, diff_variant, h, n_eq, n_uvars, order, high_accuracy,
@@ -394,10 +402,11 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
 
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
             auto val = builder.CreateLoad(fp_vec_t, builder.CreateInBoundsGEP(fp_vec_t, new_state, cur_var_idx));
-            store_vector_to_memory(builder,
-                                   builder.CreateInBoundsGEP(
-                                       fp_t, state_ptr, builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))),
-                                   val);
+            ext_store_vector_to_memory(
+                s,
+                builder.CreateInBoundsGEP(ext_fp_t, state_ptr,
+                                          builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))),
+                val);
         });
     } else {
         const auto &new_state = std::get<std::vector<llvm::Value *>>(new_state_var);
@@ -405,17 +414,17 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
         assert(new_state.size() == n_eq);
 
         for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
-            store_vector_to_memory(builder,
-                                   builder.CreateInBoundsGEP(fp_t, state_ptr, builder.getInt32(var_idx * batch_size)),
-                                   new_state[var_idx]);
+            ext_store_vector_to_memory(
+                s, builder.CreateInBoundsGEP(ext_fp_t, state_ptr, builder.getInt32(var_idx * batch_size)),
+                new_state[var_idx]);
         }
     }
 
     // Store the timesteps that were used.
-    store_vector_to_memory(builder, h_ptr, h);
+    ext_store_vector_to_memory(s, h_ptr, h);
 
     // Write the Taylor coefficients, if requested.
-    auto nptr = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
+    auto *nptr = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(ext_fp_t));
     llvm_if_then_else(
         s, builder.CreateICmpNE(tc_ptr, nptr),
         [&]() {
@@ -535,9 +544,9 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
         }
 
         std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step_with_events<T>(
-            m_llvm, "step_e", sys, tol, 1, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
+            m_llvm, "step_e", sys, m_tol, 1, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
     } else {
-        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, 1, high_accuracy,
+        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step<T>(m_llvm, "step", sys, m_tol, 1, high_accuracy,
                                                                       compact_mode, parallel_mode);
     }
 

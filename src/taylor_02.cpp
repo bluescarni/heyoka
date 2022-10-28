@@ -234,10 +234,10 @@ number taylor_determine_h_rhofac(llvm_state &s, llvm::Type *fp_t, std::uint32_t 
 
 // Helper to generate the LLVM code to determine the timestep in an adaptive Taylor integrator,
 // following Jorba's prescription. diff_variant is the output of taylor_compute_jet(), and it contains
-// the jet of derivatives for the state variables and the sv_funcs. h_ptr is a pointer containing
+// the jet of derivatives for the state variables and the sv_funcs. h_ptr is an external pointer containing
 // the clamping values for the timesteps. svf_ptr is a pointer to the first element of an LLVM array containing the
 // values in sv_funcs_dc. If max_abs_state_ptr is not nullptr, the computed norm infinity of the
-// state vector (including sv_funcs, if any) will be written into it.
+// state vector (including sv_funcs, if any) will be written into it (max_abs_state_ptr is an external pointer).
 llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
                                 const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
                                 const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *h_ptr,
@@ -362,7 +362,7 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
 
     // Store max_abs_state, if requested.
     if (max_abs_state_ptr != nullptr) {
-        store_vector_to_memory(builder, max_abs_state_ptr, max_abs_state);
+        ext_store_vector_to_memory(s, max_abs_state_ptr, max_abs_state);
     }
 
     // Determine if we are in absolute or relative tolerance mode.
@@ -395,7 +395,7 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
     auto *h = llvm_fmul(s, rho_m, vector_splat(builder, llvm_codegen(s, fp_t, rhofac), batch_size));
 
     // Ensure that the step size does not exceed the limit in absolute value.
-    auto *max_h_vec = load_vector_from_memory(builder, fp_t, h_ptr, batch_size);
+    auto *max_h_vec = ext_load_vector_from_memory(s, fp_t, h_ptr, batch_size);
     h = taylor_step_minabs(s, h, max_h_vec);
 
     // Handle backwards propagation.
@@ -864,6 +864,7 @@ auto taylor_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vect
 
 // Helper for the computation of a jet of derivatives in compact mode,
 // used in taylor_compute_jet().
+// NOTE: order0, par_ptr and time_ptr are external pointers.
 llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *order0,
                                              llvm::Value *par_ptr, llvm::Value *time_ptr, const taylor_dc_t &dc,
                                              const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq,
@@ -873,6 +874,9 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Type *fp_type,
     auto &builder = s.builder();
     auto &context = s.context();
     auto &md = s.module();
+
+    // Fetch the external type corresponding to fp_type.
+    auto *ext_fp_t = llvm_ext_type(fp_type);
 
     // Split dc into segments.
     const auto s_dc = taylor_segment_dc(dc, n_eq);
@@ -924,10 +928,10 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Type *fp_type,
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
         // Fetch the pointer from order0.
         auto *ptr
-            = builder.CreateInBoundsGEP(fp_type, order0, builder.CreateMul(cur_var_idx, builder.getInt32(batch_size)));
+            = builder.CreateInBoundsGEP(ext_fp_t, order0, builder.CreateMul(cur_var_idx, builder.getInt32(batch_size)));
 
         // Load as a vector.
-        auto *vec = load_vector_from_memory(builder, fp_type, ptr, batch_size);
+        auto *vec = ext_load_vector_from_memory(s, fp_type, ptr, batch_size);
 
         // Store into diff_arr.
         taylor_c_store_diff(s, fp_vec_type, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx, vec);
@@ -939,8 +943,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Type *fp_type,
     llvm::Type *par_data_t = nullptr;
 
     if (parallel_mode) {
-        // Fetch the LLVM version of T *.
-        auto *scal_ptr_t = llvm::PointerType::getUnqual(fp_type);
+        auto *ext_fp_ptr_t = llvm::PointerType::getUnqual(ext_fp_t);
 
         // NOTE: we will use a global variable with these fields:
         //
@@ -949,7 +952,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Type *fp_type,
         // - T * (pointer to the time coordinate(s)),
         //
         // to pass the data necessary to the parallel workers.
-        par_data_t = llvm::StructType::get(context, {builder.getInt32Ty(), scal_ptr_t, scal_ptr_t});
+        par_data_t = llvm::StructType::get(context, {builder.getInt32Ty(), ext_fp_ptr_t, ext_fp_ptr_t});
         gl_par_data = new llvm::GlobalVariable(md, par_data_t, false, llvm::GlobalVariable::InternalLinkage,
                                                llvm::ConstantAggregateZero::get(par_data_t));
 
@@ -1000,17 +1003,17 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Type *fp_type,
                 auto *cur_order = builder.CreateLoad(
                     builder.getInt32Ty(),
                     builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(0)}));
-                auto par_arg = builder.CreateLoad(
-                    scal_ptr_t,
+                auto *par_arg = builder.CreateLoad(
+                    ext_fp_ptr_t,
                     builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(1)}));
-                auto time_arg = builder.CreateLoad(
-                    scal_ptr_t,
+                auto *time_arg = builder.CreateLoad(
+                    ext_fp_ptr_t,
                     builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(2)}));
 
                 // Iterate over the range.
                 llvm_loop_u32(s, b_idx, e_idx, [&](llvm::Value *cur_call_idx) {
                     // Create the u variable index from the first generator.
-                    auto u_idx = gens[0](cur_call_idx);
+                    auto *u_idx = gens[0](cur_call_idx);
 
                     // Initialise the vector of arguments with which func must be called. The following
                     // initial arguments are always present:
@@ -1242,20 +1245,24 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Type *fp_type,
 
 // Given an input pointer 'in', load the first n * batch_size values in it as n vectors
 // with size batch_size. If batch_size is 1, the values will be loaded as scalars.
+// 'in' is an external pointer.
 auto taylor_load_values(llvm_state &s, llvm::Type *fp_t, llvm::Value *in, std::uint32_t n, std::uint32_t batch_size)
 {
     assert(batch_size > 0u); // LCOV_EXCL_LINE
 
     auto &builder = s.builder();
 
+    // Fetch the external type corresponding to fp_t.
+    auto *ext_fp_t = llvm_ext_type(fp_t);
+
     std::vector<llvm::Value *> retval;
     for (std::uint32_t i = 0; i < n; ++i) {
         // Fetch the pointer from in.
         // NOTE: overflow checking is done in the parent function.
-        auto *ptr = builder.CreateInBoundsGEP(fp_t, in, builder.getInt32(i * batch_size));
+        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, in, builder.getInt32(i * batch_size));
 
         // Load the value in vector mode.
-        retval.push_back(load_vector_from_memory(builder, fp_t, ptr, batch_size));
+        retval.push_back(ext_load_vector_from_memory(s, fp_t, ptr, batch_size));
     }
 
     return retval;
@@ -1272,6 +1279,8 @@ auto taylor_load_values(llvm_state &s, llvm::Type *fp_t, llvm::Value *in, std::u
 // the numerical values of the parameters, time_ptr a pointer to the time value(s).
 // sv_funcs are the indices, in the decomposition, of the functions of state
 // variables.
+//
+// order0, par_ptr and time_ptr are all external pointers.
 //
 // The return value is a variant containing either:
 // - in compact mode, the array containing the derivatives of all u variables,
@@ -1411,6 +1420,7 @@ taylor_compute_jet(llvm_state &s, llvm::Type *fp_t, llvm::Value *order0, llvm::V
 // Helper to generate the LLVM code to store the Taylor coefficients of the state variables and
 // the sv funcs into an external array. The Taylor polynomials are stored in row-major order,
 // first the state variables and after the sv funcs. For use in the adaptive timestepper implementations.
+// tc_ptr is an external pointer.
 void taylor_write_tc(llvm_state &s, llvm::Type *fp_t,
                      const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
                      const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *tc_ptr,
@@ -1433,6 +1443,9 @@ void taylor_write_tc(llvm_state &s, llvm::Type *fp_t,
 
     // Fetch the vector type.
     auto *fp_vec_t = make_vector_type(fp_t, batch_size);
+
+    // Fetch the external type corresponding to fp_t.
+    auto *ext_fp_t = llvm_ext_type(fp_t);
 
     // Convert to std::uint32_t for overflow checking and use below.
     const auto n_sv_funcs = boost::numeric_cast<std::uint32_t>(sv_funcs_dc.size());
@@ -1469,7 +1482,7 @@ void taylor_write_tc(llvm_state &s, llvm::Type *fp_t,
                                             builder.CreateMul(cur_order, builder.getInt32(batch_size)));
 
                     // Store into tc_ptr.
-                    store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_t, tc_ptr, out_idx), diff_val);
+                    ext_store_vector_to_memory(s, builder.CreateInBoundsGEP(ext_fp_t, tc_ptr, out_idx), diff_val);
                 });
         });
 
@@ -1493,7 +1506,7 @@ void taylor_write_tc(llvm_state &s, llvm::Type *fp_t,
                                                 builder.CreateMul(cur_order, builder.getInt32(batch_size)));
 
                         // Store into tc_ptr.
-                        store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_t, tc_ptr, out_idx), diff_val);
+                        ext_store_vector_to_memory(s, builder.CreateInBoundsGEP(ext_fp_t, tc_ptr, out_idx), diff_val);
                     });
             });
         }
@@ -1516,9 +1529,9 @@ void taylor_write_tc(llvm_state &s, llvm::Type *fp_t,
                 const auto out_idx = (order + 1u) * batch_size * j + cur_order * batch_size;
 
                 // Write to tc_ptr.
-                auto *out_ptr
-                    = builder.CreateInBoundsGEP(fp_t, tc_ptr, builder.getInt32(static_cast<std::uint32_t>(out_idx)));
-                store_vector_to_memory(builder, out_ptr, val);
+                auto *out_ptr = builder.CreateInBoundsGEP(ext_fp_t, tc_ptr,
+                                                          builder.getInt32(static_cast<std::uint32_t>(out_idx)));
+                ext_store_vector_to_memory(s, out_ptr, val);
             }
         }
     }

@@ -202,6 +202,9 @@ llvm::Value *taylor_codegen_numparam(llvm_state &s, llvm::Type *fp_t, const para
 
     auto &builder = s.builder();
 
+    // Fetch the external type corresponding to fp_t.
+    auto *ext_fp_t = llvm_ext_type(fp_t);
+
     // Determine the index into the parameter array.
     // LCOV_EXCL_START
     if (p.idx() > std::numeric_limits<std::uint32_t>::max() / batch_size) {
@@ -211,10 +214,10 @@ llvm::Value *taylor_codegen_numparam(llvm_state &s, llvm::Type *fp_t, const para
     const auto arr_idx = static_cast<std::uint32_t>(p.idx() * batch_size);
 
     // Compute the pointer to load from.
-    auto *ptr = builder.CreateInBoundsGEP(fp_t, par_ptr, builder.getInt32(arr_idx));
+    auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, par_ptr, builder.getInt32(arr_idx));
 
     // Load.
-    return load_vector_from_memory(builder, fp_t, ptr, batch_size);
+    return ext_load_vector_from_memory(s, fp_t, ptr, batch_size);
 }
 
 // Codegen helpers for number/param for use in the generic c_diff implementations.
@@ -234,11 +237,14 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, llvm::Type *fp_t, con
 
     auto &builder = s.builder();
 
+    // Fetch the external type corresponding to fp_t.
+    auto *ext_fp_t = llvm_ext_type(fp_t);
+
     // Fetch the pointer into par_ptr.
     // NOTE: the overflow check is done in taylor_compute_jet().
-    auto *ptr = builder.CreateInBoundsGEP(fp_t, par_ptr, builder.CreateMul(p, builder.getInt32(batch_size)));
+    auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, par_ptr, builder.CreateMul(p, builder.getInt32(batch_size)));
 
-    return load_vector_from_memory(builder, fp_t, ptr, batch_size);
+    return ext_load_vector_from_memory(s, fp_t, ptr, batch_size);
 }
 
 // Helper to fetch the derivative of order 'order' of the u variable at index u_idx from the
