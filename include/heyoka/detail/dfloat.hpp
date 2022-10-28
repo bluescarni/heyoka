@@ -23,6 +23,7 @@
 
 #endif
 
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
 
 namespace heyoka::detail
@@ -60,7 +61,7 @@ private:
 // in order to ensure the ctors always set the components
 // to the same precision (and if they can't, they will throw).
 template <>
-struct dfloat<mppp::real> {
+struct HEYOKA_DLL_PUBLIC dfloat<mppp::real> {
     mppp::real hi, lo;
 
     dfloat();
