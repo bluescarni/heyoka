@@ -31,9 +31,7 @@ dfloat<mppp::real>::dfloat(mppp::real x) : hi(std::move(x)), lo(mppp::real_kind:
 dfloat<mppp::real>::dfloat(mppp::real h, mppp::real l) : hi(std::move(h)), lo(std::move(l))
 {
     if (hi.get_prec() != lo.get_prec()) {
-        // LCOV_EXCL_START
         throw std::invalid_argument("Mismatched precisions in the components of a dfloat<mppp::real>");
-        // LCOV_EXCL_STOP
     }
 }
 
