@@ -282,8 +282,9 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
         }
     }();
 
-    // tol (defaults to eps).
-    auto tol = [&p]() -> T {
+    // tol (defaults to undefined). Zero tolerance is considered
+    // the same as undefined.
+    auto tol = [&p]() -> std::optional<T> {
         if constexpr (p.has(kw::tol)) {
             auto retval = std::forward<decltype(p(kw::tol))>(p(kw::tol));
             if (retval != T(0)) {
@@ -291,11 +292,11 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
                 return retval;
             }
             // NOTE: zero tolerance will be interpreted
-            // as automatically-deduced by falling through
+            // as undefined by falling through
             // the code below.
         }
 
-        return std::numeric_limits<T>::epsilon();
+        return {};
     }();
 
     // Compact mode (defaults to false).
@@ -325,7 +326,7 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
         }
     }();
 
-    return std::tuple{high_accuracy, tol, compact_mode, std::move(pars), parallel_mode};
+    return std::tuple{high_accuracy, std::move(tol), compact_mode, std::move(pars), parallel_mode};
 }
 
 template <typename T, bool B>
@@ -867,6 +868,8 @@ protected:
     // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes,misc-non-private-member-variables-in-classes)
     unsigned m_prec = 0;
 
+    void data_prec_check() const;
+
 public:
     [[nodiscard]] unsigned get_prec() const;
 };
@@ -1014,8 +1017,8 @@ private:
     // NOTE: apparently on Windows we need to re-iterate
     // here that this is going to be dll-exported.
     template <typename U>
-    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(const U &, std::vector<T>, T, T, bool, bool, std::vector<T>,
-                                              std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(const U &, std::vector<T>, std::optional<T>, std::optional<T>, bool, bool,
+                                              std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
     template <typename U, typename... KwArgs>
     void finalise_ctor(const U &sys, std::vector<T> state, KwArgs &&...kw_args)
     {
@@ -1026,12 +1029,12 @@ private:
                           "The variadic arguments in the construction of an adaptive Taylor integrator contain "
                           "unnamed arguments.");
         } else {
-            // Initial time (defaults to zero).
-            const auto tm = [&p]() -> T {
+            // Initial time (defaults to undefined).
+            auto tm = [&p]() -> std::optional<T> {
                 if constexpr (p.has(kw::time)) {
                     return std::forward<decltype(p(kw::time))>(p(kw::time));
                 } else {
-                    return T(0);
+                    return {};
                 }
             }();
 
@@ -1056,8 +1059,8 @@ private:
                 }
             }();
 
-            finalise_ctor_impl(sys, std::move(state), tm, tol, high_accuracy, compact_mode, std::move(pars),
-                               std::move(tes), std::move(ntes), parallel_mode);
+            finalise_ctor_impl(sys, std::move(state), std::move(tm), std::move(tol), high_accuracy, compact_mode,
+                               std::move(pars), std::move(tes), std::move(ntes), parallel_mode);
         }
     }
 
@@ -1111,10 +1114,7 @@ public:
     {
         return static_cast<T>(m_time);
     }
-    void set_time(T t)
-    {
-        m_time = detail::dfloat<T>(t);
-    }
+    void set_time(T);
 
     // Time set/get in double-length format.
     std::pair<T, T> get_dtime() const
@@ -1525,8 +1525,9 @@ private:
 
     // Private implementation-detail constructor machinery.
     template <typename U>
-    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(const U &, std::vector<T>, std::uint32_t, std::vector<T>, T, bool, bool,
-                                              std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(const U &, std::vector<T>, std::uint32_t, std::vector<T>,
+                                              std::optional<T>, bool, bool, std::vector<T>, std::vector<t_event_t>,
+                                              std::vector<nt_event_t>, bool);
     template <typename U, typename... KwArgs>
     void finalise_ctor(const U &sys, std::vector<T> state, std::uint32_t batch_size, KwArgs &&...kw_args)
     {
@@ -1567,8 +1568,8 @@ private:
                 }
             }();
 
-            finalise_ctor_impl(sys, std::move(state), batch_size, std::move(tm), tol, high_accuracy, compact_mode,
-                               std::move(pars), std::move(tes), std::move(ntes), parallel_mode);
+            finalise_ctor_impl(sys, std::move(state), batch_size, std::move(tm), std::move(tol), high_accuracy,
+                               compact_mode, std::move(pars), std::move(tes), std::move(ntes), parallel_mode);
         }
     }
 

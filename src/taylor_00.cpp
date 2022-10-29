@@ -53,6 +53,8 @@
 
 #include <mp++/real.hpp>
 
+#include <heyoka/detail/real_helpers.hpp>
+
 #endif
 
 #include <heyoka/detail/event_detection.hpp>
@@ -463,16 +465,62 @@ unsigned taylor_adaptive_base<mppp::real, Derived>::get_prec() const
     return m_prec;
 }
 
+// Helper to check that the integrator data is consistent with
+// the precision. To be used at the end of construciton or before using
+// the integrator data (e.g., in step(), propagate(), etc.).
+template <typename Derived>
+void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
+{
+    const auto *dthis = static_cast<const Derived *>(this);
+
+    const auto sprec = static_cast<real_prec_t>(m_prec);
+
+    assert(sprec > 0);
+
+    // Time, tolerance, Taylor coefficients, m_last_h, dense output
+    // are all supposed to maintain the original precision after construction.
+    assert(dthis->m_time.hi.get_prec() == sprec);
+    assert(dthis->m_time.lo.get_prec() == sprec);
+    assert(dthis->m_tol.get_prec() == sprec);
+    assert(
+        std::all_of(dthis->m_tc.begin(), dthis->m_tc.end(), [sprec](const auto &x) { return x.get_prec() == sprec; }));
+    assert(dthis->m_last_h.get_prec() == sprec);
+    assert(std::all_of(dthis->m_d_out.begin(), dthis->m_d_out.end(),
+                       [sprec](const auto &x) { return x.get_prec() == sprec; }));
+
+    // State, pars can be changed by the user and thus need to be checked.
+    for (const auto &x : dthis->m_state) {
+        if (x.get_prec() != sprec) {
+            throw std::invalid_argument(fmt::format("A state variable with precision {} was detected in the state "
+                                                    "vector: this is incompatible with the integrator precision of {}",
+                                                    x.get_prec(), sprec));
+        }
+    }
+
+    for (const auto &x : dthis->m_pars) {
+        if (x.get_prec() != sprec) {
+            throw std::invalid_argument(fmt::format("A value with precision {} was detected in the parameter "
+                                                    "vector: this is incompatible with the integrator precision of {}",
+                                                    x.get_prec(), sprec));
+        }
+    }
+}
+
 #endif
 
 } // namespace detail
 
 template <typename T>
 template <typename U>
-void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, T time, T tol, bool high_accuracy,
-                                            bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
+void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, std::optional<T> time,
+                                            std::optional<T> tol, bool high_accuracy, bool compact_mode,
+                                            std::vector<T> pars, std::vector<t_event_t> tes,
                                             std::vector<nt_event_t> ntes, bool parallel_mode)
 {
+    // NOTE: this must hold because tol == 0 is interpreted
+    // as undefined in finalise_ctor().
+    assert(!tol || *tol != 0);
+
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
         throw not_implemented_error("'long double' computations are not supported on PowerPC");
@@ -481,10 +529,49 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
 
     using std::isfinite;
 
-    // Assign the data members.
+    // Run an immediate check on state. This is a bit redundant with other checks
+    // later (e.g., state.size() must be consistent with the ODE definition, which in
+    // turn cannot consist of zero equations), but it's handy to do it here so that,
+    // e.g., we can immediately infer the precision if T == mppp::real.
+    if (state.empty()) {
+        throw std::invalid_argument("Cannot initialise an adaptive integrator with an empty state vector");
+    }
+
+    // Assign the state.
     m_state = std::move(state);
-    m_time = detail::dfloat<T>(time);
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    // Infer the precision.
+    // NOTE: this must be done early so that the precision of the integrator
+    // is available for other checks later.
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        this->m_prec = boost::numeric_cast<unsigned>(m_state[0].get_prec());
+    }
+
+#endif
+
+    // Init the time.
+    // NOTE: we do this via set_time() so that any additional checks
+    // necessary on time are run as well.
+    if (time) {
+        set_time(std::move(*time));
+    } else {
+#if defined(HEYOKA_HAVE_REAL)
+        if constexpr (std::is_same_v<T, mppp::real>) {
+            set_time(mppp::real{mppp::real_kind::zero, static_cast<detail::real_prec_t>(this->m_prec)});
+        } else {
+#endif
+            set_time(static_cast<T>(0));
+#if defined(HEYOKA_HAVE_REAL)
+        }
+#endif
+    }
+
+    // Parameter values.
     m_pars = std::move(pars);
+
+    // High accuracy and compact mode flags.
     m_high_accuracy = high_accuracy;
     m_compact_mode = compact_mode;
 
@@ -507,10 +594,10 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
                         detail::fp_to_string(static_cast<T>(m_time))));
     }
 
-    if (!isfinite(tol) || tol <= 0) {
+    if (tol && (!isfinite(*tol) || *tol < 0)) {
         throw std::invalid_argument(fmt::format(
             "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead",
-            detail::fp_to_string(tol)));
+            detail::fp_to_string(*tol)));
     }
 
     if (parallel_mode && !compact_mode) {
@@ -518,7 +605,34 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     }
 
     // Store the tolerance.
-    m_tol = tol;
+    if (tol) {
+        m_tol = std::move(*tol);
+    } else {
+#if defined(HEYOKA_HAVE_REAL)
+        if constexpr (std::is_same_v<T, mppp::real>) {
+            // NOTE: for consistency with the epsilons returned for the other
+            // types, we return here 2**-(prec - 1). See:
+            // https://en.wikipedia.org/wiki/Machine_epsilon
+            const auto sprec = static_cast<detail::real_prec_t>(this->m_prec);
+            m_tol = mppp::real{1ul, boost::numeric_cast<detail::real_exp_t>(-(sprec - 1)), sprec};
+        } else {
+#endif
+            m_tol = std::numeric_limits<T>::epsilon();
+#if defined(HEYOKA_HAVE_REAL)
+        }
+#endif
+    }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        // Force the tolerance to have the inferred precision.
+        // NOTE: this is important as in taylor_add_adaptive_step*()
+        // we use the tolerance value to infer the internal type.
+        m_tol.prec_round(static_cast<detail::real_prec_t>(this->m_prec));
+    }
+
+#endif
 
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -553,7 +667,18 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     // Fix m_pars' size, if necessary.
     const auto npars = detail::n_pars_in_dc(m_dc);
     if (m_pars.size() < npars) {
-        m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
+#if defined(HEYOKA_HAVE_REAL)
+        if constexpr (std::is_same_v<T, mppp::real>) {
+            // For mppp::real, ensure that the appended parameter
+            // values all have the inferred precision.
+            m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars),
+                          mppp::real{mppp::real_kind::zero, static_cast<detail::real_prec_t>(this->m_prec)});
+        } else {
+#endif
+            m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
+#if defined(HEYOKA_HAVE_REAL)
+        }
+#endif
     } else if (m_pars.size() > npars) {
         throw std::invalid_argument(fmt::format(
             "Excessive number of parameter values passed to the constructor of an adaptive "
@@ -566,7 +691,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
 
     // Add the function for the computation of
     // the dense output.
-    detail::taylor_add_d_out_function(m_llvm, detail::to_llvm_type<T>(m_llvm.context()), m_dim, m_order, 1,
+    detail::taylor_add_d_out_function(m_llvm, detail::llvm_type_like(m_llvm, m_state[0]), m_dim, m_order, 1,
                                       high_accuracy);
 
     detail::get_logger()->trace("Taylor dense output runtime: {}", sw);
@@ -605,10 +730,31 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     }
     // LCOV_EXCL_STOP
 
-    m_tc.resize(m_state.size() * (m_order + 1u));
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        // NOTE: ensure the Taylor coefficients are all generated
+        // with the inferred precision.
+        m_tc.resize(m_state.size() * (m_order + 1u),
+                    mppp::real{mppp::real_kind::zero, static_cast<detail::real_prec_t>(this->m_prec)});
+    } else {
+#endif
+        m_tc.resize(m_state.size() * (m_order + 1u));
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
 
     // Setup the vector for the dense output.
-    m_d_out.resize(m_state.size());
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        // NOTE: ensure the values are all generated with the inferred precision.
+        m_d_out.resize(m_state.size(),
+                       mppp::real{mppp::real_kind::zero, static_cast<detail::real_prec_t>(this->m_prec)});
+    } else {
+#endif
+        m_d_out.resize(m_state.size());
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
 
     // Init the event data structure if needed.
     // NOTE: this can be done in parallel with the rest of the constructor,
@@ -616,6 +762,18 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     if (with_events) {
         m_ed_data = std::make_unique<ed_data>(std::move(tes), std::move(ntes), m_order, m_dim);
     }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        // Fix the precision of m_last_h, which was inited from '0'.
+        m_last_h.prec_round(static_cast<detail::real_prec_t>(this->m_prec));
+
+        // Run the precision check on the integrator data.
+        this->data_prec_check();
+    }
+
+#endif
 }
 
 template <typename T>
@@ -1514,13 +1672,30 @@ std::uint32_t taylor_adaptive<T>::get_dim() const
     return m_dim;
 }
 
+template <typename T>
+void taylor_adaptive<T>::set_time(T t)
+{
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        if (t.get_prec() != static_cast<detail::real_prec_t>(this->m_prec)) {
+            throw std::invalid_argument(
+                fmt::format("Invalid precision detected in the time variable: the precision of the integrator is "
+                            "{}, but the time variable has a precision of {} instead",
+                            this->m_prec, t.get_prec()));
+        }
+    }
+#endif
+
+    m_time = detail::dfloat<T>(std::move(t));
+}
+
 namespace
 {
 
 // NOTE: double-length normalisation assumes abs(hi) >= abs(lo), we need to enforce this
 // when setting the time coordinate in double-length format.
 template <typename T>
-void dtime_checks(T hi, T lo)
+void dtime_checks(const T &hi, const T &lo)
 {
     using std::abs;
     using std::isfinite;
@@ -1544,10 +1719,24 @@ void dtime_checks(T hi, T lo)
 template <typename T>
 void taylor_adaptive<T>::set_dtime(T hi, T lo)
 {
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        // NOTE: the constructor of dfloat will take care to check
+        // that the precisions of hi and lo match, so that here
+        // we only need to check the precision of hi.
+        if (hi.get_prec() != static_cast<detail::real_prec_t>(this->m_prec)) {
+            throw std::invalid_argument(
+                fmt::format("Invalid precision detected in the time variable: the precision of the integrator is "
+                            "{}, but the time variable has a precision of {} instead",
+                            this->m_prec, hi.get_prec()));
+        }
+    }
+#endif
+
     // Check the components.
     dtime_checks(hi, lo);
 
-    m_time = normalise(detail::dfloat<T>(hi, lo));
+    m_time = normalise(detail::dfloat<T>(std::move(hi), std::move(lo)));
 }
 
 template <typename T>
@@ -1600,26 +1789,27 @@ template class taylor_adaptive_base<mppp::real, taylor_adaptive<mppp::real>>;
 template class taylor_adaptive<double>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive<double>::finalise_ctor_impl(const std::vector<expression> &,
-                                                                            std::vector<double>, double, double, bool,
-                                                                            bool, std::vector<double>,
-                                                                            std::vector<t_event_t>,
+                                                                            std::vector<double>, std::optional<double>,
+                                                                            std::optional<double>, bool, bool,
+                                                                            std::vector<double>, std::vector<t_event_t>,
                                                                             std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive<double>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &, std::vector<double>,
-                                            double, double, bool, bool, std::vector<double>, std::vector<t_event_t>,
-                                            std::vector<nt_event_t>, bool);
+                                            std::optional<double>, std::optional<double>, bool, bool,
+                                            std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template class taylor_adaptive<long double>;
 
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive<long double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<long double>, long double,
-                                                 long double, bool, bool, std::vector<long double>,
-                                                 std::vector<t_event_t>, std::vector<nt_event_t>, bool);
-
 template HEYOKA_DLL_PUBLIC void taylor_adaptive<long double>::finalise_ctor_impl(
-    const std::vector<std::pair<expression, expression>> &, std::vector<long double>, long double, long double, bool,
-    bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+    const std::vector<expression> &, std::vector<long double>, std::optional<long double>, std::optional<long double>,
+    bool, bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive<long double>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &,
+                                                 std::vector<long double>, std::optional<long double>,
+                                                 std::optional<long double>, bool, bool, std::vector<long double>,
+                                                 std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -1627,12 +1817,15 @@ template class taylor_adaptive<mppp::real128>;
 
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive<mppp::real128>::finalise_ctor_impl(const std::vector<expression> &, std::vector<mppp::real128>,
-                                                   mppp::real128, mppp::real128, bool, bool, std::vector<mppp::real128>,
-                                                   std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+                                                   std::optional<mppp::real128>, std::optional<mppp::real128>, bool,
+                                                   bool, std::vector<mppp::real128>, std::vector<t_event_t>,
+                                                   std::vector<nt_event_t>, bool);
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive<mppp::real128>::finalise_ctor_impl(
-    const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, mppp::real128, mppp::real128,
-    bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive<mppp::real128>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &,
+                                                   std::vector<mppp::real128>, std::optional<mppp::real128>,
+                                                   std::optional<mppp::real128>, bool, bool, std::vector<mppp::real128>,
+                                                   std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 #endif
 
@@ -1640,24 +1833,29 @@ template HEYOKA_DLL_PUBLIC void taylor_adaptive<mppp::real128>::finalise_ctor_im
 
 template class taylor_adaptive<mppp::real>;
 
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive<mppp::real>::finalise_ctor_impl(const std::vector<expression> &, std::vector<mppp::real>, mppp::real,
-                                                mppp::real, bool, bool, std::vector<mppp::real>, std::vector<t_event_t>,
-                                                std::vector<nt_event_t>, bool);
-
 template HEYOKA_DLL_PUBLIC void taylor_adaptive<mppp::real>::finalise_ctor_impl(
-    const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real>, mppp::real, mppp::real, bool, bool,
-    std::vector<mppp::real>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+    const std::vector<expression> &, std::vector<mppp::real>, std::optional<mppp::real>, std::optional<mppp::real>,
+    bool, bool, std::vector<mppp::real>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive<mppp::real>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &,
+                                                std::vector<mppp::real>, std::optional<mppp::real>,
+                                                std::optional<mppp::real>, bool, bool, std::vector<mppp::real>,
+                                                std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 #endif
 
 template <typename T>
 template <typename U>
 void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, std::uint32_t batch_size,
-                                                  std::vector<T> time, T tol, bool high_accuracy, bool compact_mode,
-                                                  std::vector<T> pars, std::vector<t_event_t> tes,
+                                                  std::vector<T> time, std::optional<T> tol, bool high_accuracy,
+                                                  bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
                                                   std::vector<nt_event_t> ntes, bool parallel_mode)
 {
+    // NOTE: this must hold because tol == 0 is interpreted
+    // as undefined in finalise_ctor().
+    assert(!tol || *tol != 0);
+
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
         throw not_implemented_error("'long double' computations are not supported on PowerPC");
@@ -1713,10 +1911,10 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
             "A non-finite initial time was detected in the initialisation of an adaptive Taylor integrator");
     }
 
-    if (!isfinite(tol) || tol <= 0) {
+    if (tol && (!isfinite(*tol) || *tol < 0)) {
         throw std::invalid_argument(fmt::format(
             "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead",
-            detail::fp_to_string(tol)));
+            detail::fp_to_string(*tol)));
     }
 
     if (parallel_mode && !compact_mode) {
@@ -1724,7 +1922,11 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
     }
 
     // Store the tolerance.
-    m_tol = tol;
+    if (tol) {
+        m_tol = *tol;
+    } else {
+        m_tol = std::numeric_limits<T>::epsilon();
+    }
 
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -1750,9 +1952,9 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
         }
 
         std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step_with_events<T>(
-            m_llvm, "step_e", sys, tol, batch_size, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
+            m_llvm, "step_e", sys, m_tol, batch_size, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
     } else {
-        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, batch_size,
+        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step<T>(m_llvm, "step", sys, m_tol, batch_size,
                                                                       high_accuracy, compact_mode, parallel_mode);
     }
 
@@ -3364,24 +3566,25 @@ void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
 // Explicit instantiation of the batch implementation classes.
 template class taylor_adaptive_batch<double>;
 
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_batch<double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<double>, std::uint32_t,
-                                                  std::vector<double>, double, bool, bool, std::vector<double>,
-                                                  std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<double>::finalise_ctor_impl(
+    const std::vector<expression> &, std::vector<double>, std::uint32_t, std::vector<double>, std::optional<double>,
+    bool, bool, std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<double>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<double>, std::uint32_t, std::vector<double>,
-    double, bool, bool, std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+    std::optional<double>, bool, bool, std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template class taylor_adaptive_batch<long double>;
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<long double>::finalise_ctor_impl(
-    const std::vector<expression> &, std::vector<long double>, std::uint32_t, std::vector<long double>, long double,
-    bool, bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive_batch<long double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<long double>,
+                                                       std::uint32_t, std::vector<long double>,
+                                                       std::optional<long double>, bool, bool, std::vector<long double>,
+                                                       std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<long double>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<long double>, std::uint32_t,
-    std::vector<long double>, long double, bool, bool, std::vector<long double>, std::vector<t_event_t>,
+    std::vector<long double>, std::optional<long double>, bool, bool, std::vector<long double>, std::vector<t_event_t>,
     std::vector<nt_event_t>, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -3390,12 +3593,13 @@ template class taylor_adaptive_batch<mppp::real128>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<mppp::real128>::finalise_ctor_impl(
     const std::vector<expression> &, std::vector<mppp::real128>, std::uint32_t, std::vector<mppp::real128>,
-    mppp::real128, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+    std::optional<mppp::real128>, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>,
+    std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<mppp::real128>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, std::uint32_t,
-    std::vector<mppp::real128>, mppp::real128, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>,
-    std::vector<nt_event_t>, bool);
+    std::vector<mppp::real128>, std::optional<mppp::real128>, bool, bool, std::vector<mppp::real128>,
+    std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 #endif
 

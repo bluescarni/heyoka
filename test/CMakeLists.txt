@@ -128,3 +128,7 @@ ADD_HEYOKA_TESTCASE(parallel_mode)
 ADD_HEYOKA_TESTCASE(opt_checks)
 ADD_HEYOKA_TESTCASE(poly_enclosures)
 ADD_HEYOKA_TESTCASE(function_decompose)
+
+if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
+  ADD_HEYOKA_TESTCASE(taylor_adaptive_mp)
+endif()
