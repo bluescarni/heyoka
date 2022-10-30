@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <initializer_list>
+#include <tuple>
 
 #include <mp++/real.hpp>
 
@@ -14,8 +15,10 @@
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
 
 TEST_CASE("basics")
 {
@@ -24,8 +27,13 @@ TEST_CASE("basics")
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
         for (auto cm : {false, true}) {
             for (auto prec : {30u, 237u}) {
-                auto ta = taylor_adaptive<mppp::real>({x}, {mppp::real{0, prec}}, kw::compact_mode = cm,
+                auto ta = taylor_adaptive<mppp::real>({x}, {mppp::real{1, prec}}, kw::compact_mode = cm,
                                                       kw::opt_level = opt_level);
+
+                for (auto i = 0; i < 10; ++i) {
+                    REQUIRE(std::get<0>(ta.step()) == taylor_outcome::success);
+                }
+                REQUIRE(ta.get_state()[0] == approximately(exp(ta.get_time())));
             }
         }
     }

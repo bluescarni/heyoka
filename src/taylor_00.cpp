@@ -940,6 +940,17 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T &max_delta_t
     assert(!isnan(max_delta_t)); // LCOV_EXCL_LINE
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        assert(max_delta_t.get_prec() == this->get_sprec());
+
+        // Run the data precision checks.
+        this->data_prec_check();
+    }
+
+#endif
+
     auto h = max_delta_t;
 
     if (m_step_f.index() == 0u) {
@@ -1140,15 +1151,32 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T &max_delta_t
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(bool wtc)
 {
+
     // NOTE: time limit +inf means integration forward in time
     // and no time limit.
-    return step_impl(std::numeric_limits<T>::infinity(), wtc);
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        return step_impl(mppp::real{mppp::real_kind::inf, this->get_sprec()}, wtc);
+    } else {
+#endif
+        return step_impl(std::numeric_limits<T>::infinity(), wtc);
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
 }
 
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_backward(bool wtc)
 {
-    return step_impl(-std::numeric_limits<T>::infinity(), wtc);
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        return step_impl(mppp::real{mppp::real_kind::inf, -1, this->get_sprec()}, wtc);
+    } else {
+#endif
+        return step_impl(-std::numeric_limits<T>::infinity(), wtc);
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
 }
 
 template <typename T>
@@ -1160,6 +1188,19 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(const T &max_delta_t, boo
         throw std::invalid_argument(
             "A NaN max_delta_t was passed to the step() function of an adaptive Taylor integrator");
     }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        if (max_delta_t.get_prec() != this->get_sprec()) {
+            throw std::invalid_argument(
+                fmt::format("Invalid max_delta_t argument passed to the step() function of an adaptive Taylor "
+                            "integrator: max_delta_t has a precision of {}, while the integrator's precision is {}",
+                            max_delta_t.get_prec(), this->get_sprec()));
+        }
+    }
+
+#endif
 
     return step_impl(max_delta_t, wtc);
 }
