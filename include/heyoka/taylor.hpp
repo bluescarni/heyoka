@@ -1835,6 +1835,13 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive<mppp::real> &);
+
+#endif
+
 template <typename T>
 inline std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch<T> &)
 {
