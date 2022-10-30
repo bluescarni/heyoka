@@ -933,7 +933,7 @@ void taylor_adaptive<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
 //   and the Taylor coefficients being recorded in the internal array
 //   (if wtc == true). That is, h == 0 is not treated in any special way.
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T &max_delta_t, bool wtc)
 {
     using std::abs;
     using std::isfinite;
@@ -962,10 +962,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         // end of the timestep.
         if (!isfinite(m_time)
             || std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !isfinite(x); })) {
-            return std::tuple{taylor_outcome::err_nf_state, h};
+            return std::tuple{taylor_outcome::err_nf_state, std::move(h)};
         }
 
-        return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, h};
+        return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, std::move(h)};
     } else {
         assert(m_ed_data); // LCOV_EXCL_LINE
 
@@ -1156,7 +1156,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_backward(bool wtc)
 }
 
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(T max_delta_t, bool wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(const T &max_delta_t, bool wtc)
 {
     using std::isnan;
 

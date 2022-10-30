@@ -1014,7 +1014,7 @@ private:
     void load(boost::archive::binary_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
-    HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
+    HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(const T &, bool);
 
     // Private implementation-detail constructor machinery.
     // NOTE: apparently on Windows we need to re-iterate
@@ -1200,7 +1200,7 @@ public:
 
     std::tuple<taylor_outcome, T> step(bool = false);
     std::tuple<taylor_outcome, T> step_backward(bool = false);
-    std::tuple<taylor_outcome, T> step(T, bool = false);
+    std::tuple<taylor_outcome, T> step(const T &, bool = false);
 
 private:
     // Implementations of the propagate_*() functions.
