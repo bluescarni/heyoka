@@ -1154,19 +1154,17 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
     std::ostringstream oss;
     oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
     oss.imbue(std::locale::classic());
-    oss << std::showpoint;
-    oss.precision(std::numeric_limits<T>::max_digits10);
     oss << std::boolalpha;
 
-    oss << "Tolerance               : " << ta.get_tol() << '\n';
+    oss << "Tolerance               : " << fp_to_string(ta.get_tol()) << '\n';
     oss << "High accuracy           : " << ta.get_high_accuracy() << '\n';
     oss << "Compact mode            : " << ta.get_compact_mode() << '\n';
     oss << "Taylor order            : " << ta.get_order() << '\n';
     oss << "Dimension               : " << ta.get_dim() << '\n';
-    oss << "Time                    : " << ta.get_time() << '\n';
+    oss << "Time                    : " << fp_to_string(ta.get_time()) << '\n';
     oss << "State                   : [";
     for (decltype(ta.get_state().size()) i = 0; i < ta.get_state().size(); ++i) {
-        oss << ta.get_state()[i];
+        oss << fp_to_string(ta.get_state()[i]);
         if (i != ta.get_state().size() - 1u) {
             oss << ", ";
         }
@@ -1176,7 +1174,7 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
     if (!ta.get_pars().empty()) {
         oss << "Parameters              : [";
         for (decltype(ta.get_pars().size()) i = 0; i < ta.get_pars().size(); ++i) {
-            oss << ta.get_pars()[i];
+            oss << fp_to_string(ta.get_pars()[i]);
             if (i != ta.get_pars().size() - 1u) {
                 oss << ", ";
             }
@@ -1204,11 +1202,9 @@ std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_a
     std::ostringstream oss;
     oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
     oss.imbue(std::locale::classic());
-    oss << std::showpoint;
-    oss.precision(std::numeric_limits<T>::max_digits10);
     oss << std::boolalpha;
 
-    oss << "Tolerance               : " << ta.get_tol() << '\n';
+    oss << "Tolerance               : " << fp_to_string(ta.get_tol()) << '\n';
     oss << "High accuracy           : " << ta.get_high_accuracy() << '\n';
     oss << "Compact mode            : " << ta.get_compact_mode() << '\n';
     oss << "Taylor order            : " << ta.get_order() << '\n';
@@ -1216,7 +1212,7 @@ std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_a
     oss << "Batch size              : " << ta.get_batch_size() << '\n';
     oss << "Time                    : [";
     for (decltype(ta.get_time().size()) i = 0; i < ta.get_time().size(); ++i) {
-        oss << ta.get_time()[i];
+        oss << fp_to_string(ta.get_time()[i]);
         if (i != ta.get_time().size() - 1u) {
             oss << ", ";
         }
@@ -1224,7 +1220,7 @@ std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_a
     oss << "]\n";
     oss << "State                   : [";
     for (decltype(ta.get_state().size()) i = 0; i < ta.get_state().size(); ++i) {
-        oss << ta.get_state()[i];
+        oss << fp_to_string(ta.get_state()[i]);
         if (i != ta.get_state().size() - 1u) {
             oss << ", ";
         }
@@ -1234,7 +1230,7 @@ std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_a
     if (!ta.get_pars().empty()) {
         oss << "Parameters              : [";
         for (decltype(ta.get_pars().size()) i = 0; i < ta.get_pars().size(); ++i) {
-            oss << ta.get_pars()[i];
+            oss << fp_to_string(ta.get_pars()[i]);
             if (i != ta.get_pars().size() - 1u) {
                 oss << ", ";
             }
