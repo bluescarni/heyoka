@@ -482,9 +482,7 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
 {
     const auto *dthis = static_cast<const Derived *>(this);
 
-    const auto sprec = static_cast<real_prec_t>(m_prec);
-
-    assert(sprec > 0);
+    const auto sprec = get_sprec();
 
     // Time, tolerance, Taylor coefficients, m_last_h, dense output
     // are all supposed to maintain the original precision after construction.
@@ -568,7 +566,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     } else {
 #if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
-            set_time(mppp::real{mppp::real_kind::zero, static_cast<detail::real_prec_t>(this->m_prec)});
+            set_time(mppp::real{mppp::real_kind::zero, this->get_sprec()});
         } else {
 #endif
             set_time(static_cast<T>(0));
@@ -622,7 +620,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
             // NOTE: for consistency with the epsilons returned for the other
             // types, we return here 2**-(prec - 1). See:
             // https://en.wikipedia.org/wiki/Machine_epsilon
-            const auto sprec = static_cast<detail::real_prec_t>(this->m_prec);
+            const auto sprec = this->get_sprec();
             m_tol = mppp::real{1ul, boost::numeric_cast<detail::real_exp_t>(-(sprec - 1)), sprec};
         } else {
 #endif
@@ -638,7 +636,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
         // Force the tolerance to have the inferred precision.
         // NOTE: this is important as in taylor_add_adaptive_step*()
         // we use the tolerance value to infer the internal type.
-        m_tol.prec_round(static_cast<detail::real_prec_t>(this->m_prec));
+        m_tol.prec_round(this->get_sprec());
     }
 
 #endif
@@ -681,7 +679,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
             // For mppp::real, ensure that the appended parameter
             // values all have the inferred precision.
             m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars),
-                          mppp::real{mppp::real_kind::zero, static_cast<detail::real_prec_t>(this->m_prec)});
+                          mppp::real{mppp::real_kind::zero, this->get_sprec()});
         } else {
 #endif
             m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
@@ -743,8 +741,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     if constexpr (std::is_same_v<T, mppp::real>) {
         // NOTE: ensure the Taylor coefficients are all generated
         // with the inferred precision.
-        m_tc.resize(m_state.size() * (m_order + 1u),
-                    mppp::real{mppp::real_kind::zero, static_cast<detail::real_prec_t>(this->m_prec)});
+        m_tc.resize(m_state.size() * (m_order + 1u), mppp::real{mppp::real_kind::zero, this->get_sprec()});
     } else {
 #endif
         m_tc.resize(m_state.size() * (m_order + 1u));
@@ -756,8 +753,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
 #if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         // NOTE: ensure the values are all generated with the inferred precision.
-        m_d_out.resize(m_state.size(),
-                       mppp::real{mppp::real_kind::zero, static_cast<detail::real_prec_t>(this->m_prec)});
+        m_d_out.resize(m_state.size(), mppp::real{mppp::real_kind::zero, this->get_sprec()});
     } else {
 #endif
         m_d_out.resize(m_state.size());
@@ -776,7 +772,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
 
     if constexpr (std::is_same_v<T, mppp::real>) {
         // Fix the precision of m_last_h, which was inited from '0'.
-        m_last_h.prec_round(static_cast<detail::real_prec_t>(this->m_prec));
+        m_last_h.prec_round(this->get_sprec());
 
         // Run the precision check on the integrator data.
         this->data_prec_check();
@@ -1686,11 +1682,11 @@ void taylor_adaptive<T>::set_time(T t)
 {
 #if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
-        if (t.get_prec() != static_cast<detail::real_prec_t>(this->m_prec)) {
+        if (t.get_prec() != this->get_sprec()) {
             throw std::invalid_argument(
                 fmt::format("Invalid precision detected in the time variable: the precision of the integrator is "
                             "{}, but the time variable has a precision of {} instead",
-                            this->m_prec, t.get_prec()));
+                            this->get_sprec(), t.get_prec()));
         }
     }
 #endif
@@ -1733,11 +1729,11 @@ void taylor_adaptive<T>::set_dtime(T hi, T lo)
         // NOTE: the constructor of dfloat will take care to check
         // that the precisions of hi and lo match, so that here
         // we only need to check the precision of hi.
-        if (hi.get_prec() != static_cast<detail::real_prec_t>(this->m_prec)) {
+        if (hi.get_prec() != this->get_sprec()) {
             throw std::invalid_argument(
                 fmt::format("Invalid precision detected in the time variable: the precision of the integrator is "
                             "{}, but the time variable has a precision of {} instead",
-                            this->m_prec, hi.get_prec()));
+                            this->get_sprec(), hi.get_prec()));
         }
     }
 #endif
