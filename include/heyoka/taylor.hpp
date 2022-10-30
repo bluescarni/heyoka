@@ -869,8 +869,11 @@ protected:
     unsigned m_prec = 0;
 
     void data_prec_check() const;
+    // NOTE: this is for internal use with the handy cast.
+    [[nodiscard]] mpfr_prec_t get_sprec() const;
 
 public:
+    // NOTE: this is for public consumption.
     [[nodiscard]] unsigned get_prec() const;
 };
 

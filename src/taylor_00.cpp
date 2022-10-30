@@ -465,6 +465,15 @@ unsigned taylor_adaptive_base<mppp::real, Derived>::get_prec() const
     return m_prec;
 }
 
+template <typename Derived>
+mpfr_prec_t taylor_adaptive_base<mppp::real, Derived>::get_sprec() const
+{
+    assert(m_prec > 0u);
+    assert(m_prec <= static_cast<std::make_unsigned_t<mpfr_prec_t>>(std::numeric_limits<mpfr_prec_t>::max()));
+
+    return static_cast<mpfr_prec_t>(m_prec);
+}
+
 // Helper to check that the integrator data is consistent with
 // the precision. To be used at the end of construciton or before using
 // the integrator data (e.g., in step(), propagate(), etc.).
