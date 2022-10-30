@@ -1281,6 +1281,16 @@ std::ostream &operator<<(std::ostream &os, const taylor_adaptive<mppp::real128> 
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive<mppp::real> &ta)
+{
+    return detail::taylor_adaptive_stream_impl(os, ta);
+}
+
+#endif
+
 template <>
 std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch<double> &ta)
 {
