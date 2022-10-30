@@ -110,6 +110,9 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
     // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
+    // Fetch the external type corresponding to fp_t.
+    auto *ext_fp_t = llvm_ext_type(fp_t);
+
     // Init the name.
     auto fname = fmt::format("heyoka.taylor_c_diff.{}.", name);
 
@@ -117,11 +120,11 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
     // - diff order,
     // - idx of the u variable whose diff is being computed,
     // - diff array (pointer to val_t),
-    // - par ptr (pointer to scalar),
-    // - time ptr (pointer to scalar).
-    std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), llvm::PointerType::getUnqual(val_t),
-        llvm::PointerType::getUnqual(val_t->getScalarType()), llvm::PointerType::getUnqual(val_t->getScalarType())};
+    // - par ptr (pointer to external scalar),
+    // - time ptr (pointer to external scalar).
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
+                                    llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(ext_fp_t),
+                                    llvm::PointerType::getUnqual(ext_fp_t)};
 
     // Add the mangling and LLVM arg types for the argument types. Also, detect if
     // we have variables in the arguments.
