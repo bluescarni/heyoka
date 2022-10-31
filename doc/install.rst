@@ -33,9 +33,11 @@ heyoka has the following **mandatory** dependencies:
 
 Additionally, heyoka has the following **optional** dependencies:
 
-* the `mp++ <https://bluescarni.github.io/mppp/>`__ multiprecision library
-  (provides support for quadruple-precision integrations on platforms
-  supporting the non-standard ``__float128`` type) (version >= 0.27),
+* the `mp++ <https://bluescarni.github.io/mppp/>`__ multiprecision library,
+  which provides support for quadruple-precision integrations on platforms
+  supporting the non-standard ``__float128`` type (version >= 0.27, note that
+  heyoka requires an installation of mp++ with support for Boost.serialization -
+  see the :ref:`mp++ installation instructions <mppp:installation>`),
 * the `SLEEF <https://sleef.org/>`__ vectorized math library (improves the performance
   of integrations in batch mode),
 * the `xtensor and xtensor-blas <https://xtensor.readthedocs.io/en/latest/>`__
