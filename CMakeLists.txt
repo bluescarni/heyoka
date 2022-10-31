@@ -408,13 +408,22 @@ if(HEYOKA_WITH_MPPP)
     if(${mp++_VERSION} VERSION_LESS ${_HEYOKA_MIN_MPPP_VERSION})
         message(FATAL_ERROR "mp++ >= ${_HEYOKA_MIN_MPPP_VERSION} is required.")
     endif()
+
+    # NOTE: this is necessary for the serialisation of several classes.
+    if(NOT mp++_WITH_BOOST_S11N)
+        message(FATAL_ERROR "mp++ must be installed with support for Boost.serialization.")
+    endif()
+
     target_link_libraries(heyoka PUBLIC mp++::mp++)
 
     # NOTE: _HEYOKA_WITH_REAL128 is used to signal the support
     # for mppp::real128 in the config-file package.
     set(_HEYOKA_WITH_REAL128 ${mp++_WITH_QUADMATH})
+    # Similarly for mppp::real.
+    set(_HEYOKA_WITH_REAL ${mp++_WITH_MPFR})
 else()
     set(_HEYOKA_WITH_REAL128 NO)
+    set(_HEYOKA_WITH_REAL NO)
 endif()
 
 # Optional dependency on SLEEF.
@@ -462,6 +471,7 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" DESTINAT
 # Cleanup.
 unset(_HEYOKA_MIN_MPPP_VERSION)
 unset(_HEYOKA_WITH_REAL128)
+unset(_HEYOKA_WITH_REAL)
 
 if(HEYOKA_BUILD_TESTS)
     enable_testing()
