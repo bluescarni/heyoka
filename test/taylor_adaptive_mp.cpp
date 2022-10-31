@@ -138,12 +138,38 @@ TEST_CASE("step")
 
     const auto prec = 30u;
 
-    auto ta = taylor_adaptive<mppp::real>({prime(x) = x}, {mppp::real{1, prec}}, kw::compact_mode = true);
+    auto ta = taylor_adaptive<mppp::real>({prime(x) = x + par[0]}, {mppp::real{1, prec}}, kw::compact_mode = true);
 
     REQUIRE_THROWS_MATCHES(
         ta.step(mppp::real{1, 31}), std::invalid_argument,
         Message("Invalid max_delta_t argument passed to the step() function of an adaptive Taylor "
                 "integrator: max_delta_t has a precision of 31, while the integrator's precision is 30"));
+
+    // Take a step, then change state in incompatible way.
+    ta.step();
+    ta.get_state_data()[0].prec_round(prec + 1);
+
+    auto old_dtime = ta.get_dtime();
+
+    REQUIRE_THROWS_MATCHES(ta.step(), std::invalid_argument,
+                           Message("A state variable with precision 31 was detected in the state "
+                                   "vector: this is incompatible with the integrator precision of 30"));
+
+    REQUIRE(ta.get_dtime() == old_dtime);
+
+    ta.get_state_data()[0].prec_round(prec);
+
+    // Same with the par.
+    ta.step();
+    ta.get_pars_data()[0].prec_round(prec + 1);
+
+    old_dtime = ta.get_dtime();
+
+    REQUIRE_THROWS_MATCHES(ta.step(), std::invalid_argument,
+                           Message("A value with precision 31 was detected in the parameter "
+                                   "vector: this is incompatible with the integrator precision of 30"));
+
+    REQUIRE(ta.get_dtime() == old_dtime);
 }
 
 // Failure modes in time setting.
