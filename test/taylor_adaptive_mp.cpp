@@ -12,9 +12,12 @@
 #include <tuple>
 #include <utility>
 
+#include <fmt/format.h>
+
 #include <mp++/real.hpp>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -194,4 +197,20 @@ TEST_CASE("copy move prec")
     // Move assignment.
     ta2 = std::move(ta4);
     REQUIRE(ta2.get_prec() == prec + 1u);
+}
+
+// Test failure mode in taylor_add_jet.
+TEST_CASE("taylor_add_jet prec")
+{
+    using Catch::Matchers::Message;
+
+    auto [x] = make_vars("x");
+
+    llvm_state s;
+
+    REQUIRE_THROWS_MATCHES(taylor_add_jet<mppp::real>(s, "jet", {x}, 2, 1, false, false, {}, false),
+                           std::invalid_argument,
+                           Message(fmt::format("An invalid precision value of 0 was passed to taylor_add_jet() (the "
+                                               "value must be in the [{}, {}] range)",
+                                               mppp::real_prec_min(), mppp::real_prec_max())));
 }

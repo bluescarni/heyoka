@@ -51,6 +51,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -1728,7 +1734,7 @@ namespace
 template <typename T, typename U>
 auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, std::uint32_t order,
                          std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                         const std::vector<expression> &sv_funcs, bool parallel_mode)
+                         const std::vector<expression> &sv_funcs, bool parallel_mode, [[maybe_unused]] unsigned prec)
 {
     if (s.is_compiled()) {
         throw std::invalid_argument("A function for the computation of the jet of Taylor derivatives cannot be added "
@@ -1751,6 +1757,21 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     if constexpr (std::is_same_v<T, long double>) {
         throw not_implemented_error("'long double' computations are not supported on PowerPC");
     }
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        const auto sprec = boost::numeric_cast<mpfr_prec_t>(prec);
+
+        if (sprec < mppp::real_prec_min() || sprec > mppp::real_prec_max()) {
+            throw std::invalid_argument(
+                fmt::format("An invalid precision value of {} was passed to taylor_add_jet() (the "
+                            "value must be in the [{}, {}] range)",
+                            sprec, mppp::real_prec_min(), mppp::real_prec_max()));
+        }
+    }
+
 #endif
 
     auto &builder = s.builder();
@@ -1780,10 +1801,22 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 
     // Prepare the function prototype. The first argument is a float pointer to the in/out array,
     // the second argument a const float pointer to the pars, the third argument
-    // a float pointer to the time. These arrays cannot overlap.
-    auto *fp_t = to_llvm_type<T>(context);
+    // a float pointer to the time. These arrays cannot overlap. The pointers
+    // are all to external types.
+    auto *fp_t = [&]() {
+#if defined(HEYOKA_HAVE_REAL)
+        if constexpr (std::is_same_v<T, mppp::real>) {
+            return llvm_type_like(s, mppp::real{0, static_cast<mpfr_prec_t>(prec)});
+        } else {
+#endif
+            return to_llvm_type<T>(context);
+#if defined(HEYOKA_HAVE_REAL)
+        }
+#endif
+    }();
     auto *fp_vec_t = make_vector_type(fp_t, batch_size);
-    const std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_t));
+    auto *ext_fp_t = llvm_ext_type(fp_t);
+    const std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(ext_fp_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -1842,6 +1875,8 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
         auto svf_ptr = taylor_c_make_sv_funcs_arr(s, sv_funcs_dc);
 
         // Write the order 0 of the sv_funcs, if needed.
+        // NOTE: contrary to the state variables, the order 0 of the sv funcs is not
+        // present in the original state vector. It will be computed by taylor_compute_jet().
         if (svf_ptr != nullptr) {
             llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_sv_funcs), [&](llvm::Value *arr_idx) {
                 // Fetch the u var index from svf_ptr.
@@ -1856,7 +1891,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
                                                  builder.getInt32(batch_size));
 
                 // Store into in_out.
-                store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_t, in_out, out_idx), diff_val);
+                ext_store_vector_to_memory(s, builder.CreateInBoundsGEP(ext_fp_t, in_out, out_idx), diff_val);
             });
         }
 
@@ -1874,7 +1909,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
                         builder.CreateMul(cur_idx, builder.getInt32(batch_size)));
 
                     // Store into in_out.
-                    store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_t, in_out, out_idx), diff_val);
+                    ext_store_vector_to_memory(s, builder.CreateInBoundsGEP(ext_fp_t, in_out, out_idx), diff_val);
                 });
 
                 if (svf_ptr != nullptr) {
@@ -1893,7 +1928,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
                                               builder.getInt32(batch_size)));
 
                         // Store into in_out.
-                        store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_t, in_out, out_idx), diff_val);
+                        ext_store_vector_to_memory(s, builder.CreateInBoundsGEP(ext_fp_t, in_out, out_idx), diff_val);
                     });
                 }
             });
@@ -1914,8 +1949,8 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
             const auto out_idx = (n_eq + j) * batch_size;
 
             auto *out_ptr
-                = builder.CreateInBoundsGEP(fp_t, in_out, builder.getInt32(static_cast<std::uint32_t>(out_idx)));
-            store_vector_to_memory(builder, out_ptr, val);
+                = builder.CreateInBoundsGEP(ext_fp_t, in_out, builder.getInt32(static_cast<std::uint32_t>(out_idx)));
+            ext_store_vector_to_memory(s, out_ptr, val);
         }
 
         for (decltype(diff_arr.size()) cur_order = 1; cur_order <= order; ++cur_order) {
@@ -1931,9 +1966,9 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
                 // Index in the output array.
                 const auto out_idx = (n_eq + n_sv_funcs) * batch_size * cur_order + j * batch_size;
 
-                auto *out_ptr
-                    = builder.CreateInBoundsGEP(fp_t, in_out, builder.getInt32(static_cast<std::uint32_t>(out_idx)));
-                store_vector_to_memory(builder, out_ptr, val);
+                auto *out_ptr = builder.CreateInBoundsGEP(ext_fp_t, in_out,
+                                                          builder.getInt32(static_cast<std::uint32_t>(out_idx)));
+                ext_store_vector_to_memory(s, out_ptr, val);
             }
 
             for (std::uint32_t j = 0; j < n_sv_funcs; ++j) {
@@ -1943,9 +1978,9 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 
                 const auto out_idx = (n_eq + n_sv_funcs) * batch_size * cur_order + (n_eq + j) * batch_size;
 
-                auto *out_ptr
-                    = builder.CreateInBoundsGEP(fp_t, in_out, builder.getInt32(static_cast<std::uint32_t>(out_idx)));
-                store_vector_to_memory(builder, out_ptr, val);
+                auto *out_ptr = builder.CreateInBoundsGEP(ext_fp_t, in_out,
+                                                          builder.getInt32(static_cast<std::uint32_t>(out_idx)));
+                ext_store_vector_to_memory(s, out_ptr, val);
             }
         }
     }
@@ -1972,52 +2007,65 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 template <typename T>
 taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
                            std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                           const std::vector<expression> &sv_funcs, bool parallel_mode)
+                           const std::vector<expression> &sv_funcs, bool parallel_mode, unsigned prec)
 {
     return detail::taylor_add_jet_impl<T>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
-                                          parallel_mode);
+                                          parallel_mode, prec);
 }
 
 template <typename T>
 taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name,
                            const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
                            std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                           const std::vector<expression> &sv_funcs, bool parallel_mode)
+                           const std::vector<expression> &sv_funcs, bool parallel_mode, unsigned prec)
 {
     return detail::taylor_add_jet_impl<T>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
-                                          parallel_mode);
+                                          parallel_mode, prec);
 }
 
 // Explicit instantiations.
 template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<double>(llvm_state &, const std::string &,
                                                               const std::vector<expression> &, std::uint32_t,
                                                               std::uint32_t, bool, bool,
-                                                              const std::vector<expression> &, bool);
+                                                              const std::vector<expression> &, bool, unsigned);
 
 template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<double>(llvm_state &, const std::string &,
                                                               const std::vector<std::pair<expression, expression>> &,
                                                               std::uint32_t, std::uint32_t, bool, bool,
-                                                              const std::vector<expression> &, bool);
+                                                              const std::vector<expression> &, bool, unsigned);
 
 template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<long double>(llvm_state &, const std::string &,
                                                                    const std::vector<expression> &, std::uint32_t,
                                                                    std::uint32_t, bool, bool,
-                                                                   const std::vector<expression> &, bool);
+                                                                   const std::vector<expression> &, bool, unsigned);
 
 template HEYOKA_DLL_PUBLIC taylor_dc_t
 taylor_add_jet<long double>(llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &,
-                            std::uint32_t, std::uint32_t, bool, bool, const std::vector<expression> &, bool);
+                            std::uint32_t, std::uint32_t, bool, bool, const std::vector<expression> &, bool, unsigned);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<mppp::real128>(llvm_state &, const std::string &,
                                                                      const std::vector<expression> &, std::uint32_t,
                                                                      std::uint32_t, bool, bool,
-                                                                     const std::vector<expression> &, bool);
+                                                                     const std::vector<expression> &, bool, unsigned);
+
+template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<mppp::real128>(
+    llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &, std::uint32_t,
+    std::uint32_t, bool, bool, const std::vector<expression> &, bool, unsigned);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<mppp::real>(llvm_state &, const std::string &,
+                                                                  const std::vector<expression> &, std::uint32_t,
+                                                                  std::uint32_t, bool, bool,
+                                                                  const std::vector<expression> &, bool, unsigned);
 
 template HEYOKA_DLL_PUBLIC taylor_dc_t
-taylor_add_jet<mppp::real128>(llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &,
-                              std::uint32_t, std::uint32_t, bool, bool, const std::vector<expression> &, bool);
+taylor_add_jet<mppp::real>(llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &,
+                           std::uint32_t, std::uint32_t, bool, bool, const std::vector<expression> &, bool, unsigned);
 
 #endif
 
