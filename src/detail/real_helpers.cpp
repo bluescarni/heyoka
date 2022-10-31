@@ -706,6 +706,21 @@ llvm::Value *llvm_real_sgn(llvm_state &s, llvm::Value *x)
     return builder.CreateCall(f, x);
 }
 
+// Utility to create a real with precision p
+// whose value is the epsilon at that precision.
+// NOTE: for consistency with the epsilons returned for the other
+// types, we return here 2**-(prec - 1). See:
+// https://en.wikipedia.org/wiki/Machine_epsilon
+// NOTE: mp++ 0.28 has a dedicated function for this,
+// we can just switch to that implementation
+// when we bump up the mp++ required version.
+mppp::real eps_from_prec(mpfr_prec_t p)
+{
+    assert(p >= mppp::real_prec_min() && p <= mppp::real_prec_max());
+
+    return mppp::real{1ul, boost::numeric_cast<mpfr_exp_t>(-(p - 1)), p};
+}
+
 } // namespace heyoka::detail
 
 #if !defined(NDEBUG)

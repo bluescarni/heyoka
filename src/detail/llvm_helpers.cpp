@@ -2341,10 +2341,7 @@ number inv_kep_E_eps_like(llvm_state &s, llvm::Type *tp)
 #endif
 #if defined(HEYOKA_HAVE_REAL)
     } else if (const auto prec = llvm_is_real(tp)) {
-        // NOTE: for consistency with the epsilons returned for the other
-        // types, we return here 2**-(prec - 1). See:
-        // https://en.wikipedia.org/wiki/Machine_epsilon
-        return number(mppp::real{1ul, boost::numeric_cast<mpfr_exp_t>(-(prec - 1)), prec});
+        return number{eps_from_prec(prec)};
 #endif
     }
 

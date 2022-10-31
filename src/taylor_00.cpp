@@ -617,11 +617,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     } else {
 #if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
-            // NOTE: for consistency with the epsilons returned for the other
-            // types, we return here 2**-(prec - 1). See:
-            // https://en.wikipedia.org/wiki/Machine_epsilon
-            const auto sprec = this->get_sprec();
-            m_tol = mppp::real{1ul, boost::numeric_cast<mpfr_exp_t>(-(sprec - 1)), sprec};
+            m_tol = detail::eps_from_prec(this->get_sprec());
         } else {
 #endif
             m_tol = std::numeric_limits<T>::epsilon();
