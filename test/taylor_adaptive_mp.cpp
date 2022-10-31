@@ -10,6 +10,7 @@
 #include <initializer_list>
 #include <stdexcept>
 #include <tuple>
+#include <utility>
 
 #include <mp++/real.hpp>
 
@@ -123,4 +124,74 @@ TEST_CASE("trivial odes")
             }
         }
     }
+}
+
+// Failure modes in the stepper.
+TEST_CASE("step")
+{
+    using Catch::Matchers::Message;
+
+    auto [x] = make_vars("x");
+
+    const auto prec = 30u;
+
+    auto ta = taylor_adaptive<mppp::real>({prime(x) = x}, {mppp::real{1, prec}}, kw::compact_mode = true);
+
+    REQUIRE_THROWS_MATCHES(
+        ta.step(mppp::real{1, 31}), std::invalid_argument,
+        Message("Invalid max_delta_t argument passed to the step() function of an adaptive Taylor "
+                "integrator: max_delta_t has a precision of 31, while the integrator's precision is 30"));
+}
+
+// Failure modes in time setting.
+TEST_CASE("time set")
+{
+    using Catch::Matchers::Message;
+
+    auto [x] = make_vars("x");
+
+    const auto prec = 30u;
+
+    auto ta = taylor_adaptive<mppp::real>({prime(x) = x}, {mppp::real{1, prec}}, kw::compact_mode = true);
+
+    REQUIRE_THROWS_MATCHES(
+        ta.set_time(mppp::real{1, 31}), std::invalid_argument,
+        Message("Invalid precision detected in the time variable: the precision of the integrator is "
+                "30, but the time variable has a precision of 31 instead"));
+
+    REQUIRE_THROWS_MATCHES(
+        ta.set_dtime(mppp::real{1, 31}, mppp::real{0, 31}), std::invalid_argument,
+        Message("Invalid precision detected in the time variable: the precision of the integrator is "
+                "30, but the time variable has a precision of 31 instead"));
+    REQUIRE_THROWS_MATCHES(
+        ta.set_dtime(mppp::real{1, 30}, mppp::real{0, 31}), std::invalid_argument,
+        Message("Mismatched precisions in the components of a dfloat<mppp::real>: the high component has a "
+                "precision of 30, while the low component has a precision of 31"));
+}
+
+// Test that precision is preserved when copying/moving an integrator object.
+TEST_CASE("copy move prec")
+{
+    auto [x] = make_vars("x");
+
+    const auto prec = 30u;
+
+    auto ta = taylor_adaptive<mppp::real>({prime(x) = x}, {mppp::real{1, prec}}, kw::compact_mode = true);
+
+    // Copy ctor.
+    auto ta2 = ta;
+    REQUIRE(ta2.get_prec() == prec);
+
+    // Move ctor.
+    auto ta3(std::move(ta2));
+    REQUIRE(ta3.get_prec() == prec);
+
+    // Copy assignment.
+    auto ta4 = taylor_adaptive<mppp::real>({prime(x) = x}, {mppp::real{1, prec + 1u}}, kw::compact_mode = true);
+    ta = ta4;
+    REQUIRE(ta.get_prec() == prec + 1u);
+
+    // Move assignment.
+    ta2 = std::move(ta4);
+    REQUIRE(ta2.get_prec() == prec + 1u);
 }

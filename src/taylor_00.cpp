@@ -789,10 +789,10 @@ taylor_adaptive<T>::taylor_adaptive()
 
 template <typename T>
 taylor_adaptive<T>::taylor_adaptive(const taylor_adaptive &other)
-    : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_order(other.m_order),
-      m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode),
-      m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
-      m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
+    : base_t(static_cast<const base_t &>(other)), m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm),
+      m_dim(other.m_dim), m_order(other.m_order), m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy),
+      m_compact_mode(other.m_compact_mode), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h),
+      m_d_out(other.m_d_out), m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
 {
     // NOTE: make explicit deep copy of the decomposition.
     m_dc.reserve(other.m_dc.size());

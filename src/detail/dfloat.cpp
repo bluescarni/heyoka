@@ -11,6 +11,8 @@
 #include <stdexcept>
 #include <utility>
 
+#include <fmt/format.h>
+
 #if defined(HEYOKA_HAVE_REAL)
 
 #include <mp++/real.hpp>
@@ -31,7 +33,10 @@ dfloat<mppp::real>::dfloat(mppp::real x) : hi(std::move(x)), lo(mppp::real_kind:
 dfloat<mppp::real>::dfloat(mppp::real h, mppp::real l) : hi(std::move(h)), lo(std::move(l))
 {
     if (hi.get_prec() != lo.get_prec()) {
-        throw std::invalid_argument("Mismatched precisions in the components of a dfloat<mppp::real>");
+        throw std::invalid_argument(
+            fmt::format("Mismatched precisions in the components of a dfloat<mppp::real>: the high component has a "
+                        "precision of {}, while the low component has a precision of {}",
+                        hi.get_prec(), lo.get_prec()));
     }
 }
 

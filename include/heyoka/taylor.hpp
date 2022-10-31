@@ -886,6 +886,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive : public detail::taylor_adaptive_base<T,
 {
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
     friend class HEYOKA_DLL_PUBLIC detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
+    using base_t = detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
 
 public:
     using nt_event_t = nt_event<T>;
@@ -1108,7 +1109,7 @@ public:
     [[nodiscard]] const taylor_dc_t &get_decomposition() const;
 
     [[nodiscard]] std::uint32_t get_order() const;
-    T get_tol() const;
+    [[nodiscard]] T get_tol() const;
     [[nodiscard]] bool get_high_accuracy() const;
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] std::uint32_t get_dim() const;
