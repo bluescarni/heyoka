@@ -104,16 +104,18 @@ TEST_CASE("trivial odes")
         for (auto cm : {false, true}) {
             for (auto prec : {30u, 123u}) {
                 auto ta = taylor_adaptive<mppp::real>(
-                    {prime(x) = x, prime(y) = par[0], prime(z) = heyoka::time, prime(u) = 1.5_dbl},
+                    {prime(x) = x, prime(y) = par[0] + par[1], prime(z) = heyoka::time, prime(u) = 1.5_dbl},
                     {mppp::real{1, prec}, mppp::real{2, prec}, mppp::real{3, prec}, mppp::real{4, prec}},
-                    kw::compact_mode = cm, kw::opt_level = opt_level, kw::pars = {mppp::real{"1.3", prec}});
+                    kw::compact_mode = cm, kw::opt_level = opt_level,
+                    kw::pars = {mppp::real{"1.3", prec}, mppp::real{"2.7", prec}});
 
                 for (auto i = 0; i < 3; ++i) {
                     auto [oc, h] = ta.step();
                     REQUIRE(oc == taylor_outcome::success);
                 }
                 REQUIRE(ta.get_state()[0] == approximately(exp(ta.get_time())));
-                REQUIRE(ta.get_state()[1] == approximately(mppp::real{2, prec} + ta.get_pars()[0] * ta.get_time()));
+                REQUIRE(ta.get_state()[1]
+                        == approximately(mppp::real{2, prec} + (ta.get_pars()[0] + ta.get_pars()[1]) * ta.get_time()));
                 REQUIRE(ta.get_state()[2]
                         == approximately(mppp::real{3, prec} + ta.get_time() * ta.get_time() / mppp::real{2, prec}));
                 REQUIRE(ta.get_state()[3]
