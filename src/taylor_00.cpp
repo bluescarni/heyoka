@@ -621,7 +621,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
             // types, we return here 2**-(prec - 1). See:
             // https://en.wikipedia.org/wiki/Machine_epsilon
             const auto sprec = this->get_sprec();
-            m_tol = mppp::real{1ul, boost::numeric_cast<detail::real_exp_t>(-(sprec - 1)), sprec};
+            m_tol = mppp::real{1ul, boost::numeric_cast<mpfr_exp_t>(-(sprec - 1)), sprec};
         } else {
 #endif
             m_tol = std::numeric_limits<T>::epsilon();

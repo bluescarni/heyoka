@@ -3046,7 +3046,7 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
 #if defined(HEYOKA_HAVE_REAL)
 
     if constexpr (std::is_same_v<T, mppp::real>) {
-        const auto sprec = boost::numeric_cast<real_prec_t>(prec);
+        const auto sprec = boost::numeric_cast<mpfr_prec_t>(prec);
 
         if (sprec < mppp::real_prec_min() || sprec > mppp::real_prec_max()) {
             throw std::invalid_argument(fmt::format("An invalid precision value of {} was passed to add_cfunc() (the "
@@ -3101,7 +3101,7 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     auto *fp_t = [&]() {
 #if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
-            return llvm_type_like(s, mppp::real{mppp::real_kind::zero, static_cast<real_prec_t>(prec)});
+            return llvm_type_like(s, mppp::real{mppp::real_kind::zero, static_cast<mpfr_prec_t>(prec)});
         } else {
 #endif
             return to_llvm_type<T>(context);

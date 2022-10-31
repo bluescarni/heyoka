@@ -53,18 +53,14 @@ namespace heyoka::detail
 static_assert(sizeof(mppp::real) == sizeof(mppp::mpfr_struct_t));
 static_assert(alignof(mppp::real) == alignof(mppp::mpfr_struct_t));
 static_assert(mppp::real_prec_min() > 0);
-static_assert(std::is_signed_v<real_sign_t>);
-static_assert(std::is_signed_v<real_exp_t>);
-static_assert(std::is_signed_v<real_exp_t>);
+static_assert(std::is_signed_v<mpfr_prec_t>);
+static_assert(std::is_signed_v<mpfr_sign_t>);
+static_assert(std::is_signed_v<mpfr_exp_t>);
 static_assert(std::is_signed_v<real_rnd_t>);
-static_assert(std::is_same_v<real_prec_t, mpfr_prec_t>);
-static_assert(std::is_same_v<real_sign_t, mpfr_sign_t>);
-static_assert(std::is_same_v<real_exp_t, mpfr_exp_t>);
-static_assert(std::is_same_v<real_limb_t, mp_limb_t>);
 
 // Determine if the input type is heyoka.real.N,
 // and, in such case, return N. Otherwise, return 0.
-real_prec_t llvm_is_real(llvm::Type *t)
+mpfr_prec_t llvm_is_real(llvm::Type *t)
 {
     if (auto *ptr = llvm::dyn_cast<llvm::StructType>(t)) {
         const auto sname = ptr->getStructName();
@@ -77,7 +73,7 @@ real_prec_t llvm_is_real(llvm::Type *t)
             }
             // LCOV_EXCL_STOP
 
-            real_prec_t value = 0;
+            mpfr_prec_t value = 0;
 
             const auto ret = std::from_chars(sname.data() + 12, sname.data() + sname.size(), value);
 
@@ -135,9 +131,9 @@ llvm::Constant *llvm_mpfr_rndn(llvm_state &s)
 
 // Small helper to codegen an MPFR precision value
 // as an LLVM constant.
-llvm::Constant *llvm_mpfr_prec(llvm_state &s, real_prec_t prec)
+llvm::Constant *llvm_mpfr_prec(llvm_state &s, mpfr_prec_t prec)
 {
-    return llvm::ConstantInt::getSigned(to_llvm_type<real_prec_t>(s.context()),
+    return llvm::ConstantInt::getSigned(to_llvm_type<mpfr_prec_t>(s.context()),
                                         boost::numeric_cast<std::int64_t>(prec));
 }
 
@@ -254,7 +250,7 @@ llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst
     // In debug mode, double check that the precision in the view matches
     // the precision of fp_t.
 
-    auto *prec_t = to_llvm_type<real_prec_t>(s.context());
+    auto *prec_t = to_llvm_type<mpfr_prec_t>(s.context());
 
     // Load the precision value from the view.
     auto *prec_ptr = builder.CreateInBoundsGEP(real_t, mpfr_struct_inst, {builder.getInt32(0), builder.getInt32(0)});
@@ -714,9 +710,8 @@ llvm::Value *llvm_real_sgn(llvm_state &s, llvm::Value *x)
 
 #if !defined(NDEBUG)
 
-extern "C" HEYOKA_DLL_PUBLIC void
-heyoka_assert_real_match_precs_mpfr_view_to_real(heyoka::detail::real_prec_t p1,
-                                                 heyoka::detail::real_prec_t p2) noexcept
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_mpfr_view_to_real(mpfr_prec_t p1,
+                                                                                   mpfr_prec_t p2) noexcept
 {
     assert(p1 == p2);
 }

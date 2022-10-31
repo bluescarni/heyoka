@@ -69,6 +69,7 @@
 
 #if defined(HEYOKA_HAVE_REAL)
 
+#include <mp++/integer.hpp>
 #include <mp++/real.hpp>
 
 #include <heyoka/detail/real_helpers.hpp>
@@ -167,9 +168,9 @@ const auto type_map = []() {
             return ptr;
         }
 
-        auto *ret = llvm::StructType::create({to_llvm_type<real_prec_t>(c), to_llvm_type<real_sign_t>(c),
-                                              to_llvm_type<real_exp_t>(c),
-                                              llvm::PointerType::getUnqual(to_llvm_type<real_limb_t>(c))},
+        auto *ret = llvm::StructType::create({to_llvm_type<mpfr_prec_t>(c), to_llvm_type<mpfr_sign_t>(c),
+                                              to_llvm_type<mpfr_exp_t>(c),
+                                              llvm::PointerType::getUnqual(to_llvm_type<mp_limb_t>(c))},
                                              "heyoka.real");
 
         assert(ret != nullptr);
@@ -178,9 +179,9 @@ const auto type_map = []() {
         return ret;
 #else
         // NOTE: in earlier LLVM versions, make this an unnamed struct.
-        auto *ret = llvm::StructType::get(c, {to_llvm_type<real_prec_t>(c), to_llvm_type<real_sign_t>(c),
-                                              to_llvm_type<real_exp_t>(c),
-                                              llvm::PointerType::getUnqual(to_llvm_type<real_limb_t>(c))});
+        auto *ret = llvm::StructType::get(c, {to_llvm_type<mpfr_prec_t>(c), to_llvm_type<mpfr_sign_t>(c),
+                                              to_llvm_type<mpfr_exp_t>(c),
+                                              llvm::PointerType::getUnqual(to_llvm_type<mp_limb_t>(c))});
 
         assert(ret != nullptr);
 
@@ -363,7 +364,7 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
         auto &context = s.context();
 
         // Fetch the limb type.
-        auto *limb_t = to_llvm_type<real_limb_t>(context);
+        auto *limb_t = to_llvm_type<mp_limb_t>(context);
 
         // Fetch the external real struct type.
         auto *real_t = to_llvm_type<mppp::real>(context);
@@ -377,7 +378,7 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
         // type matches exactly the precision of the external variable.
 
         // Load the precision from the external value.
-        auto *prec_t = to_llvm_type<real_prec_t>(context);
+        auto *prec_t = to_llvm_type<mpfr_prec_t>(context);
         auto *prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
         auto *prec = builder.CreateLoad(prec_t, prec_ptr);
 
@@ -392,12 +393,12 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
 
         // Read and insert the sign.
         auto *sign_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(1)});
-        auto *sign = builder.CreateLoad(to_llvm_type<real_sign_t>(context), sign_ptr);
+        auto *sign = builder.CreateLoad(to_llvm_type<mpfr_sign_t>(context), sign_ptr);
         ret = builder.CreateInsertValue(ret, sign, {0u});
 
         // Read and insert the exponent.
         auto *exp_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(2)});
-        auto *exp = builder.CreateLoad(to_llvm_type<real_exp_t>(context), exp_ptr);
+        auto *exp = builder.CreateLoad(to_llvm_type<mpfr_exp_t>(context), exp_ptr);
         ret = builder.CreateInsertValue(ret, exp, {1u});
 
         // Load in a local variable the input pointer to the limbs.
@@ -463,7 +464,7 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
         auto &context = s.context();
 
         // Fetch the limb type.
-        auto *limb_t = to_llvm_type<real_limb_t>(context);
+        auto *limb_t = to_llvm_type<mp_limb_t>(context);
 
         // Fetch the external real struct type.
         auto *real_t = to_llvm_type<mppp::real>(context);
@@ -477,7 +478,7 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
         // type matches exactly the precision of the external variable.
 
         // Load the precision from the external value.
-        auto *prec_t = to_llvm_type<real_prec_t>(context);
+        auto *prec_t = to_llvm_type<mpfr_prec_t>(context);
         auto *out_prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
         auto *prec = builder.CreateLoad(prec_t, out_prec_ptr);
 
@@ -2296,7 +2297,7 @@ std::pair<number, number> inv_kep_E_dl_twopi_like(llvm_state &s, llvm::Type *fp_
     } else if (const auto prec = llvm_is_real(fp_t)) {
         // Overflow check.
         // LCOV_EXCL_START
-        if (prec > std::numeric_limits<real_prec_t>::max() / 4) {
+        if (prec > std::numeric_limits<mpfr_prec_t>::max() / 4) {
             throw std::overflow_error("Overflow detected in inv_kep_E_dl_twopi_like()");
         }
         // LCOV_EXCL_STOP
@@ -3946,10 +3947,10 @@ llvm::Type *llvm_type_like(llvm_state &s, [[maybe_unused]] const T &x)
 
         // Fetch the limb array type.
         auto *limb_arr_t
-            = llvm::ArrayType::get(to_llvm_type<real_limb_t>(c), boost::numeric_cast<std::uint64_t>(x.get_nlimbs()));
+            = llvm::ArrayType::get(to_llvm_type<mp_limb_t>(c), boost::numeric_cast<std::uint64_t>(x.get_nlimbs()));
 
         auto *ret
-            = llvm::StructType::create({to_llvm_type<real_sign_t>(c), to_llvm_type<real_exp_t>(c), limb_arr_t}, name);
+            = llvm::StructType::create({to_llvm_type<mpfr_sign_t>(c), to_llvm_type<mpfr_exp_t>(c), limb_arr_t}, name);
 
         assert(ret != nullptr);
 #if LLVM_VERSION_MAJOR >= 12
@@ -4041,14 +4042,12 @@ extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter() noexcept
 
 #if defined(HEYOKA_HAVE_REAL)
 
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_load(heyoka::detail::real_prec_t p1,
-                                                                          heyoka::detail::real_prec_t p2) noexcept
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_load(mpfr_prec_t p1, mpfr_prec_t p2) noexcept
 {
     assert(p1 == p2);
 }
 
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_store(heyoka::detail::real_prec_t p1,
-                                                                           heyoka::detail::real_prec_t p2) noexcept
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_store(mpfr_prec_t p1, mpfr_prec_t p2) noexcept
 {
     assert(p1 == p2);
 }
