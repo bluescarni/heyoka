@@ -88,6 +88,13 @@ inline std::ostream &operator<<(std::ostream &os, const approximately<T> &a)
     return os << oss.str();
 }
 
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+std::ostream &operator<< <mppp::real>(std::ostream &, const approximately<mppp::real> &);
+
+#endif
+
 // Tuple for_each(). It will apply the input functor f to each element of
 // the input tuple tup, sequentially.
 template <typename Tuple, typename F>
