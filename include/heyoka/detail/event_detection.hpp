@@ -64,6 +64,8 @@ mppp::real taylor_deduce_cooldown(mppp::real, mppp::real);
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t,
                                                      bool = false);
 
+HEYOKA_DLL_PUBLIC llvm::Function *add_poly_translator_1(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
+
 // Machinery to add a function that, given an input polynomial of order n represented
 // as an array of coefficients:
 // - reverses it,

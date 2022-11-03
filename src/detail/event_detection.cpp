@@ -230,6 +230,8 @@ struct is_terminal_event<t_event_impl<T, B>> : std::true_type {
 template <typename T>
 constexpr bool is_terminal_event_v = is_terminal_event<T>::value;
 
+} // namespace
+
 // Helper to add a polynomial translation function
 // to the state 's'.
 // NOTE: these event-detection-related LLVM functions are currently not mangled in any way.
@@ -249,6 +251,9 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
     auto &builder = s.builder();
     auto &context = s.context();
 
+    // Fetch the external type corresponding to fp_t.
+    auto *ext_fp_t = llvm_ext_type(fp_t);
+
     // Helper to fetch the (i, j) binomial coefficient from
     // a precomputed global array. The returned value is already
     // splatted.
@@ -267,8 +272,8 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
     // The function arguments:
     // - the output pointer,
     // - the pointer to the poly coefficients (read-only).
-    // No overlap is allowed.
-    const std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(fp_t));
+    // No overlap is allowed, all pointers are to external types.
+    const std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(ext_fp_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -299,22 +304,23 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
 
     // Init the return values as zeroes.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
-        auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.CreateMul(i, builder.getInt32(batch_size)));
-        store_vector_to_memory(builder, ptr, vector_splat(builder, llvm_constantfp(s, fp_t, 0.), batch_size));
+        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.CreateMul(i, builder.getInt32(batch_size)));
+        ext_store_vector_to_memory(s, ptr, vector_splat(builder, llvm_constantfp(s, fp_t, 0.), batch_size));
     });
 
     // Do the translation.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
-        auto *ai = load_vector_from_memory(
-            builder, fp_t, builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.CreateMul(i, builder.getInt32(batch_size))),
+        auto *ai = ext_load_vector_from_memory(
+            s, fp_t, builder.CreateInBoundsGEP(ext_fp_t, cf_ptr, builder.CreateMul(i, builder.getInt32(batch_size))),
             batch_size);
 
         llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(i, builder.getInt32(1)), [&](llvm::Value *k) {
             auto *tmp = llvm_fmul(s, ai, get_bc(i, k));
 
-            auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.CreateMul(k, builder.getInt32(batch_size)));
-            auto *new_val = llvm_fadd(s, load_vector_from_memory(builder, fp_t, ptr, batch_size), tmp);
-            store_vector_to_memory(builder, ptr, new_val);
+            auto *ptr
+                = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.CreateMul(k, builder.getInt32(batch_size)));
+            auto *new_val = llvm_fadd(s, ext_load_vector_from_memory(s, fp_t, ptr, batch_size), tmp);
+            ext_store_vector_to_memory(s, ptr, new_val);
         });
     });
 
@@ -330,6 +336,9 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
     // NOTE: the optimisation pass will be run outside.
     return f;
 }
+
+namespace
+{
 
 // Helper to automatically deduce the cooldown
 // for a terminal event. g_eps is the maximum

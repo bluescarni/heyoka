@@ -130,6 +130,7 @@ ADD_HEYOKA_TESTCASE(poly_enclosures)
 ADD_HEYOKA_TESTCASE(function_decompose)
 
 if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
+  ADD_HEYOKA_TESTCASE(event_detection_mp)
   ADD_HEYOKA_TESTCASE(taylor_adaptive_mp)
   ADD_HEYOKA_TESTCASE(taylor_binary_op_mp)
 endif()
