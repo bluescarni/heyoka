@@ -78,14 +78,16 @@ TEST_CASE("poly csc")
 
             llvm_state s{kw::opt_level = opt_level};
 
+            const auto mname = detail::llvm_mangle_type(detail::llvm_type_like(s, input[0]));
+
             detail::llvm_add_csc(s, detail::llvm_type_like(s, input[0]), 5, 1);
 
             s.optimise();
 
             s.compile();
 
-            auto *pt1 = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(
-                fmt::format("heyoka_csc_degree_5_{}", detail::llvm_mangle_type(detail::llvm_type_like(s, input[0])))));
+            auto *pt1 = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(
+                s.jit_lookup(fmt::format("heyoka_csc_degree_5_{}", mname)));
 
             std::uint32_t out = 1;
             pt1(&out, input.data());
