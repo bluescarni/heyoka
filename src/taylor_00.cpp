@@ -189,9 +189,6 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the LLVM type corresponding to T.
-    auto *fp_t = to_llvm_type<T>(context);
-
     // Prepare the function prototype. The arguments are:
     // - pointer to the output jet of derivative (write only),
     // - pointer to the current state vector (read only),
@@ -200,7 +197,12 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     // - pointer to the array of max timesteps (read & write),
     // - pointer to the max_abs_state output variable (write only).
     // These pointers cannot overlap.
-    const std::vector<llvm::Type *> fargs(6, llvm::PointerType::getUnqual(fp_t));
+    auto *ext_fp_t = to_llvm_type<T>(context);
+    // NOTE: in case of mppp::real, before calling taylor_add_adaptive_step_with_events(), we ensured
+    // that the tolerance value has the inferred precision, so that llvm_type_like()
+    // will yield the correct internal type.
+    auto *fp_t = llvm_type_like(s, tol);
+    const std::vector<llvm::Type *> fargs(6, llvm::PointerType::getUnqual(ext_fp_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -263,11 +265,11 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
                                            batch_size, compact_mode, high_accuracy, parallel_mode);
 
     // Determine the integration timestep.
-    auto h = taylor_determine_h(s, fp_t, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size,
-                                max_abs_state_ptr);
+    auto *h = taylor_determine_h(s, fp_t, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size,
+                                 max_abs_state_ptr);
 
     // Store h to memory.
-    store_vector_to_memory(builder, h_ptr, h);
+    ext_store_vector_to_memory(s, h_ptr, h);
 
     // Copy the jet of derivatives to jet_ptr.
     taylor_write_tc(s, fp_t, diff_variant, ev_dc, svf_ptr, jet_ptr, n_eq, n_uvars, order, batch_size);
@@ -976,7 +978,17 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T &max_delta_t
 
         // Invoke the stepper for event handling. We will record the norm infinity of the state vector +
         // event equations at the beginning of the timestep for later use.
-        T max_abs_state;
+        auto max_abs_state = [&]() {
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<T, mppp::real>) {
+                return mppp::real{mppp::real_kind::zero, this->get_sprec()};
+            } else {
+#endif
+                return T{};
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
+        }();
         std::get<1>(m_step_f)(edd.m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state);
 
         // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
