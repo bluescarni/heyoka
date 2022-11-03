@@ -1827,7 +1827,7 @@ llvm::Value *llvm_floor(llvm_state &s, llvm::Value *x)
 
 // Add a function to count the number of sign changes in the coefficients
 // of a polynomial of degree n. The coefficients are SIMD vectors of size batch_size
-// and scalar type T.
+// and scalar type scal_t.
 llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n, std::uint32_t batch_size)
 {
     assert(batch_size > 0u);
