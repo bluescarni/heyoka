@@ -6,11 +6,14 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cstdint>
 #include <initializer_list>
 #include <vector>
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Type.h>
+
+#include <fmt/format.h>
 
 #include <mp++/real.hpp>
 
@@ -56,6 +59,51 @@ TEST_CASE("poly translator 1")
 
             REQUIRE(poly_eval5(output, fp_t{"1.1", prec})
                     == approximately(poly_eval5(input, fp_t{"1.1", prec} + fp_t{1, prec})));
+        }
+    }
+}
+
+TEST_CASE("poly csc")
+{
+    using fp_t = mppp::real;
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto prec : {30u, 123u}) {
+            std::vector<fp_t> input;
+            input.resize(6u, fp_t{0, prec});
+
+            for (auto i = 0u; i < 6u; ++i) {
+                mppp::set(input[i], i + 1u);
+            }
+
+            llvm_state s{kw::opt_level = opt_level};
+
+            detail::llvm_add_csc(s, detail::llvm_type_like(s, input[0]), 5, 1);
+
+            s.optimise();
+
+            s.compile();
+
+            auto *pt1 = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(
+                fmt::format("heyoka_csc_degree_5_{}", detail::llvm_mangle_type(detail::llvm_type_like(s, input[0])))));
+
+            std::uint32_t out = 1;
+            pt1(&out, input.data());
+
+            REQUIRE(out == 0u);
+
+            mppp::set(input[0], -1);
+
+            pt1(&out, input.data());
+
+            REQUIRE(out == 1u);
+
+            mppp::set(input[1], -2);
+            mppp::set(input[3], -1);
+
+            pt1(&out, input.data());
+
+            REQUIRE(out == 3u);
         }
     }
 }

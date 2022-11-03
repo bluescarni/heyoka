@@ -552,6 +552,30 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
     }
 }
 
+// Same as above, but for external loads.
+llvm::Value *ext_gather_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Value *ptr)
+{
+    auto &builder = s.builder();
+
+#if defined(HEYOKA_HAVE_REAL)
+    if (const auto real_prec = llvm_is_real(tp->getScalarType())) {
+        // LCOV_EXCL_START
+        if (tp->isVectorTy()) {
+            throw std::invalid_argument("Cannot gather from memory a vector of reals");
+        }
+        // LCOV_EXCL_STOP
+
+        assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
+
+        return ext_load_vector_from_memory(s, tp, ptr, 1);
+    } else {
+#endif
+        return gather_vector_from_memory(builder, tp, ptr);
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
+}
+
 // Create a SIMD vector of size vector_size filled with the value c. If vector_size is 1,
 // c will be returned.
 llvm::Value *vector_splat(ir_builder &builder, llvm::Value *c, std::uint32_t vector_size)
@@ -1845,6 +1869,9 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
     auto &builder = s.builder();
     auto &context = s.context();
 
+    // Fetch the external type.
+    auto *ext_fp_t = llvm_ext_type(scal_t);
+
     // Fetch the vector floating-point type.
     auto *tp = make_vector_type(scal_t, batch_size);
 
@@ -1856,9 +1883,9 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
     // - pointer to the array of coefficients.
     // NOTE: both pointers are to the scalar counterparts
     // of the vector types, so that we can call this from regular
-    // C++ code.
+    // C++ code. The second pointer is to an external type.
     const std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(builder.getInt32Ty()),
-                                          llvm::PointerType::getUnqual(scal_t)};
+                                          llvm::PointerType::getUnqual(ext_fp_t)};
 
     // Try to see if we already created the function.
     auto *f = md.getFunction(fname);
@@ -1928,17 +1955,17 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
         // The iteration range is [1, n].
         llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *cur_n) {
             // Load the current poly coefficient(s).
-            auto *cur_cf = load_vector_from_memory(
-                builder, scal_t,
-                builder.CreateInBoundsGEP(scal_t, cf_ptr, builder.CreateMul(cur_n, builder.getInt32(batch_size))),
+            auto *cur_cf = ext_load_vector_from_memory(
+                s, scal_t,
+                builder.CreateInBoundsGEP(ext_fp_t, cf_ptr, builder.CreateMul(cur_n, builder.getInt32(batch_size))),
                 batch_size);
 
             // Load the last nonzero coefficient(s).
             auto *last_nz_ptr_idx = builder.CreateAdd(
                 offset, builder.CreateMul(builder.CreateLoad(last_nz_idx_t, last_nz_idx),
                                           vector_splat(builder, builder.getInt32(batch_size), batch_size)));
-            auto *last_nz_ptr = builder.CreateInBoundsGEP(scal_t, cf_ptr_v, last_nz_ptr_idx);
-            auto *last_nz_cf = gather_vector_from_memory(builder, cur_cf->getType(), last_nz_ptr);
+            auto *last_nz_ptr = builder.CreateInBoundsGEP(ext_fp_t, cf_ptr_v, last_nz_ptr_idx);
+            auto *last_nz_cf = ext_gather_vector_from_memory(s, cur_cf->getType(), last_nz_ptr);
 
             // Compute the sign of the current coefficient(s).
             auto *cur_sgn = llvm_sgn(s, cur_cf);
