@@ -106,7 +106,7 @@ TEST_CASE("trivial odes")
 
     for (auto opt_level : {0u, 3u}) {
         for (auto cm : {false, true}) {
-            for (auto prec : {30u, 123u}) {
+            for (auto prec : {30, 123}) {
                 auto ta = taylor_adaptive<mppp::real>(
                     {prime(x) = x, prime(y) = par[0] + par[1], prime(z) = heyoka::time, prime(u) = 1.5_dbl},
                     {mppp::real{1, prec}, mppp::real{2, prec}, mppp::real{3, prec}, mppp::real{4, prec}},

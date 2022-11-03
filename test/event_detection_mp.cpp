@@ -36,7 +36,7 @@ TEST_CASE("poly translator 1")
     };
 
     for (auto opt_level : {0u, 3u}) {
-        for (auto prec : {30u, 123u}) {
+        for (auto prec : {30, 123}) {
             std::vector<fp_t> output, input;
             output.resize(6u, fp_t{0, prec});
             input.resize(6u, fp_t{0, prec});
@@ -68,7 +68,7 @@ TEST_CASE("poly csc")
     using fp_t = mppp::real;
 
     for (auto opt_level : {0u, 3u}) {
-        for (auto prec : {30u, 123u}) {
+        for (auto prec : {30, 123}) {
             std::vector<fp_t> input;
             input.resize(6u, fp_t{0, prec});
 

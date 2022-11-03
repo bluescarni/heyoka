@@ -30,12 +30,14 @@ TEST_CASE("taylor add")
     for (auto opt_level : {0u, 3u}) {
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
-                for (auto prec : {30u, 123u}) {
+                for (auto prec : {30, 123}) {
+                    const auto uprec = static_cast<unsigned>(prec);
+
                     // Test with num/param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {add(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {add(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
 
                         s.compile();
 
@@ -59,7 +61,7 @@ TEST_CASE("taylor add")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {y + 2_dbl, par[0] + x}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {y + 2_dbl, par[0] + x}, 2, 1, ha, cm, {}, false, uprec);
 
                         s.compile();
 
@@ -83,7 +85,7 @@ TEST_CASE("taylor add")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {x + y, y + x}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {x + y, y + x}, 2, 1, ha, cm, {}, false, uprec);
 
                         s.compile();
 
@@ -116,12 +118,14 @@ TEST_CASE("taylor sub")
     for (auto opt_level : {0u, 3u}) {
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
-                for (auto prec : {30u, 123u}) {
+                for (auto prec : {30, 123}) {
+                    const auto uprec = static_cast<unsigned>(prec);
+
                     // Test with num/param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {sub(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {sub(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
 
                         s.compile();
 
@@ -145,7 +149,7 @@ TEST_CASE("taylor sub")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {y - 2_dbl, par[0] - x}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {y - 2_dbl, par[0] - x}, 2, 1, ha, cm, {}, false, uprec);
 
                         s.compile();
 
@@ -169,7 +173,7 @@ TEST_CASE("taylor sub")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {x - y, y - x}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {x - y, y - x}, 2, 1, ha, cm, {}, false, uprec);
 
                         s.compile();
 
@@ -202,12 +206,14 @@ TEST_CASE("taylor mul")
     for (auto opt_level : {0u, 3u}) {
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
-                for (auto prec : {30u, 123u}) {
+                for (auto prec : {30, 123}) {
+                    const auto uprec = static_cast<unsigned>(prec);
+
                     // Test with num/param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {mul(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {mul(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
 
                         s.compile();
 
@@ -231,7 +237,7 @@ TEST_CASE("taylor mul")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {y * 2_dbl, par[0] * x}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {y * 2_dbl, par[0] * x}, 2, 1, ha, cm, {}, false, uprec);
 
                         s.compile();
 
@@ -255,7 +261,7 @@ TEST_CASE("taylor mul")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {x * y, y * x}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {x * y, y * x}, 2, 1, ha, cm, {}, false, uprec);
 
                         s.compile();
 
@@ -292,12 +298,14 @@ TEST_CASE("taylor div")
     for (auto opt_level : {0u, 3u}) {
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
-                for (auto prec : {30u, 123u}) {
+                for (auto prec : {30, 123}) {
+                    const auto uprec = static_cast<unsigned>(prec);
+
                     // Test with num/param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {div(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {div(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
 
                         s.compile();
 
@@ -321,7 +329,7 @@ TEST_CASE("taylor div")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {y / 2_dbl, par[0] / x}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {y / 2_dbl, par[0] / x}, 2, 1, ha, cm, {}, false, uprec);
 
                         s.compile();
 
@@ -345,7 +353,7 @@ TEST_CASE("taylor div")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {x / y, y / x}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {x / y, y / x}, 2, 1, ha, cm, {}, false, uprec);
 
                         s.compile();
 
