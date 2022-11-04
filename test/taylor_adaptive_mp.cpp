@@ -240,3 +240,48 @@ TEST_CASE("taylor_add_jet prec")
                                                "value must be in the [{}, {}] range)",
                                                mppp::real_prec_min(), mppp::real_prec_max())));
 }
+
+// Dense output.
+TEST_CASE("dense out")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto prec : {30, 123}) {
+            for (auto cm : {false, true}) {
+                auto ta = taylor_adaptive<mppp::real>({prime(x) = v, prime(v) = -x},
+                                                      {mppp::real{0, prec}, mppp::real{1, prec}}, kw::compact_mode = cm,
+                                                      kw::opt_level = opt_level);
+
+                auto [oc, h] = ta.step(true);
+
+                REQUIRE(oc == taylor_outcome::success);
+
+                ta.update_d_output(mppp::real{0, prec});
+
+                REQUIRE(ta.get_d_output()[0] == 0);
+                REQUIRE(ta.get_d_output()[1] == 1);
+
+                ta.update_d_output(h);
+
+                REQUIRE(ta.get_d_output()[0] == approximately(sin(h)));
+                REQUIRE(ta.get_d_output()[1] == approximately(cos(h)));
+
+                ta.update_d_output(h / mppp::real{2, prec});
+
+                REQUIRE(ta.get_d_output()[0] == approximately(sin(h / mppp::real{2, prec})));
+                REQUIRE(ta.get_d_output()[1] == approximately(cos(h / mppp::real{2, prec})));
+
+                // Failure mode.
+                REQUIRE_THROWS_MATCHES(
+                    ta.update_d_output(mppp::real{0, prec - 1}), std::invalid_argument,
+                    Message(fmt::format(
+                        "Invalid time variable passed to update_d_output(): the time variable has a precision of "
+                        "{}, while the integrator has a precision of {}",
+                        prec - 1, prec)));
+            }
+        }
+    }
+}

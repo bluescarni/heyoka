@@ -1662,12 +1662,15 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
     auto &builder = s.builder();
     auto &context = s.context();
 
+    // Fetch the external type corresponding to fp_scal_t.
+    auto *ext_fp_scal_t = llvm_ext_type(fp_scal_t);
+
     // The function arguments:
     // - the output pointer (read/write, used also for accumulation),
     // - the pointer to the Taylor coefficients (read-only),
     // - the pointer to the h values (read-only).
-    // No overlap is allowed.
-    const std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_scal_t));
+    // No overlap is allowed. All pointers are external.
+    const std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(ext_fp_scal_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -1706,7 +1709,7 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
     builder.SetInsertPoint(bb);
 
     // Load the value of h.
-    auto *h = load_vector_from_memory(builder, fp_scal_t, h_ptr, batch_size);
+    auto *h = ext_load_vector_from_memory(s, fp_scal_t, h_ptr, batch_size);
 
     if (high_accuracy) {
         auto *vector_t = make_vector_type(fp_scal_t, batch_size);
@@ -1722,13 +1725,13 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
             // Load the coefficient from tc_ptr. The index is:
             // batch_size * (order + 1u) * cur_var_idx.
             auto *tc_idx = builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx);
-            auto *tc = load_vector_from_memory(builder, fp_scal_t, builder.CreateInBoundsGEP(fp_scal_t, tc_ptr, tc_idx),
-                                               batch_size);
+            auto *tc = ext_load_vector_from_memory(
+                s, fp_scal_t, builder.CreateInBoundsGEP(ext_fp_scal_t, tc_ptr, tc_idx), batch_size);
 
             // Store it in out_ptr. The index is:
             // batch_size * cur_var_idx.
             auto *out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
-            store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_scal_t, out_ptr, out_idx), tc);
+            ext_store_vector_to_memory(s, builder.CreateInBoundsGEP(ext_fp_scal_t, out_ptr, out_idx), tc);
 
             // Zero-init the element in comp_arr.
             builder.CreateStore(llvm_constantfp(s, vector_t, 0.),
@@ -1750,21 +1753,21 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
                 auto *tc_idx
                     = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
                                         builder.CreateMul(builder.getInt32(batch_size), cur_order));
-                auto *cf = load_vector_from_memory(builder, fp_scal_t,
-                                                   builder.CreateInBoundsGEP(fp_scal_t, tc_ptr, tc_idx), batch_size);
+                auto *cf = ext_load_vector_from_memory(
+                    s, fp_scal_t, builder.CreateInBoundsGEP(ext_fp_scal_t, tc_ptr, tc_idx), batch_size);
                 auto *tmp = llvm_fmul(s, cf, cur_h_val);
 
                 // Compute the quantities for the compensation.
                 auto *comp_ptr = builder.CreateInBoundsGEP(vector_t, comp_arr, cur_var_idx);
                 auto *out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
-                auto *res_ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, out_idx);
+                auto *res_ptr = builder.CreateInBoundsGEP(ext_fp_scal_t, out_ptr, out_idx);
                 auto *y = llvm_fsub(s, tmp, builder.CreateLoad(vector_t, comp_ptr));
-                auto *cur_res = load_vector_from_memory(builder, fp_scal_t, res_ptr, batch_size);
+                auto *cur_res = ext_load_vector_from_memory(s, fp_scal_t, res_ptr, batch_size);
                 auto *t = llvm_fadd(s, cur_res, y);
 
                 // Update the compensation and the return value.
                 builder.CreateStore(llvm_fsub(s, llvm_fsub(s, t, cur_res), y), comp_ptr);
-                store_vector_to_memory(builder, res_ptr, t);
+                ext_store_vector_to_memory(s, res_ptr, t);
             });
 
             // Update the value of h.
@@ -1779,13 +1782,13 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
             auto *tc_idx
                 = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
                                     builder.getInt32(batch_size * order));
-            auto *tc = load_vector_from_memory(builder, fp_scal_t, builder.CreateInBoundsGEP(fp_scal_t, tc_ptr, tc_idx),
-                                               batch_size);
+            auto *tc = ext_load_vector_from_memory(
+                s, fp_scal_t, builder.CreateInBoundsGEP(ext_fp_scal_t, tc_ptr, tc_idx), batch_size);
 
             // Store it in out_ptr. The index is:
             // batch_size * cur_var_idx.
             auto *out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
-            store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_scal_t, out_ptr, out_idx), tc);
+            ext_store_vector_to_memory(s, builder.CreateInBoundsGEP(ext_fp_scal_t, out_ptr, out_idx), tc);
         });
 
         // Now let's run the Horner scheme.
@@ -1801,15 +1804,15 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
                                   builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
                                   builder.CreateMul(builder.getInt32(batch_size),
                                                     builder.CreateSub(builder.getInt32(order), cur_order)));
-                              auto *tc = load_vector_from_memory(
-                                  builder, fp_scal_t, builder.CreateInBoundsGEP(fp_scal_t, tc_ptr, tc_idx), batch_size);
+                              auto *tc = ext_load_vector_from_memory(
+                                  s, fp_scal_t, builder.CreateInBoundsGEP(ext_fp_scal_t, tc_ptr, tc_idx), batch_size);
 
                               // Accumulate in out_ptr. The index is:
                               // batch_size * cur_var_idx.
                               auto *out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
-                              auto *out_p = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, out_idx);
-                              auto *cur_out = load_vector_from_memory(builder, fp_scal_t, out_p, batch_size);
-                              store_vector_to_memory(builder, out_p, llvm_fadd(s, tc, llvm_fmul(s, cur_out, h)));
+                              auto *out_p = builder.CreateInBoundsGEP(ext_fp_scal_t, out_ptr, out_idx);
+                              auto *cur_out = ext_load_vector_from_memory(s, fp_scal_t, out_p, batch_size);
+                              ext_store_vector_to_memory(s, out_p, llvm_fadd(s, tc, llvm_fmul(s, cur_out, h)));
                           });
                       });
     }

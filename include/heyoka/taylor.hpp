@@ -1167,7 +1167,7 @@ public:
     {
         return m_d_out;
     }
-    const std::vector<T> &update_d_output(T, bool = false);
+    const std::vector<T> &update_d_output(const T &, bool = false);
 
     [[nodiscard]] bool with_events() const
     {

@@ -1803,8 +1803,26 @@ void taylor_adaptive<T>::set_dtime(T hi, T lo)
 }
 
 template <typename T>
-const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
+const std::vector<T> &taylor_adaptive<T>::update_d_output(const T &time, bool rel_time)
 {
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    // NOTE: here it is not necessary to run the precision
+    // check on the state/params, as they are never used
+    // in the computation.
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        if (time.get_prec() != this->get_sprec()) {
+            throw std::invalid_argument(
+                fmt::format("Invalid time variable passed to update_d_output(): the time variable has a precision of "
+                            "{}, while the integrator has a precision of {}",
+                            time.get_prec(), this->get_sprec()));
+        }
+    }
+
+#endif
+
     // NOTE: "time" needs to be translated
     // because m_d_out_f expects a time coordinate
     // with respect to the starting time t0 of
