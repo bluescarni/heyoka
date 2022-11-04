@@ -770,7 +770,18 @@ taylor_adaptive<T>::ed_data::ed_data(llvm_state s, std::vector<t_event_t> tes, s
                                   "or the state size is too large");
     }
     // LCOV_EXCL_STOP
-    m_ev_jet.resize((dim + (n_tes + n_ntes)) * (order + 1u));
+
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        // NOTE: for mppp::real, ensure m_ev_jet is inited with
+        // values with the correct precision.
+        m_ev_jet.resize((dim + (n_tes + n_ntes)) * (order + 1u), mppp::real{mppp::real_kind::zero, s0.get_prec()});
+    } else {
+#endif
+        m_ev_jet.resize((dim + (n_tes + n_ntes)) * (order + 1u));
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
 
     // Setup the vector of cooldowns.
     m_te_cooldowns.resize(boost::numeric_cast<decltype(m_te_cooldowns.size())>(m_tes.size()));
