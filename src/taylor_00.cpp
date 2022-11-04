@@ -497,6 +497,14 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
     assert(std::all_of(dthis->m_d_out.begin(), dthis->m_d_out.end(),
                        [sprec](const auto &x) { return x.get_prec() == sprec; }));
 
+    // Same goes for the event detection jet data, if present.
+#if !defined(NDEBUG)
+    if (dthis->m_ed_data) {
+        assert(std::all_of(dthis->m_ed_data->m_ev_jet.begin(), dthis->m_ed_data->m_ev_jet.end(),
+                           [sprec](const auto &x) { return x.get_prec() == sprec; }));
+    }
+#endif
+
     // State, pars can be changed by the user and thus need to be checked.
     for (const auto &x : dthis->m_state) {
         if (x.get_prec() != sprec) {

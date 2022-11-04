@@ -19,7 +19,9 @@
 
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
 #include "test_utils.hpp"
@@ -106,6 +108,29 @@ TEST_CASE("poly csc")
             pt1(&out, input.data());
 
             REQUIRE(out == 3u);
+        }
+    }
+}
+
+// Simple test for the construction of an integrator with events.
+TEST_CASE("event construction")
+{
+    using fp_t = mppp::real;
+
+    using nt_ev_t = nt_event<fp_t>;
+    using t_ev_t = t_event<fp_t>;
+
+    auto [x] = make_vars("x");
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto prec : {30, 123}) {
+            auto ta_ev = taylor_adaptive<fp_t>{
+                {prime(x) = 1_dbl},
+                {fp_t{0., prec}},
+                kw::opt_level = opt_level,
+                kw::t_events = {t_ev_t(
+                    x - 1., kw::callback = [](const taylor_adaptive<fp_t> &, bool, int) { return true; })},
+                kw::nt_events = {nt_ev_t(x - 1., [](taylor_adaptive<fp_t> &, const fp_t &, int) {})}};
         }
     }
 }
