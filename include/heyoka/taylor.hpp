@@ -945,7 +945,7 @@ private:
         isol_t m_isol;
 
         // Constructors.
-        ed_data(std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t);
+        ed_data(llvm_state, std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t, const T &);
         ed_data(const ed_data &);
         ~ed_data();
 
@@ -1433,7 +1433,8 @@ private:
         isol_t m_isol;
 
         // Constructors.
-        ed_data(std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t, std::uint32_t);
+        ed_data(llvm_state, std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t,
+                std::uint32_t);
         ed_data(const ed_data &);
         ~ed_data();
 

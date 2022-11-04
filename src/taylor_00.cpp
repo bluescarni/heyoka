@@ -763,7 +763,8 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     // NOTE: this can be done in parallel with the rest of the constructor,
     // once we have m_order/m_dim and we are done using tes/ntes.
     if (with_events) {
-        m_ed_data = std::make_unique<ed_data>(std::move(tes), std::move(ntes), m_order, m_dim);
+        m_ed_data = std::make_unique<ed_data>(m_llvm.make_similar(), std::move(tes), std::move(ntes), m_order, m_dim,
+                                              m_state[0]);
     }
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -2120,7 +2121,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
     // NOTE: this can be done in parallel with the rest of the constructor,
     // once we have m_order/m_dim/m_batch_size and we are done using tes/ntes.
     if (with_events) {
-        m_ed_data = std::make_unique<ed_data>(std::move(tes), std::move(ntes), m_order, m_dim, m_batch_size);
+        m_ed_data = std::make_unique<ed_data>(m_llvm.make_similar(), std::move(tes), std::move(ntes), m_order, m_dim,
+                                              m_batch_size);
     }
 }
 

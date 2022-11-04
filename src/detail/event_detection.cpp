@@ -735,14 +735,16 @@ template <typename T>
 taylor_adaptive<T>::ed_data::ed_data() = default;
 
 template <typename T>
-taylor_adaptive<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vector<nt_event_t> ntes, std::uint32_t order,
-                                     std::uint32_t dim)
-    : m_tes(std::move(tes)), m_ntes(std::move(ntes))
+taylor_adaptive<T>::ed_data::ed_data(llvm_state s, std::vector<t_event_t> tes, std::vector<nt_event_t> ntes,
+                                     std::uint32_t order, std::uint32_t dim, const T &s0)
+    : m_tes(std::move(tes)), m_ntes(std::move(ntes)), m_state(std::move(s))
 {
     assert(!m_tes.empty() || !m_ntes.empty()); // LCOV_EXCL_LINE
 
     // Fetch the scalar FP type.
-    auto *fp_t = detail::to_llvm_type<T>(m_state.context());
+    // NOTE: s0 is the first value in the state vector of the integrator,
+    // from which the internal floating-point type is deduced.
+    auto *fp_t = detail::llvm_type_like(m_state, s0);
 
     // NOTE: the numeric cast will also ensure that we can
     // index into the events using 32-bit ints.
@@ -1322,9 +1324,9 @@ template <typename T>
 taylor_adaptive_batch<T>::ed_data::ed_data() = default;
 
 template <typename T>
-taylor_adaptive_batch<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vector<nt_event_t> ntes,
+taylor_adaptive_batch<T>::ed_data::ed_data(llvm_state s, std::vector<t_event_t> tes, std::vector<nt_event_t> ntes,
                                            std::uint32_t order, std::uint32_t dim, std::uint32_t batch_size)
-    : m_tes(std::move(tes)), m_ntes(std::move(ntes))
+    : m_tes(std::move(tes)), m_ntes(std::move(ntes)), m_state(std::move(s))
 {
     assert(!m_tes.empty() || !m_ntes.empty()); // LCOV_EXCL_LINE
     assert(batch_size != 0u);                  // LCOV_EXCL_LINE
