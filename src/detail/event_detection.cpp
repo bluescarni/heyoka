@@ -552,6 +552,9 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto &builder = s.builder();
     auto &context = s.context();
 
+    // Fetch the external type.
+    auto *ext_fp_t = llvm_ext_type(fp_t);
+
     // Fetch the current insertion block.
     auto *orig_bb = builder.GetInsertBlock();
 
@@ -560,10 +563,10 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // - pointer to the timestep value (s) (read-only),
     // - pointer to the int32 flag(s) to signal integration backwards in time (read-only),
     // - output pointer (write-only).
-    // No overlap is allowed.
-    auto *fp_ptr_t = llvm::PointerType::getUnqual(fp_t);
+    // No overlap is allowed. All floating-point pointers are to external types.
+    auto *ext_fp_ptr_t = llvm::PointerType::getUnqual(ext_fp_t);
     auto *int32_ptr_t = llvm::PointerType::getUnqual(builder.getInt32Ty());
-    const std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, int32_ptr_t, int32_ptr_t};
+    const std::vector<llvm::Type *> fargs{ext_fp_ptr_t, ext_fp_ptr_t, int32_ptr_t, int32_ptr_t};
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -606,7 +609,7 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_
     builder.SetInsertPoint(bb);
 
     // Load the timestep.
-    auto *h = load_vector_from_memory(builder, fp_t, h_ptr, batch_size);
+    auto *h = ext_load_vector_from_memory(s, fp_t, h_ptr, batch_size);
 
     // Init the extrema of the enclosure.
     llvm::Value *enc_lo = nullptr, *enc_hi = nullptr;
@@ -643,7 +646,7 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto *retval = builder.CreateZExt(cmp, make_vector_type(builder.getInt32Ty(), batch_size));
 
     // Store the result in out_ptr.
-    store_vector_to_memory(builder, out_ptr, retval);
+    ext_store_vector_to_memory(s, out_ptr, retval);
 
     // Return.
     builder.CreateRetVoid();

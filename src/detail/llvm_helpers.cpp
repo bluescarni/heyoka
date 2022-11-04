@@ -2022,7 +2022,7 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
 
 // Compute the enclosure of the polynomial of order n with coefficients stored in cf_ptr
 // over the interval [h_lo, h_hi] using interval arithmetics. The polynomial coefficients
-// are vectors of size batch_size and scalar type T.
+// are vectors of size batch_size and scalar type fp_t. cf_ptr is an external pointer.
 // NOTE: the interval arithmetic implementation here is not 100% correct, because
 // we do not account for floating-point truncation. In order to be mathematically
 // correct, we would need to adjust the results of interval arithmetic add/mul via
@@ -2030,7 +2030,8 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
 // https://stackoverflow.com/questions/10420848/how-do-you-get-the-next-value-in-the-floating-point-sequence
 // http://web.mit.edu/hyperbook/Patrikalakis-Maekawa-Cho/node46.html
 // Perhaps another alternative would be to employ FP primitives with explicit rounding modes,
-// which are available in LLVM.
+// which are available in LLVM. For mppp::real, we could employ the MPFR primitives
+// with specific rounding modes.
 std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::Type *fp_t, llvm::Value *cf_ptr,
                                                            std::uint32_t n, llvm::Value *h_lo, llvm::Value *h_hi,
                                                            std::uint32_t batch_size)
@@ -2053,6 +2054,9 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
     // LCOV_EXCL_STOP
 
     auto &builder = s.builder();
+
+    // Fetch the external type.
+    auto *ext_fp_t = llvm_ext_type(fp_t);
 
     // Helper to implement the sum of two intervals.
     // NOTE: see https://en.wikipedia.org/wiki/Interval_arithmetic.
@@ -2093,9 +2097,10 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
     auto *acc_hi = builder.CreateAlloca(fp_vec_t);
 
     // Init the accumulator's lo/hi components with the highest-order coefficient.
-    auto *ho_cf = load_vector_from_memory(
-        builder, fp_t,
-        builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.CreateMul(builder.getInt32(n), builder.getInt32(batch_size))),
+    auto *ho_cf = ext_load_vector_from_memory(
+        s, fp_t,
+        builder.CreateInBoundsGEP(ext_fp_t, cf_ptr,
+                                  builder.CreateMul(builder.getInt32(n), builder.getInt32(batch_size))),
         batch_size);
     builder.CreateStore(ho_cf, acc_lo);
     builder.CreateStore(ho_cf, acc_hi);
@@ -2107,8 +2112,9 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
         // NOTE: we are iterating backwards from the high-order coefficients
         // to the low-order ones.
         auto *ptr = builder.CreateInBoundsGEP(
-            fp_t, cf_ptr, builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size)));
-        auto *cur_cf = load_vector_from_memory(builder, fp_t, ptr, batch_size);
+            ext_fp_t, cf_ptr,
+            builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size)));
+        auto *cur_cf = ext_load_vector_from_memory(s, fp_t, ptr, batch_size);
 
         // Multiply the accumulator by h.
         auto [acc_h_lo, acc_h_hi]
@@ -2126,8 +2132,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
 
 // Compute the enclosure of the polynomial of order n with coefficients stored in cf_ptr
 // over an interval using the Cargo-Shisha algorithm. The polynomial coefficients
-// are vectors of size batch_size and scalar type T. The interval of the independent variable
-// is [0, h] if h >= 0, [h, 0] otherwise.
+// are vectors of size batch_size and scalar type fp_t. The interval of the independent variable
+// is [0, h] if h >= 0, [h, 0] otherwise. cf_ptr is an external pointer.
 // NOTE: the Cargo-Shisha algorithm produces tighter bounds, but it has quadratic complexity
 // and it seems to be less well-behaved numerically in corner cases. It might still be worth it up to double-precision
 // computations, where the practical slowdown wrt interval arithmetics is smaller.
@@ -2153,6 +2159,9 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
 
     auto &builder = s.builder();
 
+    // Fetch the external type.
+    auto *ext_fp_t = llvm_ext_type(fp_t);
+
     // bj_series will contain the terms of the series
     // for the computation of bj. old_bj_series will be
     // used to deal with the fact that the pairwise sum
@@ -2163,7 +2172,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
     auto *cur_h_pow = h;
 
     // Compute the first value, b0, and add it to bj_series.
-    auto *b0 = load_vector_from_memory(builder, fp_t, cf_ptr, batch_size);
+    auto *b0 = ext_load_vector_from_memory(s, fp_t, cf_ptr, batch_size);
     bj_series.push_back(b0);
 
     // Init min/max bj with b0.
@@ -2172,8 +2181,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
     // Main iteration.
     for (std::uint32_t j = 1u; j <= n; ++j) {
         // Compute the new term of the series.
-        auto *ptr = builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.getInt32(j * batch_size));
-        auto *cur_cf = load_vector_from_memory(builder, fp_t, ptr, batch_size);
+        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, cf_ptr, builder.getInt32(j * batch_size));
+        auto *cur_cf = ext_load_vector_from_memory(s, fp_t, ptr, batch_size);
         auto *new_term = llvm_fmul(s, cur_cf, cur_h_pow);
         new_term = llvm_fdiv(s, new_term,
                              vector_splat(builder,
