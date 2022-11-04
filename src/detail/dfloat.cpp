@@ -40,9 +40,14 @@ dfloat<mppp::real>::dfloat(mppp::real h, mppp::real l) : hi(std::move(h)), lo(st
     }
 }
 
-dfloat<mppp::real>::operator mppp::real() const
+dfloat<mppp::real>::operator mppp::real() const &
 {
     return hi;
+}
+
+dfloat<mppp::real>::operator mppp::real() &&
+{
+    return std::move(hi);
 }
 
 #endif

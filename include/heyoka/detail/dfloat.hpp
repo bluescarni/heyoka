@@ -68,7 +68,8 @@ struct HEYOKA_DLL_PUBLIC dfloat<mppp::real> {
     explicit dfloat(mppp::real);
     explicit dfloat(mppp::real, mppp::real);
 
-    explicit operator mppp::real() const;
+    explicit operator mppp::real() const &;
+    explicit operator mppp::real() &&;
 
 private:
     // Serialization.
