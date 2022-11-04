@@ -437,6 +437,9 @@ llvm::Function *llvm_add_poly_rtscc(llvm_state &s, llvm::Type *fp_t, std::uint32
     auto &builder = s.builder();
     auto &context = s.context();
 
+    // Fetch the external type.
+    auto *ext_fp_t = llvm_ext_type(fp_t);
+
     // Add the translator and the sign changes counting function.
     auto *pt = add_poly_translator_1(s, fp_t, n, batch_size);
     auto *scc = llvm_add_csc(s, fp_t, n, batch_size);
@@ -448,10 +451,10 @@ llvm::Function *llvm_add_poly_rtscc(llvm_state &s, llvm::Type *fp_t, std::uint32
     // - two poly coefficients output pointers,
     // - the output pointer to the number of sign changes (write-only),
     // - the input pointer to the original poly coefficients (read-only).
-    // No overlap is allowed.
-    auto *fp_ptr_t = llvm::PointerType::getUnqual(fp_t);
-    const std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, llvm::PointerType::getUnqual(builder.getInt32Ty()),
-                                          fp_ptr_t};
+    // No overlap is allowed. The coefficient pointers are to external types.
+    auto *ext_fp_ptr_t = llvm::PointerType::getUnqual(ext_fp_t);
+    const std::vector<llvm::Type *> fargs{ext_fp_ptr_t, ext_fp_ptr_t,
+                                          llvm::PointerType::getUnqual(builder.getInt32Ty()), ext_fp_ptr_t};
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -503,8 +506,8 @@ llvm::Function *llvm_add_poly_rtscc(llvm_state &s, llvm::Type *fp_t, std::uint32
         auto *store_idx = builder.CreateMul(i, builder.getInt32(batch_size));
 
         auto *cur_cf
-            = load_vector_from_memory(builder, fp_t, builder.CreateInBoundsGEP(fp_t, cf_ptr, load_idx), batch_size);
-        store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_t, out_ptr1, store_idx), cur_cf);
+            = ext_load_vector_from_memory(s, fp_t, builder.CreateInBoundsGEP(ext_fp_t, cf_ptr, load_idx), batch_size);
+        ext_store_vector_to_memory(s, builder.CreateInBoundsGEP(ext_fp_t, out_ptr1, store_idx), cur_cf);
     });
 
     // Translate out_ptr1 into out_ptr2.
