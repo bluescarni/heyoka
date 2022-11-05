@@ -10,6 +10,11 @@ New
 - Support LLVM 15
   (`#274 <https://github.com/bluescarni/heyoka/pull/274>`__).
 
+Fix
+~~~
+
+- Avoid accidental indirect inclusion of libquadmath's header file
+  (`#279 <https://github.com/bluescarni/heyoka/pull/279>`__).
 
 0.19.0 (2022-09-18)
 -------------------
