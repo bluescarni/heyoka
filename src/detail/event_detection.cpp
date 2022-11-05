@@ -369,15 +369,15 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
 
     if (isfinite(ret)) {
         return ret;
-        // LCOV_EXCL_START
     } else {
+        // LCOV_EXCL_START
         get_logger()->warn("deducing a cooldown of zero for a terminal event because the automatic deduction "
                            "heuristic produced a non-finite value of {}",
                            fp_to_string(ret));
 
         return 0;
+        // LCOV_EXCL_STOP
     }
-    // LCOV_EXCL_STOP
 }
 
 } // namespace
