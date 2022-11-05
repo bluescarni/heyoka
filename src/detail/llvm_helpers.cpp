@@ -25,6 +25,7 @@
 #include <vector>
 
 #include <boost/core/demangle.hpp>
+#include <boost/lexical_cast.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 #include <boost/numeric/conversion/cast.hpp>
@@ -55,13 +56,6 @@
 #include <llvm/Support/raw_ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
-
-// NOTE: this is a bit iffy, because it ends up including
-// quadmath.h: this works, as mp++ introduces a public dependency
-// on libquadmath, but technically we are introducing a direct
-// dependency for *heyoka* on libquadmath (thus we should be looking
-// for quadmath in the build system etc. etc.).
-#include <boost/multiprecision/float128.hpp>
 
 #include <mp++/real128.hpp>
 
@@ -2257,13 +2251,15 @@ std::pair<number, number> inv_kep_E_dl_twopi_like(llvm_state &s, llvm::Type *fp_
 
 #if defined(HEYOKA_HAVE_REAL128)
             if constexpr (std::is_same_v<type, mppp::real128>) {
-                const auto twopi_hi = static_cast<bmp::float128>(mp_twopi);
-                const auto twopi_lo = static_cast<bmp::float128>(mp_twopi - mp_fp_t(twopi_hi));
+                using bmp_float128 = bmp::cpp_bin_float_quad;
+
+                const auto twopi_hi = static_cast<bmp_float128>(mp_twopi);
+                const auto twopi_lo = static_cast<bmp_float128>(mp_twopi - mp_fp_t(twopi_hi));
 
                 assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
 
-                return std::make_pair(number{mppp::real128{twopi_hi.backend().value()}},
-                                      number{mppp::real128{twopi_lo.backend().value()}});
+                return std::make_pair(number{mppp::real128{boost::lexical_cast<std::string>(twopi_hi)}},
+                                      number{mppp::real128{boost::lexical_cast<std::string>(twopi_lo)}});
             } else {
 #endif
                 const auto twopi_hi = static_cast<type>(mp_twopi);
