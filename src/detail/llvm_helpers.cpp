@@ -14,6 +14,9 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <locale>
+#include <sstream>
+#include <ios>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -25,7 +28,6 @@
 #include <vector>
 
 #include <boost/core/demangle.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 #include <boost/numeric/conversion/cast.hpp>
@@ -2258,8 +2260,21 @@ std::pair<number, number> inv_kep_E_dl_twopi_like(llvm_state &s, llvm::Type *fp_
 
                 assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
 
-                return std::make_pair(number{mppp::real128{boost::lexical_cast<std::string>(twopi_hi)}},
-                                      number{mppp::real128{boost::lexical_cast<std::string>(twopi_lo)}});
+                // Go through string conversions in order to construct mppp::real128 instances.
+                std::ostringstream oss;
+                oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+                oss.imbue(std::locale::classic());
+                oss << std::showpoint;
+                oss.precision(std::numeric_limits<bmp_float128>::max_digits10);
+
+                oss << twopi_hi;
+                const auto hi_str = oss.str();
+                oss.str("");
+                oss << twopi_lo;
+                const auto lo_str = oss.str();
+
+                return std::make_pair(number{mppp::real128{hi_str}},
+                                      number{mppp::real128{lo_str}});
             } else {
 #endif
                 const auto twopi_hi = static_cast<type>(mp_twopi);
