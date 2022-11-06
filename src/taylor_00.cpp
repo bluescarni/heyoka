@@ -1168,7 +1168,6 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T &max_delta_t
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(bool wtc)
 {
-
     // NOTE: time limit +inf means integration forward in time
     // and no time limit.
 #if defined(HEYOKA_HAVE_REAL)
