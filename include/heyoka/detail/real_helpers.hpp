@@ -15,6 +15,7 @@
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/visibility.hpp>
 
 #include <mp++/real.hpp>
 
@@ -38,7 +39,7 @@ llvm::Value *llvm_real_fcmp_oeq(llvm_state &, llvm::Value *, llvm::Value *);
 llvm::Value *llvm_real_ui_to_fp(llvm_state &, llvm::Value *, llvm::Type *);
 llvm::Value *llvm_real_sgn(llvm_state &, llvm::Value *);
 
-mppp::real eps_from_prec(mpfr_prec_t);
+HEYOKA_DLL_PUBLIC mppp::real eps_from_prec(mpfr_prec_t);
 
 } // namespace heyoka::detail
 

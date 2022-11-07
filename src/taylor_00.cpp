@@ -61,6 +61,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/num_utils.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -625,15 +626,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     if (tol) {
         m_tol = std::move(*tol);
     } else {
-#if defined(HEYOKA_HAVE_REAL)
-        if constexpr (std::is_same_v<T, mppp::real>) {
-            m_tol = detail::eps_from_prec(this->get_sprec());
-        } else {
-#endif
-            m_tol = std::numeric_limits<T>::epsilon();
-#if defined(HEYOKA_HAVE_REAL)
-        }
-#endif
+        m_tol = detail::num_eps_like(m_state[0]);
     }
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -907,6 +900,36 @@ void taylor_adaptive<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
     load_impl(ar, v);
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// Small helper to compare the absolute
+// values of two input values.
+template <typename T>
+bool abs_lt(const T &a, const T &b)
+{
+    using std::abs;
+
+    return abs(a) < abs(b);
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+bool abs_lt<mppp::real>(const mppp::real &a, const mppp::real &b)
+{
+    return mppp::cmpabs(a, b) < 0;
+}
+
+#endif
+
+} // namespace
+
+} // namespace detail
+
 // Implementation detail to make a single integration timestep.
 // The magnitude of the timestep is automatically deduced, but it will
 // always be not greater than abs(max_delta_t). The propagation
@@ -987,48 +1010,49 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T &max_delta_t
 
         // Invoke the stepper for event handling. We will record the norm infinity of the state vector +
         // event equations at the beginning of the timestep for later use.
-        auto max_abs_state = [&]() {
-#if defined(HEYOKA_HAVE_REAL)
-            if constexpr (std::is_same_v<T, mppp::real>) {
-                return mppp::real{mppp::real_kind::zero, this->get_sprec()};
-            } else {
-#endif
-                return T{};
-#if defined(HEYOKA_HAVE_REAL)
-            }
-#endif
-        }();
+        auto max_abs_state = detail::num_zero_like(h);
         std::get<1>(m_step_f)(edd.m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state);
 
         // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
         // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
         // in edd.detect_events() we skip event detection altogether.
-        T g_eps;
-        if (isfinite(max_abs_state)) {
-            // Are we in absolute or relative error control mode?
-            const auto abs_or_rel = max_abs_state < 1;
+        const auto g_eps = [&]() {
+            if (isfinite(max_abs_state)) {
+                // Are we in absolute or relative error control mode?
+                const auto abs_or_rel = max_abs_state < 1;
 
-            // Estimate the size of the largest remainder in the Taylor
-            // series of both the dynamical equations and the events.
-            const auto max_r_size = abs_or_rel ? m_tol : (m_tol * max_abs_state);
+                // Estimate the size of the largest remainder in the Taylor
+                // series of both the dynamical equations and the events.
+                auto max_r_size = abs_or_rel ? m_tol : (m_tol * max_abs_state);
 
-            // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real
-            // integration error cannot be too small due to floating-point truncation.
-            // This is the case for instance if we use sub-epsilon integration tolerances
-            // to achieve Brouwer's law. In such a case, we cap the value of g_eps,
-            // using eps * max_abs_state as an estimation of the smallest number
-            // that can be resolved with the current floating-point type.
-            // NOTE: the if condition in the next line is equivalent, in relative
-            // error control mode, to:
-            // if (m_tol < std::numeric_limits<T>::epsilon())
-            if (max_r_size < std::numeric_limits<T>::epsilon() * max_abs_state) {
-                g_eps = std::numeric_limits<T>::epsilon() * max_abs_state;
+                // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real
+                // integration error cannot be too small due to floating-point truncation.
+                // This is the case for instance if we use sub-epsilon integration tolerances
+                // to achieve Brouwer's law. In such a case, we cap the value of g_eps,
+                // using eps * max_abs_state as an estimation of the smallest number
+                // that can be resolved with the current floating-point type.
+                auto tmp = detail::num_eps_like(max_abs_state) * max_abs_state;
+
+                // NOTE: the if condition in the next line is equivalent, in relative
+                // error control mode, to:
+                // if (m_tol < eps)
+                if (max_r_size < tmp) {
+                    return tmp;
+                } else {
+                    return max_r_size;
+                }
             } else {
-                g_eps = max_r_size;
+                return detail::num_inf_like(max_abs_state);
             }
-        } else {
-            g_eps = std::numeric_limits<T>::infinity();
+        }();
+
+#if defined(HEYOKA_HAVE_REAL)
+
+        if constexpr (std::is_same_v<T, mppp::real>) {
+            assert(g_eps.get_prec() == this->get_sprec());
         }
+
+#endif
 
         // Write unconditionally the tcs.
         std::copy(edd.m_ev_jet.data(), edd.m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
@@ -1050,14 +1074,24 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T &max_delta_t
         // happen closer to the beginning of the timestep.
         // NOTE: the checks inside edd.detect_events() ensure
         // that we can safely sort the events' times.
-        auto cmp = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
+        auto cmp = [](const auto &ev0, const auto &ev1) { return detail::abs_lt(std::get<1>(ev0), std::get<1>(ev1)); };
         std::sort(edd.m_d_tes.begin(), edd.m_d_tes.end(), cmp);
         std::sort(edd.m_d_ntes.begin(), edd.m_d_ntes.end(), cmp);
 
         // If we have terminal events we need
         // to update the value of h.
         if (!edd.m_d_tes.empty()) {
-            h = std::get<1>(edd.m_d_tes[0]);
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<T, mppp::real>) {
+                // NOTE: use set() so that no matter what happens during event detection,
+                // we will not change the precision of h to an invalid value.
+                h.set(std::get<1>(edd.m_d_tes[0]));
+            } else {
+#endif
+                h = std::get<1>(edd.m_d_tes[0]);
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
         }
 
         // Update the state.
@@ -1077,7 +1111,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T &max_delta_t
             // they have become useless.
             reset_cooldowns();
 
-            return std::tuple{taylor_outcome::err_nf_state, h};
+            return std::tuple{taylor_outcome::err_nf_state, std::move(h)};
         }
 
         // Update the cooldowns.
@@ -1107,7 +1141,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T &max_delta_t
             = edd.m_d_tes.empty()
                   ? edd.m_d_ntes.end()
                   : std::lower_bound(edd.m_d_ntes.begin(), edd.m_d_ntes.end(), h,
-                                     [](const auto &ev, const auto &t) { return abs(std::get<1>(ev)) < abs(t); });
+                                     [](const auto &ev, const auto &t) { return detail::abs_lt(std::get<1>(ev), t); });
 
         // Invoke the callbacks of the non-terminal events, which are guaranteed
         // to happen before the first terminal event.
@@ -1150,7 +1184,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T &max_delta_t
 
         if (edd.m_d_tes.empty()) {
             // No terminal events detected, return success or time limit.
-            return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, h};
+            return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, std::move(h)};
         } else {
             // Terminal event detected. Fetch its index.
             const auto ev_idx = static_cast<std::int64_t>(std::get<0>(edd.m_d_tes[0]));
@@ -1160,7 +1194,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T &max_delta_t
             // integration should continue). Otherwise, either the terminal event
             // has no callback or its callback returned false, meaning that the
             // integration must stop.
-            return std::tuple{taylor_outcome{te_cb_ret ? ev_idx : (-ev_idx - 1)}, h};
+            return std::tuple{taylor_outcome{te_cb_ret ? ev_idx : (-ev_idx - 1)}, std::move(h)};
         }
     }
 }

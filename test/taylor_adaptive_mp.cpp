@@ -16,6 +16,7 @@
 
 #include <mp++/real.hpp>
 
+#include <heyoka/detail/real_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/time.hpp>
@@ -49,7 +50,7 @@ TEST_CASE("ctors prec")
         REQUIRE(ta.get_prec() == prec);
         REQUIRE(ta.get_time() == 0);
         REQUIRE(ta.get_time().get_prec() == sprec);
-        // TODO test tolerance value as well.
+        REQUIRE(ta.get_tol() == detail::eps_from_prec(sprec));
         REQUIRE(ta.get_tol().get_prec() == sprec);
         REQUIRE(ta.get_pars()[0] == 0);
         REQUIRE(ta.get_pars()[0].get_prec() == sprec);

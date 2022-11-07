@@ -955,7 +955,7 @@ private:
         ed_data &operator=(ed_data &&) = delete;
 
         // The event detection function.
-        void detect_events(T, std::uint32_t, std::uint32_t, T);
+        void detect_events(const T &, std::uint32_t, std::uint32_t, const T &);
 
     private:
         // Serialisation.
