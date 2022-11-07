@@ -21,6 +21,9 @@ template <typename T>
 T num_zero_like(const T &);
 
 template <typename T>
+T num_one_like(const T &);
+
+template <typename T>
 T num_eps_like(const T &);
 
 template <typename T>
