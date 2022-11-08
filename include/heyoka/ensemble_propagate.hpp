@@ -35,123 +35,23 @@ namespace detail
 {
 
 template <typename T>
-inline std::vector<
-    std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
-ensemble_propagate_until_impl(const taylor_adaptive<T> &, T, std::size_t,
-                              const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t,
-                              T, const std::function<bool(taylor_adaptive<T> &)> &, bool, bool)
-{
-    static_assert(detail::always_false_v<T>, "Unhandled type.");
-
-    throw;
-}
-
-template <>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive<double>, taylor_outcome, double, double, std::size_t,
-                                         std::optional<continuous_output<double>>>>
-ensemble_propagate_until_impl<double>(
-    const taylor_adaptive<double> &, double, std::size_t,
-    const std::function<taylor_adaptive<double>(taylor_adaptive<double>, std::size_t)> &, std::size_t, double,
-    const std::function<bool(taylor_adaptive<double> &)> &, bool, bool);
-
-template <>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive<long double>, taylor_outcome, long double, long double,
-                                         std::size_t, std::optional<continuous_output<long double>>>>
-ensemble_propagate_until_impl<long double>(
-    const taylor_adaptive<long double> &, long double, std::size_t,
-    const std::function<taylor_adaptive<long double>(taylor_adaptive<long double>, std::size_t)> &, std::size_t,
-    long double, const std::function<bool(taylor_adaptive<long double> &)> &, bool, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive<mppp::real128>, taylor_outcome, mppp::real128, mppp::real128,
-                                         std::size_t, std::optional<continuous_output<mppp::real128>>>>
-ensemble_propagate_until_impl<mppp::real128>(
-    const taylor_adaptive<mppp::real128> &, mppp::real128, std::size_t,
-    const std::function<taylor_adaptive<mppp::real128>(taylor_adaptive<mppp::real128>, std::size_t)> &, std::size_t,
-    mppp::real128, const std::function<bool(taylor_adaptive<mppp::real128> &)> &, bool, bool);
-
-#endif
+HEYOKA_DLL_PUBLIC
+    std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
+    ensemble_propagate_until_impl(const taylor_adaptive<T> &, T, std::size_t,
+                                  const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,
+                                  std::size_t, T, const std::function<bool(taylor_adaptive<T> &)> &, bool, bool);
 
 template <typename T>
-inline std::vector<
-    std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
-ensemble_propagate_for_impl(const taylor_adaptive<T> &, T, std::size_t,
-                            const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t, T,
-                            const std::function<bool(taylor_adaptive<T> &)> &, bool, bool)
-{
-    static_assert(detail::always_false_v<T>, "Unhandled type.");
-
-    throw;
-}
-
-template <>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive<double>, taylor_outcome, double, double, std::size_t,
-                                         std::optional<continuous_output<double>>>>
-ensemble_propagate_for_impl<double>(
-    const taylor_adaptive<double> &, double, std::size_t,
-    const std::function<taylor_adaptive<double>(taylor_adaptive<double>, std::size_t)> &, std::size_t, double,
-    const std::function<bool(taylor_adaptive<double> &)> &, bool, bool);
-
-template <>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive<long double>, taylor_outcome, long double, long double,
-                                         std::size_t, std::optional<continuous_output<long double>>>>
-ensemble_propagate_for_impl<long double>(
-    const taylor_adaptive<long double> &, long double, std::size_t,
-    const std::function<taylor_adaptive<long double>(taylor_adaptive<long double>, std::size_t)> &, std::size_t,
-    long double, const std::function<bool(taylor_adaptive<long double> &)> &, bool, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive<mppp::real128>, taylor_outcome, mppp::real128, mppp::real128,
-                                         std::size_t, std::optional<continuous_output<mppp::real128>>>>
-ensemble_propagate_for_impl<mppp::real128>(
-    const taylor_adaptive<mppp::real128> &, mppp::real128, std::size_t,
-    const std::function<taylor_adaptive<mppp::real128>(taylor_adaptive<mppp::real128>, std::size_t)> &, std::size_t,
-    mppp::real128, const std::function<bool(taylor_adaptive<mppp::real128> &)> &, bool, bool);
-
-#endif
-
+HEYOKA_DLL_PUBLIC
+    std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
+    ensemble_propagate_for_impl(const taylor_adaptive<T> &, T, std::size_t,
+                                const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t,
+                                T, const std::function<bool(taylor_adaptive<T> &)> &, bool, bool);
 template <typename T>
-inline std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::vector<T>>>
+HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::vector<T>>>
 ensemble_propagate_grid_impl(const taylor_adaptive<T> &, const std::vector<T> &, std::size_t,
                              const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t, T,
-                             const std::function<bool(taylor_adaptive<T> &)> &)
-{
-    static_assert(detail::always_false_v<T>, "Unhandled type.");
-
-    throw;
-}
-
-template <>
-HEYOKA_DLL_PUBLIC
-    std::vector<std::tuple<taylor_adaptive<double>, taylor_outcome, double, double, std::size_t, std::vector<double>>>
-    ensemble_propagate_grid_impl<double>(
-        const taylor_adaptive<double> &, const std::vector<double> &, std::size_t,
-        const std::function<taylor_adaptive<double>(taylor_adaptive<double>, std::size_t)> &, std::size_t, double,
-        const std::function<bool(taylor_adaptive<double> &)> &);
-
-template <>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive<long double>, taylor_outcome, long double, long double,
-                                         std::size_t, std::vector<long double>>>
-ensemble_propagate_grid_impl<long double>(
-    const taylor_adaptive<long double> &, const std::vector<long double> &, std::size_t,
-    const std::function<taylor_adaptive<long double>(taylor_adaptive<long double>, std::size_t)> &, std::size_t,
-    long double, const std::function<bool(taylor_adaptive<long double> &)> &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive<mppp::real128>, taylor_outcome, mppp::real128, mppp::real128,
-                                         std::size_t, std::vector<mppp::real128>>>
-ensemble_propagate_grid_impl<mppp::real128>(
-    const taylor_adaptive<mppp::real128> &, const std::vector<mppp::real128> &, std::size_t,
-    const std::function<taylor_adaptive<mppp::real128>(taylor_adaptive<mppp::real128>, std::size_t)> &, std::size_t,
-    mppp::real128, const std::function<bool(taylor_adaptive<mppp::real128> &)> &);
-
-#endif
+                             const std::function<bool(taylor_adaptive<T> &)> &);
 
 } // namespace detail
 
@@ -198,123 +98,24 @@ namespace detail
 {
 
 template <typename T>
-inline std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>>>
+HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>>>
 ensemble_propagate_until_batch_impl(
     const taylor_adaptive_batch<T> &, T, std::size_t,
     const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,
-    const std::vector<T> &, const std::function<bool(taylor_adaptive_batch<T> &)> &, bool, bool)
-{
-    static_assert(detail::always_false_v<T>, "Unhandled type.");
-
-    throw;
-}
-
-template <>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive_batch<double>, std::optional<continuous_output_batch<double>>>>
-ensemble_propagate_until_batch_impl<double>(
-    const taylor_adaptive_batch<double> &, double, std::size_t,
-    const std::function<taylor_adaptive_batch<double>(taylor_adaptive_batch<double>, std::size_t)> &, std::size_t,
-    const std::vector<double> &, const std::function<bool(taylor_adaptive_batch<double> &)> &, bool, bool);
-
-template <>
-HEYOKA_DLL_PUBLIC
-    std::vector<std::tuple<taylor_adaptive_batch<long double>, std::optional<continuous_output_batch<long double>>>>
-    ensemble_propagate_until_batch_impl<long double>(
-        const taylor_adaptive_batch<long double> &, long double, std::size_t,
-        const std::function<taylor_adaptive_batch<long double>(taylor_adaptive_batch<long double>, std::size_t)> &,
-        std::size_t, const std::vector<long double> &,
-        const std::function<bool(taylor_adaptive_batch<long double> &)> &, bool, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-HEYOKA_DLL_PUBLIC
-    std::vector<std::tuple<taylor_adaptive_batch<mppp::real128>, std::optional<continuous_output_batch<mppp::real128>>>>
-    ensemble_propagate_until_batch_impl<mppp::real128>(
-        const taylor_adaptive_batch<mppp::real128> &, mppp::real128, std::size_t,
-        const std::function<taylor_adaptive_batch<mppp::real128>(taylor_adaptive_batch<mppp::real128>, std::size_t)> &,
-        std::size_t, const std::vector<mppp::real128> &,
-        const std::function<bool(taylor_adaptive_batch<mppp::real128> &)> &, bool, bool);
-
-#endif
+    const std::vector<T> &, const std::function<bool(taylor_adaptive_batch<T> &)> &, bool, bool);
 
 template <typename T>
-inline std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>>>
+HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>>>
 ensemble_propagate_for_batch_impl(
     const taylor_adaptive_batch<T> &, T, std::size_t,
     const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,
-    const std::vector<T> &, const std::function<bool(taylor_adaptive_batch<T> &)> &, bool, bool)
-{
-    static_assert(detail::always_false_v<T>, "Unhandled type.");
-
-    throw;
-}
-
-template <>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive_batch<double>, std::optional<continuous_output_batch<double>>>>
-ensemble_propagate_for_batch_impl<double>(
-    const taylor_adaptive_batch<double> &, double, std::size_t,
-    const std::function<taylor_adaptive_batch<double>(taylor_adaptive_batch<double>, std::size_t)> &, std::size_t,
-    const std::vector<double> &, const std::function<bool(taylor_adaptive_batch<double> &)> &, bool, bool);
-
-template <>
-HEYOKA_DLL_PUBLIC
-    std::vector<std::tuple<taylor_adaptive_batch<long double>, std::optional<continuous_output_batch<long double>>>>
-    ensemble_propagate_for_batch_impl<long double>(
-        const taylor_adaptive_batch<long double> &, long double, std::size_t,
-        const std::function<taylor_adaptive_batch<long double>(taylor_adaptive_batch<long double>, std::size_t)> &,
-        std::size_t, const std::vector<long double> &,
-        const std::function<bool(taylor_adaptive_batch<long double> &)> &, bool, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-HEYOKA_DLL_PUBLIC
-    std::vector<std::tuple<taylor_adaptive_batch<mppp::real128>, std::optional<continuous_output_batch<mppp::real128>>>>
-    ensemble_propagate_for_batch_impl<mppp::real128>(
-        const taylor_adaptive_batch<mppp::real128> &, mppp::real128, std::size_t,
-        const std::function<taylor_adaptive_batch<mppp::real128>(taylor_adaptive_batch<mppp::real128>, std::size_t)> &,
-        std::size_t, const std::vector<mppp::real128> &,
-        const std::function<bool(taylor_adaptive_batch<mppp::real128> &)> &, bool, bool);
-
-#endif
+    const std::vector<T> &, const std::function<bool(taylor_adaptive_batch<T> &)> &, bool, bool);
 
 template <typename T>
-inline std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>> ensemble_propagate_grid_batch_impl(
+HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>> ensemble_propagate_grid_batch_impl(
     const taylor_adaptive_batch<T> &, const std::vector<T> &, std::size_t,
     const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,
-    const std::vector<T> &, const std::function<bool(taylor_adaptive_batch<T> &)> &)
-{
-    static_assert(detail::always_false_v<T>, "Unhandled type.");
-
-    throw;
-}
-
-template <>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive_batch<double>, std::vector<double>>>
-ensemble_propagate_grid_batch_impl<double>(
-    const taylor_adaptive_batch<double> &, const std::vector<double> &, std::size_t,
-    const std::function<taylor_adaptive_batch<double>(taylor_adaptive_batch<double>, std::size_t)> &, std::size_t,
-    const std::vector<double> &, const std::function<bool(taylor_adaptive_batch<double> &)> &);
-
-template <>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive_batch<long double>, std::vector<long double>>>
-ensemble_propagate_grid_batch_impl<long double>(
-    const taylor_adaptive_batch<long double> &, const std::vector<long double> &, std::size_t,
-    const std::function<taylor_adaptive_batch<long double>(taylor_adaptive_batch<long double>, std::size_t)> &,
-    std::size_t, const std::vector<long double> &, const std::function<bool(taylor_adaptive_batch<long double> &)> &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive_batch<mppp::real128>, std::vector<mppp::real128>>>
-ensemble_propagate_grid_batch_impl<mppp::real128>(
-    const taylor_adaptive_batch<mppp::real128> &, const std::vector<mppp::real128> &, std::size_t,
-    const std::function<taylor_adaptive_batch<mppp::real128>(taylor_adaptive_batch<mppp::real128>, std::size_t)> &,
-    std::size_t, const std::vector<mppp::real128> &,
-    const std::function<bool(taylor_adaptive_batch<mppp::real128> &)> &);
-
-#endif
+    const std::vector<T> &, const std::function<bool(taylor_adaptive_batch<T> &)> &);
 
 } // namespace detail
 
