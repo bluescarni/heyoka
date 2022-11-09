@@ -2929,7 +2929,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
                                         "integrator in batch mode results in an overflow condition");
         }
 
-        m_t_dir[i] = (m_rem_time[i] >= T(0));
+        m_t_dir[i] = (m_rem_time[i] >= static_cast<T>(0));
     }
 
     // Cache the presence/absence of a callback.
@@ -3017,8 +3017,8 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
             assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0)); // LCOV_EXCL_LINE
 
             // Compute the time limit.
-            const auto dt_limit = m_t_dir[i] ? std::min(detail::dfloat<T>(max_delta_ts[i]), m_rem_time[i])
-                                             : std::max(detail::dfloat<T>(-max_delta_ts[i]), m_rem_time[i]);
+            const auto dt_limit = m_t_dir[i] != 0 ? std::min(detail::dfloat<T>(max_delta_ts[i]), m_rem_time[i])
+                                                  : std::max(detail::dfloat<T>(-max_delta_ts[i]), m_rem_time[i]);
 
             // Store it.
             m_cur_max_delta_ts[i] = static_cast<T>(dt_limit);
@@ -3347,7 +3347,7 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
                                         "integrator in batch mode results in an overflow condition");
         }
 
-        m_t_dir[i] = (m_rem_time[i] >= T(0));
+        m_t_dir[i] = (m_rem_time[i] >= static_cast<T>(0));
     }
 
     // Cache the presence/absence of a callback.
@@ -3423,7 +3423,7 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
                     // of the dense output.
                     const auto idx = gidx * m_batch_size + i;
                     const auto d_avail = (grid_ptr[idx] >= t0[i] && grid_ptr[idx] <= t1[i])
-                                         || (m_rem_time[i] == detail::dfloat<T>(T(0)));
+                                         || (m_rem_time[i] == detail::dfloat<T>(static_cast<T>(0)));
                     dflags[i] = d_avail;
                     counter += d_avail;
 
@@ -3510,8 +3510,8 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
 
             // Compute the step limit for the current batch element.
             assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0)); // LCOV_EXCL_LINE
-            const auto dt_limit = m_t_dir[i] ? std::min(detail::dfloat<T>(max_delta_t), m_rem_time[i])
-                                             : std::max(detail::dfloat<T>(-max_delta_t), m_rem_time[i]);
+            const auto dt_limit = m_t_dir[i] != 0 ? std::min(detail::dfloat<T>(max_delta_t), m_rem_time[i])
+                                                  : std::max(detail::dfloat<T>(-max_delta_t), m_rem_time[i]);
 
             pgrid_tmp[i] = static_cast<T>(dt_limit);
         }
@@ -3566,7 +3566,7 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
                 // could also result in time_limit.
                 if (h == static_cast<T>(m_rem_time[i])) {
                     assert(oc == taylor_outcome::time_limit); // LCOV_EXCL_LINE
-                    m_rem_time[i] = detail::dfloat<T>(T(0));
+                    m_rem_time[i] = detail::dfloat<T>(static_cast<T>(0));
                 } else {
                     // NOTE: this should never flip the time direction of the
                     // integration for the same reasons as explained in the
