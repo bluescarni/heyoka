@@ -117,6 +117,9 @@ TEST_CASE("trivial odes")
                 for (auto i = 0; i < 3; ++i) {
                     auto [oc, h] = ta.step();
                     REQUIRE(oc == taylor_outcome::success);
+                    REQUIRE(h.get_prec() == prec);
+                    REQUIRE(ta.get_last_h().get_prec() == prec);
+                    REQUIRE(ta.get_time().get_prec() == prec);
                 }
                 REQUIRE(ta.get_state()[0] == approximately(exp(ta.get_time())));
                 REQUIRE(ta.get_state()[1]
@@ -257,6 +260,10 @@ TEST_CASE("dense out")
                                                       kw::opt_level = opt_level);
 
                 auto [oc, h] = ta.step(true);
+
+                REQUIRE(h.get_prec() == prec);
+                REQUIRE(ta.get_last_h().get_prec() == prec);
+                REQUIRE(ta.get_time().get_prec() == prec);
 
                 REQUIRE(oc == taylor_outcome::success);
 

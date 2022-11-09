@@ -1281,7 +1281,8 @@ void taylor_adaptive<T>::reset_cooldowns()
 // unless a non-finite state was detected.
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t max_steps, T max_delta_t,
+taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t max_steps,
+                                         const std::optional<T> &max_delta_t_,
                                          const std::function<bool(taylor_adaptive &)> &cb, bool wtc, bool with_c_out)
 {
     using std::abs;
@@ -1300,7 +1301,51 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
             "A non-finite time was passed to the propagate_until() function of an adaptive Taylor integrator");
     }
 
-    // Check max_delta_t.
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        assert(t.hi.get_prec() == t.lo.get_prec());
+
+        if (t.hi.get_prec() != this->get_sprec()) {
+            throw std::invalid_argument(fmt::format(
+                "Invalid final time argument passed to the propagate_until() function of an adaptive Taylor "
+                "integrator: the time variable has a precision of {}, while the integrator's precision is {}",
+                t.hi.get_prec(), this->get_sprec()));
+        }
+    }
+
+#endif
+
+    // Fetch and check max_delta_t.
+    const auto max_delta_t = [&]() {
+        if (max_delta_t_) {
+            return *max_delta_t_;
+        } else {
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<T, mppp::real>) {
+                return mppp::real{mppp::real_kind::inf, this->get_sprec()};
+            } else {
+#endif
+                return std::numeric_limits<T>::infinity();
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
+        }
+    }();
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        if (max_delta_t.get_prec() != this->get_sprec()) {
+            throw std::invalid_argument(fmt::format(
+                "Invalid max_delta_t argument passed to the propagate_until() function of an adaptive Taylor "
+                "integrator: max_delta_t has a precision of {}, while the integrator's precision is {}",
+                max_delta_t.get_prec(), this->get_sprec()));
+        }
+    }
+
+#endif
+
     if (isnan(max_delta_t)) {
         throw std::invalid_argument(
             "A nan max_delta_t was passed to the propagate_until() function of an adaptive Taylor integrator");
@@ -1330,9 +1375,14 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
     // with a nonzero h. Most of the time these two quantities
     // will be identical, apart from corner cases.
     std::size_t iter_counter = 0, step_counter = 0;
-    T min_h = std::numeric_limits<T>::infinity(), max_h(0);
+    // NOTE: in case of mppp::real, we know that max_delta_t has the correct
+    // precision by now.
+    T min_h = detail::num_inf_like(max_delta_t), max_h = detail::num_zero_like(max_delta_t);
 
     // Init the remaining time.
+    // NOTE: for mppp::real, manipulations on rem_time involve only t and m_time: t's precision
+    // has been checked, m_time is manipulated only by step(), which enforces the correct
+    // precision is maintained. Thus, rem_time will always keep the correct precision.
     auto rem_time = t - m_time;
 
     // Check it.
@@ -1342,7 +1392,7 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
     }
 
     // Cache the integration direction.
-    const auto t_dir = (rem_time >= T(0));
+    const auto t_dir = (rem_time >= static_cast<T>(0));
 
     // Cache the presence/absence of a callback.
     const auto with_cb = static_cast<bool>(cb);
@@ -1365,7 +1415,10 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
             ret.m_times_lo = std::move(c_out_times_lo);
 
             // Prepare the output vector.
-            ret.m_output.resize(boost::numeric_cast<decltype(ret.m_output.size())>(m_dim));
+            // NOTE: in case of mppp::real, we know that max_delta_t has the correct
+            // precision by now.
+            ret.m_output.resize(boost::numeric_cast<decltype(ret.m_output.size())>(m_dim),
+                                detail::num_zero_like(max_delta_t));
 
             // Add the continuous output function.
             ret.add_c_out_function(m_order, m_dim, m_high_accuracy);
@@ -1410,13 +1463,13 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
         const auto dt_limit = t_dir ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
                                     : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
-        const auto [oc, h] = step_impl(static_cast<T>(dt_limit), wtc);
+        const auto [oc, h] = step_impl(dt_limit.hi, wtc);
 
         if (oc == taylor_outcome::err_nf_state) {
             // If a non-finite state is detected, we do *not* want
             // to execute the propagate() callback and we do *not* want
             // to update the continuous output. Just exit.
-            return std::tuple{oc, min_h, max_h, step_counter, make_c_out()};
+            return std::tuple{oc, std::move(min_h), std::move(max_h), step_counter, make_c_out()};
         }
 
         // Update the number of steps.
@@ -1440,7 +1493,7 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
         // Execute the propagate() callback, if applicable.
         if (with_cb && !cb(*this)) {
             // Interruption via callback.
-            return std::tuple{taylor_outcome::cb_stop, min_h, max_h, step_counter, make_c_out()};
+            return std::tuple{taylor_outcome::cb_stop, std::move(min_h), std::move(max_h), step_counter, make_c_out()};
         }
 
         // The breakout conditions:
@@ -1450,13 +1503,13 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
         // oc == time_limit, because clamping via max_delta_t
         // could also result in time_limit.
         const bool ste_detected = oc > taylor_outcome::success && oc < taylor_outcome{0};
-        if (h == static_cast<T>(rem_time) || ste_detected) {
+        if (h == rem_time.hi || ste_detected) {
 #if !defined(NDEBUG)
-            if (h == static_cast<T>(rem_time)) {
+            if (h == rem_time.hi) {
                 assert(oc == taylor_outcome::time_limit);
             }
 #endif
-            return std::tuple{oc, min_h, max_h, step_counter, make_c_out()};
+            return std::tuple{oc, std::move(min_h), std::move(max_h), step_counter, make_c_out()};
         }
 
         // Check the iteration limit.
@@ -1464,15 +1517,16 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
         // then this condition will never trigger (modulo wraparound)
         // as by this point we are sure iter_counter is at least 1.
         if (iter_counter == max_steps) {
-            return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter, make_c_out()};
+            return std::tuple{taylor_outcome::step_limit, std::move(min_h), std::move(max_h), step_counter,
+                              make_c_out()};
         }
 
         // Update the remaining time.
         // NOTE: at this point, we are sure
-        // that abs(h) < abs(static_cast<T>(rem_time)). This implies
+        // that abs(h) < abs(rem_time.hi). This implies
         // that t - m_time cannot undergo a sign
         // flip and invert the integration direction.
-        assert(abs(h) < abs(static_cast<T>(rem_time)));
+        assert(abs(h) < abs(rem_time.hi));
         rem_time = t - m_time;
     }
 }
@@ -1487,7 +1541,8 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
 // a non-finite state was detected.
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
-taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps, T max_delta_t,
+taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
+                                        const std::optional<T> &max_delta_t_,
                                         const std::function<bool(taylor_adaptive &)> &cb)
 {
     using std::abs;
@@ -1499,7 +1554,23 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
             "Cannot invoke propagate_grid() in an adaptive Taylor integrator if the current time is not finite");
     }
 
-    // Check max_delta_t.
+    // Fetch and check max_delta_t.
+    const auto max_delta_t = [&]() {
+        if (max_delta_t_) {
+            return *max_delta_t_;
+        } else {
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<T, mppp::real>) {
+                return mppp::real{mppp::real_kind::inf, this->get_sprec()};
+            } else {
+#endif
+                return std::numeric_limits<T>::infinity();
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
+        }
+    }();
+
     if (isnan(max_delta_t)) {
         throw std::invalid_argument(
             "A nan max_delta_t was passed to the propagate_grid() function of an adaptive Taylor integrator");

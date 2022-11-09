@@ -37,21 +37,24 @@ namespace detail
 template <typename T>
 HEYOKA_DLL_PUBLIC
     std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
-    ensemble_propagate_until_impl(const taylor_adaptive<T> &, T, std::size_t,
+    ensemble_propagate_until_impl(const taylor_adaptive<T> &, const T &, std::size_t,
                                   const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,
-                                  std::size_t, T, const std::function<bool(taylor_adaptive<T> &)> &, bool, bool);
+                                  std::size_t, const std::optional<T> &,
+                                  const std::function<bool(taylor_adaptive<T> &)> &, bool, bool);
 
 template <typename T>
 HEYOKA_DLL_PUBLIC
     std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
-    ensemble_propagate_for_impl(const taylor_adaptive<T> &, T, std::size_t,
+    ensemble_propagate_for_impl(const taylor_adaptive<T> &, const T &, std::size_t,
                                 const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t,
-                                T, const std::function<bool(taylor_adaptive<T> &)> &, bool, bool);
+                                const std::optional<T> &, const std::function<bool(taylor_adaptive<T> &)> &, bool,
+                                bool);
+
 template <typename T>
 HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::vector<T>>>
 ensemble_propagate_grid_impl(const taylor_adaptive<T> &, const std::vector<T> &, std::size_t,
-                             const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t, T,
-                             const std::function<bool(taylor_adaptive<T> &)> &);
+                             const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t,
+                             const std::optional<T> &, const std::function<bool(taylor_adaptive<T> &)> &);
 
 } // namespace detail
 
