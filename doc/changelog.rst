@@ -13,6 +13,8 @@ New
 Fix
 ~~~
 
+- Avoid accidental indirect inclusion of libquadmath's header file
+  (`#279 <https://github.com/bluescarni/heyoka/pull/279>`__).
 - Prevent callbacks from changing the time coordinate of the integrator.
   This was never supported and could lead to crashes and/or hangs
   in the ``propagate_*()`` functions

@@ -14,6 +14,9 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <locale>
+#include <sstream>
+#include <ios>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -55,13 +58,6 @@
 #include <llvm/Support/raw_ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
-
-// NOTE: this is a bit iffy, because it ends up including
-// quadmath.h: this works, as mp++ introduces a public dependency
-// on libquadmath, but technically we are introducing a direct
-// dependency for *heyoka* on libquadmath (thus we should be looking
-// for quadmath in the build system etc. etc.).
-#include <boost/multiprecision/float128.hpp>
 
 #include <mp++/real128.hpp>
 
@@ -2292,13 +2288,28 @@ std::pair<number, number> inv_kep_E_dl_twopi_like(llvm_state &s, llvm::Type *fp_
 
 #if defined(HEYOKA_HAVE_REAL128)
             if constexpr (std::is_same_v<type, mppp::real128>) {
-                const auto twopi_hi = static_cast<bmp::float128>(mp_twopi);
-                const auto twopi_lo = static_cast<bmp::float128>(mp_twopi - mp_fp_t(twopi_hi));
+                using bmp_float128 = bmp::cpp_bin_float_quad;
+
+                const auto twopi_hi = static_cast<bmp_float128>(mp_twopi);
+                const auto twopi_lo = static_cast<bmp_float128>(mp_twopi - mp_fp_t(twopi_hi));
 
                 assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
 
-                return std::make_pair(number{mppp::real128{twopi_hi.backend().value()}},
-                                      number{mppp::real128{twopi_lo.backend().value()}});
+                // Go through string conversions in order to construct mppp::real128 instances.
+                std::ostringstream oss;
+                oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+                oss.imbue(std::locale::classic());
+                oss << std::showpoint;
+                oss.precision(std::numeric_limits<bmp_float128>::max_digits10);
+
+                oss << twopi_hi;
+                const auto hi_str = oss.str();
+                oss.str("");
+                oss << twopi_lo;
+                const auto lo_str = oss.str();
+
+                return std::make_pair(number{mppp::real128{hi_str}},
+                                      number{mppp::real128{lo_str}});
             } else {
 #endif
                 const auto twopi_hi = static_cast<type>(mp_twopi);
