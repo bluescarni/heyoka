@@ -1349,7 +1349,22 @@ TEST_CASE("ev exception callback")
                     throw std::invalid_argument("hello world 1");
                 })}};
 
-        REQUIRE_THROWS_MATCHES(ta.propagate_until({4., 4., 4., 4.}), std::invalid_argument, Message("hello world 0"));
+        bool raised = false;
+
+        try {
+            ta.propagate_until({4., 4., 4., 4.});
+        } catch (const std::runtime_error &re) {
+            raised = true;
+
+            REQUIRE(!boost::contains(re.what(), "Batch index #0"));
+            REQUIRE(!boost::contains(re.what(), "hello world 1"));
+            REQUIRE(boost::contains(re.what(), "hello world 0"));
+            REQUIRE(boost::contains(re.what(), "Batch index #1"));
+            REQUIRE(boost::contains(re.what(), "Batch index #2"));
+            REQUIRE(boost::contains(re.what(), "Batch index #3"));
+        }
+
+        REQUIRE(raised);
     }
 
     {
@@ -1363,8 +1378,205 @@ TEST_CASE("ev exception callback")
                                                       throw std::invalid_argument("hello world 1");
                                                   })}};
 
+        bool raised = false;
+
+        try {
+            ta.propagate_until({4., 4., 4., 4.});
+        } catch (const std::runtime_error &re) {
+            raised = true;
+
+            REQUIRE(!boost::contains(re.what(), "Batch index #0"));
+            REQUIRE(boost::contains(re.what(), "hello world 1"));
+            REQUIRE(boost::contains(re.what(), "Batch index #1"));
+            REQUIRE(boost::contains(re.what(), "Batch index #2"));
+            REQUIRE(boost::contains(re.what(), "Batch index #3"));
+        }
+
+        REQUIRE(raised);
+    }
+
+    // Check also the single exception case.
+    {
+        auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                              {0, 0., 0., 0.03, .25, .25, .25, .28},
+                                              4,
+                                              kw::nt_events
+                                              = {nte_t(v * v - 1e-10, [](auto &, fp_t, int, std::uint32_t) {})},
+                                              kw::t_events = {te_t(
+                                                  v, kw::callback = [](auto &, bool, int, std::uint32_t) -> bool {
+                                                      throw std::invalid_argument("hello world 1");
+                                                  })}};
+
         REQUIRE_THROWS_MATCHES(ta.propagate_until({4., 4., 4., 4.}), std::invalid_argument, Message("hello world 1"));
     }
+}
+
+// Test to check that event callbacks which alter the time coordinate
+// result in an exception being thrown.
+TEST_CASE("event cb time")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using nt_ev_t = taylor_adaptive_batch<double>::nt_event_t;
+    using t_ev_t = taylor_adaptive_batch<double>::t_event_t;
+
+    auto tcount0 = 0u, tcount1 = 0u;
+
+    // With non-terminal event first.
+    auto ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 0., 1., -1.}, 2u,
+                                    kw::nt_events = {nt_ev_t(x - 1e-5,
+                                                             [&](auto &tint, auto t, auto, auto) {
+                                                                 // NOTE: check also that the time coordinate passed to
+                                                                 // the callback is the correct one, not the one that
+                                                                 // might be set by another callback.
+                                                                 REQUIRE(std::isfinite(t));
+
+                                                                 ++tcount0;
+
+                                                                 tint.set_time({-10., tint.get_time()[1]});
+                                                             }),
+                                                     nt_ev_t(x - 1e-5, [&](auto &tint, auto t, auto, auto) {
+                                                         // NOTE: check also that the time coordinate passed to
+                                                         // the callback is the correct one, not the one that
+                                                         // might be set by another callback.
+                                                         REQUIRE(std::isfinite(t));
+
+                                                         ++tcount1;
+
+                                                         tint.set_time({-10., tint.get_time()[1]});
+                                                     })});
+
+    REQUIRE_THROWS_MATCHES(ta.step(), std::runtime_error,
+                           Message("The invocation of one or more event callbacks resulted in the alteration of the "
+                                   "time coordinate of the integrator at the batch index 0 - this is not supported"));
+
+    REQUIRE(tcount0 == 1u);
+    REQUIRE(tcount1 == 1u);
+
+    // Same test, but now we make both batch elements trigger.
+    ta = taylor_adaptive_batch(
+        {prime(x) = v, prime(v) = -x}, std::vector<double>{0., 0., 1., 1.}, 2u,
+        kw::nt_events = {nt_ev_t(x - 1e-5,
+                                 [&](auto &tint, auto t, auto, auto) {
+                                     // NOTE: check also that the time coordinate passed to
+                                     // the callback is the correct one, not the one that
+                                     // might be set by another callback.
+                                     REQUIRE(std::isfinite(t));
+
+                                     ++tcount0;
+
+                                     tint.set_time({-std::numeric_limits<double>::infinity(), tint.get_time()[1]});
+                                 }),
+                         nt_ev_t(x - 1e-5, [&](auto &tint, auto t, auto, auto) {
+                             // NOTE: check also that the time coordinate passed to
+                             // the callback is the correct one, not the one that
+                             // might be set by another callback.
+                             REQUIRE(std::isfinite(t));
+
+                             ++tcount1;
+
+                             tint.set_time({std::numeric_limits<double>::quiet_NaN(), tint.get_time()[1]});
+                         })});
+
+    // Make also a copy to test copy semantics of the internal time copy members.
+    auto ta2(ta);
+
+    tcount0 = 0;
+    tcount1 = 0;
+
+    REQUIRE_THROWS_MATCHES(ta.step(), std::runtime_error,
+                           Message("The invocation of one or more event callbacks resulted in the alteration of the "
+                                   "time coordinate of the integrator at the batch index 0 - this is not supported"));
+
+    REQUIRE(tcount0 == 2u);
+    REQUIRE(tcount1 == 2u);
+
+    REQUIRE_THROWS_MATCHES(ta2.step(), std::runtime_error,
+                           Message("The invocation of one or more event callbacks resulted in the alteration of the "
+                                   "time coordinate of the integrator at the batch index 0 - this is not supported"));
+
+    REQUIRE(tcount0 == 4u);
+    REQUIRE(tcount1 == 4u);
+
+    // Ensure that the non-finiteness check on the state vector is run before executing the callbacks.
+    ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 0., 1., 1.}, 2u,
+                               kw::nt_events = {nt_ev_t(x - 1e-5,
+                                                        [&](auto &tint, auto, auto, auto) {
+                                                            auto *ptr = tint.get_state_data();
+
+                                                            std::fill(ptr, ptr + 4,
+                                                                      std::numeric_limits<double>::infinity());
+                                                        }),
+                                                nt_ev_t(x - 1e-5, [&](auto &tint, auto, auto, auto) {
+                                                    auto *ptr = tint.get_state_data();
+
+                                                    std::fill(ptr, ptr + 4, std::numeric_limits<double>::infinity());
+                                                })});
+
+    ta.step();
+
+    REQUIRE(std::get<0>(ta.get_step_res()[0]) == taylor_outcome::success);
+    REQUIRE(std::get<0>(ta.get_step_res()[1]) == taylor_outcome::success);
+
+    ta.step();
+
+    REQUIRE(std::get<0>(ta.get_step_res()[0]) == taylor_outcome::err_nf_state);
+    REQUIRE(std::get<0>(ta.get_step_res()[1]) == taylor_outcome::err_nf_state);
+
+    // Check the same for terminal events.
+    ta = taylor_adaptive_batch(
+        {prime(x) = v, prime(v) = -x}, std::vector<double>{0., 0., 1., -1.}, 2u,
+        kw::nt_events = {nt_ev_t(x - 1e-5,
+                                 [&](auto &tint, auto t, auto, auto) {
+                                     // NOTE: check also that the time coordinate passed to
+                                     // the callback is the correct one, not the one that
+                                     // might be set by another callback.
+                                     REQUIRE(std::isfinite(t));
+
+                                     ++tcount0;
+
+                                     tint.set_time({-std::numeric_limits<double>::infinity(), tint.get_time()[1]});
+                                 })},
+        kw::t_events = {t_ev_t(
+            x - 2e-5, kw::callback = [&](auto &tint, auto, auto, auto) {
+                ++tcount1;
+
+                tint.set_time({-10., tint.get_time()[1]});
+
+                return true;
+            })});
+
+    tcount0 = 0;
+    tcount1 = 0;
+
+    REQUIRE_THROWS_MATCHES(ta.step(), std::runtime_error,
+                           Message("The invocation of one or more event callbacks resulted in the alteration of the "
+                                   "time coordinate of the integrator at the batch index 0 - this is not supported"));
+
+    REQUIRE(tcount0 == 1u);
+    REQUIRE(tcount1 == 1u);
+
+    ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 0., 1., 1.}, 2u,
+                               kw::t_events = {t_ev_t(
+                                   x - 2e-5, kw::callback = [&](auto &tint, auto, auto, auto) {
+                                       auto *ptr = tint.get_state_data();
+
+                                       std::fill(ptr, ptr + 4, std::numeric_limits<double>::infinity());
+
+                                       return true;
+                                   })});
+
+    ta.step();
+
+    REQUIRE(std::get<0>(ta.get_step_res()[0]) == taylor_outcome{0});
+    REQUIRE(std::get<0>(ta.get_step_res()[1]) == taylor_outcome{0});
+
+    ta.step();
+
+    REQUIRE(std::get<0>(ta.get_step_res()[0]) == taylor_outcome::err_nf_state);
+    REQUIRE(std::get<0>(ta.get_step_res()[1]) == taylor_outcome::err_nf_state);
 }
 
 TEST_CASE("reset cooldowns")

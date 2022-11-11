@@ -1510,13 +1510,15 @@ private:
     // and propagate functions.
     std::vector<std::tuple<taylor_outcome, T>> m_step_res;
     std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> m_prop_res;
-    // Temporary vectors used in the propagate_*() implementations.
+    // Temporary vectors used in the step()/propagate_*() implementations.
     std::vector<std::size_t> m_ts_count;
     std::vector<T> m_min_abs_h, m_max_abs_h;
     std::vector<T> m_cur_max_delta_ts;
     std::vector<detail::dfloat<T>> m_pfor_ts;
     std::vector<int> m_t_dir;
     std::vector<detail::dfloat<T>> m_rem_time;
+    std::vector<T> m_time_copy_hi, m_time_copy_lo;
+    std::vector<int> m_nf_detected;
     // Temporary vector used in the dense output implementation.
     std::vector<T> m_d_out_time;
     // Auxiliary data/functions for event detection.

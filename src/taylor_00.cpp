@@ -23,10 +23,12 @@
 #include <string>
 #include <tuple>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 #include <variant>
 #include <vector>
 
+#include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
@@ -926,6 +928,22 @@ bool abs_lt<mppp::real>(const mppp::real &a, const mppp::real &b)
 
 #endif
 
+// Custom equality comparison that considers all NaN values equal.
+template <typename T>
+bool cmp_nan_eq(const T &a, const T &b)
+{
+    using std::isnan;
+
+    const auto nan_a = isnan(a);
+    const auto nan_b = isnan(b);
+
+    if (!nan_a && !nan_b) {
+        return a == b;
+    } else {
+        return nan_a && nan_b;
+    }
+}
+
 } // namespace
 
 } // namespace detail
@@ -1143,13 +1161,19 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T &max_delta_t
                   : std::lower_bound(edd.m_d_ntes.begin(), edd.m_d_ntes.end(), h,
                                      [](const auto &ev, const auto &t) { return detail::abs_lt(std::get<1>(ev), t); });
 
+        // Store the time coordinate before invoking the callbacks.
+        const auto new_time = m_time;
+
         // Invoke the callbacks of the non-terminal events, which are guaranteed
         // to happen before the first terminal event.
         for (auto it = edd.m_d_ntes.begin(); it != ntes_end_it; ++it) {
             const auto &t = *it;
             const auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
             assert(cb); // LCOV_EXCL_LINE
-            cb(*this, static_cast<T>(m_time - m_last_h + std::get<1>(t)), std::get<2>(t));
+            // NOTE: use new_time, instead of m_time, in order to prevent
+            // passing the wrong time coordinate to the callback if an earlier
+            // callback changed it.
+            cb(*this, static_cast<T>(new_time - m_last_h + std::get<1>(t)), std::get<2>(t));
         }
 
         // The return value of the first
@@ -1180,6 +1204,18 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T &max_delta_t
             if (te.get_callback()) {
                 te_cb_ret = te.get_callback()(*this, std::get<2>(edd.m_d_tes[0]), std::get<3>(edd.m_d_tes[0]));
             }
+        }
+
+        // NOTE: event callbacks - terminal or not - cannot modify the time
+        // variable, as this is going to mess up the internal time keeping logic
+        // in the propagate_*() functions.
+        // NOTE: use cmp_nan_eq() so that we consider NaN == NaN in the time coordinates.
+        // This is necessary in case something goes wrong in the integration step
+        // and the time coordinate goes NaN - in such a case, the standard equality operator
+        // would trigger (because NaN != NaN) even if the time coordinate was not changed by the callback.
+        if (!detail::cmp_nan_eq(m_time.hi, new_time.hi) || !detail::cmp_nan_eq(m_time.lo, new_time.lo)) {
+            throw std::runtime_error("The invocation of one or more event callbacks resulted in the alteration of the "
+                                     "time coordinate of the integrator - this is not supported");
         }
 
         if (edd.m_d_tes.empty()) {
@@ -2233,10 +2269,12 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
 
     // NOTE: init the outcome to success, the rest to zero.
     m_step_res.resize(boost::numeric_cast<decltype(m_step_res.size())>(m_batch_size),
-                      std::tuple{taylor_outcome::success, T(0)});
-    m_prop_res.resize(boost::numeric_cast<decltype(m_prop_res.size())>(m_batch_size),
-                      std::tuple{taylor_outcome::success, T(0), T(0), std::size_t(0)});
+                      std::tuple{taylor_outcome::success, static_cast<T>(0)});
+    m_prop_res.resize(
+        boost::numeric_cast<decltype(m_prop_res.size())>(m_batch_size),
+        std::tuple{taylor_outcome::success, static_cast<T>(0), static_cast<T>(0), static_cast<std::size_t>(0)});
 
+    // Prepare the internal buffers.
     m_ts_count.resize(boost::numeric_cast<decltype(m_ts_count.size())>(m_batch_size));
     m_min_abs_h.resize(m_batch_size);
     m_max_abs_h.resize(m_batch_size);
@@ -2244,6 +2282,9 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
     m_pfor_ts.resize(boost::numeric_cast<decltype(m_pfor_ts.size())>(m_batch_size));
     m_t_dir.resize(boost::numeric_cast<decltype(m_t_dir.size())>(m_batch_size));
     m_rem_time.resize(m_batch_size);
+    m_time_copy_hi.resize(m_batch_size);
+    m_time_copy_lo.resize(m_batch_size);
+    m_nf_detected.resize(m_batch_size);
 
     m_d_out_time.resize(m_batch_size);
 
@@ -2272,7 +2313,8 @@ taylor_adaptive_batch<T>::taylor_adaptive_batch(const taylor_adaptive_batch &oth
       m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
       m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
-      m_rem_time(other.m_rem_time), m_d_out_time(other.m_d_out_time),
+      m_rem_time(other.m_rem_time), m_time_copy_hi(other.m_time_copy_hi), m_time_copy_lo(other.m_time_copy_lo),
+      m_nf_detected(other.m_nf_detected), m_d_out_time(other.m_d_out_time),
       m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
 {
     // NOTE: make explicit deep copy of the decomposition.
@@ -2341,6 +2383,9 @@ void taylor_adaptive_batch<T>::save_impl(Archive &ar, unsigned) const
     ar << m_pfor_ts;
     ar << m_t_dir;
     ar << m_rem_time;
+    ar << m_time_copy_hi;
+    ar << m_time_copy_lo;
+    ar << m_nf_detected;
     ar << m_d_out_time;
     ar << m_ed_data;
 }
@@ -2384,6 +2429,9 @@ void taylor_adaptive_batch<T>::load_impl(Archive &ar, unsigned version)
     ar >> m_pfor_ts;
     ar >> m_t_dir;
     ar >> m_rem_time;
+    ar >> m_time_copy_hi;
+    ar >> m_time_copy_lo;
+    ar >> m_nf_detected;
     ar >> m_d_out_time;
     ar >> m_ed_data;
 
@@ -2645,24 +2693,50 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         // Update the state.
         m_d_out_f(m_state.data(), edd.m_ev_jet.data(), m_delta_ts.data());
 
-        // We will use this to capture the first exception thrown
-        // by a callback, if any.
-        std::exception_ptr eptr;
+        // We will use this to capture exceptions thrown while
+        // executing callbacks.
+        std::vector<std::pair<std::uint32_t, std::exception_ptr>> cb_eptrs;
+
+        // Make a copy of the current times before invoking the callbacks, so that:
+        // - we can notice if the callbacks change the time coordinate, and,
+        // - if they do, we will use the original time coordinate in the
+        //   time update logic, rather than the (wrong) time coordinate
+        //   that a callback invocation might set.
+        // In other words, m_time_copy will end up containing the correctly-updated
+        // time coordinate, while m_time is subject to arbitrary changes via callbacks.
+        std::copy(m_time_hi.begin(), m_time_hi.end(), m_time_copy_hi.begin());
+        std::copy(m_time_lo.begin(), m_time_lo.end(), m_time_copy_lo.begin());
+
+        // Run the finiteness check on the state vector
+        // *before* executing the callbacks, as the execution of
+        // a callback on a batch index might alter the state
+        // variables of another batch index.
+        // NOTE: this can probably be vectorised, if necessary.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            m_nf_detected[i] = check_nf_batch(i);
+        }
 
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             const auto h = m_delta_ts[i];
 
             // Compute the new time in double-length arithmetic.
-            const auto new_time = detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) + h;
+            // NOTE: take the time coordinate from m_time_copy (rather than
+            // m_time directly) as m_time might have been modified by incorrectly
+            // implemented callbacks.
+            const auto new_time = detail::dfloat<T>(m_time_copy_hi[i], m_time_copy_lo[i]) + h;
             m_time_hi[i] = new_time.hi;
             m_time_lo[i] = new_time.lo;
+
+            // Update also m_time_copy with the new time.
+            m_time_copy_hi[i] = new_time.hi;
+            m_time_copy_lo[i] = new_time.lo;
 
             // Store the last timestep.
             m_last_h[i] = h;
 
             // Check if the time or the state vector are non-finite at the
             // end of the timestep.
-            if (!isfinite(new_time) || check_nf_batch(i)) {
+            if (!isfinite(new_time) || m_nf_detected[i] != 0) {
                 // Let's also reset the cooldown values for this batch index,
                 // as at this point they have become useless.
                 reset_cooldowns(i);
@@ -2702,8 +2776,16 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                       : std::lower_bound(edd.m_d_ntes[i].begin(), edd.m_d_ntes[i].end(), h,
                                          [](const auto &ev, const auto &t) { return abs(std::get<1>(ev)) < abs(t); });
 
+            // Flag to signal that the callback of a non-terminal event threw
+            // an exception.
+            bool nt_cb_exception = false;
+
             // Invoke the callbacks of the non-terminal events, which are guaranteed
             // to happen before the first terminal event.
+            // NOTE: the loop will be exited as soon as an exception is raised
+            // by a callback. This is intended to match the behaviour of the
+            // scalar integrator (i.e., do not process any more events for the current
+            // batch element and move to the next batch element instead).
             for (auto it = edd.m_d_ntes[i].begin(); it != ntes_end_it; ++it) {
                 const auto &t = *it;
                 const auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
@@ -2711,10 +2793,20 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                 try {
                     cb(*this, static_cast<T>(new_time - m_last_h[i] + std::get<1>(t)), std::get<2>(t), i);
                 } catch (...) {
-                    if (!eptr) {
-                        eptr = std::current_exception();
-                    }
+                    // NOTE: in case of exception, remember it, set nt_cb_exception
+                    // to true and break out, so that we do not process additional events.
+                    cb_eptrs.emplace_back(i, std::current_exception());
+                    nt_cb_exception = true;
+                    break;
                 }
+            }
+
+            // Don't proceed to the terminal events if a non-terminal
+            // callback threw, just move to the next batch element. This
+            // is intended to match the behaviour of the
+            // scalar integrator.
+            if (nt_cb_exception) {
+                continue;
             }
 
             // The return value of the first
@@ -2747,9 +2839,12 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                         te_cb_ret = te.get_callback()(*this, std::get<2>(edd.m_d_tes[i][0]),
                                                       std::get<3>(edd.m_d_tes[i][0]), i);
                     } catch (...) {
-                        if (!eptr) {
-                            eptr = std::current_exception();
-                        }
+                        // NOTE: if an exception is raised, record it
+                        // and then move on to the next batch element.
+                        // This is intended to match the behaviour of
+                        // the scalar integrator.
+                        cb_eptrs.emplace_back(i, std::current_exception());
+                        continue;
                     }
                 }
             }
@@ -2775,10 +2870,54 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             }
         }
 
-        // Check if any callback threw an exception, and re-throw
-        // it in case.
-        if (eptr) {
-            std::rethrow_exception(eptr);
+        // Check if any callback threw an exception.
+        if (!cb_eptrs.empty()) {
+            // If there's only 1 exception just rethrow it.
+            if (cb_eptrs.size() == 1u) {
+                std::rethrow_exception(cb_eptrs[0].second);
+            }
+
+            // Otherwise, we will assemble and throw a new exception
+            // containing the messages of all thrown exceptions.
+            std::string exc_msg = "Two or more exceptions were raised during the execution of event callbacks in a "
+                                  "batch integrator:\n\n";
+
+            for (auto &[i, eptr] : cb_eptrs) {
+                exc_msg += fmt::format("Batch index #{}:\n", i);
+
+                try {
+                    std::rethrow_exception(eptr);
+                } catch (const std::exception &ex) {
+                    exc_msg += fmt::format("    Exception type: {}\n", boost::core::demangle(typeid(ex).name()));
+                    exc_msg += fmt::format("    Exception message: {}\n", ex.what());
+                } catch (...) {
+                    // LCOV_EXCL_START
+                    exc_msg += "    Exception type: unknown\n";
+                    exc_msg += "    Exception message: unknown\n";
+                    // LCOV_EXCL_STOP
+                }
+
+                exc_msg += '\n';
+            }
+
+            throw std::runtime_error(exc_msg);
+        }
+
+        // NOTE: event callbacks - terminal or not - cannot modify the time
+        // variable, as this is going to mess up the internal time keeping logic
+        // in the propagate_*() functions.
+        // NOTE: use cmp_nan_eq() so that we consider NaN == NaN in the time coordinates.
+        // This is necessary in case something goes wrong in the integration step
+        // and the time coordinate goes NaN - in such a case, the standard equality operator
+        // would trigger (because NaN != NaN) even if the time coordinate was not changed by the callback.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            if (!detail::cmp_nan_eq(m_time_hi[i], m_time_copy_hi[i])
+                || !detail::cmp_nan_eq(m_time_lo[i], m_time_copy_lo[i])) {
+                throw std::runtime_error(
+                    fmt::format("The invocation of one or more event callbacks resulted in the alteration of the "
+                                "time coordinate of the integrator at the batch index {} - this is not supported",
+                                i));
+            }
         }
     }
 }

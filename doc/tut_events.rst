@@ -106,7 +106,7 @@ zero derivative).
     from within the callback, as that will result in undefined behaviour.
 
 Because non-terminal event detection is performed at the end of an integration step,
-when the callback is invoked the state and time of the integrator object are those *at the end* of the integration
+when the callback is invoked the state and time of the integrator object are those **at the end** of the integration
 step in which the event was detected. Note that when integrating an ODE system with events, the ``taylor_adaptive``
 class ensures that the Taylor coefficients are always kept up to date (as explained in the tutorial about
 :ref:`dense output <tut_d_output>`), and thus in the callback function it is always possible to use the ``update_d_output()``
