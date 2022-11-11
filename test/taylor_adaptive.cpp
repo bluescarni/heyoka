@@ -289,6 +289,31 @@ TEST_CASE("propagate grid scalar")
     out = ta.propagate_grid({10., 100.});
     REQUIRE(std::get<0>(out) == taylor_outcome{-1});
     REQUIRE(std::get<4>(out).empty());
+
+    // A case in which we have a callback which never stops and a terminal event
+    // which triggers.
+    ta = taylor_adaptive<double>{
+        {prime(x) = v, prime(v) = -x},
+        {0., 1.},
+        kw::t_events = {t_event<double>(
+            v - .1, kw::callback = [](taylor_adaptive<double> &, bool, int) { return false; })}};
+    out = ta.propagate_grid(
+        {0., 10.}, kw::callback = [](const auto &) { return true; });
+    REQUIRE(std::get<0>(out) == taylor_outcome{-1});
+
+    // Callback attempting the change the time coordinate.
+    ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -x}, {0., 1.}};
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid(
+            {0., 10.}, kw::callback =
+                           [](auto &tint) {
+                               tint.set_time(std::numeric_limits<double>::quiet_NaN());
+
+                               return true;
+                           }),
+        std::runtime_error,
+        Message("The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
+                "time coordinate of the integrator - this is not supported"));
 }
 
 TEST_CASE("streaming op")

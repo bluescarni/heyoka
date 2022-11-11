@@ -366,6 +366,35 @@ TEST_CASE("propagate grid")
     std::function<bool(taylor_adaptive_batch<double> &)> f_cb_grid(cb_functor_grid{});
     f_cb_grid.target<cb_functor_grid>()->n_copies_after = f_cb_grid.target<cb_functor_grid>()->n_copies;
     ta.propagate_grid({10., 10., 10., 10., 100., 100., 100., 100.}, kw::callback = f_cb_grid);
+
+    // Callback attempts to change the time coordinate.
+    ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03}, 4};
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid(
+            {10., 10., 10., 10., 100., 100., 100., 100.}, kw::callback =
+                                                              [](auto &tint) {
+                                                                  tint.set_time(-100.);
+
+                                                                  return true;
+                                                              }),
+        std::runtime_error,
+        Message("The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
+                "time coordinate of the integrator - this is not supported"));
+
+    // Try also with a single time coord.
+    ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03}, 4};
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid(
+            {10., 10., 10., 10., 100., 100., 100., 100.},
+            kw::callback =
+                [](auto &tint) {
+                    tint.set_time({tint.get_time()[0], -100., tint.get_time()[2], tint.get_time()[3]});
+
+                    return true;
+                }),
+        std::runtime_error,
+        Message("The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
+                "time coordinate of the integrator - this is not supported"));
 }
 
 // A test to make sure the propagate functions deal correctly

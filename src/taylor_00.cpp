@@ -1728,7 +1728,7 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
     }
 
     // Cache the integration direction.
-    const auto t_dir = (rem_time >= T(0));
+    const auto t_dir = (rem_time >= static_cast<T>(0));
 
     // Cache the presence/absence of a callback.
     const auto with_cb = static_cast<bool>(cb);
@@ -1817,9 +1817,35 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
         // Update the number of iterations.
         ++iter_counter;
 
+        // Small helper to wrap the invocation of the callback
+        // while checking that the callback does not change the
+        // time coordinate.
+        auto wrap_cb_call = [this, &cb]() {
+            // Store the current time coordinate before
+            // executing the cb, so that we can check if
+            // the cb changes the time coordinate.
+            const auto orig_time = m_time;
+            // NOTE: this is ensured by the fact that the outcome
+            // of the single step is *not* err_nf_state.
+            assert(isfinite(orig_time));
+
+            // Execute the cb.
+            assert(cb);
+            const auto ret_cb = cb(*this);
+
+            // Check the time coordinate.
+            if (m_time != orig_time) {
+                throw std::runtime_error(
+                    "The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
+                    "time coordinate of the integrator - this is not supported");
+            }
+
+            return ret_cb;
+        };
+
         // Check the early interruption conditions.
         // NOTE: only one of them must be set.
-        if (with_cb && !cb(*this)) {
+        if (with_cb && !wrap_cb_call()) {
             // Interruption via callback.
             interrupt = taylor_outcome::cb_stop;
         } else if (oc > taylor_outcome::success && oc < taylor_outcome{0}) {
@@ -1838,7 +1864,7 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
         // will also force the processing of all remaining grid points.
         if (h == static_cast<T>(rem_time)) {
             assert(oc == taylor_outcome::time_limit); // LCOV_EXCL_LINE
-            rem_time = detail::dfloat<T>(T(0));
+            rem_time = detail::dfloat<T>(static_cast<T>(0));
         } else {
             // NOTE: this should never flip the time direction of the
             // integration for the same reasons as explained in the
@@ -3771,12 +3797,38 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
         // Update the number of iterations.
         ++iter_counter;
 
+        // Small helper to wrap the invocation of the callback
+        // while checking that the callback does not change the
+        // time coordinate.
+        auto wrap_cb_call = [this, &cb]() {
+            // Store the current time coordinate before
+            // executing the cb, so that we can check if
+            // the cb changes the time coordinate.
+            std::copy(m_time_hi.begin(), m_time_hi.end(), m_time_copy_hi.begin());
+            std::copy(m_time_lo.begin(), m_time_lo.end(), m_time_copy_lo.begin());
+
+            // Execute the cb.
+            assert(cb);
+            const auto ret_cb = cb(*this);
+
+            // Check the time coordinate.
+            // NOTE: we can use normal equality as we are sure that
+            // all components of the time coordinate are finite.
+            if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) {
+                throw std::runtime_error(
+                    "The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
+                    "time coordinate of the integrator - this is not supported");
+            }
+
+            return ret_cb;
+        };
+
         // Check the early interruption conditions.
         // NOTE: in case of cb_stop or step_limit,
         // we will overwrite the outcomes in m_prop_res.
         // The outcome for a stopping terminal event is already
         // set up properly in the previous loop.
-        if (with_cb && !cb(*this)) {
+        if (with_cb && !wrap_cb_call()) {
             // Interruption via callback.
             for (auto &t : m_prop_res) {
                 std::get<0>(t) = taylor_outcome::cb_stop;
