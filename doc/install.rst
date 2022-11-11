@@ -72,7 +72,7 @@ quadruple-precision integrations are always supported. Otherwise,
 on platforms such as x86-64, quadruple-precision computations are supported if:
 
 * the nonstandard ``__float128`` floating-point type is
-  `available and supported <https://gcc.gnu.org/onlinedocs/gcc/Floating-Types.html>`__, and
+  available and supported, and
 * an installation of the `mp++ <https://bluescarni.github.io/mppp/>`__ library with support
   for the :cpp:class:`mppp::real128` class is available (see the :ref:`mp++ installation instructions <mppp:installation>`),
   and
@@ -127,7 +127,7 @@ your conda installation.
 FreeBSD
 ```````
 
-A community-supported FreeBSD port via `pkg <https://www.freebsd.org/doc/handbook/pkgng-intro.html>`__ is available for
+A community-supported FreeBSD port via `pkg <https://docs.freebsd.org/en/books/handbook/ports/#pkgng-intro>`__ is available for
 heyoka. In order to install heyoka using pkg, execute the following command:
 
 .. code-block:: console
