@@ -2173,23 +2173,25 @@ TEST_CASE("event cb time")
                                    "time coordinate of the integrator - this is not supported"));
 }
 
-// TODO implement.
-#if 0
-
 // Test case for a propagate callback changing the time coordinate
 // in invalid ways.
 TEST_CASE("bug prop_cb time")
 {
+    using Catch::Matchers::Message;
+
     auto [x, v] = make_vars("x", "v");
 
     auto ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector{0., 1.});
 
-    ta.propagate_until(
-        10., kw::callback = [](auto &t) {
-            t.set_time(100.);
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_until(
+            10., kw::callback =
+                     [](auto &t) {
+                         t.set_time(100.);
 
-            return true;
-        });
+                         return true;
+                     }),
+        std::runtime_error,
+        Message("The invocation of the callback passed to propagate_until() resulted in the alteration of the "
+                "time coordinate of the integrator - this is not supported"));
 }
-
-#endif

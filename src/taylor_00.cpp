@@ -1527,9 +1527,30 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
         ++iter_counter;
 
         // Execute the propagate() callback, if applicable.
-        if (with_cb && !cb(*this)) {
-            // Interruption via callback.
-            return std::tuple{taylor_outcome::cb_stop, std::move(min_h), std::move(max_h), step_counter, make_c_out()};
+        if (with_cb) {
+            // Store the current time coordinate before
+            // executing the cb, so that we can check if
+            // the cb changes the time coordinate.
+            const auto orig_time = m_time;
+            // NOTE: this is ensured by the fact that the outcome
+            // of the single step is *not* err_nf_state.
+            assert(isfinite(orig_time));
+
+            // Execute the cb.
+            const auto ret_cb = cb(*this);
+
+            // Check the time coordinate.
+            if (m_time != orig_time) {
+                throw std::runtime_error(
+                    "The invocation of the callback passed to propagate_until() resulted in the alteration of the "
+                    "time coordinate of the integrator - this is not supported");
+            }
+
+            if (!ret_cb) {
+                // Interruption via callback.
+                return std::tuple{taylor_outcome::cb_stop, std::move(min_h), std::move(max_h), step_counter,
+                                  make_c_out()};
+            }
         }
 
         // The breakout conditions:
@@ -3222,7 +3243,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
                     // NOTE: if m_rem_time[i] was previously set to zero, it
                     // will end up being repeatedly set to zero here. This
                     // should be harmless.
-                    m_rem_time[i] = detail::dfloat<T>(T(0));
+                    m_rem_time[i] = detail::dfloat<T>(static_cast<T>(0));
                 } else {
                     // NOTE: this should never flip the time direction of the
                     // integration for the same reasons as explained in the
@@ -3250,14 +3271,34 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
         ++iter_counter;
 
         // Execute the propagate() callback, if applicable.
-        if (with_cb && !cb(*this)) {
-            // Change m_prop_res before exiting by setting all outcomes
-            // to cb_stop regardless of the timestep outcome.
-            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                std::get<0>(m_prop_res[i]) = taylor_outcome::cb_stop;
+        if (with_cb) {
+            // Store the current time coordinate before
+            // executing the cb, so that we can check if
+            // the cb changes the time coordinate.
+            std::copy(m_time_hi.begin(), m_time_hi.end(), m_time_copy_hi.begin());
+            std::copy(m_time_lo.begin(), m_time_lo.end(), m_time_copy_lo.begin());
+
+            // Execute the cb.
+            const auto ret_cb = cb(*this);
+
+            // Check the time coordinate.
+            // NOTE: we can use normal equality as we are sure that
+            // all components of the time coordinate are finite.
+            if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) {
+                throw std::runtime_error(
+                    "The invocation of the callback passed to propagate_until() resulted in the alteration of the "
+                    "time coordinate of the integrator - this is not supported");
             }
 
-            return make_c_out();
+            if (!ret_cb) {
+                // Change m_prop_res before exiting by setting all outcomes
+                // to cb_stop regardless of the timestep outcome.
+                for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+                    std::get<0>(m_prop_res[i]) = taylor_outcome::cb_stop;
+                }
+
+                return make_c_out();
+            }
         }
 
         // We need to break out if either we reached the final time
