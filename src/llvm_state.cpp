@@ -617,7 +617,9 @@ llvm_state &llvm_state::operator=(const llvm_state &other)
 }
 
 // NOTE: this cannot be defaulted because the moving of the LLVM objects
-// needs to be done in a different order.
+// needs to be done in a different order (specifically, we need to
+// ensure that the LLVM objects in this are destroyed in a specific
+// order).
 llvm_state &llvm_state::operator=(llvm_state &&other) noexcept
 {
     if (this != &other) {
@@ -682,7 +684,6 @@ void llvm_state::save_impl(Archive &ar, unsigned) const
 template <typename Archive>
 void llvm_state::load_impl(Archive &ar, unsigned version)
 {
-
     // NOTE: all serialised objects in the archive
     // are primitive types, no need to reset the
     // addresses.
