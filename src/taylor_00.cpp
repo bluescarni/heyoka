@@ -1170,10 +1170,25 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T &max_delta_t
             const auto &t = *it;
             const auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
             assert(cb); // LCOV_EXCL_LINE
+
             // NOTE: use new_time, instead of m_time, in order to prevent
             // passing the wrong time coordinate to the callback if an earlier
             // callback changed it.
-            cb(*this, static_cast<T>(new_time - m_last_h + std::get<1>(t)), std::get<2>(t));
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<T, mppp::real>) {
+                // NOTE: for mppp::real, we must ensure that the time coordinate
+                // of the event is computed with the correct precision (we are
+                // getting the time coordinate from the event detection machinery,
+                // which does not enforce preservation of the correct precision).
+                auto tc = static_cast<T>((new_time - m_last_h + std::get<1>(t)));
+                tc.prec_round(this->get_sprec());
+                cb(*this, tc, std::get<2>(t));
+            } else {
+#endif
+                cb(*this, static_cast<T>(new_time - m_last_h + std::get<1>(t)), std::get<2>(t));
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
         }
 
         // The return value of the first
