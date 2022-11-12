@@ -252,7 +252,9 @@ public:
 
 } // namespace heyoka
 
-// Current archive version is 2.
+// Current archive version is 2. Changelog:
+// - version 1: got rid of the inline_functions setting;
+// - version 2: added the force_avx512 setting.
 BOOST_CLASS_VERSION(heyoka::llvm_state, 2)
 
 #endif
