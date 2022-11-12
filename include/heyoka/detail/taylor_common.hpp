@@ -47,20 +47,20 @@ namespace heyoka::detail
 // array (see the implementation of taylor_c_diff_numparam_codegen()).
 template <typename Tup, typename ArgIter, std::size_t... I>
 inline std::vector<llvm::Value *>
-taylor_c_diff_func_numpar_codegen_impl(llvm_state &s, const Tup &np_tup, ArgIter numpar_begin, llvm::Value *par_ptr,
-                                       std::uint32_t batch_size, std::index_sequence<I...>)
+taylor_c_diff_func_numpar_codegen_impl(llvm_state &s, llvm::Type *fp_t, const Tup &np_tup, ArgIter numpar_begin,
+                                       llvm::Value *par_ptr, std::uint32_t batch_size, std::index_sequence<I...>)
 {
-    return {taylor_c_diff_numparam_codegen(s, std::get<I>(np_tup), numpar_begin + I, par_ptr, batch_size)...};
+    return {taylor_c_diff_numparam_codegen(s, fp_t, std::get<I>(np_tup), numpar_begin + I, par_ptr, batch_size)...};
 }
 
 // Helper to implement the function for the differentiation of
 // a function of number(s)/param(s) in compact mode. The function will always return zero,
 // unless the order is 0 (in which case it will return the result of applying the functor cgen
 // to the number(s)/param(s) arguments).
-template <typename T, typename F, typename... NumPars>
-inline llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                 const std::string &name, std::uint32_t n_hidden_deps, const F &cgen,
-                                                 const NumPars &...np)
+template <typename F, typename... NumPars>
+inline llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                                 std::uint32_t batch_size, const std::string &name,
+                                                 std::uint32_t n_hidden_deps, const F &cgen, const NumPars &...np)
 {
     static_assert(sizeof...(np) > 0u);
 
@@ -68,11 +68,11 @@ inline llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, std::uint32_t n_
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto *val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, name, n_uvars, batch_size, {np...}, n_hidden_deps);
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, name, n_uvars, batch_size, {np...}, n_hidden_deps);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -106,7 +106,7 @@ inline llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, std::uint32_t n_
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // Generate the vector of num/param arguments.
-                auto np_args = taylor_c_diff_func_numpar_codegen_impl(s, std::make_tuple(std::cref(np)...),
+                auto np_args = taylor_c_diff_func_numpar_codegen_impl(s, fp_t, std::make_tuple(std::cref(np)...),
                                                                       numpar_begin, par_ptr, batch_size,
                                                                       std::make_index_sequence<sizeof...(np)>{});
 
@@ -115,7 +115,7 @@ inline llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, std::uint32_t n_
             },
             [&]() {
                 // Otherwise, return zero.
-                builder.CreateStore(llvm::ConstantFP::get(val_t, 0.), retval);
+                builder.CreateStore(llvm_constantfp(s, val_t, 0.), retval);
             });
 
         // Return the result.

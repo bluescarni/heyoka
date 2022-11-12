@@ -85,7 +85,6 @@ bool operator!=(const variable &v1, const variable &v2)
 
 double eval_dbl(const variable &var, const std::unordered_map<std::string, double> &map, const std::vector<double> &)
 {
-    using namespace fmt::literals;
     if (auto it = map.find(var.name()); it != map.end()) {
         return it->second;
     } else {
@@ -97,7 +96,6 @@ double eval_dbl(const variable &var, const std::unordered_map<std::string, doubl
 long double eval_ldbl(const variable &var, const std::unordered_map<std::string, long double> &map,
                       const std::vector<long double> &)
 {
-    using namespace fmt::literals;
     if (auto it = map.find(var.name()); it != map.end()) {
         return it->second;
     } else {
@@ -111,7 +109,6 @@ long double eval_ldbl(const variable &var, const std::unordered_map<std::string,
 mppp::real128 eval_f128(const variable &var, const std::unordered_map<std::string, mppp::real128> &map,
                         const std::vector<mppp::real128> &)
 {
-    using namespace fmt::literals;
     if (auto it = map.find(var.name()); it != map.end()) {
         return it->second;
     } else {

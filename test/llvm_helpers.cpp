@@ -38,6 +38,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -111,6 +117,68 @@ TEST_CASE("sgn scalar")
     tuple_for_each(fp_types, tester);
 }
 
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("sgn scalar mp")
+{
+    using detail::llvm_sgn;
+    using detail::to_llvm_type;
+
+    using fp_t = mppp::real;
+
+    const auto prec = 237u;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        llvm_state s{kw::opt_level = opt_level};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *val_t = to_llvm_type<fp_t>(context);
+        auto *real_t = detail::llvm_type_like(s, mppp::real{0, prec});
+
+        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {llvm::PointerType::getUnqual(val_t)}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sgn", &md);
+
+        auto *xptr = f->args().begin();
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *x = detail::ext_load_vector_from_memory(s, real_t, xptr, 1u);
+
+        // Create the return value.
+        builder.CreateRet(llvm_sgn(s, x));
+
+        // Verify.
+        s.verify_function(f);
+
+        // Run the optimisation pass.
+        s.optimise();
+
+        // Compile.
+        s.compile();
+
+        // Fetch the function pointer.
+        auto f_ptr = reinterpret_cast<std::int32_t (*)(const fp_t *)>(s.jit_lookup("sgn"));
+
+        mppp::real arg{0, prec};
+        REQUIRE(f_ptr(&arg) == 0);
+        arg = mppp::real{-123, prec};
+        REQUIRE(f_ptr(&arg) == -1);
+        arg = mppp::real{123, prec};
+        REQUIRE(f_ptr(&arg) == 1);
+        arg = mppp::real{"inf", prec};
+        REQUIRE(f_ptr(&arg) == 1);
+        arg = mppp::real{"-inf", prec};
+        REQUIRE(f_ptr(&arg) == -1);
+        arg = mppp::real{"nan", prec};
+        REQUIRE(f_ptr(&arg) == 0);
+    }
+}
+
+#endif
+
 // Generic branchless sign function.
 template <typename T>
 int sgn(T val)
@@ -147,7 +215,7 @@ TEST_CASE("sgn batch")
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
                 // Load the vector from memory.
-                auto v = detail::load_vector_from_memory(builder, x, batch_size);
+                auto v = detail::load_vector_from_memory(builder, val_t, x, batch_size);
 
                 // Create and store the return value.
                 detail::store_vector_to_memory(builder, out, llvm_sgn(s, v));
@@ -277,13 +345,13 @@ TEST_CASE("sincos batch")
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
                 auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sc", &md);
 
-                auto xptr = f->args().begin();
-                auto sptr = f->args().begin() + 1;
-                auto cptr = f->args().begin() + 2;
+                auto *xptr = f->args().begin();
+                auto *sptr = f->args().begin() + 1;
+                auto *cptr = f->args().begin() + 2;
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                auto x = detail::load_vector_from_memory(builder, xptr, batch_size);
+                auto *x = detail::load_vector_from_memory(builder, val_t, xptr, batch_size);
 
                 auto ret = llvm_sincos(s, x);
                 detail::store_vector_to_memory(builder, sptr, ret.first);
@@ -322,6 +390,67 @@ TEST_CASE("sincos batch")
 
     tuple_for_each(fp_types, tester);
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("sincos mp")
+{
+    using detail::llvm_sincos;
+    using detail::to_llvm_type;
+    using std::cos;
+    using std::sin;
+
+    const auto prec = 237u;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        llvm_state s{kw::opt_level = opt_level};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *real_t = to_llvm_type<mppp::real>(context);
+        auto *fp_t = detail::llvm_type_like(s, mppp::real{0, prec});
+
+        const std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(real_t));
+        auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sc", &md);
+
+        auto *sptr = f->args().begin();
+        auto *cptr = f->args().begin() + 1;
+        auto *x = f->args().begin() + 2;
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *in_val = detail::ext_load_vector_from_memory(s, fp_t, x, 1);
+        auto [ret_sin, ret_cos] = llvm_sincos(s, in_val);
+
+        detail::ext_store_vector_to_memory(s, sptr, ret_sin);
+        detail::ext_store_vector_to_memory(s, cptr, ret_cos);
+
+        // Create the return value.
+        builder.CreateRetVoid();
+
+        // Verify.
+        s.verify_function(f);
+
+        // Run the optimisation pass.
+        s.optimise();
+
+        // Compile.
+        s.compile();
+
+        // Fetch the function pointer.
+        auto f_ptr = reinterpret_cast<void (*)(mppp::real *, mppp::real *, mppp::real *)>(s.jit_lookup("sc"));
+
+        mppp::real sn{0, prec}, cs{0, prec}, arg{"2.1", prec};
+        f_ptr(&sn, &cs, &arg);
+        REQUIRE(sn == sin(arg));
+        REQUIRE(cs == cos(arg));
+    }
+}
+
+#endif
 
 TEST_CASE("modulus scalar")
 {
@@ -404,14 +533,14 @@ TEST_CASE("modulus batch")
                 auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
                 auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_rem", &md);
 
-                auto ret_ptr = f->args().begin();
-                auto x_ptr = f->args().begin() + 1;
-                auto y_ptr = f->args().begin() + 2;
+                auto *ret_ptr = f->args().begin();
+                auto *x_ptr = f->args().begin() + 1;
+                auto *y_ptr = f->args().begin() + 2;
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                auto ret = llvm_modulus(s, detail::load_vector_from_memory(builder, x_ptr, batch_size),
-                                        detail::load_vector_from_memory(builder, y_ptr, batch_size));
+                auto *ret = llvm_modulus(s, detail::load_vector_from_memory(builder, val_t, x_ptr, batch_size),
+                                         detail::load_vector_from_memory(builder, val_t, y_ptr, batch_size));
 
                 detail::store_vector_to_memory(builder, ret_ptr, ret);
 
@@ -466,7 +595,7 @@ TEST_CASE("inv_kep_E_scalar")
             llvm_state s{kw::opt_level = opt_level};
 
             // Add the function.
-            llvm_add_inv_kep_E_wrapper<fp_t>(s, 1, "hey_kep");
+            llvm_add_inv_kep_E_wrapper(s, detail::to_llvm_type<fp_t>(s.context()), 1, "hey_kep");
 
             // Run the optimisation pass.
             s.optimise();
@@ -614,7 +743,7 @@ TEST_CASE("inv_kep_E_batch")
                 llvm_state s{kw::opt_level = opt_level};
 
                 // Add the function.
-                llvm_add_inv_kep_E_wrapper<fp_t>(s, batch_size, "hey_kep");
+                llvm_add_inv_kep_E_wrapper(s, detail::to_llvm_type<fp_t>(s.context()), batch_size, "hey_kep");
 
                 // Run the optimisation pass.
                 s.optimise();
@@ -838,6 +967,155 @@ TEST_CASE("inv_kep_E_batch")
     tuple_for_each(fp_types, tester);
 }
 
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("inv_kep_E_scalar mp")
+{
+    using detail::llvm_add_inv_kep_E_wrapper;
+    using std::cos;
+    using std::isnan;
+    using std::sin;
+
+    const auto prec = 237u;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        llvm_state s{kw::opt_level = opt_level};
+
+        auto *fp_t = detail::llvm_type_like(s, mppp::real{0, prec});
+
+        // Add the function.
+        llvm_add_inv_kep_E_wrapper(s, fp_t, 1, "hey_kep");
+
+        // Run the optimisation pass.
+        s.optimise();
+
+        // Compile.
+        s.compile();
+
+        // Fetch the function pointer.
+        auto f_ptr
+            = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(s.jit_lookup("hey_kep"));
+
+        std::uniform_real_distribution<double> e_dist(0., 1.), M_dist(0., 2 * boost::math::constants::pi<double>());
+
+        // First set of tests with zero eccentricity.
+        for (auto i = 0; i < ntrials; ++i) {
+            const mppp::real M{M_dist(rng), prec};
+            const mppp::real e{0, prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(M == approximately(E));
+        }
+
+        // Non-zero eccentricities.
+        for (auto i = 0; i < ntrials * 10; ++i) {
+            const mppp::real M{M_dist(rng), prec};
+            const mppp::real e{e_dist(rng), prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(M == approximately(E - e * sin(E), mppp::real(10000)));
+        }
+
+        // Try a very high eccentricity.
+        {
+            const mppp::real M{0, prec};
+            auto e = mppp::real{1, prec} - mppp::real{1ul, -(static_cast<int>(prec) - 1), prec} * mppp::real{4, prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(M == approximately(E - e * sin(E), mppp::real(10000)));
+        }
+
+        // Test invalid inputs.
+        {
+            const mppp::real M{"1.23", prec};
+            const mppp::real e{"-.1", prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+
+        {
+            const mppp::real M{"1.23", prec};
+            const mppp::real e{1, prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+
+        {
+            const mppp::real M{"1.23", prec};
+            const mppp::real e{"inf", prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+
+        {
+            const mppp::real M{"1.23", prec};
+            const mppp::real e{"-inf", prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+
+        {
+            const mppp::real M{"1.23", prec};
+            const mppp::real e{"nan", prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+
+        {
+            const mppp::real M{"inf", prec};
+            const mppp::real e{".1", prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+
+        {
+            const mppp::real M{"-inf", prec};
+            const mppp::real e{".2", prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+
+        {
+            const mppp::real M{"nan", prec};
+            const mppp::real e{".1", prec};
+            mppp::real E{0, prec};
+
+            f_ptr(&E, &e, &M);
+
+            REQUIRE(isnan(E));
+        }
+    }
+}
+
+#endif
+
 TEST_CASE("while_loop")
 {
     using detail::llvm_while_loop;
@@ -991,7 +1269,7 @@ TEST_CASE("csc_scalar")
 
             const auto degree = 4u;
 
-            llvm_add_csc<fp_t>(s, degree, 1);
+            llvm_add_csc(s, to_llvm_type<fp_t>(s.context()), degree, 1);
 
             s.optimise();
 
@@ -1067,7 +1345,7 @@ TEST_CASE("csc_batch")
 
                 const auto degree = 4u;
 
-                llvm_add_csc<fp_t>(s, degree, batch_size);
+                llvm_add_csc(s, to_llvm_type<fp_t>(s.context()), degree, batch_size);
 
                 s.optimise();
 
@@ -1163,8 +1441,8 @@ TEST_CASE("minmax")
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                auto a = detail::load_vector_from_memory(builder, a_ptr, batch_size);
-                auto b = detail::load_vector_from_memory(builder, b_ptr, batch_size);
+                auto a = detail::load_vector_from_memory(builder, val_t, a_ptr, batch_size);
+                auto b = detail::load_vector_from_memory(builder, val_t, b_ptr, batch_size);
 
                 auto ret = detail::llvm_min(s, a, b);
 
@@ -1185,8 +1463,8 @@ TEST_CASE("minmax")
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                a = detail::load_vector_from_memory(builder, a_ptr, batch_size);
-                b = detail::load_vector_from_memory(builder, b_ptr, batch_size);
+                a = detail::load_vector_from_memory(builder, val_t, a_ptr, batch_size);
+                b = detail::load_vector_from_memory(builder, val_t, b_ptr, batch_size);
 
                 ret = detail::llvm_max(s, a, b);
 
@@ -1207,8 +1485,8 @@ TEST_CASE("minmax")
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                a = detail::load_vector_from_memory(builder, a_ptr, batch_size);
-                b = detail::load_vector_from_memory(builder, b_ptr, batch_size);
+                a = detail::load_vector_from_memory(builder, val_t, a_ptr, batch_size);
+                b = detail::load_vector_from_memory(builder, val_t, b_ptr, batch_size);
 
                 ret = detail::llvm_min_nan(s, a, b);
 
@@ -1229,8 +1507,8 @@ TEST_CASE("minmax")
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                a = detail::load_vector_from_memory(builder, a_ptr, batch_size);
-                b = detail::load_vector_from_memory(builder, b_ptr, batch_size);
+                a = detail::load_vector_from_memory(builder, val_t, a_ptr, batch_size);
+                b = detail::load_vector_from_memory(builder, val_t, b_ptr, batch_size);
 
                 ret = detail::llvm_max_nan(s, a, b);
 
@@ -1439,9 +1717,9 @@ TEST_CASE("fma batch")
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                auto ret = llvm_fma(s, detail::load_vector_from_memory(builder, x_ptr, batch_size),
-                                    detail::load_vector_from_memory(builder, y_ptr, batch_size),
-                                    detail::load_vector_from_memory(builder, z_ptr, batch_size));
+                auto ret = llvm_fma(s, detail::load_vector_from_memory(builder, val_t, x_ptr, batch_size),
+                                    detail::load_vector_from_memory(builder, val_t, y_ptr, batch_size),
+                                    detail::load_vector_from_memory(builder, val_t, z_ptr, batch_size));
 
                 detail::store_vector_to_memory(builder, ret_ptr, ret);
 
@@ -1482,6 +1760,72 @@ TEST_CASE("fma batch")
 
     tuple_for_each(fp_types, tester);
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("fma scalar mp")
+{
+    using detail::llvm_fma;
+    using detail::to_llvm_type;
+    using std::fma;
+
+    const auto prec = 237u;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        llvm_state s{kw::opt_level = opt_level};
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *real_t = to_llvm_type<mppp::real>(context);
+        auto *fp_t = detail::llvm_type_like(s, mppp::real{0, prec});
+
+        const std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(real_t));
+        auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_fma", &md);
+
+        auto *ret = f->args().begin();
+        auto *x = f->args().begin() + 1;
+        auto *y = f->args().begin() + 2;
+        auto *z = f->args().begin() + 3;
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *res = llvm_fma(s, detail::ext_load_vector_from_memory(s, fp_t, x, 1),
+                             detail::ext_load_vector_from_memory(s, fp_t, y, 1),
+                             detail::ext_load_vector_from_memory(s, fp_t, z, 1));
+
+        detail::ext_store_vector_to_memory(s, ret, res);
+
+        builder.CreateRetVoid();
+
+        // Verify.
+        s.verify_function(f);
+
+        // Run the optimisation pass.
+        s.optimise();
+
+        // Compile.
+        s.compile();
+
+        // Fetch the function pointer.
+        auto f_ptr
+            = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
+                s.jit_lookup("hey_fma"));
+
+        auto a = mppp::real("1.1", prec);
+        auto b = mppp::real("2.1", prec);
+        auto c = mppp::real("-6.1", prec);
+        auto out = mppp::real(0, prec);
+
+        f_ptr(&out, &a, &b, &c);
+
+        REQUIRE(out == mppp::fma(a, b, c));
+    }
+}
+
+#endif
 
 TEST_CASE("eft_product scalar")
 {
@@ -1599,8 +1943,8 @@ TEST_CASE("eft_product batch")
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                auto [x, y] = llvm_eft_product(s, detail::load_vector_from_memory(builder, a_ptr, batch_size),
-                                               detail::load_vector_from_memory(builder, b_ptr, batch_size));
+                auto [x, y] = llvm_eft_product(s, detail::load_vector_from_memory(builder, val_t, a_ptr, batch_size),
+                                               detail::load_vector_from_memory(builder, val_t, b_ptr, batch_size));
 
                 detail::store_vector_to_memory(builder, x_ptr, x);
                 detail::store_vector_to_memory(builder, y_ptr, y);
@@ -1803,10 +2147,10 @@ TEST_CASE("dl mul batch")
 
                     builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                    auto [x, y] = llvm_dl_mul(s, detail::load_vector_from_memory(builder, a_hi_ptr, batch_size),
-                                              detail::load_vector_from_memory(builder, a_lo_ptr, batch_size),
-                                              detail::load_vector_from_memory(builder, b_hi_ptr, batch_size),
-                                              detail::load_vector_from_memory(builder, b_lo_ptr, batch_size));
+                    auto [x, y] = llvm_dl_mul(s, detail::load_vector_from_memory(builder, val_t, a_hi_ptr, batch_size),
+                                              detail::load_vector_from_memory(builder, val_t, a_lo_ptr, batch_size),
+                                              detail::load_vector_from_memory(builder, val_t, b_hi_ptr, batch_size),
+                                              detail::load_vector_from_memory(builder, val_t, b_lo_ptr, batch_size));
 
                     detail::store_vector_to_memory(builder, x_ptr, x);
                     detail::store_vector_to_memory(builder, y_ptr, y);
@@ -2026,10 +2370,10 @@ TEST_CASE("dl div batch")
 
                     builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                    auto [x, y] = llvm_dl_div(s, detail::load_vector_from_memory(builder, a_hi_ptr, batch_size),
-                                              detail::load_vector_from_memory(builder, a_lo_ptr, batch_size),
-                                              detail::load_vector_from_memory(builder, b_hi_ptr, batch_size),
-                                              detail::load_vector_from_memory(builder, b_lo_ptr, batch_size));
+                    auto [x, y] = llvm_dl_div(s, detail::load_vector_from_memory(builder, val_t, a_hi_ptr, batch_size),
+                                              detail::load_vector_from_memory(builder, val_t, a_lo_ptr, batch_size),
+                                              detail::load_vector_from_memory(builder, val_t, b_hi_ptr, batch_size),
+                                              detail::load_vector_from_memory(builder, val_t, b_lo_ptr, batch_size));
 
                     detail::store_vector_to_memory(builder, x_ptr, x);
                     detail::store_vector_to_memory(builder, y_ptr, y);
@@ -2187,7 +2531,7 @@ TEST_CASE("floor batch")
 
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                auto ret = llvm_floor(s, detail::load_vector_from_memory(builder, x_ptr, batch_size));
+                auto ret = llvm_floor(s, detail::load_vector_from_memory(builder, val_t, x_ptr, batch_size));
 
                 detail::store_vector_to_memory(builder, ret_ptr, ret);
 
@@ -2228,6 +2572,7 @@ TEST_CASE("dl floor scalar")
     using detail::llvm_dl_floor;
     using detail::to_llvm_type;
     using std::abs;
+    using std::floor;
     using std::trunc;
 
     auto tester = [](auto fp_x) {
@@ -2315,6 +2660,7 @@ TEST_CASE("dl floor batch")
     using detail::llvm_dl_floor;
     using detail::to_llvm_type;
     using std::abs;
+    using std::floor;
     using std::trunc;
 
     auto tester = [](auto fp_x) {
@@ -2342,8 +2688,9 @@ TEST_CASE("dl floor batch")
 
                     builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                    auto [x, y] = llvm_dl_floor(s, detail::load_vector_from_memory(builder, a_hi_ptr, batch_size),
-                                                detail::load_vector_from_memory(builder, a_lo_ptr, batch_size));
+                    auto [x, y]
+                        = llvm_dl_floor(s, detail::load_vector_from_memory(builder, val_t, a_hi_ptr, batch_size),
+                                        detail::load_vector_from_memory(builder, val_t, a_lo_ptr, batch_size));
 
                     detail::store_vector_to_memory(builder, x_ptr, x);
                     detail::store_vector_to_memory(builder, y_ptr, y);
@@ -2526,10 +2873,11 @@ TEST_CASE("dl modulus batch")
 
                     builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-                    auto [x, y] = llvm_dl_modulus(s, detail::load_vector_from_memory(builder, a_hi_ptr, batch_size),
-                                                  detail::load_vector_from_memory(builder, a_lo_ptr, batch_size),
-                                                  detail::load_vector_from_memory(builder, b_hi_ptr, batch_size),
-                                                  detail::load_vector_from_memory(builder, b_lo_ptr, batch_size));
+                    auto [x, y]
+                        = llvm_dl_modulus(s, detail::load_vector_from_memory(builder, val_t, a_hi_ptr, batch_size),
+                                          detail::load_vector_from_memory(builder, val_t, a_lo_ptr, batch_size),
+                                          detail::load_vector_from_memory(builder, val_t, b_hi_ptr, batch_size),
+                                          detail::load_vector_from_memory(builder, val_t, b_lo_ptr, batch_size));
 
                     detail::store_vector_to_memory(builder, x_ptr, x);
                     detail::store_vector_to_memory(builder, y_ptr, y);
@@ -2668,7 +3016,7 @@ TEST_CASE("to_size_t")
         auto *bb = llvm::BasicBlock::Create(context, "entry", f);
         builder.SetInsertPoint(bb);
 
-        auto *ret = to_size_t(s, load_vector_from_memory(builder, in_val, 4));
+        auto *ret = to_size_t(s, load_vector_from_memory(builder, builder.getInt32Ty(), in_val, 4));
         store_vector_to_memory(builder, out_val, ret);
 
         builder.CreateRetVoid();
@@ -2737,7 +3085,7 @@ TEST_CASE("to_size_t")
         auto *bb = llvm::BasicBlock::Create(context, "entry", f);
         builder.SetInsertPoint(bb);
 
-        auto *ret = to_size_t(s, load_vector_from_memory(builder, in_val, 4));
+        auto *ret = to_size_t(s, load_vector_from_memory(builder, builder.getInt64Ty(), in_val, 4));
         store_vector_to_memory(builder, out_val, ret);
 
         builder.CreateRetVoid();
@@ -2760,3 +3108,49 @@ TEST_CASE("to_size_t")
         REQUIRE(out[3] == static_cast<std::size_t>(std::numeric_limits<std::uint64_t>::max()));
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("real_ext_load")
+{
+    llvm_state s{kw::opt_level = 3u};
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    auto *real_t = detail::to_llvm_type<mppp::real>(context);
+
+    const auto real_pi_257 = mppp::real_pi(257);
+
+    auto *ft = llvm::FunctionType::get(
+        builder.getVoidTy(), {llvm::PointerType::getUnqual(real_t), llvm::PointerType::getUnqual(real_t)}, false);
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+    // Load the input from the first pointer.
+    auto *real_val = detail::ext_load_vector_from_memory(s, detail::llvm_type_like(s, real_pi_257), f->arg_begin(), 1);
+
+    // Write it out.
+    detail::ext_store_vector_to_memory(s, f->arg_begin() + 1, real_val);
+
+    builder.CreateRetVoid();
+
+    s.verify_function(f);
+
+    s.optimise();
+
+    s.compile();
+
+    auto f_ptr = reinterpret_cast<void (*)(mppp::real *, mppp::real *)>(s.jit_lookup("test"));
+
+    mppp::real in{"1.1", 257}, out{0, 257};
+
+    f_ptr(&in, &out);
+
+    REQUIRE(out == mppp::real{"1.1", 257});
+    REQUIRE(out.get_prec() == 257);
+}
+
+#endif

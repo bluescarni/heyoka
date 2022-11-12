@@ -66,8 +66,8 @@ std::vector<expression> time_impl::gradient() const
 namespace
 {
 
-template <typename T>
-llvm::Value *time_taylor_diff_impl(llvm_state &s, llvm::Value *time_ptr, std::uint32_t order, std::uint32_t batch_size)
+llvm::Value *time_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, llvm::Value *time_ptr, std::uint32_t order,
+                                   std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
@@ -77,43 +77,23 @@ llvm::Value *time_taylor_diff_impl(llvm_state &s, llvm::Value *time_ptr, std::ui
     // the non-normalised derivatives.
     switch (order) {
         case 0u:
-            return load_vector_from_memory(builder, time_ptr, batch_size);
+            return load_vector_from_memory(builder, fp_t, time_ptr, batch_size);
         case 1u:
-            return vector_splat(builder, codegen<T>(s, number{1.}), batch_size);
+            return vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
         default:
-            return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+            return vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
 } // namespace
 
-llvm::Value *time_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &,
-                                        const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *time_ptr,
-                                        std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
-                                        bool) const
+llvm::Value *time_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &,
+                                    const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *time_ptr,
+                                    std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
+                                    bool) const
 {
-    return time_taylor_diff_impl<double>(s, time_ptr, order, batch_size);
+    return time_taylor_diff_impl(s, fp_t, time_ptr, order, batch_size);
 }
-
-llvm::Value *time_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &,
-                                         const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *time_ptr,
-                                         std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
-                                         bool) const
-{
-    return time_taylor_diff_impl<long double>(s, time_ptr, order, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *time_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &,
-                                         const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *time_ptr,
-                                         std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
-                                         bool) const
-{
-    return time_taylor_diff_impl<mppp::real128>(s, time_ptr, order, batch_size);
-}
-
-#endif
 
 namespace
 {
@@ -121,18 +101,18 @@ namespace
 // NOTE: perhaps later on this can become a generic implementation
 // for nullary functions, in the same mold as
 // taylor_c_diff_func_numpar().
-template <typename T>
-llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_time_impl(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                        std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "time", n_uvars, batch_size, {});
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "time", n_uvars, batch_size, {});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -143,7 +123,7 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t n_uvars, st
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -169,18 +149,20 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t n_uvars, st
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // If the order is zero, return the time itself.
-                builder.CreateStore(load_vector_from_memory(builder, t_ptr, batch_size), retval);
+                builder.CreateStore(load_vector_from_memory(builder, fp_t, t_ptr, batch_size), retval);
             },
             [&]() {
                 llvm_if_then_else(
                     s, builder.CreateICmpEQ(ord, builder.getInt32(1)),
                     [&]() {
                         // If the order is one, return 1.
-                        builder.CreateStore(vector_splat(builder, codegen<T>(s, number{1.}), batch_size), retval);
+                        builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size),
+                                            retval);
                     },
                     [&]() {
                         // If order > 1, return zero.
-                        builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), retval);
+                        builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size),
+                                            retval);
                     });
             });
 
@@ -210,33 +192,17 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t n_uvars, st
 
 } // namespace
 
-llvm::Function *time_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
+llvm::Function *time_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                              std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_time_impl<double>(s, n_uvars, batch_size);
+    return taylor_c_diff_time_impl(s, fp_t, n_uvars, batch_size);
 }
-
-llvm::Function *time_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                   bool) const
-{
-    return taylor_c_diff_time_impl<long double>(s, n_uvars, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *time_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                   bool) const
-{
-    return taylor_c_diff_time_impl<mppp::real128>(s, n_uvars, batch_size);
-}
-
-#endif
 
 // Small helper to detect if an expression
 // is a time function.
 bool is_time(const expression &ex)
 {
-    if (auto func_ptr = std::get_if<func>(&ex.value());
+    if (const auto *func_ptr = std::get_if<func>(&ex.value());
         func_ptr != nullptr && func_ptr->extract<time_impl>() != nullptr) {
         return true;
     } else {

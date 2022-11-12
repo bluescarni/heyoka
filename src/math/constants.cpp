@@ -11,19 +11,28 @@
 #include <cassert>
 #include <cstdint>
 #include <initializer_list>
+#include <ios>
+#include <limits>
+#include <locale>
 #include <ostream>
+#include <regex>
+#include <sstream>
 #include <stdexcept>
 #include <string>
-#include <unordered_map>
+#include <typeindex>
 #include <utility>
-#include <variant>
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
+#include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
 
+#include <llvm/ADT/APFloat.h>
+#include <llvm/Config/llvm-config.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constant.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
@@ -31,10 +40,19 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/Casting.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#include <heyoka/detail/real_helpers.hpp>
 
 #endif
 
@@ -53,109 +71,186 @@ namespace heyoka
 namespace detail
 {
 
+std::string null_constant_func::operator()([[maybe_unused]] unsigned prec) const
+{
+    assert(prec > 0u);
+
+    return "0";
+}
+
+std::string pi_constant_func::operator()(unsigned prec) const
+{
+    assert(prec > 0u);
+
+    // NOTE: we assume double is always ieee style.
+    static_assert(std::numeric_limits<double>::is_iec559);
+    if (prec <= static_cast<unsigned>(std::numeric_limits<double>::digits)) {
+        return fmt::format("{:.{}}", boost::math::constants::pi<double>(), std::numeric_limits<double>::max_digits10);
+    }
+
+    // Try with long double.
+    if (std::numeric_limits<long double>::is_iec559
+        && prec <= static_cast<unsigned>(std::numeric_limits<long double>::digits)) {
+        // NOTE: fmt support for long double is sketchy, let's go with iostreams.
+        std::ostringstream oss;
+        oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+
+        oss.imbue(std::locale::classic());
+        oss << std::showpoint;
+
+        oss.precision(std::numeric_limits<long double>::max_digits10);
+        oss << boost::math::constants::pi<long double>();
+
+        return oss.str();
+    }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    if (prec <= static_cast<unsigned>(std::numeric_limits<mppp::real128>::digits)) {
+        return mppp::pi_128.to_string();
+    }
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    return mppp::real_pi(boost::numeric_cast<mpfr_prec_t>(prec)).to_string();
+
+#else
+
+    throw std::invalid_argument(fmt::format("Unable to generate a pi constant with a precision of {} bits", prec));
+
+#endif
+}
+
 namespace
 {
 
-using max_fp_t =
-#if defined(HEYOKA_HAVE_REAL128)
-    mppp::real128
-#else
-    long double
-#endif
-    ;
+// Regex to match floating-point numbers. See:
+// https://www.regular-expressions.info/floatingpoint.html
+// NOLINTNEXTLINE(cert-err58-cpp)
+const std::regex fp_regex(R"(^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$)");
 
 } // namespace
 
-constant_impl::constant_impl() : constant_impl("null_constant", number(max_fp_t(0))) {}
+} // namespace detail
 
-constant_impl::constant_impl(std::string name, number val) : func_base(std::move(name), {}), m_value(std::move(val))
+constant::constant() : constant("null_constant", detail::null_constant_func{}) {}
+
+constant::constant(std::string name, str_func_t f, std::optional<std::string> repr)
+    : func_base(std::move(name), {}), m_str_func(std::move(f)), m_repr(std::move(repr))
 {
-    if (!std::holds_alternative<max_fp_t>(m_value.value())) {
-        throw std::invalid_argument(
-            "A constant can be initialised only from a floating-point value with the maximum precision");
+    if (!m_str_func) {
+        throw std::invalid_argument("Cannot construct a constant with an empty string function");
     }
 }
 
-const number &constant_impl::get_value() const
+// Fetch the internal type of the string
+// function. This is intended to help discriminating
+// different constants.
+std::type_index constant::get_str_func_t() const
 {
-    return m_value;
+    return m_str_func.get_type_index();
 }
 
-void constant_impl::to_stream(std::ostream &os) const
+void constant::to_stream(std::ostream &os) const
 {
-    os << get_name();
+    if (m_repr) {
+        os << *m_repr;
+    } else {
+        os << get_name();
+    }
 }
 
-std::vector<expression> constant_impl::gradient() const
+std::vector<expression> constant::gradient() const
 {
     assert(args().empty());
     return {};
 }
 
-llvm::Value *constant_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &, llvm::Value *,
-                                          llvm::Value *, std::uint32_t batch_size, bool) const
+// This is a thin wrapper around m_str_func that checks
+// the input prec value and validates the returned string.
+std::string constant::operator()(unsigned prec) const
 {
-    return vector_splat(s.builder(), codegen<double>(s, get_value()), batch_size);
+    if (prec == 0u) {
+        throw std::invalid_argument("Cannot generate a constant with a precision of zero bits");
+    }
+
+    auto ret = m_str_func(prec);
+
+    // Validate the return value.
+    if (!std::regex_match(ret, detail::fp_regex)) {
+        throw std::invalid_argument(fmt::format("The string '{}' returned by the implementation of a constant is not a "
+                                                "valid representation of a floating-point number in base 10",
+                                                ret));
+    }
+
+    return ret;
 }
 
-llvm::Value *constant_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &, llvm::Value *,
-                                           llvm::Value *, std::uint32_t batch_size, bool) const
+// Helper to generate the LLVM version of the constant for the type tp.
+// tp is supposed to be a scalar type.
+llvm::Constant *constant::make_llvm_const(llvm_state &s, llvm::Type *tp) const
 {
-    return vector_splat(s.builder(), codegen<long double>(s, get_value()), batch_size);
-}
+    assert(tp != nullptr);
+    assert(!tp->isVectorTy());
 
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *constant_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &, llvm::Value *,
-                                           llvm::Value *, std::uint32_t batch_size, bool) const
-{
-    return vector_splat(s.builder(), codegen<mppp::real128>(s, get_value()), batch_size);
-}
-
+    // NOTE: isIEEE() is only available since LLVM 13.
+    // For earlier versions of LLVM, we check that
+    // tp is not a double-double, all the other available
+    // FP types should be IEEE.
+    if (tp->isFloatingPointTy() &&
+#if LLVM_VERSION_MAJOR >= 13
+        tp->isIEEE()
+#else
+        !tp->isPPC_FP128Ty()
 #endif
+    ) {
+        // Fetch the FP semantics and precision.
+        const auto &sem = tp->getFltSemantics();
+        const auto prec = llvm::APFloatBase::semanticsPrecision(sem);
 
-namespace
-{
+        // Fetch the string representation at the desired precision.
+        const auto str_rep = operator()(prec);
 
-template <typename T>
-[[nodiscard]] llvm::Function *constant_llvm_c_eval(llvm_state &s, const constant_impl &ci, std::uint32_t batch_size,
-                                                   bool high_accuracy)
+        // Generate the APFloat and the constant.
+        return llvm::ConstantFP::get(tp, llvm::APFloat(sem, str_rep));
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (const auto real_prec = detail::llvm_is_real(tp)) {
+        // Fetch the string representation at the desired precision.
+        const auto str_rep = operator()(boost::numeric_cast<unsigned>(real_prec));
+
+        // Go through llvm_codegen().
+        return llvm::cast<llvm::Constant>(llvm_codegen(s, tp, number{mppp::real{str_rep, real_prec}}));
+#endif
+    } else {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(
+            fmt::format("Cannot generate an LLVM constant of type '{}'", detail::llvm_type_name(tp)));
+        // LCOV_EXCL_STOP
+    }
+}
+
+llvm::Value *constant::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &, llvm::Value *,
+                                 llvm::Value *, std::uint32_t batch_size, bool) const
 {
-    return llvm_c_eval_func_helper<T>(
-        ci.get_name(),
-        [&s, &ci, batch_size](const std::vector<llvm::Value *> &, bool) {
-            return vector_splat(s.builder(), codegen<T>(s, ci.get_value()), batch_size);
+    return detail::vector_splat(s.builder(), make_llvm_const(s, fp_t), batch_size);
+}
+
+llvm::Function *constant::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                           bool high_accuracy) const
+{
+    return detail::llvm_c_eval_func_helper(
+        get_name(),
+        [&s, batch_size, fp_t, this](const std::vector<llvm::Value *> &, bool) {
+            return detail::vector_splat(s.builder(), make_llvm_const(s, fp_t), batch_size);
         },
-        ci, s, batch_size, high_accuracy);
+        *this, s, fp_t, batch_size, high_accuracy);
 }
 
-} // namespace
-
-llvm::Function *constant_impl::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return constant_llvm_c_eval<double>(s, *this, batch_size, high_accuracy);
-}
-
-llvm::Function *constant_impl::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return constant_llvm_c_eval<long double>(s, *this, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *constant_impl::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return constant_llvm_c_eval<mppp::real128>(s, *this, batch_size, high_accuracy);
-}
-
-#endif
-
-namespace
-{
-
-template <typename T>
-llvm::Value *constant_taylor_diff_impl(const constant_impl &c, llvm_state &s, std::uint32_t order,
-                                       std::uint32_t batch_size)
+llvm::Value *constant::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &,
+                                   const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
+                                   std::uint32_t order, std::uint32_t, std::uint32_t batch_size, bool) const
 {
     auto &builder = s.builder();
 
@@ -164,70 +259,36 @@ llvm::Value *constant_taylor_diff_impl(const constant_impl &c, llvm_state &s, st
     // for which the normalised derivative coincides with
     // the non-normalised derivative.
     if (order == 0u) {
-        return vector_splat(builder, codegen<T>(s, c.get_value()), batch_size);
+        return detail::vector_splat(builder, make_llvm_const(s, fp_t), batch_size);
     } else {
-        return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+        return detail::vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
-} // namespace
-
-llvm::Value *constant_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &,
-                                            const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
-                                            std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
-                                            bool) const
-{
-    return constant_taylor_diff_impl<double>(*this, s, order, batch_size);
-}
-
-llvm::Value *constant_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &,
-                                             const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
-                                             std::uint32_t, std::uint32_t order, std::uint32_t,
+llvm::Function *constant::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
                                              std::uint32_t batch_size, bool) const
-{
-    return constant_taylor_diff_impl<long double>(*this, s, order, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *constant_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &,
-                                             const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
-                                             std::uint32_t, std::uint32_t order, std::uint32_t,
-                                             std::uint32_t batch_size, bool) const
-{
-    return constant_taylor_diff_impl<mppp::real128>(*this, s, order, batch_size);
-}
-
-#endif
-
-namespace
-{
-
-template <typename T>
-llvm::Function *taylor_c_diff_constant_impl(const constant_impl &c, llvm_state &s, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the vector floating-point type.
+    auto *val_t = detail::make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair
-        = taylor_c_diff_func_name_args<T>(context, fmt::format("constant_{}", c.get_name()), n_uvars, batch_size, {});
+    const auto na_pair = detail::taylor_c_diff_func_name_args(context, fp_t, fmt::format("constant_{}", get_name()),
+                                                              n_uvars, batch_size, {});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto *f = module.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -236,27 +297,28 @@ llvm::Function *taylor_c_diff_constant_impl(const constant_impl &c, llvm_state &
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
-        auto ord = f->args().begin();
+        auto *ord = f->args().begin();
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         // NOTE: no need for normalisation of the derivative,
         // as the only nonzero retval is for order 0
         // for which the normalised derivative coincides with
         // the non-normalised derivative.
-        llvm_if_then_else(
+        detail::llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // If the order is zero, return the constant itself.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, c.get_value()), batch_size), retval);
+                builder.CreateStore(detail::vector_splat(builder, make_llvm_const(s, fp_t), batch_size), retval);
             },
             [&]() {
                 // Otherwise, return zero.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), retval);
+                builder.CreateStore(detail::vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size),
+                                    retval);
             });
 
         // Return the result.
@@ -273,7 +335,7 @@ llvm::Function *taylor_c_diff_constant_impl(const constant_impl &c, llvm_state &
         // NOTE: there could be a mismatch if the derivative function was created
         // and then optimised - optimisation might remove arguments which are compile-time
         // constants.
-        if (!compare_function_signature(f, val_t, fargs)) {
+        if (!detail::compare_function_signature(f, val_t, fargs)) {
             throw std::invalid_argument(
                 "Inconsistent function signature for the Taylor derivative of a constant in compact mode detected");
         }
@@ -283,50 +345,13 @@ llvm::Function *taylor_c_diff_constant_impl(const constant_impl &c, llvm_state &
     return f;
 }
 
-} // namespace
-
-llvm::Function *constant_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                      bool) const
-{
-    return taylor_c_diff_constant_impl<double>(*this, s, n_uvars, batch_size);
-}
-
-llvm::Function *constant_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                       bool) const
-{
-    return taylor_c_diff_constant_impl<long double>(*this, s, n_uvars, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *constant_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                       bool) const
-{
-    return taylor_c_diff_constant_impl<mppp::real128>(*this, s, n_uvars, batch_size);
-}
-
-#endif
-
-pi_impl::pi_impl()
-    : constant_impl("pi", number(
-#if defined(HEYOKA_HAVE_REAL128)
-                              mppp::pi_128
-#else
-                              boost::math::constants::pi<long double>()
-#endif
-                              ))
-{
-}
-
-void pi_impl::to_stream(std::ostream &os) const
-{
-    os << u8"π";
-}
-
-} // namespace detail
-
-const expression pi{func{detail::pi_impl{}}};
+// NOLINTNEXTLINE(cert-err58-cpp)
+const expression pi{func{constant{"pi", detail::pi_constant_func{}, u8"π"}}};
 
 } // namespace heyoka
 
-HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::pi_impl)
+HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::null_constant_func, std::string, unsigned)
+
+HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::pi_constant_func, std::string, unsigned)
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::constant)

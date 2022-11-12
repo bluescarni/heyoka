@@ -25,6 +25,7 @@ IGOR_MAKE_NAMED_ARGUMENT(time);
 IGOR_MAKE_NAMED_ARGUMENT(compact_mode);
 IGOR_MAKE_NAMED_ARGUMENT(high_accuracy);
 IGOR_MAKE_NAMED_ARGUMENT(parallel_mode);
+IGOR_MAKE_NAMED_ARGUMENT(prec);
 
 } // namespace heyoka::kw
 

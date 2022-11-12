@@ -34,7 +34,6 @@
 
 #endif
 
-#include <heyoka/detail/binomial.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -81,9 +80,8 @@ void tpoly_impl::to_stream(std::ostream &os) const
 namespace
 {
 
-template <typename T>
-llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                                    std::uint32_t order, std::uint32_t batch_size)
+llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, llvm::Type *fp_t, const tpoly_impl &tp, llvm::Value *par_ptr,
+                                    llvm::Value *time_ptr, std::uint32_t order, std::uint32_t batch_size)
 {
     assert(tp.m_e_idx > tp.m_b_idx);
     assert(std::holds_alternative<param>(tp.args()[0].value()));
@@ -96,18 +94,18 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
     // Null retval if the diff order is larger than the
     // polynomial order.
     if (order > n) {
-        return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+        return vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 
     // Load the time value.
-    auto tm = load_vector_from_memory(builder, time_ptr, batch_size);
+    auto *tm = load_vector_from_memory(builder, fp_t, time_ptr, batch_size);
 
     // Init the return value with the highest-order coefficient (scaled by the corresponding
     // binomial coefficient).
     assert(tp.m_e_idx > 0u);
-    auto bc = binomial<T>(n, order);
-    auto ret = taylor_codegen_numparam<T>(s, param{tp.m_e_idx - 1u}, par_ptr, batch_size);
-    ret = builder.CreateFMul(ret, vector_splat(builder, codegen<T>(s, number{bc}), batch_size));
+    auto bc = binomial(number_like(s, fp_t, static_cast<double>(n)), number_like(s, fp_t, static_cast<double>(order)));
+    auto *ret = taylor_codegen_numparam(s, fp_t, param{tp.m_e_idx - 1u}, par_ptr, batch_size);
+    ret = llvm_fmul(s, ret, vector_splat(builder, llvm_codegen(s, fp_t, bc), batch_size));
 
     // Horner evaluation of polynomial derivative.
     for (std::uint32_t i_ = 1; i_ <= n - order; ++i_) {
@@ -116,14 +114,15 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
         const auto i = n - order - i_;
 
         // Compute the binomial coefficient.
-        bc = binomial<T>(i + order, order);
+        bc = binomial(number_like(s, fp_t, static_cast<double>(i + order)),
+                      number_like(s, fp_t, static_cast<double>(order)));
 
         // Load the poly coefficient from the par array and multiply it by bc.
-        auto cf = taylor_codegen_numparam<T>(s, param{tp.m_b_idx + i + order}, par_ptr, batch_size);
-        cf = builder.CreateFMul(cf, vector_splat(builder, codegen<T>(s, number{bc}), batch_size));
+        auto *cf = taylor_codegen_numparam(s, fp_t, param{tp.m_b_idx + i + order}, par_ptr, batch_size);
+        cf = llvm_fmul(s, cf, vector_splat(builder, llvm_codegen(s, fp_t, bc), batch_size));
 
         // Horner iteration.
-        ret = builder.CreateFAdd(cf, builder.CreateFMul(ret, tm));
+        ret = llvm_fadd(s, cf, llvm_fmul(s, ret, tm));
     }
 
     return ret;
@@ -131,39 +130,18 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
 
 } // namespace
 
-llvm::Value *tpoly_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &,
-                                         const std::vector<llvm::Value *> &, llvm::Value *par_ptr,
-                                         llvm::Value *time_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                         std::uint32_t batch_size, bool) const
+llvm::Value *tpoly_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &,
+                                     const std::vector<llvm::Value *> &, llvm::Value *par_ptr, llvm::Value *time_ptr,
+                                     std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
+                                     bool) const
 {
-    return taylor_diff_tpoly_impl<double>(s, *this, par_ptr, time_ptr, order, batch_size);
+    return taylor_diff_tpoly_impl(s, fp_t, *this, par_ptr, time_ptr, order, batch_size);
 }
-
-llvm::Value *tpoly_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &,
-                                          const std::vector<llvm::Value *> &, llvm::Value *par_ptr,
-                                          llvm::Value *time_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                          std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_tpoly_impl<long double>(s, *this, par_ptr, time_ptr, order, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *tpoly_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &,
-                                          const std::vector<llvm::Value *> &, llvm::Value *par_ptr,
-                                          llvm::Value *time_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                          std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_tpoly_impl<mppp::real128>(s, *this, par_ptr, time_ptr, order, batch_size);
-}
-
-#endif
 
 namespace
 {
 
-template <typename T>
-llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, llvm::Type *scal_t, const tpoly_impl &tp, std::uint32_t n_uvars,
                                          std::uint32_t batch_size)
 {
     assert(tp.m_e_idx > tp.m_b_idx);
@@ -177,16 +155,15 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point types.
-    auto *scal_t = to_llvm_type<T>(context);
-    auto *val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(scal_t, batch_size);
 
     // Fetch the function name and arguments.
     // NOTE: we mangle on the poly degree as well, so that we will be
     // generating a different function for each polynomial degree.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(
-        context, fmt::format("tpoly_{}", n_const), n_uvars, batch_size,
-        {std::get<param>(tp.args()[0].value()), std::get<param>(tp.args()[1].value())});
+    const auto na_pair
+        = taylor_c_diff_func_name_args(context, scal_t, fmt::format("tpoly_{}", n_const), n_uvars, batch_size,
+                                       {std::get<param>(tp.args()[0].value()), std::get<param>(tp.args()[1].value())});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -197,13 +174,13 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // Helper to fetch the (i, j) binomial coefficient from
         // a precomputed global array. The returned value is already
         // splatted.
-        auto get_bc = [&, bc_ptr = llvm_add_bc_array<T>(s, n_const)](llvm::Value *i, llvm::Value *j) {
-            auto idx = builder.CreateMul(i, builder.getInt32(n_const + 1u));
+        auto get_bc = [&, bc_ptr = llvm_add_bc_array(s, scal_t, n_const)](llvm::Value *i, llvm::Value *j) {
+            auto *idx = builder.CreateMul(i, builder.getInt32(n_const + 1u));
             idx = builder.CreateAdd(idx, j);
 
             auto val = builder.CreateLoad(scal_t, builder.CreateInBoundsGEP(scal_t, bc_ptr, idx));
@@ -231,28 +208,30 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
         auto retval = builder.CreateAlloca(val_t);
 
         // Cache the order of the polynomial.
-        auto n = builder.getInt32(n_const);
+        auto *n = builder.getInt32(n_const);
 
         // Null retval if the diff order is larger than the
         // polynomial order.
         // NOTE: unsigned comparison.
         llvm_if_then_else(
             s, builder.CreateICmpUGT(ord, n),
-            [&]() { builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), retval); },
+            [&]() {
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, scal_t, number{0.}), batch_size), retval);
+            },
             [&]() {
                 // Load the time value.
-                auto tm = load_vector_from_memory(builder, t_ptr, batch_size);
+                auto tm = load_vector_from_memory(builder, scal_t, t_ptr, batch_size);
 
                 // Init the return value with the highest-order coefficient (scaled by the corresponding
                 // binomial coefficient).
                 auto bc = get_bc(n, ord);
                 auto cf = load_vector_from_memory(
-                    builder,
-                    builder.CreateInBoundsGEP(scal_t, par_ptr,
-                                              {builder.CreateMul(builder.getInt32(batch_size),
-                                                                 builder.CreateSub(e_idx, builder.getInt32(1)))}),
+                    builder, scal_t,
+                    builder.CreateInBoundsGEP(
+                        scal_t, par_ptr,
+                        builder.CreateMul(builder.getInt32(batch_size), builder.CreateSub(e_idx, builder.getInt32(1)))),
                     batch_size);
-                cf = builder.CreateFMul(cf, bc);
+                cf = llvm_fmul(s, cf, bc);
                 builder.CreateStore(cf, retval);
 
                 // Horner evaluation of polynomial derivative.
@@ -269,12 +248,11 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
                                   auto cf_idx = builder.CreateMul(builder.CreateAdd(builder.CreateAdd(b_idx, i), ord),
                                                                   builder.getInt32(batch_size));
                                   cf = load_vector_from_memory(
-                                      builder, builder.CreateInBoundsGEP(scal_t, par_ptr, cf_idx), batch_size);
-                                  cf = builder.CreateFMul(cf, bc);
+                                      builder, scal_t, builder.CreateInBoundsGEP(scal_t, par_ptr, cf_idx), batch_size);
+                                  cf = llvm_fmul(s, cf, bc);
 
                                   // Horner iteration.
-                                  auto new_val = builder.CreateFAdd(
-                                      cf, builder.CreateFMul(builder.CreateLoad(val_t, retval), tm));
+                                  auto new_val = llvm_fadd(s, cf, llvm_fmul(s, builder.CreateLoad(val_t, retval), tm));
 
                                   // Update retval.
                                   builder.CreateStore(new_val, retval);
@@ -307,27 +285,11 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
 
 } // namespace
 
-llvm::Function *tpoly_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                   bool) const
+llvm::Function *tpoly_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                               std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_tpoly_impl<double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_tpoly_impl(s, fp_t, *this, n_uvars, batch_size);
 }
-
-llvm::Function *tpoly_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                    bool) const
-{
-    return taylor_c_diff_tpoly_impl<long double>(s, *this, n_uvars, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *tpoly_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                    bool) const
-{
-    return taylor_c_diff_tpoly_impl<mppp::real128>(s, *this, n_uvars, batch_size);
-}
-
-#endif
 
 // Small helper to detect if an expression
 // is a tpoly function.

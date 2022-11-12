@@ -68,66 +68,32 @@ std::vector<expression> sinh_impl::gradient() const
     return {cosh(args()[0])};
 }
 
-llvm::Value *sinh_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                      llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Value *sinh_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                                  llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                  bool high_accuracy) const
 {
-    return llvm_eval_helper<double>(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_sinh(s, args[0]); }, *this, s, eval_arr,
-        par_ptr, stride, batch_size, high_accuracy);
+    return llvm_eval_helper([&s](const std::vector<llvm::Value *> &args, bool) { return llvm_sinh(s, args[0]); }, *this,
+                            s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
-
-llvm::Value *sinh_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                       llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return llvm_eval_helper<long double>(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_sinh(s, args[0]); }, *this, s, eval_arr,
-        par_ptr, stride, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *sinh_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                       llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return llvm_eval_helper<mppp::real128>(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_sinh(s, args[0]); }, *this, s, eval_arr,
-        par_ptr, stride, batch_size, high_accuracy);
-}
-
-#endif
 
 namespace
 {
 
-template <typename T>
-[[nodiscard]] llvm::Function *sinh_llvm_c_eval(llvm_state &s, const func_base &fb, std::uint32_t batch_size,
-                                               bool high_accuracy)
+[[nodiscard]] llvm::Function *sinh_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
+                                               std::uint32_t batch_size, bool high_accuracy)
 {
-    return llvm_c_eval_func_helper<T>(
-        "sinh", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_sinh(s, args[0]); }, fb, s, batch_size,
-        high_accuracy);
+    return llvm_c_eval_func_helper(
+        "sinh", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_sinh(s, args[0]); }, fb, s, fp_t,
+        batch_size, high_accuracy);
 }
 
 } // namespace
 
-llvm::Function *sinh_impl::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Function *sinh_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                            bool high_accuracy) const
 {
-    return sinh_llvm_c_eval<double>(s, *this, batch_size, high_accuracy);
+    return sinh_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy);
 }
-
-llvm::Function *sinh_impl::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return sinh_llvm_c_eval<long double>(s, *this, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *sinh_impl::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return sinh_llvm_c_eval<mppp::real128>(s, *this, batch_size, high_accuracy);
-}
-
-#endif
 
 taylor_dc_t::size_type sinh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
@@ -152,23 +118,24 @@ namespace
 {
 
 // Derivative of sinh(number).
-template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_sinh_impl(llvm_state &s, const sinh_impl &, const std::vector<std::uint32_t> &, const U &num,
-                                   const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
-                                   std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *taylor_diff_sinh_impl(llvm_state &s, llvm::Type *fp_t, const sinh_impl &,
+                                   const std::vector<std::uint32_t> &, const U &num, const std::vector<llvm::Value *> &,
+                                   llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
+                                   std::uint32_t batch_size)
 {
     if (order == 0u) {
-        return llvm_sinh(s, taylor_codegen_numparam<T>(s, num, par_ptr, batch_size));
+        return llvm_sinh(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
-        return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+        return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
 // Derivative of sinh(variable).
-template <typename T>
-llvm::Value *taylor_diff_sinh_impl(llvm_state &s, const sinh_impl &, const std::vector<std::uint32_t> &deps,
-                                   const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *,
-                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+llvm::Value *taylor_diff_sinh_impl(llvm_state &s, llvm::Type *fp_t, const sinh_impl &,
+                                   const std::vector<std::uint32_t> &deps, const variable &var,
+                                   const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
+                                   std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
@@ -185,38 +152,38 @@ llvm::Value *taylor_diff_sinh_impl(llvm_state &s, const sinh_impl &, const std::
     for (std::uint32_t j = 1; j <= order; ++j) {
         // NOTE: the only hidden dependency contains the index of the
         // u variable whose definition is cosh(var).
-        auto cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
-        auto bj = taylor_fetch_diff(arr, b_idx, j, n_uvars);
+        auto *cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
+        auto *bj = taylor_fetch_diff(arr, b_idx, j, n_uvars);
 
-        auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
+        auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*cnj*bj to the sum.
-        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(cnj, bj)));
+        sum.push_back(llvm_fmul(s, fac, llvm_fmul(s, cnj, bj)));
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = pairwise_sum(builder, sum);
+    auto *ret_acc = pairwise_sum(s, sum);
 
     // Compute and return the result: ret_acc / order
-    auto div = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
+    auto *div = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(order))), batch_size);
 
-    return builder.CreateFDiv(ret_acc, div);
+    return llvm_fdiv(s, ret_acc, div);
 }
 
 // All the other cases.
-template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_sinh_impl(llvm_state &, const sinh_impl &, const std::vector<std::uint32_t> &, const U &,
-                                   const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
-                                   std::uint32_t, std::uint32_t)
+template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
+llvm::Value *taylor_diff_sinh_impl(llvm_state &, llvm::Type *, const sinh_impl &, const std::vector<std::uint32_t> &,
+                                   const U &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+                                   std::uint32_t, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a hyperbolic sine");
 }
 
-template <typename T>
-llvm::Value *taylor_diff_sinh(llvm_state &s, const sinh_impl &f, const std::vector<std::uint32_t> &deps,
-                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
-                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+llvm::Value *taylor_diff_sinh(llvm_state &s, llvm::Type *fp_t, const sinh_impl &f,
+                              const std::vector<std::uint32_t> &deps, const std::vector<llvm::Value *> &arr,
+                              llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                              std::uint32_t batch_size)
 {
     assert(f.args().size() == 1u);
 
@@ -229,51 +196,31 @@ llvm::Value *taylor_diff_sinh(llvm_state &s, const sinh_impl &f, const std::vect
 
     return std::visit(
         [&](const auto &v) {
-            return taylor_diff_sinh_impl<T>(s, f, deps, v, arr, par_ptr, n_uvars, order, idx, batch_size);
+            return taylor_diff_sinh_impl(s, fp_t, f, deps, v, arr, par_ptr, n_uvars, order, idx, batch_size);
         },
         f.args()[0].value());
 }
 
 } // namespace
 
-llvm::Value *sinh_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                        std::uint32_t batch_size, bool) const
+llvm::Value *sinh_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                    const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                    std::uint32_t batch_size, bool) const
 {
-    return taylor_diff_sinh<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_sinh(s, fp_t, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
-
-llvm::Value *sinh_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                         std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_sinh<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *sinh_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                         std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_sinh<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
-}
-
-#endif
 
 namespace
 {
 
 // Derivative of sinh(number).
-template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &, const U &num, std::uint32_t n_uvars,
-                                             std::uint32_t batch_size)
+template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, llvm::Type *fp_t, const sinh_impl &, const U &num,
+                                             std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_numpar<T>(
-        s, n_uvars, batch_size, "sinh", 1,
+    return taylor_c_diff_func_numpar(
+        s, fp_t, n_uvars, batch_size, "sinh", 1,
         [&s](const auto &args) {
             // LCOV_EXCL_START
             assert(args.size() == 1u);
@@ -286,18 +233,17 @@ llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &, c
 }
 
 // Derivative of sinh(variable).
-template <typename T>
-llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &, const variable &var,
+llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, llvm::Type *fp_t, const sinh_impl &, const variable &var,
                                              std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "sinh", n_uvars, batch_size, {var}, 1);
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "sinh", n_uvars, batch_size, {var}, 1);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -308,7 +254,7 @@ llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &, c
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -335,28 +281,27 @@ llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &, c
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of b_idx.
-                builder.CreateStore(llvm_sinh(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx)),
-                                    retval);
+                builder.CreateStore(
+                    llvm_sinh(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx)), retval);
             },
             [&]() {
                 // Init the accumlator.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-                    auto cnj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
-                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, b_idx);
+                    auto cnj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
+                    auto bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, b_idx);
 
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+                    auto j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
-                                                           builder.CreateFMul(j_v, builder.CreateFMul(cnj, bj))),
-                                        acc);
+                    builder.CreateStore(
+                        llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, j_v, llvm_fmul(s, cnj, bj))), acc);
                 });
 
                 // Divide by the order to produce the return value.
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
-                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_v), retval);
+                auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
+                builder.CreateStore(llvm_fdiv(s, builder.CreateLoad(val_t, acc), ord_v), retval);
             });
 
         // Return the result.
@@ -382,46 +327,30 @@ llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &, c
 }
 
 // All the other cases.
-template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &, const sinh_impl &, const U &, std::uint32_t, std::uint32_t)
+template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
+llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &, llvm::Type *, const sinh_impl &, const U &, std::uint32_t,
+                                             std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a hyperbolic sine in compact mode");
 }
 
-template <typename T>
-llvm::Function *taylor_c_diff_func_sinh(llvm_state &s, const sinh_impl &fn, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_sinh(llvm_state &s, llvm::Type *fp_t, const sinh_impl &fn, std::uint32_t n_uvars,
                                         std::uint32_t batch_size)
 {
     assert(fn.args().size() == 1u);
 
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_sinh_impl<T>(s, fn, v, n_uvars, batch_size); },
+    return std::visit([&](const auto &v) { return taylor_c_diff_func_sinh_impl(s, fp_t, fn, v, n_uvars, batch_size); },
                       fn.args()[0].value());
 }
 
 } // namespace
 
-llvm::Function *sinh_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
+llvm::Function *sinh_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                              std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_sinh<double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_sinh(s, fp_t, *this, n_uvars, batch_size);
 }
-
-llvm::Function *sinh_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                   bool) const
-{
-    return taylor_c_diff_func_sinh<long double>(s, *this, n_uvars, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *sinh_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                   bool) const
-{
-    return taylor_c_diff_func_sinh<mppp::real128>(s, *this, n_uvars, batch_size);
-}
-
-#endif
 
 } // namespace detail
 

@@ -61,6 +61,14 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#include <heyoka/detail/real_helpers.hpp>
+
+#endif
+
 #include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -109,6 +117,12 @@ expression::expression(long double x) : expression(number{x}) {}
 #if defined(HEYOKA_HAVE_REAL128)
 
 expression::expression(mppp::real128 x) : expression(number{x}) {}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression::expression(mppp::real x) : expression(number{std::move(x)}) {}
 
 #endif
 
@@ -400,11 +414,11 @@ expression operator+(expression e)
 
 expression operator-(expression e)
 {
-    if (auto num_ptr = std::get_if<number>(&e.value())) {
+    if (auto *num_ptr = std::get_if<number>(&e.value())) {
         // Simplify -number to its numerical value.
         return expression{-std::move(*num_ptr)};
     } else {
-        if (auto fptr = detail::is_neg(e)) {
+        if (auto *fptr = detail::is_neg(e)) {
             // Simplify -(-x) to x.
             assert(!fptr->args().empty()); // LCOV_EXCL_LINE
             return fptr->args()[0];
@@ -417,7 +431,7 @@ expression operator-(expression e)
 expression operator+(expression e1, expression e2)
 {
     // Simplify x + neg(y) to x - y.
-    if (auto fptr = detail::is_neg(e2)) {
+    if (auto *fptr = detail::is_neg(e2)) {
         assert(!fptr->args().empty()); // LCOV_EXCL_LINE
         return std::move(e1) - fptr->args()[0];
     }
@@ -460,7 +474,7 @@ expression operator+(expression e1, expression e2)
 expression operator-(expression e1, expression e2)
 {
     // Simplify x - (-y) to x + y.
-    if (auto fptr = detail::is_neg(e2)) {
+    if (auto *fptr = detail::is_neg(e2)) {
         assert(!fptr->args().empty()); // LCOV_EXCL_LINE
         return std::move(e1) + fptr->args()[0];
     }
@@ -494,8 +508,8 @@ expression operator-(expression e1, expression e2)
 
 expression operator*(expression e1, expression e2)
 {
-    auto fptr1 = detail::is_neg(e1);
-    auto fptr2 = detail::is_neg(e2);
+    auto *fptr1 = detail::is_neg(e1);
+    auto *fptr2 = detail::is_neg(e2);
 
     if (fptr1 != nullptr && fptr2 != nullptr) {
         // Simplify (-x) * (-y) into x*y.
@@ -560,8 +574,8 @@ expression operator*(expression e1, expression e2)
 
 expression operator/(expression e1, expression e2)
 {
-    auto fptr1 = detail::is_neg(e1);
-    auto fptr2 = detail::is_neg(e2);
+    auto *fptr1 = detail::is_neg(e1);
+    auto *fptr2 = detail::is_neg(e2);
 
     if (fptr1 != nullptr && fptr2 != nullptr) {
         // Simplify (-x) / (-y) into x/y.
@@ -650,6 +664,15 @@ expression operator+(expression ex, mppp::real128 x)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator+(expression ex, mppp::real x)
+{
+    return std::move(ex) + expression{std::move(x)};
+}
+
+#endif
+
 expression operator+(double x, expression ex)
 {
     return expression{x} + std::move(ex);
@@ -665,6 +688,15 @@ expression operator+(long double x, expression ex)
 expression operator+(mppp::real128 x, expression ex)
 {
     return expression{x} + std::move(ex);
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator+(mppp::real x, expression ex)
+{
+    return expression{std::move(x)} + std::move(ex);
 }
 
 #endif
@@ -688,6 +720,15 @@ expression operator-(expression ex, mppp::real128 x)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator-(expression ex, mppp::real x)
+{
+    return std::move(ex) - expression{std::move(x)};
+}
+
+#endif
+
 expression operator-(double x, expression ex)
 {
     return expression{x} - std::move(ex);
@@ -703,6 +744,15 @@ expression operator-(long double x, expression ex)
 expression operator-(mppp::real128 x, expression ex)
 {
     return expression{x} - std::move(ex);
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator-(mppp::real x, expression ex)
+{
+    return expression{std::move(x)} - std::move(ex);
 }
 
 #endif
@@ -726,6 +776,15 @@ expression operator*(expression ex, mppp::real128 x)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator*(expression ex, mppp::real x)
+{
+    return std::move(ex) * expression{std::move(x)};
+}
+
+#endif
+
 expression operator*(double x, expression ex)
 {
     return expression{x} * std::move(ex);
@@ -741,6 +800,15 @@ expression operator*(long double x, expression ex)
 expression operator*(mppp::real128 x, expression ex)
 {
     return expression{x} * std::move(ex);
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator*(mppp::real x, expression ex)
+{
+    return expression{std::move(x)} * std::move(ex);
 }
 
 #endif
@@ -764,6 +832,15 @@ expression operator/(expression ex, mppp::real128 x)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator/(expression ex, mppp::real x)
+{
+    return std::move(ex) / expression{std::move(x)};
+}
+
+#endif
+
 expression operator/(double x, expression ex)
 {
     return expression{x} / std::move(ex);
@@ -779,6 +856,15 @@ expression operator/(long double x, expression ex)
 expression operator/(mppp::real128 x, expression ex)
 {
     return expression{x} / std::move(ex);
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression operator/(mppp::real x, expression ex)
+{
+    return expression{std::move(x)} / std::move(ex);
 }
 
 #endif
@@ -822,6 +908,15 @@ expression &operator+=(expression &ex, mppp::real128 x)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression &operator+=(expression &ex, mppp::real x)
+{
+    return ex += expression{std::move(x)};
+}
+
+#endif
+
 expression &operator-=(expression &ex, double x)
 {
     return ex -= expression{x};
@@ -837,6 +932,15 @@ expression &operator-=(expression &ex, long double x)
 expression &operator-=(expression &ex, mppp::real128 x)
 {
     return ex -= expression{x};
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression &operator-=(expression &ex, mppp::real x)
+{
+    return ex -= expression{std::move(x)};
 }
 
 #endif
@@ -860,6 +964,15 @@ expression &operator*=(expression &ex, mppp::real128 x)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+expression &operator*=(expression &ex, mppp::real x)
+{
+    return ex *= expression{std::move(x)};
+}
+
+#endif
+
 expression &operator/=(expression &ex, double x)
 {
     return ex /= expression{x};
@@ -875,6 +988,15 @@ expression &operator/=(expression &ex, long double x)
 expression &operator/=(expression &ex, mppp::real128 x)
 {
     return ex /= expression{x};
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+expression &operator/=(expression &ex, mppp::real x)
+{
+    return ex /= expression{std::move(x)};
 }
 
 #endif
@@ -1299,27 +1421,13 @@ taylor_dc_t::size_type taylor_decompose(const expression &ex, taylor_dc_t &dc)
     return detail::taylor_decompose(func_map, ex, dc);
 }
 
-template <typename T>
-llvm::Value *taylor_diff(llvm_state &s, const expression &ex, const std::vector<std::uint32_t> &deps,
+llvm::Value *taylor_diff(llvm_state &s, llvm::Type *fp_t, const expression &ex, const std::vector<std::uint32_t> &deps,
                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
                          std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
                          bool high_accuracy)
 {
     if (const auto *fptr = std::get_if<func>(&ex.value())) {
-        if constexpr (std::is_same_v<T, double>) {
-            return fptr->taylor_diff_dbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
-                                         high_accuracy);
-        } else if constexpr (std::is_same_v<T, long double>) {
-            return fptr->taylor_diff_ldbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
-                                          high_accuracy);
-#if defined(HEYOKA_HAVE_REAL128)
-        } else if constexpr (std::is_same_v<T, mppp::real128>) {
-            return fptr->taylor_diff_f128(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
-                                          high_accuracy);
-#endif
-        } else {
-            static_assert(detail::always_false_v<T>, "Unhandled type.");
-        }
+        return fptr->taylor_diff(s, fp_t, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size, high_accuracy);
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument("Taylor derivatives can be computed only for functions");
@@ -1327,64 +1435,17 @@ llvm::Value *taylor_diff(llvm_state &s, const expression &ex, const std::vector<
     }
 }
 
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff<double>(llvm_state &, const expression &,
-                                                            const std::vector<std::uint32_t> &,
-                                                            const std::vector<llvm::Value *> &, llvm::Value *,
-                                                            llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                                            std::uint32_t, bool);
-
-template HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff<long double>(llvm_state &, const expression &,
-                                                                 const std::vector<std::uint32_t> &,
-                                                                 const std::vector<llvm::Value *> &, llvm::Value *,
-                                                                 llvm::Value *, std::uint32_t, std::uint32_t,
-                                                                 std::uint32_t, std::uint32_t, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff<mppp::real128>(llvm_state &, const expression &,
-                                                                   const std::vector<std::uint32_t> &,
-                                                                   const std::vector<llvm::Value *> &, llvm::Value *,
-                                                                   llvm::Value *, std::uint32_t, std::uint32_t,
-                                                                   std::uint32_t, std::uint32_t, bool);
-#endif
-
-template <typename T>
-llvm::Function *taylor_c_diff_func(llvm_state &s, const expression &ex, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                   bool high_accuracy)
+llvm::Function *taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, const expression &ex, std::uint32_t n_uvars,
+                                   std::uint32_t batch_size, bool high_accuracy)
 {
     if (const auto *fptr = std::get_if<func>(&ex.value())) {
-        if constexpr (std::is_same_v<T, double>) {
-            return fptr->taylor_c_diff_func_dbl(s, n_uvars, batch_size, high_accuracy);
-        } else if constexpr (std::is_same_v<T, long double>) {
-            return fptr->taylor_c_diff_func_ldbl(s, n_uvars, batch_size, high_accuracy);
-#if defined(HEYOKA_HAVE_REAL128)
-        } else if constexpr (std::is_same_v<T, mppp::real128>) {
-            return fptr->taylor_c_diff_func_f128(s, n_uvars, batch_size, high_accuracy);
-#endif
-        } else {
-            static_assert(detail::always_false_v<T>, "Unhandled type.");
-        }
+        return fptr->taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy);
     } else {
         // LCOV_EXCL_START
         throw std::invalid_argument("Taylor derivatives in compact mode can be computed only for functions");
         // LCOV_EXCL_STOP
     }
 }
-
-// Explicit instantiations.
-template HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func<double>(llvm_state &, const expression &, std::uint32_t,
-                                                                      std::uint32_t, bool);
-
-template HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func<long double>(llvm_state &, const expression &,
-                                                                           std::uint32_t, std::uint32_t, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func<mppp::real128>(llvm_state &, const expression &,
-                                                                             std::uint32_t, std::uint32_t, bool);
-
-#endif
 
 namespace detail
 {
@@ -2285,25 +2346,23 @@ namespace detail
 namespace
 {
 
-template <typename T>
-void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
+void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
                        llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars,
                        std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
 {
     auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the scalar FP type.
-    auto *fp_t = to_llvm_type<T>(context);
 
     // The array containing the evaluation of the decomposition.
     std::vector<llvm::Value *> eval_arr;
 
+    // Fetch the type for external loading.
+    auto *ext_fp_t = llvm_ext_type(fp_t);
+
     // Init it by loading the input values from in_ptr.
     for (std::uint32_t i = 0; i < nvars; ++i) {
         auto *ptr
-            = builder.CreateInBoundsGEP(fp_t, in_ptr, builder.CreateMul(stride, to_size_t(s, builder.getInt32(i))));
-        eval_arr.push_back(load_vector_from_memory(builder, ptr, batch_size));
+            = builder.CreateInBoundsGEP(ext_fp_t, in_ptr, builder.CreateMul(stride, to_size_t(s, builder.getInt32(i))));
+        eval_arr.push_back(ext_load_vector_from_memory(s, fp_t, ptr, batch_size));
     }
 
     // Evaluate the elementary subexpressions in the decomposition.
@@ -2311,7 +2370,7 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
         assert(std::holds_alternative<func>(dc[i].value()));
 
         eval_arr.push_back(
-            llvm_eval<T>(std::get<func>(dc[i].value()), s, eval_arr, par_ptr, stride, batch_size, high_accuracy));
+            std::get<func>(dc[i].value()).llvm_eval(s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy));
     }
 
     // Write the outputs.
@@ -2320,7 +2379,7 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
         const auto out_idx = static_cast<std::uint32_t>(i - nuvars);
 
         // Compute the pointer to write to.
-        auto *ptr = builder.CreateInBoundsGEP(fp_t, out_ptr,
+        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr,
                                               builder.CreateMul(stride, to_size_t(s, builder.getInt32(out_idx))));
 
         std::visit(
@@ -2333,14 +2392,13 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr,
                     assert(u_idx < eval_arr.size());
 
                     // Fetch the corresponding value from eval_arr and store it.
-                    store_vector_to_memory(builder, ptr, eval_arr[u_idx]);
+                    ext_store_vector_to_memory(s, ptr, eval_arr[u_idx]);
                 } else if constexpr (std::is_same_v<type, number>) {
                     // Codegen the number and store it.
-                    store_vector_to_memory(builder, ptr, vector_splat(builder, codegen<T>(s, v), batch_size));
+                    ext_store_vector_to_memory(s, ptr, vector_splat(builder, llvm_codegen(s, fp_t, v), batch_size));
                 } else if constexpr (std::is_same_v<type, param>) {
                     // Codegen the parameter and store it.
-                    store_vector_to_memory(builder, ptr,
-                                           cfunc_nc_param_codegen(s, v, batch_size, fp_t, par_ptr, stride));
+                    ext_store_vector_to_memory(s, ptr, cfunc_nc_param_codegen(s, v, batch_size, fp_t, par_ptr, stride));
                 } else {
                     assert(false); // LCOV_EXCL_LINE
                 }
@@ -2464,9 +2522,8 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
     return s_dc;
 }
 
-template <typename T>
-auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expression>> &s_dc, std::uint32_t nvars,
-                               std::uint32_t batch_size, bool high_accuracy)
+auto cfunc_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vector<std::vector<expression>> &s_dc,
+                               std::uint32_t nvars, std::uint32_t batch_size, bool high_accuracy)
 {
     // Log runtime in trace mode.
     spdlog::stopwatch sw;
@@ -2495,7 +2552,7 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
 
         for (const auto &ex : seg) {
             // Get the evaluation function.
-            auto *func = llvm_c_eval_func<T>(std::get<heyoka::func>(ex.value()), s, batch_size, high_accuracy);
+            auto *func = std::get<heyoka::func>(ex.value()).llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
 
             // Insert the function into tmp_map.
             const auto [it, is_new_func] = tmp_map.try_emplace(func);
@@ -2580,13 +2637,13 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
             // Create the g functions for each argument.
             for (const auto &v : vv) {
                 it->second.second.push_back(std::visit(
-                    [&s](const auto &x) {
+                    [&s, fp_t](const auto &x) {
                         using type = uncvref_t<decltype(x)>;
 
                         if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
                             return cm_make_arg_gen_vidx(s, x);
                         } else {
-                            return cm_make_arg_gen_vc<T>(s, x);
+                            return cm_make_arg_gen_vc(s, fp_t, x);
                         }
                     },
                     v));
@@ -2616,26 +2673,24 @@ auto cfunc_build_function_maps(llvm_state &s, const std::vector<std::vector<expr
     return retval;
 }
 
-void cfunc_c_store_eval(llvm_state &s, llvm::Value *eval_arr, llvm::Value *idx, llvm::Value *val)
+void cfunc_c_store_eval(llvm_state &s, llvm::Type *fp_vec_t, llvm::Value *eval_arr, llvm::Value *idx, llvm::Value *val)
 {
     auto &builder = s.builder();
 
-    assert(llvm_depr_GEP_type_check(eval_arr, pointee_type(eval_arr))); // LCOV_EXCL_LINE
-    auto *ptr = builder.CreateInBoundsGEP(pointee_type(eval_arr), eval_arr, idx);
+    auto *ptr = builder.CreateInBoundsGEP(fp_vec_t, eval_arr, idx);
 
     builder.CreateStore(val, ptr);
 }
 
 } // namespace
 
-llvm::Value *cfunc_c_load_eval(llvm_state &s, llvm::Value *eval_arr, llvm::Value *idx)
+llvm::Value *cfunc_c_load_eval(llvm_state &s, llvm::Type *fp_vec_t, llvm::Value *eval_arr, llvm::Value *idx)
 {
     auto &builder = s.builder();
 
-    assert(llvm_depr_GEP_type_check(eval_arr, pointee_type(eval_arr))); // LCOV_EXCL_LINE
-    auto *ptr = builder.CreateInBoundsGEP(pointee_type(eval_arr), eval_arr, idx);
+    auto *ptr = builder.CreateInBoundsGEP(fp_vec_t, eval_arr, idx);
 
-    return builder.CreateLoad(pointee_type(eval_arr), ptr);
+    return builder.CreateLoad(fp_vec_t, ptr);
 }
 
 namespace
@@ -2652,9 +2707,8 @@ namespace
 // - the indices of the params.
 // The second part of the return value is a boolean flag that will be true if
 // all outputs are u variables, false otherwise.
-template <typename T>
 std::pair<std::array<llvm::GlobalVariable *, 6>, bool>
-cfunc_c_make_output_globals(llvm_state &s, const std::vector<expression> &dc, std::uint32_t nuvars)
+cfunc_c_make_output_globals(llvm_state &s, llvm::Type *fp_t, const std::vector<expression> &dc, std::uint32_t nuvars)
 {
     auto &context = s.context();
     auto &builder = s.builder();
@@ -2680,7 +2734,7 @@ cfunc_c_make_output_globals(llvm_state &s, const std::vector<expression> &dc, st
                     vars.push_back(builder.getInt32(uname_to_index(v.name())));
                 } else if constexpr (std::is_same_v<type, number>) {
                     num_indices.push_back(builder.getInt32(i - nuvars));
-                    nums.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, v)));
+                    nums.push_back(llvm::cast<llvm::Constant>(llvm_codegen(s, fp_t, v)));
                 } else if constexpr (std::is_same_v<type, param>) {
                     par_indices.push_back(builder.getInt32(i - nuvars));
                     pars.push_back(builder.getInt32(v.idx()));
@@ -2720,8 +2774,7 @@ cfunc_c_make_output_globals(llvm_state &s, const std::vector<expression> &dc, st
     auto *g_num_indices = new llvm::GlobalVariable(md, num_indices_arr->getType(), true,
                                                    llvm::GlobalVariable::InternalLinkage, num_indices_arr);
 
-    auto nums_arr_type
-        = llvm::ArrayType::get(to_llvm_type<T>(context), boost::numeric_cast<std::uint64_t>(nums.size()));
+    auto nums_arr_type = llvm::ArrayType::get(fp_t, boost::numeric_cast<std::uint64_t>(nums.size()));
     auto nums_arr = llvm::ConstantArray::get(nums_arr_type, nums);
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     auto *g_nums
@@ -2752,7 +2805,7 @@ std::uint32_t cfunc_c_gl_arr_size(llvm::Value *v)
 // Helper to write the outputs of a compiled function in compact mode.
 // cout_gl is the return value of cfunc_c_make_output_globals(), which contains
 // the indices/constants necessary for the computation.
-void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
+void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *out_ptr,
                            const std::pair<std::array<llvm::GlobalVariable *, 6>, bool> &cout_gl, llvm::Value *eval_arr,
                            llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size)
 {
@@ -2771,10 +2824,11 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
     const auto n_nums = cfunc_c_gl_arr_size(out_gl[2]);
     const auto n_pars = cfunc_c_gl_arr_size(out_gl[4]);
 
-    // Fetch the type stored in the evaluation array.
-    auto *fp_vec_t = pointee_type(eval_arr);
-    // Fetch the scalar type corresponding to fp_vec_t.
-    auto *fp_scal_t = fp_vec_t->getScalarType();
+    // Fetch the type for external loading.
+    auto *ext_fp_t = llvm_ext_type(fp_scal_t);
+
+    // Fetch the vector type.
+    auto *fp_vec_t = make_vector_type(fp_scal_t, batch_size);
 
     // Handle the u variable outputs.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_vars), [&](llvm::Value *cur_idx) {
@@ -2782,92 +2836,94 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Value *out_ptr,
         // NOTE: if all outputs are u variables, there's
         // no need to lookup the index in the global array (which will just contain
         // a range).
-        auto *out_idx = all_out_vars ? cur_idx
-                                     : builder.CreateLoad(builder.getInt32Ty(),
-                                                          builder.CreateInBoundsGEP(pointee_type(out_gl[0]), out_gl[0],
-                                                                                    {builder.getInt32(0), cur_idx}));
+        auto *out_idx = all_out_vars
+                            ? cur_idx
+                            : builder.CreateLoad(builder.getInt32Ty(),
+                                                 builder.CreateInBoundsGEP(out_gl[0]->getValueType(), out_gl[0],
+                                                                           {builder.getInt32(0), cur_idx}));
 
         // Fetch the index of the u variable.
         auto *u_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[1]), out_gl[1],
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[1]->getValueType(), out_gl[1],
                                                                                  {builder.getInt32(0), cur_idx}));
 
         // Fetch from eval_arr the value of the u variable u_idx.
-        auto *ret = cfunc_c_load_eval(s, eval_arr, u_idx);
+        auto *ret = cfunc_c_load_eval(s, fp_vec_t, eval_arr, u_idx);
 
         // Compute the pointer into out_ptr.
-        auto *ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
+        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
 
         // Store ret.
-        store_vector_to_memory(builder, ptr, ret);
+        ext_store_vector_to_memory(s, ptr, ret);
     });
 
     // Handle the number definitions.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_nums), [&](llvm::Value *cur_idx) {
         // Fetch the index of the output.
         auto *out_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[2]), out_gl[2],
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[2]->getValueType(), out_gl[2],
                                                                                  {builder.getInt32(0), cur_idx}));
 
         // Fetch the constant.
         auto *num = builder.CreateLoad(
-            fp_scal_t, builder.CreateInBoundsGEP(pointee_type(out_gl[3]), out_gl[3], {builder.getInt32(0), cur_idx}));
+            fp_scal_t, builder.CreateInBoundsGEP(out_gl[3]->getValueType(), out_gl[3], {builder.getInt32(0), cur_idx}));
 
         // Splat it out.
         auto *ret = vector_splat(builder, num, batch_size);
 
         // Compute the pointer into out_ptr.
-        auto *ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
+        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
 
         // Store ret.
-        store_vector_to_memory(builder, ptr, ret);
+        ext_store_vector_to_memory(s, ptr, ret);
     });
 
     // Handle the param definitions.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_pars), [&](llvm::Value *cur_idx) {
         // Fetch the index of the output.
         auto *out_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[4]), out_gl[4],
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[4]->getValueType(), out_gl[4],
                                                                                  {builder.getInt32(0), cur_idx}));
 
         // Fetch the index of the param.
         auto *par_idx
-            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(pointee_type(out_gl[5]), out_gl[5],
+            = builder.CreateLoad(builder.getInt32Ty(), builder.CreateInBoundsGEP(out_gl[5]->getValueType(), out_gl[5],
                                                                                  {builder.getInt32(0), cur_idx}));
 
         // Load the parameter value from the array.
-        auto *ptr = builder.CreateInBoundsGEP(fp_scal_t, par_ptr, builder.CreateMul(stride, to_size_t(s, par_idx)));
-        auto *ret = load_vector_from_memory(builder, ptr, batch_size);
+        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, par_ptr, builder.CreateMul(stride, to_size_t(s, par_idx)));
+        auto *ret = ext_load_vector_from_memory(s, fp_scal_t, ptr, batch_size);
 
         // Compute the pointer into out_ptr.
-        ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
+        ptr = builder.CreateInBoundsGEP(ext_fp_t, out_ptr, builder.CreateMul(stride, to_size_t(s, out_idx)));
 
         // Store ret.
-        store_vector_to_memory(builder, ptr, ret);
+        ext_store_vector_to_memory(s, ptr, ret);
     });
 }
 
-template <typename T>
-void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
-                      llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars, std::uint32_t nuvars,
-                      std::uint32_t batch_size, bool high_accuracy)
+void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, llvm::Value *in_ptr,
+                      llvm::Value *par_ptr, llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars,
+                      std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
 {
     auto &builder = s.builder();
-    auto &context = s.context();
     auto &md = s.module();
+
+    // Fetch the type for external loading.
+    auto *ext_fp_t = llvm_ext_type(fp_type);
 
     // Split dc into segments.
     const auto s_dc = function_segment_dc(dc, nvars, nuvars);
 
     // Generate the function maps.
-    const auto f_maps = cfunc_build_function_maps<T>(s, s_dc, nvars, batch_size, high_accuracy);
+    const auto f_maps = cfunc_build_function_maps(s, fp_type, s_dc, nvars, batch_size, high_accuracy);
 
     // Log the runtime of IR construction in trace mode.
     spdlog::stopwatch sw;
 
     // Generate the global arrays used to write the outputs at the
     // end of the computation.
-    const auto cout_gl = cfunc_c_make_output_globals<T>(s, dc, nuvars);
+    const auto cout_gl = cfunc_c_make_output_globals(s, fp_type, dc, nuvars);
 
     // Prepare the array that will contain the evaluation of all the
     // elementary subexpressions.
@@ -2876,7 +2932,6 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
     // NOTE: fp_type is the original, scalar floating-point type.
     // It will be turned into a vector type (if necessary) by
     // make_vector_type() below.
-    auto *fp_type = to_llvm_type<T>(context);
     auto *fp_vec_type = make_vector_type(fp_type, batch_size);
     auto *array_type = llvm::ArrayType::get(fp_vec_type, nuvars);
 
@@ -2885,22 +2940,20 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
     // its size can grow quite large, which can lead to stack overflow issues.
     // This has of course consequences in terms of thread safety, which
     // we will have to document.
-    auto eval_arr_gvar = make_global_zero_array(md, array_type);
-    assert(llvm_depr_GEP_type_check(eval_arr_gvar, array_type)); // LCOV_EXCL_LINE
+    auto *eval_arr_gvar = make_global_zero_array(md, array_type);
     auto *eval_arr = builder.CreateInBoundsGEP(array_type, eval_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
 
     // Copy over the values of the variables.
     // NOTE: overflow checking is already done in the parent function.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(nvars), [&](llvm::Value *cur_var_idx) {
         // Fetch the pointer from in_ptr.
-        assert(llvm_depr_GEP_type_check(in_ptr, fp_type)); // LCOV_EXCL_LINE
-        auto *ptr = builder.CreateInBoundsGEP(fp_type, in_ptr, builder.CreateMul(stride, to_size_t(s, cur_var_idx)));
+        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, in_ptr, builder.CreateMul(stride, to_size_t(s, cur_var_idx)));
 
         // Load as a vector.
-        auto *vec = load_vector_from_memory(builder, ptr, batch_size);
+        auto *vec = ext_load_vector_from_memory(s, fp_type, ptr, batch_size);
 
         // Store into eval_arr.
-        cfunc_c_store_eval(s, eval_arr, cur_var_idx, vec);
+        cfunc_c_store_eval(s, fp_vec_type, eval_arr, cur_var_idx, vec);
     });
 
     // Helper to evaluate a block.
@@ -2932,7 +2985,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
             }
 
             // Evaluate and store the result.
-            cfunc_c_store_eval(s, eval_arr, u_idx, builder.CreateCall(func, args));
+            cfunc_c_store_eval(s, fp_vec_type, eval_arr, u_idx, builder.CreateCall(func, args));
         });
     };
 
@@ -2945,7 +2998,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
     }
 
     // Write the results to the output pointer.
-    cfunc_c_write_outputs(s, out_ptr, cout_gl, eval_arr, par_ptr, stride, batch_size);
+    cfunc_c_write_outputs(s, fp_type, out_ptr, cout_gl, eval_arr, par_ptr, stride, batch_size);
 
     get_logger()->trace("cfunc IR creation compact mode runtime: {}", sw);
 }
@@ -2966,7 +3019,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Value *out_ptr, llvm::Value *in_ptr, 
 // [0, 1], [3, 4], [6, 7], [9, 10], ... in the input array.
 template <typename T, typename F>
 auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::uint32_t batch_size, bool high_accuracy,
-                    bool compact_mode, bool parallel_mode)
+                    bool compact_mode, bool parallel_mode, [[maybe_unused]] unsigned prec)
 {
     if (s.is_compiled()) {
         throw std::invalid_argument("A compiled function cannot be added to an llvm_state after compilation");
@@ -2988,6 +3041,20 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     if constexpr (std::is_same_v<T, long double>) {
         throw not_implemented_error("'long double' computations are not supported on PowerPC");
     }
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        const auto sprec = boost::numeric_cast<real_prec_t>(prec);
+
+        if (sprec < mppp::real_prec_min() || sprec > mppp::real_prec_max()) {
+            throw std::invalid_argument(fmt::format("An invalid precision value of {} was passed to add_cfunc() (the "
+                                                    "value must be in the [{}, {}] range)",
+                                                    sprec, mppp::real_prec_min(), mppp::real_prec_max()));
+        }
+    }
+
 #endif
 
     // Decompose the function and cache the number of vars and outputs.
@@ -3031,10 +3098,20 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // - the fourth argument is the stride.
     //
     // The pointer arguments cannot overlap.
-    auto *fp_t = to_llvm_type<T>(context);
-    auto *lst = to_llvm_type<std::size_t>(context);
-    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_t));
-    fargs.push_back(lst);
+    auto *fp_t = [&]() {
+#if defined(HEYOKA_HAVE_REAL)
+        if constexpr (std::is_same_v<T, mppp::real>) {
+            return llvm_type_like(s, mppp::real{0, static_cast<real_prec_t>(prec)});
+        } else {
+#endif
+            return to_llvm_type<T>(context);
+#if defined(HEYOKA_HAVE_REAL)
+        }
+#endif
+    }();
+    auto *ext_fp_t = llvm_ext_type(fp_t);
+    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(ext_fp_t));
+    fargs.push_back(to_llvm_type<std::size_t>(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -3076,9 +3153,9 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     builder.SetInsertPoint(bb);
 
     if (compact_mode) {
-        add_cfunc_c_mode<T>(s, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
+        add_cfunc_c_mode(s, fp_t, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
     } else {
-        add_cfunc_nc_mode<T>(s, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
+        add_cfunc_nc_mode(s, fp_t, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
     }
 
     // Finish off the function.
@@ -3147,45 +3224,59 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
 
 template <typename T>
 std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &v_ex,
-                                  std::uint32_t batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode)
+                                  std::uint32_t batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode,
+                                  unsigned prec)
 {
-    return detail::add_cfunc_impl<T>(s, name, v_ex, batch_size, high_accuracy, compact_mode, parallel_mode);
+    return detail::add_cfunc_impl<T>(s, name, v_ex, batch_size, high_accuracy, compact_mode, parallel_mode, prec);
 }
 
 template <typename T>
 std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &v_ex,
                                   const std::vector<expression> &vars, std::uint32_t batch_size, bool high_accuracy,
-                                  bool compact_mode, bool parallel_mode)
+                                  bool compact_mode, bool parallel_mode, unsigned prec)
 {
     return detail::add_cfunc_impl<T>(s, name, std::make_pair(std::cref(v_ex), std::cref(vars)), batch_size,
-                                     high_accuracy, compact_mode, parallel_mode);
+                                     high_accuracy, compact_mode, parallel_mode, prec);
 }
 
 // Explicit instantiations.
-template HEYOKA_DLL_PUBLIC std::vector<expression>
-add_cfunc<double>(llvm_state &, const std::string &, const std::vector<expression> &, std::uint32_t, bool, bool, bool);
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<double>(llvm_state &, const std::string &,
+                                                                     const std::vector<expression> &, std::uint32_t,
+                                                                     bool, bool, bool, unsigned);
 template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<double>(llvm_state &, const std::string &,
                                                                      const std::vector<expression> &,
                                                                      const std::vector<expression> &, std::uint32_t,
-                                                                     bool, bool, bool);
+                                                                     bool, bool, bool, unsigned);
 
 template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<long double>(llvm_state &, const std::string &,
                                                                           const std::vector<expression> &,
-                                                                          std::uint32_t, bool, bool, bool);
+                                                                          std::uint32_t, bool, bool, bool, unsigned);
 template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<long double>(llvm_state &, const std::string &,
                                                                           const std::vector<expression> &,
                                                                           const std::vector<expression> &,
-                                                                          std::uint32_t, bool, bool, bool);
+                                                                          std::uint32_t, bool, bool, bool, unsigned);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real128>(llvm_state &, const std::string &,
                                                                             const std::vector<expression> &,
-                                                                            std::uint32_t, bool, bool, bool);
+                                                                            std::uint32_t, bool, bool, bool, unsigned);
 template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real128>(llvm_state &, const std::string &,
                                                                             const std::vector<expression> &,
                                                                             const std::vector<expression> &,
-                                                                            std::uint32_t, bool, bool, bool);
+                                                                            std::uint32_t, bool, bool, bool, unsigned);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real>(llvm_state &, const std::string &,
+                                                                         const std::vector<expression> &, std::uint32_t,
+                                                                         bool, bool, bool, unsigned);
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real>(llvm_state &, const std::string &,
+                                                                         const std::vector<expression> &,
+                                                                         const std::vector<expression> &, std::uint32_t,
+                                                                         bool, bool, bool, unsigned);
 
 #endif
 

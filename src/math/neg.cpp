@@ -95,110 +95,74 @@ mppp::real128 neg_impl::eval_f128(const std::unordered_map<std::string, mppp::re
 }
 #endif
 
-llvm::Value *neg_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                     llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Value *neg_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                                 llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                 bool high_accuracy) const
 {
-    return llvm_eval_helper<double>([&s](const std::vector<llvm::Value *> &args, bool) { return llvm_neg(s, args[0]); },
-                                    *this, s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    return llvm_eval_helper([&s](const std::vector<llvm::Value *> &args, bool) { return llvm_fneg(s, args[0]); }, *this,
+                            s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
-
-llvm::Value *neg_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                      llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return llvm_eval_helper<long double>(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_neg(s, args[0]); }, *this, s, eval_arr,
-        par_ptr, stride, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *neg_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                      llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return llvm_eval_helper<mppp::real128>(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_neg(s, args[0]); }, *this, s, eval_arr,
-        par_ptr, stride, batch_size, high_accuracy);
-}
-
-#endif
 
 namespace
 {
 
-template <typename T>
-[[nodiscard]] llvm::Function *neg_llvm_c_eval(llvm_state &s, const func_base &fb, std::uint32_t batch_size,
-                                              bool high_accuracy)
+[[nodiscard]] llvm::Function *neg_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
+                                              std::uint32_t batch_size, bool high_accuracy)
 {
-    return llvm_c_eval_func_helper<T>(
-        "neg", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_neg(s, args[0]); }, fb, s, batch_size,
-        high_accuracy);
+    return llvm_c_eval_func_helper(
+        "neg", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_fneg(s, args[0]); }, fb, s, fp_t,
+        batch_size, high_accuracy);
 }
 
 } // namespace
 
-llvm::Function *neg_impl::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Function *neg_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                           bool high_accuracy) const
 {
-    return neg_llvm_c_eval<double>(s, *this, batch_size, high_accuracy);
+    return neg_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy);
 }
-
-llvm::Function *neg_impl::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return neg_llvm_c_eval<long double>(s, *this, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *neg_impl::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return neg_llvm_c_eval<mppp::real128>(s, *this, batch_size, high_accuracy);
-}
-
-#endif
 
 namespace
 {
 
 // Derivative of neg(number).
-template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_neg_impl(llvm_state &s, const neg_impl &, const U &num, const std::vector<llvm::Value *> &,
-                                  llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                  std::uint32_t batch_size)
+template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *taylor_diff_neg_impl(llvm_state &s, llvm::Type *fp_t, const neg_impl &, const U &num,
+                                  const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
+                                  std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     if (order == 0u) {
-        return s.builder().CreateFNeg(taylor_codegen_numparam<T>(s, num, par_ptr, batch_size));
+        return llvm_fneg(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
-        return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+        return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
 // Derivative of neg(variable).
-template <typename T>
-llvm::Value *taylor_diff_neg_impl(llvm_state &s, const neg_impl &, const variable &var,
+llvm::Value *taylor_diff_neg_impl(llvm_state &s, llvm::Type *, const neg_impl &, const variable &var,
                                   const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
                                   std::uint32_t order, std::uint32_t, std::uint32_t)
 {
-    return s.builder().CreateFNeg(taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars));
+    return llvm_fneg(s, taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars));
 }
 
 // All the other cases.
-template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_neg_impl(llvm_state &, const neg_impl &, const U &, const std::vector<llvm::Value *> &,
-                                  llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
+template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
+llvm::Value *taylor_diff_neg_impl(llvm_state &, llvm::Type *, const neg_impl &, const U &,
+                                  const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                  std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a negation");
 }
 
-template <typename T>
-llvm::Value *taylor_diff_neg(llvm_state &s, const neg_impl &f, const std::vector<std::uint32_t> &deps,
+llvm::Value *taylor_diff_neg(llvm_state &s, llvm::Type *fp_t, const neg_impl &f, const std::vector<std::uint32_t> &deps,
                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     assert(f.args().size() == 1u);
 
     if (!deps.empty()) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(
             fmt::format("An empty hidden dependency vector is expected in order to compute the Taylor "
                         "derivative of the negation, but a vector of size {} was passed "
@@ -207,74 +171,55 @@ llvm::Value *taylor_diff_neg(llvm_state &s, const neg_impl &f, const std::vector
     }
 
     return std::visit(
-        [&](const auto &v) { return taylor_diff_neg_impl<T>(s, f, v, arr, par_ptr, n_uvars, order, idx, batch_size); },
+        [&](const auto &v) {
+            return taylor_diff_neg_impl(s, fp_t, f, v, arr, par_ptr, n_uvars, order, idx, batch_size);
+        },
         f.args()[0].value());
 }
 
 } // namespace
 
-llvm::Value *neg_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                       const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                       std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                       std::uint32_t batch_size, bool) const
+llvm::Value *neg_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                   const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                   std::uint32_t batch_size, bool) const
 {
-    return taylor_diff_neg<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_neg(s, fp_t, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
-
-llvm::Value *neg_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                        std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_neg<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *neg_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                        std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_neg<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
-}
-
-#endif
 
 namespace
 {
 
 // Derivative of neg(number).
-template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, const neg_impl &, const U &num, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, llvm::Type *fp_t, const neg_impl &, const U &num,
+                                            std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_numpar<T>(
-        s, n_uvars, batch_size, "neg", 0,
+    return taylor_c_diff_func_numpar(
+        s, fp_t, n_uvars, batch_size, "neg", 0,
         [&s](const auto &args) {
             // LCOV_EXCL_START
             assert(args.size() == 1u);
             assert(args[0] != nullptr);
             // LCOV_EXCL_STOP
 
-            return llvm_neg(s, args[0]);
+            return llvm_fneg(s, args[0]);
         },
         num);
 }
 
 // Derivative of neg(variable).
-template <typename T>
-llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, const neg_impl &, const variable &var, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, llvm::Type *fp_t, const neg_impl &, const variable &var,
+                                            std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "neg", n_uvars, batch_size, {var});
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "neg", n_uvars, batch_size, {var});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -285,7 +230,7 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, const neg_impl &, con
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -302,7 +247,7 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, const neg_impl &, con
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateFNeg(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx));
+        auto retval = llvm_fneg(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, var_idx));
 
         // Return the result.
         builder.CreateRet(retval);
@@ -327,46 +272,30 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, const neg_impl &, con
 }
 
 // All the other cases.
-template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &, const neg_impl &, const U &, std::uint32_t, std::uint32_t)
+template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
+llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &, llvm::Type *, const neg_impl &, const U &, std::uint32_t,
+                                            std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a negation in compact mode");
 }
 
-template <typename T>
-llvm::Function *taylor_c_diff_func_neg(llvm_state &s, const neg_impl &fn, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_neg(llvm_state &s, llvm::Type *fp_t, const neg_impl &fn, std::uint32_t n_uvars,
                                        std::uint32_t batch_size)
 {
     assert(fn.args().size() == 1u);
 
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_neg_impl<T>(s, fn, v, n_uvars, batch_size); },
+    return std::visit([&](const auto &v) { return taylor_c_diff_func_neg_impl(s, fp_t, fn, v, n_uvars, batch_size); },
                       fn.args()[0].value());
 }
 
 } // namespace
 
-llvm::Function *neg_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                 bool) const
+llvm::Function *neg_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                             std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_neg<double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_neg(s, fp_t, *this, n_uvars, batch_size);
 }
-
-llvm::Function *neg_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
-{
-    return taylor_c_diff_func_neg<long double>(s, *this, n_uvars, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *neg_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
-{
-    return taylor_c_diff_func_neg<mppp::real128>(s, *this, n_uvars, batch_size);
-}
-
-#endif
 
 // Small helper to detect if an expression
 // is a neg function. Mutable so we can extract

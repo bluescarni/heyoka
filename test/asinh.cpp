@@ -28,6 +28,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/asinh.hpp>
@@ -55,7 +61,7 @@ const auto fp_types = std::tuple<double
                                  >{};
 
 constexpr bool skip_batch_ld =
-#if LLVM_VERSION_MAJOR == 13 || LLVM_VERSION_MAJOR == 14
+#if LLVM_VERSION_MAJOR == 13 || LLVM_VERSION_MAJOR == 14 || LLVM_VERSION_MAJOR == 15
     std::numeric_limits<long double>::digits == 64
 #else
     false
@@ -163,3 +169,39 @@ TEST_CASE("cfunc")
         }
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("cfunc_mp")
+{
+    auto [x] = make_vars("x");
+
+    const auto prec = 237u;
+
+    for (auto compact_mode : {false, true}) {
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            add_cfunc<mppp::real>(s, "cfunc", {asinh(x), asinh(expression{1.5}), asinh(par[0])},
+                                  kw::compact_mode = compact_mode, kw::prec = prec);
+
+            s.compile();
+
+            auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(
+                s.jit_lookup("cfunc"));
+
+            const std::vector ins{mppp::real{"1.7", prec}};
+            const std::vector pars{mppp::real{"2.1", prec}};
+            std::vector<mppp::real> outs(3u, mppp::real{0, prec});
+
+            cf_ptr(outs.data(), ins.data(), pars.data());
+
+            auto i = 0u;
+            REQUIRE(outs[i] == asinh(ins[i]));
+            REQUIRE(outs[i + 1u] == asinh(mppp::real{1.5, prec}));
+            REQUIRE(outs[i + 2u * 1u] == asinh(pars[i]));
+        }
+    }
+}
+
+#endif

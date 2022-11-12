@@ -252,7 +252,6 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vidx(llvm_state &s, 
 
     // Return the generator.
     return [&builder, gvar, arr_type](llvm::Value *cur_call_idx) -> llvm::Value * {
-        assert(llvm_depr_GEP_type_check(gvar, arr_type)); // LCOV_EXCL_LINE
         return builder.CreateLoad(builder.getInt32Ty(),
                                   builder.CreateInBoundsGEP(arr_type, gvar, {builder.getInt32(0), cur_call_idx}));
     };
@@ -263,8 +262,8 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vidx(llvm_state &s, 
 // NOTE: here we ensure that the return value does not capture
 // any LLVM object except for types and global variables. This way we ensure that
 // the generator does not rely on LLVM values created at the current insertion point.
-template <typename T>
-std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vc(llvm_state &s, const std::vector<number> &vc)
+std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vc(llvm_state &s, llvm::Type *fp_t,
+                                                               const std::vector<number> &vc)
 {
     assert(!vc.empty()); // LCOV_EXCL_LINE
 
@@ -272,14 +271,14 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vc(llvm_state &s, co
     if (std::all_of(vc.begin() + 1, vc.end(), [&vc](const auto &n) { return n == vc[0]; })) {
         // If all constants are the same, don't construct an array, just always return
         // the same value.
-        return [&s, num = vc[0]](llvm::Value *) -> llvm::Value * { return codegen<T>(s, num); };
+        return [&s, fp_t, num = vc[0]](llvm::Value *) -> llvm::Value * { return llvm_codegen(s, fp_t, num); };
     }
 
     // Generate the array of constants as llvm constants.
     std::vector<llvm::Constant *> tmp_c_vec;
     tmp_c_vec.reserve(vc.size());
     for (const auto &val : vc) {
-        tmp_c_vec.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, val)));
+        tmp_c_vec.push_back(llvm::cast<llvm::Constant>(llvm_codegen(s, fp_t, val)));
     }
 
     // Create the array type.
@@ -298,24 +297,10 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vc(llvm_state &s, co
     return [&s, gvar, arr_type](llvm::Value *cur_call_idx) -> llvm::Value * {
         auto &builder = s.builder();
 
-        assert(llvm_depr_GEP_type_check(gvar, arr_type)); // LCOV_EXCL_LINE
         return builder.CreateLoad(arr_type->getArrayElementType(),
                                   builder.CreateInBoundsGEP(arr_type, gvar, {builder.getInt32(0), cur_call_idx}));
     };
 }
-
-// Explicit instantiations.
-template std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vc<double>(llvm_state &,
-                                                                                const std::vector<number> &);
-
-template std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vc<long double>(llvm_state &,
-                                                                                     const std::vector<number> &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vc<mppp::real128>(llvm_state &,
-                                                                                       const std::vector<number> &);
-#endif
 
 std::string cm_mangle(const variable &)
 {

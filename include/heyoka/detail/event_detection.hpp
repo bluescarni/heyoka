@@ -48,8 +48,8 @@ mppp::real128 taylor_deduce_cooldown(mppp::real128, mppp::real128);
 #endif
 
 // Machinery to add a fast event exclusion check function to an llvm_state.
-template <typename>
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check(llvm_state &, std::uint32_t, std::uint32_t, bool = false);
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t,
+                                                     bool = false);
 
 // Machinery to add a function that, given an input polynomial of order n represented
 // as an array of coefficients:
@@ -57,30 +57,7 @@ HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check(llvm_state &, std::uint32_t
 // - translates it by 1,
 // - counts the sign changes in the coefficients
 //   of the resulting polynomial.
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_poly_rtscc_dbl(llvm_state &, std::uint32_t, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_poly_rtscc_ldbl(llvm_state &, std::uint32_t, std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_poly_rtscc_f128(llvm_state &, std::uint32_t, std::uint32_t);
-
-#endif
-
-template <typename T>
-inline llvm::Function *llvm_add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return llvm_add_poly_rtscc_dbl(s, n, batch_size);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return llvm_add_poly_rtscc_ldbl(s, n, batch_size);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return llvm_add_poly_rtscc_f128(s, n, batch_size);
-#endif
-    } else {
-        static_assert(always_false_v<T>, "Unhandled type.");
-    }
-}
+llvm::Function *llvm_add_poly_rtscc(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
 
 } // namespace heyoka::detail
 

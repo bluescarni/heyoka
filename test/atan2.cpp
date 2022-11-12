@@ -30,6 +30,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -48,6 +54,12 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
+#if defined(HEYOKA_HAVE_REAL128) || defined(HEYOKA_HAVE_REAL)
+
+using namespace mppp::literals;
+
+#endif
+
 const auto fp_types = std::tuple<double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
@@ -60,7 +72,7 @@ const auto fp_types = std::tuple<double
                                  >{};
 
 constexpr bool skip_batch_ld =
-#if LLVM_VERSION_MAJOR == 13 || LLVM_VERSION_MAJOR == 14
+#if LLVM_VERSION_MAJOR == 13 || LLVM_VERSION_MAJOR == 14 || LLVM_VERSION_MAJOR == 15
     std::numeric_limits<long double>::digits == 64
 #else
     false
@@ -163,6 +175,12 @@ TEST_CASE("atan2 overloads")
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{mppp::real128{"1.1"}});
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+    k = atan2("x"_var, 1.1_r256);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1_r256});
+#endif
+
     k = atan2(1.1, "x"_var);
     REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{1.1});
@@ -175,6 +193,12 @@ TEST_CASE("atan2 overloads")
     k = atan2(mppp::real128{"1.1"}, "x"_var);
     REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{mppp::real128{"1.1"}});
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+    k = atan2(1.1_r256, "x"_var);
+    REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{1.1_r256});
 #endif
 }
 
@@ -289,3 +313,43 @@ TEST_CASE("cfunc")
         }
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("cfunc_mp")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    const auto prec = 237u;
+
+    for (auto compact_mode : {false, true}) {
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            add_cfunc<mppp::real>(
+                s, "cfunc",
+                {atan2(x, y), atan2(x, par[0]), atan2(par[0], x), atan2(x, 3. / 2_dbl), atan2(3. / 2_dbl, x)},
+                kw::compact_mode = compact_mode, kw::prec = prec);
+
+            s.compile();
+
+            auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(
+                s.jit_lookup("cfunc"));
+
+            const std::vector ins{mppp::real{"1.1", prec}, mppp::real{"2.1", prec}};
+            const std::vector pars{mppp::real{"3.1", prec}};
+            std::vector<mppp::real> outs(5u, mppp::real{0, prec});
+
+            cf_ptr(outs.data(), ins.data(), pars.data());
+
+            auto i = 0u;
+            REQUIRE(outs[i] == atan2(ins[i], ins[i + 1u]));
+            REQUIRE(outs[i + 1u] == atan2(ins[i], pars[i]));
+            REQUIRE(outs[i + 2u * 1u] == atan2(pars[i], ins[i]));
+            REQUIRE(outs[i + 3u * 1u] == atan2(ins[i], 3. / 2));
+            REQUIRE(outs[i + 4u * 1u] == atan2(3. / 2, ins[i]));
+        }
+    }
+}
+
+#endif

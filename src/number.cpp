@@ -8,10 +8,14 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <ios>
 #include <limits>
 #include <locale>
 #include <ostream>
@@ -27,19 +31,35 @@
 #include <vector>
 
 #include <boost/core/demangle.hpp>
+#include <boost/numeric/conversion/cast.hpp>
 
 #include <llvm/ADT/APFloat.h>
+#include <llvm/Config/llvm-config.h>
+#include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
 #include <fmt/format.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
+#include <mp++/integer.hpp>
 #include <mp++/real128.hpp>
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#include <heyoka/detail/real_helpers.hpp>
+
+#endif
+
+#include <heyoka/detail/binomial.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -62,6 +82,12 @@ number::number(long double x) : m_value(x) {}
 #if defined(HEYOKA_HAVE_REAL128)
 
 number::number(mppp::real128 x) : m_value(x) {}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+number::number(mppp::real x) : m_value(std::move(x)) {}
 
 #endif
 
@@ -90,64 +116,81 @@ void swap(number &n0, number &n1) noexcept
     std::swap(n0.value(), n1.value());
 }
 
-// NOTE: for consistency with the equality operator,
-// we want to ensure that:
-// - all nan values hash to the same value,
-// - two numbers with the same value hash to the same value,
-//   even if they are of different types.
-// The strategy is then to cast the value to the largest
-// floating-point type (which ensures that the original
-// value is preserved exactly) and then hash on that.
 std::size_t hash(const number &n)
 {
-    return std::visit(
-        [](const auto &v) -> std::size_t {
-#if defined(HEYOKA_HAVE_REAL128)
-            // NOTE: mppp::hash() already ensures that
-            // all nans hash to the same value.
-            return mppp::hash(static_cast<mppp::real128>(v));
-#else
-            if (std::isnan(v)) {
-                // Make sure all nan values
-                // have the same hash.
-                return 0;
+    return std::visit([](const auto &v) { return std::hash<detail::uncvref_t<decltype(v)>>{}(v); }, n.value());
+}
+
+std::ostream &operator<<(std::ostream &os, const number &n)
+{
+    std::visit(
+        [&os](const auto &arg) {
+            using type = detail::uncvref_t<decltype(arg)>;
+
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<type, mppp::real>) {
+                os << arg.to_string();
             } else {
-                return std::hash<long double>{}(static_cast<long double>(v));
+#endif
+                // NOTE: we make sure to print all digits
+                // necessary for short-circuiting. Make also
+                // sure to always print the decimal point and to
+                // use the C locale.
+                std::ostringstream oss;
+                oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+
+                oss.imbue(std::locale::classic());
+                oss << std::showpoint;
+
+                oss.precision(std::numeric_limits<type>::max_digits10);
+                oss << arg;
+
+                os << oss.str();
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
+        },
+        n.value());
+
+    return os;
+}
+
+bool is_zero(const number &n)
+{
+    return std::visit(
+        [](const auto &arg) {
+            using type [[maybe_unused]] = detail::uncvref_t<decltype(arg)>;
+
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<type, mppp::real>) {
+                return arg.zero_p();
+            } else {
+#endif
+                return arg == 0;
+#if defined(HEYOKA_HAVE_REAL)
             }
 #endif
         },
         n.value());
 }
 
-std::ostream &operator<<(std::ostream &os, const number &n)
-{
-    // NOTE: we make sure to print all digits
-    // necessary for short-circuiting. Make also
-    // sure to always print the decimal point and to
-    // use the C locale.
-    std::ostringstream oss;
-    oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-    oss.imbue(std::locale::classic());
-    oss << std::showpoint;
-
-    std::visit(
-        [&oss](const auto &arg) {
-            oss.precision(std::numeric_limits<detail::uncvref_t<decltype(arg)>>::max_digits10);
-            oss << arg;
-        },
-        n.value());
-
-    return os << oss.str();
-}
-
-bool is_zero(const number &n)
-{
-    return std::visit([](const auto &arg) { return arg == 0; }, n.value());
-}
-
 bool is_one(const number &n)
 {
-    return std::visit([](const auto &arg) { return arg == 1; }, n.value());
+    return std::visit(
+        [](const auto &arg) {
+            using type [[maybe_unused]] = detail::uncvref_t<decltype(arg)>;
+
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<type, mppp::real>) {
+                return arg.is_one();
+            } else {
+#endif
+                return arg == 1;
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
+        },
+        n.value());
 }
 
 bool is_negative_one(const number &n)
@@ -197,14 +240,6 @@ template <typename T, typename U = T>
 using is_divisible = std::conjunction<is_detected<div_t, T, U>, is_detected<div_t, U, T>,
                                       std::is_same<detected_t<div_t, T, U>, detected_t<div_t, U, T>>>;
 
-template <typename T, typename U>
-using eq_t = decltype(std::declval<T>() == std::declval<U>());
-
-template <typename T, typename U = T>
-using is_equality_comparable = std::conjunction<is_detected<eq_t, T, U>, is_detected<eq_t, U, T>,
-                                                std::is_same<detected_t<eq_t, T, U>, detected_t<eq_t, U, T>>,
-                                                std::is_convertible<detected_t<eq_t, U, T>, bool>>;
-
 } // namespace
 
 } // namespace detail
@@ -217,7 +252,7 @@ number operator+(number n1, number n2)
                 return number{std::forward<decltype(arg1)>(arg1) + std::forward<decltype(arg2)>(arg2)};
             } else {
                 // LCOV_EXCL_START
-                throw std::invalid_argument(fmt::format("Cannot add an object of type {} to an object of type {}",
+                throw std::invalid_argument(fmt::format("Cannot add an object of type '{}' to an object of type '{}'",
                                                         boost::core::demangle(typeid(arg1).name()),
                                                         boost::core::demangle(typeid(arg2).name())));
                 // LCOV_EXCL_STOP
@@ -235,7 +270,7 @@ number operator-(number n1, number n2)
             } else {
                 // LCOV_EXCL_START
                 throw std::invalid_argument(fmt::format(
-                    "Cannot subtract an object of type {} from an object of type {}",
+                    "Cannot subtract an object of type '{}' from an object of type '{}'",
                     boost::core::demangle(typeid(arg2).name()), boost::core::demangle(typeid(arg1).name())));
                 // LCOV_EXCL_STOP
             }
@@ -251,9 +286,9 @@ number operator*(number n1, number n2)
                 return number{std::forward<decltype(arg1)>(arg1) * std::forward<decltype(arg2)>(arg2)};
             } else {
                 // LCOV_EXCL_START
-                throw std::invalid_argument(fmt::format("Cannot multiply an object of type {} by an object of type {}",
-                                                        boost::core::demangle(typeid(arg1).name()),
-                                                        boost::core::demangle(typeid(arg2).name())));
+                throw std::invalid_argument(fmt::format(
+                    "Cannot multiply an object of type '{}' by an object of type '{}'",
+                    boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
                 // LCOV_EXCL_STOP
             }
         },
@@ -268,39 +303,31 @@ number operator/(number n1, number n2)
                 return number{std::forward<decltype(arg1)>(arg1) / std::forward<decltype(arg2)>(arg2)};
             } else {
                 // LCOV_EXCL_START
-                throw std::invalid_argument(fmt::format("Cannot divide an object of type {} by an object of type {}",
-                                                        boost::core::demangle(typeid(arg1).name()),
-                                                        boost::core::demangle(typeid(arg2).name())));
+                throw std::invalid_argument(fmt::format(
+                    "Cannot divide an object of type '{}' by an object of type '{}'",
+                    boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
                 // LCOV_EXCL_STOP
             }
         },
         std::move(n1.value()), std::move(n2.value()));
 }
 
+// NOTE: in order for equality to be consistent with hashing,
+// we want to make sure that two numbers of different type
+// are always considered different (were they considered equal,
+// we would have then to ensure that they both hash to the same
+// value, which would be quite hard to do).
 bool operator==(const number &n1, const number &n2)
 {
     return std::visit(
         [](const auto &v1, const auto &v2) -> bool {
-            if constexpr (detail::is_equality_comparable<decltype(v1), decltype(v2)>::value) {
-                using std::isnan;
+            using type1 = detail::uncvref_t<decltype(v1)>;
+            using type2 = detail::uncvref_t<decltype(v2)>;
 
-                if (isnan(v1) && isnan(v2)) {
-                    // NOTE: make nan compare equal, for consistency
-                    // with hashing.
-                    return true;
-                } else {
-                    // NOTE: this covers the following cases:
-                    // - neither v1 nor v2 is nan,
-                    // - v1 is nan and v2 is not,
-                    // - v2 is nan and v1 is not.
-                    return v1 == v2;
-                }
+            if constexpr (std::is_same_v<type1, type2>) {
+                return v1 == v2;
             } else {
-                // LCOV_EXCL_START
-                throw std::invalid_argument(fmt::format("Cannot compare an object of type {} to an object of type {}",
-                                                        boost::core::demangle(typeid(v1).name()),
-                                                        boost::core::demangle(typeid(v2).name())));
-                // LCOV_EXCL_STOP
+                return false;
             }
         },
         n1.value(), n2.value());
@@ -309,6 +336,93 @@ bool operator==(const number &n1, const number &n2)
 bool operator!=(const number &n1, const number &n2)
 {
     return !(n1 == n2);
+}
+
+number exp(number n)
+{
+    return std::visit(
+        [](auto &&arg) {
+            using std::exp;
+
+            return number{exp(std::forward<decltype(arg)>(arg))};
+        },
+        std::move(n.value()));
+}
+
+number binomial(const number &i, const number &j)
+{
+    return std::visit(
+        [](const auto &v1, const auto &v2) -> number {
+            using type1 = detail::uncvref_t<decltype(v1)>;
+            using type2 = detail::uncvref_t<decltype(v2)>;
+
+            if constexpr (!std::is_same_v<type1, type2>) {
+                throw std::invalid_argument("Cannot compute the binomial coefficient of two numbers of different type");
+            } else {
+                using std::isfinite;
+                using std::trunc;
+
+                if (!isfinite(v1) || !isfinite(v2)) {
+                    throw std::invalid_argument("Cannot compute the binomial coefficient of non-finite values");
+                }
+
+                if (trunc(v1) != v1 || trunc(v2) != v2) {
+                    throw std::invalid_argument("Cannot compute the binomial coefficient non-integral values");
+                }
+
+                if constexpr (std::is_floating_point_v<type1>) {
+                    // For C++ FP types, we can use directly the binomial
+                    // implementation in detail, after casting the
+                    // arguments back to std::uint32_t.
+                    return number{detail::binomial<type1>(boost::numeric_cast<std::uint32_t>(v1),
+                                                          boost::numeric_cast<std::uint32_t>(v2))};
+#if defined(HEYOKA_HAVE_REAL128)
+                } else if constexpr (std::is_same_v<type1, mppp::real128>) {
+                    // For real128, we cannot use boost::numeric_cast, so we go through
+                    // a checked conversion via mppp::integer.
+                    const auto n1 = static_cast<mppp::integer<1>>(v1);
+                    const auto n2 = static_cast<mppp::integer<1>>(v2);
+
+                    return number{
+                        detail::binomial<type1>(static_cast<std::uint32_t>(n1), static_cast<std::uint32_t>(n2))};
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+                } else if constexpr (std::is_same_v<type1, mppp::real>) {
+                    // For real, we transform the input arguments into mppp::integer,
+                    // invoke binomial and then convert back to real.
+                    const auto n1 = static_cast<mppp::integer<1>>(v1);
+                    const auto n2 = static_cast<mppp::integer<1>>(v2);
+
+                    // NOTE: do the conversion using the maximum precision among the operands, as usual.
+                    return number{mppp::real{binomial(n1, n2), std::max(v1.get_prec(), v2.get_prec())}};
+#endif
+                    // LCOV_EXCL_START
+                } else {
+                    throw std::invalid_argument(fmt::format("Arguments of type '{}' are not supported by binomial()",
+                                                            boost::core::demangle(typeid(type1).name())));
+                }
+                // LCOV_EXCL_STOP
+            }
+        },
+        i.value(), j.value());
+}
+
+number nextafter(const number &from, const number &to)
+{
+    return std::visit(
+        [](const auto &v1, const auto &v2) -> number {
+            using type1 = detail::uncvref_t<decltype(v1)>;
+            using type2 = detail::uncvref_t<decltype(v2)>;
+
+            if constexpr (!std::is_same_v<type1, type2>) {
+                throw std::invalid_argument("Cannot invoke nextafter() on two numbers of different type");
+            } else {
+                using std::nextafter;
+
+                return number{nextafter(v1, v2)};
+            }
+        },
+        from.value(), to.value());
 }
 
 namespace detail
@@ -326,9 +440,9 @@ To number_eval_impl(const number &n)
                 return static_cast<To>(v);
             } else {
                 // LCOV_EXCL_START
-                throw std::invalid_argument(fmt::format("Cannot convert an object of type {} to an object of type {}",
-                                                        boost::core::demangle(typeid(v).name()),
-                                                        boost::core::demangle(typeid(To).name())));
+                throw std::invalid_argument(
+                    fmt::format("Cannot convert an object of type '{}' to an object of type '{}'",
+                                boost::core::demangle(typeid(v).name()), boost::core::demangle(typeid(To).name())));
                 // LCOV_EXCL_STOP
             }
         },
@@ -395,78 +509,135 @@ void update_grad_dbl(std::unordered_map<std::string, double> &, const number &,
     node_counter++;
 }
 
-template <typename T>
-llvm::Value *codegen(llvm_state &s, const number &n)
+// Generate an LLVM constant of type tp representing the number n.
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
 {
-    if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
-        return std::visit(
-            [&s](const auto &v) {
-                // NOTE: it looks like the APFloat class infers the proper target type
-                // for a FP constant from the semantics. In case of float/double, it seems
-                // to be assuming that they correspond to single/double precision, which is
-                // also heyoka's assumption.
-                return llvm::ConstantFP::get(s.context(), llvm::APFloat(static_cast<T>(v)));
+    assert(tp != nullptr);
+
+    // NOTE: isIEEE() is only available since LLVM 13.
+    // For earlier versions of LLVM, we check that
+    // tp is not a double-double, all the other available
+    // FP types should be IEEE.
+    if (tp->isFloatingPointTy() &&
+#if LLVM_VERSION_MAJOR >= 13
+        tp->isIEEE()
+#else
+        !tp->isPPC_FP128Ty()
+#endif
+    ) {
+        // NOTE: for float and double we can construct
+        // directly an APFloat.
+        if (tp->isFloatTy() || tp->isDoubleTy()) {
+            const auto apf
+                = tp->isFloatTy()
+                      ? llvm::APFloat(std::visit([](const auto &v) { return static_cast<float>(v); }, n.value()))
+                      : llvm::APFloat(std::visit([](const auto &v) { return static_cast<double>(v); }, n.value()));
+
+            return llvm::ConstantFP::get(s.context(), apf);
+        }
+
+        // Fetch the FP semantics and precision.
+        const auto &sem = tp->getFltSemantics();
+        const auto prec = llvm::APFloatBase::semanticsPrecision(sem);
+
+        // Compute the number of base-10 digits that are necessary to uniquely represent
+        // all distinct values of the type tp. See:
+        // https://en.cppreference.com/w/cpp/types/numeric_limits/max_digits10
+        const auto max_d10 = boost::numeric_cast<std::streamsize>(std::ceil(prec * std::log10(2.) + 1));
+
+#if !defined(NDEBUG) && defined(HEYOKA_HAVE_REAL128)
+
+        if (tp == llvm::Type::getFP128Ty(s.context())) {
+            assert(max_d10 == std::numeric_limits<mppp::real128>::max_digits10);
+            assert(prec == static_cast<unsigned>(std::numeric_limits<mppp::real128>::digits));
+        }
+
+#endif
+
+        // Fetch a string representation of n via the stream operator.
+        // Ensure that we use max_d10 digits in the representation, so that
+        // we get the closest approximation possible of n for the type tp.
+        std::ostringstream ss;
+        ss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+        ss.imbue(std::locale::classic());
+        ss.precision(max_d10);
+
+        const auto str_rep = std::visit(
+            [&ss](const auto &v) {
+                ss << v;
+
+                return ss.str();
             },
             n.value());
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return std::visit(
-            [&s](const auto &v) -> llvm::Value * {
-                if constexpr (std::is_constructible_v<long double, decltype(v)>) {
-                    // NOTE: the idea here is that we first fetch the FP
-                    // semantics of the LLVM type long double corresponds
-                    // to. Then we use them to construct a FP constant from
-                    // the string representation of v.
-                    // NOTE: v must be cast to long double so that we ensure
-                    // that fmt produces a string representation
-                    // of v in long double precision accurate to the
-                    // last digit.
-                    // NOTE: regarding the format string: we use the general format
-                    // 'g' and a precision of max_digits10, which should guarantee
-                    // round trip behaviour. Note that when using 'g', the precision
-                    // argument represents the total number of significant digits
-                    // printed (before and after the decimal point).
-                    const auto &sem = detail::to_llvm_type<long double>(s.context())->getFltSemantics();
-                    return llvm::ConstantFP::get(
-                        s.context(), llvm::APFloat(sem, fmt::format("{:.{}g}", static_cast<long double>(v),
-                                                                    std::numeric_limits<long double>::max_digits10)));
-                } else {
-                    // LCOV_EXCL_START
-                    throw std::invalid_argument(
-                        fmt::format("Cannot perform long double codegen for the type {} on this platform",
-                                    boost::core::demangle(typeid(decltype(v)).name())));
-                    // LCOV_EXCL_STOP
-                }
-            },
-            n.value());
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return std::visit(
-            [&s](const auto &v) {
-                const auto &sem = detail::to_llvm_type<mppp::real128>(s.context())->getFltSemantics();
-                // NOTE: for real128 use directly the to_string() member function, which guarantees
-                // round trip behaviour.
-                return llvm::ConstantFP::get(s.context(),
-                                             llvm::APFloat(sem, static_cast<mppp::real128>(v).to_string()));
-            },
-            n.value());
+
+        // Construct the FP constant.
+        // NOTE: llvm will deduce the correct type for the codegen from the supplied
+        // floating-point semantics.
+        return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, str_rep));
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (const auto real_prec = detail::llvm_is_real(tp)) {
+        // From the number, generate a real with the desired precition.
+        const auto r = std::visit([real_prec](const auto &v) { return mppp::real{v, real_prec}; }, n.value());
+
+        // Generate the limb array in LLVM.
+        auto *struct_tp = llvm::cast<llvm::StructType>(tp);
+        auto *limb_array_t = llvm::cast<llvm::ArrayType>(struct_tp->elements()[2]);
+
+        std::vector<llvm::Constant *> limbs;
+        for (std::size_t i = 0; i < r.get_nlimbs(); ++i) {
+            limbs.push_back(llvm::ConstantInt::get(limb_array_t->getElementType(),
+                                                   boost::numeric_cast<std::uint64_t>(r.get_mpfr_t()->_mpfr_d[i])));
+        }
+
+        auto *limb_arr = llvm::ConstantArray::get(limb_array_t, limbs);
+
+        // Generate sign and exponent.
+        auto *sign = llvm::ConstantInt::getSigned(struct_tp->elements()[0],
+                                                  boost::numeric_cast<std::int64_t>(r.get_mpfr_t()->_mpfr_sign));
+        auto *exp = llvm::ConstantInt::getSigned(struct_tp->elements()[1],
+                                                 boost::numeric_cast<std::int64_t>(r.get_mpfr_t()->_mpfr_exp));
+
+        // Generate the struct.
+        return llvm::ConstantStruct::get(struct_tp, {sign, exp, limb_arr});
 #endif
     } else {
-        // LCOV_EXCL_START
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-        // LCOV_EXCL_STOP
+        throw std::invalid_argument(
+            fmt::format("Cannot generate an LLVM constant of type '{}'", detail::llvm_type_name(tp)));
     }
 }
 
-template HEYOKA_DLL_PUBLIC llvm::Value *codegen<float>(llvm_state &, const number &);
+namespace detail
+{
 
-template HEYOKA_DLL_PUBLIC llvm::Value *codegen<double>(llvm_state &, const number &);
+// A small helper to create a number instance containing the value val
+// cast to the C++ type corresponding to the LLVM type tp.
+number number_like(llvm_state &s, llvm::Type *tp, double val)
+{
+    assert(tp != nullptr);
 
-template HEYOKA_DLL_PUBLIC llvm::Value *codegen<long double>(llvm_state &, const number &);
+    auto &context = s.context();
 
+    if (tp == to_llvm_type<float>(context, false)) {
+        return number{static_cast<float>(val)};
+    } else if (tp == to_llvm_type<double>(context, false)) {
+        return number{val};
+    } else if (tp == to_llvm_type<long double>(context, false)) {
+        return number{static_cast<long double>(val)};
 #if defined(HEYOKA_HAVE_REAL128)
-
-template HEYOKA_DLL_PUBLIC llvm::Value *codegen<mppp::real128>(llvm_state &, const number &);
-
+    } else if (tp == to_llvm_type<mppp::real128>(context, false)) {
+        return number{static_cast<mppp::real128>(val)};
 #endif
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (const auto real_prec = llvm_is_real(tp)) {
+        return number{mppp::real{val, real_prec}};
+#endif
+    }
+
+    throw std::invalid_argument(
+        fmt::format("Unable to create a number of type '{}' from the input value {}", llvm_type_name(tp), val));
+}
+
+} // namespace detail
 
 } // namespace heyoka

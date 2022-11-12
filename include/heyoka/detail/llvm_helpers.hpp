@@ -9,8 +9,6 @@
 #ifndef HEYOKA_DETAIL_LLVM_HELPERS_HPP
 #define HEYOKA_DETAIL_LLVM_HELPERS_HPP
 
-#include <heyoka/config.hpp>
-
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -29,16 +27,20 @@
 namespace heyoka::detail
 {
 
-HEYOKA_DLL_PUBLIC llvm::Type *to_llvm_type_impl(llvm::LLVMContext &, const std::type_info &);
+HEYOKA_DLL_PUBLIC llvm::Type *to_llvm_type_impl(llvm::LLVMContext &, const std::type_info &, bool);
 
 // Helper to associate a C++ type to an LLVM type.
 template <typename T>
-inline llvm::Type *to_llvm_type(llvm::LLVMContext &c)
+inline llvm::Type *to_llvm_type(llvm::LLVMContext &c, bool err_throw = true)
 {
-    return to_llvm_type_impl(c, typeid(T));
+    return to_llvm_type_impl(c, typeid(T), err_throw);
 }
 
+template <typename T>
+HEYOKA_DLL_PUBLIC llvm::Type *llvm_type_like(llvm_state &, const T &);
+
 HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Type *llvm_ext_type(llvm::Type *);
 
 // Helper to construct an LLVM vector type of size batch_size with elements
 // of the LLVM type tp corresponding to the C++ type T. If batch_size is 1, tp
@@ -59,9 +61,13 @@ HEYOKA_DLL_PUBLIC llvm::Value *to_size_t(llvm_state &, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC llvm::GlobalVariable *make_global_zero_array(llvm::Module &, llvm::ArrayType *);
 
-HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Value *, std::uint32_t);
-HEYOKA_DLL_PUBLIC void store_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Type *, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *ext_load_vector_from_memory(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t);
+
 llvm::Value *gather_vector_from_memory(ir_builder &, llvm::Type *, llvm::Value *);
+
+HEYOKA_DLL_PUBLIC void store_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC void ext_store_vector_to_memory(llvm_state &, llvm::Value *, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC llvm::Value *vector_splat(ir_builder &, llvm::Value *, std::uint32_t);
 
@@ -71,7 +77,7 @@ HEYOKA_DLL_PUBLIC llvm::Value *scalars_to_vector(ir_builder &, const std::vector
 
 HEYOKA_DLL_PUBLIC llvm::Value *pairwise_reduce(std::vector<llvm::Value *> &,
                                                const std::function<llvm::Value *(llvm::Value *, llvm::Value *)> &);
-HEYOKA_DLL_PUBLIC llvm::Value *pairwise_sum(ir_builder &, std::vector<llvm::Value *> &);
+HEYOKA_DLL_PUBLIC llvm::Value *pairwise_sum(llvm_state &, std::vector<llvm::Value *> &);
 
 HEYOKA_DLL_PUBLIC llvm::CallInst *llvm_invoke_intrinsic(ir_builder &, const std::string &,
                                                         const std::vector<llvm::Type *> &,
@@ -94,8 +100,6 @@ HEYOKA_DLL_PUBLIC void llvm_while_loop(llvm_state &, const std::function<llvm::V
 HEYOKA_DLL_PUBLIC void llvm_if_then_else(llvm_state &, llvm::Value *, const std::function<void()> &,
                                          const std::function<void()> &);
 
-HEYOKA_DLL_PUBLIC llvm::Type *pointee_type(llvm::Value *);
-
 HEYOKA_DLL_PUBLIC std::string llvm_type_name(llvm::Type *);
 
 HEYOKA_DLL_PUBLIC bool compare_function_signature(llvm::Function *, llvm::Type *, const std::vector<llvm::Type *> &);
@@ -103,18 +107,36 @@ HEYOKA_DLL_PUBLIC bool compare_function_signature(llvm::Function *, llvm::Type *
 HEYOKA_DLL_PUBLIC llvm::Value *call_extern_vec(llvm_state &, const std::vector<llvm::Value *> &, const std::string &);
 
 // Math helpers.
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_modulus(llvm_state &, llvm::Value *, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_abs(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fadd(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fsub(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fmul(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fdiv(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fneg(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fma(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_square(llvm_state &, llvm::Value *);
+
+HEYOKA_DLL_PUBLIC llvm::Constant *llvm_constantfp(llvm_state &, llvm::Type *, double);
+
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_ult(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_oge(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_ole(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_olt(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_fcmp_oeq(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_min(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_max(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_min_nan(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_max_nan(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_sgn(llvm_state &, llvm::Value *);
+
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_ui_to_fp(llvm_state &, llvm::Value *, llvm::Type *);
+
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_modulus(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_abs(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_floor(llvm_state &, llvm::Value *);
+
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_atan2(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_exp(llvm_state &, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_fma(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_floor(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_acos(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_acosh(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_asin(llvm_state &, llvm::Value *);
@@ -126,82 +148,27 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_sin(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_cosh(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_erf(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_log(llvm_state &, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_neg(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_sigmoid(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_sinh(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_sqrt(llvm_state &, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_square(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_tan(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_tanh(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_pow(llvm_state &, llvm::Value *, llvm::Value *, bool = false);
 
-template <typename>
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc(llvm_state &, std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
 
-template <typename>
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &, llvm::Type *, llvm::Value *,
+                                                                             std::uint32_t, llvm::Value *,
+                                                                             llvm::Value *, std::uint32_t);
+
 HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_interval(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, llvm::Value *, std::uint32_t);
+llvm_penc_cargo_shisha(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
 
-template <typename>
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
-llvm_penc_cargo_shisha(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
+llvm::Function *llvm_add_inv_kep_E(llvm_state &, llvm::Type *, std::uint32_t);
 
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_dbl(llvm_state &, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_ldbl(llvm_state &, std::uint32_t);
+HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper(llvm_state &, llvm::Type *, std::uint32_t, const std::string &);
 
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_f128(llvm_state &, std::uint32_t);
-
-#endif
-
-template <typename T>
-inline llvm::Function *llvm_add_inv_kep_E(llvm_state &s, std::uint32_t batch_size)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return llvm_add_inv_kep_E_dbl(s, batch_size);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return llvm_add_inv_kep_E_ldbl(s, batch_size);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return llvm_add_inv_kep_E_f128(s, batch_size);
-#endif
-    } else {
-        static_assert(always_false_v<T>, "Unhandled type.");
-    }
-}
-
-template <typename>
-HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper(llvm_state &, std::uint32_t, const std::string &);
-
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array_dbl(llvm_state &, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array_ldbl(llvm_state &, std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array_f128(llvm_state &, std::uint32_t);
-
-#endif
-
-template <typename T>
-inline llvm::Value *llvm_add_bc_array(llvm_state &s, std::uint32_t n)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return llvm_add_bc_array_dbl(s, n);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return llvm_add_bc_array_ldbl(s, n);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return llvm_add_bc_array_f128(s, n);
-#endif
-    } else {
-        static_assert(always_false_v<T>, "Unhandled type.");
-    }
-}
-
-// Helpers to double check the modifications needed
-// by LLVM deprecations.
-bool llvm_depr_GEP_type_check(llvm::Value *, llvm::Type *);
+llvm::Value *llvm_add_bc_array(llvm_state &, llvm::Type *, std::uint32_t);
 
 // Primitives for double-length arithmetic.
 

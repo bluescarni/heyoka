@@ -2,14 +2,14 @@
 version: 2.1
 
 jobs:
-  focal_gcc9_conda_asan:
+  conda_asan:
     docker:
-    - image: circleci/buildpack-deps:focal
+    - image: cimg/base:current
     steps:
     - checkout
     - run:
         name: Build and test
-        command: bash ./tools/circleci_focal_gcc9_conda_asan.sh
+        command: bash ./tools/circleci_conda_asan.sh
   ubuntu_arm64:
     machine:
       image: ubuntu-2004:202101-01
@@ -24,5 +24,5 @@ workflows:
   version: 2.1
   all_builds:
     jobs:
-    - focal_gcc9_conda_asan
+    - conda_asan
     - ubuntu_arm64

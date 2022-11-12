@@ -30,13 +30,15 @@
 
 #endif
 
+#if defined(MPPP_WITH_MPFR)
+
+#define HEYOKA_HAVE_REAL
+
 #endif
 
-#if defined(__i386) || defined(_M_IX86) || defined(_X86_) || defined(__amd64__) || defined(_M_AMD64)
+#endif
 
-#define HEYOKA_ARCH_X86
-
-#elif defined(_ARCH_PPC) || defined(_M_PPC)
+#if defined(_ARCH_PPC) || defined(_M_PPC)
 
 #define HEYOKA_ARCH_PPC
 

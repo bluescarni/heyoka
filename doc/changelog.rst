@@ -1,15 +1,47 @@
 Changelog
 =========
 
-0.19.0 (unreleased)
+0.20.0 (unreleased)
 -------------------
 
 New
 ~~~
 
+- Support LLVM 15
+  (`#274 <https://github.com/bluescarni/heyoka/pull/274>`__).
+
+Fix
+~~~
+
+- Avoid accidental indirect inclusion of libquadmath's header file
+  (`#279 <https://github.com/bluescarni/heyoka/pull/279>`__).
+
+0.19.0 (2022-09-18)
+-------------------
+
+New
+~~~
+
+- Add a short tutorial on extended-precision computations
+  (`#270 <https://github.com/bluescarni/heyoka/pull/270>`__).
+- The numerical integrator classes now support class template argument deduction
+  (`#267 <https://github.com/bluescarni/heyoka/pull/267>`__).
 - Add the capability to compile multivariate vector functions
   at runtime
   (`#261 <https://github.com/bluescarni/heyoka/pull/261>`__).
+
+Changes
+~~~~~~~
+
+- heyoka now builds against recent versions of the fmt library
+  without deprecation warnings
+  (`#266 <https://github.com/bluescarni/heyoka/pull/266>`__).
+
+Fix
+~~~
+
+- Fix compilation against recent LLVM 14.x releases on Windows
+  (`#268 <https://github.com/bluescarni/heyoka/pull/268>`__).
 
 0.18.0 (2022-05-11)
 -------------------

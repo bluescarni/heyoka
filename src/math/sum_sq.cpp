@@ -109,12 +109,11 @@ expression sum_sq_impl::diff(std::unordered_map<const void *, expression> &func_
 namespace
 {
 
-template <typename T>
-llvm::Value *sum_sq_llvm_eval_impl(llvm_state &s, const func_base &fb, const std::vector<llvm::Value *> &eval_arr,
-                                   llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
-                                   bool high_accuracy)
+llvm::Value *sum_sq_llvm_eval_impl(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
+                                   const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
+                                   llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy)
 {
-    return llvm_eval_helper<T>(
+    return llvm_eval_helper(
         [&s](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
             std::vector<llvm::Value *> sqs;
 
@@ -122,45 +121,27 @@ llvm::Value *sum_sq_llvm_eval_impl(llvm_state &s, const func_base &fb, const std
                 sqs.push_back(llvm_square(s, val));
             }
 
-            return pairwise_sum(s.builder(), sqs);
+            return pairwise_sum(s, sqs);
         },
-        fb, s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+        fb, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 } // namespace
 
-llvm::Value *sum_sq_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                        llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Value *sum_sq_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                                    llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                    bool high_accuracy) const
 {
-    return sum_sq_llvm_eval_impl<double>(s, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    return sum_sq_llvm_eval_impl(s, fp_t, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
-
-llvm::Value *sum_sq_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
-                                         llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
-                                         bool high_accuracy) const
-{
-    return sum_sq_llvm_eval_impl<long double>(s, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *sum_sq_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr,
-                                         llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
-                                         bool high_accuracy) const
-{
-    return sum_sq_llvm_eval_impl<mppp::real128>(s, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);
-}
-
-#endif
 
 namespace
 {
 
-template <typename T>
-[[nodiscard]] llvm::Function *sum_sq_llvm_c_eval(llvm_state &s, const func_base &fb, std::uint32_t batch_size,
-                                                 bool high_accuracy)
+[[nodiscard]] llvm::Function *sum_sq_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
+                                                 std::uint32_t batch_size, bool high_accuracy)
 {
-    return llvm_c_eval_func_helper<T>(
+    return llvm_c_eval_func_helper(
         "sum_sq",
         [&s](const std::vector<llvm::Value *> &args, bool) {
             std::vector<llvm::Value *> sqs;
@@ -169,39 +150,26 @@ template <typename T>
                 sqs.push_back(llvm_square(s, val));
             }
 
-            return pairwise_sum(s.builder(), sqs);
+            return pairwise_sum(s, sqs);
         },
-        fb, s, batch_size, high_accuracy);
+        fb, s, fp_t, batch_size, high_accuracy);
 }
 
 } // namespace
 
-llvm::Function *sum_sq_impl::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Function *sum_sq_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                              bool high_accuracy) const
 {
-    return sum_sq_llvm_c_eval<double>(s, *this, batch_size, high_accuracy);
+    return sum_sq_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy);
 }
-
-llvm::Function *sum_sq_impl::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return sum_sq_llvm_c_eval<long double>(s, *this, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *sum_sq_impl::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return sum_sq_llvm_c_eval<mppp::real128>(s, *this, batch_size, high_accuracy);
-}
-
-#endif
 
 namespace
 {
 
-template <typename T>
-llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, const sum_sq_impl &sf, const std::vector<std::uint32_t> &deps,
-                                     const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
-                                     std::uint32_t order, std::uint32_t batch_size)
+llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_sq_impl &sf,
+                                     const std::vector<std::uint32_t> &deps, const std::vector<llvm::Value *> &arr,
+                                     llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order,
+                                     std::uint32_t batch_size)
 {
     // NOTE: this is prevented in the implementation
     // of the sum_sq() function.
@@ -239,7 +207,7 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, const sum_sq_impl &sf, const
                         auto v0 = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
                         auto v1 = taylor_fetch_diff(arr, u_idx, j, n_uvars);
 
-                        v_sums[k].push_back(builder.CreateFMul(v0, v1));
+                        v_sums[k].push_back(llvm_fmul(s, v0, v1));
                     } else if constexpr (is_num_param_v<type>) {
                         // Number/param.
 
@@ -247,7 +215,7 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, const sum_sq_impl &sf, const
                         // will be zero. Thus, ensure that v_sums[k] just
                         // contains a single zero.
                         if (v_sums[k].empty()) {
-                            v_sums[k].push_back(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+                            v_sums[k].push_back(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size));
                         }
                     } else {
                         // LCOV_EXCL_START
@@ -271,14 +239,14 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, const sum_sq_impl &sf, const
         std::vector<llvm::Value *> tmp;
         tmp.reserve(boost::numeric_cast<decltype(tmp.size())>(v_sums.size()));
         for (auto &v_sum : v_sums) {
-            tmp.push_back(pairwise_sum(builder, v_sum));
+            tmp.push_back(pairwise_sum(s, v_sum));
         }
 
         // Sum the sums.
-        pairwise_sum(builder, tmp);
+        pairwise_sum(s, tmp);
 
         // Multiply by 2 and return.
-        return builder.CreateFAdd(tmp[0], tmp[0]);
+        return llvm_fadd(s, tmp[0], tmp[0]);
     } else {
         // Even order.
         for (std::uint32_t j = 0; order > 0u && j <= (order - 2u) / 2u; ++j) {
@@ -298,14 +266,14 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, const sum_sq_impl &sf, const
                     if constexpr (std::is_same_v<type, variable>) {
                         // Variable.
                         auto val = taylor_fetch_diff(arr, uname_to_index(v.name()), order / 2u, n_uvars);
-                        return builder.CreateFMul(val, val);
+                        return llvm_fmul(s, val, val);
                     } else if constexpr (is_num_param_v<type>) {
                         // Number/param.
                         if (order == 0u) {
-                            auto val = taylor_codegen_numparam<T>(s, v, par_ptr, batch_size);
-                            return builder.CreateFMul(val, val);
+                            auto val = taylor_codegen_numparam(s, fp_t, v, par_ptr, batch_size);
+                            return llvm_fmul(s, val, val);
                         } else {
-                            return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+                            return vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
                         }
                     } else {
                         // LCOV_EXCL_START
@@ -321,55 +289,34 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, const sum_sq_impl &sf, const
             // the items in v_sums are all empty and tmp.back() contains only the term
             // outside the summation.
             if (order > 0u) {
-                auto p_sum = pairwise_sum(builder, v_sums[k]);
+                auto *p_sum = pairwise_sum(s, v_sums[k]);
                 // Muliply the pairwise sum by 2.
-                p_sum = builder.CreateFAdd(p_sum, p_sum);
+                p_sum = llvm_fadd(s, p_sum, p_sum);
                 // Add it to the term outside the sum.
-                tmp.back() = builder.CreateFAdd(p_sum, tmp.back());
+                tmp.back() = llvm_fadd(s, p_sum, tmp.back());
             }
         }
 
         // Sum the sums and return.
-        return pairwise_sum(builder, tmp);
+        return pairwise_sum(s, tmp);
     }
 }
 
 } // namespace
 
-llvm::Value *sum_sq_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                          std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
-                                          std::uint32_t batch_size, bool) const
+llvm::Value *sum_sq_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                      const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                      std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+                                      std::uint32_t batch_size, bool) const
 {
-    return sum_sq_taylor_diff_impl<double>(s, *this, deps, arr, par_ptr, n_uvars, order, batch_size);
+    return sum_sq_taylor_diff_impl(s, fp_t, *this, deps, arr, par_ptr, n_uvars, order, batch_size);
 }
-
-llvm::Value *sum_sq_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                           const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                           std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
-                                           std::uint32_t batch_size, bool) const
-{
-    return sum_sq_taylor_diff_impl<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *sum_sq_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                           const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                           std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
-                                           std::uint32_t batch_size, bool) const
-{
-    return sum_sq_taylor_diff_impl<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, batch_size);
-}
-
-#endif
 
 namespace
 {
 
-template <typename T>
-llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl &sf, std::uint32_t n_uvars,
-                                               std::uint32_t batch_size)
+llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, const sum_sq_impl &sf,
+                                               std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     // NOTE: this is prevented in the implementation
     // of the sum() function.
@@ -379,8 +326,8 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Build the vector of arguments needed to determine the function name.
     std::vector<std::variant<variable, number, param>> nm_args;
@@ -403,7 +350,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
     }
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "sum_sq", n_uvars, batch_size, nm_args);
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "sum_sq", n_uvars, batch_size, nm_args);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -414,7 +361,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -438,7 +385,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
         v_accs.resize(boost::numeric_cast<decltype(v_accs.size())>(sf.args().size()));
         for (auto &acc : v_accs) {
             acc = builder.CreateAlloca(val_t);
-            builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+            builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
         }
 
         // Create the return value.
@@ -455,13 +402,13 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
 
                         if constexpr (std::is_same_v<type, variable>) {
                             // Variable.
-                            auto v0 = taylor_c_load_diff(s, diff_arr, n_uvars, builder.CreateSub(order, j), terms + k);
-                            auto v1 = taylor_c_load_diff(s, diff_arr, n_uvars, j, terms + k);
+                            auto v0 = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, builder.CreateSub(order, j),
+                                                         terms + k);
+                            auto v1 = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, j, terms + k);
 
                             // Update the k-th accumulator.
                             builder.CreateStore(
-                                builder.CreateFAdd(builder.CreateLoad(val_t, v_accs[k]), builder.CreateFMul(v0, v1)),
-                                v_accs[k]);
+                                llvm_fadd(s, builder.CreateLoad(val_t, v_accs[k]), llvm_fmul(s, v0, v1)), v_accs[k]);
                         } else if constexpr (is_num_param_v<type>) {
                             // Number/param: nothing to do, leave the accumulator to zero.
                         } else {
@@ -496,10 +443,10 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
                 for (auto &acc : v_accs) {
                     tmp.push_back(builder.CreateLoad(val_t, acc));
                 }
-                auto ret = pairwise_sum(builder, tmp);
+                auto ret = pairwise_sum(s, tmp);
 
                 // Return 2 * ret.
-                builder.CreateStore(builder.CreateFAdd(ret, ret), retval);
+                builder.CreateStore(llvm_fadd(s, ret, ret), retval);
             },
             [&]() {
                 // Even order.
@@ -524,7 +471,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
                 for (decltype(sf.args().size()) k = 0; k < sf.args().size(); ++k) {
                     // Load the current accumulator and multiply it by 2.
                     auto acc_val = builder.CreateLoad(val_t, v_accs[k]);
-                    auto acc2 = builder.CreateFAdd(acc_val, acc_val);
+                    auto acc2 = llvm_fadd(s, acc_val, acc_val);
 
                     // Load the external term.
                     auto ex_term = std::visit( // LCOV_EXCL_LINE
@@ -533,9 +480,10 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
 
                             if constexpr (std::is_same_v<type, variable>) {
                                 // Variable.
-                                auto val = taylor_c_load_diff(
-                                    s, diff_arr, n_uvars, builder.CreateUDiv(order, builder.getInt32(2)), terms + k);
-                                return builder.CreateFMul(val, val);
+                                auto val
+                                    = taylor_c_load_diff(s, val_t, diff_arr, n_uvars,
+                                                         builder.CreateUDiv(order, builder.getInt32(2)), terms + k);
+                                return llvm_fmul(s, val, val);
                             } else if constexpr (is_num_param_v<type>) {
                                 // Number/param.
                                 auto ret = builder.CreateAlloca(val_t);
@@ -545,17 +493,18 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
                                     [&]() {
                                         // Order 0, store the num/param.
                                         builder.CreateStore(
-                                            taylor_c_diff_numparam_codegen(s, v, terms + k, par_ptr, batch_size), ret);
+                                            taylor_c_diff_numparam_codegen(s, fp_t, v, terms + k, par_ptr, batch_size),
+                                            ret);
                                     },
                                     [&]() {
                                         // Order 2 or higher, store zero.
                                         builder.CreateStore(
-                                            vector_splat(builder, codegen<T>(s, number{0.}), batch_size), ret);
+                                            vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), ret);
                                     });
 
                                 auto val = builder.CreateLoad(val_t, ret);
 
-                                return builder.CreateFMul(val, val);
+                                return llvm_fmul(s, val, val);
                             } else {
                                 // LCOV_EXCL_START
                                 throw std::invalid_argument(
@@ -567,11 +516,11 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
                         sf.args()[k].value());
 
                     // Compute the Taylor derivative for the current argument.
-                    tmp.push_back(builder.CreateFAdd(acc2, ex_term));
+                    tmp.push_back(llvm_fadd(s, acc2, ex_term));
                 }
 
                 // Return the pairwise sum.
-                builder.CreateStore(pairwise_sum(builder, tmp), retval);
+                builder.CreateStore(pairwise_sum(s, tmp), retval);
             });
 
         // Create the return value.
@@ -600,28 +549,11 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
 
 } // namespace
 
-llvm::Function *sum_sq_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                    bool) const
+llvm::Function *sum_sq_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                                std::uint32_t batch_size, bool) const
 {
-    return sum_sq_taylor_c_diff_func_impl<double>(s, *this, n_uvars, batch_size);
+    return sum_sq_taylor_c_diff_func_impl(s, fp_t, *this, n_uvars, batch_size);
 }
-
-llvm::Function *sum_sq_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                     bool) const
-{
-    return sum_sq_taylor_c_diff_func_impl<long double>(s, *this, n_uvars, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *sum_sq_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                     bool) const
-{
-    return sum_sq_taylor_c_diff_func_impl<mppp::real128>(s, *this, n_uvars, batch_size);
-}
-
-#endif
-
 } // namespace detail
 
 expression sum_sq(std::vector<expression> args, std::uint32_t split)

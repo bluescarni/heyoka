@@ -40,6 +40,14 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#include <heyoka/detail/real_helpers.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -92,65 +100,32 @@ mppp::real128 erf_impl::eval_f128(const std::unordered_map<std::string, mppp::re
 }
 #endif
 
-llvm::Value *erf_impl::llvm_eval_dbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                     llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Value *erf_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                                 llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                 bool high_accuracy) const
 {
-    return llvm_eval_helper<double>([&s](const std::vector<llvm::Value *> &args, bool) { return llvm_erf(s, args[0]); },
-                                    *this, s, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    return llvm_eval_helper([&s](const std::vector<llvm::Value *> &args, bool) { return llvm_erf(s, args[0]); }, *this,
+                            s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
-
-llvm::Value *erf_impl::llvm_eval_ldbl(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                      llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return llvm_eval_helper<long double>(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_erf(s, args[0]); }, *this, s, eval_arr,
-        par_ptr, stride, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *erf_impl::llvm_eval_f128(llvm_state &s, const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                      llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return llvm_eval_helper<mppp::real128>(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_erf(s, args[0]); }, *this, s, eval_arr,
-        par_ptr, stride, batch_size, high_accuracy);
-}
-
-#endif
 
 namespace
 {
 
-template <typename T>
-[[nodiscard]] llvm::Function *erf_llvm_c_eval(llvm_state &s, const func_base &fb, std::uint32_t batch_size,
-                                              bool high_accuracy)
+[[nodiscard]] llvm::Function *erf_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
+                                              std::uint32_t batch_size, bool high_accuracy)
 {
-    return llvm_c_eval_func_helper<T>(
-        "erf", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_erf(s, args[0]); }, fb, s, batch_size,
-        high_accuracy);
+    return llvm_c_eval_func_helper(
+        "erf", [&s](const std::vector<llvm::Value *> &args, bool) { return llvm_erf(s, args[0]); }, fb, s, fp_t,
+        batch_size, high_accuracy);
 }
 
 } // namespace
 
-llvm::Function *erf_impl::llvm_c_eval_func_dbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
+llvm::Function *erf_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                           bool high_accuracy) const
 {
-    return erf_llvm_c_eval<double>(s, *this, batch_size, high_accuracy);
+    return erf_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy);
 }
-
-llvm::Function *erf_impl::llvm_c_eval_func_ldbl(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return erf_llvm_c_eval<long double>(s, *this, batch_size, high_accuracy);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *erf_impl::llvm_c_eval_func_f128(llvm_state &s, std::uint32_t batch_size, bool high_accuracy) const
-{
-    return erf_llvm_c_eval<mppp::real128>(s, *this, batch_size, high_accuracy);
-}
-
-#endif
 
 taylor_dc_t::size_type erf_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
@@ -180,35 +155,57 @@ taylor_dc_t::size_type erf_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 namespace
 {
 
-// Variable template for the constant sqrt(pi) / 2 at different levels of precision.
-template <typename T>
-const auto sqrt_pi_2 = std::sqrt(boost::math::constants::pi<T>()) / 2;
+// Small helper to compute sqrt(pi) / 2 at the precision of the floating-point type tp.
+// NOTE: this is a repetition of number_like(), perhaps we can abstract this?
+number sqrt_pi_2_like(llvm_state &s, llvm::Type *tp)
+{
+    assert(tp != nullptr);
 
+    auto &context = s.context();
+
+    if (tp == to_llvm_type<float>(context, false)) {
+        return number{std::sqrt(boost::math::constants::pi<float>()) / 2};
+    } else if (tp == to_llvm_type<double>(context, false)) {
+        return number{std::sqrt(boost::math::constants::pi<double>()) / 2};
+    } else if (tp == to_llvm_type<long double>(context, false)) {
+        return number{std::sqrt(boost::math::constants::pi<long double>()) / 2};
 #if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-const mppp::real128 sqrt_pi_2<mppp::real128> = mppp::sqrt(mppp::pi_128) / 2;
-
+    } else if (tp == to_llvm_type<mppp::real128>(context, false)) {
+        return number{mppp::sqrt(mppp::pi_128) / 2};
 #endif
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (const auto real_prec = llvm_is_real(tp)) {
+        auto ret = mppp::sqrt(mppp::real_pi(real_prec));
+        mppp::div_2ui(ret, ret, 1ul);
+
+        return number{std::move(ret)};
+#endif
+    }
+
+    // LCOV_EXCL_START
+    throw std::invalid_argument(
+        fmt::format("Unable to create a number of type '{}' from the constant sqrt(pi) / 2", llvm_type_name(tp)));
+    // LCOV_EXCL_STOP
+}
 
 // Derivative of erf(number).
-template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_erf_impl(llvm_state &s, const erf_impl &, const std::vector<std::uint32_t> &, const U &num,
-                                  const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
+template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *taylor_diff_erf_impl(llvm_state &s, llvm::Type *fp_t, const erf_impl &, const std::vector<std::uint32_t> &,
+                                  const U &num, const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
                                   std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     if (order == 0u) {
-        return llvm_erf(s, taylor_codegen_numparam<T>(s, num, par_ptr, batch_size));
+        return llvm_erf(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
     } else {
-        return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+        return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
 }
 
 // Derivative of erf(variable).
-template <typename T>
-llvm::Value *taylor_diff_erf_impl(llvm_state &s, const erf_impl &, const std::vector<std::uint32_t> &deps,
-                                  const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *,
-                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+llvm::Value *taylor_diff_erf_impl(llvm_state &s, llvm::Type *fp_t, const erf_impl &,
+                                  const std::vector<std::uint32_t> &deps, const variable &var,
+                                  const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
+                                  std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     assert(deps.size() == 1u);
 
@@ -226,38 +223,37 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, const erf_impl &, const std::ve
     for (std::uint32_t j = 1; j <= order; ++j) {
         // NOTE: the only hidden dependency contains the index of the
         // u variable whose definition is exp(- var * var).
-        auto bj = taylor_fetch_diff(arr, b_idx, j, n_uvars);
-        auto cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
+        auto *bj = taylor_fetch_diff(arr, b_idx, j, n_uvars);
+        auto *cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
 
-        auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
+        auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
 
         // Add j*cnj*bj to the sum vector.
-        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(cnj, bj)));
+        sum.push_back(llvm_fmul(s, fac, llvm_fmul(s, cnj, bj)));
     }
 
     // Create ret with the sum.
-    auto ret = pairwise_sum(builder, sum);
+    auto *ret = pairwise_sum(s, sum);
 
     // Generate the factor n * sqrt(pi) / 2.
-    auto fac = number(order * sqrt_pi_2<T>);
-    auto fac_s = vector_splat(builder, codegen<T>(s, fac), batch_size);
+    auto fac = number_like(s, fp_t, static_cast<double>(order)) * sqrt_pi_2_like(s, fp_t);
+    auto *fac_s = vector_splat(builder, llvm_codegen(s, fp_t, fac), batch_size);
 
     // Multiply and return.
-    return builder.CreateFDiv(ret, fac_s);
+    return llvm_fdiv(s, ret, fac_s);
 }
 
 // All the other cases.
-template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_erf_impl(llvm_state &, const erf_impl &, const std::vector<std::uint32_t> &, const U &,
-                                  const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
-                                  std::uint32_t, std::uint32_t)
+template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
+llvm::Value *taylor_diff_erf_impl(llvm_state &, llvm::Type *, const erf_impl &, const std::vector<std::uint32_t> &,
+                                  const U &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+                                  std::uint32_t, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of the error function");
 }
 
-template <typename T>
-llvm::Value *taylor_diff_erf(llvm_state &s, const erf_impl &f, const std::vector<std::uint32_t> &deps,
+llvm::Value *taylor_diff_erf(llvm_state &s, llvm::Type *fp_t, const erf_impl &f, const std::vector<std::uint32_t> &deps,
                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
@@ -272,51 +268,31 @@ llvm::Value *taylor_diff_erf(llvm_state &s, const erf_impl &f, const std::vector
 
     return std::visit(
         [&](const auto &v) {
-            return taylor_diff_erf_impl<T>(s, f, deps, v, arr, par_ptr, n_uvars, order, idx, batch_size);
+            return taylor_diff_erf_impl(s, fp_t, f, deps, v, arr, par_ptr, n_uvars, order, idx, batch_size);
         },
         f.args()[0].value());
 }
 
 } // namespace
 
-llvm::Value *erf_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                       const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                       std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                       std::uint32_t batch_size, bool) const
+llvm::Value *erf_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                   const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                   std::uint32_t batch_size, bool) const
 {
-    return taylor_diff_erf<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_erf(s, fp_t, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
-
-llvm::Value *erf_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                        std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_erf<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *erf_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                        std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_erf<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
-}
-
-#endif
 
 namespace
 {
 
 // Derivative of erf(number).
-template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &, const U &num, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, llvm::Type *fp_t, const erf_impl &, const U &num,
+                                            std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_numpar<T>(
-        s, n_uvars, batch_size, "erf", 1,
+    return taylor_c_diff_func_numpar(
+        s, fp_t, n_uvars, batch_size, "erf", 1,
         [&s](const auto &args) {
             // LCOV_EXCL_START
             assert(args.size() == 1u);
@@ -329,19 +305,18 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &, con
 }
 
 // Derivative of erf(variable).
-template <typename T>
-llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &, const variable &var, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, llvm::Type *fp_t, const erf_impl &, const variable &var,
+                                            std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "erf", n_uvars, batch_size, {var}, 1);
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "erf", n_uvars, batch_size, {var}, 1);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -352,7 +327,7 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &, con
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -379,34 +354,33 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &, con
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of b_idx.
-                builder.CreateStore(llvm_erf(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx)),
-                                    retval);
+                builder.CreateStore(
+                    llvm_erf(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), b_idx)), retval);
             },
             [&]() {
                 // Compute the fp version of the order.
-                auto ord_fp = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+                auto ord_fp = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Init the accumulator.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-                    auto c_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
-                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, b_idx);
+                    auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
+                    auto bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, b_idx);
 
-                    auto fac = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+                    auto fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
-                                                           builder.CreateFMul(fac, builder.CreateFMul(c_nj, bj))),
-                                        acc);
+                    builder.CreateStore(
+                        llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, c_nj, bj))), acc);
                 });
 
                 // Generate the factor n * sqrt(pi) /2
-                auto t1_llvm = vector_splat(builder, codegen<T>(s, number(sqrt_pi_2<T>)), batch_size);
-                auto fac = builder.CreateFMul(t1_llvm, ord_fp);
+                auto t1_llvm = vector_splat(builder, llvm_codegen(s, fp_t, sqrt_pi_2_like(s, fp_t)), batch_size);
+                auto fac = llvm_fmul(s, t1_llvm, ord_fp);
 
                 // Store into retval.
-                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(val_t, acc), fac), retval);
+                builder.CreateStore(llvm_fdiv(s, builder.CreateLoad(val_t, acc), fac), retval);
             });
 
         // Return the result.
@@ -433,46 +407,30 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &, con
 }
 
 // All the other cases.
-template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &, const erf_impl &, const U &, std::uint32_t, std::uint32_t)
+template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
+llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &, llvm::Type *, const erf_impl &, const U &, std::uint32_t,
+                                            std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of the error function in compact mode");
 }
 
-template <typename T>
-llvm::Function *taylor_c_diff_func_erf(llvm_state &s, const erf_impl &fn, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_erf(llvm_state &s, llvm::Type *fp_t, const erf_impl &fn, std::uint32_t n_uvars,
                                        std::uint32_t batch_size)
 {
     assert(fn.args().size() == 1u);
 
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_erf_impl<T>(s, fn, v, n_uvars, batch_size); },
+    return std::visit([&](const auto &v) { return taylor_c_diff_func_erf_impl(s, fp_t, fn, v, n_uvars, batch_size); },
                       fn.args()[0].value());
 }
 
 } // namespace
 
-llvm::Function *erf_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                 bool) const
+llvm::Function *erf_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                             std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_erf<double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_erf(s, fp_t, *this, n_uvars, batch_size);
 }
-
-llvm::Function *erf_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
-{
-    return taylor_c_diff_func_erf<long double>(s, *this, n_uvars, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *erf_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
-{
-    return taylor_c_diff_func_erf<mppp::real128>(s, *this, n_uvars, batch_size);
-}
-
-#endif
 
 std::vector<expression> erf_impl::gradient() const
 {

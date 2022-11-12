@@ -28,6 +28,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/log.hpp>
@@ -44,7 +50,7 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-#if defined(HEYOKA_HAVE_REAL128)
+#if defined(HEYOKA_HAVE_REAL128) || defined(HEYOKA_HAVE_REAL)
 
 using namespace mppp::literals;
 
@@ -62,7 +68,7 @@ const auto fp_types = std::tuple<double
                                  >{};
 
 constexpr bool skip_batch_ld =
-#if LLVM_VERSION_MAJOR == 13 || LLVM_VERSION_MAJOR == 14
+#if LLVM_VERSION_MAJOR == 13 || LLVM_VERSION_MAJOR == 14 || LLVM_VERSION_MAJOR == 15
     std::numeric_limits<long double>::digits == 64
 #else
     false
@@ -198,6 +204,13 @@ TEST_CASE("pow expo 4")
 #if defined(HEYOKA_HAVE_REAL128)
 
     REQUIRE(heyoka::pow(x, 41._rq) != square(x) * square(x));
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(heyoka::pow(x, 1.1_r256) != square(x) * square(x));
+    REQUIRE(heyoka::pow(x, 1.1_r256) == heyoka::pow(x, expression{1.1_r256}));
 
 #endif
 }
@@ -336,3 +349,39 @@ TEST_CASE("cfunc")
         }
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("cfunc_mp")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    const auto prec = 237u;
+
+    for (auto compact_mode : {false, true}) {
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            add_cfunc<mppp::real>(s, "cfunc", {pow(x, y), pow(x, par[0]), pow(x, 3. / 2_dbl)},
+                                  kw::compact_mode = compact_mode, kw::prec = prec);
+
+            s.compile();
+
+            auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(
+                s.jit_lookup("cfunc"));
+
+            const std::vector ins{mppp::real{"1.1", prec}, mppp::real{"2.1", prec}};
+            const std::vector pars{mppp::real{"3.1", prec}};
+            std::vector<mppp::real> outs(3u, mppp::real{0, prec});
+
+            cf_ptr(outs.data(), ins.data(), pars.data());
+
+            auto i = 0u;
+            REQUIRE(outs[i] == pow(ins[i], ins[i + 1u]));
+            REQUIRE(outs[i + 1u] == pow(ins[i], pars[i]));
+            REQUIRE(outs[i + 2u * 1u] == pow(ins[i], 3. / 2));
+        }
+    }
+}
+
+#endif

@@ -56,7 +56,6 @@ void run_integration(const std::string &filename, T t_final, double perturb, boo
 
     using namespace heyoka;
     using namespace heyoka_benchmark;
-    using namespace fmt::literals;
 
     auto masses
         = std::vector{T(1.00000597682), T(1) / 1047.355, T(1) / 3501.6, T(1) / 22869., T(1) / 19314., T(7.4074074e-09)};
@@ -102,14 +101,14 @@ void run_integration(const std::string &filename, T t_final, double perturb, boo
     std::vector<nt_event<T>> evs;
     auto cb = [](taylor_adaptive<T> &, T, int) { throw; };
     for (auto i = 0; i < 6; ++i) {
-        auto xi = expression(fmt::format("x_{}",i));
-        auto yi = expression(fmt::format("y_{}",i));
-        auto zi = expression(fmt::format("z_{}",i));
+        auto xi = expression(fmt::format("x_{}", i));
+        auto yi = expression(fmt::format("y_{}", i));
+        auto zi = expression(fmt::format("z_{}", i));
 
         for (auto j = i + 1; j < 6; ++j) {
-            auto xj = expression(fmt::format("x_{}",j));
-            auto yj = expression(fmt::format("y_{}",j));
-            auto zj = expression(fmt::format("z_{}",j));
+            auto xj = expression(fmt::format("x_{}", j));
+            auto yj = expression(fmt::format("y_{}", j));
+            auto zj = expression(fmt::format("z_{}", j));
 
             auto diff_x = xj - xi;
             auto diff_y = yj - yi;

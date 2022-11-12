@@ -9,6 +9,8 @@
 #ifndef HEYOKA_TEST_UTILS_HPP
 #define HEYOKA_TEST_UTILS_HPP
 
+#include <heyoka/config.hpp>
+
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -24,6 +26,12 @@
 #include <xtensor/xfixed.hpp>
 #include <xtensor/xshape.hpp>
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 namespace heyoka_test
 {
 
@@ -34,6 +42,20 @@ struct approximately {
 
     explicit approximately(T x, T eps_mul = T(100)) : m_value(x), m_eps_mul(eps_mul) {}
 };
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+struct approximately<mppp::real> {
+    const mppp::real m_value;
+    const mppp::real m_eps_mul;
+
+    static const mppp::real default_tol;
+
+    explicit approximately(mppp::real, mppp::real = default_tol);
+};
+
+#endif
 
 template <typename T>
 inline bool operator==(const T &cmp, const approximately<T> &a)
@@ -48,6 +70,13 @@ inline bool operator==(const T &cmp, const approximately<T> &a)
         return abs((cmp - a.m_value) / cmp) <= tol;
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+bool operator==<mppp::real>(const mppp::real &, const approximately<mppp::real> &);
+
+#endif
 
 template <typename T>
 inline std::ostream &operator<<(std::ostream &os, const approximately<T> &a)

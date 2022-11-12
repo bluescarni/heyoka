@@ -2,7 +2,7 @@
 find_package(xtensor REQUIRED CONFIG)
 find_package(xtensor-blas REQUIRED CONFIG)
 
-add_library(heyoka_test STATIC catch_main.cpp spdlog_oss.cpp)
+add_library(heyoka_test STATIC catch_main.cpp spdlog_oss.cpp test_utils.cpp)
 target_compile_options(heyoka_test PRIVATE
   "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
   "$<$<CONFIG:Release>:${HEYOKA_CXX_FLAGS_RELEASE}>"
@@ -13,7 +13,7 @@ target_compile_options(heyoka_test PRIVATE
 # Setup the C++ standard.
 target_compile_features(heyoka_test PRIVATE cxx_std_17)
 set_property(TARGET heyoka_test PROPERTY CXX_EXTENSIONS NO)
-target_link_libraries(heyoka_test PRIVATE spdlog::spdlog)
+target_link_libraries(heyoka_test PRIVATE spdlog::spdlog heyoka)
 
 function(ADD_HEYOKA_TESTCASE arg1)
   add_executable(${arg1} ${arg1}.cpp)
@@ -40,6 +40,7 @@ ADD_HEYOKA_TESTCASE(callable)
 ADD_HEYOKA_TESTCASE(variable)
 ADD_HEYOKA_TESTCASE(param)
 ADD_HEYOKA_TESTCASE(binary_op)
+ADD_HEYOKA_TESTCASE(taylor_addsub)
 ADD_HEYOKA_TESTCASE(taylor_adaptive)
 ADD_HEYOKA_TESTCASE(taylor_t_event)
 ADD_HEYOKA_TESTCASE(taylor_nt_event)
@@ -51,7 +52,6 @@ ADD_HEYOKA_TESTCASE(taylor_erf)
 ADD_HEYOKA_TESTCASE(taylor_exp)
 ADD_HEYOKA_TESTCASE(taylor_log)
 ADD_HEYOKA_TESTCASE(taylor_mul)
-ADD_HEYOKA_TESTCASE(taylor_addsub)
 ADD_HEYOKA_TESTCASE(taylor_pow)
 ADD_HEYOKA_TESTCASE(taylor_sqrt)
 ADD_HEYOKA_TESTCASE(taylor_square)
