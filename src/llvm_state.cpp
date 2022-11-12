@@ -684,6 +684,14 @@ void llvm_state::save_impl(Archive &ar, unsigned) const
 template <typename Archive>
 void llvm_state::load_impl(Archive &ar, unsigned version)
 {
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<llvm_state>::type::value)) {
+        throw std::invalid_argument(fmt::format("Unable to load an llvm_state object: "
+                                                "the archive version ({}) is too old",
+                                                version));
+    }
+    // LCOV_EXCL_STOP
+
     // NOTE: all serialised objects in the archive
     // are primitive types, no need to reset the
     // addresses.
@@ -704,25 +712,11 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
     bool fast_math{};
     ar >> fast_math;
 
-    bool force_avx512 = false;
-    // NOTE: before archive version 2, there was
-    // no force_avx512 flag. The behaviour was
-    // equivalent to force_avx512 == false.
-    if (version >= 2u) {
-        ar >> force_avx512;
-    }
+    bool force_avx512{};
+    ar >> force_avx512;
 
     std::string module_name;
     ar >> module_name;
-
-    // LCOV_EXCL_START
-    if (version == 0u) {
-        // NOTE: version 0 had a setting here for function inlining.
-        // Load it and ignore it.
-        bool inline_functions{};
-        ar >> inline_functions;
-    }
-    // LCOV_EXCL_STOP
 
     // Load the ir
     std::string ir;
