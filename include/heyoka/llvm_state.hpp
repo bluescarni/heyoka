@@ -231,6 +231,7 @@ public:
     [[nodiscard]] const llvm::LLVMContext &context() const;
     [[nodiscard]] const unsigned &opt_level() const;
     [[nodiscard]] bool fast_math() const;
+    [[nodiscard]] bool force_avx512() const;
 
     [[nodiscard]] std::string get_ir() const;
     void dump_object_code(const std::string &) const;

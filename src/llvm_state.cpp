@@ -842,6 +842,11 @@ bool llvm_state::fast_math() const
     return m_fast_math;
 }
 
+bool llvm_state::force_avx512() const
+{
+    return m_force_avx512;
+}
+
 void llvm_state::check_uncompiled(const char *f) const
 {
     if (!m_module) {
