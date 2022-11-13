@@ -19,14 +19,31 @@
 #include <heyoka/detail/real_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/taylor.hpp>
 
+#include <xtensor/xadapt.hpp>
+#include <xtensor/xview.hpp>
+
 #include "catch.hpp"
+#include "heyoka/kw.hpp"
 #include "test_utils.hpp"
 
 using namespace heyoka;
 using namespace heyoka_test;
+
+template <typename Out, typename P, typename T>
+auto &horner_eval(Out &ret, const P &p, int order, const T &eval)
+{
+    ret = xt::view(p, xt::all(), order);
+
+    for (--order; order >= 0; --order) {
+        ret = xt::view(p, xt::all(), order) + ret * eval;
+    }
+
+    return ret;
+}
 
 // Tests to check precision handling on construction.
 TEST_CASE("ctors prec")
@@ -290,6 +307,278 @@ TEST_CASE("dense out")
                         "{}, while the integrator has a precision of {}",
                         prec - 1, prec)));
             }
+        }
+    }
+}
+
+TEST_CASE("taylor tc basic")
+{
+    using fp_t = mppp::real;
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto prec : {30, 123}) {
+            auto [x, v] = make_vars("x", "v");
+
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                            {fp_t(0.05, prec), fp_t(0.025, prec)},
+                                            kw::compact_mode = true,
+                                            kw::opt_level = opt_level};
+
+            REQUIRE(ta.get_tc().size() == 2u * (ta.get_order() + 1u));
+
+            auto tca = xt::adapt(ta.get_tc().data(), {2u, ta.get_order() + 1u});
+
+            auto [oc, h] = ta.step(true);
+
+            auto ret = xt::eval(xt::zeros<mppp::real>({2}));
+
+            horner_eval(ret, tca, static_cast<int>(ta.get_order()), fp_t(0, prec));
+            REQUIRE(ret[0] == approximately(fp_t(0.05, prec), fp_t(10., prec)));
+            REQUIRE(ret[1] == approximately(fp_t(0.025, prec), fp_t(10., prec)));
+
+            horner_eval(ret, tca, static_cast<int>(ta.get_order()), h);
+            REQUIRE(ret[0] == approximately(ta.get_state()[0], fp_t(10., prec)));
+            REQUIRE(ret[1] == approximately(ta.get_state()[1], fp_t(10., prec)));
+
+            auto old_state = ta.get_state();
+
+            std::tie(oc, h) = ta.step_backward(true);
+
+            horner_eval(ret, tca, static_cast<int>(ta.get_order()), fp_t(0, prec));
+            REQUIRE(ret[0] == approximately(old_state[0], fp_t(10., prec)));
+            REQUIRE(ret[1] == approximately(old_state[1], fp_t(10., prec)));
+
+            horner_eval(ret, tca, static_cast<int>(ta.get_order()), h);
+            REQUIRE(ret[0] == approximately(ta.get_state()[0], fp_t(10., prec)));
+            REQUIRE(ret[1] == approximately(ta.get_state()[1], fp_t(10., prec)));
+
+            old_state = ta.get_state();
+
+            std::tie(oc, h) = ta.step(fp_t(1e-3, prec), true);
+
+            horner_eval(ret, tca, static_cast<int>(ta.get_order()), fp_t(0, prec));
+            REQUIRE(ret[0] == approximately(old_state[0], fp_t(10., prec)));
+            REQUIRE(ret[1] == approximately(old_state[1], fp_t(10., prec)));
+
+            horner_eval(ret, tca, static_cast<int>(ta.get_order()), h);
+            REQUIRE(ret[0] == approximately(ta.get_state()[0], fp_t(10., prec)));
+            REQUIRE(ret[1] == approximately(ta.get_state()[1], fp_t(10., prec)));
+        }
+    }
+}
+
+// A test to make sure the propagate functions deal correctly
+// with trivial dynamics.
+TEST_CASE("propagate trivial")
+{
+    using fp_t = mppp::real;
+
+    auto [x, v] = make_vars("x", "v");
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto prec : {30, 123}) {
+
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = 1_dbl},
+                                            {fp_t(0, prec), fp_t(0, prec)},
+                                            kw::opt_level = opt_level,
+                                            kw::compact_mode = true};
+
+            REQUIRE(std::get<0>(ta.propagate_for(fp_t(1.2, prec))) == taylor_outcome::time_limit);
+            REQUIRE(std::get<0>(ta.propagate_until(fp_t(2.3, prec))) == taylor_outcome::time_limit);
+            // TODO enable once we have propagate_grid.
+            // REQUIRE(std::get<0>(ta.propagate_grid({3, 4, 5, 6, 7.})) == taylor_outcome::time_limit);
+        }
+    }
+}
+
+TEST_CASE("propagate for_until")
+{
+    using Catch::Matchers::Message;
+
+    using fp_t = mppp::real;
+
+    auto [x, v] = make_vars("x", "v");
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto prec : {30, 123}) {
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                            {fp_t(0.05, prec), fp_t(0.025, prec)},
+                                            kw::opt_level = opt_level,
+                                            kw::compact_mode = true};
+            auto ta_copy = ta;
+
+            // Error modes.
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_until(fp_t(std::numeric_limits<double>::infinity(), prec)), std::invalid_argument,
+                Message(
+                    "A non-finite time was passed to the propagate_until() function of an adaptive Taylor integrator"));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_until(fp_t(1, prec - 1)), std::invalid_argument,
+                Message(fmt::format(
+                    "Invalid final time argument passed to the propagate_until() function of an adaptive Taylor "
+                    "integrator: the time variable has a precision of {}, while the integrator's precision is {}",
+                    prec - 1, prec)));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_until(fp_t(10., prec),
+                                   kw::max_delta_t = fp_t(std::numeric_limits<double>::quiet_NaN(), prec)),
+                std::invalid_argument,
+                Message(
+                    "A nan max_delta_t was passed to the propagate_until() function of an adaptive Taylor integrator"));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_until(fp_t(10., prec), kw::max_delta_t = fp_t(-1, prec)), std::invalid_argument,
+                Message("A non-positive max_delta_t was passed to the propagate_until() function of an "
+                        "adaptive Taylor integrator"));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_until(fp_t(10., prec), kw::max_delta_t = fp_t(1, prec + 1)), std::invalid_argument,
+                Message(fmt::format(
+                    "Invalid max_delta_t argument passed to the propagate_until() function of an adaptive Taylor "
+                    "integrator: max_delta_t has a precision of {}, while the integrator's precision is {}",
+                    prec + 1, prec)));
+
+            // Propagate forward in time limiting the timestep size and passing in a callback.
+            auto counter = 0ul;
+
+            auto oc = std::get<0>(ta.propagate_until(
+                fp_t(1., prec), kw::max_delta_t = fp_t(1e-4, prec), kw::callback = [&counter](auto &) {
+                    ++counter;
+                    return true;
+                }));
+            auto oc_copy = std::get<0>(ta_copy.propagate_until(fp_t(1., prec)));
+
+            REQUIRE(ta.get_time() == 1.);
+            // NOTE: at low precision the step counting
+            // results in 10001 rather than 10000.
+            if (prec > 30) {
+                REQUIRE(counter == 10000ul);
+            }
+            REQUIRE(oc == taylor_outcome::time_limit);
+
+            REQUIRE(ta_copy.get_time() == 1.);
+            REQUIRE(oc_copy == taylor_outcome::time_limit);
+
+            REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], fp_t(1000., prec)));
+            REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], fp_t(1000., prec)));
+
+            // Do propagate_for() too.
+            oc = std::get<0>(ta.propagate_for(
+                fp_t(1., prec), kw::max_delta_t = fp_t(1e-4, prec), kw::callback = [&counter](auto &) {
+                    ++counter;
+                    return true;
+                }));
+            oc_copy = std::get<0>(ta_copy.propagate_for(fp_t(1., prec)));
+
+            REQUIRE(ta.get_time() == 2.);
+            if (prec > 30) {
+                REQUIRE(counter == 20000ul);
+            }
+            REQUIRE(oc == taylor_outcome::time_limit);
+
+            REQUIRE(ta_copy.get_time() == 2.);
+            REQUIRE(oc_copy == taylor_outcome::time_limit);
+
+            REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], fp_t(1000., prec)));
+            REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], fp_t(1000., prec)));
+
+            // Do backwards in time too.
+            oc = std::get<0>(ta.propagate_for(
+                -fp_t(1., prec), kw::max_delta_t = fp_t(1e-4, prec), kw::callback = [&counter](auto &) {
+                    ++counter;
+                    return true;
+                }));
+            oc_copy = std::get<0>(ta_copy.propagate_for(-fp_t(1., prec)));
+
+            REQUIRE(ta.get_time() == 1.);
+            if (prec > 30) {
+                REQUIRE(counter == 30000ul);
+            }
+            REQUIRE(oc == taylor_outcome::time_limit);
+
+            REQUIRE(ta_copy.get_time() == 1.);
+            REQUIRE(oc_copy == taylor_outcome::time_limit);
+
+            REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], fp_t(1000., prec)));
+            REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], fp_t(1000., prec)));
+
+            oc = std::get<0>(ta.propagate_until(
+                fp_t(0., prec), kw::max_delta_t = fp_t(1e-4, prec), kw::callback = [&counter](auto &) {
+                    ++counter;
+                    return true;
+                }));
+            oc_copy = std::get<0>(ta_copy.propagate_until(fp_t(0., prec)));
+
+            REQUIRE(ta.get_time() == 0.);
+            if (prec > 30) {
+                REQUIRE(counter == 40000ul);
+            }
+            REQUIRE(oc == taylor_outcome::time_limit);
+
+            REQUIRE(ta_copy.get_time() == 0.);
+            REQUIRE(oc_copy == taylor_outcome::time_limit);
+
+            REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], fp_t(1000., prec)));
+            REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], fp_t(1000., prec)));
+        }
+    }
+}
+
+TEST_CASE("propagate for_until write_tc")
+{
+    using fp_t = mppp::real;
+
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto prec : {30, 123}) {
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                            {fp_t(0.05, prec), fp_t(0.025, prec)},
+                                            kw::opt_level = opt_level,
+                                            kw::compact_mode = true};
+
+            ta.propagate_until(
+                fp_t(10, prec), kw::callback = [&](auto &t) {
+                    REQUIRE(
+                        std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &val) { return val == 0.; }));
+                    REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(),
+                                        [prec](const auto &val) { return val.get_prec() == prec; }));
+                    return true;
+                });
+
+            ta.propagate_until(
+                fp_t(20, prec), kw::write_tc = true, kw::callback = [&](auto &t) {
+                    REQUIRE(
+                        !std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &val) { return val == 0.; }));
+                    REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(),
+                                        [prec](const auto &val) { return val.get_prec() == prec; }));
+                    return true;
+                });
+
+            ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                       {fp_t(0.05, prec), fp_t(0.025, prec)},
+                                       kw::compact_mode = true};
+
+            ta.propagate_for(
+                fp_t(10, prec), kw::callback = [&](auto &t) {
+                    REQUIRE(
+                        std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &val) { return val == 0.; }));
+                    REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(),
+                                        [prec](const auto &val) { return val.get_prec() == prec; }));
+                    return true;
+                });
+
+            ta.propagate_for(
+                fp_t(20, prec), kw::write_tc = true, kw::callback = [&](auto &t) {
+                    REQUIRE(
+                        !std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &val) { return val == 0.; }));
+                    REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(),
+                                        [prec](const auto &val) { return val.get_prec() == prec; }));
+                    return true;
+                });
         }
     }
 }
