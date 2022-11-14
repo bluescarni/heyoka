@@ -1083,76 +1083,69 @@ TEST_CASE("taylor te propagate_for")
     }
 }
 
-// TODO re-enable when we have propagate_grid().
-#if 0
-
 TEST_CASE("taylor te propagate_grid")
 {
-    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
-        using std::abs;
 
-        using fp_t = decltype(fp_x);
+    using std::abs;
 
-        auto [x, v] = make_vars("x", "v");
+    using fp_t = mppp::real;
 
-        using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
+    auto [x, v] = make_vars("x", "v");
 
-        auto counter = 0u;
+    using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
 
-        t_ev_t ev(
-            v, kw::callback = [&counter](taylor_adaptive<fp_t> &, bool mr, int) {
-                ++counter;
-                REQUIRE(!mr);
-                return true;
-            });
+    for (auto opt_level : {0u, 3u}) {
+        for (auto prec : {30, 123}) {
+            auto counter = 0u;
 
-        auto ta = taylor_adaptive<fp_t>{
-            {prime(x) = v, prime(v) = -9.8 * sin(x)}, {fp_t(0), fp_t(0.25)},           kw::opt_level = opt_level,
-            kw::high_accuracy = high_accuracy,        kw::compact_mode = compact_mode, kw::t_events = {ev}};
+            t_ev_t ev(
+                v, kw::callback = [&counter](taylor_adaptive<fp_t> &, bool mr, int) {
+                    ++counter;
+                    REQUIRE(!mr);
+                    return true;
+                });
 
-        std::vector<fp_t> grid;
-        for (auto i = 0; i < 101; ++i) {
-            grid.emplace_back(i);
-        }
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                            {fp_t(0, prec), fp_t(0.25, prec)},
+                                            kw::opt_level = opt_level,
+                                            kw::compact_mode = true,
+                                            kw::t_events = {ev}};
 
-        taylor_outcome oc;
-        {
-            auto [oc_, _1, _2, _3, out] = ta.propagate_grid(grid);
-            oc = oc_;
-            REQUIRE(out.size() == 202u);
-        }
-        REQUIRE(oc == taylor_outcome::time_limit);
-        REQUIRE(ta.get_time() >= 100);
+            std::vector<fp_t> grid;
+            for (auto i = 0; i < 101; ++i) {
+                grid.emplace_back(i, prec);
+            }
 
-        REQUIRE(counter == 100u);
+            taylor_outcome oc;
+            {
+                auto [oc_, _1, _2, _3, out] = ta.propagate_grid(grid);
+                oc = oc_;
+                REQUIRE(out.size() == 202u);
+            }
+            REQUIRE(oc == taylor_outcome::time_limit);
+            REQUIRE(ta.get_time() >= 100);
 
-        t_ev_t ev1(v);
+            REQUIRE(counter == 100u);
 
-        ta = taylor_adaptive<fp_t>{
-            {prime(x) = v, prime(v) = -9.8 * sin(x)}, {fp_t(0), fp_t(0.25)},           kw::opt_level = opt_level,
-            kw::high_accuracy = high_accuracy,        kw::compact_mode = compact_mode, kw::t_events = {ev1}};
+            t_ev_t ev1(v);
 
-        {
-            auto [oc_, _1, _2, _3, out] = ta.propagate_grid(grid);
-            oc = oc_;
-            REQUIRE(out.size() == 2u);
-        }
-        REQUIRE(oc > taylor_outcome::time_limit);
-        REQUIRE(static_cast<std::int64_t>(oc) == -1);
-        REQUIRE(ta.get_time() < 0.502);
-    };
+            ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                       {fp_t(0, prec), fp_t(0.25, prec)},
+                                       kw::opt_level = opt_level,
+                                       kw::compact_mode = true,
+                                       kw::t_events = {ev1}};
 
-    for (auto cm : {false, true}) {
-        for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            {
+                auto [oc_, _1, _2, _3, out] = ta.propagate_grid(grid);
+                oc = oc_;
+                REQUIRE(out.size() == 2u);
+            }
+            REQUIRE(oc > taylor_outcome::time_limit);
+            REQUIRE(static_cast<std::int64_t>(oc) == -1);
+            REQUIRE(ta.get_time() < 0.502);
         }
     }
 }
-
-#endif
 
 // Test a terminal event exactly at the end of a timestep.
 TEST_CASE("te step end")

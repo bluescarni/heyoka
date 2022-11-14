@@ -385,8 +385,9 @@ TEST_CASE("propagate trivial")
 
             REQUIRE(std::get<0>(ta.propagate_for(fp_t(1.2, prec))) == taylor_outcome::time_limit);
             REQUIRE(std::get<0>(ta.propagate_until(fp_t(2.3, prec))) == taylor_outcome::time_limit);
-            // TODO enable once we have propagate_grid.
-            // REQUIRE(std::get<0>(ta.propagate_grid({3, 4, 5, 6, 7.})) == taylor_outcome::time_limit);
+            REQUIRE(std::get<0>(
+                        ta.propagate_grid({fp_t(3, prec), fp_t(4, prec), fp_t(5, prec), fp_t(6, prec), fp_t(7., prec)}))
+                    == taylor_outcome::time_limit);
         }
     }
 }
