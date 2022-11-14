@@ -75,6 +75,13 @@ namespace kw
 IGOR_MAKE_NAMED_ARGUMENT(mname);
 IGOR_MAKE_NAMED_ARGUMENT(opt_level);
 IGOR_MAKE_NAMED_ARGUMENT(fast_math);
+// NOTE: this flag is used to force the use of 512-bit AVX512
+// registers (if the CPU supports them). At the time of this writing,
+// LLVM defaults to 256-bit registers due to CPU downclocking issues
+// which can lead to performance degradation. Hopefully we
+// can get rid of this in the future when AVX512 implementations improve
+// and LLVM learns to discriminate good and bad implementations.
+IGOR_MAKE_NAMED_ARGUMENT(force_avx512);
 
 } // namespace kw
 
@@ -115,6 +122,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
     unsigned m_opt_level;
     std::string m_ir_snapshot;
     bool m_fast_math;
+    bool m_force_avx512;
     std::string m_module_name;
 
     // Serialization.
@@ -172,10 +180,19 @@ class HEYOKA_DLL_PUBLIC llvm_state
                 }
             }();
 
-            return std::tuple{std::move(mod_name), opt_level, fmath};
+            // Force usage of AVX512 registers (defaults to false).
+            auto force_avx512 = [&p]() -> bool {
+                if constexpr (p.has(kw::force_avx512)) {
+                    return std::forward<decltype(p(kw::force_avx512))>(p(kw::force_avx512));
+                } else {
+                    return false;
+                }
+            }();
+
+            return std::tuple{std::move(mod_name), opt_level, fmath, force_avx512};
         }
     }
-    explicit llvm_state(std::tuple<std::string, unsigned, bool> &&);
+    explicit llvm_state(std::tuple<std::string, unsigned, bool, bool> &&);
 
     // Small shared helper to setup the math flags in the builder at the
     // end of a constructor.
@@ -214,6 +231,7 @@ public:
     [[nodiscard]] const llvm::LLVMContext &context() const;
     [[nodiscard]] const unsigned &opt_level() const;
     [[nodiscard]] bool fast_math() const;
+    [[nodiscard]] bool force_avx512() const;
 
     [[nodiscard]] std::string get_ir() const;
     void dump_object_code(const std::string &) const;
@@ -235,7 +253,9 @@ public:
 
 } // namespace heyoka
 
-// Current archive version is 1.
-BOOST_CLASS_VERSION(heyoka::llvm_state, 1)
+// Current archive version is 2. Changelog:
+// - version 1: got rid of the inline_functions setting;
+// - version 2: added the force_avx512 setting.
+BOOST_CLASS_VERSION(heyoka::llvm_state, 2)
 
 #endif

@@ -130,8 +130,8 @@ if(YACMA_COMPILER_IS_MSVC)
     unset(_HEYOKA_CLANG_CL_DISABLED_WARNINGS)
   else()
     # Same as above, disable some cl warnings.
-    list(APPEND HEYOKA_CXX_FLAGS_DEBUG "/wd4459" "/wd4127" "/wd4251")
-    list(APPEND HEYOKA_CXX_FLAGS_RELEASE "/wd4459" "/wd4127" "/wd4251")
+    list(APPEND HEYOKA_CXX_FLAGS_DEBUG "/wd4459" "/wd4127" "/wd4251" "/wd4661")
+    list(APPEND HEYOKA_CXX_FLAGS_RELEASE "/wd4459" "/wd4127" "/wd4251" "/wd4661")
   endif()
   # Enable strict conformance mode, if supported.
   set(CMAKE_REQUIRED_QUIET TRUE)

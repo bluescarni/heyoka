@@ -14,6 +14,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <vector>
+#include <utility>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -200,7 +201,7 @@ TEST_CASE("s11n")
             oa << s;
         }
 
-        s = llvm_state{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
+        s = llvm_state{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::force_avx512 = true};
 
         {
             boost::archive::binary_iarchive ia(ss);
@@ -213,13 +214,14 @@ TEST_CASE("s11n")
         REQUIRE(s.module_name() == "");
         REQUIRE(s.opt_level() == 3u);
         REQUIRE(s.fast_math() == false);
+        REQUIRE(s.force_avx512() == false);
     }
 
     // Compiled state but without object file.
     {
         std::stringstream ss;
 
-        llvm_state s;
+        llvm_state s{kw::force_avx512 = true};
 
         taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
 
@@ -246,6 +248,7 @@ TEST_CASE("s11n")
         REQUIRE(s.module_name() == "");
         REQUIRE(s.opt_level() == 3u);
         REQUIRE(s.fast_math() == false);
+        REQUIRE(s.force_avx512() == true);
     }
 
     // Compiled state with object file.
@@ -300,7 +303,7 @@ TEST_CASE("make_similar")
 {
     auto [x, y] = make_vars("x", "y");
 
-    llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
+    llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::force_avx512 = true};
     taylor_add_jet<double>(s, "jet", {sub(2_dbl, 3_dbl), x + y}, 1, 1, true, false);
 
     s.compile();
@@ -309,12 +312,55 @@ TEST_CASE("make_similar")
     REQUIRE(s.opt_level() == 2u);
     REQUIRE(s.fast_math());
     REQUIRE(s.is_compiled());
+    REQUIRE(s.force_avx512());
 
     auto s2 = s.make_similar();
 
     REQUIRE(s2.module_name() == "sample state");
     REQUIRE(s2.opt_level() == 2u);
     REQUIRE(s2.fast_math());
+    REQUIRE(s2.force_avx512());
     REQUIRE(!s2.is_compiled());
     REQUIRE(s.get_ir() != s2.get_ir());
+}
+
+TEST_CASE("force_avx512")
+{
+    {
+        llvm_state s;
+        REQUIRE(!s.force_avx512());
+
+        llvm_state s2(s);
+        REQUIRE(!s2.force_avx512());
+
+        llvm_state s3(std::move(s2));
+        REQUIRE(!s3.force_avx512());
+
+        llvm_state s4;
+        s4 = s3;
+        REQUIRE(!s4.force_avx512());
+
+        llvm_state s5;
+        s5 = std::move(s4);
+        REQUIRE(!s5.force_avx512());
+    }
+
+    {
+        llvm_state s{kw::force_avx512 = true};
+        REQUIRE(s.force_avx512());
+
+        llvm_state s2(s);
+        REQUIRE(s2.force_avx512());
+
+        llvm_state s3(std::move(s2));
+        REQUIRE(s3.force_avx512());
+
+        llvm_state s4;
+        s4 = s3;
+        REQUIRE(s4.force_avx512());
+
+        llvm_state s5;
+        s5 = std::move(s4);
+        REQUIRE(s5.force_avx512());
+    }
 }
