@@ -902,8 +902,8 @@ TEST_CASE("continuous output")
 
             // Run a grid propagation.
             auto t_grid = std::vector<fp_t>{0., 1., 2., 3., 4., 5., 6., 7., 8., 9., 10.};
-            for (auto &v : t_grid) {
-                v.prec_round(prec);
+            for (auto &vec : t_grid) {
+                vec.prec_round(prec);
             }
             auto grid_out = std::get<4>(ta.propagate_grid(t_grid));
 
@@ -979,8 +979,8 @@ TEST_CASE("continuous output")
 
             // Run a grid propagation.
             t_grid = std::vector<fp_t>{0., -1., -2., -3., -4., -5., -6., -7., -8., -9., -10.};
-            for (auto &v : t_grid) {
-                v.prec_round(prec);
+            for (auto &vec : t_grid) {
+                vec.prec_round(prec);
             }
             grid_out = std::get<4>(ta.propagate_grid(t_grid));
 
