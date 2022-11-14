@@ -30,6 +30,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/ensemble_propagate.hpp>
 #include <heyoka/taylor.hpp>
@@ -204,6 +210,12 @@ HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(long double)
 #if defined(HEYOKA_HAVE_REAL128)
 
 HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(mppp::real128)
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(mppp::real)
 
 #endif
 
