@@ -6,9 +6,11 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
 #include <iostream>
+#include <tuple>
 #include <vector>
 
 #include <llvm/IR/Function.h>
@@ -1240,6 +1242,139 @@ TEST_CASE("te open range")
 
             REQUIRE(oc == taylor_outcome::success);
             REQUIRE(h > 0);
+        }
+    }
+}
+
+// Test event callbacks that change the precision of the internal data.
+TEST_CASE("events prec error")
+{
+    using Catch::Matchers::Message;
+
+    using fp_t = mppp::real;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = taylor_adaptive<fp_t>::t_event_t;
+    using nt_ev_t = taylor_adaptive<fp_t>::nt_event_t;
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto prec : {30, 123}) {
+            // First a couple of ntes.
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = v, prime(v) = -9.8 * sin(x)},
+                {fp_t(-0.25, prec), fp_t(0., prec)},
+                kw::nt_events
+                = {nt_ev_t(x, [&](auto &tint, const auto &...) { tint.get_state_data()[0].prec_round(prec - 1); })},
+                kw::opt_level = opt_level,
+                kw::compact_mode = true};
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_for(fp_t(100, prec)), std::invalid_argument,
+                Message(fmt::format("A state variable with precision {} was detected in the state "
+                                    "vector: this is incompatible with the integrator precision of {}",
+                                    prec - 1, prec)));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_for(fp_t(100, prec)), std::invalid_argument,
+                Message(fmt::format("A state variable with precision {} was detected in the state "
+                                    "vector: this is incompatible with the integrator precision of {}",
+                                    prec - 1, prec)));
+
+            // Only the first nte changes the precision.
+            ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                       {fp_t(-0.25, prec), fp_t(0., prec)},
+                                       kw::nt_events = {nt_ev_t(x + 1e-5,
+                                                                [&](auto &tint, const auto &...) {
+                                                                    tint.get_state_data()[0].prec_round(prec - 1);
+                                                                }),
+                                                        nt_ev_t(x, [&](auto &, const auto &...) {})},
+                                       kw::opt_level = opt_level,
+                                       kw::compact_mode = true};
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_for(fp_t(100, prec)), std::invalid_argument,
+                Message(fmt::format("A state variable with precision {} was detected in the state "
+                                    "vector: this is incompatible with the integrator precision of {}",
+                                    prec - 1, prec)));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_for(fp_t(100, prec)), std::invalid_argument,
+                Message(fmt::format("A state variable with precision {} was detected in the state "
+                                    "vector: this is incompatible with the integrator precision of {}",
+                                    prec - 1, prec)));
+
+            // Terminal event.
+            ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                       {fp_t(-0.25, prec), fp_t(0., prec)},
+                                       kw::t_events = {t_ev_t(
+                                           x, kw::callback =
+                                                  [&](auto &tint, const auto &...) {
+                                                      tint.get_state_data()[0].prec_round(prec - 1);
+                                                      return true;
+                                                  })},
+                                       kw::opt_level = opt_level,
+                                       kw::compact_mode = true};
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_for(fp_t(100, prec)), std::invalid_argument,
+                Message(fmt::format("A state variable with precision {} was detected in the state "
+                                    "vector: this is incompatible with the integrator precision of {}",
+                                    prec - 1, prec)));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_for(fp_t(100, prec)), std::invalid_argument,
+                Message(fmt::format("A state variable with precision {} was detected in the state "
+                                    "vector: this is incompatible with the integrator precision of {}",
+                                    prec - 1, prec)));
+
+            // Mix up te and nte.
+            ta = taylor_adaptive<fp_t>{
+                {prime(x) = v, prime(v) = -9.8 * sin(x)},
+                {fp_t(-0.25, prec), fp_t(0., prec)},
+                kw::t_events = {t_ev_t(x - 0.25)},
+                kw::nt_events
+                = {nt_ev_t(x, [&](auto &tint, const auto &...) { tint.get_state_data()[0].prec_round(prec - 1); })},
+                kw::opt_level = opt_level,
+                kw::compact_mode = true};
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_for(fp_t(100, prec)), std::invalid_argument,
+                Message(fmt::format("A state variable with precision {} was detected in the state "
+                                    "vector: this is incompatible with the integrator precision of {}",
+                                    prec - 1, prec)));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_for(fp_t(100, prec)), std::invalid_argument,
+                Message(fmt::format("A state variable with precision {} was detected in the state "
+                                    "vector: this is incompatible with the integrator precision of {}",
+                                    prec - 1, prec)));
+
+            ta = taylor_adaptive<fp_t>{
+                {prime(x) = v, prime(v) = -9.8 * sin(x)},
+                {fp_t(-0.25, prec), fp_t(0., prec)},
+                kw::t_events = {t_ev_t(
+                    x, kw::callback =
+                           [&](auto &tint, const auto &...) {
+                               tint.get_state_data()[0].prec_round(prec - 1);
+                               return true;
+                           })},
+                kw::nt_events = {nt_ev_t(
+                    x - 0.25, [&](auto &tint, const auto &...) { tint.get_state_data()[0].prec_round(prec - 1); })},
+                kw::opt_level = opt_level,
+                kw::compact_mode = true};
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_for(fp_t(100, prec)), std::invalid_argument,
+                Message(fmt::format("A state variable with precision {} was detected in the state "
+                                    "vector: this is incompatible with the integrator precision of {}",
+                                    prec - 1, prec)));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_for(fp_t(100, prec)), std::invalid_argument,
+                Message(fmt::format("A state variable with precision {} was detected in the state "
+                                    "vector: this is incompatible with the integrator precision of {}",
+                                    prec - 1, prec)));
         }
     }
 }

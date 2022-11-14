@@ -521,6 +521,31 @@ TEST_CASE("propagate for_until")
 
             REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], fp_t(1000., prec)));
             REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], fp_t(1000., prec)));
+
+            // Pass a callback that changes the precision of the internal data.
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_for(
+                    fp_t(1., prec), kw::callback =
+                                        [prec](auto &tint) {
+                                            tint.get_state_data()[0].prec_round(prec - 1);
+                                            return true;
+                                        }),
+                std::invalid_argument,
+                Message(fmt::format("A state variable with precision {} was detected in the state "
+                                    "vector: this is incompatible with the integrator precision of {}",
+                                    prec - 1, prec)));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_for(
+                    fp_t(1., prec), kw::callback =
+                                        [prec](auto &tint) {
+                                            tint.get_state_data()[0].prec_round(prec - 1);
+                                            return true;
+                                        }),
+                std::invalid_argument,
+                Message(fmt::format("A state variable with precision {} was detected in the state "
+                                    "vector: this is incompatible with the integrator precision of {}",
+                                    prec - 1, prec)));
         }
     }
 }
@@ -528,8 +553,6 @@ TEST_CASE("propagate for_until")
 TEST_CASE("propagate for_until write_tc")
 {
     using fp_t = mppp::real;
-
-    using Catch::Matchers::Message;
 
     auto [x, v] = make_vars("x", "v");
 
