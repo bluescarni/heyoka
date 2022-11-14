@@ -1844,6 +1844,7 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
         // Double check that the initialisation of the continuous_output
         // object in the integrator code set up everything
         // with consistent precisions.
+        assert(!m_output.empty());
         assert(std::all_of(m_tcs.begin(), m_tcs.end(),
                            [&](const auto &x) { return x.get_prec() == m_output[0].get_prec(); }));
         assert(std::all_of(m_times_hi.begin(), m_times_hi.end(),

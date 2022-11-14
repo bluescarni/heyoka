@@ -865,3 +865,172 @@ TEST_CASE("propagate grid scalar")
         }
     }
 }
+
+TEST_CASE("continuous output")
+{
+    using std::cos;
+    using std::sin;
+
+    using Catch::Matchers::Message;
+
+    using fp_t = mppp::real;
+
+    auto [x, v] = make_vars("x", "v");
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto prec : {30, 123}) {
+            continuous_output<fp_t> co;
+
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -x},
+                                            {fp_t(0., prec), fp_t(1., prec)},
+                                            kw::opt_level = opt_level,
+                                            kw::compact_mode = true};
+
+            auto [_0, _1, _2, tot_steps, d_out] = ta.propagate_until(fp_t(10., prec), kw::c_output = true);
+
+            REQUIRE(d_out.has_value());
+            REQUIRE(d_out->get_output().size() == 2u);
+            REQUIRE(d_out->get_times().size() == d_out->get_n_steps() + 1u);
+            REQUIRE(!d_out->get_tcs().empty());
+            REQUIRE(!d_out->get_llvm_state().get_ir().empty());
+            REQUIRE(tot_steps == d_out->get_n_steps());
+
+            // Reset time/state.
+            ta.get_state_data()[0] = fp_t(0, prec);
+            ta.get_state_data()[1] = fp_t(1, prec);
+            ta.set_time(fp_t(0, prec));
+
+            // Run a grid propagation.
+            auto t_grid = std::vector<fp_t>{0., 1., 2., 3., 4., 5., 6., 7., 8., 9., 10.};
+            for (auto &v : t_grid) {
+                v.prec_round(prec);
+            }
+            auto grid_out = std::get<4>(ta.propagate_grid(t_grid));
+
+            // Compare the two.
+            for (auto i = 0u; i < 11u; ++i) {
+                (*d_out)(t_grid[i]);
+                REQUIRE(d_out->get_output()[0] == approximately(grid_out[2u * i], fp_t(10, prec)));
+                REQUIRE(d_out->get_output()[1] == approximately(grid_out[2u * i + 1u], fp_t(10, prec)));
+            }
+
+            REQUIRE(d_out->get_bounds().first == 0.);
+            REQUIRE(d_out->get_bounds().second == approximately(fp_t(10, prec)));
+            REQUIRE(d_out->get_n_steps() > 0u);
+
+            // Try slightly outside the bounds.
+            (*d_out)(fp_t(-.01, prec));
+            REQUIRE(d_out->get_output()[0] == approximately(sin(fp_t(-0.01, prec))));
+            REQUIRE(d_out->get_output()[1] == approximately(cos(fp_t(-0.01, prec))));
+            (*d_out)(fp_t(10.01, prec));
+            REQUIRE(d_out->get_output()[0] == approximately(sin(fp_t(10.01, prec))));
+            REQUIRE(d_out->get_output()[1] == approximately(cos(fp_t(10.01, prec))));
+
+            // Try making a copy too.
+            auto co3 = *d_out;
+            co3(fp_t(4., prec));
+            REQUIRE(co3.get_output()[0] == approximately(grid_out[2u * 4u], fp_t(10, prec)));
+            REQUIRE(co3.get_output()[1] == approximately(grid_out[2u * 4u + 1u], fp_t(10, prec)));
+
+            // Limiting case in which not steps are taken.
+            ta.get_state_data()[0] = fp_t(0, prec);
+            ta.get_state_data()[1] = fp_t(std::numeric_limits<double>::infinity(), prec);
+            ta.set_time(fp_t(0, prec));
+            d_out = std::get<4>(ta.propagate_until(fp_t(10., prec), kw::c_output = true));
+            REQUIRE(!d_out.has_value());
+
+            // Try with propagate_for() too.
+
+            // Reset time/state.
+            ta.get_state_data()[0] = fp_t(0, prec);
+            ta.get_state_data()[1] = fp_t(1, prec);
+            ta.set_time(fp_t(0, prec));
+
+            std::tie(_0, _1, _2, tot_steps, d_out) = ta.propagate_for(fp_t(10., prec), kw::c_output = true);
+
+            REQUIRE(d_out.has_value());
+            REQUIRE(d_out->get_output().size() == 2u);
+            REQUIRE(d_out->get_times().size() == d_out->get_n_steps() + 1u);
+            REQUIRE(!d_out->get_tcs().empty());
+            REQUIRE(!d_out->get_llvm_state().get_ir().empty());
+            REQUIRE(tot_steps == d_out->get_n_steps());
+
+            // Compare the two.
+            for (auto i = 0u; i < 11u; ++i) {
+                (*d_out)(t_grid[i]);
+                REQUIRE(d_out->get_output()[0] == approximately(grid_out[2u * i], fp_t(10, prec)));
+                REQUIRE(d_out->get_output()[1] == approximately(grid_out[2u * i + 1u], fp_t(10, prec)));
+            }
+
+            // Do it backwards too.
+            ta.get_state_data()[0] = fp_t(0, prec);
+            ta.get_state_data()[1] = fp_t(1, prec);
+            ta.set_time(fp_t(0, prec));
+
+            d_out = std::get<4>(ta.propagate_until(fp_t(-10., prec), kw::c_output = true));
+
+            REQUIRE(d_out.has_value());
+            REQUIRE(d_out->get_times().size() == d_out->get_n_steps() + 1u);
+            REQUIRE(!d_out->get_tcs().empty());
+
+            ta.get_state_data()[0] = fp_t(0, prec);
+            ta.get_state_data()[1] = fp_t(1, prec);
+            ta.set_time(fp_t(0, prec));
+
+            // Run a grid propagation.
+            t_grid = std::vector<fp_t>{0., -1., -2., -3., -4., -5., -6., -7., -8., -9., -10.};
+            for (auto &v : t_grid) {
+                v.prec_round(prec);
+            }
+            grid_out = std::get<4>(ta.propagate_grid(t_grid));
+
+            // Compare the two.
+            for (auto i = 0u; i < 11u; ++i) {
+                (*d_out)(t_grid[i]);
+                REQUIRE(d_out->get_output()[0] == approximately(grid_out[2u * i], fp_t(10, prec)));
+                REQUIRE(d_out->get_output()[1] == approximately(grid_out[2u * i + 1u], fp_t(10, prec)));
+            }
+
+            REQUIRE(d_out->get_bounds().first == 0.);
+            REQUIRE(d_out->get_bounds().second == approximately(fp_t(-10, prec)));
+            REQUIRE(d_out->get_n_steps() > 0u);
+
+            // Try slightly outside the bounds.
+            (*d_out)(fp_t(.01, prec));
+            REQUIRE(d_out->get_output()[0] == approximately(sin(fp_t(0.01, prec))));
+            REQUIRE(d_out->get_output()[1] == approximately(cos(fp_t(0.01, prec))));
+            (*d_out)(fp_t(-10.01, prec));
+            REQUIRE(d_out->get_output()[0] == approximately(sin(fp_t(-10.01, prec))));
+            REQUIRE(d_out->get_output()[1] == approximately(cos(fp_t(-10.01, prec))));
+
+            // Try making a copy too.
+            co = *d_out;
+            co(fp_t(-4., prec));
+            REQUIRE(co.get_output()[0] == approximately(grid_out[2u * 4u], fp_t(10, prec)));
+            REQUIRE(co.get_output()[1] == approximately(grid_out[2u * 4u + 1u], fp_t(10, prec)));
+
+            co = *&co;
+            co(fp_t(-5., prec));
+            REQUIRE(co.get_output()[0] == approximately(grid_out[2u * 5u], fp_t(10, prec)));
+            REQUIRE(co.get_output()[1] == approximately(grid_out[2u * 5u + 1u], fp_t(10, prec)));
+
+            // Limiting case in which not steps are taken.
+            ta.get_state_data()[0] = fp_t(0, prec);
+            ta.get_state_data()[1] = fp_t(std::numeric_limits<double>::infinity(), prec);
+            ta.set_time(fp_t(0, prec));
+            d_out = std::get<4>(ta.propagate_until(fp_t(-10., prec), kw::c_output = true));
+            REQUIRE(!d_out.has_value());
+
+            // Try with non-finite time.
+            REQUIRE_THROWS_AS(co(fp_t(std::numeric_limits<double>::infinity(), prec)), std::invalid_argument);
+
+            // Failure modes specific to mppp::real.
+            REQUIRE_THROWS_MATCHES(
+                co(fp_t(1, prec - 1)), std::invalid_argument,
+                Message(
+                    fmt::format("Invalid precision detected for the time argument in a continuous output functor: the "
+                                "precision of the time coordinate is {}, but the precision of the internal data is {}",
+                                prec - 1, prec)));
+        }
+    }
+}
