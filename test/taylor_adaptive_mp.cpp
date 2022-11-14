@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <initializer_list>
+#include <random>
 #include <stdexcept>
 #include <tuple>
 #include <utility>
@@ -44,6 +45,8 @@ auto &horner_eval(Out &ret, const P &p, int order, const T &eval)
 
     return ret;
 }
+
+static std::mt19937 rng;
 
 // Tests to check precision handling on construction.
 TEST_CASE("ctors prec")
@@ -603,6 +606,262 @@ TEST_CASE("propagate for_until write_tc")
                                         [prec](const auto &val) { return val.get_prec() == prec; }));
                     return true;
                 });
+        }
+    }
+}
+
+TEST_CASE("propagate grid scalar")
+{
+    using fp_t = mppp::real;
+
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto prec : {30, 123}) {
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                            {fp_t(0.05, prec), fp_t(0.025, prec)},
+                                            kw::opt_level = opt_level,
+                                            kw::compact_mode = true};
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_grid({}), std::invalid_argument,
+                Message("Cannot invoke propagate_grid() in an adaptive Taylor integrator if the time grid is empty"));
+
+            ta.set_time(fp_t(std::numeric_limits<double>::infinity(), prec));
+
+            REQUIRE_THROWS_MATCHES(ta.propagate_grid({0.}), std::invalid_argument,
+                                   Message("Cannot invoke propagate_grid() in an adaptive Taylor integrator if the "
+                                           "current time is not finite"));
+
+            ta.set_time(fp_t(0., prec));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_grid({fp_t(std::numeric_limits<double>::infinity(), prec)}), std::invalid_argument,
+                Message("A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator"));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_grid({fp_t(1., prec), fp_t(std::numeric_limits<double>::infinity(), prec)}),
+                std::invalid_argument,
+                Message("A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator"));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_grid({fp_t(1., prec), fp_t(2., prec), fp_t(1., prec)}), std::invalid_argument,
+                Message("A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator"));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_grid({-fp_t(1., prec), -fp_t(2., prec), fp_t(1., prec)}), std::invalid_argument,
+                Message("A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator"));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_grid({fp_t(0., prec), fp_t(0., prec), fp_t(1., prec)}), std::invalid_argument,
+                Message("A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator"));
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_grid({fp_t(0., prec), fp_t(1., prec), fp_t(1., prec)}), std::invalid_argument,
+                Message("A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator"));
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_grid({fp_t(0., prec), fp_t(1., prec), fp_t(2., prec), fp_t(2., prec)}),
+                std::invalid_argument,
+                Message("A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator"));
+
+            // Set an infinity in the state.
+            ta.get_state_data()[0] = fp_t(std::numeric_limits<double>::infinity(), prec);
+
+            auto out = ta.propagate_grid({fp_t(.2, prec)});
+            REQUIRE(std::get<0>(out) == taylor_outcome::err_nf_state);
+            REQUIRE(std::get<4>(out).empty());
+
+            // Error modes specific to mppp::real.
+            ta.set_time(fp_t(0, prec));
+
+            // max_delta_t with wrong precision.
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_grid({fp_t(.2, prec)}, kw::max_delta_t = fp_t(.1, prec - 1)), std::invalid_argument,
+                Message(fmt::format(
+                    "Invalid max_delta_t argument passed to the propagate_grid() function of an adaptive Taylor "
+                    "integrator: max_delta_t has a precision of {}, while the integrator's precision is {}",
+                    prec - 1, prec)));
+
+            // Wrong precisions in the grid.
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_grid({fp_t(.2, prec + 1)}), std::invalid_argument,
+                Message(
+                    fmt::format("Invalid precision detected in the time grid passed to the propagate_grid() function "
+                                "of an adaptive Taylor integrator: a value of precision {} was "
+                                "detected in the grid, but the precision of the integrator is {} instead",
+                                prec + 1, prec)));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_grid({fp_t(.2, prec), fp_t(.3, prec - 1)}), std::invalid_argument,
+                Message(
+                    fmt::format("Invalid precision detected in the time grid passed to the propagate_grid() function "
+                                "of an adaptive Taylor integrator: a value of precision {} was "
+                                "detected in the grid, but the precision of the integrator is {} instead",
+                                prec - 1, prec)));
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_grid({fp_t(.2, prec), fp_t(.3, prec), fp_t(.4, prec + 2)}), std::invalid_argument,
+                Message(
+                    fmt::format("Invalid precision detected in the time grid passed to the propagate_grid() function "
+                                "of an adaptive Taylor integrator: a value of precision {} was "
+                                "detected in the grid, but the precision of the integrator is {} instead",
+                                prec + 2, prec)));
+
+            // Reset the integrator.
+            ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                       {fp_t(0.05, prec), fp_t(0.025, prec)},
+                                       kw::opt_level = opt_level,
+                                       kw::compact_mode = true};
+
+            // Propagate to the initial time.
+            out = ta.propagate_grid({fp_t(0., prec)});
+            REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+            REQUIRE(std::get<1>(out) == std::numeric_limits<double>::infinity());
+            REQUIRE(std::get<2>(out) == 0);
+            REQUIRE(std::get<3>(out) == 0u);
+            REQUIRE(std::get<4>(out) == std::vector{fp_t(0.05, prec), fp_t(0.025, prec)});
+            REQUIRE(ta.get_time() == 0.);
+
+            REQUIRE_THROWS_MATCHES(
+                ta.propagate_grid({fp_t(2., prec), fp_t(std::numeric_limits<double>::infinity(), prec)}),
+                std::invalid_argument,
+                Message("A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator"));
+
+            // Switch to the harmonic oscillator.
+            ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -x},
+                                       {fp_t(0., prec), fp_t(1., prec)},
+                                       kw::opt_level = opt_level,
+                                       kw::compact_mode = true};
+
+            // Integrate forward over a dense grid from 0 to 10.
+            std::vector<fp_t> grid;
+            for (auto i = 0u; i < 1000u; ++i) {
+                grid.emplace_back(i / 100., prec);
+            }
+            out = ta.propagate_grid(grid);
+
+            REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+            REQUIRE(std::get<4>(out).size() == 2000u);
+            REQUIRE(ta.get_time() == grid.back());
+
+            for (auto i = 0u; i < 1000u; ++i) {
+                REQUIRE(std::get<4>(out)[2u * i] == approximately(sin(grid[i]), fp_t(10000., prec)));
+                REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(cos(grid[i]), fp_t(10000., prec)));
+            }
+
+            // Do the same backwards.
+            ta.set_time(fp_t(10., prec));
+            ta.get_state_data()[0] = sin(fp_t(10., prec));
+            ta.get_state_data()[1] = cos(fp_t(10., prec));
+            std::reverse(grid.begin(), grid.end());
+
+            out = ta.propagate_grid(grid);
+
+            REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+            REQUIRE(std::get<4>(out).size() == 2000u);
+            REQUIRE(ta.get_time() == grid.back());
+
+            for (auto i = 0u; i < 1000u; ++i) {
+                REQUIRE(std::get<4>(out)[2u * i] == approximately(sin(grid[i]), fp_t(10000., prec)));
+                REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(cos(grid[i]), fp_t(10000., prec)));
+            }
+
+            // Random testing.
+            ta.set_time(fp_t(0., prec));
+            ta.get_state_data()[0] = fp_t(0., prec);
+            ta.get_state_data()[1] = fp_t(1., prec);
+
+            std::uniform_real_distribution<double> rdist(0., .1);
+            grid[0] = fp_t(0, prec);
+            for (auto i = 1u; i < 1000u; ++i) {
+                grid[i] = grid[i - 1u] + fp_t(rdist(rng), prec);
+            }
+
+            out = ta.propagate_grid(grid);
+
+            REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+            REQUIRE(std::get<4>(out).size() == 2000u);
+            REQUIRE(ta.get_time() == grid.back());
+
+            for (auto i = 0u; i < 1000u; ++i) {
+                REQUIRE(std::get<4>(out)[2u * i] == approximately(sin(grid[i]), fp_t(100000., prec)));
+                REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(cos(grid[i]), fp_t(100000., prec)));
+            }
+
+            // Do it also backwards.
+            ta.set_time(fp_t(0., prec));
+            ta.get_state_data()[0] = fp_t(0., prec);
+            ta.get_state_data()[1] = fp_t(1., prec);
+
+            rdist = std::uniform_real_distribution<double>(-.1, 0.);
+            grid[0] = fp_t(0, prec);
+            for (auto i = 1u; i < 1000u; ++i) {
+                grid[i] = grid[i - 1u] + fp_t(rdist(rng), prec);
+            }
+
+            out = ta.propagate_grid(grid);
+
+            REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+            REQUIRE(std::get<4>(out).size() == 2000u);
+            REQUIRE(ta.get_time() == grid.back());
+
+            for (auto i = 0u; i < 1000u; ++i) {
+                REQUIRE(std::get<4>(out)[2u * i] == approximately(sin(grid[i]), fp_t(100000., prec)));
+                REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(cos(grid[i]), fp_t(100000., prec)));
+            }
+
+            // A test with a sparse grid.
+            ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -x},
+                                       {fp_t(0., prec), fp_t(1., prec)},
+                                       kw::opt_level = opt_level,
+                                       kw::compact_mode = true};
+
+            out = ta.propagate_grid({fp_t(.1, prec), fp_t(10., prec), fp_t(100., prec)});
+
+            REQUIRE(std::get<4>(out).size() == 6u);
+            REQUIRE(ta.get_time() == 100.);
+            REQUIRE(std::get<4>(out)[0] == approximately(sin(fp_t(.1, prec)), fp_t(100., prec)));
+            REQUIRE(std::get<4>(out)[1] == approximately(cos(fp_t(.1, prec)), fp_t(100., prec)));
+            REQUIRE(std::get<4>(out)[2] == approximately(sin(fp_t(10, prec)), fp_t(100., prec)));
+            REQUIRE(std::get<4>(out)[3] == approximately(cos(fp_t(10, prec)), fp_t(100, prec)));
+            REQUIRE(std::get<4>(out)[4] == approximately(sin(fp_t(100, prec)), fp_t(1000, prec)));
+            REQUIRE(std::get<4>(out)[5] == approximately(cos(fp_t(100, prec)), fp_t(1000, prec)));
+
+            // A case in which the initial propagate_until() to bring the system
+            // to grid[0] interrupts the integration.
+            ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -x},
+                                       {fp_t(0., prec), fp_t(1., prec)},
+                                       kw::opt_level = opt_level,
+                                       kw::compact_mode = true,
+                                       kw::t_events = {t_event<fp_t>(v - 0.999)}};
+            out = ta.propagate_grid({fp_t(10., prec), fp_t(100., prec)});
+            REQUIRE(std::get<0>(out) == taylor_outcome{-1});
+            REQUIRE(std::get<4>(out).empty());
+
+            ta = taylor_adaptive<fp_t>{
+                {prime(x) = v, prime(v) = -x},
+                {fp_t(0., prec), fp_t(1., prec)},
+                kw::opt_level = opt_level,
+                kw::compact_mode = true,
+                kw::t_events = {t_event<fp_t>(
+                    v - 0.999, kw::callback = [](taylor_adaptive<fp_t> &, bool, int) { return false; })}};
+            out = ta.propagate_grid({fp_t(10., prec), fp_t(100., prec)});
+            REQUIRE(std::get<0>(out) == taylor_outcome{-1});
+            REQUIRE(std::get<4>(out).empty());
+
+            // A case in which we have a callback which never stops and a terminal event
+            // which triggers.
+            ta = taylor_adaptive<fp_t>{
+                {prime(x) = v, prime(v) = -x},
+                {fp_t(0., prec), fp_t(1., prec)},
+                kw::opt_level = opt_level,
+                kw::compact_mode = true,
+                kw::t_events = {t_event<fp_t>(
+                    v - .1, kw::callback = [](taylor_adaptive<fp_t> &, bool, int) { return false; })}};
+            out = ta.propagate_grid(
+                {fp_t(10., prec), fp_t(100., prec)}, kw::callback = [](const auto &) { return true; });
+            REQUIRE(std::get<0>(out) == taylor_outcome{-1});
         }
     }
 }
