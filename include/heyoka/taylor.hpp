@@ -576,7 +576,7 @@ class HEYOKA_DLL_PUBLIC continuous_output
     std::vector<T> m_tcs;
     std::vector<T> m_times_hi, m_times_lo;
     std::vector<T> m_output;
-    using fptr_t = void (*)(T *, T, const T *, const T *, const T *) noexcept;
+    using fptr_t = void (*)(T *, T *, const T *, const T *, const T *) noexcept;
     fptr_t m_f_ptr = nullptr;
 
     HEYOKA_DLL_LOCAL void add_c_out_function(std::uint32_t, std::uint32_t, bool);
@@ -600,7 +600,7 @@ public:
 
     [[nodiscard]] const llvm_state &get_llvm_state() const;
 
-    const std::vector<T> &operator()(T tm)
+    const std::vector<T> &operator()(const T &tm)
     {
         call_impl(tm);
         return m_output;

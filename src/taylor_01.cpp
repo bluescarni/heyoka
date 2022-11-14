@@ -1838,6 +1838,24 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
 template <typename T>
 void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t dim, bool high_accuracy)
 {
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        // Double check that the initialisation of the continuous_output
+        // object in the integrator code set up everything
+        // with consistent precisions.
+        assert(std::all_of(m_tcs.begin(), m_tcs.end(),
+                           [&](const auto &x) { return x.get_prec() == m_output[0].get_prec(); }));
+        assert(std::all_of(m_times_hi.begin(), m_times_hi.end(),
+                           [&](const auto &x) { return x.get_prec() == m_output[0].get_prec(); }));
+        assert(std::all_of(m_times_lo.begin(), m_times_lo.end(),
+                           [&](const auto &x) { return x.get_prec() == m_output[0].get_prec(); }));
+        assert(std::all_of(m_output.begin(), m_output.end(),
+                           [&](const auto &x) { return x.get_prec() == m_output[0].get_prec(); }));
+    }
+
+#endif
+
     // Overflow check: we want to be able to index into the arrays of
     // times and Taylor coefficients using 32-bit ints.
     // LCOV_EXCL_START
@@ -1851,12 +1869,14 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     auto &builder = m_llvm_state.builder();
     auto &context = m_llvm_state.context();
 
-    auto *fp_t = detail::to_llvm_type<T>(context);
+    // Fetch the internal floating-point type.
+    auto *fp_t = detail::llvm_type_like(m_llvm_state, m_output[0]);
 
     // Fetch the current insertion block.
     auto *orig_bb = builder.GetInsertBlock();
 
     // Add the function for the computation of the dense output.
+    // NOTE: the dense output function operates on data in external format.
     detail::taylor_add_d_out_function(m_llvm_state, fp_t, dim, order, 1, high_accuracy, false, false);
 
     // Fetch it.
@@ -1872,13 +1892,16 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
 
     // The function arguments:
     // - the output pointer (read/write, used also for accumulation),
-    // - the time value,
+    // - the pointer to the time value (read/write: after the time value
+    //   is read, the pointer will be re-used to store the h value
+    //   that needs to be passed to the dense output function),
     // - the pointer to the Taylor coefficients (read-only),
     // - the pointer to the hi times (read-only),
     // - the pointer to the lo times (read-only).
-    // No overlap is allowed.
-    auto ptr_t = llvm::PointerType::getUnqual(fp_t);
-    const std::vector<llvm::Type *> fargs{ptr_t, fp_t, ptr_t, ptr_t, ptr_t};
+    // No overlap is allowed. All pointers are external.
+    auto *ext_fp_t = detail::to_llvm_type<T>(context);
+    auto *ptr_t = llvm::PointerType::getUnqual(ext_fp_t);
+    const std::vector<llvm::Type *> fargs(5u, ptr_t);
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -1896,8 +1919,10 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     out_ptr->addAttr(llvm::Attribute::NoCapture);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
 
-    auto *tm = f->args().begin() + 1;
-    tm->setName("tm");
+    auto *tm_ptr = f->args().begin() + 1;
+    tm_ptr->setName("tm_ptr");
+    tm_ptr->addAttr(llvm::Attribute::NoCapture);
+    tm_ptr->addAttr(llvm::Attribute::NoAlias);
 
     auto *tc_ptr = f->args().begin() + 2;
     tc_ptr->setName("tc_ptr");
@@ -1922,10 +1947,8 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     assert(bb != nullptr); // LCOV_EXCL_LINE
     builder.SetInsertPoint(bb);
 
-    // Create the variable in which we will store the timestep size.
-    // This is necessary because the d_out_f function requires a pointer
-    // to the timestep.
-    auto h_ptr = builder.CreateAlloca(fp_t);
+    // Load the time value from tm_ptr.
+    auto *tm = detail::ext_load_vector_from_memory(m_llvm_state, fp_t, tm_ptr, 1);
 
     // Look for the index in the times vector corresponding to
     // a time greater than tm (less than tm in backwards integration).
@@ -1958,13 +1981,15 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
             // Logical condition:
             // - !(tm < *tidx), if integrating forward,
             // - !(tm > *tidx), if integrating backward.
-            auto tidx_val_hi = builder.CreateLoad(
-                fp_t, builder.CreateInBoundsGEP(fp_t, times_ptr_hi, builder.CreateLoad(builder.getInt32Ty(), tidx)));
-            auto tidx_val_lo = builder.CreateLoad(
-                fp_t, builder.CreateInBoundsGEP(fp_t, times_ptr_lo, builder.CreateLoad(builder.getInt32Ty(), tidx)));
-            auto zero_val = detail::llvm_constantfp(m_llvm_state, fp_t, 0.);
-            auto cond = dir ? detail::llvm_dl_lt(m_llvm_state, tm, zero_val, tidx_val_hi, tidx_val_lo)
-                            : detail::llvm_dl_gt(m_llvm_state, tm, zero_val, tidx_val_hi, tidx_val_lo);
+            auto *tidx_val_hi = detail::ext_load_vector_from_memory(
+                m_llvm_state, fp_t,
+                builder.CreateInBoundsGEP(ext_fp_t, times_ptr_hi, builder.CreateLoad(builder.getInt32Ty(), tidx)), 1);
+            auto *tidx_val_lo = detail::ext_load_vector_from_memory(
+                m_llvm_state, fp_t,
+                builder.CreateInBoundsGEP(ext_fp_t, times_ptr_lo, builder.CreateLoad(builder.getInt32Ty(), tidx)), 1);
+            auto *zero_val = detail::llvm_constantfp(m_llvm_state, fp_t, 0.);
+            auto *cond = dir ? detail::llvm_dl_lt(m_llvm_state, tm, zero_val, tidx_val_hi, tidx_val_lo)
+                             : detail::llvm_dl_gt(m_llvm_state, tm, zero_val, tidx_val_hi, tidx_val_lo);
             cond = builder.CreateNot(cond);
 
             detail::llvm_if_then_else(
@@ -2021,20 +2046,22 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     tc_idx = builder.CreateLoad(builder.getInt32Ty(), first);
 
     // Load the time corresponding to tc_idx.
-    auto *start_tm_hi = builder.CreateLoad(fp_t, builder.CreateInBoundsGEP(fp_t, times_ptr_hi, tc_idx));
-    auto *start_tm_lo = builder.CreateLoad(fp_t, builder.CreateInBoundsGEP(fp_t, times_ptr_lo, tc_idx));
+    auto *start_tm_hi = detail::ext_load_vector_from_memory(
+        m_llvm_state, fp_t, builder.CreateInBoundsGEP(ext_fp_t, times_ptr_hi, tc_idx), 1);
+    auto *start_tm_lo = detail::ext_load_vector_from_memory(
+        m_llvm_state, fp_t, builder.CreateInBoundsGEP(ext_fp_t, times_ptr_lo, tc_idx), 1);
 
-    // Compute and store the value of h = tm - start_tm.
+    // Compute and store the value of h = tm - start_tm into tm_ptr.
     auto [h_hi, h_lo] = detail::llvm_dl_add(m_llvm_state, tm, detail::llvm_constantfp(m_llvm_state, fp_t, 0.),
                                             detail::llvm_fneg(m_llvm_state, start_tm_hi),
                                             detail::llvm_fneg(m_llvm_state, start_tm_lo));
-    builder.CreateStore(h_hi, h_ptr);
+    detail::ext_store_vector_to_memory(m_llvm_state, tm_ptr, h_hi);
 
     // Compute the index into the Taylor coefficients array.
     tc_idx = builder.CreateMul(tc_idx, builder.getInt32(dim * (order + 1u)));
 
     // Invoke the d_out function.
-    builder.CreateCall(d_out_f, {out_ptr, builder.CreateInBoundsGEP(fp_t, tc_ptr, tc_idx), h_ptr});
+    builder.CreateCall(d_out_f, {out_ptr, builder.CreateInBoundsGEP(ext_fp_t, tc_ptr, tc_idx), tm_ptr});
 
     // Create the return value.
     builder.CreateRetVoid();
@@ -2091,6 +2118,8 @@ continuous_output<T> &continuous_output<T>::operator=(const continuous_output &o
 template <typename T>
 continuous_output<T> &continuous_output<T>::operator=(continuous_output &&) noexcept = default;
 
+// NOTE: pass by copy so that we are sure t does not
+// overlap with other data.
 template <typename T>
 void continuous_output<T>::call_impl(T t)
 {
@@ -2105,12 +2134,31 @@ void continuous_output<T>::call_impl(T t)
 
     // LCOV_EXCL_START
 #if !defined(NDEBUG)
+
     // m_output must not be empty.
     assert(!m_output.empty());
     // Need at least 2 time points.
     assert(m_times_hi.size() >= 2u);
     // hi/lo parts of times must have the same sizes.
     assert(m_times_hi.size() == m_times_lo.size());
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        // All data must have the same precision
+        // (inferred from the first element of m_output).
+        assert(std::all_of(m_tcs.begin(), m_tcs.end(),
+                           [&](const auto &x) { return x.get_prec() == m_output[0].get_prec(); }));
+        assert(std::all_of(m_times_hi.begin(), m_times_hi.end(),
+                           [&](const auto &x) { return x.get_prec() == m_output[0].get_prec(); }));
+        assert(std::all_of(m_times_lo.begin(), m_times_lo.end(),
+                           [&](const auto &x) { return x.get_prec() == m_output[0].get_prec(); }));
+        assert(std::all_of(m_output.begin(), m_output.end(),
+                           [&](const auto &x) { return x.get_prec() == m_output[0].get_prec(); }));
+    }
+
+#endif
+
 #endif
     // LCOV_EXCL_STOP
 
@@ -2119,7 +2167,20 @@ void continuous_output<T>::call_impl(T t)
             fmt::format("Cannot compute the continuous output at the non-finite time {}", detail::fp_to_string(t)));
     }
 
-    m_f_ptr(m_output.data(), t, m_tcs.data(), m_times_hi.data(), m_times_lo.data());
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        if (t.get_prec() != m_output[0].get_prec()) {
+            throw std::invalid_argument(
+                fmt::format("Invalid precision detected for the time argument in a continuous output functor: the "
+                            "precision of the time coordinate is {}, but the precision of the internal data is {}",
+                            t.get_prec(), m_output[0].get_prec()));
+        }
+    }
+
+#endif
+
+    m_f_ptr(m_output.data(), &t, m_tcs.data(), m_times_hi.data(), m_times_lo.data());
 }
 
 template <typename T>
