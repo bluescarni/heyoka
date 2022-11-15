@@ -190,7 +190,7 @@ std::string constant::operator()(unsigned prec) const
 
 // Helper to generate the LLVM version of the constant for the type tp.
 // tp is supposed to be a scalar type.
-llvm::Constant *constant::make_llvm_const(llvm_state &s, llvm::Type *tp) const
+llvm::Constant *constant::make_llvm_const([[maybe_unused]] llvm_state &s, llvm::Type *tp) const
 {
     assert(tp != nullptr);
     assert(!tp->isVectorTy());
