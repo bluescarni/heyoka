@@ -27,6 +27,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -105,6 +111,13 @@ HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<long double>();
 
 template <>
 HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<mppp::real128>();
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<mppp::real>();
 
 #endif
 
