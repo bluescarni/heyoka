@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <initializer_list>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <tuple>
 #include <utility>
@@ -22,6 +23,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #include <xtensor/xadapt.hpp>
@@ -1031,6 +1033,71 @@ TEST_CASE("continuous output")
                     fmt::format("Invalid precision detected for the time argument in a continuous output functor: the "
                                 "precision of the time coordinate is {}, but the precision of the internal data is {}",
                                 prec - 1, prec)));
+        }
+    }
+}
+
+TEST_CASE("s11n")
+{
+    using fp_t = mppp::real;
+
+    auto [x, v] = make_vars("x", "v");
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto prec : {30, 123}) {
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                            {fp_t(0., prec), fp_t(0.5, prec)},
+                                            kw::compact_mode = true,
+                                            kw::opt_level = opt_level};
+
+            REQUIRE(std::get<0>(ta.step(true)) == taylor_outcome::success);
+
+            std::stringstream ss;
+
+            {
+                boost::archive::binary_oarchive oa(ss);
+                oa << ta;
+            }
+
+            auto ta_copy = ta;
+            ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                       {fp_t(0., prec), fp_t(0.5, prec)},
+                                       kw::compact_mode = true,
+                                       kw::opt_level = opt_level};
+
+            {
+                boost::archive::binary_iarchive ia(ss);
+                ia >> ta;
+            }
+
+            REQUIRE(ta.get_llvm_state().get_ir() == ta_copy.get_llvm_state().get_ir());
+            REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
+            REQUIRE(ta.get_order() == ta_copy.get_order());
+            REQUIRE(ta.get_tol() == ta_copy.get_tol());
+            REQUIRE(ta.get_high_accuracy() == ta_copy.get_high_accuracy());
+            REQUIRE(ta.get_compact_mode() == ta_copy.get_compact_mode());
+            REQUIRE(ta.get_dim() == ta_copy.get_dim());
+            REQUIRE(ta.get_time() == ta_copy.get_time());
+            REQUIRE(ta.get_state() == ta_copy.get_state());
+            REQUIRE(ta.get_pars() == ta_copy.get_pars());
+            REQUIRE(ta.get_tc() == ta_copy.get_tc());
+            REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
+            REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+            REQUIRE(ta.get_prec() == ta_copy.get_prec());
+
+            // Take a step in ta and in ta_copy.
+            ta.step(true);
+            ta_copy.step(true);
+
+            REQUIRE(ta.get_time() == ta_copy.get_time());
+            REQUIRE(ta.get_state() == ta_copy.get_state());
+            REQUIRE(ta.get_tc() == ta_copy.get_tc());
+            REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
+
+            ta.update_d_output(fp_t(-.1, prec), true);
+            ta_copy.update_d_output(fp_t(-.1, prec), true);
+
+            REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
         }
     }
 }
