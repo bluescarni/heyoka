@@ -98,7 +98,7 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, llvm::Type *fp_t, const tpoly
     }
 
     // Load the time value.
-    auto *tm = load_vector_from_memory(builder, fp_t, time_ptr, batch_size);
+    auto *tm = ext_load_vector_from_memory(s, fp_t, time_ptr, batch_size);
 
     // Init the return value with the highest-order coefficient (scaled by the corresponding
     // binomial coefficient).
@@ -158,6 +158,9 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, llvm::Type *scal_t, cons
     // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(scal_t, batch_size);
 
+    // Fetch the external type corresponding to scal_t.
+    auto *ext_scal_t = llvm_ext_type(scal_t);
+
     // Fetch the function name and arguments.
     // NOTE: we mangle on the poly degree as well, so that we will be
     // generating a different function for each polynomial degree.
@@ -168,7 +171,7 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, llvm::Type *scal_t, cons
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = md.getFunction(fname);
+    auto *f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -183,7 +186,7 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, llvm::Type *scal_t, cons
             auto *idx = builder.CreateMul(i, builder.getInt32(n_const + 1u));
             idx = builder.CreateAdd(idx, j);
 
-            auto val = builder.CreateLoad(scal_t, builder.CreateInBoundsGEP(scal_t, bc_ptr, idx));
+            auto *val = builder.CreateLoad(scal_t, builder.CreateInBoundsGEP(scal_t, bc_ptr, idx));
 
             return vector_splat(builder, val, batch_size);
         };
@@ -195,17 +198,17 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, llvm::Type *scal_t, cons
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
-        auto ord = f->args().begin();
-        auto par_ptr = f->args().begin() + 3;
-        auto t_ptr = f->args().begin() + 4;
-        auto b_idx = f->args().begin() + 5;
-        auto e_idx = f->args().begin() + 6;
+        auto *ord = f->args().begin();
+        auto *par_ptr = f->args().begin() + 3;
+        auto *t_ptr = f->args().begin() + 4;
+        auto *b_idx = f->args().begin() + 5;
+        auto *e_idx = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         // Cache the order of the polynomial.
         auto *n = builder.getInt32(n_const);
@@ -220,15 +223,15 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, llvm::Type *scal_t, cons
             },
             [&]() {
                 // Load the time value.
-                auto tm = load_vector_from_memory(builder, scal_t, t_ptr, batch_size);
+                auto *tm = ext_load_vector_from_memory(s, scal_t, t_ptr, batch_size);
 
                 // Init the return value with the highest-order coefficient (scaled by the corresponding
                 // binomial coefficient).
-                auto bc = get_bc(n, ord);
-                auto cf = load_vector_from_memory(
-                    builder, scal_t,
+                auto *bc = get_bc(n, ord);
+                auto *cf = ext_load_vector_from_memory(
+                    s, scal_t,
                     builder.CreateInBoundsGEP(
-                        scal_t, par_ptr,
+                        ext_scal_t, par_ptr,
                         builder.CreateMul(builder.getInt32(batch_size), builder.CreateSub(e_idx, builder.getInt32(1)))),
                     batch_size);
                 cf = llvm_fmul(s, cf, bc);
@@ -239,20 +242,20 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, llvm::Type *scal_t, cons
                               [&](llvm::Value *i_) {
                                   // NOTE: need to invert i because Horner's method
                                   // proceeds backwards.
-                                  auto i = builder.CreateSub(builder.CreateSub(n, ord), i_);
+                                  auto *i = builder.CreateSub(builder.CreateSub(n, ord), i_);
 
                                   // Get the binomial coefficient.
                                   bc = get_bc(builder.CreateAdd(i, ord), ord);
 
                                   // Load the poly coefficient from the par array and multiply it by bc.
-                                  auto cf_idx = builder.CreateMul(builder.CreateAdd(builder.CreateAdd(b_idx, i), ord),
-                                                                  builder.getInt32(batch_size));
-                                  cf = load_vector_from_memory(
-                                      builder, scal_t, builder.CreateInBoundsGEP(scal_t, par_ptr, cf_idx), batch_size);
+                                  auto *cf_idx = builder.CreateMul(builder.CreateAdd(builder.CreateAdd(b_idx, i), ord),
+                                                                   builder.getInt32(batch_size));
+                                  cf = ext_load_vector_from_memory(
+                                      s, scal_t, builder.CreateInBoundsGEP(ext_scal_t, par_ptr, cf_idx), batch_size);
                                   cf = llvm_fmul(s, cf, bc);
 
                                   // Horner iteration.
-                                  auto new_val = llvm_fadd(s, cf, llvm_fmul(s, builder.CreateLoad(val_t, retval), tm));
+                                  auto *new_val = llvm_fadd(s, cf, llvm_fmul(s, builder.CreateLoad(val_t, retval), tm));
 
                                   // Update retval.
                                   builder.CreateStore(new_val, retval);
