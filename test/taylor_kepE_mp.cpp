@@ -21,7 +21,7 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-TEST_CASE("taylor add")
+TEST_CASE("kepE")
 {
     using fp_t = mppp::real;
 
