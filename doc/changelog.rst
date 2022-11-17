@@ -7,6 +7,11 @@ Changelog
 New
 ~~~
 
+- Add option to force the use of AVX-512 registers
+  (`#280 <https://github.com/bluescarni/heyoka/pull/280>`__).
+- Implement support for arbitrary-precision computations
+  (`#278 <https://github.com/bluescarni/heyoka/pull/278>`__,
+  `#276 <https://github.com/bluescarni/heyoka/pull/276>`__).
 - Support LLVM 15
   (`#274 <https://github.com/bluescarni/heyoka/pull/274>`__).
 
