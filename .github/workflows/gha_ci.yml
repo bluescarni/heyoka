@@ -28,7 +28,7 @@ jobs:
       - name: Build
         shell: pwsh
         run: |
-          tools\gha_win.bat
+          cmd.exe /c 'tools\gha_win.bat'
   conda_release:
     runs-on: ubuntu-latest
     steps:
