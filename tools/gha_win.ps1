@@ -1,5 +1,9 @@
 echo "The conda prefix is: "
 echo $env:CONDA_PREFIX
+$env:GMP_INCLUDE_DIR = $env:CONDA_PREFIX
+$env:GMP_INCLUDE_DIR += '\include'
+echo "The GMP include dir is: "
+echo $env:GMP_INCLUDE_DIR
 conda install heyoka cmake 'llvmdev=15.0.2' tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel fmt spdlog sleef zlib libzlib 'mppp>=0.27' -y
 mkdir build
 cd build
