@@ -46,7 +46,7 @@ TEST_CASE("add jet sv_funcs")
                         llvm_state s{kw::opt_level = opt_level};
 
                         taylor_add_jet<fp_t>(s, "jet", {prime(x) = y, prime(y) = x}, 3, 1, cm, ha, {x + y}, false,
-                                             static_cast<unsigned>(prec));
+                                             prec);
 
                         s.compile();
 
@@ -80,8 +80,7 @@ TEST_CASE("add jet sv_funcs")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {prime(x) = y, prime(y) = x}, 3, 1, cm, ha, {x, y}, false,
-                                             static_cast<unsigned>(prec));
+                        taylor_add_jet<fp_t>(s, "jet", {prime(x) = y, prime(y) = x}, 3, 1, cm, ha, {x, y}, false, prec);
 
                         s.compile();
 
@@ -120,7 +119,7 @@ TEST_CASE("add jet sv_funcs")
                         llvm_state s{kw::opt_level = opt_level};
 
                         taylor_add_jet<fp_t>(s, "jet", {prime(x) = y, prime(y) = x}, 3, 1, cm, ha, {x, y, x, y}, false,
-                                             static_cast<unsigned>(prec));
+                                             prec);
 
                         s.compile();
 
@@ -167,7 +166,7 @@ TEST_CASE("add jet sv_funcs")
                         llvm_state s{kw::opt_level = opt_level};
 
                         taylor_add_jet<fp_t>(s, "jet", {prime(x) = x + y, prime(y) = x - y}, 3, 1, cm, ha,
-                                             {x - y, x + y, x, y}, false, static_cast<unsigned>(prec));
+                                             {x - y, x + y, x, y}, false, prec);
 
                         s.compile();
 
@@ -214,8 +213,7 @@ TEST_CASE("add jet sv_funcs")
                         llvm_state s{kw::opt_level = opt_level};
 
                         taylor_add_jet<fp_t>(s, "jet", {prime(x) = x + y, prime(y) = x - y}, 3, 1, cm, ha,
-                                             {x - y, x + y, x + 2. * y, y + 2. * x}, false,
-                                             static_cast<unsigned>(prec));
+                                             {x - y, x + y, x + 2. * y, y + 2. * x}, false, prec);
 
                         s.compile();
 
@@ -262,7 +260,7 @@ TEST_CASE("add jet sv_funcs")
                         llvm_state s{kw::opt_level = opt_level};
 
                         taylor_add_jet<fp_t>(s, "jet", {prime(x) = x + y, prime(y) = x - y}, 3, 1, cm, ha,
-                                             {x - y, x + y, x - y, x + y}, false, static_cast<unsigned>(prec));
+                                             {x - y, x + y, x - y, x + y}, false, prec);
 
                         s.compile();
 
@@ -309,8 +307,7 @@ TEST_CASE("add jet sv_funcs")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {prime(x) = cos(x) + x}, 3, 1, cm, ha, {cos(x)}, false,
-                                             static_cast<unsigned>(prec));
+                        taylor_add_jet<fp_t>(s, "jet", {prime(x) = cos(x) + x}, 3, 1, cm, ha, {cos(x)}, false, prec);
 
                         s.compile();
 
