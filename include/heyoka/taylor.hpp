@@ -142,13 +142,13 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &, const s
 template <typename>
 HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet(llvm_state &, const std::string &, const std::vector<expression> &,
                                              std::uint32_t, std::uint32_t, bool, bool,
-                                             const std::vector<expression> & = {}, bool = false, unsigned = 0);
+                                             const std::vector<expression> & = {}, bool = false, long long = 0);
 
 template <typename>
 HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet(llvm_state &, const std::string &,
                                              const std::vector<std::pair<expression, expression>> &, std::uint32_t,
                                              std::uint32_t, bool, bool, const std::vector<expression> & = {},
-                                             bool = false, unsigned = 0);
+                                             bool = false, long long = 0);
 
 // Enum to represent the outcome of a stepping/propagate function.
 enum class taylor_outcome : std::int64_t {

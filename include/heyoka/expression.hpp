@@ -481,12 +481,12 @@ namespace detail
 
 template <typename>
 HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
-                                                    std::uint32_t, bool, bool, bool, unsigned);
+                                                    std::uint32_t, bool, bool, bool, long long);
 
 template <typename>
 HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
                                                     const std::vector<expression> &, std::uint32_t, bool, bool, bool,
-                                                    unsigned);
+                                                    long long);
 
 } // namespace detail
 
@@ -544,7 +544,7 @@ inline std::vector<expression> add_cfunc(llvm_state &s, const std::string &name,
         }();
 
         // Precision (defaults to zero).
-        const auto prec = [&p]() -> unsigned {
+        const auto prec = [&p]() -> long long {
             if constexpr (p.has(kw::prec)) {
                 return std::forward<decltype(p(kw::prec))>(p(kw::prec));
             } else {

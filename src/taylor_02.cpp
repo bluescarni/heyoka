@@ -1734,7 +1734,7 @@ namespace
 template <typename T, typename U>
 auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, std::uint32_t order,
                          std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                         const std::vector<expression> &sv_funcs, bool parallel_mode, [[maybe_unused]] unsigned prec)
+                         const std::vector<expression> &sv_funcs, bool parallel_mode, [[maybe_unused]] long long prec)
 {
     if (s.is_compiled()) {
         throw std::invalid_argument("A function for the computation of the jet of Taylor derivatives cannot be added "
@@ -2007,7 +2007,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 template <typename T>
 taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
                            std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                           const std::vector<expression> &sv_funcs, bool parallel_mode, unsigned prec)
+                           const std::vector<expression> &sv_funcs, bool parallel_mode, long long prec)
 {
     return detail::taylor_add_jet_impl<T>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
                                           parallel_mode, prec);
@@ -2017,7 +2017,7 @@ template <typename T>
 taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name,
                            const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
                            std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                           const std::vector<expression> &sv_funcs, bool parallel_mode, unsigned prec)
+                           const std::vector<expression> &sv_funcs, bool parallel_mode, long long prec)
 {
     return detail::taylor_add_jet_impl<T>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
                                           parallel_mode, prec);
@@ -2027,32 +2027,32 @@ taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name,
 template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<double>(llvm_state &, const std::string &,
                                                               const std::vector<expression> &, std::uint32_t,
                                                               std::uint32_t, bool, bool,
-                                                              const std::vector<expression> &, bool, unsigned);
+                                                              const std::vector<expression> &, bool, long long);
 
 template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<double>(llvm_state &, const std::string &,
                                                               const std::vector<std::pair<expression, expression>> &,
                                                               std::uint32_t, std::uint32_t, bool, bool,
-                                                              const std::vector<expression> &, bool, unsigned);
+                                                              const std::vector<expression> &, bool, long long);
 
 template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<long double>(llvm_state &, const std::string &,
                                                                    const std::vector<expression> &, std::uint32_t,
                                                                    std::uint32_t, bool, bool,
-                                                                   const std::vector<expression> &, bool, unsigned);
+                                                                   const std::vector<expression> &, bool, long long);
 
 template HEYOKA_DLL_PUBLIC taylor_dc_t
 taylor_add_jet<long double>(llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &,
-                            std::uint32_t, std::uint32_t, bool, bool, const std::vector<expression> &, bool, unsigned);
+                            std::uint32_t, std::uint32_t, bool, bool, const std::vector<expression> &, bool, long long);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<mppp::real128>(llvm_state &, const std::string &,
                                                                      const std::vector<expression> &, std::uint32_t,
                                                                      std::uint32_t, bool, bool,
-                                                                     const std::vector<expression> &, bool, unsigned);
+                                                                     const std::vector<expression> &, bool, long long);
 
 template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<mppp::real128>(
     llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &, std::uint32_t,
-    std::uint32_t, bool, bool, const std::vector<expression> &, bool, unsigned);
+    std::uint32_t, bool, bool, const std::vector<expression> &, bool, long long);
 
 #endif
 
@@ -2061,11 +2061,11 @@ template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<mppp::real128>(
 template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<mppp::real>(llvm_state &, const std::string &,
                                                                   const std::vector<expression> &, std::uint32_t,
                                                                   std::uint32_t, bool, bool,
-                                                                  const std::vector<expression> &, bool, unsigned);
+                                                                  const std::vector<expression> &, bool, long long);
 
 template HEYOKA_DLL_PUBLIC taylor_dc_t
 taylor_add_jet<mppp::real>(llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &,
-                           std::uint32_t, std::uint32_t, bool, bool, const std::vector<expression> &, bool, unsigned);
+                           std::uint32_t, std::uint32_t, bool, bool, const std::vector<expression> &, bool, long long);
 
 #endif
 
