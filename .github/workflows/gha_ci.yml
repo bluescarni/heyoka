@@ -26,8 +26,9 @@ jobs:
           channels: conda-forge
           channel-priority: strict
       - name: Build
-        shell: pwsh
-        run: tools\gha_win.ps1
+        shell: cmd
+        run: |
+          tools\gha_win.bat
   conda_release:
     runs-on: ubuntu-latest
     steps:
