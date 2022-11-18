@@ -27,8 +27,7 @@ jobs:
           channel-priority: strict
       - name: Build
         shell: pwsh
-        run: |
-          cmd.exe /c 'tools\gha_win.bat'
+        run: tools\gha_win.ps1
   conda_release:
     runs-on: ubuntu-latest
     steps:
