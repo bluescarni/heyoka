@@ -20,7 +20,7 @@ Arbitrary-precision floating-point values are represented in heyoka via the mp++
 We refer the reader to the :ref:`mp++ tutorial <mppp:tutorial_real>` for a quick overview of the main features
 of this class. For the purposes of this tutorial, it is sufficient to note how :cpp:class:`mppp::real` largely
 behaves like a builtin floating-point type, the only difference being that the number of digits in the significand
-can be set and changed at runtime.
+can be set at runtime.
 
 A simple example
 ----------------
@@ -81,7 +81,7 @@ This change is motivated by the fact that the Taylor order of arbitrary-precisio
 much higher than in double-precision and extended-precision integrators, which results in very long compilation
 times even for simple ODEs. Moreover, in arbitrary-precision integrators compact mode does not bring performance
 improvements due to the fact that most numerical computations are offloaded to the mp++ library (rather than
-being implemented in LLVM).
+being implemented directly in LLVM).
 
 Extended vs arbitrary precision
 -------------------------------
