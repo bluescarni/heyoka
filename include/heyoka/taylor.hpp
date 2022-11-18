@@ -878,15 +878,12 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_base<mppp::real, Derived>
 
 protected:
     // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes,misc-non-private-member-variables-in-classes)
-    unsigned m_prec = 0;
+    mpfr_prec_t m_prec = 0;
 
     void data_prec_check() const;
-    // NOTE: this is for internal use with the handy cast.
-    [[nodiscard]] mpfr_prec_t get_sprec() const;
 
 public:
-    // NOTE: this is for public consumption.
-    [[nodiscard]] unsigned get_prec() const;
+    [[nodiscard]] mpfr_prec_t get_prec() const;
 };
 
 #endif
