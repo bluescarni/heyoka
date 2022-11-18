@@ -2,7 +2,7 @@ echo on
 
 echo "The conda prefix is: "
 echo %CONDA_PREFIX%
-conda install ^
+conda install -y ^
     cmake ^
     'llvmdev=15.0.2' ^
     tbb-devel ^
@@ -17,8 +17,7 @@ conda install ^
     sleef ^
     zlib ^
     libzlib ^
-    'mppp>=0.27' ^
-    -y
+    'mppp^>=0.27'
 
 mkdir build
 cd build
