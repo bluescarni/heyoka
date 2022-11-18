@@ -1,3 +1,5 @@
+echo on 
+
 echo "The conda prefix is: "
 echo %CONDA_PREFIX%
 conda install heyoka cmake 'llvmdev=15.0.2' tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel fmt spdlog sleef zlib libzlib 'mppp>=0.27' -y
