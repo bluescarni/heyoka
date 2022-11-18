@@ -1159,6 +1159,14 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
     oss.imbue(std::locale::classic());
     oss << std::boolalpha;
 
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        oss << "Precision               : " << ta.get_prec() << " bits\n";
+    }
+
+#endif
+
     oss << "Tolerance               : " << fp_to_string(ta.get_tol()) << '\n';
     oss << "High accuracy           : " << ta.get_high_accuracy() << '\n';
     oss << "Compact mode            : " << ta.get_compact_mode() << '\n';

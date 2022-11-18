@@ -299,12 +299,18 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
         return {};
     }();
 
-    // Compact mode (defaults to false).
+    // Compact mode (defaults to false, except for real where
+    // it defaults to true).
     auto compact_mode = [&p]() -> bool {
         if constexpr (p.has(kw::compact_mode)) {
             return std::forward<decltype(p(kw::compact_mode))>(p(kw::compact_mode));
         } else {
+#if defined(HEYOKA_HAVE_REAL)
+            return std::is_same_v<T, mppp::real>;
+#else
             return false;
+
+#endif
         }
     }();
 
