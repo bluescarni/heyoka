@@ -32,13 +32,11 @@ TEST_CASE("sqrt")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     // Test with param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {sqrt(par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {sqrt(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -61,7 +59,7 @@ TEST_CASE("sqrt")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {sqrt(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {sqrt(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -98,13 +96,11 @@ TEST_CASE("pow")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     // Test with num/param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {pow(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {pow(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -128,7 +124,7 @@ TEST_CASE("pow")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {pow(y, 2_dbl), pow(x, par[0])}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {pow(y, 2_dbl), pow(x, par[0])}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 

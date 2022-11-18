@@ -32,13 +32,11 @@ TEST_CASE("sum")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     // Test with num/param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {sum({par[0], 2_dbl}), x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {sum({par[0], 2_dbl}), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -61,7 +59,7 @@ TEST_CASE("sum")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {sum({x, y}), sum({par[0], x})}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {sum({x, y}), sum({par[0], x})}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -96,14 +94,11 @@ TEST_CASE("sum_sq")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     // Test with num/param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {sum_sq({par[0], 2_dbl}), x + y}, 2, 1, ha, cm, {}, false,
-                                             uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {sum_sq({par[0], 2_dbl}), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -127,7 +122,7 @@ TEST_CASE("sum_sq")
                         llvm_state s{kw::opt_level = opt_level};
 
                         taylor_add_jet<fp_t>(s, "jet", {sum_sq({x, y}), sum_sq({par[0], x})}, 2, 1, ha, cm, {}, false,
-                                             uprec);
+                                             prec);
 
                         s.compile();
 

@@ -45,13 +45,11 @@ TEST_CASE("exp")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     // Test with param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {exp(par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {exp(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -74,7 +72,7 @@ TEST_CASE("exp")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {exp(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {exp(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -109,13 +107,11 @@ TEST_CASE("log")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     // Test with param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {log(par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {log(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -138,7 +134,7 @@ TEST_CASE("log")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {log(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {log(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -173,13 +169,11 @@ TEST_CASE("sigmoid")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     // Test with param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {sigmoid(par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {sigmoid(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -202,8 +196,7 @@ TEST_CASE("sigmoid")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {sigmoid(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false,
-                                             uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {sigmoid(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 

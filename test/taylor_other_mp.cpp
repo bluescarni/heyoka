@@ -31,13 +31,11 @@ TEST_CASE("erf")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     // Test with param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {erf(par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {erf(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -60,7 +58,7 @@ TEST_CASE("erf")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {erf(y + .2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {erf(y + .2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 

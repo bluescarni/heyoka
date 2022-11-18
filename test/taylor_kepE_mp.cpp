@@ -31,13 +31,11 @@ TEST_CASE("kepE")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     // Test with num/param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {kepE(.2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {kepE(.2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -62,7 +60,7 @@ TEST_CASE("kepE")
                         llvm_state s{kw::opt_level = opt_level};
 
                         taylor_add_jet<fp_t>(s, "jet", {kepE(y, 2_dbl), kepE(par[0], x)}, 2, 1, ha, cm, {}, false,
-                                             uprec);
+                                             prec);
 
                         s.compile();
 
@@ -89,7 +87,7 @@ TEST_CASE("kepE")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {kepE(x, y), kepE(y, x)}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {kepE(x, y), kepE(y, x)}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 

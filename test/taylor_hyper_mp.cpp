@@ -37,13 +37,11 @@ TEST_CASE("cosh")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     // Test with param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {cosh(par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {cosh(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -66,7 +64,7 @@ TEST_CASE("cosh")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {cosh(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {cosh(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -101,13 +99,11 @@ TEST_CASE("sinh")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     // Test with param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {sinh(par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {sinh(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -130,7 +126,7 @@ TEST_CASE("sinh")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {sinh(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {sinh(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -165,13 +161,11 @@ TEST_CASE("tanh")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     // Test with param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {tanh(par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {tanh(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -194,7 +188,7 @@ TEST_CASE("tanh")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {tanh(y + .2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {tanh(y + .2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -232,13 +226,11 @@ TEST_CASE("acosh")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     // Test with param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {acosh(par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {acosh(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -261,7 +253,7 @@ TEST_CASE("acosh")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {acosh(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {acosh(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -300,13 +292,11 @@ TEST_CASE("asinh")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     // Test with param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {asinh(par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {asinh(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -329,7 +319,7 @@ TEST_CASE("asinh")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {asinh(y + .2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {asinh(y + .2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -368,13 +358,11 @@ TEST_CASE("atanh")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     // Test with param.
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {atanh(par[0]), x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {atanh(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -397,7 +385,7 @@ TEST_CASE("atanh")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {atanh(y + .2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {atanh(y + .2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 

@@ -32,12 +32,10 @@ TEST_CASE("time")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {heyoka::time, x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {heyoka::time, x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -72,12 +70,10 @@ TEST_CASE("tpoly")
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
-                    const auto uprec = static_cast<unsigned>(prec);
-
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {tpoly(par[0], par[2]), x + y}, 2, 1, ha, cm, {}, false, uprec);
+                        taylor_add_jet<fp_t>(s, "jet", {tpoly(par[0], par[2]), x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
