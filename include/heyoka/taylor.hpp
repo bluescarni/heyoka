@@ -1031,7 +1031,8 @@ private:
     // here that this is going to be dll-exported.
     template <typename U>
     HEYOKA_DLL_PUBLIC void finalise_ctor_impl(const U &, std::vector<T>, std::optional<T>, std::optional<T>, bool, bool,
-                                              std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+                                              std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool,
+                                              std::optional<long long>);
     template <typename U, typename... KwArgs>
     void finalise_ctor(const U &sys, std::vector<T> state, KwArgs &&...kw_args)
     {
@@ -1072,8 +1073,17 @@ private:
                 }
             }();
 
+            // Fetch the precision, if provided.
+            auto prec = [&p]() -> std::optional<long long> {
+                if constexpr (p.has(kw::prec)) {
+                    return std::forward<decltype(p(kw::prec))>(p(kw::prec));
+                } else {
+                    return {};
+                }
+            }();
+
             finalise_ctor_impl(sys, std::move(state), std::move(tm), std::move(tol), high_accuracy, compact_mode,
-                               std::move(pars), std::move(tes), std::move(ntes), parallel_mode);
+                               std::move(pars), std::move(tes), std::move(ntes), parallel_mode, std::move(prec));
         }
     }
 
