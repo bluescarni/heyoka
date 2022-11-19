@@ -33,7 +33,8 @@ we specified ``long double``, instead of the usual ``double``, as the (only) tem
 Note that, for simplicity, we still used double-precision values for the initial state: these values are automatically
 converted to ``long double`` by the integrator's constructor. Note also that, when operating in extended precision,
 *all* numerical values encapsulated in an integrator are represented in extended precision - this includes not only the state vector,
-but also the time coordinate, the tolerance, the Taylor coefficients, etc.
+but also the time coordinate, the tolerance, the Taylor coefficients, etc. Similarly to double-precision integrators, the default value
+of the tolerance is the machine epsilon of ``long double``.
 
 Next, we define a small helper function that will allow us to monitor the evolution of the energy constant
 throughout the integration:

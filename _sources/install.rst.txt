@@ -33,9 +33,13 @@ heyoka has the following **mandatory** dependencies:
 
 Additionally, heyoka has the following **optional** dependencies:
 
-* the `mp++ <https://bluescarni.github.io/mppp/>`__ multiprecision library
-  (provides support for quadruple-precision integrations on platforms
-  supporting the non-standard ``__float128`` type) (version >= 0.27),
+* the `mp++ <https://bluescarni.github.io/mppp/>`__ multiprecision library,
+  which provides support for arbitrary-precision integrations on all platforms,
+  and for quadruple-precision integrations on platforms
+  supporting the non-standard ``__float128`` type. heyoka requires
+  an mp++ installation with support for Boost.serialization
+  (see the :ref:`mp++ installation instructions <mppp:installation>`).
+  The minimum required version of mp++ is 0.27;
 * the `SLEEF <https://sleef.org/>`__ vectorized math library (improves the performance
   of integrations in batch mode),
 * the `xtensor and xtensor-blas <https://xtensor.readthedocs.io/en/latest/>`__
@@ -43,6 +47,16 @@ Additionally, heyoka has the following **optional** dependencies:
 
 `CMake <https://cmake.org/>`__ is the build system used by heyoka and it must also be available when
 installing from source (the minimum required version is 3.8).
+
+.. warning::
+
+   The `spdlog <https://github.com/gabime/spdlog>`__ library depends on the `{fmt} <https://fmt.dev/latest/index.html>`__ library,
+   and by default spdlog uses a bundled internal copy of {fmt} which may not be compatible with other {fmt} installations
+   that may be present on the system. This situation can lead to build and/or runtime errors.
+
+   Users are thus advised to ensure that spdlog is built with the
+   ``SPDLOG_FMT_EXTERNAL`` CMake option turned ``ON``, in order to ensure that both spdlog and heyoka are linking
+   to the same {fmt} installation.
 
 .. _ep_support:
 
@@ -70,7 +84,7 @@ quadruple-precision integrations are always supported. Otherwise,
 on platforms such as x86-64, quadruple-precision computations are supported if:
 
 * the nonstandard ``__float128`` floating-point type is
-  `available and supported <https://gcc.gnu.org/onlinedocs/gcc/Floating-Types.html>`__, and
+  available and supported, and
 * an installation of the `mp++ <https://bluescarni.github.io/mppp/>`__ library with support
   for the :cpp:class:`mppp::real128` class is available (see the :ref:`mp++ installation instructions <mppp:installation>`),
   and
@@ -84,6 +98,14 @@ via the :cpp:class:`mppp::real128` type.
    The non-IEEE ``long double`` type available on some PowerPC platforms
    (which implements a double-length floating-point representation with 106
    significant bits) is **not** supported by heyoka at this time.
+
+Arbitrary-precision
+^^^^^^^^^^^^^^^^^^^
+
+Arbitrary-precision integrations are supported on all platforms, provided that heyoka
+is compiled with the ``HEYOKA_WITH_MPPP`` option enabled (see :ref:`below <installation_from_source>`)
+and that the mp++ library is compiled with the ``MPPP_WITH_MPFR`` option enabled
+(see the :ref:`mp++ installation instructions <mppp:installation>`).
 
 Packages
 --------
@@ -125,7 +147,7 @@ your conda installation.
 FreeBSD
 ```````
 
-A community-supported FreeBSD port via `pkg <https://www.freebsd.org/doc/handbook/pkgng-intro.html>`__ is available for
+A community-supported FreeBSD port via `pkg <https://docs.freebsd.org/en/books/handbook/ports/#pkgng-intro>`__ is available for
 heyoka. In order to install heyoka using pkg, execute the following command:
 
 .. code-block:: console
@@ -235,7 +257,9 @@ dependencies heyoka was compiled:
 * ``heyoka_WITH_SLEEF`` if SLEEF support was enabled,
 * ``heyoka_WITH_MPPP`` if mp++ support was enabled,
 * ``heyoka_WITH_REAL128`` (new in version 0.19) if quadruple-precision
-  computations via the :cpp:class:`mppp::real128` type are supported.
+  computations via the :cpp:class:`mppp::real128` type are supported,
+* ``heyoka_WITH_REAL`` (new in version 0.20) if arbitrary-precision
+  computations via the :cpp:class:`mppp::real` type are supported.
 
 .. versionadded:: 0.17.0
 

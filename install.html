@@ -165,6 +165,11 @@
     </a>
    </li>
    <li class="toctree-l2">
+    <a class="reference internal" href="tut_arbitrary_precision.html">
+     Computations in arbitrary precision
+    </a>
+   </li>
+   <li class="toctree-l2">
     <a class="reference internal" href="tut_s11n.html">
      Serialisation
     </a>
@@ -408,6 +413,11 @@ title="Print to PDF"
        128-bit precision
       </a>
      </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#arbitrary-precision">
+       Arbitrary-precision
+      </a>
+     </li>
     </ul>
    </li>
   </ul>
@@ -476,6 +486,11 @@ title="Print to PDF"
      <li class="toc-h4 nav-item toc-entry">
       <a class="reference internal nav-link" href="#id2">
        128-bit precision
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#arbitrary-precision">
+       Arbitrary-precision
       </a>
      </li>
     </ul>
@@ -549,9 +564,13 @@ with the <code class="docutils literal notranslate"><span class="pre">clang-cl</
 </ul>
 <p>Additionally, heyoka has the following <strong>optional</strong> dependencies:</p>
 <ul class="simple">
-<li><p>the <a class="reference external" href="https://bluescarni.github.io/mppp/">mp++</a> multiprecision library
-(provides support for quadruple-precision integrations on platforms
-supporting the non-standard <code class="docutils literal notranslate"><span class="pre">__float128</span></code> type) (version &gt;= 0.27),</p></li>
+<li><p>the <a class="reference external" href="https://bluescarni.github.io/mppp/">mp++</a> multiprecision library,
+which provides support for arbitrary-precision integrations on all platforms,
+and for quadruple-precision integrations on platforms
+supporting the non-standard <code class="docutils literal notranslate"><span class="pre">__float128</span></code> type. heyoka requires
+an mp++ installation with support for Boost.serialization
+(see the <a class="reference external" href="https://bluescarni.github.io/mppp/installation.html#installation" title="(in mp++ v0.27)"><span class="xref std std-ref">mp++ installation instructions</span></a>).
+The minimum required version of mp++ is 0.27;</p></li>
 <li><p>the <a class="reference external" href="https://sleef.org/">SLEEF</a> vectorized math library (improves the performance
 of integrations in batch mode),</p></li>
 <li><p>the <a class="reference external" href="https://xtensor.readthedocs.io/en/latest/">xtensor and xtensor-blas</a>
@@ -559,6 +578,15 @@ libraries (used in the tests and benchmarks).</p></li>
 </ul>
 <p><a class="reference external" href="https://cmake.org/">CMake</a> is the build system used by heyoka and it must also be available when
 installing from source (the minimum required version is 3.8).</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The <a class="reference external" href="https://github.com/gabime/spdlog">spdlog</a> library depends on the <a class="reference external" href="https://fmt.dev/latest/index.html">{fmt}</a> library,
+and by default spdlog uses a bundled internal copy of {fmt} which may not be compatible with other {fmt} installations
+that may be present on the system. This situation can lead to build and/or runtime errors.</p>
+<p>Users are thus advised to ensure that spdlog is built with the
+<code class="docutils literal notranslate"><span class="pre">SPDLOG_FMT_EXTERNAL</span></code> CMake option turned <code class="docutils literal notranslate"><span class="pre">ON</span></code>, in order to ensure that both spdlog and heyoka are linking
+to the same {fmt} installation.</p>
+</div>
 <section id="support-for-extended-precision">
 <span id="ep-support"></span><h3>Support for extended precision<a class="headerlink" href="#support-for-extended-precision" title="Permalink to this headline">#</a></h3>
 <p>Whereas in heyoka double-precision computations are always supported, support for extended-precision
@@ -579,7 +607,7 @@ quadruple-precision integrations are always supported. Otherwise,
 on platforms such as x86-64, quadruple-precision computations are supported if:</p>
 <ul class="simple">
 <li><p>the nonstandard <code class="docutils literal notranslate"><span class="pre">__float128</span></code> floating-point type is
-<a class="reference external" href="https://gcc.gnu.org/onlinedocs/gcc/Floating-Types.html">available and supported</a>, and</p></li>
+available and supported, and</p></li>
 <li><p>an installation of the <a class="reference external" href="https://bluescarni.github.io/mppp/">mp++</a> library with support
 for the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> class is available (see the <a class="reference external" href="https://bluescarni.github.io/mppp/installation.html#installation" title="(in mp++ v0.27)"><span class="xref std std-ref">mp++ installation instructions</span></a>),
 and</p></li>
@@ -593,6 +621,13 @@ via the <a class="reference external" href="https://bluescarni.github.io/mppp/re
 (which implements a double-length floating-point representation with 106
 significant bits) is <strong>not</strong> supported by heyoka at this time.</p>
 </div>
+</section>
+<section id="arbitrary-precision">
+<h4>Arbitrary-precision<a class="headerlink" href="#arbitrary-precision" title="Permalink to this headline">#</a></h4>
+<p>Arbitrary-precision integrations are supported on all platforms, provided that heyoka
+is compiled with the <code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_MPPP</span></code> option enabled (see <a class="reference internal" href="#installation-from-source"><span class="std std-ref">below</span></a>)
+and that the mp++ library is compiled with the <code class="docutils literal notranslate"><span class="pre">MPPP_WITH_MPFR</span></code> option enabled
+(see the <a class="reference external" href="https://bluescarni.github.io/mppp/installation.html#installation" title="(in mp++ v0.27)"><span class="xref std std-ref">mp++ installation instructions</span></a>).</p>
 </section>
 </section>
 </section>
@@ -626,7 +661,7 @@ your conda installation.</p>
 </section>
 <section id="freebsd">
 <h3>FreeBSD<a class="headerlink" href="#freebsd" title="Permalink to this headline">#</a></h3>
-<p>A community-supported FreeBSD port via <a class="reference external" href="https://www.freebsd.org/doc/handbook/pkgng-intro.html">pkg</a> is available for
+<p>A community-supported FreeBSD port via <a class="reference external" href="https://docs.freebsd.org/en/books/handbook/ports/#pkgng-intro">pkg</a> is available for
 heyoka. In order to install heyoka using pkg, execute the following command:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pkg install heyoka
 </pre></div>
@@ -723,7 +758,9 @@ dependencies heyoka was compiled:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">heyoka_WITH_SLEEF</span></code> if SLEEF support was enabled,</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">heyoka_WITH_MPPP</span></code> if mp++ support was enabled,</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">heyoka_WITH_REAL128</span></code> (new in version 0.19) if quadruple-precision
-computations via the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> type are supported.</p></li>
+computations via the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> type are supported,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">heyoka_WITH_REAL</span></code> (new in version 0.20) if arbitrary-precision
+computations via the <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a> type are supported.</p></li>
 </ul>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 0.17.0.</span></p>

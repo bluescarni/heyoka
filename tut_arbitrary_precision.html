@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
-    <title>Computations in extended precision &#8212; heyoka 0.20.0 documentation</title>
+    <title>Computations in arbitrary precision &#8212; heyoka 0.20.0 documentation</title>
     
   <!-- Loaded before other Sphinx assets -->
   <link href="_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
@@ -34,8 +34,8 @@
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Computations in arbitrary precision" href="tut_arbitrary_precision.html" />
-    <link rel="prev" title="Batch mode" href="tut_batch_mode.html" />
+    <link rel="next" title="Serialisation" href="tut_s11n.html" />
+    <link rel="prev" title="Computations in extended precision" href="tut_extended_precision.html" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="docsearch:language" content="None">
     
@@ -160,13 +160,13 @@
      Batch mode
     </a>
    </li>
-   <li class="toctree-l2 current active">
-    <a class="current reference internal" href="#">
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_extended_precision.html">
      Computations in extended precision
     </a>
    </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_arbitrary_precision.html">
+   <li class="toctree-l2 current active">
+    <a class="current reference internal" href="#">
      Computations in arbitrary precision
     </a>
    </li>
@@ -307,7 +307,7 @@ title="Source repository"
       </li>
       
       <li>
-        <a href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Ftut_extended_precision.html&body=Your%20issue%20content%20here."
+        <a href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Ftut_arbitrary_precision.html&body=Your%20issue%20content%20here."
    class="headerbtn"
    data-toggle="tooltip"
 data-placement="left"
@@ -335,7 +335,7 @@ title="Open an issue"
   <div class="menu-dropdown__content">
     <ul>
       <li>
-        <a href="_sources/tut_extended_precision.rst.txt"
+        <a href="_sources/tut_arbitrary_precision.rst.txt"
    class="headerbtn"
    data-toggle="tooltip"
 data-placement="left"
@@ -405,8 +405,8 @@ title="Print to PDF"
   </a>
  </li>
  <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#full-code-listing">
-   Full code listing
+  <a class="reference internal nav-link" href="#extended-vs-arbitrary-precision">
+   Extended vs arbitrary precision
   </a>
  </li>
 </ul>
@@ -418,7 +418,7 @@ title="Print to PDF"
         <div class="col pl-md-3 pl-lg-5 content-container">
             <!-- Table of contents that is only displayed when printing the page -->
             <div id="jb-print-docs-body" class="onlyprint">
-                <h1>Computations in extended precision</h1>
+                <h1>Computations in arbitrary precision</h1>
                 <!-- Table of contents -->
                 <div id="print-main-content">
                     <div id="jb-print-toc">
@@ -439,8 +439,8 @@ title="Print to PDF"
   </a>
  </li>
  <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#full-code-listing">
-   Full code listing
+  <a class="reference internal nav-link" href="#extended-vs-arbitrary-precision">
+   Extended vs arbitrary precision
   </a>
  </li>
 </ul>
@@ -453,48 +453,110 @@ title="Print to PDF"
                 
               <div>
                 
-  <section id="computations-in-extended-precision">
-<span id="tut-extended-precision"></span><h1>Computations in extended precision<a class="headerlink" href="#computations-in-extended-precision" title="Permalink to this headline">#</a></h1>
-<p>As hinted in the <a class="reference internal" href="install.html#ep-support"><span class="std std-ref">installation instructions</span></a>, heyoka supports computations
-not only in double precision, but also in extended precision. Specifically, heyoka currently supports:</p>
-<ul class="simple">
-<li><p>the 80-bit IEEE <a class="reference external" href="https://en.wikipedia.org/wiki/Extended_precision">extended-precision format</a> (~21 decimal digits),</p></li>
-<li><p>the 128-bit IEEE <a class="reference external" href="https://en.wikipedia.org/wiki/Quadruple-precision_floating-point_format">quadruple-precision format</a> (~36 decimal digits).</p></li>
-</ul>
-<p>How these extended precision floating-point types can be accessed and used from C++ varies depending on the platform. The 80-bit
-extended-precision format is available as the C++ <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> type on most platforms based on Intel x86 processors. Quadruple-precision
-computations are supported either via the <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> type (e.g., on 64-bit ARM processors) or via the the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> type
-(provided that the platform supports the nonstandard <code class="docutils literal notranslate"><span class="pre">__float128</span></code> floating-point type and that heyoka was compiled with support
-for the mp++ library - see the <a class="reference internal" href="install.html#installation"><span class="std std-ref">installation instructions</span></a>).</p>
+  <section id="computations-in-arbitrary-precision">
+<span id="tut-arbitrary-precision"></span><h1>Computations in arbitrary precision<a class="headerlink" href="#computations-in-arbitrary-precision" title="Permalink to this headline">#</a></h1>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.20.0.</span></p>
+</div>
+<p>In addition to <a class="reference internal" href="tut_extended_precision.html#tut-extended-precision"><span class="std std-ref">extended-precision computations</span></a>, heyoka also supports
+computations in <em>arbitrary</em> precision. In arbitrary-precision computations the user can
+decide at runtime the number of bits of precision to be employed in the representation
+of floating-point numbers. The precision is limited, in principle, only by the available
+memory.</p>
+<p>As explained in the <a class="reference internal" href="install.html#installation"><span class="std std-ref">installation instructions</span></a>, arbitrary-precision mode
+requires heyoka to be compiled with support for the <a class="reference external" href="https://bluescarni.github.io/mppp/">mp++</a>
+multiprecision library. The mp++ library, in turn, must be compiled
+with the <code class="docutils literal notranslate"><span class="pre">MPPP_WITH_MPFR</span></code> option enabled (see the <a class="reference external" href="https://bluescarni.github.io/mppp/installation.html#installation" title="(in mp++ v0.27)"><span class="xref std std-ref">mp++ installation instructions</span></a>).</p>
+<p>Arbitrary-precision floating-point values are represented in heyoka via the mp++ <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a> class.
+We refer the reader to the <a class="reference external" href="https://bluescarni.github.io/mppp/tutorial_real.html#tutorial-real" title="(in mp++ v0.27)"><span class="xref std std-ref">mp++ tutorial</span></a> for a quick overview of the main features
+of this class. For the purposes of this tutorial, it is sufficient to note how <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a> largely
+behaves like a builtin floating-point type, the only difference being that the number of digits in the significand
+can be set at runtime.</p>
 <section id="a-simple-example">
 <h2>A simple example<a class="headerlink" href="#a-simple-example" title="Permalink to this headline">#</a></h2>
-<p>We will be assuming here that <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> implements the 80-bit extended-precision floating-point format.
-In order to verify that heyoka indeed is able to work in extended precision, we will be monitoring the evolution of the energy constant
-in a high-precision numerical integration of the simple pendulum.</p>
+<p>In this tutorial, we will repeat the simple pendulum integration from the
+<a class="reference internal" href="tut_extended_precision.html#tut-extended-precision"><span class="std std-ref">extended-precision tutorial</span></a>, but this time
+in <a class="reference external" href="https://en.wikipedia.org/wiki/Octuple-precision_floating-point_format">octuple precision</a>.
+The number of binary digits in this representation is 237, corresponding to circa 71 decimal digits.</p>
 <p>Let us begin as usual with the definition of the dynamical equations and the creation of the integrator object:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create the symbolic variables x and v.</span>
 <span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;v&quot;</span><span class="p">);</span><span class="w"></span>
 
+<span class="w">    </span><span class="c1">// Setup the precision.</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">mpfr_prec_t</span><span class="w"> </span><span class="n">prec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">237</span><span class="p">;</span><span class="w"></span>
+
 <span class="w">    </span><span class="c1">// Create the integrator object</span>
-<span class="w">    </span><span class="c1">// in extended precision.</span>
-<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
-<span class="w">                                           </span><span class="c1">// x&#39; = v</span>
-<span class="w">                                           </span><span class="c1">// v&#39; = -9.8 * sin(x)</span>
-<span class="w">                                           </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"></span>
-<span class="w">                                           </span><span class="c1">// Initial conditions</span>
-<span class="w">                                           </span><span class="c1">// for x and v.</span>
-<span class="w">                                           </span><span class="p">{</span><span class="mf">-1.</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">}};</span><span class="w"></span>
+<span class="w">    </span><span class="c1">// in octuple precision.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="n">mppp</span><span class="o">::</span><span class="n">real</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+<span class="w">                                          </span><span class="c1">// x&#39; = v</span>
+<span class="w">                                          </span><span class="c1">// v&#39; = -9.8 * sin(x)</span>
+<span class="w">                                          </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"></span>
+<span class="w">                                          </span><span class="c1">// Initial conditions</span>
+<span class="w">                                          </span><span class="c1">// for x and v.</span>
+<span class="w">                                          </span><span class="p">{</span><span class="n">mppp</span><span class="o">::</span><span class="n">real</span><span class="p">{</span><span class="mf">-1.</span><span class="p">,</span><span class="w"> </span><span class="n">prec</span><span class="p">},</span><span class="w"> </span><span class="n">mppp</span><span class="o">::</span><span class="n">real</span><span class="p">{</span><span class="mf">0.</span><span class="p">,</span><span class="w"> </span><span class="n">prec</span><span class="p">}}};</span><span class="w"></span>
 </pre></div>
 </div>
-<p>In order to activate extended precision, we created an integrator object of type <code class="docutils literal notranslate"><span class="pre">taylor_adaptive&lt;long</span> <span class="pre">double&gt;</span></code> - that is,
-we specified <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code>, instead of the usual <code class="docutils literal notranslate"><span class="pre">double</span></code>, as the (only) template parameter for the <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> class template.
-Note that, for simplicity, we still used double-precision values for the initial state: these values are automatically
-converted to <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> by the integrator’s constructor. Note also that, when operating in extended precision,
-<em>all</em> numerical values encapsulated in an integrator are represented in extended precision - this includes not only the state vector,
-but also the time coordinate, the tolerance, the Taylor coefficients, etc. Similarly to double-precision integrators, the default value
-of the tolerance is the machine epsilon of <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code>.</p>
-<p>Next, we define a small helper function that will allow us to monitor the evolution of the energy constant
-throughout the integration:</p>
+<p>In order to activate arbitrary precision, we created an integrator object of type <code class="docutils literal notranslate"><span class="pre">taylor_adaptive&lt;mppp::real&gt;</span></code> - that is,
+we specified <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a>, instead of the usual <code class="docutils literal notranslate"><span class="pre">double</span></code>, as the (only) template parameter for the <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>
+class template. The initial conditions were also initialised as a vector of <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a>, and each value in the initial
+state vector was created with a precision of 237 bits. The precision of an <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a> is represented in mp++ via the
+<a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv411mpfr_prec_t" title="(in mp++ v0.27)"><code class="xref cpp cpp-type docutils literal notranslate"><span class="pre">mpfr_prec_t</span></code></a> type (an alias for a signed integral type).</p>
+<p>Like in <a class="reference internal" href="tut_extended_precision.html#tut-extended-precision"><span class="std std-ref">extended-precision mode</span></a>, in an arbitrary-precision integrator
+<em>all</em> numerical values encapsulated in an integrator are represented in arbitrary precision - this includes not only the state vector,
+but also the time coordinate, the tolerance, the Taylor coefficients, etc. Each arbitrary-precision integrator has a global
+precision value which is specified or inferred upon construction. This global precision
+value can be accessed after construction via the <code class="docutils literal notranslate"><span class="pre">get_prec()</span></code> member function.</p>
+<p>The precision value for an integrator can either be inferred from the initial state vector, as we saw in the
+code snippet above, or it can be explicitly passed as the <code class="docutils literal notranslate"><span class="pre">prec</span></code> keyword argument. That is, an alternative,
+but equivalent, way of constructing a 237-bit integrator would be:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="n">mppp</span><span class="o">::</span><span class="n">real</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+<span class="w">                                      </span><span class="c1">// x&#39; = v</span>
+<span class="w">                                      </span><span class="c1">// v&#39; = -9.8 * sin(x)</span>
+<span class="w">                                      </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"></span>
+<span class="w">                                      </span><span class="c1">// Initial conditions</span>
+<span class="w">                                      </span><span class="c1">// for x and v.</span>
+<span class="w">                                      </span><span class="p">{</span><span class="mf">1.</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">},</span><span class="w"></span>
+<span class="w">                                      </span><span class="c1">// Explicitly set the precision.</span>
+<span class="w">                                      </span><span class="n">kw</span><span class="o">::</span><span class="n">prec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">237</span><span class="w"></span>
+<span class="w">                                      </span><span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Regardless of how the integrator’s precision is specified, all the numerical values encapsulated in the
+integrator in addition to the state vector (that is, the time coordinate, the parameter values, the Taylor coefficients, etc.) are initialised
+with the same precision upon construction. If at any time after construction
+the user changes the precision of the internal data of the integrator, any successive attempt to continue the numerical
+integration will result in an exception being raised.
+In other words, heyoka will not accept any change to the precision of the numerical data stored within an
+arbitrary-precision integrator after construction.</p>
+<p>Let us print to screen the integrator object:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Print the integrator object to screen.</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Precision               : 237 bits</span>
+<span class="go">Tolerance               : 9.055679078826712367509119290887791780682531198139138189582614889935501319e-72</span>
+<span class="go">High accuracy           : false</span>
+<span class="go">Compact mode            : true</span>
+<span class="go">Taylor order            : 83</span>
+<span class="go">Dimension               : 2</span>
+<span class="go">Time                    : 0.000000000000000000000000000000000000000000000000000000000000000000000000</span>
+<span class="go">State                   : [-1.000000000000000000000000000000000000000000000000000000000000000000000000, 0.000000000000000000000000000000000000000000000000000000000000000000000000]</span>
+</pre></div>
+</div>
+<p>The screen output indeed confirms that the precision was correctly inferred to be 237 bits from the initial conditions.
+Similarly to double-precision and extended-precision integrators, the tolerance is set by default to the machine epsilon
+corresponding to the inferred precision.</p>
+<p>An important change in the defaults with respect to double-precision and extended-precision integrators is that, in
+arbitrary-precision integrators, <a class="reference internal" href="tut_adaptive_custom.html#tut-compact-mode"><span class="std std-ref">compact mode</span></a> is <strong>on</strong> by default, rather than off.
+This change is motivated by the fact that the Taylor order of arbitrary-precision integrators will typically be
+much higher than in double-precision and extended-precision integrators, which results in very long compilation
+times even for simple ODEs. Moreover, in arbitrary-precision integrators compact mode does not bring performance
+improvements due to the fact that most numerical computations are offloaded to the mp++ library (rather than
+being implemented directly in LLVM).</p>
+<p>We proceed now to the definition of a small helper function that will allow us to monitor the evolution of the energy constant
+throughout the integration. As we mentioned earlier, the <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a> class can be used like a builtin floating-point type, thus we can
+copy without changes and re-use the generic <code class="docutils literal notranslate"><span class="pre">compute_energy</span></code> helper function from the
+<a class="reference internal" href="tut_extended_precision.html#tut-extended-precision"><span class="std std-ref">extended-precision tutorial</span></a>:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create a small helper to compute the energy constant</span>
 <span class="w">    </span><span class="c1">// from the state vector.</span>
 <span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">compute_energy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[](</span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="n">sv</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
@@ -521,91 +583,45 @@ and printing to screen the relative energy error:</p>
 <span class="w">    </span><span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Relative energy error: 0</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Relative energy error: 8.04049e-72</span>
 <span class="go">Relative energy error: 0</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
 <span class="go">Relative energy error: 0</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 1.92532e-19</span>
-<span class="go">Relative energy error: 1.92532e-19</span>
-<span class="go">Relative energy error: 1.92532e-19</span>
-<span class="go">Relative energy error: 1.92532e-19</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 1.92532e-19</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
 <span class="go">Relative energy error: 0</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
+<span class="go">Relative energy error: 8.04049e-72</span>
+<span class="go">Relative energy error: 1.6081e-71</span>
+<span class="go">Relative energy error: 8.04049e-72</span>
+<span class="go">Relative energy error: 8.04049e-72</span>
+<span class="go">Relative energy error: 1.6081e-71</span>
+<span class="go">Relative energy error: 1.6081e-71</span>
+<span class="go">Relative energy error: 1.6081e-71</span>
+<span class="go">Relative energy error: 1.6081e-71</span>
+<span class="go">Relative energy error: 8.04049e-72</span>
+<span class="go">Relative energy error: 0</span>
+<span class="go">Relative energy error: 8.04049e-72</span>
+<span class="go">Relative energy error: 8.04049e-72</span>
+<span class="go">Relative energy error: 8.04049e-72</span>
+<span class="go">Relative energy error: 1.6081e-71</span>
+<span class="go">Relative energy error: 8.04049e-72</span>
+<span class="go">Relative energy error: 1.6081e-71</span>
 </pre></div>
 </div>
-<p>The console output indeed confirms that energy is conserved at the level of the epsilon of the 80-bit
-extended-precision format (that is, <span class="math notranslate nohighlight">\(\sim 10^{-19}\)</span>).</p>
-<p>Performing quadruple-precision integrations via the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> type follows exactly the same pattern. That is,
-one just needs to replace <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> with <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> when instantiating the integrator object.</p>
+<p>The console output indeed confirms that energy is conserved at the level of the epsilon of the octuple-precision
+format (that is, <span class="math notranslate nohighlight">\(\sim 10^{-71}\)</span>).</p>
 </section>
 <section id="other-classes-and-functions">
 <h2>Other classes and functions<a class="headerlink" href="#other-classes-and-functions" title="Permalink to this headline">#</a></h2>
-<p>Besides the adaptive integrator, several other classes and functions in heyoka can be used in extended precision.</p>
-<p>The <a class="reference internal" href="tut_events.html#tut-events"><span class="std std-ref">event classes</span></a>, for instance, can be constructed in extended precision by passing <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code>
-or <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> as the template parameter (instead of <code class="docutils literal notranslate"><span class="pre">double</span></code>). Note that the precision of an event
-must match the precision of the integrator object in which the event is used, otherwise an error will be produced
-at compilation time.</p>
+<p>Besides the adaptive integrator, several other classes and functions in heyoka can be used in arbitrary precision.</p>
+<p>The <a class="reference internal" href="tut_events.html#tut-events"><span class="std std-ref">event classes</span></a>, for instance, can be constructed in arbitrary precision by passing <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a>
+as the template parameter (instead of <code class="docutils literal notranslate"><span class="pre">double</span></code>). Note that arbitrary-precision events <strong>must</strong> be used in an arbitrary-precision
+integrator, otherwise an error will be produced at compilation time.</p>
 </section>
-<section id="full-code-listing">
-<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">#</a></h2>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
-
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span><span class="cp"></span>
-
-<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">heyoka</span><span class="p">;</span><span class="w"></span>
-
-<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"></span>
-<span class="p">{</span><span class="w"></span>
-
-<span class="cp">#if !defined(HEYOKA_ARCH_PPC)</span>
-
-<span class="w">    </span><span class="c1">// Create the symbolic variables x and v.</span>
-<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;v&quot;</span><span class="p">);</span><span class="w"></span>
-
-<span class="w">    </span><span class="c1">// Create the integrator object</span>
-<span class="w">    </span><span class="c1">// in extended precision.</span>
-<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
-<span class="w">                                           </span><span class="c1">// x&#39; = v</span>
-<span class="w">                                           </span><span class="c1">// v&#39; = -9.8 * sin(x)</span>
-<span class="w">                                           </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"></span>
-<span class="w">                                           </span><span class="c1">// Initial conditions</span>
-<span class="w">                                           </span><span class="c1">// for x and v.</span>
-<span class="w">                                           </span><span class="p">{</span><span class="mf">-1.</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">}};</span><span class="w"></span>
-
-<span class="w">    </span><span class="c1">// Create a small helper to compute the energy constant</span>
-<span class="w">    </span><span class="c1">// from the state vector.</span>
-<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">compute_energy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[](</span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="n">sv</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">using</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">cos</span><span class="p">;</span><span class="w"></span>
-
-<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="p">(</span><span class="n">sv</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sv</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mf">9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">cos</span><span class="p">(</span><span class="n">sv</span><span class="p">[</span><span class="mi">0</span><span class="p">]));</span><span class="w"></span>
-<span class="w">    </span><span class="p">};</span><span class="w"></span>
-
-<span class="w">    </span><span class="c1">// Compute and store the intial energy.</span>
-<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="w"> </span><span class="n">orig_E</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">compute_energy</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">());</span><span class="w"></span>
-
-<span class="w">    </span><span class="c1">// Integrate for a few timesteps.</span>
-<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">20</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">        </span><span class="k">using</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">abs</span><span class="p">;</span><span class="w"></span>
-
-<span class="w">        </span><span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">();</span><span class="w"></span>
-
-<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Relative energy error: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">abs</span><span class="p">((</span><span class="n">orig_E</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">compute_energy</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()))</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">orig_E</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="p">}</span><span class="w"></span>
-
-<span class="cp">#endif</span>
-<span class="p">}</span><span class="w"></span>
-</pre></div>
-</div>
+<section id="extended-vs-arbitrary-precision">
+<h2>Extended vs arbitrary precision<a class="headerlink" href="#extended-vs-arbitrary-precision" title="Permalink to this headline">#</a></h2>
+<p>In general, if your architecture supports <a class="reference internal" href="tut_extended_precision.html#tut-extended-precision"><span class="std std-ref">extended-precision data types</span></a> and their precision
+is sufficient, you should prefer extended-precision integrations over arbitrary-precision integrations, as the former
+will provide better performance.</p>
+<p>On the other hand, arbitrary-precision integrations can satisfy any precision requirement, and they are available on all
+platforms, even where there are no extended-precision data types (e.g., on Windows).</p>
 </section>
 </section>
 
@@ -617,17 +633,17 @@ at compilation time.</p>
                 
     <!-- Previous / next buttons -->
 <div class='prev-next-area'>
-    <a class='left-prev' id="prev-link" href="tut_batch_mode.html" title="previous page">
+    <a class='left-prev' id="prev-link" href="tut_extended_precision.html" title="previous page">
         <i class="fas fa-angle-left"></i>
         <div class="prev-next-info">
             <p class="prev-next-subtitle">previous</p>
-            <p class="prev-next-title">Batch mode</p>
+            <p class="prev-next-title">Computations in extended precision</p>
         </div>
     </a>
-    <a class='right-next' id="next-link" href="tut_arbitrary_precision.html" title="next page">
+    <a class='right-next' id="next-link" href="tut_s11n.html" title="next page">
     <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Computations in arbitrary precision</p>
+        <p class="prev-next-title">Serialisation</p>
     </div>
     <i class="fas fa-angle-right"></i>
     </a>

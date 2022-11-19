@@ -166,6 +166,11 @@
     </a>
    </li>
    <li class="toctree-l2">
+    <a class="reference internal" href="tut_arbitrary_precision.html">
+     Computations in arbitrary precision
+    </a>
+   </li>
+   <li class="toctree-l2">
     <a class="reference internal" href="tut_s11n.html">
      Serialisation
     </a>
@@ -1239,6 +1244,11 @@ title="Print to PDF"
 <section id="new">
 <h3>New<a class="headerlink" href="#new" title="Permalink to this headline">#</a></h3>
 <ul class="simple">
+<li><p>Add option to force the use of AVX-512 registers
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/280">#280</a>).</p></li>
+<li><p>Implement support for arbitrary-precision computations
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/278">#278</a>,
+<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/276">#276</a>).</p></li>
 <li><p>Support LLVM 15
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/274">#274</a>).</p></li>
 </ul>
@@ -1248,6 +1258,10 @@ title="Print to PDF"
 <ul class="simple">
 <li><p>Avoid accidental indirect inclusion of libquadmath’s header file
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/279">#279</a>).</p></li>
+<li><p>Prevent callbacks from changing the time coordinate of the integrator.
+This was never supported and could lead to crashes and/or hangs
+in the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/278">#278</a>).</p></li>
 </ul>
 </section>
 </section>
