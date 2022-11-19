@@ -1371,8 +1371,7 @@ void taylor_adaptive<T>::reset_cooldowns()
 // unless a non-finite state was detected.
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_steps,
-                                         const std::optional<T> &max_delta_t_,
+taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_steps, T max_delta_t,
                                          const std::function<bool(taylor_adaptive &)> &cb, bool wtc, bool with_c_out)
 {
     using std::abs;
@@ -1397,40 +1396,13 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
         assert(t.hi.get_prec() == t.lo.get_prec());
         t.hi.prec_round(this->get_prec());
         t.lo.prec_round(this->get_prec());
+
+        max_delta_t.prec_round(this->get_prec());
     }
 
 #endif
 
-    // Fetch and check max_delta_t.
-    const auto max_delta_t = [&]() {
-        if (max_delta_t_) {
-            return *max_delta_t_;
-        } else {
-#if defined(HEYOKA_HAVE_REAL)
-            if constexpr (std::is_same_v<T, mppp::real>) {
-                return mppp::real{mppp::real_kind::inf, this->get_prec()};
-            } else {
-#endif
-                return std::numeric_limits<T>::infinity();
-#if defined(HEYOKA_HAVE_REAL)
-            }
-#endif
-        }
-    }();
-
-#if defined(HEYOKA_HAVE_REAL)
-
-    if constexpr (std::is_same_v<T, mppp::real>) {
-        if (max_delta_t.get_prec() != this->get_prec()) {
-            throw std::invalid_argument(fmt::format(
-                "Invalid max_delta_t argument passed to the propagate_until() function of an adaptive Taylor "
-                "integrator: max_delta_t has a precision of {}, while the integrator's precision is {}",
-                max_delta_t.get_prec(), this->get_prec()));
-        }
-    }
-
-#endif
-
+    // Check max_delta_t.
     if (isnan(max_delta_t)) {
         throw std::invalid_argument(
             "A nan max_delta_t was passed to the propagate_until() function of an adaptive Taylor integrator");
@@ -1647,8 +1619,7 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
 // a non-finite state was detected.
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
-taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_steps,
-                                        const std::optional<T> &max_delta_t_,
+taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_steps, T max_delta_t,
                                         const std::function<bool(taylor_adaptive &)> &cb)
 {
     using std::abs;
@@ -1660,36 +1631,15 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
             "Cannot invoke propagate_grid() in an adaptive Taylor integrator if the current time is not finite");
     }
 
-    // Fetch and check max_delta_t.
-    const auto max_delta_t = [&]() {
-        if (max_delta_t_) {
-            return *max_delta_t_;
-        } else {
-#if defined(HEYOKA_HAVE_REAL)
-            if constexpr (std::is_same_v<T, mppp::real>) {
-                return mppp::real{mppp::real_kind::inf, this->get_prec()};
-            } else {
-#endif
-                return std::numeric_limits<T>::infinity();
-#if defined(HEYOKA_HAVE_REAL)
-            }
-#endif
-        }
-    }();
-
 #if defined(HEYOKA_HAVE_REAL)
 
     if constexpr (std::is_same_v<T, mppp::real>) {
-        if (max_delta_t.get_prec() != this->get_prec()) {
-            throw std::invalid_argument(fmt::format(
-                "Invalid max_delta_t argument passed to the propagate_grid() function of an adaptive Taylor "
-                "integrator: max_delta_t has a precision of {}, while the integrator's precision is {}",
-                max_delta_t.get_prec(), this->get_prec()));
-        }
+        max_delta_t.prec_round(this->get_prec());
     }
 
 #endif
 
+    // Check max_delta_t.
     if (isnan(max_delta_t)) {
         throw std::invalid_argument(
             "A nan max_delta_t was passed to the propagate_grid() function of an adaptive Taylor integrator");
