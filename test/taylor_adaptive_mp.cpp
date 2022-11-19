@@ -503,13 +503,6 @@ TEST_CASE("propagate for_until")
                 Message("A non-positive max_delta_t was passed to the propagate_until() function of an "
                         "adaptive Taylor integrator"));
 
-            REQUIRE_THROWS_MATCHES(
-                ta.propagate_until(fp_t(10., prec), kw::max_delta_t = fp_t(1, prec + 1)), std::invalid_argument,
-                Message(fmt::format(
-                    "Invalid max_delta_t argument passed to the propagate_until() function of an adaptive Taylor "
-                    "integrator: max_delta_t has a precision of {}, while the integrator's precision is {}",
-                    prec + 1, prec)));
-
             // Propagate forward in time limiting the timestep size and passing in a callback.
             auto counter = 0ul;
 
@@ -632,9 +625,9 @@ TEST_CASE("propagate for_until")
             REQUIRE(ta.get_state() == ta_copy.get_state());
             REQUIRE(ta.get_dtime() == ta_copy.get_dtime());
 
-            // Same with propagate_for.
-            ta.propagate_for(fp_t(2, prec - 5));
-            ta_copy.propagate_for(fp_t(2, prec));
+            // Same with propagate_for and the max_delta_t argument.
+            ta.propagate_for(fp_t(2, prec - 5), kw::max_delta_t = fp_t(0.03125, prec - 5));
+            ta_copy.propagate_for(fp_t(2, prec), kw::max_delta_t = fp_t(0.03125, prec));
 
             REQUIRE(ta.get_state() == ta_copy.get_state());
             REQUIRE(ta.get_dtime() == ta_copy.get_dtime());
@@ -763,14 +756,6 @@ TEST_CASE("propagate grid scalar")
             // Error modes specific to mppp::real.
             ta.set_time(fp_t(0, prec));
 
-            // max_delta_t with wrong precision.
-            REQUIRE_THROWS_MATCHES(
-                ta.propagate_grid({fp_t(.2, prec)}, kw::max_delta_t = fp_t(.1, prec - 1)), std::invalid_argument,
-                Message(fmt::format(
-                    "Invalid max_delta_t argument passed to the propagate_grid() function of an adaptive Taylor "
-                    "integrator: max_delta_t has a precision of {}, while the integrator's precision is {}",
-                    prec - 1, prec)));
-
             // Reset the integrator.
             ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                        {fp_t(0.05, prec), fp_t(0.025, prec)},
@@ -808,8 +793,8 @@ TEST_CASE("propagate grid scalar")
                 grid2.emplace_back(i / 100., prec);
                 grid2.back().prec_round(prec + static_cast<int>(i % 10u));
             }
-            out = ta.propagate_grid(grid);
-            auto out2 = ta_copy.propagate_grid(grid2);
+            out = ta.propagate_grid(grid, kw::max_delta_t = fp_t(0.03125, prec));
+            auto out2 = ta_copy.propagate_grid(grid2, kw::max_delta_t = fp_t(0.03125, prec - 5));
 
             REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
             REQUIRE(std::get<4>(out).size() == 2000u);
