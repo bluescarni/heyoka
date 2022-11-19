@@ -103,7 +103,9 @@ Arbitrary-precision
 ^^^^^^^^^^^^^^^^^^^
 
 Arbitrary-precision integrations are supported on all platforms, provided that heyoka
-is compiled with the ``HEYOKA_WITH_MPPP`` option enabled (see :ref:`below <installation_from_source>`).
+is compiled with the ``HEYOKA_WITH_MPPP`` option enabled (see :ref:`below <installation_from_source>`)
+and that the mp++ library is compiled with the ``MPPP_WITH_MPFR`` option enabled
+(see the :ref:`mp++ installation instructions <mppp:installation>`).
 
 Packages
 --------
