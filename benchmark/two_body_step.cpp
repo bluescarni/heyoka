@@ -24,6 +24,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -33,7 +39,7 @@ using namespace heyoka;
 using namespace heyoka_benchmark;
 
 template <typename T>
-void run_bench(T tol, bool high_accuracy, bool compact_mode, bool fast_math)
+void run_bench(T tol, bool high_accuracy, bool compact_mode, bool fast_math, long long prec)
 {
     warmup();
 
@@ -45,7 +51,8 @@ void run_bench(T tol, bool high_accuracy, bool compact_mode, bool fast_math)
     auto start = std::chrono::high_resolution_clock::now();
 
     auto tad = taylor_adaptive<T>{std::move(sys), std::move(init_state),           kw::high_accuracy = high_accuracy,
-                                  kw::tol = tol,  kw::compact_mode = compact_mode, kw::fast_math = fast_math};
+                                  kw::tol = tol,  kw::compact_mode = compact_mode, kw::fast_math = fast_math,
+                                  kw::prec = prec};
 
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
@@ -69,6 +76,7 @@ int main(int argc, char *argv[])
     namespace po = boost::program_options;
 
     std::string fp_type;
+    long long prec;
     bool high_accuracy = false;
     double tol;
     bool compact_mode = false;
@@ -79,8 +87,9 @@ int main(int argc, char *argv[])
     desc.add_options()("help", "produce help message")(
         "fp_type", po::value<std::string>(&fp_type)->default_value("double"), "floating-point type")(
         "tol", po::value<double>(&tol)->default_value(0.), "tolerance (if 0, it will be the type's epsilon)")(
-        "high_accuracy", "enable high-accuracy mode")("compact_mode", "enable compact mode")("fast_math",
-                                                                                             "enable fast math flags");
+        "high_accuracy", "enable high-accuracy mode")("compact_mode", "enable compact mode")(
+        "fast_math", "enable fast math flags")("prec", po::value<long long>(&prec)->default_value(0),
+                                               "precision (used only in multiprecision mode)");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -104,12 +113,16 @@ int main(int argc, char *argv[])
     }
 
     if (fp_type == "double") {
-        run_bench<double>(tol, high_accuracy, compact_mode, fast_math);
+        run_bench<double>(tol, high_accuracy, compact_mode, fast_math, prec);
     } else if (fp_type == "long double") {
-        run_bench<long double>(tol, high_accuracy, compact_mode, fast_math);
+        run_bench<long double>(tol, high_accuracy, compact_mode, fast_math, prec);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (fp_type == "real128") {
-        run_bench<mppp::real128>(mppp::real128(tol), high_accuracy, compact_mode, fast_math);
+        run_bench<mppp::real128>(mppp::real128(tol), high_accuracy, compact_mode, fast_math, prec);
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (fp_type == "real") {
+        run_bench<mppp::real>(mppp::real(tol), high_accuracy, compact_mode, fast_math, prec);
 #endif
     } else {
         throw std::invalid_argument("Invalid floating-point type: '" + fp_type + "'");

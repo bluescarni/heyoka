@@ -39,22 +39,20 @@ HEYOKA_DLL_PUBLIC
     std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
     ensemble_propagate_until_impl(const taylor_adaptive<T> &, T, std::size_t,
                                   const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,
-                                  std::size_t, const std::optional<T> &,
-                                  const std::function<bool(taylor_adaptive<T> &)> &, bool, bool);
+                                  std::size_t, T, const std::function<bool(taylor_adaptive<T> &)> &, bool, bool);
 
 template <typename T>
 HEYOKA_DLL_PUBLIC
     std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
     ensemble_propagate_for_impl(const taylor_adaptive<T> &, T, std::size_t,
                                 const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t,
-                                const std::optional<T> &, const std::function<bool(taylor_adaptive<T> &)> &, bool,
-                                bool);
+                                T, const std::function<bool(taylor_adaptive<T> &)> &, bool, bool);
 
 template <typename T>
 HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::vector<T>>>
 ensemble_propagate_grid_impl(const taylor_adaptive<T> &, std::vector<T>, std::size_t,
-                             const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t,
-                             const std::optional<T> &, const std::function<bool(taylor_adaptive<T> &)> &);
+                             const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t, T,
+                             const std::function<bool(taylor_adaptive<T> &)> &);
 
 } // namespace detail
 
@@ -68,8 +66,8 @@ ensemble_propagate_until(const taylor_adaptive<T> &ta, T t, std::size_t n_iter,
     auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
         = detail::taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
 
-    return detail::ensemble_propagate_until_impl(ta, std::move(t), n_iter, gen, max_steps, max_delta_t, cb, write_tc,
-                                                 with_c_out);
+    return detail::ensemble_propagate_until_impl(ta, std::move(t), n_iter, gen, max_steps, std::move(max_delta_t), cb,
+                                                 write_tc, with_c_out);
 }
 
 template <typename T, typename... KwArgs>
@@ -82,8 +80,8 @@ ensemble_propagate_for(const taylor_adaptive<T> &ta, T delta_t, std::size_t n_it
     auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
         = detail::taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
 
-    return detail::ensemble_propagate_for_impl(ta, std::move(delta_t), n_iter, gen, max_steps, max_delta_t, cb,
-                                               write_tc, with_c_out);
+    return detail::ensemble_propagate_for_impl(ta, std::move(delta_t), n_iter, gen, max_steps, std::move(max_delta_t),
+                                               cb, write_tc, with_c_out);
 }
 
 template <typename T, typename... KwArgs>
@@ -95,7 +93,8 @@ ensemble_propagate_grid(const taylor_adaptive<T> &ta, std::vector<T> grid, std::
     auto [max_steps, max_delta_t, cb, _]
         = detail::taylor_propagate_common_ops<T, true>(std::forward<KwArgs>(kw_args)...);
 
-    return detail::ensemble_propagate_grid_impl(ta, std::move(grid), n_iter, gen, max_steps, max_delta_t, cb);
+    return detail::ensemble_propagate_grid_impl(ta, std::move(grid), n_iter, gen, max_steps, std::move(max_delta_t),
+                                                cb);
 }
 
 namespace detail
