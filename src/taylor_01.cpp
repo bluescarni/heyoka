@@ -2128,7 +2128,7 @@ template <typename T>
 continuous_output<T> &continuous_output<T>::operator=(continuous_output &&) noexcept = default;
 
 // NOTE: pass by copy so that we are sure t does not
-// overlap with other data.
+// alias other data.
 template <typename T>
 void continuous_output<T>::call_impl(T t)
 {

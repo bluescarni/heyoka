@@ -606,9 +606,9 @@ public:
 
     [[nodiscard]] const llvm_state &get_llvm_state() const;
 
-    const std::vector<T> &operator()(const T &tm)
+    const std::vector<T> &operator()(T tm)
     {
-        call_impl(tm);
+        call_impl(std::move(tm));
         return m_output;
     }
     const std::vector<T> &get_output() const
@@ -1024,7 +1024,7 @@ private:
     void load(boost::archive::binary_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
-    HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(const T &, bool);
+    HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
     // Private implementation-detail constructor machinery.
     // NOTE: apparently on Windows we need to re-iterate
@@ -1186,7 +1186,7 @@ public:
     {
         return m_d_out;
     }
-    const std::vector<T> &update_d_output(const T &, bool = false);
+    const std::vector<T> &update_d_output(T, bool = false);
 
     [[nodiscard]] bool with_events() const
     {
@@ -1220,15 +1220,15 @@ public:
 
     std::tuple<taylor_outcome, T> step(bool = false);
     std::tuple<taylor_outcome, T> step_backward(bool = false);
-    std::tuple<taylor_outcome, T> step(const T &, bool = false);
+    std::tuple<taylor_outcome, T> step(T, bool = false);
 
 private:
     // Implementations of the propagate_*() functions.
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-    propagate_until_impl(const detail::dfloat<T> &, std::size_t, const std::optional<T> &,
+    propagate_until_impl(detail::dfloat<T>, std::size_t, const std::optional<T> &,
                          const std::function<bool(taylor_adaptive &)> &, bool, bool);
     std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
-    propagate_grid_impl(const std::vector<T> &, std::size_t, const std::optional<T> &,
+    propagate_grid_impl(std::vector<T>, std::size_t, const std::optional<T> &,
                         const std::function<bool(taylor_adaptive &)> &);
 
 public:
@@ -1244,24 +1244,22 @@ public:
     // only if at least 1-2 steps were taken successfully.
     template <typename... KwArgs>
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-    propagate_until(const T &t, KwArgs &&...kw_args)
+    propagate_until(T t, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
 
-        return propagate_until_impl(detail::dfloat<T>(t), max_steps, max_delta_t, cb, write_tc, with_c_out);
+        return propagate_until_impl(detail::dfloat<T>(std::move(t)), max_steps, max_delta_t, cb, write_tc, with_c_out);
     }
     template <typename... KwArgs>
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-    propagate_for(const T &delta_t, KwArgs &&...kw_args)
+    propagate_for(T delta_t, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
 
-        return propagate_until_impl(m_time + delta_t, max_steps, max_delta_t, cb, write_tc, with_c_out);
+        return propagate_until_impl(m_time + std::move(delta_t), max_steps, max_delta_t, cb, write_tc, with_c_out);
     }
-    // NOTE: grid is taken by copy because in the implementation loop we keep on reading from it.
-    // Hence, we need to avoid any aliasing issue with other public integrator data.
     template <typename... KwArgs>
     std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid(std::vector<T> grid,
                                                                                  KwArgs &&...kw_args)
@@ -1269,7 +1267,7 @@ public:
         auto [max_steps, max_delta_t, cb, _]
             = detail::taylor_propagate_common_ops<T, true>(std::forward<KwArgs>(kw_args)...);
 
-        return propagate_grid_impl(grid, max_steps, max_delta_t, cb);
+        return propagate_grid_impl(std::move(grid), max_steps, max_delta_t, cb);
     }
 };
 

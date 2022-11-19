@@ -1021,7 +1021,7 @@ bool cmp_nan_eq(const T &a, const T &b)
 //   and the Taylor coefficients being recorded in the internal array
 //   (if wtc == true). That is, h == 0 is not treated in any special way.
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(const T &max_delta_t, bool wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool wtc)
 {
     using std::abs;
     using std::isfinite;
@@ -1325,7 +1325,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_backward(bool wtc)
 }
 
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(const T &max_delta_t, bool wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(T max_delta_t, bool wtc)
 {
     using std::isnan;
 
@@ -1347,7 +1347,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(const T &max_delta_t, boo
 
 #endif
 
-    return step_impl(max_delta_t, wtc);
+    return step_impl(std::move(max_delta_t), wtc);
 }
 
 // Reset all cooldowns for the terminal events.
@@ -1376,7 +1376,7 @@ void taylor_adaptive<T>::reset_cooldowns()
 // unless a non-finite state was detected.
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t max_steps,
+taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_steps,
                                          const std::optional<T> &max_delta_t_,
                                          const std::function<bool(taylor_adaptive &)> &cb, bool wtc, bool with_c_out)
 {
@@ -1555,10 +1555,10 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
         // If some non-finite state/time is generated in
         // the step function, the integration will be stopped.
         assert((rem_time >= T(0)) == t_dir); // LCOV_EXCL_LINE
-        const auto dt_limit = t_dir ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
-                                    : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
+        auto dt_limit = t_dir ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
+                              : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
-        const auto [oc, h] = step_impl(dt_limit.hi, wtc);
+        const auto [oc, h] = step_impl(std::move(dt_limit.hi), wtc);
 
         if (oc == taylor_outcome::err_nf_state) {
             // If a non-finite state is detected, we do *not* want
@@ -1657,7 +1657,7 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
 // a non-finite state was detected.
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
-taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
+taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_steps,
                                         const std::optional<T> &max_delta_t_,
                                         const std::function<bool(taylor_adaptive &)> &cb)
 {
@@ -1910,9 +1910,9 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
         // If some non-finite state/time is generated in
         // the step function, the integration will be stopped.
         assert((rem_time >= T(0)) == t_dir); // LCOV_EXCL_LINE
-        const auto dt_limit = t_dir ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
-                                    : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
-        const auto [oc, h] = step_impl(dt_limit.hi, true);
+        auto dt_limit = t_dir ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
+                              : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
+        const auto [oc, h] = step_impl(std::move(dt_limit.hi), true);
 
         if (oc == taylor_outcome::err_nf_state) {
             // If a non-finite state is detected, we do *not* want
@@ -2112,7 +2112,7 @@ void taylor_adaptive<T>::set_dtime(T hi, T lo)
 }
 
 template <typename T>
-const std::vector<T> &taylor_adaptive<T>::update_d_output(const T &time, bool rel_time)
+const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
 {
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -2138,12 +2138,12 @@ const std::vector<T> &taylor_adaptive<T>::update_d_output(const T &time, bool re
     // the *previous* timestep.
     if (rel_time) {
         // Time coordinate relative to the current time.
-        const auto h = m_last_h + time;
+        const auto h = m_last_h + std::move(time);
 
         m_d_out_f(m_d_out.data(), m_tc.data(), &h);
     } else {
         // Absolute time coordinate.
-        const auto h = time - (m_time - m_last_h);
+        const auto h = std::move(time) - (m_time - m_last_h);
 
         m_d_out_f(m_d_out.data(), m_tc.data(), &h.hi);
     }
