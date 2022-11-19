@@ -1337,12 +1337,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(T max_delta_t, bool wtc)
 #if defined(HEYOKA_HAVE_REAL)
 
     if constexpr (std::is_same_v<T, mppp::real>) {
-        if (max_delta_t.get_prec() != this->get_prec()) {
-            throw std::invalid_argument(
-                fmt::format("Invalid max_delta_t argument passed to the step() function of an adaptive Taylor "
-                            "integrator: max_delta_t has a precision of {}, while the integrator's precision is {}",
-                            max_delta_t.get_prec(), this->get_prec()));
-        }
+        max_delta_t.prec_round(this->get_prec());
     }
 
 #endif
@@ -1400,13 +1395,8 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
 
     if constexpr (std::is_same_v<T, mppp::real>) {
         assert(t.hi.get_prec() == t.lo.get_prec());
-
-        if (t.hi.get_prec() != this->get_prec()) {
-            throw std::invalid_argument(fmt::format(
-                "Invalid final time argument passed to the propagate_until() function of an adaptive Taylor "
-                "integrator: the time variable has a precision of {}, while the integrator's precision is {}",
-                t.hi.get_prec(), this->get_prec()));
-        }
+        t.hi.prec_round(this->get_prec());
+        t.lo.prec_round(this->get_prec());
     }
 
 #endif
@@ -1727,13 +1717,9 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
 
 #if defined(HEYOKA_HAVE_REAL)
 
-    constexpr auto prec_err_msg = "Invalid precision detected in the time grid passed to the propagate_grid() function "
-                                  "of an adaptive Taylor integrator: a value of precision {} was "
-                                  "detected in the grid, but the precision of the integrator is {} instead";
-
     if constexpr (std::is_same_v<T, mppp::real>) {
-        if (grid[0].get_prec() != this->get_prec()) {
-            throw std::invalid_argument(fmt::format(prec_err_msg, grid[0].get_prec(), this->get_prec()));
+        for (auto &val : grid) {
+            val.prec_round(this->get_prec());
         }
     }
 
@@ -1748,13 +1734,6 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
         if (grid[1] == grid[0]) {
             throw std::invalid_argument(ig_err_msg);
         }
-#if defined(HEYOKA_HAVE_REAL)
-        if constexpr (std::is_same_v<T, mppp::real>) {
-            if (grid[1].get_prec() != this->get_prec()) {
-                throw std::invalid_argument(fmt::format(prec_err_msg, grid[1].get_prec(), this->get_prec()));
-            }
-        }
-#endif
 
         const auto grid_direction = grid[1] > grid[0];
 
@@ -1768,14 +1747,6 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
             if ((grid[i] > grid[i - 1u]) != grid_direction) {
                 throw std::invalid_argument(ig_err_msg);
             }
-
-#if defined(HEYOKA_HAVE_REAL)
-            if constexpr (std::is_same_v<T, mppp::real>) {
-                if (grid[i].get_prec() != this->get_prec()) {
-                    throw std::invalid_argument(fmt::format(prec_err_msg, grid[i].get_prec(), this->get_prec()));
-                }
-            }
-#endif
         }
     }
 
@@ -2049,12 +2020,7 @@ void taylor_adaptive<T>::set_time(T t)
 {
 #if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
-        if (t.get_prec() != this->get_prec()) {
-            throw std::invalid_argument(
-                fmt::format("Invalid precision detected in the time variable: the precision of the integrator is "
-                            "{}, but the time variable has a precision of {} instead",
-                            this->get_prec(), t.get_prec()));
-        }
+        t.prec_round(this->get_prec());
     }
 #endif
 
@@ -2093,15 +2059,8 @@ void taylor_adaptive<T>::set_dtime(T hi, T lo)
 {
 #if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
-        // NOTE: the constructor of dfloat will take care to check
-        // that the precisions of hi and lo match, so that here
-        // we only need to check the precision of hi.
-        if (hi.get_prec() != this->get_prec()) {
-            throw std::invalid_argument(
-                fmt::format("Invalid precision detected in the time variable: the precision of the integrator is "
-                            "{}, but the time variable has a precision of {} instead",
-                            this->get_prec(), hi.get_prec()));
-        }
+        hi.prec_round(this->get_prec());
+        lo.prec_round(this->get_prec());
     }
 #endif
 
@@ -2122,12 +2081,7 @@ const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
     // in the computation.
 
     if constexpr (std::is_same_v<T, mppp::real>) {
-        if (time.get_prec() != this->get_prec()) {
-            throw std::invalid_argument(
-                fmt::format("Invalid time variable passed to update_d_output(): the time variable has a precision of "
-                            "{}, while the integrator has a precision of {}",
-                            time.get_prec(), this->get_prec()));
-        }
+        time.prec_round(this->get_prec());
     }
 
 #endif

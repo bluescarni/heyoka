@@ -164,6 +164,23 @@ TEST_CASE("ctors prec")
                               {x + par[0], y + par[1]}, {mppp::real{1, prec}, mppp::real{1, prec - 1}},
                               kw::compact_mode = cm, kw::opt_level = 0u, kw::prec = mppp::real_prec_min() - 1),
                           std::invalid_argument);
+
+        // Check that kw::prec = 0 is the same as undefined.
+        ta = taylor_adaptive<mppp::real>({x + par[0]}, {mppp::real{1, prec + 1}}, kw::compact_mode = cm,
+                                         kw::opt_level = 0u, kw::prec = 0);
+        REQUIRE(ta.get_prec() == prec + 1);
+        REQUIRE(ta.get_time() == 0);
+        REQUIRE(ta.get_time().get_prec() == prec + 1);
+        REQUIRE(ta.get_tol() == detail::eps_from_prec(prec + 1));
+        REQUIRE(ta.get_tol().get_prec() == prec + 1);
+        REQUIRE(ta.get_pars()[0] == 0);
+        REQUIRE(ta.get_pars()[0].get_prec() == prec + 1);
+        REQUIRE(std::all_of(ta.get_tc().begin(), ta.get_tc().end(),
+                            [prec](const auto &v) { return v == 0 && v.get_prec() == prec + 1; }));
+        REQUIRE(std::all_of(ta.get_d_output().begin(), ta.get_d_output().end(),
+                            [prec](const auto &v) { return v == 0 && v.get_prec() == prec + 1; }));
+        REQUIRE(ta.get_last_h() == 0);
+        REQUIRE(ta.get_last_h().get_prec() == prec + 1);
     }
 }
 
@@ -210,11 +227,16 @@ TEST_CASE("step")
     const auto prec = 30u;
 
     auto ta = taylor_adaptive<mppp::real>({prime(x) = x + par[0]}, {mppp::real{1, prec}}, kw::compact_mode = true);
+    auto ta_copy = ta;
 
-    REQUIRE_THROWS_MATCHES(
-        ta.step(mppp::real{1, 31}), std::invalid_argument,
-        Message("Invalid max_delta_t argument passed to the step() function of an adaptive Taylor "
-                "integrator: max_delta_t has a precision of 31, while the integrator's precision is 30"));
+    ta.step(mppp::real{1, prec});
+    // Take step with max_delta_t set to a different precision, same
+    // value.
+    ta_copy.step(mppp::real{1, prec + 1});
+
+    // Verify the two steps were identical.
+    REQUIRE(ta.get_state() == ta_copy.get_state());
+    REQUIRE(ta.get_dtime() == ta_copy.get_dtime());
 
     // Take a step, then change state in incompatible way.
     ta.step();
@@ -243,7 +265,6 @@ TEST_CASE("step")
     REQUIRE(ta.get_dtime() == old_dtime);
 }
 
-// Failure modes in time setting.
 TEST_CASE("time set")
 {
     using Catch::Matchers::Message;
@@ -254,19 +275,23 @@ TEST_CASE("time set")
 
     auto ta = taylor_adaptive<mppp::real>({prime(x) = x}, {mppp::real{1, prec}}, kw::compact_mode = true);
 
-    REQUIRE_THROWS_MATCHES(
-        ta.set_time(mppp::real{1, 31}), std::invalid_argument,
-        Message("Invalid precision detected in the time variable: the precision of the integrator is "
-                "30, but the time variable has a precision of 31 instead"));
+    // Check set time automatically rounds to the correct precision.
+    ta.set_time(mppp::real{1, 31});
+    REQUIRE(ta.get_time() == mppp::real{1, prec});
+    REQUIRE(ta.get_time().get_prec() == prec);
 
-    REQUIRE_THROWS_MATCHES(
-        ta.set_dtime(mppp::real{1, 31}, mppp::real{0, 31}), std::invalid_argument,
-        Message("Invalid precision detected in the time variable: the precision of the integrator is "
-                "30, but the time variable has a precision of 31 instead"));
-    REQUIRE_THROWS_MATCHES(
-        ta.set_dtime(mppp::real{1, 30}, mppp::real{0, 31}), std::invalid_argument,
-        Message("Mismatched precisions in the components of a dfloat<mppp::real>: the high component has a "
-                "precision of 30, while the low component has a precision of 31"));
+    // Same for dtime, possibly with different precision in the components.
+    ta.set_dtime(mppp::real{1, 31}, mppp::real{0, 31});
+    REQUIRE(ta.get_dtime().first == mppp::real{1, prec});
+    REQUIRE(ta.get_dtime().first.get_prec() == prec);
+    REQUIRE(ta.get_dtime().second == mppp::real{0, prec});
+    REQUIRE(ta.get_dtime().second.get_prec() == prec);
+
+    ta.set_dtime(mppp::real{1, 31}, mppp::real{0, 29});
+    REQUIRE(ta.get_dtime().first == mppp::real{1, prec});
+    REQUIRE(ta.get_dtime().first.get_prec() == prec);
+    REQUIRE(ta.get_dtime().second == mppp::real{0, prec});
+    REQUIRE(ta.get_dtime().second.get_prec() == prec);
 }
 
 // Test that precision is preserved when copying/moving an integrator object.
@@ -349,13 +374,15 @@ TEST_CASE("dense out")
                 REQUIRE(ta.get_d_output()[0] == approximately(sin(h / mppp::real{2, prec})));
                 REQUIRE(ta.get_d_output()[1] == approximately(cos(h / mppp::real{2, prec})));
 
-                // Failure mode.
-                REQUIRE_THROWS_MATCHES(
-                    ta.update_d_output(mppp::real{0, prec - 1}), std::invalid_argument,
-                    Message(fmt::format(
-                        "Invalid time variable passed to update_d_output(): the time variable has a precision of "
-                        "{}, while the integrator has a precision of {}",
-                        prec - 1, prec)));
+                // Try with different precision too.
+                const auto tmp0 = ta.get_d_output()[0];
+                const auto tmp1 = ta.get_d_output()[1];
+                ta.update_d_output(h / mppp::real{2, prec - 5});
+
+                REQUIRE(ta.get_d_output()[0] == tmp0);
+                REQUIRE(ta.get_d_output()[1] == tmp1);
+                REQUIRE(ta.get_d_output()[0].get_prec() == prec);
+                REQUIRE(ta.get_d_output()[1].get_prec() == prec);
             }
         }
     }
@@ -463,13 +490,6 @@ TEST_CASE("propagate for_until")
                 ta.propagate_until(fp_t(std::numeric_limits<double>::infinity(), prec)), std::invalid_argument,
                 Message(
                     "A non-finite time was passed to the propagate_until() function of an adaptive Taylor integrator"));
-
-            REQUIRE_THROWS_MATCHES(
-                ta.propagate_until(fp_t(1, prec - 1)), std::invalid_argument,
-                Message(fmt::format(
-                    "Invalid final time argument passed to the propagate_until() function of an adaptive Taylor "
-                    "integrator: the time variable has a precision of {}, while the integrator's precision is {}",
-                    prec - 1, prec)));
 
             REQUIRE_THROWS_MATCHES(
                 ta.propagate_until(fp_t(10., prec),
@@ -597,6 +617,27 @@ TEST_CASE("propagate for_until")
                 Message(fmt::format("A state variable with precision {} was detected in the state "
                                     "vector: this is incompatible with the integrator precision of {}",
                                     prec - 1, prec)));
+
+            // Check that passing time limits with different precisions automatically
+            // rounds the time limits to the correct precision.
+            ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                       {fp_t(0.05, prec), fp_t(0.025, prec)},
+                                       kw::opt_level = opt_level,
+                                       kw::compact_mode = true};
+            ta_copy = ta;
+
+            ta.propagate_until(fp_t(2, prec - 5));
+            ta_copy.propagate_until(fp_t(2, prec));
+
+            REQUIRE(ta.get_state() == ta_copy.get_state());
+            REQUIRE(ta.get_dtime() == ta_copy.get_dtime());
+
+            // Same with propagate_for.
+            ta.propagate_for(fp_t(2, prec - 5));
+            ta_copy.propagate_for(fp_t(2, prec));
+
+            REQUIRE(ta.get_state() == ta_copy.get_state());
+            REQUIRE(ta.get_dtime() == ta_copy.get_dtime());
         }
     }
 }
@@ -730,31 +771,6 @@ TEST_CASE("propagate grid scalar")
                     "integrator: max_delta_t has a precision of {}, while the integrator's precision is {}",
                     prec - 1, prec)));
 
-            // Wrong precisions in the grid.
-            REQUIRE_THROWS_MATCHES(
-                ta.propagate_grid({fp_t(.2, prec + 1)}), std::invalid_argument,
-                Message(
-                    fmt::format("Invalid precision detected in the time grid passed to the propagate_grid() function "
-                                "of an adaptive Taylor integrator: a value of precision {} was "
-                                "detected in the grid, but the precision of the integrator is {} instead",
-                                prec + 1, prec)));
-
-            REQUIRE_THROWS_MATCHES(
-                ta.propagate_grid({fp_t(.2, prec), fp_t(.3, prec - 1)}), std::invalid_argument,
-                Message(
-                    fmt::format("Invalid precision detected in the time grid passed to the propagate_grid() function "
-                                "of an adaptive Taylor integrator: a value of precision {} was "
-                                "detected in the grid, but the precision of the integrator is {} instead",
-                                prec - 1, prec)));
-
-            REQUIRE_THROWS_MATCHES(
-                ta.propagate_grid({fp_t(.2, prec), fp_t(.3, prec), fp_t(.4, prec + 2)}), std::invalid_argument,
-                Message(
-                    fmt::format("Invalid precision detected in the time grid passed to the propagate_grid() function "
-                                "of an adaptive Taylor integrator: a value of precision {} was "
-                                "detected in the grid, but the precision of the integrator is {} instead",
-                                prec + 2, prec)));
-
             // Reset the integrator.
             ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                        {fp_t(0.05, prec), fp_t(0.025, prec)},
@@ -781,16 +797,31 @@ TEST_CASE("propagate grid scalar")
                                        kw::opt_level = opt_level,
                                        kw::compact_mode = true};
 
+            // Make a copy to run the same propagation on a grid
+            // with different precision.
+            auto ta_copy = ta;
+
             // Integrate forward over a dense grid from 0 to 10.
-            std::vector<fp_t> grid;
+            std::vector<fp_t> grid, grid2;
             for (auto i = 0u; i < 1000u; ++i) {
                 grid.emplace_back(i / 100., prec);
+                grid2.emplace_back(i / 100., prec);
+                grid2.back().prec_round(prec + static_cast<int>(i % 10u));
             }
             out = ta.propagate_grid(grid);
+            auto out2 = ta_copy.propagate_grid(grid2);
 
             REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
             REQUIRE(std::get<4>(out).size() == 2000u);
             REQUIRE(ta.get_time() == grid.back());
+            REQUIRE(std::get<0>(out2) == taylor_outcome::time_limit);
+            REQUIRE(std::get<4>(out2).size() == 2000u);
+            REQUIRE(ta_copy.get_time() == grid.back());
+            REQUIRE(out == out2);
+            REQUIRE(std::all_of(std::get<4>(out).begin(), std::get<4>(out).end(),
+                                [prec](const auto &val) { return val.get_prec() == prec; }));
+            REQUIRE(std::all_of(std::get<4>(out2).begin(), std::get<4>(out2).end(),
+                                [prec](const auto &val) { return val.get_prec() == prec; }));
 
             for (auto i = 0u; i < 1000u; ++i) {
                 REQUIRE(std::get<4>(out)[2u * i] == approximately(sin(grid[i]), fp_t(10000., prec)));
@@ -1071,13 +1102,12 @@ TEST_CASE("continuous output")
             // Try with non-finite time.
             REQUIRE_THROWS_AS(co(fp_t(std::numeric_limits<double>::infinity(), prec)), std::invalid_argument);
 
-            // Failure modes specific to mppp::real.
-            REQUIRE_THROWS_MATCHES(
-                co(fp_t(1, prec - 1)), std::invalid_argument,
-                Message(
-                    fmt::format("Invalid precision detected for the time argument in a continuous output functor: the "
-                                "precision of the time coordinate is {}, but the precision of the internal data is {}",
-                                prec - 1, prec)));
+            // Verify a time coordinate with different precision works too, identically.
+            auto tmp0 = co(fp_t(1, prec - 5));
+            auto tmp1 = co(fp_t(1, prec));
+            REQUIRE(tmp0 == tmp1);
+            REQUIRE(std::all_of(tmp0.begin(), tmp0.end(), [prec](const auto &val) { return val.get_prec() == prec; }));
+            REQUIRE(std::all_of(tmp1.begin(), tmp1.end(), [prec](const auto &val) { return val.get_prec() == prec; }));
         }
     }
 }

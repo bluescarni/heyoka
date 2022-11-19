@@ -2179,12 +2179,7 @@ void continuous_output<T>::call_impl(T t)
 #if defined(HEYOKA_HAVE_REAL)
 
     if constexpr (std::is_same_v<T, mppp::real>) {
-        if (t.get_prec() != m_output[0].get_prec()) {
-            throw std::invalid_argument(
-                fmt::format("Invalid precision detected for the time argument in a continuous output functor: the "
-                            "precision of the time coordinate is {}, but the precision of the internal data is {}",
-                            t.get_prec(), m_output[0].get_prec()));
-        }
+        t.prec_round(m_output[0].get_prec());
     }
 
 #endif

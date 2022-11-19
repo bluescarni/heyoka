@@ -286,8 +286,8 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
     // the same as undefined.
     auto tol = [&p]() -> std::optional<T> {
         if constexpr (p.has(kw::tol)) {
-            auto retval = std::forward<decltype(p(kw::tol))>(p(kw::tol));
-            if (retval != T(0)) {
+            auto retval = static_cast<T>(std::forward<decltype(p(kw::tol))>(p(kw::tol)));
+            if (retval != 0) {
                 // NOTE: this covers the NaN case as well.
                 return retval;
             }
@@ -1073,13 +1073,17 @@ private:
                 }
             }();
 
-            // Fetch the precision, if provided.
+            // Fetch the precision, if provided. Zero precision
+            // is considered the same as undefined.
             auto prec = [&p]() -> std::optional<long long> {
                 if constexpr (p.has(kw::prec)) {
-                    return std::forward<decltype(p(kw::prec))>(p(kw::prec));
-                } else {
-                    return {};
+                    auto ret = static_cast<long long>(std::forward<decltype(p(kw::prec))>(p(kw::prec)));
+                    if (ret != 0) {
+                        return ret;
+                    }
                 }
+
+                return {};
             }();
 
             finalise_ctor_impl(sys, std::move(state), std::move(tm), std::move(tol), high_accuracy, compact_mode,
