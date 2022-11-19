@@ -15,24 +15,17 @@
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/visibility.hpp>
 
 #include <mp++/real.hpp>
 
 namespace heyoka::detail
 {
 
-// Handy typedefs.
-using real_prec_t = decltype(std::declval<mppp::mpfr_struct_t>()._mpfr_prec);
-using real_sign_t = decltype(std::declval<mppp::mpfr_struct_t>()._mpfr_sign);
-using real_exp_t = decltype(std::declval<mppp::mpfr_struct_t>()._mpfr_exp);
-using real_limb_t = std::remove_pointer_t<decltype(std::declval<mppp::mpfr_struct_t>()._mpfr_d)>;
-
-// NOTE: mpfr_rnd_t is part of the MPFR API, so technically this introduces
-// a direct dependency on MPFR. On the other hand, perhaps we can guarantee that
-// including real.hpp includes transitively mpfr.h and leave it at that?
+// The integral type corresponding to the mpfr_rnd_t enum.
 using real_rnd_t = std::underlying_type_t<mpfr_rnd_t>;
 
-real_prec_t llvm_is_real(llvm::Type *);
+mpfr_prec_t llvm_is_real(llvm::Type *);
 
 llvm::Value *llvm_real_fneg(llvm_state &, llvm ::Value *);
 llvm::Function *real_nary_op(llvm_state &, llvm::Type *, const std::string &, const std::string &, unsigned);
@@ -45,6 +38,8 @@ llvm::Value *llvm_real_fcmp_ogt(llvm_state &, llvm::Value *, llvm::Value *);
 llvm::Value *llvm_real_fcmp_oeq(llvm_state &, llvm::Value *, llvm::Value *);
 llvm::Value *llvm_real_ui_to_fp(llvm_state &, llvm::Value *, llvm::Type *);
 llvm::Value *llvm_real_sgn(llvm_state &, llvm::Value *);
+
+HEYOKA_DLL_PUBLIC mppp::real eps_from_prec(mpfr_prec_t);
 
 } // namespace heyoka::detail
 

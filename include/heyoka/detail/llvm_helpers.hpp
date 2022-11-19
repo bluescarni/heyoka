@@ -65,6 +65,7 @@ HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Type 
 HEYOKA_DLL_PUBLIC llvm::Value *ext_load_vector_from_memory(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t);
 
 llvm::Value *gather_vector_from_memory(ir_builder &, llvm::Type *, llvm::Value *);
+llvm::Value *ext_gather_vector_from_memory(llvm_state &, llvm::Type *, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC void store_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC void ext_store_vector_to_memory(llvm_state &, llvm::Value *, llvm::Value *);

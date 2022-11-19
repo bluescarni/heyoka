@@ -289,6 +289,31 @@ TEST_CASE("propagate grid scalar")
     out = ta.propagate_grid({10., 100.});
     REQUIRE(std::get<0>(out) == taylor_outcome{-1});
     REQUIRE(std::get<4>(out).empty());
+
+    // A case in which we have a callback which never stops and a terminal event
+    // which triggers.
+    ta = taylor_adaptive<double>{
+        {prime(x) = v, prime(v) = -x},
+        {0., 1.},
+        kw::t_events = {t_event<double>(
+            v - .1, kw::callback = [](taylor_adaptive<double> &, bool, int) { return false; })}};
+    out = ta.propagate_grid(
+        {0., 10.}, kw::callback = [](const auto &) { return true; });
+    REQUIRE(std::get<0>(out) == taylor_outcome{-1});
+
+    // Callback attempting the change the time coordinate.
+    ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -x}, {0., 1.}};
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid(
+            {0., 10.}, kw::callback =
+                           [](auto &tint) {
+                               tint.set_time(std::numeric_limits<double>::quiet_NaN());
+
+                               return true;
+                           }),
+        std::runtime_error,
+        Message("The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
+                "time coordinate of the integrator - this is not supported"));
 }
 
 TEST_CASE("streaming op")
@@ -2046,4 +2071,152 @@ TEST_CASE("ctad")
         REQUIRE(ta.get_state()[1] == 1);
     }
 #endif
+}
+
+// Test to trigger the empty state check early in the
+// construction process.
+TEST_CASE("early empty state check")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    REQUIRE_THROWS_MATCHES(taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector<double>{}), std::invalid_argument,
+                           Message("Cannot initialise an adaptive integrator with an empty state vector"));
+}
+
+// Test to check that event callbacks which alter the time coordinate
+// result in an exception being thrown.
+TEST_CASE("event cb time")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using nt_ev_t = taylor_adaptive<double>::nt_event_t;
+    using t_ev_t = taylor_adaptive<double>::t_event_t;
+
+    // With non-terminal event first.
+    auto ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 1.},
+                              kw::nt_events = {nt_ev_t(x - 1e-5, [](auto &tint, auto, auto) { tint.set_time(-10.); })});
+
+    REQUIRE_THROWS_MATCHES(ta.step(), std::runtime_error,
+                           Message("The invocation of one or more event callbacks resulted in the alteration of the "
+                                   "time coordinate of the integrator - this is not supported"));
+
+    ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 1.},
+                         kw::nt_events = {nt_ev_t(x - 1e-5, [](auto &tint, auto, auto) {
+                             tint.set_time(std::numeric_limits<double>::infinity());
+                         })});
+
+    REQUIRE_THROWS_MATCHES(ta.step(), std::runtime_error,
+                           Message("The invocation of one or more event callbacks resulted in the alteration of the "
+                                   "time coordinate of the integrator - this is not supported"));
+
+    ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 1.},
+                         kw::nt_events = {nt_ev_t(x - 1e-5, [](auto &tint, auto, auto) {
+                             tint.set_time(std::numeric_limits<double>::quiet_NaN());
+                         })});
+
+    REQUIRE_THROWS_MATCHES(ta.step(), std::runtime_error,
+                           Message("The invocation of one or more event callbacks resulted in the alteration of the "
+                                   "time coordinate of the integrator - this is not supported"));
+
+    // Check that all callbacks are executed before raising the time coordinate exception.
+    bool trigger0 = false, trigger1 = false;
+
+    ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 1.},
+                         kw::nt_events = {nt_ev_t(x - 1e-5,
+                                                  [&](auto &tint, auto t, auto) {
+                                                      // NOTE: check also that the time coordinate passed to the
+                                                      // callback is the correct one, not the one that might be set by
+                                                      // another callback.
+                                                      REQUIRE(std::isfinite(t));
+
+                                                      trigger0 = true;
+                                                      tint.set_time(std::numeric_limits<double>::quiet_NaN());
+                                                  }),
+                                          nt_ev_t(x - 1e-5, [&](auto &tint, auto t, auto) {
+                                              // NOTE: check also that the time coordinate passed to the
+                                              // callback is the correct one, not the one that might be set by
+                                              // another callback.
+                                              REQUIRE(std::isfinite(t));
+
+                                              trigger1 = true;
+                                              tint.set_time(std::numeric_limits<double>::quiet_NaN());
+                                          })});
+
+    REQUIRE_THROWS_MATCHES(ta.step(), std::runtime_error,
+                           Message("The invocation of one or more event callbacks resulted in the alteration of the "
+                                   "time coordinate of the integrator - this is not supported"));
+    REQUIRE(trigger0);
+    REQUIRE(trigger1);
+
+    // With terminal event.
+    trigger0 = false;
+    trigger1 = false;
+    bool trigger2 = false;
+
+    ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 1.},
+                         kw::nt_events = {nt_ev_t(x - 1e-5,
+                                                  [&](auto &tint, auto, auto) {
+                                                      trigger0 = true;
+                                                      tint.set_time(std::numeric_limits<double>::quiet_NaN());
+                                                  }),
+                                          nt_ev_t(x - 1e-5,
+                                                  [&](auto &tint, auto, auto) {
+                                                      trigger1 = true;
+                                                      tint.set_time(std::numeric_limits<double>::quiet_NaN());
+                                                  })},
+                         kw::t_events = {t_ev_t(
+                             x - 2e-5, kw::callback = [&](auto &tint, auto, auto) {
+                                 trigger2 = true;
+
+                                 tint.set_time(-10.);
+
+                                 return true;
+                             })});
+
+    REQUIRE_THROWS_MATCHES(ta.step(), std::runtime_error,
+                           Message("The invocation of one or more event callbacks resulted in the alteration of the "
+                                   "time coordinate of the integrator - this is not supported"));
+
+    REQUIRE(trigger0);
+    REQUIRE(trigger1);
+    REQUIRE(trigger2);
+
+    ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 1.},
+                         kw::t_events = {t_ev_t(
+                             x - 1e-5, kw::callback = [](auto &tint, auto, auto) {
+                                 tint.set_time(std::numeric_limits<double>::infinity());
+
+                                 return true;
+                             })});
+
+    REQUIRE_THROWS_MATCHES(ta.step(), std::runtime_error,
+                           Message("The invocation of one or more event callbacks resulted in the alteration of the "
+                                   "time coordinate of the integrator - this is not supported"));
+}
+
+// Test case for a propagate callback changing the time coordinate
+// in invalid ways.
+TEST_CASE("bug prop_cb time")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector{0., 1.});
+
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_until(
+            10., kw::callback =
+                     [](auto &t) {
+                         t.set_time(100.);
+
+                         return true;
+                     }),
+        std::runtime_error,
+        Message("The invocation of the callback passed to propagate_until() resulted in the alteration of the "
+                "time coordinate of the integrator - this is not supported"));
 }

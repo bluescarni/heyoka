@@ -299,6 +299,16 @@ std::uint32_t recommended_simd_size<mppp::real128>()
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+std::uint32_t recommended_simd_size<mppp::real>()
+{
+    return 1;
+}
+
+#endif
+
 // Implementation of the jit class.
 struct llvm_state::jit {
     std::unique_ptr<llvm::orc::LLJIT> m_lljit;
@@ -963,7 +973,7 @@ void llvm_state::optimise()
         // Force usage of AVX512 registers, if requested.
         if (m_force_avx512 && detail::get_target_features().avx512f) {
             for (auto &f : module()) {
-                 f.addFnAttr("prefer-vector-width", "512");
+                f.addFnAttr("prefer-vector-width", "512");
             }
         }
 
@@ -1211,7 +1221,8 @@ const std::string &llvm_state::module_name() const
 // but with no code defined in it.
 llvm_state llvm_state::make_similar() const
 {
-    return llvm_state(kw::mname = m_module_name, kw::opt_level = m_opt_level, kw::fast_math = m_fast_math, kw::force_avx512 = m_force_avx512);
+    return llvm_state(kw::mname = m_module_name, kw::opt_level = m_opt_level, kw::fast_math = m_fast_math,
+                      kw::force_avx512 = m_force_avx512);
 }
 
 std::ostream &operator<<(std::ostream &os, const llvm_state &s)

@@ -7,6 +7,11 @@ Changelog
 New
 ~~~
 
+- Add option to force the use of AVX-512 registers
+  (`#280 <https://github.com/bluescarni/heyoka/pull/280>`__).
+- Implement support for arbitrary-precision computations
+  (`#278 <https://github.com/bluescarni/heyoka/pull/278>`__,
+  `#276 <https://github.com/bluescarni/heyoka/pull/276>`__).
 - Support LLVM 15
   (`#274 <https://github.com/bluescarni/heyoka/pull/274>`__).
 
@@ -15,6 +20,10 @@ Fix
 
 - Avoid accidental indirect inclusion of libquadmath's header file
   (`#279 <https://github.com/bluescarni/heyoka/pull/279>`__).
+- Prevent callbacks from changing the time coordinate of the integrator.
+  This was never supported and could lead to crashes and/or hangs
+  in the ``propagate_*()`` functions
+  (`#278 <https://github.com/bluescarni/heyoka/pull/278>`__).
 
 0.19.0 (2022-09-18)
 -------------------

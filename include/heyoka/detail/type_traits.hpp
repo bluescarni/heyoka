@@ -21,6 +21,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 namespace heyoka::detail
 {
 
@@ -77,6 +83,14 @@ struct is_supported_fp<long double> : std::true_type {
 
 template <>
 struct is_supported_fp<mppp::real128> : std::true_type {
+};
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+struct is_supported_fp<mppp::real> : std::true_type {
 };
 
 #endif

@@ -40,6 +40,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/callable.hpp>
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/fmt_compat.hpp>
@@ -136,13 +142,13 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &, const s
 template <typename>
 HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet(llvm_state &, const std::string &, const std::vector<expression> &,
                                              std::uint32_t, std::uint32_t, bool, bool,
-                                             const std::vector<expression> & = {}, bool = false);
+                                             const std::vector<expression> & = {}, bool = false, long long = 0);
 
 template <typename>
 HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet(llvm_state &, const std::string &,
                                              const std::vector<std::pair<expression, expression>> &, std::uint32_t,
                                              std::uint32_t, bool, bool, const std::vector<expression> & = {},
-                                             bool = false);
+                                             bool = false, long long = 0);
 
 // Enum to represent the outcome of a stepping/propagate function.
 enum class taylor_outcome : std::int64_t {
@@ -276,8 +282,9 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
         }
     }();
 
-    // tol (defaults to eps).
-    auto tol = [&p]() -> T {
+    // tol (defaults to undefined). Zero tolerance is considered
+    // the same as undefined.
+    auto tol = [&p]() -> std::optional<T> {
         if constexpr (p.has(kw::tol)) {
             auto retval = std::forward<decltype(p(kw::tol))>(p(kw::tol));
             if (retval != T(0)) {
@@ -285,19 +292,25 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
                 return retval;
             }
             // NOTE: zero tolerance will be interpreted
-            // as automatically-deduced by falling through
+            // as undefined by falling through
             // the code below.
         }
 
-        return std::numeric_limits<T>::epsilon();
+        return {};
     }();
 
-    // Compact mode (defaults to false).
+    // Compact mode (defaults to false, except for real where
+    // it defaults to true).
     auto compact_mode = [&p]() -> bool {
         if constexpr (p.has(kw::compact_mode)) {
             return std::forward<decltype(p(kw::compact_mode))>(p(kw::compact_mode));
         } else {
+#if defined(HEYOKA_HAVE_REAL)
+            return std::is_same_v<T, mppp::real>;
+#else
             return false;
+
+#endif
         }
     }();
 
@@ -319,7 +332,7 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
         }
     }();
 
-    return std::tuple{high_accuracy, tol, compact_mode, std::move(pars), parallel_mode};
+    return std::tuple{high_accuracy, std::move(tol), compact_mode, std::move(pars), parallel_mode};
 }
 
 template <typename T, bool B>
@@ -569,7 +582,7 @@ class HEYOKA_DLL_PUBLIC continuous_output
     std::vector<T> m_tcs;
     std::vector<T> m_times_hi, m_times_lo;
     std::vector<T> m_output;
-    using fptr_t = void (*)(T *, T, const T *, const T *, const T *) noexcept;
+    using fptr_t = void (*)(T *, T *, const T *, const T *, const T *) noexcept;
     fptr_t m_f_ptr = nullptr;
 
     HEYOKA_DLL_LOCAL void add_c_out_function(std::uint32_t, std::uint32_t, bool);
@@ -595,7 +608,7 @@ public:
 
     const std::vector<T> &operator()(T tm)
     {
-        call_impl(tm);
+        call_impl(std::move(tm));
         return m_output;
     }
     const std::vector<T> &get_output() const
@@ -633,6 +646,13 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_outp
 
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<mppp::real128> &);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<mppp::real> &);
 
 #endif
 
@@ -771,12 +791,18 @@ inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
             }
         }();
 
-        // Max delta_t (defaults to positive infinity).
-        auto max_delta_t = [&p]() -> T {
+        // Max delta_t (defaults to undefined). If a std::optional<T>
+        // is passed, return a const reference wrapper in order to avoid
+        // a useless copy.
+        auto max_delta_t = [&p]() {
             if constexpr (p.has(kw::max_delta_t)) {
-                return std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t));
+                if constexpr (std::is_same_v<uncvref_t<decltype(p(kw::max_delta_t))>, std::optional<T>>) {
+                    return std::cref(p(kw::max_delta_t));
+                } else {
+                    return std::optional<T>{std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t))};
+                }
             } else {
-                return std::numeric_limits<T>::infinity();
+                return std::optional<T>{};
             }
         }();
 
@@ -807,10 +833,10 @@ inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
             }
         }();
 
-        // NOTE: use std::make_tuple() so that if cb is a reference wrapper, it is turned
+        // NOTE: use std::make_tuple() so that if cb/max_delta_t is a reference wrapper, it is turned
         // into a reference tuple element.
         if constexpr (Grid) {
-            return std::make_tuple(max_steps, max_delta_t, std::move(cb), write_tc);
+            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc);
         } else {
             // Continuous output (defaults to false).
             auto with_c_out = [&p]() -> bool {
@@ -821,17 +847,55 @@ inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
                 }
             }();
 
-            return std::make_tuple(max_steps, max_delta_t, std::move(cb), write_tc, with_c_out);
+            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc, with_c_out);
         }
     }
 }
 
+// Base class to contain data specific to integrators of type
+// T. By default this is just an empty class.
+template <typename T, typename Derived>
+class HEYOKA_DLL_PUBLIC taylor_adaptive_base
+{
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
+};
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <typename Derived>
+class HEYOKA_DLL_PUBLIC taylor_adaptive_base<mppp::real, Derived>
+{
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &m_prec;
+    }
+
+protected:
+    // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes,misc-non-private-member-variables-in-classes)
+    mpfr_prec_t m_prec = 0;
+
+    void data_prec_check() const;
+
+public:
+    [[nodiscard]] mpfr_prec_t get_prec() const;
+};
+
+#endif
+
 } // namespace detail
 
 template <typename T>
-class HEYOKA_DLL_PUBLIC taylor_adaptive
+class HEYOKA_DLL_PUBLIC taylor_adaptive : public detail::taylor_adaptive_base<T, taylor_adaptive<T>>
 {
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
+    friend class HEYOKA_DLL_PUBLIC detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
+    using base_t = detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
 
 public:
     using nt_event_t = nt_event<T>;
@@ -890,7 +954,7 @@ private:
         isol_t m_isol;
 
         // Constructors.
-        ed_data(std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t);
+        ed_data(llvm_state, std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t, const T &);
         ed_data(const ed_data &);
         ~ed_data();
 
@@ -900,7 +964,7 @@ private:
         ed_data &operator=(ed_data &&) = delete;
 
         // The event detection function.
-        void detect_events(T, std::uint32_t, std::uint32_t, T);
+        void detect_events(const T &, std::uint32_t, std::uint32_t, const T &);
 
     private:
         // Serialisation.
@@ -966,8 +1030,9 @@ private:
     // NOTE: apparently on Windows we need to re-iterate
     // here that this is going to be dll-exported.
     template <typename U>
-    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(const U &, std::vector<T>, T, T, bool, bool, std::vector<T>,
-                                              std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(const U &, std::vector<T>, std::optional<T>, std::optional<T>, bool, bool,
+                                              std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool,
+                                              std::optional<long long>);
     template <typename U, typename... KwArgs>
     void finalise_ctor(const U &sys, std::vector<T> state, KwArgs &&...kw_args)
     {
@@ -978,12 +1043,12 @@ private:
                           "The variadic arguments in the construction of an adaptive Taylor integrator contain "
                           "unnamed arguments.");
         } else {
-            // Initial time (defaults to zero).
-            const auto tm = [&p]() -> T {
+            // Initial time (defaults to undefined).
+            auto tm = [&p]() -> std::optional<T> {
                 if constexpr (p.has(kw::time)) {
                     return std::forward<decltype(p(kw::time))>(p(kw::time));
                 } else {
-                    return T(0);
+                    return {};
                 }
             }();
 
@@ -1008,8 +1073,17 @@ private:
                 }
             }();
 
-            finalise_ctor_impl(sys, std::move(state), tm, tol, high_accuracy, compact_mode, std::move(pars),
-                               std::move(tes), std::move(ntes), parallel_mode);
+            // Fetch the precision, if provided.
+            auto prec = [&p]() -> std::optional<long long> {
+                if constexpr (p.has(kw::prec)) {
+                    return std::forward<decltype(p(kw::prec))>(p(kw::prec));
+                } else {
+                    return {};
+                }
+            }();
+
+            finalise_ctor_impl(sys, std::move(state), std::move(tm), std::move(tol), high_accuracy, compact_mode,
+                               std::move(pars), std::move(tes), std::move(ntes), parallel_mode, std::move(prec));
         }
     }
 
@@ -1054,7 +1128,7 @@ public:
     [[nodiscard]] const taylor_dc_t &get_decomposition() const;
 
     [[nodiscard]] std::uint32_t get_order() const;
-    T get_tol() const;
+    [[nodiscard]] T get_tol() const;
     [[nodiscard]] bool get_high_accuracy() const;
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] std::uint32_t get_dim() const;
@@ -1063,10 +1137,7 @@ public:
     {
         return static_cast<T>(m_time);
     }
-    void set_time(T t)
-    {
-        m_time = detail::dfloat<T>(t);
-    }
+    void set_time(T);
 
     // Time set/get in double-length format.
     std::pair<T, T> get_dtime() const
@@ -1154,10 +1225,11 @@ public:
 private:
     // Implementations of the propagate_*() functions.
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-    propagate_until_impl(const detail::dfloat<T> &, std::size_t, T, const std::function<bool(taylor_adaptive &)> &,
-                         bool, bool);
+    propagate_until_impl(detail::dfloat<T>, std::size_t, const std::optional<T> &,
+                         const std::function<bool(taylor_adaptive &)> &, bool, bool);
     std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
-    propagate_grid_impl(const std::vector<T> &, std::size_t, T, const std::function<bool(taylor_adaptive &)> &);
+    propagate_grid_impl(std::vector<T>, std::size_t, const std::optional<T> &,
+                        const std::function<bool(taylor_adaptive &)> &);
 
 public:
     // NOTE: return values:
@@ -1177,7 +1249,7 @@ public:
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
 
-        return propagate_until_impl(detail::dfloat<T>(t), max_steps, max_delta_t, cb, write_tc, with_c_out);
+        return propagate_until_impl(detail::dfloat<T>(std::move(t)), max_steps, max_delta_t, cb, write_tc, with_c_out);
     }
     template <typename... KwArgs>
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
@@ -1186,10 +1258,8 @@ public:
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
 
-        return propagate_until_impl(m_time + delta_t, max_steps, max_delta_t, cb, write_tc, with_c_out);
+        return propagate_until_impl(m_time + std::move(delta_t), max_steps, max_delta_t, cb, write_tc, with_c_out);
     }
-    // NOTE: grid is taken by copy because in the implementation loop we keep on reading from it.
-    // Hence, we need to avoid any aliasing issue with other public integrator data.
     template <typename... KwArgs>
     std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid(std::vector<T> grid,
                                                                                  KwArgs &&...kw_args)
@@ -1197,7 +1267,7 @@ public:
         auto [max_steps, max_delta_t, cb, _]
             = detail::taylor_propagate_common_ops<T, true>(std::forward<KwArgs>(kw_args)...);
 
-        return propagate_grid_impl(grid, max_steps, max_delta_t, cb);
+        return propagate_grid_impl(std::move(grid), max_steps, max_delta_t, cb);
     }
 };
 
@@ -1381,7 +1451,8 @@ private:
         isol_t m_isol;
 
         // Constructors.
-        ed_data(std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t, std::uint32_t);
+        ed_data(llvm_state, std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t,
+                std::uint32_t);
         ed_data(const ed_data &);
         ~ed_data();
 
@@ -1450,13 +1521,15 @@ private:
     // and propagate functions.
     std::vector<std::tuple<taylor_outcome, T>> m_step_res;
     std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> m_prop_res;
-    // Temporary vectors used in the propagate_*() implementations.
+    // Temporary vectors used in the step()/propagate_*() implementations.
     std::vector<std::size_t> m_ts_count;
     std::vector<T> m_min_abs_h, m_max_abs_h;
     std::vector<T> m_cur_max_delta_ts;
     std::vector<detail::dfloat<T>> m_pfor_ts;
     std::vector<int> m_t_dir;
     std::vector<detail::dfloat<T>> m_rem_time;
+    std::vector<T> m_time_copy_hi, m_time_copy_lo;
+    std::vector<int> m_nf_detected;
     // Temporary vector used in the dense output implementation.
     std::vector<T> m_d_out_time;
     // Auxiliary data/functions for event detection.
@@ -1477,8 +1550,9 @@ private:
 
     // Private implementation-detail constructor machinery.
     template <typename U>
-    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(const U &, std::vector<T>, std::uint32_t, std::vector<T>, T, bool, bool,
-                                              std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(const U &, std::vector<T>, std::uint32_t, std::vector<T>,
+                                              std::optional<T>, bool, bool, std::vector<T>, std::vector<t_event_t>,
+                                              std::vector<nt_event_t>, bool);
     template <typename U, typename... KwArgs>
     void finalise_ctor(const U &sys, std::vector<T> state, std::uint32_t batch_size, KwArgs &&...kw_args)
     {
@@ -1519,8 +1593,8 @@ private:
                 }
             }();
 
-            finalise_ctor_impl(sys, std::move(state), batch_size, std::move(tm), tol, high_accuracy, compact_mode,
-                               std::move(pars), std::move(tes), std::move(ntes), parallel_mode);
+            finalise_ctor_impl(sys, std::move(state), batch_size, std::move(tm), std::move(tol), high_accuracy,
+                               compact_mode, std::move(pars), std::move(tes), std::move(ntes), parallel_mode);
         }
     }
 
@@ -1783,6 +1857,13 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive<mppp::real> &);
+
+#endif
+
 template <typename T>
 inline std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch<T> &)
 {
@@ -1805,5 +1886,22 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive
 #endif
 
 } // namespace heyoka
+
+// NOTE: copy the implementation of the BOOST_CLASS_VERSION macro, as it does
+// not support class templates.
+// Version history:
+// - 1: added base class to taylor_adaptive.
+namespace boost::serialization
+{
+
+template <typename T>
+struct version<heyoka::taylor_adaptive<T>> {
+    typedef mpl::int_<1> type;
+    typedef mpl::integral_c_tag tag;
+    BOOST_STATIC_CONSTANT(int, value = version::type::value);
+    BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<1>, boost::mpl::int_<256>>));
+};
+
+} // namespace boost::serialization
 
 #endif

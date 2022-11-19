@@ -18,15 +18,18 @@
 #include <functional>
 #include <initializer_list>
 #include <limits>
+#include <mp++/detail/mpfr.hpp>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <tuple>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 #include <variant>
 #include <vector>
 
+#include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
@@ -49,10 +52,19 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#include <heyoka/detail/real_helpers.hpp>
+
+#endif
+
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/num_utils.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -118,6 +130,10 @@ struct opt_disabler {
 
 // Helper to determine the optimal Taylor order for a given tolerance,
 // following Jorba's prescription.
+// NOTE: when T is mppp::real and tol has a low precision, the use
+// of integer operands in these computations might bump up the working
+// precision due to the way precision propagation works in mp++. I don't
+// think there's any negative consequence here.
 template <typename T>
 std::uint32_t taylor_order_from_tol(T tol)
 {
@@ -151,7 +167,7 @@ std::uint32_t taylor_order_from_tol(T tol)
 // propagate the state of the system. Instead, its output will be the jet of derivatives
 // of all state variables and event equations, and the deduced timestep value(s).
 template <typename T, typename U>
-auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name, const U &sys, T tol,
+auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name, const U &sys, const T &tol,
                                           std::uint32_t batch_size, bool, bool compact_mode,
                                           const std::vector<expression> &evs, bool high_accuracy, bool parallel_mode)
 {
@@ -177,9 +193,6 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the LLVM type corresponding to T.
-    auto *fp_t = to_llvm_type<T>(context);
-
     // Prepare the function prototype. The arguments are:
     // - pointer to the output jet of derivative (write only),
     // - pointer to the current state vector (read only),
@@ -188,7 +201,12 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     // - pointer to the array of max timesteps (read & write),
     // - pointer to the max_abs_state output variable (write only).
     // These pointers cannot overlap.
-    const std::vector<llvm::Type *> fargs(6, llvm::PointerType::getUnqual(fp_t));
+    auto *ext_fp_t = to_llvm_type<T>(context);
+    // NOTE: in case of mppp::real, before calling taylor_add_adaptive_step_with_events(), we ensured
+    // that the tolerance value has the inferred precision, so that llvm_type_like()
+    // will yield the correct internal type.
+    auto *fp_t = llvm_type_like(s, tol);
+    const std::vector<llvm::Type *> fargs(6, llvm::PointerType::getUnqual(ext_fp_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -251,11 +269,11 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
                                            batch_size, compact_mode, high_accuracy, parallel_mode);
 
     // Determine the integration timestep.
-    auto h = taylor_determine_h(s, fp_t, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size,
-                                max_abs_state_ptr);
+    auto *h = taylor_determine_h(s, fp_t, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size,
+                                 max_abs_state_ptr);
 
     // Store h to memory.
-    store_vector_to_memory(builder, h_ptr, h);
+    ext_store_vector_to_memory(s, h_ptr, h);
 
     // Copy the jet of derivatives to jet_ptr.
     taylor_write_tc(s, fp_t, diff_variant, ev_dc, svf_ptr, jet_ptr, n_eq, n_uvars, order, batch_size);
@@ -284,8 +302,8 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
 // in the integrators' ctors.
 // NOTE: document this eventually.
 template <typename T, typename U>
-auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &sys, T tol, std::uint32_t batch_size,
-                              bool high_accuracy, bool compact_mode, bool parallel_mode)
+auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &sys, const T &tol,
+                              std::uint32_t batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode)
 {
     using std::isfinite;
 
@@ -319,9 +337,13 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
     // - pointer to the array of max timesteps (read & write),
     // - pointer to the Taylor coefficients output (write only).
     // These pointers cannot overlap.
-    auto *fp_t = to_llvm_type<T>(context);
+    auto *ext_fp_t = to_llvm_type<T>(context);
+    // NOTE: in case of mppp::real, before calling taylor_add_adaptive_step(), we ensured
+    // that the tolerance value has the inferred precision, so that llvm_type_like()
+    // will yield the correct internal type.
+    auto *fp_t = llvm_type_like(s, tol);
     auto *fp_vec_t = make_vector_type(fp_t, batch_size);
-    const std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(fp_t));
+    const std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(ext_fp_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -371,8 +393,8 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
                                            batch_size, compact_mode, high_accuracy, parallel_mode);
 
     // Determine the integration timestep.
-    auto h = taylor_determine_h(s, fp_t, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size,
-                                nullptr);
+    auto *h = taylor_determine_h(s, fp_t, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size,
+                                 nullptr);
 
     // Evaluate the Taylor polynomials, producing the updated state of the system.
     auto new_state_var = high_accuracy ? taylor_run_ceval(s, fp_t, diff_variant, h, n_eq, n_uvars, order, high_accuracy,
@@ -388,10 +410,11 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
 
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
             auto val = builder.CreateLoad(fp_vec_t, builder.CreateInBoundsGEP(fp_vec_t, new_state, cur_var_idx));
-            store_vector_to_memory(builder,
-                                   builder.CreateInBoundsGEP(
-                                       fp_t, state_ptr, builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))),
-                                   val);
+            ext_store_vector_to_memory(
+                s,
+                builder.CreateInBoundsGEP(ext_fp_t, state_ptr,
+                                          builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))),
+                val);
         });
     } else {
         const auto &new_state = std::get<std::vector<llvm::Value *>>(new_state_var);
@@ -399,17 +422,17 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
         assert(new_state.size() == n_eq);
 
         for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
-            store_vector_to_memory(builder,
-                                   builder.CreateInBoundsGEP(fp_t, state_ptr, builder.getInt32(var_idx * batch_size)),
-                                   new_state[var_idx]);
+            ext_store_vector_to_memory(
+                s, builder.CreateInBoundsGEP(ext_fp_t, state_ptr, builder.getInt32(var_idx * batch_size)),
+                new_state[var_idx]);
         }
     }
 
     // Store the timesteps that were used.
-    store_vector_to_memory(builder, h_ptr, h);
+    ext_store_vector_to_memory(s, h_ptr, h);
 
     // Write the Taylor coefficients, if requested.
-    auto nptr = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
+    auto *nptr = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(ext_fp_t));
     llvm_if_then_else(
         s, builder.CreateICmpNE(tc_ptr, nptr),
         [&]() {
@@ -438,14 +461,78 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
 
 } // namespace
 
+#if defined(HEYOKA_HAVE_REAL)
+
+template <typename Derived>
+mpfr_prec_t taylor_adaptive_base<mppp::real, Derived>::get_prec() const
+{
+    assert(m_prec >= mppp::real_prec_min() && m_prec <= mppp::real_prec_max());
+
+    return m_prec;
+}
+
+// Helper to check that the integrator data is consistent with
+// the precision. To be used at the end of construciton or before using
+// the integrator data (e.g., in step(), propagate(), etc.).
+template <typename Derived>
+void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
+{
+    const auto *dthis = static_cast<const Derived *>(this);
+
+    const auto prec = get_prec();
+
+    // Time, tolerance, Taylor coefficients, m_last_h, dense output
+    // are all supposed to maintain the original precision after construction.
+    assert(dthis->m_time.hi.get_prec() == prec);
+    assert(dthis->m_time.lo.get_prec() == prec);
+    assert(dthis->m_tol.get_prec() == prec);
+    assert(std::all_of(dthis->m_tc.begin(), dthis->m_tc.end(), [prec](const auto &x) { return x.get_prec() == prec; }));
+    assert(dthis->m_last_h.get_prec() == prec);
+    assert(std::all_of(dthis->m_d_out.begin(), dthis->m_d_out.end(),
+                       [prec](const auto &x) { return x.get_prec() == prec; }));
+
+    // Same goes for the event detection jet data, if present.
+#if !defined(NDEBUG)
+    if (dthis->m_ed_data) {
+        assert(std::all_of(dthis->m_ed_data->m_ev_jet.begin(), dthis->m_ed_data->m_ev_jet.end(),
+                           [prec](const auto &x) { return x.get_prec() == prec; }));
+    }
+#endif
+
+    // State, pars can be changed by the user and thus need to be checked.
+    for (const auto &x : dthis->m_state) {
+        if (x.get_prec() != prec) {
+            throw std::invalid_argument(fmt::format("A state variable with precision {} was detected in the state "
+                                                    "vector: this is incompatible with the integrator precision of {}",
+                                                    x.get_prec(), prec));
+        }
+    }
+
+    for (const auto &x : dthis->m_pars) {
+        if (x.get_prec() != prec) {
+            throw std::invalid_argument(fmt::format("A value with precision {} was detected in the parameter "
+                                                    "vector: this is incompatible with the integrator precision of {}",
+                                                    x.get_prec(), prec));
+        }
+    }
+}
+
+#endif
+
 } // namespace detail
 
 template <typename T>
 template <typename U>
-void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, T time, T tol, bool high_accuracy,
-                                            bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
-                                            std::vector<nt_event_t> ntes, bool parallel_mode)
+void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, std::optional<T> time,
+                                            std::optional<T> tol, bool high_accuracy, bool compact_mode,
+                                            std::vector<T> pars, std::vector<t_event_t> tes,
+                                            std::vector<nt_event_t> ntes, bool parallel_mode,
+                                            [[maybe_unused]] std::optional<long long> prec)
 {
+    // NOTE: this must hold because tol == 0 is interpreted
+    // as undefined in finalise_ctor().
+    assert(!tol || *tol != 0);
+
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
         throw not_implemented_error("'long double' computations are not supported on PowerPC");
@@ -454,10 +541,95 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
 
     using std::isfinite;
 
-    // Assign the data members.
+    // Run an immediate check on state. This is a bit redundant with other checks
+    // later (e.g., state.size() must be consistent with the ODE definition, which in
+    // turn cannot consist of zero equations), but it's handy to do it here so that,
+    // e.g., we can immediately infer the precision if T == mppp::real.
+    if (state.empty()) {
+        throw std::invalid_argument("Cannot initialise an adaptive integrator with an empty state vector");
+    }
+
+    // Assign the state.
     m_state = std::move(state);
-    m_time = detail::dfloat<T>(time);
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    // Setup the precision: it is either passed by the user
+    // or automatically inferred from the state vector.
+    // NOTE: this must be done early so that the precision of the integrator
+    // is available for other checks later.
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        this->m_prec = prec ? boost::numeric_cast<mpfr_prec_t>(*prec) : m_state[0].get_prec();
+
+        if (prec) {
+            // If the user explicitly specifies a precision, enforce that precision
+            // on the state vector.
+            // NOTE: if the user specifies an invalid precision, we are sure
+            // here that an exception will be thrown: m_state is not empty
+            // and prec_round() will check the input precision value.
+            for (auto &val : m_state) {
+                // NOTE: use directly this->m_prec in order to avoid
+                // triggering an assertion in get_prec() if a bogus
+                // prec value was provided by the user.
+                val.prec_round(this->m_prec);
+            }
+        } else {
+            // If the precision is automatically deduced, ensure that
+            // the same precision is used for all initial values.
+            // NOTE: the automatically-deduced precision will be a valid one,
+            // as it is taken from a valid mppp::real (i.e., m_state[0]).
+            if (std::any_of(m_state.begin() + 1, m_state.end(),
+                            [this](const auto &val) { return val.get_prec() != this->get_prec(); })) {
+                throw std::invalid_argument(
+                    fmt::format("The precision deduced automatically from the initial state vector in a multiprecision "
+                                "adaptive Taylor integrator is {}, but values with different precision(s) were "
+                                "detected in the state vector",
+                                this->get_prec()));
+            }
+        }
+    }
+
+#endif
+
+    // Init the time.
+    if (time) {
+#if defined(HEYOKA_HAVE_REAL)
+        if constexpr (std::is_same_v<T, mppp::real>) {
+            // NOTE: enforce the correct precision for mppp::real.
+            m_time = detail::dfloat<T>(mppp::real{std::move(*time), this->get_prec()});
+        } else {
+#endif
+            m_time = detail::dfloat<T>(std::move(*time));
+#if defined(HEYOKA_HAVE_REAL)
+        }
+#endif
+    } else {
+#if defined(HEYOKA_HAVE_REAL)
+        if constexpr (std::is_same_v<T, mppp::real>) {
+            m_time = detail::dfloat<T>(mppp::real{mppp::real_kind::zero, this->get_prec()});
+        } else {
+#endif
+            m_time = detail::dfloat<T>(static_cast<T>(0));
+#if defined(HEYOKA_HAVE_REAL)
+        }
+#endif
+    }
+
+    // Parameter values.
     m_pars = std::move(pars);
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    // Enforce the correct precision for mppp::real.
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        for (auto &val : m_pars) {
+            val.prec_round(this->get_prec());
+        }
+    }
+
+#endif
+
+    // High accuracy and compact mode flags.
     m_high_accuracy = high_accuracy;
     m_compact_mode = compact_mode;
 
@@ -480,10 +652,10 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
                         detail::fp_to_string(static_cast<T>(m_time))));
     }
 
-    if (!isfinite(tol) || tol <= 0) {
+    if (tol && (!isfinite(*tol) || *tol < 0)) {
         throw std::invalid_argument(fmt::format(
             "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead",
-            detail::fp_to_string(tol)));
+            detail::fp_to_string(*tol)));
     }
 
     if (parallel_mode && !compact_mode) {
@@ -491,7 +663,22 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     }
 
     // Store the tolerance.
-    m_tol = tol;
+    if (tol) {
+        m_tol = std::move(*tol);
+    } else {
+        m_tol = detail::num_eps_like(m_state[0]);
+    }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        // Force the tolerance to have the inferred precision.
+        // NOTE: this is important as in taylor_add_adaptive_step*()
+        // we use the tolerance value to infer the internal type.
+        m_tol.prec_round(this->get_prec());
+    }
+
+#endif
 
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -517,16 +704,27 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
         }
 
         std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step_with_events<T>(
-            m_llvm, "step_e", sys, tol, 1, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
+            m_llvm, "step_e", sys, m_tol, 1, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
     } else {
-        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, 1, high_accuracy,
+        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step<T>(m_llvm, "step", sys, m_tol, 1, high_accuracy,
                                                                       compact_mode, parallel_mode);
     }
 
     // Fix m_pars' size, if necessary.
     const auto npars = detail::n_pars_in_dc(m_dc);
     if (m_pars.size() < npars) {
-        m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
+#if defined(HEYOKA_HAVE_REAL)
+        if constexpr (std::is_same_v<T, mppp::real>) {
+            // For mppp::real, ensure that the appended parameter
+            // values all have the inferred precision.
+            m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars),
+                          mppp::real{mppp::real_kind::zero, this->get_prec()});
+        } else {
+#endif
+            m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
+#if defined(HEYOKA_HAVE_REAL)
+        }
+#endif
     } else if (m_pars.size() > npars) {
         throw std::invalid_argument(fmt::format(
             "Excessive number of parameter values passed to the constructor of an adaptive "
@@ -539,7 +737,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
 
     // Add the function for the computation of
     // the dense output.
-    detail::taylor_add_d_out_function(m_llvm, detail::to_llvm_type<T>(m_llvm.context()), m_dim, m_order, 1,
+    detail::taylor_add_d_out_function(m_llvm, detail::llvm_type_like(m_llvm, m_state[0]), m_dim, m_order, 1,
                                       high_accuracy);
 
     detail::get_logger()->trace("Taylor dense output runtime: {}", sw);
@@ -578,30 +776,69 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     }
     // LCOV_EXCL_STOP
 
-    m_tc.resize(m_state.size() * (m_order + 1u));
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        // NOTE: ensure the Taylor coefficients are all generated
+        // with the inferred precision.
+        m_tc.resize(m_state.size() * (m_order + 1u), mppp::real{mppp::real_kind::zero, this->get_prec()});
+    } else {
+#endif
+        m_tc.resize(m_state.size() * (m_order + 1u));
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
 
     // Setup the vector for the dense output.
-    m_d_out.resize(m_state.size());
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        // NOTE: ensure the values are all generated with the inferred precision.
+        m_d_out.resize(m_state.size(), mppp::real{mppp::real_kind::zero, this->get_prec()});
+    } else {
+#endif
+        m_d_out.resize(m_state.size());
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
 
     // Init the event data structure if needed.
     // NOTE: this can be done in parallel with the rest of the constructor,
     // once we have m_order/m_dim and we are done using tes/ntes.
     if (with_events) {
-        m_ed_data = std::make_unique<ed_data>(std::move(tes), std::move(ntes), m_order, m_dim);
+        m_ed_data = std::make_unique<ed_data>(m_llvm.make_similar(), std::move(tes), std::move(ntes), m_order, m_dim,
+                                              m_state[0]);
     }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        // Fix the precision of m_last_h, which was inited from '0'.
+        m_last_h.prec_round(this->get_prec());
+
+#if !defined(NDEBUG)
+
+        // Run the precision check on the integrator data.
+        // NOTE: run it only in debug mode since at this point
+        // we should be sure all internal data has the correct precision.
+        this->data_prec_check();
+
+#endif
+    }
+
+#endif
 }
 
 template <typename T>
-taylor_adaptive<T>::taylor_adaptive() : taylor_adaptive({prime("x"_var) = 0_dbl}, {T(0)}, kw::tol = T(1e-1))
+taylor_adaptive<T>::taylor_adaptive()
+    : taylor_adaptive({prime("x"_var) = 0_dbl}, {static_cast<T>(0)}, kw::tol = static_cast<T>(1e-1))
 {
 }
 
 template <typename T>
 taylor_adaptive<T>::taylor_adaptive(const taylor_adaptive &other)
-    : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_order(other.m_order),
-      m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode),
-      m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
-      m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
+    : base_t(static_cast<const base_t &>(other)), m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm),
+      m_dim(other.m_dim), m_order(other.m_order), m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy),
+      m_compact_mode(other.m_compact_mode), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h),
+      m_d_out(other.m_d_out), m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
 {
     // NOTE: make explicit deep copy of the decomposition.
     m_dc.reserve(other.m_dc.size());
@@ -641,6 +878,8 @@ template <typename T>
 template <typename Archive>
 void taylor_adaptive<T>::save_impl(Archive &ar, unsigned) const
 {
+    ar << boost::serialization::base_object<detail::taylor_adaptive_base<T, taylor_adaptive>>(*this);
+
     ar << m_state;
     ar << m_time;
     ar << m_llvm;
@@ -668,6 +907,8 @@ void taylor_adaptive<T>::load_impl(Archive &ar, unsigned version)
                                                 version));
     }
     // LCOV_EXCL_STOP
+
+    ar >> boost::serialization::base_object<detail::taylor_adaptive_base<T, taylor_adaptive>>(*this);
 
     ar >> m_state;
     ar >> m_time;
@@ -704,6 +945,52 @@ void taylor_adaptive<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
 {
     load_impl(ar, v);
 }
+
+namespace detail
+{
+
+namespace
+{
+
+// Small helper to compare the absolute
+// values of two input values.
+template <typename T>
+bool abs_lt(const T &a, const T &b)
+{
+    using std::abs;
+
+    return abs(a) < abs(b);
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+bool abs_lt<mppp::real>(const mppp::real &a, const mppp::real &b)
+{
+    return mppp::cmpabs(a, b) < 0;
+}
+
+#endif
+
+// Custom equality comparison that considers all NaN values equal.
+template <typename T>
+bool cmp_nan_eq(const T &a, const T &b)
+{
+    using std::isnan;
+
+    const auto nan_a = isnan(a);
+    const auto nan_b = isnan(b);
+
+    if (!nan_a && !nan_b) {
+        return a == b;
+    } else {
+        return nan_a && nan_b;
+    }
+}
+
+} // namespace
+
+} // namespace detail
 
 // Implementation detail to make a single integration timestep.
 // The magnitude of the timestep is automatically deduced, but it will
@@ -745,6 +1032,17 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
     assert(!isnan(max_delta_t)); // LCOV_EXCL_LINE
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        assert(max_delta_t.get_prec() == this->get_prec());
+
+        // Run the data precision checks.
+        this->data_prec_check();
+    }
+
+#endif
+
     auto h = max_delta_t;
 
     if (m_step_f.index() == 0u) {
@@ -763,10 +1061,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         // end of the timestep.
         if (!isfinite(m_time)
             || std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !isfinite(x); })) {
-            return std::tuple{taylor_outcome::err_nf_state, h};
+            return std::tuple{taylor_outcome::err_nf_state, std::move(h)};
         }
 
-        return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, h};
+        return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, std::move(h)};
     } else {
         assert(m_ed_data); // LCOV_EXCL_LINE
 
@@ -774,38 +1072,49 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
 
         // Invoke the stepper for event handling. We will record the norm infinity of the state vector +
         // event equations at the beginning of the timestep for later use.
-        T max_abs_state;
+        auto max_abs_state = detail::num_zero_like(h);
         std::get<1>(m_step_f)(edd.m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state);
 
         // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
         // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
         // in edd.detect_events() we skip event detection altogether.
-        T g_eps;
-        if (isfinite(max_abs_state)) {
-            // Are we in absolute or relative error control mode?
-            const auto abs_or_rel = max_abs_state < 1;
+        const auto g_eps = [&]() {
+            if (isfinite(max_abs_state)) {
+                // Are we in absolute or relative error control mode?
+                const auto abs_or_rel = max_abs_state < 1;
 
-            // Estimate the size of the largest remainder in the Taylor
-            // series of both the dynamical equations and the events.
-            const auto max_r_size = abs_or_rel ? m_tol : (m_tol * max_abs_state);
+                // Estimate the size of the largest remainder in the Taylor
+                // series of both the dynamical equations and the events.
+                auto max_r_size = abs_or_rel ? m_tol : (m_tol * max_abs_state);
 
-            // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real
-            // integration error cannot be too small due to floating-point truncation.
-            // This is the case for instance if we use sub-epsilon integration tolerances
-            // to achieve Brouwer's law. In such a case, we cap the value of g_eps,
-            // using eps * max_abs_state as an estimation of the smallest number
-            // that can be resolved with the current floating-point type.
-            // NOTE: the if condition in the next line is equivalent, in relative
-            // error control mode, to:
-            // if (m_tol < std::numeric_limits<T>::epsilon())
-            if (max_r_size < std::numeric_limits<T>::epsilon() * max_abs_state) {
-                g_eps = std::numeric_limits<T>::epsilon() * max_abs_state;
+                // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real
+                // integration error cannot be too small due to floating-point truncation.
+                // This is the case for instance if we use sub-epsilon integration tolerances
+                // to achieve Brouwer's law. In such a case, we cap the value of g_eps,
+                // using eps * max_abs_state as an estimation of the smallest number
+                // that can be resolved with the current floating-point type.
+                auto tmp = detail::num_eps_like(max_abs_state) * max_abs_state;
+
+                // NOTE: the if condition in the next line is equivalent, in relative
+                // error control mode, to:
+                // if (m_tol < eps)
+                if (max_r_size < tmp) {
+                    return tmp;
+                } else {
+                    return max_r_size;
+                }
             } else {
-                g_eps = max_r_size;
+                return detail::num_inf_like(max_abs_state);
             }
-        } else {
-            g_eps = std::numeric_limits<T>::infinity();
+        }();
+
+#if defined(HEYOKA_HAVE_REAL)
+
+        if constexpr (std::is_same_v<T, mppp::real>) {
+            assert(g_eps.get_prec() == this->get_prec());
         }
+
+#endif
 
         // Write unconditionally the tcs.
         std::copy(edd.m_ev_jet.data(), edd.m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
@@ -827,14 +1136,24 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         // happen closer to the beginning of the timestep.
         // NOTE: the checks inside edd.detect_events() ensure
         // that we can safely sort the events' times.
-        auto cmp = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
+        auto cmp = [](const auto &ev0, const auto &ev1) { return detail::abs_lt(std::get<1>(ev0), std::get<1>(ev1)); };
         std::sort(edd.m_d_tes.begin(), edd.m_d_tes.end(), cmp);
         std::sort(edd.m_d_ntes.begin(), edd.m_d_ntes.end(), cmp);
 
         // If we have terminal events we need
         // to update the value of h.
         if (!edd.m_d_tes.empty()) {
-            h = std::get<1>(edd.m_d_tes[0]);
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<T, mppp::real>) {
+                // NOTE: use set() so that no matter what happens during event detection,
+                // we will not change the precision of h to an invalid value.
+                h.set(std::get<1>(edd.m_d_tes[0]));
+            } else {
+#endif
+                h = std::get<1>(edd.m_d_tes[0]);
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
         }
 
         // Update the state.
@@ -854,7 +1173,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             // they have become useless.
             reset_cooldowns();
 
-            return std::tuple{taylor_outcome::err_nf_state, h};
+            return std::tuple{taylor_outcome::err_nf_state, std::move(h)};
         }
 
         // Update the cooldowns.
@@ -884,7 +1203,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             = edd.m_d_tes.empty()
                   ? edd.m_d_ntes.end()
                   : std::lower_bound(edd.m_d_ntes.begin(), edd.m_d_ntes.end(), h,
-                                     [](const auto &ev, const auto &t) { return abs(std::get<1>(ev)) < abs(t); });
+                                     [](const auto &ev, const auto &t) { return detail::abs_lt(std::get<1>(ev), t); });
+
+        // Store the time coordinate before invoking the callbacks.
+        const auto new_time = m_time;
 
         // Invoke the callbacks of the non-terminal events, which are guaranteed
         // to happen before the first terminal event.
@@ -892,7 +1214,25 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             const auto &t = *it;
             const auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
             assert(cb); // LCOV_EXCL_LINE
-            cb(*this, static_cast<T>(m_time - m_last_h + std::get<1>(t)), std::get<2>(t));
+
+            // NOTE: use new_time, instead of m_time, in order to prevent
+            // passing the wrong time coordinate to the callback if an earlier
+            // callback changed it.
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<T, mppp::real>) {
+                // NOTE: for mppp::real, we must ensure that the time coordinate
+                // of the event is computed with the correct precision (we are
+                // getting the time coordinate from the event detection machinery,
+                // which does not enforce preservation of the correct precision).
+                auto tc = static_cast<T>((new_time - m_last_h + std::get<1>(t)));
+                tc.prec_round(this->get_prec());
+                cb(*this, tc, std::get<2>(t));
+            } else {
+#endif
+                cb(*this, static_cast<T>(new_time - m_last_h + std::get<1>(t)), std::get<2>(t));
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
         }
 
         // The return value of the first
@@ -925,9 +1265,21 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             }
         }
 
+        // NOTE: event callbacks - terminal or not - cannot modify the time
+        // variable, as this is going to mess up the internal time keeping logic
+        // in the propagate_*() functions.
+        // NOTE: use cmp_nan_eq() so that we consider NaN == NaN in the time coordinates.
+        // This is necessary in case something goes wrong in the integration step
+        // and the time coordinate goes NaN - in such a case, the standard equality operator
+        // would trigger (because NaN != NaN) even if the time coordinate was not changed by the callback.
+        if (!detail::cmp_nan_eq(m_time.hi, new_time.hi) || !detail::cmp_nan_eq(m_time.lo, new_time.lo)) {
+            throw std::runtime_error("The invocation of one or more event callbacks resulted in the alteration of the "
+                                     "time coordinate of the integrator - this is not supported");
+        }
+
         if (edd.m_d_tes.empty()) {
             // No terminal events detected, return success or time limit.
-            return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, h};
+            return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, std::move(h)};
         } else {
             // Terminal event detected. Fetch its index.
             const auto ev_idx = static_cast<std::int64_t>(std::get<0>(edd.m_d_tes[0]));
@@ -937,7 +1289,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             // integration should continue). Otherwise, either the terminal event
             // has no callback or its callback returned false, meaning that the
             // integration must stop.
-            return std::tuple{taylor_outcome{te_cb_ret ? ev_idx : (-ev_idx - 1)}, h};
+            return std::tuple{taylor_outcome{te_cb_ret ? ev_idx : (-ev_idx - 1)}, std::move(h)};
         }
     }
 }
@@ -947,13 +1299,29 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(bool wtc)
 {
     // NOTE: time limit +inf means integration forward in time
     // and no time limit.
-    return step_impl(std::numeric_limits<T>::infinity(), wtc);
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        return step_impl(mppp::real{mppp::real_kind::inf, this->get_prec()}, wtc);
+    } else {
+#endif
+        return step_impl(std::numeric_limits<T>::infinity(), wtc);
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
 }
 
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_backward(bool wtc)
 {
-    return step_impl(-std::numeric_limits<T>::infinity(), wtc);
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        return step_impl(mppp::real{mppp::real_kind::inf, -1, this->get_prec()}, wtc);
+    } else {
+#endif
+        return step_impl(-std::numeric_limits<T>::infinity(), wtc);
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
 }
 
 template <typename T>
@@ -966,7 +1334,20 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(T max_delta_t, bool wtc)
             "A NaN max_delta_t was passed to the step() function of an adaptive Taylor integrator");
     }
 
-    return step_impl(max_delta_t, wtc);
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        if (max_delta_t.get_prec() != this->get_prec()) {
+            throw std::invalid_argument(
+                fmt::format("Invalid max_delta_t argument passed to the step() function of an adaptive Taylor "
+                            "integrator: max_delta_t has a precision of {}, while the integrator's precision is {}",
+                            max_delta_t.get_prec(), this->get_prec()));
+        }
+    }
+
+#endif
+
+    return step_impl(std::move(max_delta_t), wtc);
 }
 
 // Reset all cooldowns for the terminal events.
@@ -995,7 +1376,8 @@ void taylor_adaptive<T>::reset_cooldowns()
 // unless a non-finite state was detected.
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t max_steps, T max_delta_t,
+taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_steps,
+                                         const std::optional<T> &max_delta_t_,
                                          const std::function<bool(taylor_adaptive &)> &cb, bool wtc, bool with_c_out)
 {
     using std::abs;
@@ -1014,7 +1396,51 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
             "A non-finite time was passed to the propagate_until() function of an adaptive Taylor integrator");
     }
 
-    // Check max_delta_t.
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        assert(t.hi.get_prec() == t.lo.get_prec());
+
+        if (t.hi.get_prec() != this->get_prec()) {
+            throw std::invalid_argument(fmt::format(
+                "Invalid final time argument passed to the propagate_until() function of an adaptive Taylor "
+                "integrator: the time variable has a precision of {}, while the integrator's precision is {}",
+                t.hi.get_prec(), this->get_prec()));
+        }
+    }
+
+#endif
+
+    // Fetch and check max_delta_t.
+    const auto max_delta_t = [&]() {
+        if (max_delta_t_) {
+            return *max_delta_t_;
+        } else {
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<T, mppp::real>) {
+                return mppp::real{mppp::real_kind::inf, this->get_prec()};
+            } else {
+#endif
+                return std::numeric_limits<T>::infinity();
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
+        }
+    }();
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        if (max_delta_t.get_prec() != this->get_prec()) {
+            throw std::invalid_argument(fmt::format(
+                "Invalid max_delta_t argument passed to the propagate_until() function of an adaptive Taylor "
+                "integrator: max_delta_t has a precision of {}, while the integrator's precision is {}",
+                max_delta_t.get_prec(), this->get_prec()));
+        }
+    }
+
+#endif
+
     if (isnan(max_delta_t)) {
         throw std::invalid_argument(
             "A nan max_delta_t was passed to the propagate_until() function of an adaptive Taylor integrator");
@@ -1044,9 +1470,14 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
     // with a nonzero h. Most of the time these two quantities
     // will be identical, apart from corner cases.
     std::size_t iter_counter = 0, step_counter = 0;
-    T min_h = std::numeric_limits<T>::infinity(), max_h(0);
+    // NOTE: in case of mppp::real, we know that max_delta_t has the correct
+    // precision by now.
+    T min_h = detail::num_inf_like(max_delta_t), max_h = detail::num_zero_like(max_delta_t);
 
     // Init the remaining time.
+    // NOTE: for mppp::real, manipulations on rem_time involve only t and m_time: t's precision
+    // has been checked, m_time is manipulated only by step(), which enforces the correct
+    // precision is maintained. Thus, rem_time will always keep the correct precision.
     auto rem_time = t - m_time;
 
     // Check it.
@@ -1056,7 +1487,7 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
     }
 
     // Cache the integration direction.
-    const auto t_dir = (rem_time >= T(0));
+    const auto t_dir = (rem_time >= static_cast<T>(0));
 
     // Cache the presence/absence of a callback.
     const auto with_cb = static_cast<bool>(cb);
@@ -1079,7 +1510,10 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
             ret.m_times_lo = std::move(c_out_times_lo);
 
             // Prepare the output vector.
-            ret.m_output.resize(boost::numeric_cast<decltype(ret.m_output.size())>(m_dim));
+            // NOTE: in case of mppp::real, we know that max_delta_t has the correct
+            // precision by now.
+            ret.m_output.resize(boost::numeric_cast<decltype(ret.m_output.size())>(m_dim),
+                                detail::num_zero_like(max_delta_t));
 
             // Add the continuous output function.
             ret.add_c_out_function(m_order, m_dim, m_high_accuracy);
@@ -1121,16 +1555,16 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
         // If some non-finite state/time is generated in
         // the step function, the integration will be stopped.
         assert((rem_time >= T(0)) == t_dir); // LCOV_EXCL_LINE
-        const auto dt_limit = t_dir ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
-                                    : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
+        auto dt_limit = t_dir ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
+                              : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
-        const auto [oc, h] = step_impl(static_cast<T>(dt_limit), wtc);
+        const auto [oc, h] = step_impl(std::move(dt_limit.hi), wtc);
 
         if (oc == taylor_outcome::err_nf_state) {
             // If a non-finite state is detected, we do *not* want
             // to execute the propagate() callback and we do *not* want
             // to update the continuous output. Just exit.
-            return std::tuple{oc, min_h, max_h, step_counter, make_c_out()};
+            return std::tuple{oc, std::move(min_h), std::move(max_h), step_counter, make_c_out()};
         }
 
         // Update the number of steps.
@@ -1152,9 +1586,30 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
         ++iter_counter;
 
         // Execute the propagate() callback, if applicable.
-        if (with_cb && !cb(*this)) {
-            // Interruption via callback.
-            return std::tuple{taylor_outcome::cb_stop, min_h, max_h, step_counter, make_c_out()};
+        if (with_cb) {
+            // Store the current time coordinate before
+            // executing the cb, so that we can check if
+            // the cb changes the time coordinate.
+            const auto orig_time = m_time;
+            // NOTE: this is ensured by the fact that the outcome
+            // of the single step is *not* err_nf_state.
+            assert(isfinite(orig_time));
+
+            // Execute the cb.
+            const auto ret_cb = cb(*this);
+
+            // Check the time coordinate.
+            if (m_time != orig_time) {
+                throw std::runtime_error(
+                    "The invocation of the callback passed to propagate_until() resulted in the alteration of the "
+                    "time coordinate of the integrator - this is not supported");
+            }
+
+            if (!ret_cb) {
+                // Interruption via callback.
+                return std::tuple{taylor_outcome::cb_stop, std::move(min_h), std::move(max_h), step_counter,
+                                  make_c_out()};
+            }
         }
 
         // The breakout conditions:
@@ -1164,13 +1619,13 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
         // oc == time_limit, because clamping via max_delta_t
         // could also result in time_limit.
         const bool ste_detected = oc > taylor_outcome::success && oc < taylor_outcome{0};
-        if (h == static_cast<T>(rem_time) || ste_detected) {
+        if (h == rem_time.hi || ste_detected) {
 #if !defined(NDEBUG)
-            if (h == static_cast<T>(rem_time)) {
+            if (h == rem_time.hi) {
                 assert(oc == taylor_outcome::time_limit);
             }
 #endif
-            return std::tuple{oc, min_h, max_h, step_counter, make_c_out()};
+            return std::tuple{oc, std::move(min_h), std::move(max_h), step_counter, make_c_out()};
         }
 
         // Check the iteration limit.
@@ -1178,15 +1633,16 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
         // then this condition will never trigger (modulo wraparound)
         // as by this point we are sure iter_counter is at least 1.
         if (iter_counter == max_steps) {
-            return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter, make_c_out()};
+            return std::tuple{taylor_outcome::step_limit, std::move(min_h), std::move(max_h), step_counter,
+                              make_c_out()};
         }
 
         // Update the remaining time.
         // NOTE: at this point, we are sure
-        // that abs(h) < abs(static_cast<T>(rem_time)). This implies
+        // that abs(h) < abs(rem_time.hi). This implies
         // that t - m_time cannot undergo a sign
         // flip and invert the integration direction.
-        assert(abs(h) < abs(static_cast<T>(rem_time)));
+        assert(abs(h) < abs(rem_time.hi));
         rem_time = t - m_time;
     }
 }
@@ -1201,7 +1657,8 @@ taylor_adaptive<T>::propagate_until_impl(const detail::dfloat<T> &t, std::size_t
 // a non-finite state was detected.
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
-taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps, T max_delta_t,
+taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_steps,
+                                        const std::optional<T> &max_delta_t_,
                                         const std::function<bool(taylor_adaptive &)> &cb)
 {
     using std::abs;
@@ -1213,7 +1670,36 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
             "Cannot invoke propagate_grid() in an adaptive Taylor integrator if the current time is not finite");
     }
 
-    // Check max_delta_t.
+    // Fetch and check max_delta_t.
+    const auto max_delta_t = [&]() {
+        if (max_delta_t_) {
+            return *max_delta_t_;
+        } else {
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<T, mppp::real>) {
+                return mppp::real{mppp::real_kind::inf, this->get_prec()};
+            } else {
+#endif
+                return std::numeric_limits<T>::infinity();
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
+        }
+    }();
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        if (max_delta_t.get_prec() != this->get_prec()) {
+            throw std::invalid_argument(fmt::format(
+                "Invalid max_delta_t argument passed to the propagate_grid() function of an adaptive Taylor "
+                "integrator: max_delta_t has a precision of {}, while the integrator's precision is {}",
+                max_delta_t.get_prec(), this->get_prec()));
+        }
+    }
+
+#endif
+
     if (isnan(max_delta_t)) {
         throw std::invalid_argument(
             "A nan max_delta_t was passed to the propagate_grid() function of an adaptive Taylor integrator");
@@ -1233,10 +1719,26 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
         = "A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator";
     constexpr auto ig_err_msg
         = "A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator";
+
     // Check the first point.
     if (!isfinite(grid[0])) {
         throw std::invalid_argument(nf_err_msg);
     }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    constexpr auto prec_err_msg = "Invalid precision detected in the time grid passed to the propagate_grid() function "
+                                  "of an adaptive Taylor integrator: a value of precision {} was "
+                                  "detected in the grid, but the precision of the integrator is {} instead";
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        if (grid[0].get_prec() != this->get_prec()) {
+            throw std::invalid_argument(fmt::format(prec_err_msg, grid[0].get_prec(), this->get_prec()));
+        }
+    }
+
+#endif
+
     if (grid.size() > 1u) {
         // Establish the direction of the grid from
         // the first two points.
@@ -1246,6 +1748,14 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
         if (grid[1] == grid[0]) {
             throw std::invalid_argument(ig_err_msg);
         }
+#if defined(HEYOKA_HAVE_REAL)
+        if constexpr (std::is_same_v<T, mppp::real>) {
+            if (grid[1].get_prec() != this->get_prec()) {
+                throw std::invalid_argument(fmt::format(prec_err_msg, grid[1].get_prec(), this->get_prec()));
+            }
+        }
+#endif
+
         const auto grid_direction = grid[1] > grid[0];
 
         // Check that the remaining points are finite and that
@@ -1258,6 +1768,14 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
             if ((grid[i] > grid[i - 1u]) != grid_direction) {
                 throw std::invalid_argument(ig_err_msg);
             }
+
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::is_same_v<T, mppp::real>) {
+                if (grid[i].get_prec() != this->get_prec()) {
+                    throw std::invalid_argument(fmt::format(prec_err_msg, grid[i].get_prec(), this->get_prec()));
+                }
+            }
+#endif
         }
     }
 
@@ -1279,7 +1797,9 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
     // with a nonzero h. Most of the time these two quantities
     // will be identical, apart from corner cases.
     std::size_t iter_counter = 0, step_counter = 0;
-    T min_h = std::numeric_limits<T>::infinity(), max_h(0);
+    // NOTE: in case of mppp::real, we know that max_delta_t has the correct
+    // precision by now.
+    T min_h = detail::num_inf_like(max_delta_t), max_h = detail::num_zero_like(max_delta_t);
 
     // Propagate the system up to the first grid point.
     // NOTE: we pass write_tc = true because some grid
@@ -1298,13 +1818,26 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
 
     if (oc_until != taylor_outcome::time_limit) {
         // The outcome is not time_limit, exit now.
-        return std::tuple{oc_until, min_h, max_h, step_counter, std::move(retval)};
+        return std::tuple{oc_until, std::move(min_h), std::move(max_h), step_counter, std::move(retval)};
     }
 
     // Add the first result to retval.
+    // NOTE: in principle here we could have a state
+    // with incorrect precision being added to retval - this
+    // happens in case an event callback changes the state precision
+    // at the last step of the propagate_until(). This won't have
+    // ill effects on the propagate_grid() logic as retval
+    // is only written to (we don't use its values in the
+    // function logic).
     retval.insert(retval.end(), m_state.begin(), m_state.end());
 
+    // Cache a double-length zero for several uses later.
+    const auto dl_zero = detail::dfloat<T>(detail::num_zero_like(max_delta_t));
+
     // Init the remaining time.
+    // NOTE: m_time is guaranteed to have the correct precision,
+    // grid was checked above - thus rem_time will have the correct
+    // precision.
     auto rem_time = grid.back() - m_time;
 
     // Check it.
@@ -1314,14 +1847,14 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
     }
 
     // Cache the integration direction.
-    const auto t_dir = (rem_time >= T(0));
+    const auto t_dir = (rem_time >= dl_zero);
 
     // Cache the presence/absence of a callback.
     const auto with_cb = static_cast<bool>(cb);
 
     // This flag, if set to something else than success,
     // is used to signal the early interruption of the integration.
-    taylor_outcome interrupt = taylor_outcome::success;
+    auto interrupt = taylor_outcome::success;
 
     // Iterate over the remaining grid points.
     for (decltype(grid.size()) cur_grid_idx = 1; cur_grid_idx < grid.size();) {
@@ -1337,13 +1870,13 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
         // fall within the time range of the last step.
         while (true) {
             // Fetch the current time target.
-            const auto cur_tt = grid[cur_grid_idx];
+            const auto &cur_tt = grid[cur_grid_idx];
 
             // NOTE: we force processing of all remaining grid points
             // if we are at the last timestep. We do this in order to avoid
             // numerical issues when deciding if the last grid point
             // falls within the range of the last step.
-            if ((cur_tt >= t0 && cur_tt <= t1) || (rem_time == detail::dfloat<T>(T(0)))) {
+            if ((cur_tt >= t0 && cur_tt <= t1) || (rem_time == dl_zero)) {
                 // The current time target falls within the range of
                 // the last step. Compute the dense output in cur_tt.
                 update_d_output(cur_tt);
@@ -1377,15 +1910,15 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
         // If some non-finite state/time is generated in
         // the step function, the integration will be stopped.
         assert((rem_time >= T(0)) == t_dir); // LCOV_EXCL_LINE
-        const auto dt_limit = t_dir ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
-                                    : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
-        const auto [oc, h] = step_impl(static_cast<T>(dt_limit), true);
+        auto dt_limit = t_dir ? std::min(detail::dfloat<T>(max_delta_t), rem_time)
+                              : std::max(detail::dfloat<T>(-max_delta_t), rem_time);
+        const auto [oc, h] = step_impl(std::move(dt_limit.hi), true);
 
         if (oc == taylor_outcome::err_nf_state) {
             // If a non-finite state is detected, we do *not* want
             // to execute the propagate() callback and we do *not* want
             // to update the return value. Just exit.
-            return std::tuple{oc, min_h, max_h, step_counter, std::move(retval)};
+            return std::tuple{oc, std::move(min_h), std::move(max_h), step_counter, std::move(retval)};
         }
 
         // Update the number of steps.
@@ -1403,9 +1936,38 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
         // Update the number of iterations.
         ++iter_counter;
 
+        // Small helper to wrap the invocation of the callback
+        // while checking that the callback does not change the
+        // time coordinate.
+        auto wrap_cb_call = [this, &cb]() {
+            // Store the current time coordinate before
+            // executing the cb, so that we can check if
+            // the cb changes the time coordinate.
+            const auto orig_time = m_time;
+            // NOTE: this is ensured by the fact that the outcome
+            // of the single step is *not* err_nf_state.
+            assert(isfinite(orig_time));
+
+            // Execute the cb.
+            assert(cb);
+            const auto ret_cb = cb(*this);
+
+            // Check the time coordinate.
+            if (m_time != orig_time) {
+                throw std::runtime_error(
+                    "The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
+                    "time coordinate of the integrator - this is not supported");
+            }
+
+            return ret_cb;
+        };
+
         // Check the early interruption conditions.
         // NOTE: only one of them must be set.
-        if (with_cb && !cb(*this)) {
+        // NOTE: if the integration is stopped via callback,
+        // we don't exit immediately, we process any remaining
+        // grid points first.
+        if (with_cb && !wrap_cb_call()) {
             // Interruption via callback.
             interrupt = taylor_outcome::cb_stop;
         } else if (oc > taylor_outcome::success && oc < taylor_outcome{0}) {
@@ -1417,14 +1979,14 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
         }
 
         // Update the remaining time.
-        // NOTE: if static_cast<T>(rem_time) was used as a timestep,
+        // NOTE: if rem_time.hi was used as a timestep,
         // it means that we hit the time limit. Force rem_time to zero
         // to signal this, avoiding inconsistencies with grid.back() - m_time
         // not going exactly to zero due to numerical issues. A zero rem_time
         // will also force the processing of all remaining grid points.
-        if (h == static_cast<T>(rem_time)) {
+        if (h == rem_time.hi) {
             assert(oc == taylor_outcome::time_limit); // LCOV_EXCL_LINE
-            rem_time = detail::dfloat<T>(T(0));
+            rem_time = dl_zero;
         } else {
             // NOTE: this should never flip the time direction of the
             // integration for the same reasons as explained in the
@@ -1436,8 +1998,8 @@ taylor_adaptive<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t 
 
     // Return time_limit or the interrupt condition, if the integration
     // was stopped early.
-    return std::tuple{interrupt == taylor_outcome::success ? taylor_outcome::time_limit : interrupt, min_h, max_h,
-                      step_counter, std::move(retval)};
+    return std::tuple{interrupt == taylor_outcome::success ? taylor_outcome::time_limit : interrupt, std::move(min_h),
+                      std::move(max_h), step_counter, std::move(retval)};
 }
 
 template <typename T>
@@ -1482,13 +2044,30 @@ std::uint32_t taylor_adaptive<T>::get_dim() const
     return m_dim;
 }
 
+template <typename T>
+void taylor_adaptive<T>::set_time(T t)
+{
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        if (t.get_prec() != this->get_prec()) {
+            throw std::invalid_argument(
+                fmt::format("Invalid precision detected in the time variable: the precision of the integrator is "
+                            "{}, but the time variable has a precision of {} instead",
+                            this->get_prec(), t.get_prec()));
+        }
+    }
+#endif
+
+    m_time = detail::dfloat<T>(std::move(t));
+}
+
 namespace
 {
 
 // NOTE: double-length normalisation assumes abs(hi) >= abs(lo), we need to enforce this
 // when setting the time coordinate in double-length format.
 template <typename T>
-void dtime_checks(T hi, T lo)
+void dtime_checks(const T &hi, const T &lo)
 {
     using std::abs;
     using std::isfinite;
@@ -1512,27 +2091,59 @@ void dtime_checks(T hi, T lo)
 template <typename T>
 void taylor_adaptive<T>::set_dtime(T hi, T lo)
 {
+#if defined(HEYOKA_HAVE_REAL)
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        // NOTE: the constructor of dfloat will take care to check
+        // that the precisions of hi and lo match, so that here
+        // we only need to check the precision of hi.
+        if (hi.get_prec() != this->get_prec()) {
+            throw std::invalid_argument(
+                fmt::format("Invalid precision detected in the time variable: the precision of the integrator is "
+                            "{}, but the time variable has a precision of {} instead",
+                            this->get_prec(), hi.get_prec()));
+        }
+    }
+#endif
+
     // Check the components.
     dtime_checks(hi, lo);
 
-    m_time = normalise(detail::dfloat<T>(hi, lo));
+    m_time = normalise(detail::dfloat<T>(std::move(hi), std::move(lo)));
 }
 
 template <typename T>
 const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
 {
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    // NOTE: here it is not necessary to run the precision
+    // check on the state/params, as they are never used
+    // in the computation.
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        if (time.get_prec() != this->get_prec()) {
+            throw std::invalid_argument(
+                fmt::format("Invalid time variable passed to update_d_output(): the time variable has a precision of "
+                            "{}, while the integrator has a precision of {}",
+                            time.get_prec(), this->get_prec()));
+        }
+    }
+
+#endif
+
     // NOTE: "time" needs to be translated
     // because m_d_out_f expects a time coordinate
     // with respect to the starting time t0 of
     // the *previous* timestep.
     if (rel_time) {
         // Time coordinate relative to the current time.
-        const auto h = m_last_h + time;
+        const auto h = m_last_h + std::move(time);
 
         m_d_out_f(m_d_out.data(), m_tc.data(), &h);
     } else {
         // Absolute time coordinate.
-        const auto h = time - (m_time - m_last_h);
+        const auto h = std::move(time) - (m_time - m_last_h);
 
         m_d_out_f(m_d_out.data(), m_tc.data(), &h.hi);
     }
@@ -1543,29 +2154,52 @@ const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
 // Explicit instantiation of the implementation classes/functions.
 // NOTE: on Windows apparently it is necessary to declare that
 // these instantiations are meant to be dll-exported.
+
+namespace detail
+{
+
+template class taylor_adaptive_base<double, taylor_adaptive<double>>;
+
+template class taylor_adaptive_base<long double, taylor_adaptive<long double>>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template class taylor_adaptive_base<mppp::real128, taylor_adaptive<mppp::real128>>;
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template class taylor_adaptive_base<mppp::real, taylor_adaptive<mppp::real>>;
+
+#endif
+
+} // namespace detail
+
 template class taylor_adaptive<double>;
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive<double>::finalise_ctor_impl(const std::vector<expression> &,
-                                                                            std::vector<double>, double, double, bool,
-                                                                            bool, std::vector<double>,
-                                                                            std::vector<t_event_t>,
-                                                                            std::vector<nt_event_t>, bool);
+template HEYOKA_DLL_PUBLIC void taylor_adaptive<double>::finalise_ctor_impl(
+    const std::vector<expression> &, std::vector<double>, std::optional<double>, std::optional<double>, bool, bool,
+    std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);
 
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive<double>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &, std::vector<double>,
-                                            double, double, bool, bool, std::vector<double>, std::vector<t_event_t>,
-                                            std::vector<nt_event_t>, bool);
+                                            std::optional<double>, std::optional<double>, bool, bool,
+                                            std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool,
+                                            std::optional<long long>);
 
 template class taylor_adaptive<long double>;
 
 template HEYOKA_DLL_PUBLIC void
-taylor_adaptive<long double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<long double>, long double,
-                                                 long double, bool, bool, std::vector<long double>,
-                                                 std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+taylor_adaptive<long double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<long double>,
+                                                 std::optional<long double>, std::optional<long double>, bool, bool,
+                                                 std::vector<long double>, std::vector<t_event_t>,
+                                                 std::vector<nt_event_t>, bool, std::optional<long long>);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive<long double>::finalise_ctor_impl(
-    const std::vector<std::pair<expression, expression>> &, std::vector<long double>, long double, long double, bool,
-    bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+    const std::vector<std::pair<expression, expression>> &, std::vector<long double>, std::optional<long double>,
+    std::optional<long double>, bool, bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>,
+    bool, std::optional<long long>);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -1573,22 +2207,45 @@ template class taylor_adaptive<mppp::real128>;
 
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive<mppp::real128>::finalise_ctor_impl(const std::vector<expression> &, std::vector<mppp::real128>,
-                                                   mppp::real128, mppp::real128, bool, bool, std::vector<mppp::real128>,
-                                                   std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+                                                   std::optional<mppp::real128>, std::optional<mppp::real128>, bool,
+                                                   bool, std::vector<mppp::real128>, std::vector<t_event_t>,
+                                                   std::vector<nt_event_t>, bool, std::optional<long long>);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive<mppp::real128>::finalise_ctor_impl(
-    const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, mppp::real128, mppp::real128,
-    bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+    const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, std::optional<mppp::real128>,
+    std::optional<mppp::real128>, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>,
+    std::vector<nt_event_t>, bool, std::optional<long long>);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template class taylor_adaptive<mppp::real>;
+
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive<mppp::real>::finalise_ctor_impl(const std::vector<expression> &, std::vector<mppp::real>,
+                                                std::optional<mppp::real>, std::optional<mppp::real>, bool, bool,
+                                                std::vector<mppp::real>, std::vector<t_event_t>,
+                                                std::vector<nt_event_t>, bool, std::optional<long long>);
+
+template HEYOKA_DLL_PUBLIC void taylor_adaptive<mppp::real>::finalise_ctor_impl(
+    const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real>, std::optional<mppp::real>,
+    std::optional<mppp::real>, bool, bool, std::vector<mppp::real>, std::vector<t_event_t>, std::vector<nt_event_t>,
+    bool, std::optional<long long>);
 
 #endif
 
 template <typename T>
 template <typename U>
 void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, std::uint32_t batch_size,
-                                                  std::vector<T> time, T tol, bool high_accuracy, bool compact_mode,
-                                                  std::vector<T> pars, std::vector<t_event_t> tes,
+                                                  std::vector<T> time, std::optional<T> tol, bool high_accuracy,
+                                                  bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
                                                   std::vector<nt_event_t> ntes, bool parallel_mode)
 {
+    // NOTE: this must hold because tol == 0 is interpreted
+    // as undefined in finalise_ctor().
+    assert(!tol || *tol != 0);
+
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
         throw not_implemented_error("'long double' computations are not supported on PowerPC");
@@ -1644,10 +2301,10 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
             "A non-finite initial time was detected in the initialisation of an adaptive Taylor integrator");
     }
 
-    if (!isfinite(tol) || tol <= 0) {
+    if (tol && (!isfinite(*tol) || *tol < 0)) {
         throw std::invalid_argument(fmt::format(
             "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead",
-            detail::fp_to_string(tol)));
+            detail::fp_to_string(*tol)));
     }
 
     if (parallel_mode && !compact_mode) {
@@ -1655,7 +2312,11 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
     }
 
     // Store the tolerance.
-    m_tol = tol;
+    if (tol) {
+        m_tol = *tol;
+    } else {
+        m_tol = std::numeric_limits<T>::epsilon();
+    }
 
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -1681,9 +2342,9 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
         }
 
         std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step_with_events<T>(
-            m_llvm, "step_e", sys, tol, batch_size, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
+            m_llvm, "step_e", sys, m_tol, batch_size, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
     } else {
-        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, batch_size,
+        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step<T>(m_llvm, "step", sys, m_tol, batch_size,
                                                                       high_accuracy, compact_mode, parallel_mode);
     }
 
@@ -1777,10 +2438,12 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
 
     // NOTE: init the outcome to success, the rest to zero.
     m_step_res.resize(boost::numeric_cast<decltype(m_step_res.size())>(m_batch_size),
-                      std::tuple{taylor_outcome::success, T(0)});
-    m_prop_res.resize(boost::numeric_cast<decltype(m_prop_res.size())>(m_batch_size),
-                      std::tuple{taylor_outcome::success, T(0), T(0), std::size_t(0)});
+                      std::tuple{taylor_outcome::success, static_cast<T>(0)});
+    m_prop_res.resize(
+        boost::numeric_cast<decltype(m_prop_res.size())>(m_batch_size),
+        std::tuple{taylor_outcome::success, static_cast<T>(0), static_cast<T>(0), static_cast<std::size_t>(0)});
 
+    // Prepare the internal buffers.
     m_ts_count.resize(boost::numeric_cast<decltype(m_ts_count.size())>(m_batch_size));
     m_min_abs_h.resize(m_batch_size);
     m_max_abs_h.resize(m_batch_size);
@@ -1788,6 +2451,9 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
     m_pfor_ts.resize(boost::numeric_cast<decltype(m_pfor_ts.size())>(m_batch_size));
     m_t_dir.resize(boost::numeric_cast<decltype(m_t_dir.size())>(m_batch_size));
     m_rem_time.resize(m_batch_size);
+    m_time_copy_hi.resize(m_batch_size);
+    m_time_copy_lo.resize(m_batch_size);
+    m_nf_detected.resize(m_batch_size);
 
     m_d_out_time.resize(m_batch_size);
 
@@ -1795,7 +2461,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
     // NOTE: this can be done in parallel with the rest of the constructor,
     // once we have m_order/m_dim/m_batch_size and we are done using tes/ntes.
     if (with_events) {
-        m_ed_data = std::make_unique<ed_data>(std::move(tes), std::move(ntes), m_order, m_dim, m_batch_size);
+        m_ed_data = std::make_unique<ed_data>(m_llvm.make_similar(), std::move(tes), std::move(ntes), m_order, m_dim,
+                                              m_batch_size);
     }
 }
 
@@ -1815,7 +2482,8 @@ taylor_adaptive_batch<T>::taylor_adaptive_batch(const taylor_adaptive_batch &oth
       m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
       m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
-      m_rem_time(other.m_rem_time), m_d_out_time(other.m_d_out_time),
+      m_rem_time(other.m_rem_time), m_time_copy_hi(other.m_time_copy_hi), m_time_copy_lo(other.m_time_copy_lo),
+      m_nf_detected(other.m_nf_detected), m_d_out_time(other.m_d_out_time),
       m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
 {
     // NOTE: make explicit deep copy of the decomposition.
@@ -1884,6 +2552,9 @@ void taylor_adaptive_batch<T>::save_impl(Archive &ar, unsigned) const
     ar << m_pfor_ts;
     ar << m_t_dir;
     ar << m_rem_time;
+    ar << m_time_copy_hi;
+    ar << m_time_copy_lo;
+    ar << m_nf_detected;
     ar << m_d_out_time;
     ar << m_ed_data;
 }
@@ -1927,6 +2598,9 @@ void taylor_adaptive_batch<T>::load_impl(Archive &ar, unsigned version)
     ar >> m_pfor_ts;
     ar >> m_t_dir;
     ar >> m_rem_time;
+    ar >> m_time_copy_hi;
+    ar >> m_time_copy_lo;
+    ar >> m_nf_detected;
     ar >> m_d_out_time;
     ar >> m_ed_data;
 
@@ -2188,24 +2862,50 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         // Update the state.
         m_d_out_f(m_state.data(), edd.m_ev_jet.data(), m_delta_ts.data());
 
-        // We will use this to capture the first exception thrown
-        // by a callback, if any.
-        std::exception_ptr eptr;
+        // We will use this to capture exceptions thrown while
+        // executing callbacks.
+        std::vector<std::pair<std::uint32_t, std::exception_ptr>> cb_eptrs;
+
+        // Make a copy of the current times before invoking the callbacks, so that:
+        // - we can notice if the callbacks change the time coordinate, and,
+        // - if they do, we will use the original time coordinate in the
+        //   time update logic, rather than the (wrong) time coordinate
+        //   that a callback invocation might set.
+        // In other words, m_time_copy will end up containing the correctly-updated
+        // time coordinate, while m_time is subject to arbitrary changes via callbacks.
+        std::copy(m_time_hi.begin(), m_time_hi.end(), m_time_copy_hi.begin());
+        std::copy(m_time_lo.begin(), m_time_lo.end(), m_time_copy_lo.begin());
+
+        // Run the finiteness check on the state vector
+        // *before* executing the callbacks, as the execution of
+        // a callback on a batch index might alter the state
+        // variables of another batch index.
+        // NOTE: this can probably be vectorised, if necessary.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            m_nf_detected[i] = check_nf_batch(i);
+        }
 
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             const auto h = m_delta_ts[i];
 
             // Compute the new time in double-length arithmetic.
-            const auto new_time = detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) + h;
+            // NOTE: take the time coordinate from m_time_copy (rather than
+            // m_time directly) as m_time might have been modified by incorrectly
+            // implemented callbacks.
+            const auto new_time = detail::dfloat<T>(m_time_copy_hi[i], m_time_copy_lo[i]) + h;
             m_time_hi[i] = new_time.hi;
             m_time_lo[i] = new_time.lo;
+
+            // Update also m_time_copy with the new time.
+            m_time_copy_hi[i] = new_time.hi;
+            m_time_copy_lo[i] = new_time.lo;
 
             // Store the last timestep.
             m_last_h[i] = h;
 
             // Check if the time or the state vector are non-finite at the
             // end of the timestep.
-            if (!isfinite(new_time) || check_nf_batch(i)) {
+            if (!isfinite(new_time) || m_nf_detected[i] != 0) {
                 // Let's also reset the cooldown values for this batch index,
                 // as at this point they have become useless.
                 reset_cooldowns(i);
@@ -2245,8 +2945,16 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                       : std::lower_bound(edd.m_d_ntes[i].begin(), edd.m_d_ntes[i].end(), h,
                                          [](const auto &ev, const auto &t) { return abs(std::get<1>(ev)) < abs(t); });
 
+            // Flag to signal that the callback of a non-terminal event threw
+            // an exception.
+            bool nt_cb_exception = false;
+
             // Invoke the callbacks of the non-terminal events, which are guaranteed
             // to happen before the first terminal event.
+            // NOTE: the loop will be exited as soon as an exception is raised
+            // by a callback. This is intended to match the behaviour of the
+            // scalar integrator (i.e., do not process any more events for the current
+            // batch element and move to the next batch element instead).
             for (auto it = edd.m_d_ntes[i].begin(); it != ntes_end_it; ++it) {
                 const auto &t = *it;
                 const auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
@@ -2254,10 +2962,20 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                 try {
                     cb(*this, static_cast<T>(new_time - m_last_h[i] + std::get<1>(t)), std::get<2>(t), i);
                 } catch (...) {
-                    if (!eptr) {
-                        eptr = std::current_exception();
-                    }
+                    // NOTE: in case of exception, remember it, set nt_cb_exception
+                    // to true and break out, so that we do not process additional events.
+                    cb_eptrs.emplace_back(i, std::current_exception());
+                    nt_cb_exception = true;
+                    break;
                 }
+            }
+
+            // Don't proceed to the terminal events if a non-terminal
+            // callback threw, just move to the next batch element. This
+            // is intended to match the behaviour of the
+            // scalar integrator.
+            if (nt_cb_exception) {
+                continue;
             }
 
             // The return value of the first
@@ -2290,9 +3008,12 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                         te_cb_ret = te.get_callback()(*this, std::get<2>(edd.m_d_tes[i][0]),
                                                       std::get<3>(edd.m_d_tes[i][0]), i);
                     } catch (...) {
-                        if (!eptr) {
-                            eptr = std::current_exception();
-                        }
+                        // NOTE: if an exception is raised, record it
+                        // and then move on to the next batch element.
+                        // This is intended to match the behaviour of
+                        // the scalar integrator.
+                        cb_eptrs.emplace_back(i, std::current_exception());
+                        continue;
                     }
                 }
             }
@@ -2318,10 +3039,54 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             }
         }
 
-        // Check if any callback threw an exception, and re-throw
-        // it in case.
-        if (eptr) {
-            std::rethrow_exception(eptr);
+        // Check if any callback threw an exception.
+        if (!cb_eptrs.empty()) {
+            // If there's only 1 exception just rethrow it.
+            if (cb_eptrs.size() == 1u) {
+                std::rethrow_exception(cb_eptrs[0].second);
+            }
+
+            // Otherwise, we will assemble and throw a new exception
+            // containing the messages of all thrown exceptions.
+            std::string exc_msg = "Two or more exceptions were raised during the execution of event callbacks in a "
+                                  "batch integrator:\n\n";
+
+            for (auto &[i, eptr] : cb_eptrs) {
+                exc_msg += fmt::format("Batch index #{}:\n", i);
+
+                try {
+                    std::rethrow_exception(eptr);
+                } catch (const std::exception &ex) {
+                    exc_msg += fmt::format("    Exception type: {}\n", boost::core::demangle(typeid(ex).name()));
+                    exc_msg += fmt::format("    Exception message: {}\n", ex.what());
+                } catch (...) {
+                    // LCOV_EXCL_START
+                    exc_msg += "    Exception type: unknown\n";
+                    exc_msg += "    Exception message: unknown\n";
+                    // LCOV_EXCL_STOP
+                }
+
+                exc_msg += '\n';
+            }
+
+            throw std::runtime_error(exc_msg);
+        }
+
+        // NOTE: event callbacks - terminal or not - cannot modify the time
+        // variable, as this is going to mess up the internal time keeping logic
+        // in the propagate_*() functions.
+        // NOTE: use cmp_nan_eq() so that we consider NaN == NaN in the time coordinates.
+        // This is necessary in case something goes wrong in the integration step
+        // and the time coordinate goes NaN - in such a case, the standard equality operator
+        // would trigger (because NaN != NaN) even if the time coordinate was not changed by the callback.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            if (!detail::cmp_nan_eq(m_time_hi[i], m_time_copy_hi[i])
+                || !detail::cmp_nan_eq(m_time_lo[i], m_time_copy_lo[i])) {
+                throw std::runtime_error(
+                    fmt::format("The invocation of one or more event callbacks resulted in the alteration of the "
+                                "time coordinate of the integrator at the batch index {} - this is not supported",
+                                i));
+            }
         }
     }
 }
@@ -2472,7 +3237,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
                                         "integrator in batch mode results in an overflow condition");
         }
 
-        m_t_dir[i] = (m_rem_time[i] >= T(0));
+        m_t_dir[i] = (m_rem_time[i] >= static_cast<T>(0));
     }
 
     // Cache the presence/absence of a callback.
@@ -2560,8 +3325,8 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
             assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0)); // LCOV_EXCL_LINE
 
             // Compute the time limit.
-            const auto dt_limit = m_t_dir[i] ? std::min(detail::dfloat<T>(max_delta_ts[i]), m_rem_time[i])
-                                             : std::max(detail::dfloat<T>(-max_delta_ts[i]), m_rem_time[i]);
+            const auto dt_limit = m_t_dir[i] != 0 ? std::min(detail::dfloat<T>(max_delta_ts[i]), m_rem_time[i])
+                                                  : std::max(detail::dfloat<T>(-max_delta_ts[i]), m_rem_time[i]);
 
             // Store it.
             m_cur_max_delta_ts[i] = static_cast<T>(dt_limit);
@@ -2626,7 +3391,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
                     // NOTE: if m_rem_time[i] was previously set to zero, it
                     // will end up being repeatedly set to zero here. This
                     // should be harmless.
-                    m_rem_time[i] = detail::dfloat<T>(T(0));
+                    m_rem_time[i] = detail::dfloat<T>(static_cast<T>(0));
                 } else {
                     // NOTE: this should never flip the time direction of the
                     // integration for the same reasons as explained in the
@@ -2654,14 +3419,34 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
         ++iter_counter;
 
         // Execute the propagate() callback, if applicable.
-        if (with_cb && !cb(*this)) {
-            // Change m_prop_res before exiting by setting all outcomes
-            // to cb_stop regardless of the timestep outcome.
-            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                std::get<0>(m_prop_res[i]) = taylor_outcome::cb_stop;
+        if (with_cb) {
+            // Store the current time coordinate before
+            // executing the cb, so that we can check if
+            // the cb changes the time coordinate.
+            std::copy(m_time_hi.begin(), m_time_hi.end(), m_time_copy_hi.begin());
+            std::copy(m_time_lo.begin(), m_time_lo.end(), m_time_copy_lo.begin());
+
+            // Execute the cb.
+            const auto ret_cb = cb(*this);
+
+            // Check the time coordinate.
+            // NOTE: we can use normal equality as we are sure that
+            // all components of the time coordinate are finite.
+            if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) {
+                throw std::runtime_error(
+                    "The invocation of the callback passed to propagate_until() resulted in the alteration of the "
+                    "time coordinate of the integrator - this is not supported");
             }
 
-            return make_c_out();
+            if (!ret_cb) {
+                // Change m_prop_res before exiting by setting all outcomes
+                // to cb_stop regardless of the timestep outcome.
+                for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+                    std::get<0>(m_prop_res[i]) = taylor_outcome::cb_stop;
+                }
+
+                return make_c_out();
+            }
         }
 
         // We need to break out if either we reached the final time
@@ -2890,7 +3675,7 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
                                         "integrator in batch mode results in an overflow condition");
         }
 
-        m_t_dir[i] = (m_rem_time[i] >= T(0));
+        m_t_dir[i] = (m_rem_time[i] >= static_cast<T>(0));
     }
 
     // Cache the presence/absence of a callback.
@@ -2966,7 +3751,7 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
                     // of the dense output.
                     const auto idx = gidx * m_batch_size + i;
                     const auto d_avail = (grid_ptr[idx] >= t0[i] && grid_ptr[idx] <= t1[i])
-                                         || (m_rem_time[i] == detail::dfloat<T>(T(0)));
+                                         || (m_rem_time[i] == detail::dfloat<T>(static_cast<T>(0)));
                     dflags[i] = d_avail;
                     counter += d_avail;
 
@@ -3053,8 +3838,8 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
 
             // Compute the step limit for the current batch element.
             assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0)); // LCOV_EXCL_LINE
-            const auto dt_limit = m_t_dir[i] ? std::min(detail::dfloat<T>(max_delta_t), m_rem_time[i])
-                                             : std::max(detail::dfloat<T>(-max_delta_t), m_rem_time[i]);
+            const auto dt_limit = m_t_dir[i] != 0 ? std::min(detail::dfloat<T>(max_delta_t), m_rem_time[i])
+                                                  : std::max(detail::dfloat<T>(-max_delta_t), m_rem_time[i]);
 
             pgrid_tmp[i] = static_cast<T>(dt_limit);
         }
@@ -3109,7 +3894,7 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
                 // could also result in time_limit.
                 if (h == static_cast<T>(m_rem_time[i])) {
                     assert(oc == taylor_outcome::time_limit); // LCOV_EXCL_LINE
-                    m_rem_time[i] = detail::dfloat<T>(T(0));
+                    m_rem_time[i] = detail::dfloat<T>(static_cast<T>(0));
                 } else {
                     // NOTE: this should never flip the time direction of the
                     // integration for the same reasons as explained in the
@@ -3134,12 +3919,38 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
         // Update the number of iterations.
         ++iter_counter;
 
+        // Small helper to wrap the invocation of the callback
+        // while checking that the callback does not change the
+        // time coordinate.
+        auto wrap_cb_call = [this, &cb]() {
+            // Store the current time coordinate before
+            // executing the cb, so that we can check if
+            // the cb changes the time coordinate.
+            std::copy(m_time_hi.begin(), m_time_hi.end(), m_time_copy_hi.begin());
+            std::copy(m_time_lo.begin(), m_time_lo.end(), m_time_copy_lo.begin());
+
+            // Execute the cb.
+            assert(cb);
+            const auto ret_cb = cb(*this);
+
+            // Check the time coordinate.
+            // NOTE: we can use normal equality as we are sure that
+            // all components of the time coordinate are finite.
+            if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) {
+                throw std::runtime_error(
+                    "The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
+                    "time coordinate of the integrator - this is not supported");
+            }
+
+            return ret_cb;
+        };
+
         // Check the early interruption conditions.
         // NOTE: in case of cb_stop or step_limit,
         // we will overwrite the outcomes in m_prop_res.
         // The outcome for a stopping terminal event is already
         // set up properly in the previous loop.
-        if (with_cb && !cb(*this)) {
+        if (with_cb && !wrap_cb_call()) {
             // Interruption via callback.
             for (auto &t : m_prop_res) {
                 std::get<0>(t) = taylor_outcome::cb_stop;
@@ -3295,24 +4106,25 @@ void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
 // Explicit instantiation of the batch implementation classes.
 template class taylor_adaptive_batch<double>;
 
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_batch<double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<double>, std::uint32_t,
-                                                  std::vector<double>, double, bool, bool, std::vector<double>,
-                                                  std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<double>::finalise_ctor_impl(
+    const std::vector<expression> &, std::vector<double>, std::uint32_t, std::vector<double>, std::optional<double>,
+    bool, bool, std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<double>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<double>, std::uint32_t, std::vector<double>,
-    double, bool, bool, std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+    std::optional<double>, bool, bool, std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template class taylor_adaptive_batch<long double>;
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<long double>::finalise_ctor_impl(
-    const std::vector<expression> &, std::vector<long double>, std::uint32_t, std::vector<long double>, long double,
-    bool, bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive_batch<long double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<long double>,
+                                                       std::uint32_t, std::vector<long double>,
+                                                       std::optional<long double>, bool, bool, std::vector<long double>,
+                                                       std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<long double>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<long double>, std::uint32_t,
-    std::vector<long double>, long double, bool, bool, std::vector<long double>, std::vector<t_event_t>,
+    std::vector<long double>, std::optional<long double>, bool, bool, std::vector<long double>, std::vector<t_event_t>,
     std::vector<nt_event_t>, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -3321,12 +4133,13 @@ template class taylor_adaptive_batch<mppp::real128>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<mppp::real128>::finalise_ctor_impl(
     const std::vector<expression> &, std::vector<mppp::real128>, std::uint32_t, std::vector<mppp::real128>,
-    mppp::real128, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+    std::optional<mppp::real128>, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>,
+    std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<mppp::real128>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, std::uint32_t,
-    std::vector<mppp::real128>, mppp::real128, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>,
-    std::vector<nt_event_t>, bool);
+    std::vector<mppp::real128>, std::optional<mppp::real128>, bool, bool, std::vector<mppp::real128>,
+    std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 #endif
 

@@ -20,6 +20,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -47,9 +53,18 @@ mppp::real128 taylor_deduce_cooldown(mppp::real128, mppp::real128);
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+mppp::real taylor_deduce_cooldown(mppp::real, mppp::real);
+
+#endif
+
 // Machinery to add a fast event exclusion check function to an llvm_state.
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t,
                                                      bool = false);
+
+HEYOKA_DLL_PUBLIC llvm::Function *add_poly_translator_1(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
 
 // Machinery to add a function that, given an input polynomial of order n represented
 // as an array of coefficients:

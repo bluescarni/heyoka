@@ -62,6 +62,8 @@ integration is reduced with respect to the default tolerance value:
    Time                    : 0.0000000000000000
    State                   : [0.050000000001312848, 0.024999999997558649]
 
+.. _tut_compact_mode:
+
 Compact mode
 ------------
 

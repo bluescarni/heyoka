@@ -65,6 +65,7 @@
 
 #if defined(HEYOKA_HAVE_REAL)
 
+#include <mp++/integer.hpp>
 #include <mp++/real.hpp>
 
 #include <heyoka/detail/real_helpers.hpp>
@@ -163,9 +164,9 @@ const auto type_map = []() {
             return ptr;
         }
 
-        auto *ret = llvm::StructType::create({to_llvm_type<real_prec_t>(c), to_llvm_type<real_sign_t>(c),
-                                              to_llvm_type<real_exp_t>(c),
-                                              llvm::PointerType::getUnqual(to_llvm_type<real_limb_t>(c))},
+        auto *ret = llvm::StructType::create({to_llvm_type<mpfr_prec_t>(c), to_llvm_type<mpfr_sign_t>(c),
+                                              to_llvm_type<mpfr_exp_t>(c),
+                                              llvm::PointerType::getUnqual(to_llvm_type<mp_limb_t>(c))},
                                              "heyoka.real");
 
         assert(ret != nullptr);
@@ -174,9 +175,9 @@ const auto type_map = []() {
         return ret;
 #else
         // NOTE: in earlier LLVM versions, make this an unnamed struct.
-        auto *ret = llvm::StructType::get(c, {to_llvm_type<real_prec_t>(c), to_llvm_type<real_sign_t>(c),
-                                              to_llvm_type<real_exp_t>(c),
-                                              llvm::PointerType::getUnqual(to_llvm_type<real_limb_t>(c))});
+        auto *ret = llvm::StructType::get(c, {to_llvm_type<mpfr_prec_t>(c), to_llvm_type<mpfr_sign_t>(c),
+                                              to_llvm_type<mpfr_exp_t>(c),
+                                              llvm::PointerType::getUnqual(to_llvm_type<mp_limb_t>(c))});
 
         assert(ret != nullptr);
 
@@ -359,7 +360,7 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
         auto &context = s.context();
 
         // Fetch the limb type.
-        auto *limb_t = to_llvm_type<real_limb_t>(context);
+        auto *limb_t = to_llvm_type<mp_limb_t>(context);
 
         // Fetch the external real struct type.
         auto *real_t = to_llvm_type<mppp::real>(context);
@@ -371,16 +372,15 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
 
         // In debug mode, we want to assert that the precision of the internal
         // type matches exactly the precision of the external variable.
-        if (s.opt_level() == 0u) {
-            // Load the precision from the external value.
-            auto *prec_t = to_llvm_type<real_prec_t>(context);
-            auto *prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
-            auto *prec = builder.CreateLoad(prec_t, prec_ptr);
 
-            llvm_invoke_external(
-                s, "heyoka_assert_real_match_precs_ext_load", builder.getVoidTy(),
-                {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
-        }
+        // Load the precision from the external value.
+        auto *prec_t = to_llvm_type<mpfr_prec_t>(context);
+        auto *prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
+        auto *prec = builder.CreateLoad(prec_t, prec_ptr);
+
+        llvm_invoke_external(
+            s, "heyoka_assert_real_match_precs_ext_load", builder.getVoidTy(),
+            {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
 
 #endif
 
@@ -389,12 +389,12 @@ llvm::Value *ext_load_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Va
 
         // Read and insert the sign.
         auto *sign_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(1)});
-        auto *sign = builder.CreateLoad(to_llvm_type<real_sign_t>(context), sign_ptr);
+        auto *sign = builder.CreateLoad(to_llvm_type<mpfr_sign_t>(context), sign_ptr);
         ret = builder.CreateInsertValue(ret, sign, {0u});
 
         // Read and insert the exponent.
         auto *exp_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(2)});
-        auto *exp = builder.CreateLoad(to_llvm_type<real_exp_t>(context), exp_ptr);
+        auto *exp = builder.CreateLoad(to_llvm_type<mpfr_exp_t>(context), exp_ptr);
         ret = builder.CreateInsertValue(ret, exp, {1u});
 
         // Load in a local variable the input pointer to the limbs.
@@ -460,7 +460,7 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
         auto &context = s.context();
 
         // Fetch the limb type.
-        auto *limb_t = to_llvm_type<real_limb_t>(context);
+        auto *limb_t = to_llvm_type<mp_limb_t>(context);
 
         // Fetch the external real struct type.
         auto *real_t = to_llvm_type<mppp::real>(context);
@@ -472,16 +472,15 @@ void ext_store_vector_to_memory(llvm_state &s, llvm::Value *ptr, llvm::Value *ve
 
         // In debug mode, we want to assert that the precision of the internal
         // type matches exactly the precision of the external variable.
-        if (s.opt_level() == 0u) {
-            // Load the precision from the external value.
-            auto *prec_t = to_llvm_type<real_prec_t>(context);
-            auto *out_prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
-            auto *prec = builder.CreateLoad(prec_t, out_prec_ptr);
 
-            llvm_invoke_external(
-                s, "heyoka_assert_real_match_precs_ext_store", builder.getVoidTy(),
-                {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
-        }
+        // Load the precision from the external value.
+        auto *prec_t = to_llvm_type<mpfr_prec_t>(context);
+        auto *out_prec_ptr = builder.CreateInBoundsGEP(real_t, ptr, {builder.getInt32(0), builder.getInt32(0)});
+        auto *prec = builder.CreateLoad(prec_t, out_prec_ptr);
+
+        llvm_invoke_external(
+            s, "heyoka_assert_real_match_precs_ext_store", builder.getVoidTy(),
+            {prec, llvm::ConstantInt::getSigned(prec_t, boost::numeric_cast<std::int64_t>(real_prec))});
 
 #endif
 
@@ -547,6 +546,30 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
 
         return builder.CreateLoad(vec_tp, ptrs);
     }
+}
+
+// Same as above, but for external loads.
+llvm::Value *ext_gather_vector_from_memory(llvm_state &s, llvm::Type *tp, llvm::Value *ptr)
+{
+    auto &builder = s.builder();
+
+#if defined(HEYOKA_HAVE_REAL)
+    if (const auto real_prec = llvm_is_real(tp->getScalarType())) {
+        // LCOV_EXCL_START
+        if (tp->isVectorTy()) {
+            throw std::invalid_argument("Cannot gather from memory a vector of reals");
+        }
+        // LCOV_EXCL_STOP
+
+        assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
+
+        return ext_load_vector_from_memory(s, tp, ptr, 1);
+    } else {
+#endif
+        return gather_vector_from_memory(builder, tp, ptr);
+#if defined(HEYOKA_HAVE_REAL)
+    }
+#endif
 }
 
 // Create a SIMD vector of size vector_size filled with the value c. If vector_size is 1,
@@ -1824,7 +1847,7 @@ llvm::Value *llvm_floor(llvm_state &s, llvm::Value *x)
 
 // Add a function to count the number of sign changes in the coefficients
 // of a polynomial of degree n. The coefficients are SIMD vectors of size batch_size
-// and scalar type T.
+// and scalar type scal_t.
 llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n, std::uint32_t batch_size)
 {
     assert(batch_size > 0u);
@@ -1842,6 +1865,9 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
     auto &builder = s.builder();
     auto &context = s.context();
 
+    // Fetch the external type.
+    auto *ext_fp_t = llvm_ext_type(scal_t);
+
     // Fetch the vector floating-point type.
     auto *tp = make_vector_type(scal_t, batch_size);
 
@@ -1853,9 +1879,9 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
     // - pointer to the array of coefficients.
     // NOTE: both pointers are to the scalar counterparts
     // of the vector types, so that we can call this from regular
-    // C++ code.
+    // C++ code. The second pointer is to an external type.
     const std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(builder.getInt32Ty()),
-                                          llvm::PointerType::getUnqual(scal_t)};
+                                          llvm::PointerType::getUnqual(ext_fp_t)};
 
     // Try to see if we already created the function.
     auto *f = md.getFunction(fname);
@@ -1925,17 +1951,17 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
         // The iteration range is [1, n].
         llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *cur_n) {
             // Load the current poly coefficient(s).
-            auto *cur_cf = load_vector_from_memory(
-                builder, scal_t,
-                builder.CreateInBoundsGEP(scal_t, cf_ptr, builder.CreateMul(cur_n, builder.getInt32(batch_size))),
+            auto *cur_cf = ext_load_vector_from_memory(
+                s, scal_t,
+                builder.CreateInBoundsGEP(ext_fp_t, cf_ptr, builder.CreateMul(cur_n, builder.getInt32(batch_size))),
                 batch_size);
 
             // Load the last nonzero coefficient(s).
             auto *last_nz_ptr_idx = builder.CreateAdd(
                 offset, builder.CreateMul(builder.CreateLoad(last_nz_idx_t, last_nz_idx),
                                           vector_splat(builder, builder.getInt32(batch_size), batch_size)));
-            auto *last_nz_ptr = builder.CreateInBoundsGEP(scal_t, cf_ptr_v, last_nz_ptr_idx);
-            auto *last_nz_cf = gather_vector_from_memory(builder, cur_cf->getType(), last_nz_ptr);
+            auto *last_nz_ptr = builder.CreateInBoundsGEP(ext_fp_t, cf_ptr_v, last_nz_ptr_idx);
+            auto *last_nz_cf = ext_gather_vector_from_memory(s, cur_cf->getType(), last_nz_ptr);
 
             // Compute the sign of the current coefficient(s).
             auto *cur_sgn = llvm_sgn(s, cur_cf);
@@ -1992,7 +2018,7 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
 
 // Compute the enclosure of the polynomial of order n with coefficients stored in cf_ptr
 // over the interval [h_lo, h_hi] using interval arithmetics. The polynomial coefficients
-// are vectors of size batch_size and scalar type T.
+// are vectors of size batch_size and scalar type fp_t. cf_ptr is an external pointer.
 // NOTE: the interval arithmetic implementation here is not 100% correct, because
 // we do not account for floating-point truncation. In order to be mathematically
 // correct, we would need to adjust the results of interval arithmetic add/mul via
@@ -2000,7 +2026,8 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
 // https://stackoverflow.com/questions/10420848/how-do-you-get-the-next-value-in-the-floating-point-sequence
 // http://web.mit.edu/hyperbook/Patrikalakis-Maekawa-Cho/node46.html
 // Perhaps another alternative would be to employ FP primitives with explicit rounding modes,
-// which are available in LLVM.
+// which are available in LLVM. For mppp::real, we could employ the MPFR primitives
+// with specific rounding modes.
 std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::Type *fp_t, llvm::Value *cf_ptr,
                                                            std::uint32_t n, llvm::Value *h_lo, llvm::Value *h_hi,
                                                            std::uint32_t batch_size)
@@ -2023,6 +2050,9 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
     // LCOV_EXCL_STOP
 
     auto &builder = s.builder();
+
+    // Fetch the external type.
+    auto *ext_fp_t = llvm_ext_type(fp_t);
 
     // Helper to implement the sum of two intervals.
     // NOTE: see https://en.wikipedia.org/wiki/Interval_arithmetic.
@@ -2063,9 +2093,10 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
     auto *acc_hi = builder.CreateAlloca(fp_vec_t);
 
     // Init the accumulator's lo/hi components with the highest-order coefficient.
-    auto *ho_cf = load_vector_from_memory(
-        builder, fp_t,
-        builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.CreateMul(builder.getInt32(n), builder.getInt32(batch_size))),
+    auto *ho_cf = ext_load_vector_from_memory(
+        s, fp_t,
+        builder.CreateInBoundsGEP(ext_fp_t, cf_ptr,
+                                  builder.CreateMul(builder.getInt32(n), builder.getInt32(batch_size))),
         batch_size);
     builder.CreateStore(ho_cf, acc_lo);
     builder.CreateStore(ho_cf, acc_hi);
@@ -2077,8 +2108,9 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
         // NOTE: we are iterating backwards from the high-order coefficients
         // to the low-order ones.
         auto *ptr = builder.CreateInBoundsGEP(
-            fp_t, cf_ptr, builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size)));
-        auto *cur_cf = load_vector_from_memory(builder, fp_t, ptr, batch_size);
+            ext_fp_t, cf_ptr,
+            builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size)));
+        auto *cur_cf = ext_load_vector_from_memory(s, fp_t, ptr, batch_size);
 
         // Multiply the accumulator by h.
         auto [acc_h_lo, acc_h_hi]
@@ -2096,8 +2128,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_interval(llvm_state &s, llvm::
 
 // Compute the enclosure of the polynomial of order n with coefficients stored in cf_ptr
 // over an interval using the Cargo-Shisha algorithm. The polynomial coefficients
-// are vectors of size batch_size and scalar type T. The interval of the independent variable
-// is [0, h] if h >= 0, [h, 0] otherwise.
+// are vectors of size batch_size and scalar type fp_t. The interval of the independent variable
+// is [0, h] if h >= 0, [h, 0] otherwise. cf_ptr is an external pointer.
 // NOTE: the Cargo-Shisha algorithm produces tighter bounds, but it has quadratic complexity
 // and it seems to be less well-behaved numerically in corner cases. It might still be worth it up to double-precision
 // computations, where the practical slowdown wrt interval arithmetics is smaller.
@@ -2123,6 +2155,9 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
 
     auto &builder = s.builder();
 
+    // Fetch the external type.
+    auto *ext_fp_t = llvm_ext_type(fp_t);
+
     // bj_series will contain the terms of the series
     // for the computation of bj. old_bj_series will be
     // used to deal with the fact that the pairwise sum
@@ -2133,7 +2168,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
     auto *cur_h_pow = h;
 
     // Compute the first value, b0, and add it to bj_series.
-    auto *b0 = load_vector_from_memory(builder, fp_t, cf_ptr, batch_size);
+    auto *b0 = ext_load_vector_from_memory(s, fp_t, cf_ptr, batch_size);
     bj_series.push_back(b0);
 
     // Init min/max bj with b0.
@@ -2142,8 +2177,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_penc_cargo_shisha(llvm_state &s, ll
     // Main iteration.
     for (std::uint32_t j = 1u; j <= n; ++j) {
         // Compute the new term of the series.
-        auto *ptr = builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.getInt32(j * batch_size));
-        auto *cur_cf = load_vector_from_memory(builder, fp_t, ptr, batch_size);
+        auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, cf_ptr, builder.getInt32(j * batch_size));
+        auto *cur_cf = ext_load_vector_from_memory(s, fp_t, ptr, batch_size);
         auto *new_term = llvm_fmul(s, cur_cf, cur_h_pow);
         new_term = llvm_fdiv(s, new_term,
                              vector_splat(builder,
@@ -2309,7 +2344,7 @@ std::pair<number, number> inv_kep_E_dl_twopi_like(llvm_state &s, llvm::Type *fp_
     } else if (const auto prec = llvm_is_real(fp_t)) {
         // Overflow check.
         // LCOV_EXCL_START
-        if (prec > std::numeric_limits<real_prec_t>::max() / 4) {
+        if (prec > std::numeric_limits<mpfr_prec_t>::max() / 4) {
             throw std::overflow_error("Overflow detected in inv_kep_E_dl_twopi_like()");
         }
         // LCOV_EXCL_STOP
@@ -2353,10 +2388,7 @@ number inv_kep_E_eps_like(llvm_state &s, llvm::Type *tp)
 #endif
 #if defined(HEYOKA_HAVE_REAL)
     } else if (const auto prec = llvm_is_real(tp)) {
-        // NOTE: for consistency with the epsilons returned for the other
-        // types, we return here 2**-(prec - 1). See:
-        // https://en.wikipedia.org/wiki/Machine_epsilon
-        return number(mppp::real{1ul, boost::numeric_cast<mpfr_exp_t>(-(prec - 1)), prec});
+        return number{eps_from_prec(prec)};
 #endif
     }
 
@@ -3931,6 +3963,13 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_
     }
 }
 
+// This helper returns the type to be used for the internal LLVM representation
+// of the input value x.
+// NOTE: it is not really clear from the naming of this function that
+// this returns the *internal* representation, as opposed to to_llvm_type()
+// which instead returns the representation used to communicate between
+// LLVM and the external world. Perhaps we should consider renaming
+// for clarity.
 template <typename T>
 llvm::Type *llvm_type_like(llvm_state &s, [[maybe_unused]] const T &x)
 {
@@ -3952,10 +3991,10 @@ llvm::Type *llvm_type_like(llvm_state &s, [[maybe_unused]] const T &x)
 
         // Fetch the limb array type.
         auto *limb_arr_t
-            = llvm::ArrayType::get(to_llvm_type<real_limb_t>(c), boost::numeric_cast<std::uint64_t>(x.get_nlimbs()));
+            = llvm::ArrayType::get(to_llvm_type<mp_limb_t>(c), boost::numeric_cast<std::uint64_t>(x.get_nlimbs()));
 
         auto *ret
-            = llvm::StructType::create({to_llvm_type<real_sign_t>(c), to_llvm_type<real_exp_t>(c), limb_arr_t}, name);
+            = llvm::StructType::create({to_llvm_type<mpfr_sign_t>(c), to_llvm_type<mpfr_exp_t>(c), limb_arr_t}, name);
 
         assert(ret != nullptr);
 #if LLVM_VERSION_MAJOR >= 12
@@ -4047,14 +4086,12 @@ extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter() noexcept
 
 #if defined(HEYOKA_HAVE_REAL)
 
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_load(heyoka::detail::real_prec_t p1,
-                                                                          heyoka::detail::real_prec_t p2) noexcept
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_load(mpfr_prec_t p1, mpfr_prec_t p2) noexcept
 {
     assert(p1 == p2);
 }
 
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_store(heyoka::detail::real_prec_t p1,
-                                                                           heyoka::detail::real_prec_t p2) noexcept
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_assert_real_match_precs_ext_store(mpfr_prec_t p1, mpfr_prec_t p2) noexcept
 {
     assert(p1 == p2);
 }

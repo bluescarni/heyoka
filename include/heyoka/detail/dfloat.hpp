@@ -9,12 +9,21 @@
 #ifndef HEYOKA_DETAIL_DFLOAT_HPP
 #define HEYOKA_DETAIL_DFLOAT_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cmath>
 #include <string>
 #include <tuple>
 #include <utility>
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
 
 namespace heyoka::detail
@@ -45,6 +54,35 @@ private:
         ar &lo;
     }
 };
+
+#if defined(HEYOKA_HAVE_REAL)
+
+// NOTE: we have a specialised implementation for this
+// in order to ensure the ctors always set the components
+// to the same precision (and if they can't, they will throw).
+template <>
+struct HEYOKA_DLL_PUBLIC dfloat<mppp::real> {
+    mppp::real hi, lo;
+
+    dfloat();
+    explicit dfloat(mppp::real);
+    explicit dfloat(mppp::real, mppp::real);
+
+    explicit operator mppp::real() const &;
+    explicit operator mppp::real() &&;
+
+private:
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &hi;
+        ar &lo;
+    }
+};
+
+#endif
 
 template <typename F>
 inline bool isfinite(const dfloat<F> &x)

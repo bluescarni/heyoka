@@ -13,12 +13,18 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
-#include <vector>
 #include <utility>
+#include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
 
 #endif
 
@@ -41,6 +47,10 @@ TEST_CASE("simd size")
 
 #if defined(HEYOKA_HAVE_REAL128)
     REQUIRE(recommended_simd_size<mppp::real128>() > 0u);
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+    REQUIRE(recommended_simd_size<mppp::real>() == 1u);
 #endif
 
 #if defined(__GNUC__)

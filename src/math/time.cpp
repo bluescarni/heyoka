@@ -77,7 +77,7 @@ llvm::Value *time_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, llvm::Value 
     // the non-normalised derivatives.
     switch (order) {
         case 0u:
-            return load_vector_from_memory(builder, fp_t, time_ptr, batch_size);
+            return ext_load_vector_from_memory(s, fp_t, time_ptr, batch_size);
         case 1u:
             return vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
         default:
@@ -117,7 +117,7 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, llvm::Type *fp_t, std::ui
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto *f = module.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -132,14 +132,14 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, llvm::Type *fp_t, std::ui
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
-        auto ord = f->args().begin();
-        auto t_ptr = f->args().begin() + 4;
+        auto *ord = f->args().begin();
+        auto *t_ptr = f->args().begin() + 4;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         // NOTE: no need for normalisation of the derivative,
         // as the only nonzero retvals are for orders 0 and 1
@@ -149,7 +149,7 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, llvm::Type *fp_t, std::ui
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // If the order is zero, return the time itself.
-                builder.CreateStore(load_vector_from_memory(builder, fp_t, t_ptr, batch_size), retval);
+                builder.CreateStore(ext_load_vector_from_memory(s, fp_t, t_ptr, batch_size), retval);
             },
             [&]() {
                 llvm_if_then_else(

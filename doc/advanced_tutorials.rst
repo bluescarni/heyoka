@@ -26,6 +26,7 @@ the tutorials should not be hard to follow.
 
   tut_batch_mode
   tut_extended_precision
+  tut_arbitrary_precision
   tut_s11n
   tut_ensemble
   tut_parallel_mode

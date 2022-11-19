@@ -43,6 +43,12 @@ bool operator==<mppp::real>(const mppp::real &cmp, const approximately<mppp::rea
     }
 }
 
+template <>
+std::ostream &operator<< <mppp::real>(std::ostream &os, const approximately<mppp::real> &a)
+{
+    return os << a.m_value.to_string();
+}
+
 #endif
 
 } // namespace heyoka_test
