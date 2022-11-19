@@ -771,6 +771,11 @@ using taylor_poly_cache = std::vector<std::vector<T>>;
 template <typename>
 class taylor_pwrap;
 
+// Small helper to construct a default value for the max_delta_t
+// keyword argument.
+template <typename T>
+HEYOKA_DLL_PUBLIC T taylor_default_max_delta_t();
+
 // Parser for the common kwargs options for the propagate_*() functions.
 template <typename T, bool Grid, typename... KwArgs>
 inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
@@ -796,18 +801,7 @@ inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
             if constexpr (p.has(kw::max_delta_t)) {
                 return std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t));
             } else {
-#if defined(HEYOKA_HAVE_REAL)
-                if constexpr (std::is_same_v<T, mppp::real>) {
-                    // NOTE: the precision here does not matter,
-                    // it will be rounded to the correct precision in
-                    // any case.
-                    return mppp::real{mppp::real_kind::inf, 128};
-                } else {
-#endif
-                    return std::numeric_limits<T>::infinity();
-#if defined(HEYOKA_HAVE_REAL)
-                }
-#endif
+                return taylor_default_max_delta_t<T>();
             }
         }();
 
