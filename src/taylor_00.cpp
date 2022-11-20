@@ -18,7 +18,6 @@
 #include <functional>
 #include <initializer_list>
 #include <limits>
-#include <mp++/detail/mpfr.hpp>
 #include <optional>
 #include <stdexcept>
 #include <string>
