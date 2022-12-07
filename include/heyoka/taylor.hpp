@@ -429,6 +429,13 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<m
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<mppp::real, false> &);
+
+#endif
+
 template <typename T, bool B>
 class HEYOKA_DLL_PUBLIC t_event_impl
 {
@@ -540,6 +547,13 @@ template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mppp::real128, false> &);
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mppp::real128, true> &);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mppp::real, false> &);
 
 #endif
 
