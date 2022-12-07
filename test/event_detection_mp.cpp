@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <iostream>
+#include <sstream>
 #include <tuple>
 #include <vector>
 
@@ -140,6 +141,28 @@ TEST_CASE("event construction")
                     x - 1., kw::callback = [](const taylor_adaptive<fp_t> &, bool, int) { return true; })},
                 kw::nt_events = {nt_ev_t(x - 1., [](taylor_adaptive<fp_t> &, const fp_t &, int) {})}};
         }
+    }
+
+    // Check also the stream operators for the events while we are at it.
+    {
+        std::ostringstream oss;
+
+        t_ev_t ev(
+            x - 1., kw::callback = [](const taylor_adaptive<fp_t> &, bool, int) { return true; });
+
+        oss << ev;
+
+        REQUIRE(!oss.str().empty());
+    }
+
+    {
+        std::ostringstream oss;
+
+        nt_ev_t ev(x - 1., [](taylor_adaptive<fp_t> &, const fp_t &, int) {});
+
+        oss << ev;
+
+        REQUIRE(!oss.str().empty());
     }
 }
 

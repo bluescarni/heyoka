@@ -1586,6 +1586,16 @@ std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128, tr
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real, false> &e)
+{
+    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+}
+
+#endif
+
 template <>
 std::ostream &operator<<(std::ostream &os, const t_event_impl<double, false> &e)
 {
@@ -1620,6 +1630,16 @@ std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real128, fal
 
 template <>
 std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real128, true> &e)
+{
+    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
+}
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real, false> &e)
 {
     return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
 }
