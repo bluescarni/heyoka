@@ -364,6 +364,10 @@ private:
 public:
     nt_event_impl();
 
+    // NOTE: make a deep copy of the event function in order to avoid
+    // surprises - the expression could be mutated in-place at a later
+    // stage from elsewhere. Once we remove all mutability from expressions,
+    // perhaps we can avoid making this copy.
     template <typename... KwArgs>
     explicit nt_event_impl(const expression &e, callback_t cb, KwArgs &&...kw_args)
         : eq(copy(e)), callback(std::move(cb))
@@ -467,6 +471,10 @@ private:
 public:
     t_event_impl();
 
+    // NOTE: make a deep copy of the event function in order to avoid
+    // surprises - the expression could be mutated in-place at a later
+    // stage from elsewhere. Once we remove all mutability from expressions,
+    // perhaps we can avoid making this copy.
     template <typename... KwArgs>
     explicit t_event_impl(const expression &e, KwArgs &&...kw_args) : eq(copy(e))
     {
