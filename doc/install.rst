@@ -176,6 +176,26 @@ path, etc.). The available configuration options are:
 * ``HEYOKA_ENABLE_IPO``: enable link-time optimisations when building
   the heyoka library (requires compiler support, off by default).
 
+The following advanced options are also available:
+
+* ``HEYOKA_FORCE_STATIC_LLVM``: force statically linking to the LLVM libraries
+  (off by default). Note that, by default, heyoka prefers to dynamically link to LLVM
+  if both dynamic and static versions of the libraries are available.
+* ``HEYOKA_HIDE_LLVM_SYMBOLS``: when statically linking to the LLVM libraries,
+  try to hide the symbols exported by LLVM (off by default). When linking dynamically
+  to LLVM, this option has no effects.
+
+The ``HEYOKA_HIDE_LLVM_SYMBOLS`` option is useful if heyoka needs to be used in conjunction
+with software linking to an LLVM version different from the one used by heyoka. In such
+cases, symbol collisions between different LLVM version coexisting in the same process
+will lead to unpredictable runtime behaviour (e.g., segfaults). This option attempts
+to hide the LLVM symbols exported by the LLVM version in use by heyoka in order to
+avoid symbol collisions. Note however that, depending on the platform, the
+``HEYOKA_HIDE_LLVM_SYMBOLS`` option might end up hiding the symbols exported by
+**all** the static libraries heyoka links to (i.e., not only LLVM),
+which might end up creating other issues. Users are thus advised to activate this option
+only if LLVM is the **only** static library heyoka links to.
+
 In order to build heyoka, you can run the following CMake command from the
 build directory:
 
