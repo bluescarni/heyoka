@@ -13,6 +13,12 @@ jobs:
       - uses: actions/checkout@v2
       - name: Build
         run: bash tools/gha_osx.sh
+  osx_10_15_static:
+    runs-on: macos-10.15
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build
+        run: bash tools/gha_osx_static.sh
   windows_2019:
     runs-on: windows-2019
     steps:
@@ -35,6 +41,12 @@ jobs:
           cmake --build . --config Release
           copy Release\heyoka.dll test\Release\
           ctest -j4 -V -C Release
+  conda_release_static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build
+        run: bash tools/gha_conda_release_static.sh
   conda_release:
     runs-on: ubuntu-latest
     steps:

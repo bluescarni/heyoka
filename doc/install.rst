@@ -46,7 +46,7 @@ Additionally, heyoka has the following **optional** dependencies:
   libraries (used in the tests and benchmarks).
 
 `CMake <https://cmake.org/>`__ is the build system used by heyoka and it must also be available when
-installing from source (the minimum required version is 3.8).
+installing from source (the minimum required version is 3.18).
 
 .. warning::
 
@@ -174,8 +174,7 @@ path, etc.). The available configuration options are:
 * ``HEYOKA_BUILD_STATIC_LIBRARY``: build heyoka as a static library, instead
   of a dynamic library (off by default),
 * ``HEYOKA_ENABLE_IPO``: enable link-time optimisations when building
-  the heyoka library (requires CMake >= 3.9 and compiler support,
-  off by default).
+  the heyoka library (requires compiler support, off by default).
 
 In order to build heyoka, you can run the following CMake command from the
 build directory:

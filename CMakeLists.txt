@@ -1,10 +1,6 @@
-# NOTE: C++17 supported since CMake 3.8.0:
-# https://cmake.org/cmake/help/v3.8/prop_tgt/CXX_STANDARD.html
-cmake_minimum_required(VERSION 3.8.0)
-
-# NOTE: policy for using the CheckIPOSupported module:
-# https://cmake.org/cmake/help/latest/policy/CMP0069.html
-cmake_policy(SET CMP0069 NEW)
+# NOTE: the 3.18 requirement comes from here:
+# https://cmake.org/cmake/help/latest/module/CheckLinkerFlag.html
+cmake_minimum_required(VERSION 3.18.0)
 
 # Set default build type to "Release".
 # NOTE: this should be done before the project command since the latter can set
@@ -39,10 +35,11 @@ option(HEYOKA_BUILD_TUTORIALS "Build tutorials." OFF)
 option(HEYOKA_WITH_MPPP "Enable features relying on mp++." OFF)
 option(HEYOKA_WITH_SLEEF "Enable features relying on SLEEF." OFF)
 option(HEYOKA_BUILD_STATIC_LIBRARY "Build heyoka as a static library, instead of dynamic." OFF)
-option(HEYOKA_ENABLE_IPO "Enable IPO (requires CMake >= 3.9 and compiler support)." OFF)
-mark_as_advanced(HEYOKA_ENABLE_IPO)
-option(HEYOKA_SETUP_DOCS "Setup the files for building the docs." ON)
-mark_as_advanced(HEYOKA_SETUP_DOCS)
+option(HEYOKA_ENABLE_IPO "Enable IPO (requires compiler support)." OFF)
+option(HEYOKA_FORCE_STATIC_LLVM "Force linking to the static version of the LLVM libraries." OFF)
+mark_as_advanced(HEYOKA_FORCE_STATIC_LLVM)
+option(HEYOKA_HIDE_LLVM_SYMBOLS "Try to hide LLVM symbols when linking statically to LLVM." OFF)
+mark_as_advanced(HEYOKA_HIDE_LLVM_SYMBOLS)
 
 # NOTE: on Unix systems, the correct library installation path
 # could be something other than just "lib", such as "lib64",
@@ -317,19 +314,17 @@ target_include_directories(heyoka PUBLIC
     $<INSTALL_INTERFACE:include>)
 
 # IPO setup.
-if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.9.0")
-    if(HEYOKA_ENABLE_IPO)
-        include(CheckIPOSupported)
-        check_ipo_supported(RESULT _HEYOKA_IPO_RESULT OUTPUT _HEYOKA_IPO_OUTPUT)
-        if (_HEYOKA_IPO_RESULT)
-            message(STATUS "IPO requested and supported, enabling.")
-            set_property(TARGET heyoka PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
-        else()
-            message(STATUS "IPO requested, but it is not supported by the compiler:\n${_HEYOKA_IPO_OUTPUT}")
-        endif()
-        unset(_HEYOKA_IPO_RESULT)
-        unset(_HEYOKA_IPO_OUTPUT)
+if(HEYOKA_ENABLE_IPO)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT _HEYOKA_IPO_RESULT OUTPUT _HEYOKA_IPO_OUTPUT)
+    if (_HEYOKA_IPO_RESULT)
+        message(STATUS "IPO requested and supported, enabling.")
+        set_property(TARGET heyoka PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+    else()
+        message(STATUS "IPO requested, but it is not supported by the compiler:\n${_HEYOKA_IPO_OUTPUT}")
     endif()
+    unset(_HEYOKA_IPO_RESULT)
+    unset(_HEYOKA_IPO_OUTPUT)
 endif()
 
 message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
@@ -347,14 +342,10 @@ endif()
 # Add the LLVM include dirs.
 target_include_directories(heyoka_llvm_internal SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
 
-if(TARGET LLVM)
-    # On some platforms, LLVM is built as a single shared library,
-    # which is exported by LLVM's CMake config-file package as
-    # a target called LLVM.
-    target_link_libraries(heyoka_llvm_internal INTERFACE LLVM)
-else()
-    # Otherwise, LLVM is built as a collection of
-    # separate static libraries/components.
+if(HEYOKA_FORCE_STATIC_LLVM OR NOT TARGET LLVM)
+    # NOTE: static link to llvm if explicitly requested or if the
+    # LLVM target does *not* exist. The LLVM target, if
+    # it exists, consists of a single shared library.
 
     # NOTE: this is necessary because LLVM's config-file packages
     # do not look for zlib, despite linking to the ZLIB::ZLIB
@@ -374,6 +365,14 @@ else()
     unset(_HEYOKA_LLVM_COMPONENTS)
     unset(_HEYOKA_LLVM_LIBS_DIRECT)
     unset(_HEYOKA_LLVM_LIBS)
+
+    set(_HEYOKA_LLVM_STATIC_LINK TRUE)
+else()
+    # NOTE: shared linking is preferred over static if both are available and
+    # if HEYOKA_FORCE_STATIC_LLVM is *not* set.
+    target_link_libraries(heyoka_llvm_internal INTERFACE LLVM)
+
+    set(_HEYOKA_LLVM_STATIC_LINK FALSE)
 endif()
 
 # Link to LLVM privately.
@@ -383,6 +382,47 @@ endif()
 # an interface library. See the discussion here:
 # https://gitlab.kitware.com/cmake/cmake/-/issues/15415
 target_link_libraries(heyoka PRIVATE "$<BUILD_INTERFACE:heyoka_llvm_internal>")
+
+if(_HEYOKA_LLVM_STATIC_LINK AND HEYOKA_HIDE_LLVM_SYMBOLS)
+    # NOTE: LLVM symbol hiding is done in a heuristic fashion
+    # by checking if the linker supports certain flags:
+    #
+    # - first we check for "-Wl,--exclude-libs,ALL", which is supported
+    #   by the GNU linker; if this fails,
+    # - we check for "-Wl,-unexported_symbol", which is supported by
+    #   OSX's ld64 linker; otherwise,
+    # - we don't do anything.
+    #
+    # This is not a great solution, but it works for common use cases.
+    # For the GNU linker, it would be better to use "-Wl,--exclude-libs"
+    # on all the individual LLVM libraries we are linking to, rather than
+    # on ALL the static libraries, but getting such a list out of CMake
+    # seems hard: we link directly to the _HEYOKA_LLVM_LIBS libraries,
+    # but these in turn bring in indirectly several other LLVM components.
+
+    include(CheckLinkerFlag)
+
+    set(CMAKE_REQUIRED_QUIET TRUE)
+
+    check_linker_flag(CXX "-Wl,--exclude-libs,ALL" _HEYOKA_LINKER_SUPPORTS_EXCLUDE_LIBS)
+    if(_HEYOKA_LINKER_SUPPORTS_EXCLUDE_LIBS)
+        message(STATUS "Adding the linker flag \"-Wl,--exclude-libs,ALL\" to hide LLVM symbols.")
+        target_link_options(heyoka PRIVATE "-Wl,--exclude-libs,ALL")
+    else()
+        check_linker_flag(CXX "-Wl,-unexported_symbol,dummy" _HEYOKA_LINKER_SUPPORTS_UNEXPORTED_SYMBOL)
+        if(_HEYOKA_LINKER_SUPPORTS_UNEXPORTED_SYMBOL)
+            message(STATUS "Adding the linker flag \"-Wl,-unexported_symbol\" to hide LLVM symbols.")
+            target_link_options(heyoka PRIVATE "-Wl,-unexported_symbol,__ZTVN4llvm*")
+            target_link_options(heyoka PRIVATE "-Wl,-unexported_symbol,__ZNK4llvm*")
+            target_link_options(heyoka PRIVATE "-Wl,-unexported_symbol,__ZN4llvm*")
+            target_link_options(heyoka PRIVATE "-Wl,-unexported_symbol,__ZTIN4llvm*")
+            target_link_options(heyoka PRIVATE "-Wl,-unexported_symbol,_LLVM*")
+            target_link_options(heyoka PRIVATE "-Wl,-unexported_symbol,__ZTSN4llvm*")
+        endif()
+    endif()
+
+    unset(CMAKE_REQUIRED_QUIET)
+endif()
 
 # Mandatory dependency on fmt.
 target_link_libraries(heyoka PUBLIC fmt::fmt)
@@ -436,10 +476,8 @@ endif()
 # Configure config.hpp.
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.hpp.in" "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" @ONLY)
 
-if(HEYOKA_SETUP_DOCS)
-    # Configure the doc files.
-    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/doc/conf.py.in" "${CMAKE_CURRENT_SOURCE_DIR}/doc/conf.py" @ONLY)
-endif()
+# Configure the doc files.
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/doc/conf.py.in" "${CMAKE_CURRENT_SOURCE_DIR}/doc/conf.py" @ONLY)
 
 # Installation of the header files.
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/heyoka" DESTINATION include)
@@ -460,19 +498,14 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config.cmake"
 install(EXPORT heyoka_export NAMESPACE heyoka:: DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
 # Take care of versioning.
 include(CMakePackageConfigHelpers)
-# NOTE: SameMinorVersion available only
-# since CMake 3.11.
-if(${CMAKE_VERSION} VERSION_LESS "3.11.0")
-    write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" COMPATIBILITY SameMajorVersion)
-else()
-    write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" COMPATIBILITY SameMinorVersion)
-endif()
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" COMPATIBILITY SameMinorVersion)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
 
 # Cleanup.
 unset(_HEYOKA_MIN_MPPP_VERSION)
 unset(_HEYOKA_WITH_REAL128)
 unset(_HEYOKA_WITH_REAL)
+unset(_HEYOKA_LLVM_STATIC_LINK)
 
 if(HEYOKA_BUILD_TESTS)
     enable_testing()
