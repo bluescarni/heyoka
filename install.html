@@ -577,7 +577,7 @@ of integrations in batch mode),</p></li>
 libraries (used in the tests and benchmarks).</p></li>
 </ul>
 <p><a class="reference external" href="https://cmake.org/">CMake</a> is the build system used by heyoka and it must also be available when
-installing from source (the minimum required version is 3.8).</p>
+installing from source (the minimum required version is 3.18).</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>The <a class="reference external" href="https://github.com/gabime/spdlog">spdlog</a> library depends on the <a class="reference external" href="https://fmt.dev/latest/index.html">{fmt}</a> library,
@@ -685,9 +685,27 @@ path, etc.). The available configuration options are:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_BUILD_STATIC_LIBRARY</span></code>: build heyoka as a static library, instead
 of a dynamic library (off by default),</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_ENABLE_IPO</span></code>: enable link-time optimisations when building
-the heyoka library (requires CMake &gt;= 3.9 and compiler support,
-off by default).</p></li>
+the heyoka library (requires compiler support, off by default).</p></li>
 </ul>
+<p>The following advanced options are also available:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_FORCE_STATIC_LLVM</span></code>: force statically linking to the LLVM libraries
+(off by default). Note that, by default, heyoka prefers to dynamically link to LLVM
+if both dynamic and static versions of the libraries are available.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_HIDE_LLVM_SYMBOLS</span></code>: when statically linking to the LLVM libraries,
+try to hide the symbols exported by LLVM (off by default). When linking dynamically
+to LLVM, this option has no effects.</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">HEYOKA_HIDE_LLVM_SYMBOLS</span></code> option is useful if heyoka needs to be used in conjunction
+with software linking to an LLVM version different from the one used by heyoka. In such
+cases, symbol collisions between different LLVM version coexisting in the same process
+will lead to unpredictable runtime behaviour (e.g., segfaults). This option attempts
+to hide the LLVM symbols exported by the LLVM version in use by heyoka in order to
+avoid symbol collisions. Note however that, depending on the platform, the
+<code class="docutils literal notranslate"><span class="pre">HEYOKA_HIDE_LLVM_SYMBOLS</span></code> option might end up hiding the symbols exported by
+<strong>all</strong> the static libraries heyoka links to (i.e., not only LLVM),
+which might end up creating other issues. Users are thus advised to activate this option
+only if LLVM is the <strong>only</strong> static library heyoka links to.</p>
 <p>In order to build heyoka, you can run the following CMake command from the
 build directory:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cmake --build .

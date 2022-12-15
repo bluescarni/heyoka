@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- Add option in the build system to hide the exported LLVM symbols,
+  when linking statically
+  (`#283 <https://github.com/bluescarni/heyoka/pull/283>`__).
 - Add option to force the use of AVX-512 registers
   (`#280 <https://github.com/bluescarni/heyoka/pull/280>`__).
 - Implement support for arbitrary-precision computations
@@ -14,6 +17,12 @@ New
   `#276 <https://github.com/bluescarni/heyoka/pull/276>`__).
 - Support LLVM 15
   (`#274 <https://github.com/bluescarni/heyoka/pull/274>`__).
+
+Changes
+~~~~~~~
+
+- heyoka now depends on CMake >= 3.18 when building from source
+  (`#283 <https://github.com/bluescarni/heyoka/pull/283>`__).
 
 Fix
 ~~~
