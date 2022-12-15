@@ -18,6 +18,12 @@ New
 - Support LLVM 15
   (`#274 <https://github.com/bluescarni/heyoka/pull/274>`__).
 
+Changes
+~~~~~~~
+
+- heyoka now depends on CMake >= 3.18 when building from source
+  (`#283 <https://github.com/bluescarni/heyoka/pull/283>`__).
+
 Fix
 ~~~
 
