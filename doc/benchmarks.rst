@@ -8,7 +8,7 @@ ODE integration packages. Specifically, we compare heyoka to:
 
 - `DifferentialEquations.jl <https://diffeq.sciml.ai/>`__, a popular Julia
   library implementing several ODE solvers. In these benchmarks, we will be using
-  explicit Runge-Kutta solvers such as ``Vern9``, ``Vern6``, ``Feagin14``, ``DP8``, etc. (see
+  explicit Runge-Kutta solvers such as ``Vern6``, ``Vern8``, ``Vern9``, ``Feagin14``, ``DP8``, etc. (see
   `here <https://diffeq.sciml.ai/stable/solvers/ode_solve/>`__ for a list of
   ODE solvers available in DifferentialEquations.jl);
 - `Boost.ODEInt <https://www.boost.org/doc/libs/master/libs/numeric/odeint/doc/html/index.html>`__,
@@ -26,7 +26,8 @@ In these benchmarks, we will be testing both with and without dense output.
 
 All benchmarks were run on an Intel Xeon Platinum 8360Y CPU. More benchmark results are available in the
 `heyoka paper <https://arxiv.org/abs/2105.00800>`__.
-The benchmarks' source code is available in the `github repository <https://github.com/bluescarni/heyoka/tree/master/benchmark>`__.
+The benchmarks' source code (for both heyoka and the other tested libraries)
+is available in the `github repository <https://github.com/bluescarni/heyoka/tree/master/benchmark>`__.
 
 The planetary three-body problem
 --------------------------------
@@ -189,3 +190,86 @@ the (adaptive) step size remains roughly constant in magnitude, thus resulting
 in a gradual accumulation of roundoff error.
 Representing the time coordinate in extended precision allows to drastically
 curb this phenomenon, which is particularly visible in long-running numerical integrations.
+
+Extended and arbitrary precision
+--------------------------------
+
+heyoka supports computations both in :ref:`extended precision <tut_extended_precision>` and
+:ref:`arbitrary precision <tut_arbitrary_precision>`. Taylor integrators are particularly
+well-suited for high-precision applications because they can freely choose the optimal
+order for a given tolerance. In contrast, fixed-order methods must reduce the integration
+timestep in order to achieve higher accuracy, which is more computationally expensive
+than increasing the integrator's order.
+
+In this first test, we perform a numerical integration of the simple pendulum using
+`quadruple-precision <https://en.wikipedia.org/wiki/Quadruple-precision_floating-point_format>`__
+arithmetic, with a tolerance set to :math:`10^{-34}` (i.e., close to the epsilon). heyoka's
+runtime is compared to the runtime of the ``Feagin14`` from `DifferentialEquations.jl <https://diffeq.sciml.ai/>`__.
+Both libraries are using the `quadruple-precision math library <https://gcc.gnu.org/onlinedocs/libquadmath/>`__
+from GCC under the hood.
+
+.. image:: images/quad_cmp.png
+  :align: center
+  :alt: Quadruple-precision pendulum
+
+We can see how in this test heyoka is about 20 times faster than ``Feagin14``.
+
+We can move to even higher precisions with the help of
+`arbitrary-precision arithmetic <https://en.wikipedia.org/wiki/Arbitrary-precision_arithmetic>`__.
+heyoka uses the `MPFR library <https://www.mpfr.org/>`__ for multiprecision floating-point
+computations under the hood. DifferentialEquations.jl can also use MPFR (via the
+`BigFloat <https://docs.julialang.org/en/v1/manual/integers-and-floating-point-numbers/#Arbitrary-Precision-Arithmetic>`__
+type) or, alternatively the `Arb <https://arblib.org/>`__ library (via the
+`ArbNumerics.jl <https://juliapackages.com/p/arbnumerics>`__ package).
+
+Here are the results of a numerical integration of the simple pendulum with a 256-bit significand
+and a tolerance of :math:`10^{-77}`:
+
+.. image:: images/mp_cmp.png
+  :align: center
+  :alt: Arbitrary-precision pendulum
+
+We can see how heyoka's performance lead has extended to several orders of magnitude.
+
+heyoka's superior performance in this benchmark is due both to the algorithmic advantages
+of Taylor integrators (as discussed earlier) and to the fact that heyoka's stepper function
+does not perform any memory allocation. That is, contrary to the Julia integrators,
+the storage for all the multiprecision numbers employed in the stepper function is
+pre-allocated on the stack, rather than being dynamically-allocated on-demand for every
+multiprecision operation.
+
+Dense output fidelity and stability
+-----------------------------------
+
+As explained in the :ref:`dense output tutorial <tut_d_output>`, Taylor integrators
+provide dense output (almost) for free in the form of the coefficients of the Taylor
+series of the solution of the ODE. By contrast, in most other integration methods
+(such as the Runge-Kutta family) dense output is computed via polynomial
+interpolation.
+
+Polynomial interpolation can sometimes suffer from numerical instability,
+especially in high-accuracy applications. In this test, we are integrating
+a simple Keplerian circular orbit with tolerance :math:`10^{-12}`, and asking
+the numerical integrator for the dense output in a time grid of 1000 equispaced
+points within the :math:`\left[0, 1\right]` time interval. This plot
+shows the integration error (computed against the analytical solution)
+for heyoka and the ``Vern8`` integrator from `DifferentialEquations.jl <https://diffeq.sciml.ai/>`__
+(an explicit Runge-Kutta method with lazy 8th order interpolant):
+
+.. image:: images/dense_cmp.png
+  :align: center
+  :alt: Dense output for a circular orbit
+
+We can see how for ``Vern8`` the dense output between the integration steps
+suffers from a noisy error that often exceeds the nominal tolerance of :math:`10^{-12}`, peaking
+to a local maximum right at the end of each integration step. This phenomenon
+disappears when switching to a higher-precision datatype, strongly suggesting that the
+behaviour is caused by numerical instability. The noisy and jittery behaviour of the dense
+output can be problematic when trying to solve inversion problems in high-accuracy setups
+(e.g., in precise orbit modelling/determination).
+
+heyoka's dense output, by contrast, is bounded well below the nominal tolerance of :math:`10^{-12}`,
+and it does not suffer from the noisy behaviour experienced by ``Vern8``. Indeed, in Taylor integrators,
+the dense output is calculated directly from the same formula (i.e., the Taylor series)
+used to compute the state at the end of the timestep, and it is thus guaranteed to be consistent
+with the state of the system at the beginning/end of the timesteps.
