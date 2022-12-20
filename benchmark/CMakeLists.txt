@@ -69,3 +69,11 @@ ADD_HEYOKA_BENCHMARK(burrau_3bp)
 ADD_HEYOKA_BENCHMARK(bandf)
 ADD_HEYOKA_BENCHMARK(bandf_odeint)
 ADD_HEYOKA_BENCHMARK(penc_comparison)
+
+if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
+  ADD_HEYOKA_BENCHMARK(pendulum_mp)
+endif()
+
+if(HEYOKA_WITH_MPPP AND mp++_WITH_QUADMATH)
+  ADD_HEYOKA_BENCHMARK(pendulum_quad)
+endif()
