@@ -414,6 +414,16 @@ title="Print to PDF"
    Back &amp; forth
   </a>
  </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#extended-and-arbitrary-precision">
+   Extended and arbitrary precision
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#dense-output-fidelity-and-stability">
+   Dense output fidelity and stability
+  </a>
+ </li>
 </ul>
 
     </nav>
@@ -453,6 +463,16 @@ title="Print to PDF"
    Back &amp; forth
   </a>
  </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#extended-and-arbitrary-precision">
+   Extended and arbitrary precision
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#dense-output-fidelity-and-stability">
+   Dense output fidelity and stability
+  </a>
+ </li>
 </ul>
 
                         </nav>
@@ -470,7 +490,7 @@ ODE integration packages. Specifically, we compare heyoka to:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://diffeq.sciml.ai/">DifferentialEquations.jl</a>, a popular Julia
 library implementing several ODE solvers. In these benchmarks, we will be using
-explicit Runge-Kutta solvers such as <code class="docutils literal notranslate"><span class="pre">Vern9</span></code>, <code class="docutils literal notranslate"><span class="pre">Vern6</span></code>, <code class="docutils literal notranslate"><span class="pre">Feagin14</span></code>, <code class="docutils literal notranslate"><span class="pre">DP8</span></code>, etc. (see
+explicit Runge-Kutta solvers such as <code class="docutils literal notranslate"><span class="pre">Vern6</span></code>, <code class="docutils literal notranslate"><span class="pre">Vern8</span></code>, <code class="docutils literal notranslate"><span class="pre">Vern9</span></code>, <code class="docutils literal notranslate"><span class="pre">Feagin14</span></code>, <code class="docutils literal notranslate"><span class="pre">DP8</span></code>, etc. (see
 <a class="reference external" href="https://diffeq.sciml.ai/stable/solvers/ode_solve/">here</a> for a list of
 ODE solvers available in DifferentialEquations.jl);</p></li>
 <li><p><a class="reference external" href="https://www.boost.org/doc/libs/master/libs/numeric/odeint/doc/html/index.html">Boost.ODEInt</a>,
@@ -487,7 +507,8 @@ enable dense output, which however incurs in a heavy computational cost. While h
 In these benchmarks, we will be testing both with and without dense output.</p>
 <p>All benchmarks were run on an Intel Xeon Platinum 8360Y CPU. More benchmark results are available in the
 <a class="reference external" href="https://arxiv.org/abs/2105.00800">heyoka paper</a>.
-The benchmarks’ source code is available in the <a class="reference external" href="https://github.com/bluescarni/heyoka/tree/master/benchmark">github repository</a>.</p>
+The benchmarks’ source code (for both heyoka and the other tested libraries)
+is available in the <a class="reference external" href="https://github.com/bluescarni/heyoka/tree/master/benchmark">github repository</a>.</p>
 <section id="the-planetary-three-body-problem">
 <h2>The planetary three-body problem<a class="headerlink" href="#the-planetary-three-body-problem" title="Permalink to this headline">#</a></h2>
 <p>Here we will numerically integrate a specific case of the <a class="reference external" href="https://en.wikipedia.org/wiki/Three-body_problem">three-body problem</a>
@@ -599,6 +620,69 @@ the (adaptive) step size remains roughly constant in magnitude, thus resulting
 in a gradual accumulation of roundoff error.
 Representing the time coordinate in extended precision allows to drastically
 curb this phenomenon, which is particularly visible in long-running numerical integrations.</p>
+</section>
+<section id="extended-and-arbitrary-precision">
+<h2>Extended and arbitrary precision<a class="headerlink" href="#extended-and-arbitrary-precision" title="Permalink to this headline">#</a></h2>
+<p>heyoka supports computations both in <a class="reference internal" href="tut_extended_precision.html#tut-extended-precision"><span class="std std-ref">extended precision</span></a> and
+<a class="reference internal" href="tut_arbitrary_precision.html#tut-arbitrary-precision"><span class="std std-ref">arbitrary precision</span></a>. Taylor integrators are particularly
+well-suited for high-precision applications because they can freely choose the optimal
+order for a given tolerance. In contrast, fixed-order methods must reduce the integration
+timestep in order to achieve higher accuracy, which is more computationally expensive
+than increasing the integrator’s order.</p>
+<p>In this first test, we perform a numerical integration of the simple pendulum using
+<a class="reference external" href="https://en.wikipedia.org/wiki/Quadruple-precision_floating-point_format">quadruple-precision</a>
+arithmetic, with a tolerance set to <span class="math notranslate nohighlight">\(10^{-34}\)</span> (i.e., close to the epsilon). heyoka’s
+runtime is compared to the runtime of the <code class="docutils literal notranslate"><span class="pre">Feagin14</span></code> from <a class="reference external" href="https://diffeq.sciml.ai/">DifferentialEquations.jl</a>.
+Both libraries are using the <a class="reference external" href="https://gcc.gnu.org/onlinedocs/libquadmath/">quadruple-precision math library</a>
+from GCC under the hood.</p>
+<img alt="Quadruple-precision pendulum" class="align-center" src="_images/quad_cmp.png" />
+<p>We can see how in this test heyoka is about 20 times faster than <code class="docutils literal notranslate"><span class="pre">Feagin14</span></code>.</p>
+<p>We can move to even higher precisions with the help of
+<a class="reference external" href="https://en.wikipedia.org/wiki/Arbitrary-precision_arithmetic">arbitrary-precision arithmetic</a>.
+heyoka uses the <a class="reference external" href="https://www.mpfr.org/">MPFR library</a> for multiprecision floating-point
+computations under the hood. DifferentialEquations.jl can also use MPFR (via the
+<a class="reference external" href="https://docs.julialang.org/en/v1/manual/integers-and-floating-point-numbers/#Arbitrary-Precision-Arithmetic">BigFloat</a>
+type) or, alternatively the <a class="reference external" href="https://arblib.org/">Arb</a> library (via the
+<a class="reference external" href="https://juliapackages.com/p/arbnumerics">ArbNumerics.jl</a> package).</p>
+<p>Here are the results of a numerical integration of the simple pendulum with a 256-bit significand
+and a tolerance of <span class="math notranslate nohighlight">\(10^{-77}\)</span>:</p>
+<img alt="Arbitrary-precision pendulum" class="align-center" src="_images/mp_cmp.png" />
+<p>We can see how heyoka’s performance lead has extended to several orders of magnitude.</p>
+<p>heyoka’s superior performance in this benchmark is due both to the algorithmic advantages
+of Taylor integrators (as discussed earlier) and to the fact that heyoka’s stepper function
+does not perform any memory allocation. That is, contrary to the Julia integrators,
+the storage for all the multiprecision numbers employed in the stepper function is
+pre-allocated on the stack, rather than being dynamically-allocated on-demand for every
+multiprecision operation.</p>
+</section>
+<section id="dense-output-fidelity-and-stability">
+<h2>Dense output fidelity and stability<a class="headerlink" href="#dense-output-fidelity-and-stability" title="Permalink to this headline">#</a></h2>
+<p>As explained in the <a class="reference internal" href="tut_d_output.html#tut-d-output"><span class="std std-ref">dense output tutorial</span></a>, Taylor integrators
+provide dense output (almost) for free in the form of the coefficients of the Taylor
+series of the solution of the ODE. By contrast, in most other integration methods
+(such as the Runge-Kutta family) dense output is computed via polynomial
+interpolation.</p>
+<p>Polynomial interpolation can sometimes suffer from numerical instability,
+especially in high-accuracy applications. In this test, we are integrating
+a simple Keplerian circular orbit with tolerance <span class="math notranslate nohighlight">\(10^{-12}\)</span>, and asking
+the numerical integrator for the dense output in a time grid of 1000 equispaced
+points within the <span class="math notranslate nohighlight">\(\left[0, 1\right]\)</span> time interval. This plot
+shows the integration error (computed against the analytical solution)
+for heyoka and the <code class="docutils literal notranslate"><span class="pre">Vern8</span></code> integrator from <a class="reference external" href="https://diffeq.sciml.ai/">DifferentialEquations.jl</a>
+(an explicit Runge-Kutta method with lazy 8th order interpolant):</p>
+<img alt="Dense output for a circular orbit" class="align-center" src="_images/dense_cmp.png" />
+<p>We can see how for <code class="docutils literal notranslate"><span class="pre">Vern8</span></code> the dense output between the integration steps
+suffers from a noisy error that often exceeds the nominal tolerance of <span class="math notranslate nohighlight">\(10^{-12}\)</span>, peaking
+to a local maximum right at the end of each integration step. This phenomenon
+disappears when switching to a higher-precision datatype, strongly suggesting that the
+behaviour is caused by numerical instability. The noisy and jittery behaviour of the dense
+output can be problematic when trying to solve inversion problems in high-accuracy setups
+(e.g., in precise orbit modelling/determination).</p>
+<p>heyoka’s dense output, by contrast, is bounded well below the nominal tolerance of <span class="math notranslate nohighlight">\(10^{-12}\)</span>,
+and it does not suffer from the noisy behaviour experienced by <code class="docutils literal notranslate"><span class="pre">Vern8</span></code>. Indeed, in Taylor integrators,
+the dense output is calculated directly from the same formula (i.e., the Taylor series)
+used to compute the state at the end of the timestep, and it is thus guaranteed to be consistent
+with the state of the system at the beginning/end of the timesteps.</p>
 </section>
 </section>
 
