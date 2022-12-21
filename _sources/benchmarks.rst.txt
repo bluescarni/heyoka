@@ -268,7 +268,7 @@ behaviour is caused by numerical instability. The noisy and jittery behaviour of
 output can be problematic when trying to solve inversion problems in high-accuracy setups
 (e.g., in precise orbit modelling/determination).
 
-heyoka's dense output, by contrast, is bounded well below the nominal tolerance of :math:`10^{-12}`,
+heyoka's dense output, by contrast, has an error bounded well below the nominal tolerance of :math:`10^{-12}`,
 and it does not suffer from the noisy behaviour experienced by ``Vern8``. Indeed, in Taylor integrators,
 the dense output is calculated directly from the same formula (i.e., the Taylor series)
 used to compute the state at the end of the timestep, and it is thus guaranteed to be consistent
