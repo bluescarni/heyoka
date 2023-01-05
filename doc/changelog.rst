@@ -1,6 +1,13 @@
 Changelog
 =========
 
+0.20.1 (2023-01-05)
+-------------------
+
+- Mark as visible a couple of internal functions which
+  had been marked as hidden by mistake
+  (`#286 <https://github.com/bluescarni/heyoka/pull/286>`__).
+
 0.20.0 (2022-12-17)
 -------------------
 
