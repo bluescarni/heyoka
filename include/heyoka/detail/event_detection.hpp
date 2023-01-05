@@ -72,7 +72,7 @@ HEYOKA_DLL_PUBLIC llvm::Function *add_poly_translator_1(llvm_state &, llvm::Type
 // - translates it by 1,
 // - counts the sign changes in the coefficients
 //   of the resulting polynomial.
-llvm::Function *llvm_add_poly_rtscc(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_poly_rtscc(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
 
 } // namespace heyoka::detail
 
