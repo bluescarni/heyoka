@@ -639,16 +639,16 @@ and that the mp++ library is compiled with the <code class="docutils literal not
 thanks to the infrastructure provided by <a class="reference external" href="https://conda-forge.org/">conda-forge</a>.</p>
 <p>In order to install heyoka via conda, you just need to add <code class="docutils literal notranslate"><span class="pre">conda-forge</span></code>
 to the channels, and then we can immediately install heyoka:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>conda config --add channels conda-forge
-<span class="gp">$ </span>conda config --set channel_priority strict
-<span class="gp">$ </span>conda install heyoka
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>conda<span class="w"> </span>config<span class="w"> </span>--add<span class="w"> </span>channels<span class="w"> </span>conda-forge
+<span class="gp">$ </span>conda<span class="w"> </span>config<span class="w"> </span>--set<span class="w"> </span>channel_priority<span class="w"> </span>strict
+<span class="gp">$ </span>conda<span class="w"> </span>install<span class="w"> </span>heyoka
 </pre></div>
 </div>
 <p>Note that the <code class="docutils literal notranslate"><span class="pre">heyoka</span></code> package on conda is built against an unspecified version of LLVM. If you need
 a package built against a <em>specific</em> version of LLVM, you can install one of the <code class="docutils literal notranslate"><span class="pre">heyoka-llvm-*</span></code>
 meta-packages. For instance, in order to install a package built against LLVM 12, you
 could use the following command:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>conda install heyoka-llvm-12
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>conda<span class="w"> </span>install<span class="w"> </span>heyoka-llvm-12
 </pre></div>
 </div>
 <p>The list of heyoka meta-packages is available
@@ -663,7 +663,7 @@ your conda installation.</p>
 <h3>FreeBSD<a class="headerlink" href="#freebsd" title="Permalink to this headline">#</a></h3>
 <p>A community-supported FreeBSD port via <a class="reference external" href="https://docs.freebsd.org/en/books/handbook/ports/#pkgng-intro">pkg</a> is available for
 heyoka. In order to install heyoka using pkg, execute the following command:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pkg install heyoka
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pkg<span class="w"> </span>install<span class="w"> </span>heyoka
 </pre></div>
 </div>
 </section>
@@ -708,7 +708,7 @@ which might end up creating other issues. Users are thus advised to activate thi
 only if LLVM is the <strong>only</strong> static library heyoka links to.</p>
 <p>In order to build heyoka, you can run the following CMake command from the
 build directory:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cmake --build .
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cmake<span class="w"> </span>--build<span class="w"> </span>.
 </pre></div>
 </div>
 <div class="admonition note">
@@ -720,14 +720,14 @@ If you are using the Intel C++ compiler, make sure that you are using
 the <code class="docutils literal notranslate"><span class="pre">strict</span></code> floating-point model.</p>
 </div>
 <p>To install heyoka, you can use the following CMake command:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cmake  --build . --target install
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cmake<span class="w">  </span>--build<span class="w"> </span>.<span class="w"> </span>--target<span class="w"> </span>install
 </pre></div>
 </div>
 <p>The installation command will copy the heyoka headers and library to the
 <code class="docutils literal notranslate"><span class="pre">CMAKE_INSTALL_PREFIX</span></code> directory.</p>
 <p>If you enabled the <code class="docutils literal notranslate"><span class="pre">HEYOKA_BUILD_TESTS</span></code> option, you can run the test suite
 with the following command:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cmake  --build . --target <span class="nb">test</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cmake<span class="w">  </span>--build<span class="w"> </span>.<span class="w"> </span>--target<span class="w"> </span><span class="nb">test</span>
 </pre></div>
 </div>
 <div class="admonition note">
