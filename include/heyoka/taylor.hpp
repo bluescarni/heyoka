@@ -1218,6 +1218,14 @@ public:
         return static_cast<bool>(m_ed_data);
     }
     void reset_cooldowns();
+    const auto &get_cooldowns() const
+    {
+        if (!m_ed_data) {
+            throw std::invalid_argument("No events were defined for this integrator");
+        }
+
+        return m_ed_data->m_te_cooldowns;
+    }
     const std::vector<t_event_t> &get_t_events() const
     {
         if (!m_ed_data) {
@@ -1225,14 +1233,6 @@ public:
         }
 
         return m_ed_data->m_tes;
-    }
-    const auto &get_te_cooldowns() const
-    {
-        if (!m_ed_data) {
-            throw std::invalid_argument("No events were defined for this integrator");
-        }
-
-        return m_ed_data->m_te_cooldowns;
     }
     const std::vector<nt_event_t> &get_nt_events() const
     {
@@ -1744,6 +1744,14 @@ public:
     }
     void reset_cooldowns();
     void reset_cooldowns(std::uint32_t);
+    const auto &get_cooldowns() const
+    {
+        if (!m_ed_data) {
+            throw std::invalid_argument("No events were defined for this integrator");
+        }
+
+        return m_ed_data->m_te_cooldowns;
+    }
     const std::vector<t_event_t> &get_t_events() const
     {
         if (!m_ed_data) {
@@ -1751,14 +1759,6 @@ public:
         }
 
         return m_ed_data->m_tes;
-    }
-    const auto &get_te_cooldowns() const
-    {
-        if (!m_ed_data) {
-            throw std::invalid_argument("No events were defined for this integrator");
-        }
-
-        return m_ed_data->m_te_cooldowns;
     }
     const std::vector<nt_event_t> &get_nt_events() const
     {

@@ -1636,7 +1636,7 @@ void s11n_test_impl()
         REQUIRE(ta.get_t_events()[0].get_callback().get_type_index()
                 == ta_copy.get_t_events()[0].get_callback().get_type_index());
         REQUIRE(ta.get_t_events()[0].get_cooldown() == ta_copy.get_t_events()[0].get_cooldown());
-        REQUIRE(ta.get_te_cooldowns()[0] == ta_copy.get_te_cooldowns()[0]);
+        REQUIRE(ta.get_cooldowns()[0] == ta_copy.get_cooldowns()[0]);
 
         REQUIRE(ta.get_nt_events()[0].get_callback().get_type_index()
                 == ta_copy.get_nt_events()[0].get_callback().get_type_index());
@@ -1810,7 +1810,7 @@ TEST_CASE("no events error")
         REQUIRE(!tad.with_events());
         REQUIRE_THROWS_MATCHES(tad.get_t_events(), std::invalid_argument,
                                Message("No events were defined for this integrator"));
-        REQUIRE_THROWS_MATCHES(tad.get_te_cooldowns(), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(tad.get_cooldowns(), std::invalid_argument,
                                Message("No events were defined for this integrator"));
         REQUIRE_THROWS_MATCHES(tad.get_nt_events(), std::invalid_argument,
                                Message("No events were defined for this integrator"));

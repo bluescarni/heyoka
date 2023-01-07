@@ -1104,7 +1104,7 @@ void s11n_test_impl()
         REQUIRE(ta.get_t_events()[0].get_callback().get_type_index()
                 == ta_copy.get_t_events()[0].get_callback().get_type_index());
         REQUIRE(ta.get_t_events()[0].get_cooldown() == ta_copy.get_t_events()[0].get_cooldown());
-        REQUIRE(ta.get_te_cooldowns() == ta_copy.get_te_cooldowns());
+        REQUIRE(ta.get_cooldowns() == ta_copy.get_cooldowns());
 
         REQUIRE(ta.get_nt_events()[0].get_callback().get_type_index()
                 == ta_copy.get_nt_events()[0].get_callback().get_type_index());
@@ -1308,7 +1308,7 @@ TEST_CASE("events error")
             kw::nt_events = {nt_ev_t("x_0"_var, [](auto &, double, int, std::uint32_t) {})}};
 
         REQUIRE(tad.with_events());
-        REQUIRE(std::all_of(tad.get_te_cooldowns().begin(), tad.get_te_cooldowns().end(),
+        REQUIRE(std::all_of(tad.get_cooldowns().begin(), tad.get_cooldowns().end(),
                             [](const auto &v) { return v.empty(); }));
         tad.reset_cooldowns();
         tad.reset_cooldowns(0);
@@ -1325,9 +1325,9 @@ TEST_CASE("events error")
         REQUIRE(!tad.with_events());
         REQUIRE_THROWS_MATCHES(tad.get_t_events(), std::invalid_argument,
                                Message("No events were defined for this integrator"));
-        REQUIRE_THROWS_MATCHES(tad.get_te_cooldowns(), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(tad.get_cooldowns(), std::invalid_argument,
                                Message("No events were defined for this integrator"));
-        REQUIRE_THROWS_MATCHES(tad.get_te_cooldowns(), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(tad.get_cooldowns(), std::invalid_argument,
                                Message("No events were defined for this integrator"));
         REQUIRE_THROWS_MATCHES(tad.get_nt_events(), std::invalid_argument,
                                Message("No events were defined for this integrator"));
@@ -1625,13 +1625,13 @@ TEST_CASE("reset cooldowns")
 
     ta.propagate_until({100., 100., 100., 100.});
 
-    REQUIRE(std::any_of(ta.get_te_cooldowns().begin(), ta.get_te_cooldowns().end(), [](const auto &vec) {
+    REQUIRE(std::any_of(ta.get_cooldowns().begin(), ta.get_cooldowns().end(), [](const auto &vec) {
         return std::any_of(vec.begin(), vec.end(), [](const auto &val) { return static_cast<bool>(val); });
     }));
 
     ta.reset_cooldowns();
 
-    REQUIRE(std::all_of(ta.get_te_cooldowns().begin(), ta.get_te_cooldowns().end(), [](const auto &vec) {
+    REQUIRE(std::all_of(ta.get_cooldowns().begin(), ta.get_cooldowns().end(), [](const auto &vec) {
         return std::all_of(vec.begin(), vec.end(), [](const auto &val) { return !static_cast<bool>(val); });
     }));
 }
