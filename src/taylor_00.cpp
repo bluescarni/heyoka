@@ -1082,23 +1082,27 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
                 // Are we in absolute or relative error control mode?
                 const auto abs_or_rel = max_abs_state < 1;
 
-                // Estimate the size of the largest remainder in the Taylor
-                // series of both the dynamical equations and the events.
+                // Estimate an upper bound for the size of the remainder in the Taylor
+                // series of both the dynamical equations and the events. That is, this
+                // is an estimation of the maximum *absolute* integration error.
+                // NOTE: this is based on Jorba's estimation of the integration error,
+                // except for the fact that Jorba's estimation has an additional
+                // division by e**2 (so that this estimation is more pessimistic).
                 auto max_r_size = abs_or_rel ? m_tol : (m_tol * max_abs_state);
 
-                // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real
+                // NOTE: depending on m_tol, max_r_size can be arbitrarily small, but the real
                 // integration error cannot be too small due to floating-point truncation.
                 // This is the case for instance if we use sub-epsilon integration tolerances
-                // to achieve Brouwer's law. In such a case, we cap the value of g_eps,
-                // using eps * max_abs_state as an estimation of the smallest number
-                // that can be resolved with the current floating-point type.
-                auto tmp = detail::num_eps_like(max_abs_state) * max_abs_state;
+                // to achieve Brouwer's law. In such a case, we will cap the value of g_eps,
+                // using eps * max_abs_state as an upper bound for the intrinsic and unavoidable
+                // error caused by floating-point arithmetic. The idea here is that we take
+                // the Taylor series with the largest term of order zero (i.e., max_abs_state)
+                // and we compute the magnitude of the epsilon around that value.
+                auto fp_err_ub = detail::num_eps_like(max_abs_state) * max_abs_state;
 
-                // NOTE: the if condition in the next line is equivalent, in relative
-                // error control mode, to:
-                // if (m_tol < eps)
-                if (max_r_size < tmp) {
-                    return tmp;
+                // NOTE: the condition is equivalent, in relative error control mode, to m_tol < eps.
+                if (max_r_size < fp_err_ub) {
+                    return fp_err_ub;
                 } else {
                     return max_r_size;
                 }
@@ -2704,22 +2708,12 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             const auto max_abs_state = edd.m_max_abs_state[i];
 
             if (isfinite(max_abs_state)) {
-                // Are we in absolute or relative error control mode?
+                // NOTE: see the comments in the scalar integrator
+                // for an explanation of this logic.
                 const auto abs_or_rel = max_abs_state < 1;
 
-                // Estimate the size of the largest remainder in the Taylor
-                // series of both the dynamical equations and the events.
                 const auto max_r_size = abs_or_rel ? m_tol : (m_tol * max_abs_state);
 
-                // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real
-                // integration error cannot be too small due to floating-point truncation.
-                // This is the case for instance if we use sub-epsilon integration tolerances
-                // to achieve Brouwer's law. In such a case, we cap the value of g_eps,
-                // using eps * max_abs_state as an estimation of the smallest number
-                // that can be resolved with the current floating-point type.
-                // NOTE: the if condition in the next line is equivalent, in relative
-                // error control mode, to:
-                // if (m_tol < std::numeric_limits<T>::epsilon())
                 if (max_r_size < std::numeric_limits<T>::epsilon() * max_abs_state) {
                     edd.m_g_eps[i] = std::numeric_limits<T>::epsilon() * max_abs_state;
                 } else {
