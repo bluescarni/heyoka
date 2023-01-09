@@ -436,7 +436,9 @@ find_package(TBB REQUIRED CONFIG)
 target_link_libraries(heyoka PRIVATE TBB::tbb)
 
 # Mandatory dependency on Boost.
-find_package(Boost 1.60 REQUIRED serialization)
+# NOTE: need 1.69 for safe numerics.
+set(_HEYOKA_MIN_BOOST_VERSION "1.69")
+find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} REQUIRED serialization)
 target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
@@ -502,6 +504,7 @@ write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-vers
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
 
 # Cleanup.
+unset(_HEYOKA_MIN_BOOST_VERSION)
 unset(_HEYOKA_MIN_MPPP_VERSION)
 unset(_HEYOKA_WITH_REAL128)
 unset(_HEYOKA_WITH_REAL)
