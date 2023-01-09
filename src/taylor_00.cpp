@@ -523,6 +523,7 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
 
 template <typename T>
 template <typename U>
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, std::optional<T> time,
                                             std::optional<T> tol, bool high_accuracy, bool compact_mode,
                                             std::vector<T> pars, std::vector<t_event_t> tes,
@@ -830,6 +831,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
 #endif
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init,hicpp-member-init)
 template <typename T>
 taylor_adaptive<T>::taylor_adaptive()
     : taylor_adaptive({prime("x"_var) = 0_dbl}, {static_cast<T>(0)}, kw::tol = static_cast<T>(1e-1))
@@ -2380,6 +2382,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
     }
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init,hicpp-member-init)
 template <typename T>
 taylor_adaptive_batch<T>::taylor_adaptive_batch()
     : taylor_adaptive_batch({prime("x"_var) = 0_dbl}, {static_cast<T>(0)}, 1u, kw::tol = static_cast<T>(1e-1))
@@ -3168,9 +3171,9 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
             // Add padding to the times vectors to make the
             // vectorised upper_bound implementation well defined.
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                ret.m_times_hi.push_back(m_t_dir[i] ? std::numeric_limits<T>::infinity()
-                                                    : -std::numeric_limits<T>::infinity());
-                ret.m_times_lo.push_back(T(0));
+                ret.m_times_hi.push_back(m_t_dir[i] != 0 ? std::numeric_limits<T>::infinity()
+                                                         : -std::numeric_limits<T>::infinity());
+                ret.m_times_lo.emplace_back(0);
             }
 
             // Prepare the output vector.
