@@ -30,6 +30,7 @@
 
 #include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/format.h>
 
@@ -693,6 +694,9 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     // Add the stepper function.
     if (with_events) {
         std::vector<expression> ee;
+
+        using safe_size_t = boost::safe_numerics::safe<decltype(ee.size())>;
+        ee.reserve(safe_size_t(tes.size()) + ntes.size());
         // NOTE: no need for deep copies of the expressions: ee is never mutated
         // and we will be deep-copying it anyway when we do the decomposition.
         for (const auto &ev : tes) {
@@ -2239,6 +2243,9 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
     // Add the stepper function.
     if (with_events) {
         std::vector<expression> ee;
+
+        using safe_size_t = boost::safe_numerics::safe<decltype(ee.size())>;
+        ee.reserve(safe_size_t(tes.size()) + ntes.size());
         // NOTE: no need for deep copies of the expressions: ee is never mutated
         // and we will be deep-copying it anyway when we do the decomposition.
         for (const auto &ev : tes) {
@@ -2375,7 +2382,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
 
 template <typename T>
 taylor_adaptive_batch<T>::taylor_adaptive_batch()
-    : taylor_adaptive_batch({prime("x"_var) = 0_dbl}, {T(0)}, 1u, kw::tol = T(1e-1))
+    : taylor_adaptive_batch({prime("x"_var) = 0_dbl}, {static_cast<T>(0)}, 1u, kw::tol = static_cast<T>(1e-1))
 {
 }
 
@@ -2550,7 +2557,7 @@ void taylor_adaptive_batch<T>::set_time(const std::vector<T> &new_time)
         m_time_hi[i] = new_time[i];
     }
     // Reset the lo part.
-    std::fill(m_time_lo.begin(), m_time_lo.end(), T(0));
+    std::fill(m_time_lo.begin(), m_time_lo.end(), static_cast<T>(0));
 }
 
 template <typename T>
@@ -2559,7 +2566,7 @@ void taylor_adaptive_batch<T>::set_time(T new_time)
     // Set the hi part.
     std::fill(m_time_hi.begin(), m_time_hi.end(), new_time);
     // Reset the lo part.
-    std::fill(m_time_lo.begin(), m_time_lo.end(), T(0));
+    std::fill(m_time_lo.begin(), m_time_lo.end(), static_cast<T>(0));
 }
 
 template <typename T>
@@ -3200,7 +3207,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
                 const detail::dfloat<T> new_time(c_out_times_hi[c_out_times_hi.size() - m_batch_size + i],
                                                  c_out_times_lo[c_out_times_lo.size() - m_batch_size + i]);
                 assert(isfinite(new_time));
-                if (m_t_dir[i]) {
+                if (m_t_dir[i] != 0) {
                     assert(!(new_time < prev_times[i]));
                 } else {
                     assert(!(new_time > prev_times[i]));
