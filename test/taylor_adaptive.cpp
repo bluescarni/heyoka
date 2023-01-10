@@ -2220,3 +2220,96 @@ TEST_CASE("bug prop_cb time")
         Message("The invocation of the callback passed to propagate_until() resulted in the alteration of the "
                 "time coordinate of the integrator - this is not supported"));
 }
+
+TEST_CASE("cooldown set")
+{
+    using Catch::Matchers::Message;
+
+    using t_ev_t = taylor_adaptive<double>::t_event_t;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector{0., 1.});
+
+    REQUIRE_THROWS_MATCHES(ta.set_cooldown(0, {{
+                                                  0.,
+                                                  0.,
+                                              }}),
+                           std::invalid_argument, Message("No events were defined for this integrator"));
+
+    REQUIRE_THROWS_MATCHES(ta.set_cooldowns({{{
+                               0.,
+                               0.,
+                           }}}),
+                           std::invalid_argument, Message("No events were defined for this integrator"));
+
+    ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 1.}, kw::t_events = {t_ev_t(x - 1e-5)});
+
+    REQUIRE_THROWS_MATCHES(
+        ta.set_cooldown(1, {{
+                               0.,
+                               0.,
+                           }}),
+        std::invalid_argument,
+        Message("Cannot set the cooldown for the terminal event at index 1: the number of terminal events is only 1"));
+
+    REQUIRE_THROWS_MATCHES(
+        ta.set_cooldowns({{{
+                              0.,
+                              0.,
+                          }},
+                          {{
+                              0.,
+                              0.,
+                          }}}),
+        std::invalid_argument,
+        Message("The size of the vector passed to set_cooldowns() (2) differs from the number of terminal events (1)"));
+
+    REQUIRE(!ta.get_cooldowns()[0]);
+
+    ta.propagate_until(1000.);
+
+    REQUIRE(ta.get_cooldowns()[0]);
+    REQUIRE(ta.get_cooldowns()[0]->first == 0.);
+    REQUIRE(ta.get_cooldowns()[0]->second > 0.);
+
+    REQUIRE_THROWS_AS(ta.set_cooldown(0, {{
+                                             std::numeric_limits<double>::infinity(),
+                                             0.,
+                                         }}),
+                      std::invalid_argument);
+    REQUIRE_THROWS_AS(ta.set_cooldown(0, {{0., std::numeric_limits<double>::quiet_NaN()}}), std::invalid_argument);
+    REQUIRE_THROWS_AS(ta.set_cooldown(0, {{0., -1}}), std::invalid_argument);
+    REQUIRE_THROWS_AS(ta.set_cooldown(0, {{2., 1}}), std::invalid_argument);
+
+    REQUIRE_THROWS_AS(ta.set_cooldowns({{{
+                          std::numeric_limits<double>::infinity(),
+                          0.,
+                      }}}),
+                      std::invalid_argument);
+    REQUIRE_THROWS_AS(ta.set_cooldowns({{{
+                          0.,
+                          std::numeric_limits<double>::quiet_NaN(),
+                      }}}),
+                      std::invalid_argument);
+    REQUIRE_THROWS_AS(ta.set_cooldowns({{{
+                          0.,
+                          -1,
+                      }}}),
+                      std::invalid_argument);
+    REQUIRE_THROWS_AS(ta.set_cooldowns({{{
+                          2.,
+                          1,
+                      }}}),
+                      std::invalid_argument);
+
+    ta.set_cooldown(0, {{.5, 1}});
+    REQUIRE(*ta.get_cooldowns()[0] == std::make_pair(.5, 1.));
+    ta.set_cooldown(0, {});
+    REQUIRE(!ta.get_cooldowns()[0]);
+
+    ta.set_cooldowns({{{.5, 1}}});
+    REQUIRE(*ta.get_cooldowns()[0] == std::make_pair(.5, 1.));
+    ta.set_cooldowns({{}});
+    REQUIRE(!ta.get_cooldowns()[0]);
+}

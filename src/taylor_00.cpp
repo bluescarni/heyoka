@@ -33,6 +33,7 @@
 #include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -1352,6 +1353,83 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(T max_delta_t, bool wtc)
 #endif
 
     return step_impl(std::move(max_delta_t), wtc);
+}
+
+namespace detail
+{
+
+namespace
+{
+
+// Helper to check the optional pair that represents
+// a terminal event's cooldown.
+template <typename T>
+void check_cdo(const std::optional<std::pair<T, T>> &cdo)
+{
+    if (cdo) {
+        using std::isfinite;
+
+        const auto &cd = *cdo;
+
+        if (!isfinite(cd.first) || !isfinite(cd.second)) {
+            throw std::invalid_argument(
+                fmt::format("Cannot set the cooldown of a terminal event to the non-finite pair {}", cd));
+        }
+
+        if (cd.second < 0) {
+            throw std::invalid_argument(fmt::format("The total cooldown time of a terminal event cannot be negative, "
+                                                    "but the negative value {} was provided",
+                                                    cd.second));
+        }
+
+        if (abs_lt(cd.second, cd.first)) {
+            throw std::invalid_argument(fmt::format(
+                "The elapsed cooldown time ({}) must not be greater than the total cooldown time ({}) in magnitude",
+                cd.first, cd.second));
+        }
+    }
+}
+
+} // namespace
+
+} // namespace detail
+
+template <typename T>
+void taylor_adaptive<T>::set_cooldown(std::uint32_t i, std::optional<std::pair<T, T>> cdo)
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    if (i >= m_ed_data->m_te_cooldowns.size()) {
+        throw std::invalid_argument(fmt::format(
+            "Cannot set the cooldown for the terminal event at index {}: the number of terminal events is only {}", i,
+            m_ed_data->m_te_cooldowns.size()));
+    }
+
+    detail::check_cdo(cdo);
+
+    m_ed_data->m_te_cooldowns[i] = std::move(cdo);
+}
+
+template <typename T>
+void taylor_adaptive<T>::set_cooldowns(std::vector<std::optional<std::pair<T, T>>> cdos)
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    if (cdos.size() != m_ed_data->m_te_cooldowns.size()) {
+        throw std::invalid_argument(fmt::format(
+            "The size of the vector passed to set_cooldowns() ({}) differs from the number of terminal events ({})",
+            cdos.size(), m_ed_data->m_te_cooldowns.size()));
+    }
+
+    for (const auto &cdo : cdos) {
+        detail::check_cdo(cdo);
+    }
+
+    m_ed_data->m_te_cooldowns = std::move(cdos);
 }
 
 // Reset all cooldowns for the terminal events.

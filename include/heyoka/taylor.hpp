@@ -1217,8 +1217,7 @@ public:
     {
         return static_cast<bool>(m_ed_data);
     }
-    void reset_cooldowns();
-    const auto &get_cooldowns() const
+    const std::vector<std::optional<std::pair<T, T>>> &get_cooldowns() const
     {
         if (!m_ed_data) {
             throw std::invalid_argument("No events were defined for this integrator");
@@ -1226,6 +1225,9 @@ public:
 
         return m_ed_data->m_te_cooldowns;
     }
+    void set_cooldown(std::uint32_t, std::optional<std::pair<T, T>>);
+    void set_cooldowns(std::vector<std::optional<std::pair<T, T>>>);
+    void reset_cooldowns();
     const std::vector<t_event_t> &get_t_events() const
     {
         if (!m_ed_data) {
