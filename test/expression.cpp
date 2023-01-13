@@ -976,7 +976,7 @@ TEST_CASE("copy")
             != std::get<func>(std::get<func>(bar.value()).args()[1].value()).get_ptr());
 }
 
-TEST_CASE("subs")
+TEST_CASE("subs str")
 {
     auto [x, y, z, a] = make_vars("x", "y", "z", "a");
 
@@ -1006,6 +1006,37 @@ TEST_CASE("subs")
         std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[0].value()).args()[0].value()).get_ptr()
         == std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[1].value()).args()[1].value())
                .get_ptr());
+}
+
+TEST_CASE("subs")
+{
+    auto [x, y, z, a] = make_vars("x", "y", "z", "a");
+
+    REQUIRE(subs(x, {{z, x + y}}) == x);
+    REQUIRE(subs(1_dbl, {{z, x + y}}) == 1_dbl);
+    REQUIRE(subs(x, {{x, x + y}}) == x + y);
+    REQUIRE(subs(1_dbl, {{1_dbl, x + y}}) == x + y);
+
+    REQUIRE(subs(x + y, {{x + y, z}}) == z);
+    REQUIRE(subs(x + z, {{x + y, z}}) == x + z);
+
+    auto tmp = x + y;
+    auto tmp2 = x - y;
+    auto *tmp2_id = std::get<func>(tmp2.value()).get_ptr();
+    auto ex = tmp - 2_dbl * tmp;
+    auto subs_res = subs(ex, {{tmp, tmp2}});
+
+    REQUIRE(subs_res == tmp2 - 2_dbl * tmp2);
+    REQUIRE(tmp2_id == std::get<func>(std::get<func>(subs_res.value()).args()[0].value()).get_ptr());
+    REQUIRE(tmp2_id
+            == std::get<func>(std::get<func>(std::get<func>(subs_res.value()).args()[1].value()).args()[1].value())
+                   .get_ptr());
+
+    subs_res = subs(ex, {{x, z}});
+    REQUIRE(subs_res == (z + y) - 2_dbl * (z + y));
+    REQUIRE(std::get<func>(std::get<func>(subs_res.value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(subs_res.value()).args()[1].value()).args()[1].value())
+                   .get_ptr());
 }
 
 // cfunc N-body with fixed masses.

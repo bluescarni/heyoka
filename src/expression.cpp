@@ -1197,7 +1197,6 @@ namespace detail
 namespace
 {
 
-// NOTE: an in-place API would perform better.
 expression subs(std::unordered_map<const void *, expression> &func_map, const expression &ex,
                 const std::unordered_map<std::string, expression> &smap)
 {
@@ -1247,6 +1246,69 @@ expression subs(std::unordered_map<const void *, expression> &func_map, const ex
 } // namespace detail
 
 expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
+{
+    std::unordered_map<const void *, expression> func_map;
+
+    return detail::subs(func_map, e, smap);
+}
+
+namespace detail
+{
+
+namespace
+{
+
+expression subs(std::unordered_map<const void *, expression> &func_map, const expression &ex,
+                const std::unordered_map<expression, expression> &smap)
+{
+    if (auto it = smap.find(ex); it != smap.end()) {
+        // ex is in the substitution map, return the value it maps to.
+        return it->second;
+    }
+
+    return std::visit(
+        [&](const auto &arg) {
+            using type = uncvref_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<type, func>) {
+                const auto f_id = arg.get_ptr();
+
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already performed substitution on the current function,
+                    // fetch the result from the cache.
+                    return it->second;
+                }
+
+                // NOTE: this creates a separate instance of arg, but its
+                // arguments are shallow-copied.
+                auto tmp = arg.copy();
+
+                for (auto [b, e] = tmp.get_mutable_args_it(); b != e; ++b) {
+                    *b = subs(func_map, *b, smap);
+                }
+
+                // Put the return value in the cache.
+                auto ret = expression{std::move(tmp)};
+                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return ret;
+            } else {
+                // ex is not a function, i.e., it is a var/num/... which does not show
+                // up in the substitution map. Thus, we can just return a copy of it
+                // unchanged.
+                return expression{arg};
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+} // namespace detail
+
+expression subs(const expression &e, const std::unordered_map<expression, expression> &smap)
 {
     std::unordered_map<const void *, expression> func_map;
 
