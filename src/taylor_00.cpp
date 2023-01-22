@@ -30,8 +30,10 @@
 
 #include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -522,6 +524,7 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
 
 template <typename T>
 template <typename U>
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, std::optional<T> time,
                                             std::optional<T> tol, bool high_accuracy, bool compact_mode,
                                             std::vector<T> pars, std::vector<t_event_t> tes,
@@ -693,6 +696,9 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     // Add the stepper function.
     if (with_events) {
         std::vector<expression> ee;
+
+        using safe_size_t = boost::safe_numerics::safe<decltype(ee.size())>;
+        ee.reserve(safe_size_t(tes.size()) + ntes.size());
         // NOTE: no need for deep copies of the expressions: ee is never mutated
         // and we will be deep-copying it anyway when we do the decomposition.
         for (const auto &ev : tes) {
@@ -826,6 +832,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
 #endif
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init,hicpp-member-init)
 template <typename T>
 taylor_adaptive<T>::taylor_adaptive()
     : taylor_adaptive({prime("x"_var) = 0_dbl}, {static_cast<T>(0)}, kw::tol = static_cast<T>(1e-1))
@@ -1082,23 +1089,27 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
                 // Are we in absolute or relative error control mode?
                 const auto abs_or_rel = max_abs_state < 1;
 
-                // Estimate the size of the largest remainder in the Taylor
-                // series of both the dynamical equations and the events.
+                // Estimate an upper bound for the size of the remainder in the Taylor
+                // series of both the dynamical equations and the events. That is, this
+                // is an estimation of the maximum *absolute* integration error.
+                // NOTE: this is based on Jorba's estimation of the integration error,
+                // except for the fact that Jorba's estimation has an additional
+                // division by e**2 (so that this estimation is more pessimistic).
                 auto max_r_size = abs_or_rel ? m_tol : (m_tol * max_abs_state);
 
-                // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real
+                // NOTE: depending on m_tol, max_r_size can be arbitrarily small, but the real
                 // integration error cannot be too small due to floating-point truncation.
                 // This is the case for instance if we use sub-epsilon integration tolerances
-                // to achieve Brouwer's law. In such a case, we cap the value of g_eps,
-                // using eps * max_abs_state as an estimation of the smallest number
-                // that can be resolved with the current floating-point type.
-                auto tmp = detail::num_eps_like(max_abs_state) * max_abs_state;
+                // to achieve Brouwer's law. In such a case, we will cap the value of g_eps,
+                // using eps * max_abs_state as an upper bound for the intrinsic and unavoidable
+                // error caused by floating-point arithmetic. The idea here is that we take
+                // the Taylor series with the largest term of order zero (i.e., max_abs_state)
+                // and we compute the magnitude of the epsilon around that value.
+                auto fp_err_ub = detail::num_eps_like(max_abs_state) * max_abs_state;
 
-                // NOTE: the if condition in the next line is equivalent, in relative
-                // error control mode, to:
-                // if (m_tol < eps)
-                if (max_r_size < tmp) {
-                    return tmp;
+                // NOTE: the condition is equivalent, in relative error control mode, to m_tol < eps.
+                if (max_r_size < fp_err_ub) {
+                    return fp_err_ub;
                 } else {
                     return max_r_size;
                 }
@@ -1342,6 +1353,83 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step(T max_delta_t, bool wtc)
 #endif
 
     return step_impl(std::move(max_delta_t), wtc);
+}
+
+namespace detail
+{
+
+namespace
+{
+
+// Helper to check the optional pair that represents
+// a terminal event's cooldown.
+template <typename T>
+void check_cdo(const std::optional<std::pair<T, T>> &cdo)
+{
+    if (cdo) {
+        using std::isfinite;
+
+        const auto &cd = *cdo;
+
+        if (!isfinite(cd.first) || !isfinite(cd.second)) {
+            throw std::invalid_argument(
+                fmt::format("Cannot set the cooldown of a terminal event to the non-finite pair {}", cd));
+        }
+
+        if (cd.second < 0) {
+            throw std::invalid_argument(fmt::format("The total cooldown time of a terminal event cannot be negative, "
+                                                    "but the negative value {} was provided",
+                                                    cd.second));
+        }
+
+        if (abs_lt(cd.second, cd.first)) {
+            throw std::invalid_argument(fmt::format(
+                "The elapsed cooldown time ({}) must not be greater than the total cooldown time ({}) in magnitude",
+                cd.first, cd.second));
+        }
+    }
+}
+
+} // namespace
+
+} // namespace detail
+
+template <typename T>
+void taylor_adaptive<T>::set_cooldown(std::uint32_t i, std::optional<std::pair<T, T>> cdo)
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    if (i >= m_ed_data->m_te_cooldowns.size()) {
+        throw std::invalid_argument(fmt::format(
+            "Cannot set the cooldown for the terminal event at index {}: the number of terminal events is only {}", i,
+            m_ed_data->m_te_cooldowns.size()));
+    }
+
+    detail::check_cdo(cdo);
+
+    m_ed_data->m_te_cooldowns[i] = std::move(cdo);
+}
+
+template <typename T>
+void taylor_adaptive<T>::set_cooldowns(std::vector<std::optional<std::pair<T, T>>> cdos)
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    if (cdos.size() != m_ed_data->m_te_cooldowns.size()) {
+        throw std::invalid_argument(fmt::format(
+            "The size of the vector passed to set_cooldowns() ({}) differs from the number of terminal events ({})",
+            cdos.size(), m_ed_data->m_te_cooldowns.size()));
+    }
+
+    for (const auto &cdo : cdos) {
+        detail::check_cdo(cdo);
+    }
+
+    m_ed_data->m_te_cooldowns = std::move(cdos);
 }
 
 // Reset all cooldowns for the terminal events.
@@ -2235,6 +2323,9 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
     // Add the stepper function.
     if (with_events) {
         std::vector<expression> ee;
+
+        using safe_size_t = boost::safe_numerics::safe<decltype(ee.size())>;
+        ee.reserve(safe_size_t(tes.size()) + ntes.size());
         // NOTE: no need for deep copies of the expressions: ee is never mutated
         // and we will be deep-copying it anyway when we do the decomposition.
         for (const auto &ev : tes) {
@@ -2369,9 +2460,10 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
     }
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init,hicpp-member-init)
 template <typename T>
 taylor_adaptive_batch<T>::taylor_adaptive_batch()
-    : taylor_adaptive_batch({prime("x"_var) = 0_dbl}, {T(0)}, 1u, kw::tol = T(1e-1))
+    : taylor_adaptive_batch({prime("x"_var) = 0_dbl}, {static_cast<T>(0)}, 1u, kw::tol = static_cast<T>(1e-1))
 {
 }
 
@@ -2546,7 +2638,7 @@ void taylor_adaptive_batch<T>::set_time(const std::vector<T> &new_time)
         m_time_hi[i] = new_time[i];
     }
     // Reset the lo part.
-    std::fill(m_time_lo.begin(), m_time_lo.end(), T(0));
+    std::fill(m_time_lo.begin(), m_time_lo.end(), static_cast<T>(0));
 }
 
 template <typename T>
@@ -2555,7 +2647,7 @@ void taylor_adaptive_batch<T>::set_time(T new_time)
     // Set the hi part.
     std::fill(m_time_hi.begin(), m_time_hi.end(), new_time);
     // Reset the lo part.
-    std::fill(m_time_lo.begin(), m_time_lo.end(), T(0));
+    std::fill(m_time_lo.begin(), m_time_lo.end(), static_cast<T>(0));
 }
 
 template <typename T>
@@ -2704,22 +2796,12 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             const auto max_abs_state = edd.m_max_abs_state[i];
 
             if (isfinite(max_abs_state)) {
-                // Are we in absolute or relative error control mode?
+                // NOTE: see the comments in the scalar integrator
+                // for an explanation of this logic.
                 const auto abs_or_rel = max_abs_state < 1;
 
-                // Estimate the size of the largest remainder in the Taylor
-                // series of both the dynamical equations and the events.
                 const auto max_r_size = abs_or_rel ? m_tol : (m_tol * max_abs_state);
 
-                // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real
-                // integration error cannot be too small due to floating-point truncation.
-                // This is the case for instance if we use sub-epsilon integration tolerances
-                // to achieve Brouwer's law. In such a case, we cap the value of g_eps,
-                // using eps * max_abs_state as an estimation of the smallest number
-                // that can be resolved with the current floating-point type.
-                // NOTE: the if condition in the next line is equivalent, in relative
-                // error control mode, to:
-                // if (m_tol < std::numeric_limits<T>::epsilon())
                 if (max_r_size < std::numeric_limits<T>::epsilon() * max_abs_state) {
                     edd.m_g_eps[i] = std::numeric_limits<T>::epsilon() * max_abs_state;
                 } else {
@@ -3167,9 +3249,9 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
             // Add padding to the times vectors to make the
             // vectorised upper_bound implementation well defined.
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                ret.m_times_hi.push_back(m_t_dir[i] ? std::numeric_limits<T>::infinity()
-                                                    : -std::numeric_limits<T>::infinity());
-                ret.m_times_lo.push_back(T(0));
+                ret.m_times_hi.push_back(m_t_dir[i] != 0 ? std::numeric_limits<T>::infinity()
+                                                         : -std::numeric_limits<T>::infinity());
+                ret.m_times_lo.emplace_back(0);
             }
 
             // Prepare the output vector.
@@ -3206,7 +3288,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
                 const detail::dfloat<T> new_time(c_out_times_hi[c_out_times_hi.size() - m_batch_size + i],
                                                  c_out_times_lo[c_out_times_lo.size() - m_batch_size + i]);
                 assert(isfinite(new_time));
-                if (m_t_dir[i]) {
+                if (m_t_dir[i] != 0) {
                     assert(!(new_time < prev_times[i]));
                 } else {
                     assert(!(new_time > prev_times[i]));

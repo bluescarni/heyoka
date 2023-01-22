@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 0.20.1 LANGUAGES CXX C)
+project(heyoka VERSION 0.21.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -289,8 +289,8 @@ if(HEYOKA_BUILD_STATIC_LIBRARY)
 else()
     # Setup of the heyoka shared library.
     add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
-    set_property(TARGET heyoka PROPERTY VERSION "20.0")
-    set_property(TARGET heyoka PROPERTY SOVERSION 20)
+    set_property(TARGET heyoka PROPERTY VERSION "21.0")
+    set_property(TARGET heyoka PROPERTY SOVERSION 21)
     set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
 endif()
@@ -436,7 +436,9 @@ find_package(TBB REQUIRED CONFIG)
 target_link_libraries(heyoka PRIVATE TBB::tbb)
 
 # Mandatory dependency on Boost.
-find_package(Boost 1.60 REQUIRED serialization)
+# NOTE: need 1.69 for safe numerics.
+set(_HEYOKA_MIN_BOOST_VERSION "1.69")
+find_package(Boost ${_HEYOKA_MIN_BOOST_VERSION} REQUIRED serialization)
 target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
@@ -502,6 +504,7 @@ write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-vers
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
 
 # Cleanup.
+unset(_HEYOKA_MIN_BOOST_VERSION)
 unset(_HEYOKA_MIN_MPPP_VERSION)
 unset(_HEYOKA_WITH_REAL128)
 unset(_HEYOKA_WITH_REAL)
