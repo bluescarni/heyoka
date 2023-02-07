@@ -1159,10 +1159,6 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         // end of the timestep.
         if (!isfinite(m_time)
             || std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !isfinite(x); })) {
-            // Let's also reset the cooldown values, as at this point
-            // they have become useless.
-            reset_cooldowns();
-
             return std::tuple{taylor_outcome::err_nf_state, std::move(h)};
         }
 
@@ -2789,10 +2785,6 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             // Check if the time or the state vector are non-finite at the
             // end of the timestep.
             if (!isfinite(new_time) || m_nf_detected[i] != 0) {
-                // Let's also reset the cooldown values for this batch index,
-                // as at this point they have become useless.
-                reset_cooldowns(i);
-
                 m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
 
                 // Move to the next batch element.
