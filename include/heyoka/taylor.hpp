@@ -1910,23 +1910,31 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive
 
 #endif
 
-} // namespace heyoka
-
-// NOTE: copy the implementation of the BOOST_CLASS_VERSION macro, as it does
-// not support class templates.
-// Version history:
-// - 1: added base class to taylor_adaptive.
-namespace boost::serialization
+namespace detail
 {
 
-template <typename T>
-struct version<heyoka::taylor_adaptive<T>> {
-    typedef mpl::int_<1> type;
-    typedef mpl::integral_c_tag tag;
-    BOOST_STATIC_CONSTANT(int, value = version::type::value);
-    BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<1>, boost::mpl::int_<256>>));
-};
+// Boost s11n class version history for taylor_adaptive:
+// - 1: added base class to taylor_adaptive.
+inline constexpr int taylor_adaptive_s11n_version = 1;
 
-} // namespace boost::serialization
+} // namespace detail
+
+} // namespace heyoka
+
+// Set the Boost s11n class version for taylor_adaptive.
+BOOST_CLASS_VERSION(heyoka::taylor_adaptive<double>, heyoka::detail::taylor_adaptive_s11n_version);
+BOOST_CLASS_VERSION(heyoka::taylor_adaptive<long double>, heyoka::detail::taylor_adaptive_s11n_version);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+BOOST_CLASS_VERSION(heyoka::taylor_adaptive<mppp::real128>, heyoka::detail::taylor_adaptive_s11n_version);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+BOOST_CLASS_VERSION(heyoka::taylor_adaptive<mppp::real>, heyoka::detail::taylor_adaptive_s11n_version);
+
+#endif
 
 #endif

@@ -16,7 +16,7 @@ export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 conda config --add channels conda-forge
 conda config --set channel_priority strict
-conda create -y -q -p $deps_dir c-compiler cxx-compiler cmake llvmdev tbb-devel tbb boost-cpp 'mppp>=0.27' sleef xtensor xtensor-blas blas blas-devel fmt spdlog
+conda create -y -q -p $deps_dir c-compiler cxx-compiler cmake llvmdev tbb-devel tbb boost-cpp 'mppp>=0.27' sleef xtensor xtensor-blas blas blas-devel fmt spdlog lcov
 source activate $deps_dir
 
 # Create the build dir and cd into it.
@@ -28,8 +28,13 @@ cmake ../ -DCMAKE_PREFIX_PATH=$deps_dir -DCMAKE_BUILD_TYPE=Debug -DHEYOKA_BUILD_
 make -j2 VERBOSE=1
 ctest -V -j2
 
+# Create lcov report
+lcov --capture --directory . --output-file coverage.info
+
 # Upload coverage data.
-bash <(curl -s https://codecov.io/bash) -x $deps_dir/bin/gcov
+curl -Os https://uploader.codecov.io/latest/linux/codecov
+chmod +x codecov
+./codecov -f coverage.info -g --gx $deps_dir/bin/gcov
 
 set +e
 set +x

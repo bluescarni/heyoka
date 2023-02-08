@@ -632,12 +632,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     m_high_accuracy = high_accuracy;
     m_compact_mode = compact_mode;
 
-    // Check input params.
-    if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !isfinite(x); })) {
-        throw std::invalid_argument(
-            "A non-finite value was detected in the initial state of an adaptive Taylor integrator");
-    }
-
+    // Check the input state.
     if (m_state.size() != sys.size()) {
         throw std::invalid_argument(
             fmt::format("Inconsistent sizes detected in the initialization of an adaptive Taylor "
@@ -645,18 +640,14 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
                         m_state.size(), sys.size()));
     }
 
-    if (!isfinite(m_time)) {
-        throw std::invalid_argument(
-            fmt::format("Cannot initialise an adaptive Taylor integrator with a non-finite initial time of {}",
-                        detail::fp_to_string(static_cast<T>(m_time))));
-    }
-
+    // Check the tolerance value.
     if (tol && (!isfinite(*tol) || *tol < 0)) {
         throw std::invalid_argument(fmt::format(
             "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead",
             detail::fp_to_string(*tol)));
     }
 
+    // Check the consistency of parallel vs compact mode.
     if (parallel_mode && !compact_mode) {
         throw std::invalid_argument("Parallel mode can be activated only in conjunction with compact mode");
     }
@@ -1168,10 +1159,6 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         // end of the timestep.
         if (!isfinite(m_time)
             || std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !isfinite(x); })) {
-            // Let's also reset the cooldown values, as at this point
-            // they have become useless.
-            reset_cooldowns();
-
             return std::tuple{taylor_outcome::err_nf_state, std::move(h)};
         }
 
@@ -2166,14 +2153,9 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
     m_high_accuracy = high_accuracy;
     m_compact_mode = compact_mode;
 
-    // Check input params.
+    // Check several input params.
     if (m_batch_size == 0u) {
         throw std::invalid_argument("The batch size in an adaptive Taylor integrator cannot be zero");
-    }
-
-    if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !isfinite(x); })) {
-        throw std::invalid_argument(
-            "A non-finite value was detected in the initial state of an adaptive Taylor integrator");
     }
 
     if (m_state.size() % m_batch_size != 0u) {
@@ -2196,12 +2178,6 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
             fmt::format("Invalid size detected in the initialization of an adaptive Taylor "
                         "integrator: the time vector has a size of {}, which is not equal to the batch size ({})",
                         m_time_hi.size(), m_batch_size));
-    }
-    // NOTE: no need to check m_time_lo for finiteness, as it
-    // was inited to zero already.
-    if (std::any_of(m_time_hi.begin(), m_time_hi.end(), [](const auto &x) { return !isfinite(x); })) {
-        throw std::invalid_argument(
-            "A non-finite initial time was detected in the initialisation of an adaptive Taylor integrator");
     }
 
     if (tol && (!isfinite(*tol) || *tol < 0)) {
@@ -2809,10 +2785,6 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             // Check if the time or the state vector are non-finite at the
             // end of the timestep.
             if (!isfinite(new_time) || m_nf_detected[i] != 0) {
-                // Let's also reset the cooldown values for this batch index,
-                // as at this point they have become useless.
-                reset_cooldowns(i);
-
                 m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
 
                 // Move to the next batch element.
