@@ -9,11 +9,15 @@
 #ifndef HEYOKA_KW_HPP
 #define HEYOKA_KW_HPP
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/igor.hpp>
 
 // NOTE: these are keyword arguments that are
 // shared among several files.
-namespace heyoka::kw
+
+HEYOKA_BEGIN_NAMESPACE
+
+namespace kw
 {
 
 IGOR_MAKE_NAMED_ARGUMENT(masses);
@@ -27,6 +31,8 @@ IGOR_MAKE_NAMED_ARGUMENT(high_accuracy);
 IGOR_MAKE_NAMED_ARGUMENT(parallel_mode);
 IGOR_MAKE_NAMED_ARGUMENT(prec);
 
-} // namespace heyoka::kw
+} // namespace kw
+
+HEYOKA_END_NAMESPACE
 
 #endif

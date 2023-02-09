@@ -46,7 +46,9 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 // Various static checks.
@@ -721,7 +723,9 @@ mppp::real eps_from_prec(mpfr_prec_t p)
     return mppp::real{1ul, boost::numeric_cast<mpfr_exp_t>(-(p - 1)), p};
 }
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #if !defined(NDEBUG)
 

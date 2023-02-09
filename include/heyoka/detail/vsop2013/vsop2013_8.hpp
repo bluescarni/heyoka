@@ -9,7 +9,11 @@
 #ifndef HEYOKA_DETAIL_VSOP2013_VSOP2013_8_HPP
 #define HEYOKA_DETAIL_VSOP2013_VSOP2013_8_HPP
 
-namespace heyoka::detail
+#include <heyoka/config.hpp>
+
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 inline constexpr unsigned long vsop2013_8_1_sizes[12]
@@ -31,6 +35,8 @@ extern const double *const vsop2013_8_4_data[11];
 extern const double *const vsop2013_8_5_data[9];
 extern const double *const vsop2013_8_6_data[11];
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

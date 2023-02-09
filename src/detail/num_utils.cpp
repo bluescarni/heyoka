@@ -27,7 +27,9 @@
 
 #include <heyoka/detail/num_utils.hpp>
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 template <typename T>
@@ -150,4 +152,6 @@ template mppp::real num_inf_like(const mppp::real &);
 
 #endif
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE

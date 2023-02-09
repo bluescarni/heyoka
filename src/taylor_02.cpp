@@ -90,8 +90,7 @@
 
 #endif
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -2110,7 +2109,7 @@ template HEYOKA_DLL_PUBLIC mppp::real taylor_default_max_delta_t<mppp::real>();
 
 } // namespace detail
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 #if defined(__GNUC__) && (__GNUC__ >= 11)
 

@@ -26,7 +26,9 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 // A minimal class for double-length float arithmetic.
@@ -267,6 +269,8 @@ inline bool operator>=(const F &x, const dfloat<F> &y)
     return dfloat<F>(x) >= y;
 }
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

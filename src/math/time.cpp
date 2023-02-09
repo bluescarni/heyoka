@@ -44,8 +44,7 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -214,6 +213,6 @@ bool is_time(const expression &ex)
 
 const expression time{func{detail::time_impl{}}};
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::time_impl)

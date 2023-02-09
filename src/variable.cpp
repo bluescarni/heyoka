@@ -31,8 +31,7 @@
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 variable::variable() : variable("") {}
 
@@ -158,4 +157,4 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const variab
     node_counter++;
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE

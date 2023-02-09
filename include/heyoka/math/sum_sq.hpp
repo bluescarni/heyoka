@@ -22,8 +22,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/s11n.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -69,7 +68,7 @@ inline constexpr std::uint32_t default_sum_sq_split = 64;
 
 HEYOKA_DLL_PUBLIC expression sum_sq(std::vector<expression>, std::uint32_t = detail::default_sum_sq_split);
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::sum_sq_impl)
 

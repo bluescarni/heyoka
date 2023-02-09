@@ -11,10 +11,10 @@
 
 #include <stdexcept>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/visibility.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS not_implemented_error final : std::runtime_error {
     using std::runtime_error::runtime_error;
@@ -25,6 +25,6 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS zero_division_error final : std::domain_er
     using std::domain_error::domain_error;
 };
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 #endif

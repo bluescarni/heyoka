@@ -105,8 +105,7 @@
 
 #endif
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 expression::expression() : expression(number{0.}) {}
 
@@ -3290,7 +3289,7 @@ bool has_time(const expression &ex)
     return detail::has_time(func_set, ex);
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 #if defined(__GNUC__) && (__GNUC__ >= 11)
 

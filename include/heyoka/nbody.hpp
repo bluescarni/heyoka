@@ -17,6 +17,7 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -25,8 +26,7 @@
 #include <heyoka/kw.hpp>
 #include <heyoka/number.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -217,6 +217,6 @@ inline std::vector<std::pair<expression, expression>> make_nbody_par_sys(std::ui
     }
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 #endif

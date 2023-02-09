@@ -25,7 +25,11 @@
 
 #endif
 
-namespace heyoka::detail
+#include <heyoka/config.hpp>
+
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 #if FMT_VERSION >= 90000L
@@ -59,6 +63,8 @@ struct ostream_formatter {
 
 #endif
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

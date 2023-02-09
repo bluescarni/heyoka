@@ -14,7 +14,11 @@
 // extra properties in addition to its numerical value (e.g., the precision
 // in case of mppp::real).
 
-namespace heyoka::detail
+#include <heyoka/config.hpp>
+
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 template <typename T>
@@ -29,6 +33,8 @@ T num_eps_like(const T &);
 template <typename T>
 T num_inf_like(const T &);
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

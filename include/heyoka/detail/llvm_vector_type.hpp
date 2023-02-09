@@ -12,7 +12,11 @@
 #include <llvm/Config/llvm-config.h>
 #include <llvm/IR/DerivedTypes.h>
 
-namespace heyoka::detail
+#include <heyoka/config.hpp>
+
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 // NOTE: this is a convenience typedef for the LLVM
@@ -28,6 +32,8 @@ using llvm_vector_type =
 #endif
     ;
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

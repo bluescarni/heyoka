@@ -34,8 +34,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/s11n.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -104,7 +103,7 @@ HEYOKA_DLL_PUBLIC expression atan2(mppp::real, expression);
 
 #endif
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::atan2_impl)
 

@@ -136,8 +136,7 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -1243,4 +1242,4 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
     return os << oss.str();
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE

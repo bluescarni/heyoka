@@ -77,8 +77,7 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -4018,4 +4017,4 @@ template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<mppp::real128>::finalise_c
 
 #endif
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE

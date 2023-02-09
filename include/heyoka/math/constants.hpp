@@ -17,6 +17,7 @@
 #include <vector>
 
 #include <heyoka/callable.hpp>
+#include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -24,8 +25,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/s11n.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -110,7 +110,7 @@ public:
 
 HEYOKA_DLL_PUBLIC extern const expression pi;
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::null_constant_func, std::string, unsigned)
 

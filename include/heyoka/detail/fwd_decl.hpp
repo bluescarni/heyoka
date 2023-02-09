@@ -13,10 +13,10 @@
 #include <utility>
 #include <vector>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/visibility.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 // Fwd declaration of heyoka classes.
 class HEYOKA_DLL_PUBLIC expression;
@@ -52,6 +52,6 @@ enum class event_direction { negative = -1, any = 0, positive = 1 };
 // Type representing a Taylor decomposition.
 using taylor_dc_t = std::vector<std::pair<expression, std::vector<std::uint32_t>>>;
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 #endif

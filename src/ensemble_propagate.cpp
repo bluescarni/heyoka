@@ -46,7 +46,9 @@
 // - copy construction of the events' callbacks and invocation of the call operator
 //   on the copies.
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 template <typename T>
@@ -392,4 +394,6 @@ HEYOKA_ENSEMBLE_PROPAGATE_BATCH_INST(mppp::real128)
 
 #endif
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE

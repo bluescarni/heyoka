@@ -14,14 +14,14 @@
 #include <utility>
 #include <vector>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/math/time.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace kw
 {
@@ -92,6 +92,6 @@ inline std::vector<expression> vsop2013_cartesian_icrf(std::uint32_t pl_idx, KwA
 
 HEYOKA_DLL_PUBLIC std::array<double, 10> get_vsop2013_mus();
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 #endif

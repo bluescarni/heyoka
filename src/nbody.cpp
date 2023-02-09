@@ -19,6 +19,7 @@
 
 #include <fmt/format.h>
 
+#include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sum.hpp>
@@ -27,8 +28,7 @@
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 
@@ -426,4 +426,4 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::ui
 
 } // namespace detail
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
