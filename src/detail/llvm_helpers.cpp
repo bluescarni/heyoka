@@ -12,11 +12,13 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <initializer_list>
 #include <ios>
 #include <limits>
 #include <locale>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -951,7 +953,7 @@ void llvm_if_then_else(llvm_state &s, llvm::Value *cond, const std::function<voi
 
     // Fetch the current function.
     assert(builder.GetInsertBlock() != nullptr);
-    auto f = builder.GetInsertBlock()->getParent();
+    auto *f = builder.GetInsertBlock()->getParent();
     assert(f != nullptr);
 
     // Create and insert the "then" block.
@@ -997,6 +999,107 @@ void llvm_if_then_else(llvm_state &s, llvm::Value *cond, const std::function<voi
 
     // Jump to the merge block.
     builder.CreateBr(merge_bb);
+
+    // Emit the merge block.
+    f->getBasicBlockList().push_back(merge_bb);
+    builder.SetInsertPoint(merge_bb);
+}
+
+// Create a switch statement of the type:
+//
+// switch (val) {
+//      default:
+//          default_f();
+//          break;
+//      case_i:
+//          case_i_f();
+//          break;
+// }
+//
+// where the pairs (case_i, case_i_f) are the elements in the 'cases' argument.
+// val must be a 32-bit int.
+void llvm_switch_u32(llvm_state &s, llvm::Value *val, const std::function<void()> &default_f,
+                     const std::map<std::uint32_t, std::function<void()>> &cases)
+{
+    auto &context = s.context();
+    auto &builder = s.builder();
+
+    assert(val->getType() == builder.getInt32Ty());
+
+    // Fetch the current function.
+    assert(builder.GetInsertBlock() != nullptr);
+    auto *f = builder.GetInsertBlock()->getParent();
+    assert(f != nullptr);
+
+    // Prepare the blocks for the cases.
+    std::deque<llvm::BasicBlock *> cases_blocks;
+    for ([[maybe_unused]] const auto &cp : cases) {
+        cases_blocks.push_back(llvm::BasicBlock::Create(context));
+    }
+
+    // Helper to clean up the uninserted blocks in case of exceptions.
+    auto bb_cleanup = [&cases_blocks]() {
+        for (auto *bb : cases_blocks) {
+            bb->deleteValue();
+        }
+    };
+
+    // Create and insert the default block.
+    auto *default_bb = llvm::BasicBlock::Create(context, "", f);
+
+    // Create but do not insert the merge block.
+    auto *merge_bb = llvm::BasicBlock::Create(context);
+
+    // Create the switch instruction.
+    auto *sw_inst = builder.CreateSwitch(val, default_bb);
+
+    // Emit the code for the default case.
+    builder.SetInsertPoint(default_bb);
+    try {
+        default_f();
+    } catch (...) {
+        bb_cleanup();
+
+        // NOTE: merge_bb has not been
+        // inserted into any parent yet.
+        merge_bb->deleteValue();
+
+        throw;
+    }
+
+    // Jump to the merge block.
+    builder.CreateBr(merge_bb);
+
+    // Emit the cases blocks.
+    for (const auto &[idx, case_f] : cases) {
+        // Grab the block for the current case.
+        auto *cur_bb = cases_blocks.front();
+
+        // Insert it.
+        f->getBasicBlockList().push_back(cur_bb);
+        builder.SetInsertPoint(cur_bb);
+
+        // Pop it from cases_blocks, as now cur_bb is managed
+        // by the builder and does not need cleanup in case
+        // of exceptions any more.
+        cases_blocks.pop_front();
+
+        // Emit the code for the current case.
+        try {
+            case_f();
+        } catch (...) {
+            bb_cleanup();
+            merge_bb->deleteValue();
+
+            throw;
+        }
+
+        // Jump to the merge block.
+        builder.CreateBr(merge_bb);
+
+        // Add the case to the switch instruction.
+        sw_inst->addCase(builder.getInt32(idx), cur_bb);
+    }
 
     // Emit the merge block.
     f->getBasicBlockList().push_back(merge_bb);
