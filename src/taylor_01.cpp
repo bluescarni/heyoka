@@ -84,8 +84,7 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -3075,7 +3074,7 @@ std::ostream &operator<<(std::ostream &os, const continuous_output_batch<mppp::r
 
 #endif
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 // NOTE: this is the worker function that is invoked to compute
 // in parallel all the derivatives of a block in parallel mode.
@@ -3094,7 +3093,9 @@ extern "C" HEYOKA_DLL_PUBLIC void heyoka_cm_par_looper(std::uint32_t ncalls,
     // LCOV_EXCL_STOP
 }
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 namespace
@@ -3106,7 +3107,9 @@ using par_f_ptr = void (*)() noexcept;
 
 } // namespace
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 // NOTE: this is the parallel invoker that gets called from LLVM
 // to run multiple parallel workers within a segment at the same time, i.e.,

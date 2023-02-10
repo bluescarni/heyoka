@@ -19,12 +19,15 @@
 #include <utility>
 #include <vector>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 HEYOKA_DLL_PUBLIC llvm::Type *to_llvm_type_impl(llvm::LLVMContext &, const std::type_info &, bool);
@@ -201,6 +204,8 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_lt(llvm_state &, llvm::Value *, llvm::Val
 // Greater-than.
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_gt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

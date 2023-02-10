@@ -6,11 +6,11 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/logging.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 void *create_logger()
 {
@@ -47,4 +47,4 @@ void set_logger_level_critical()
     detail::get_logger()->set_level(spdlog::level::critical);
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE

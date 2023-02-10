@@ -58,7 +58,11 @@ struct U {
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>
 
-namespace heyoka::detail
+#include <heyoka/config.hpp>
+
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 // Implementation detail for loading a std::variant.
@@ -95,7 +99,9 @@ inline void s11n_variant_load_impl(Archive &ar, std::variant<Args...> &var, std:
     // LCOV_EXCL_STOP
 }
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 // Implement serialization for a few std types currently missing
 // from Boost. We should drop these if/when they become available

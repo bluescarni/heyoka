@@ -28,7 +28,9 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 namespace
@@ -415,7 +417,9 @@ std::string sleef_function_name(llvm::LLVMContext &c, const std::string &f, llvm
     }
 }
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #else
 
@@ -427,7 +431,9 @@ std::string sleef_function_name(llvm::LLVMContext &c, const std::string &f, llvm
 
 #include <heyoka/detail/sleef.hpp>
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 // If heyoka is not configured with sleef support, sleef_function_name() will always return
@@ -437,7 +443,9 @@ std::string sleef_function_name(llvm::LLVMContext &, const std::string &, llvm::
     return "";
 }
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif
 

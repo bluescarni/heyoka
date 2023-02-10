@@ -22,8 +22,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/s11n.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -70,7 +69,7 @@ func *is_neg(expression &);
 
 HEYOKA_DLL_PUBLIC expression neg(expression);
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::neg_impl)
 

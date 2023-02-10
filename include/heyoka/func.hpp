@@ -45,8 +45,7 @@
 // Current archive version is 1.
 BOOST_CLASS_VERSION(heyoka::func, 1)
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 class HEYOKA_DLL_PUBLIC func_base
 {
@@ -535,7 +534,7 @@ HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const func &);
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 // fmt formatter for func, implemented
 // on top of the streaming operator.
@@ -548,8 +547,7 @@ struct formatter<heyoka::func> : heyoka::detail::ostream_formatter {
 
 } // namespace fmt
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 HEYOKA_DLL_PUBLIC std::size_t hash(const func &);
 
@@ -722,7 +720,7 @@ llvm_c_eval_func_helper(const std::string &,
 
 } // namespace detail
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 // Macros for the registration of s11n for concrete functions.
 #define HEYOKA_S11N_FUNC_EXPORT_KEY(f) BOOST_CLASS_EXPORT_KEY(heyoka::detail::func_inner<f>)

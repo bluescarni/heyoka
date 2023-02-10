@@ -38,6 +38,7 @@
 
 #endif
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -54,8 +55,7 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -426,6 +426,6 @@ expression acos(expression e)
     return expression{func{detail::acos_impl(std::move(e))}};
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::acos_impl)

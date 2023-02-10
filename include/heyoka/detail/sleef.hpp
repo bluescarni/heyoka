@@ -12,15 +12,20 @@
 #include <cstdint>
 #include <string>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 HEYOKA_DLL_PUBLIC std::string sleef_function_name(llvm::LLVMContext &, const std::string &, llvm::Type *,
                                                   std::uint32_t);
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

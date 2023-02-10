@@ -54,8 +54,7 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 class HEYOKA_DLL_PUBLIC expression
 {
@@ -199,7 +198,7 @@ HEYOKA_DLL_PUBLIC std::size_t hash(const expression &);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression &);
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 // fmt formatter for expression, implemented
 // on top of the streaming operator.
@@ -212,8 +211,7 @@ struct formatter<heyoka::expression> : heyoka::detail::ostream_formatter {
 
 } // namespace fmt
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const expression &);
 HEYOKA_DLL_PUBLIC void rename_variables(expression &, const std::unordered_map<std::string, std::string> &);
@@ -567,7 +565,7 @@ inline std::vector<expression> add_cfunc(llvm_state &s, const std::string &name,
     }
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 namespace std
 {

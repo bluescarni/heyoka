@@ -21,7 +21,9 @@
 
 #include <heyoka/detail/dfloat.hpp>
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -52,4 +54,6 @@ dfloat<mppp::real>::operator mppp::real() &&
 
 #endif
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE

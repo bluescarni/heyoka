@@ -40,8 +40,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -264,7 +263,7 @@ public:
     [[nodiscard]] llvm_state make_similar() const;
 };
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 // Current archive version is 2. Changelog:
 // - version 1: got rid of the inline_functions setting;

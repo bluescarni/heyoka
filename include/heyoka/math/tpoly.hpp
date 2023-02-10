@@ -20,8 +20,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/s11n.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -60,7 +59,7 @@ HEYOKA_DLL_PUBLIC bool is_tpoly(const expression &);
 
 HEYOKA_DLL_PUBLIC expression tpoly(expression, expression);
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::tpoly_impl)
 

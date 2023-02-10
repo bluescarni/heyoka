@@ -31,7 +31,9 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 template <typename T>
@@ -74,6 +76,8 @@ HEYOKA_DLL_PUBLIC llvm::Function *add_poly_translator_1(llvm_state &, llvm::Type
 //   of the resulting polynomial.
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_poly_rtscc(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t);
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

@@ -52,8 +52,7 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -1567,6 +1566,6 @@ expression div(expression x, expression y)
     return expression{func{detail::binary_op(detail::binary_op::type::div, std::move(x), std::move(y))}};
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::binary_op)

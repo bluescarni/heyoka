@@ -3,6 +3,7 @@ set(heyoka_WITH_SLEEF @HEYOKA_WITH_SLEEF@)
 set(heyoka_WITH_MPPP @HEYOKA_WITH_MPPP@)
 set(heyoka_WITH_REAL128 @_HEYOKA_WITH_REAL128@)
 set(heyoka_WITH_REAL @_HEYOKA_WITH_REAL@)
+set(heyoka_ABI_VERSION @HEYOKA_ABI_VERSION@)
 
 # Mandatory public dependencies on Boost and fmt.
 find_package(Boost 1.60 REQUIRED serialization)

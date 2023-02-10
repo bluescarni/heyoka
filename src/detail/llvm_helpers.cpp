@@ -14,10 +14,10 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
-#include <locale>
-#include <sstream>
 #include <ios>
 #include <limits>
+#include <locale>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -95,7 +95,9 @@
 
 #endif
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 namespace
@@ -2308,8 +2310,7 @@ std::pair<number, number> inv_kep_E_dl_twopi_like(llvm_state &s, llvm::Type *fp_
                 oss << twopi_lo;
                 const auto lo_str = oss.str();
 
-                return std::make_pair(number{mppp::real128{hi_str}},
-                                      number{mppp::real128{lo_str}});
+                return std::make_pair(number{mppp::real128{hi_str}}, number{mppp::real128{lo_str}});
             } else {
 #endif
                 const auto twopi_hi = static_cast<type>(mp_twopi);
@@ -4072,7 +4073,9 @@ llvm::Value *llvm_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
     }
 }
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 // NOTE: this function will be called by the LLVM implementation
 // of the inverse Kepler function when the maximum number of iterations

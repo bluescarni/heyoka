@@ -44,8 +44,7 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -313,6 +312,6 @@ expression tpoly(expression b, expression e)
     return expression{func{detail::tpoly_impl{std::move(b), std::move(e)}}};
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::tpoly_impl)

@@ -63,8 +63,7 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -170,7 +169,7 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, event_direction);
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 // fmt formatters for taylor_outcome and event_direction, implemented
 // on top of the streaming operator.
@@ -239,8 +238,7 @@ inline void serialize(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &
 
 } // namespace boost::serialization
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace kw
 {
@@ -1919,7 +1917,7 @@ inline constexpr int taylor_adaptive_s11n_version = 1;
 
 } // namespace detail
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 // Set the Boost s11n class version for taylor_adaptive.
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive<double>, heyoka::detail::taylor_adaptive_s11n_version);

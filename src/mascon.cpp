@@ -10,15 +10,14 @@
 #include <utility>
 #include <vector>
 
+#include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/mascon.hpp>
 #include <heyoka/math.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
-
 {
 
 std::vector<std::pair<expression, expression>>
@@ -90,4 +89,4 @@ expression energy_mascon_system_impl(expression Gconst, std::vector<expression> 
 
 } // namespace detail
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE

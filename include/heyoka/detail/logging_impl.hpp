@@ -23,11 +23,17 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
-namespace heyoka::detail
+#include <heyoka/config.hpp>
+
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 spdlog::logger *get_logger();
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

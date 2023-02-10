@@ -12,7 +12,11 @@
 
 #include <spdlog/sinks/stdout_color_sinks.h>
 
-namespace heyoka::detail
+#include <heyoka/config.hpp>
+
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 namespace
@@ -37,4 +41,6 @@ spdlog::logger *get_logger()
     return ret.get();
 }
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE

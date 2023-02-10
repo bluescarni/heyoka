@@ -74,8 +74,7 @@
 #include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 func_base::func_base(std::string name, std::vector<expression> args) : m_name(std::move(name)), m_args(std::move(args))
 {
@@ -141,12 +140,11 @@ struct null_func : func_base {
 
 } // namespace detail
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT(heyoka::detail::null_func)
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 func::func(std::unique_ptr<detail::func_inner_base> p) : m_ptr(p.release()) {}
 
@@ -956,4 +954,4 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
 
 } // namespace detail
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE

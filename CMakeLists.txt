@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 0.20.1 LANGUAGES CXX C)
+project(heyoka VERSION 0.21.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -282,6 +282,9 @@ if(HEYOKA_WITH_SLEEF)
     )
 endif()
 
+# Setup the heyoka ABI version number.
+set(HEYOKA_ABI_VERSION 21)
+
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.
     message(STATUS "heyoka will be built as a static library.")
@@ -289,8 +292,8 @@ if(HEYOKA_BUILD_STATIC_LIBRARY)
 else()
     # Setup of the heyoka shared library.
     add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
-    set_property(TARGET heyoka PROPERTY VERSION "20.0")
-    set_property(TARGET heyoka PROPERTY SOVERSION 20)
+    set_property(TARGET heyoka PROPERTY VERSION "${HEYOKA_ABI_VERSION}.0")
+    set_property(TARGET heyoka PROPERTY SOVERSION ${HEYOKA_ABI_VERSION})
     set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
 endif()
