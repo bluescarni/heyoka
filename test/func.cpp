@@ -769,6 +769,54 @@ TEST_CASE("null func s11n")
     REQUIRE(f.args().empty());
 }
 
+struct func_20 : func_base {
+    func_20(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
+    {
+    }
+
+    bool is_time_dependent() const
+    {
+        return true;
+    }
+};
+
+struct func_21 : func_base {
+    func_21(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
+    {
+    }
+
+    bool is_time_dependent()
+    {
+        return true;
+    }
+};
+
+struct func_22 : func_base {
+    func_22(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
+    {
+    }
+
+    int is_time_dependent() const
+    {
+        return 1;
+    }
+};
+
+TEST_CASE("is_time_dependent")
+{
+    func f;
+    REQUIRE(!f.is_time_dependent());
+
+    f = func(func_20{});
+    REQUIRE(f.is_time_dependent());
+
+    f = func(func_21{});
+    REQUIRE(!f.is_time_dependent());
+
+    f = func(func_22{});
+    REQUIRE(!f.is_time_dependent());
+}
+
 #if defined(__GNUC__)
 
 #pragma GCC diagnostic pop
