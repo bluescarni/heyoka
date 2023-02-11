@@ -98,8 +98,8 @@ public:
     expression &operator=(const expression &);
     expression &operator=(expression &&) noexcept;
 
-    value_type &value();
-    const value_type &value() const;
+    [[nodiscard]] value_type &value();
+    [[nodiscard]] const value_type &value() const;
 };
 
 HEYOKA_DLL_PUBLIC expression copy(const expression &);
@@ -430,7 +430,7 @@ HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *,
 
 HEYOKA_DLL_PUBLIC std::uint32_t get_param_size(const expression &);
 
-HEYOKA_DLL_PUBLIC bool has_time(const expression &);
+HEYOKA_DLL_PUBLIC bool is_time_dependent(const expression &);
 
 namespace detail
 {

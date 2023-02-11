@@ -14,6 +14,7 @@
 #include <random>
 #include <sstream>
 #include <tuple>
+#include <variant>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -23,6 +24,7 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/time.hpp>
@@ -126,12 +128,9 @@ TEST_CASE("stream output")
     REQUIRE(oss.str() == "(x + t)");
 }
 
-TEST_CASE("is_time")
+TEST_CASE("is_time_dependent")
 {
-    REQUIRE(!detail::is_time(1_dbl));
-    REQUIRE(!detail::is_time("x"_var));
-    REQUIRE(!detail::is_time(1_dbl + hy::time));
-    REQUIRE(detail::is_time(hy::time));
+    REQUIRE(std::get<hy::func>(hy::time.value()).is_time_dependent());
 }
 
 TEST_CASE("taylor time")

@@ -51,9 +51,9 @@ public:
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
 
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
-};
 
-HEYOKA_DLL_PUBLIC bool is_tpoly(const expression &);
+    [[nodiscard]] bool is_time_dependent() const;
+};
 
 } // namespace detail
 

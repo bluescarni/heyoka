@@ -293,16 +293,9 @@ llvm::Function *tpoly_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, 
     return taylor_c_diff_tpoly_impl(s, fp_t, *this, n_uvars, batch_size);
 }
 
-// Small helper to detect if an expression
-// is a tpoly function.
-bool is_tpoly(const expression &ex)
+bool tpoly_impl::is_time_dependent() const
 {
-    if (auto func_ptr = std::get_if<func>(&ex.value());
-        func_ptr != nullptr && func_ptr->extract<tpoly_impl>() != nullptr) {
-        return true;
-    } else {
-        return false;
-    }
+    return true;
 }
 
 } // namespace detail

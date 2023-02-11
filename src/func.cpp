@@ -200,6 +200,10 @@ void *func::get_ptr()
     return ptr()->get_ptr();
 }
 
+// NOTE: time dependency here means **intrinsic** time
+// dependence of the function. That is, we are not concerned
+// with the arguments' time dependence and, e.g., cos(time)
+// is **not** time-dependent according to this definition.
 bool func::is_time_dependent() const
 {
     return ptr()->is_time_dependent();

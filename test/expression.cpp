@@ -694,59 +694,59 @@ TEST_CASE("div simpls")
     REQUIRE(std::get<func>((y / x).value()).extract<detail::binary_op>()->args() == std::vector{y, x});
 }
 
-TEST_CASE("has time")
+TEST_CASE("is_time_dependent")
 {
     namespace hy = heyoka;
 
     auto [x, y, z] = make_vars("x", "y", "z");
 
-    REQUIRE(!has_time(x));
-    REQUIRE(!has_time(y));
-    REQUIRE(!has_time(x + y));
-    REQUIRE(!has_time(1_dbl));
-    REQUIRE(!has_time(par[0]));
-    REQUIRE(!has_time(2_dbl - par[0]));
+    REQUIRE(!is_time_dependent(x));
+    REQUIRE(!is_time_dependent(y));
+    REQUIRE(!is_time_dependent(x + y));
+    REQUIRE(!is_time_dependent(1_dbl));
+    REQUIRE(!is_time_dependent(par[0]));
+    REQUIRE(!is_time_dependent(2_dbl - par[0]));
 
-    REQUIRE(has_time(hy::time));
-    REQUIRE(has_time(hy::time + 1_dbl));
-    REQUIRE(has_time(par[42] + hy::time));
-    REQUIRE(has_time((x + y) * (hy::time + 1_dbl)));
-    REQUIRE(has_time((x + y) * (par[0] * hy::time + 1_dbl)));
+    REQUIRE(is_time_dependent(hy::time));
+    REQUIRE(is_time_dependent(hy::time + 1_dbl));
+    REQUIRE(is_time_dependent(par[42] + hy::time));
+    REQUIRE(is_time_dependent((x + y) * (hy::time + 1_dbl)));
+    REQUIRE(is_time_dependent((x + y) * (par[0] * hy::time + 1_dbl)));
 
     // With common subexpressions.
     auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
 
-    REQUIRE(!has_time(bar));
+    REQUIRE(!is_time_dependent(bar));
 
     foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
     bar = (foo - x) / (2. * foo);
 
-    REQUIRE(has_time(bar));
+    REQUIRE(is_time_dependent(bar));
 
     foo = hy::time + ((x + y) * (z + x)) * ((z - x) * (y + x));
     bar = (foo - x) / (2. * foo);
 
-    REQUIRE(has_time(bar));
+    REQUIRE(is_time_dependent(bar));
 
     foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
     bar = hy::time + (foo - x) / (2. * foo);
 
-    REQUIRE(has_time(bar));
+    REQUIRE(is_time_dependent(bar));
 
     foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
     bar = (foo - x) / (2. * foo) + hy::time;
 
-    REQUIRE(has_time(bar));
+    REQUIRE(is_time_dependent(bar));
 
     foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
     bar = (foo - x) / (2. * foo) + hy::time;
 
-    REQUIRE(has_time(bar));
+    REQUIRE(is_time_dependent(bar));
 
     foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
     bar = hy::time + (foo - x) / (2. * foo) + hy::time;
 
-    REQUIRE(has_time(bar));
+    REQUIRE(is_time_dependent(bar));
 }
 
 TEST_CASE("pairwise_prod")

@@ -42,16 +42,16 @@ public:
 
     void to_stream(std::ostream &) const;
 
-    std::vector<expression> gradient() const;
+    [[nodiscard]] std::vector<expression> gradient() const;
 
     llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
 
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
-};
 
-HEYOKA_DLL_PUBLIC bool is_time(const expression &);
+    [[nodiscard]] bool is_time_dependent() const;
+};
 
 } // namespace detail
 
