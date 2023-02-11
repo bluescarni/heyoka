@@ -194,7 +194,7 @@ expression copy_impl(std::unordered_map<const void *, expression> &func_map, con
 
                 // Construct the return value and put it into the cache.
                 auto ex = expression{std::move(f_copy)};
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ex});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ex);
                 // NOTE: an expression cannot contain itself.
                 assert(flag); // LCOV_EXCL_LINE
 
@@ -1047,7 +1047,7 @@ std::size_t get_n_nodes(std::unordered_map<const void *, std::size_t> &func_map,
 
                 // Store the number of nodes for the current function
                 // in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, retval});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, retval);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
 
@@ -1108,7 +1108,7 @@ expression diff(std::unordered_map<const void *, expression> &func_map, const ex
                 auto ret = arg.diff(func_map, s);
 
                 // Put the return value in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
 
@@ -1148,7 +1148,7 @@ expression diff(std::unordered_map<const void *, expression> &func_map, const ex
                 auto ret = arg.diff(func_map, p);
 
                 // Put the return value in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
 
@@ -1231,7 +1231,7 @@ expression subs(std::unordered_map<const void *, expression> &func_map, const ex
 
                 // Put the return value in the cache.
                 auto ret = expression{std::move(tmp)};
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
 
