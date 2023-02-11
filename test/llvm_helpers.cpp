@@ -3154,3 +3154,189 @@ TEST_CASE("real_ext_load")
 }
 
 #endif
+
+TEST_CASE("switch")
+{
+    using Catch::Matchers::Message;
+
+    // Simple test with only the default case.
+    {
+        llvm_state s;
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {builder.getInt32Ty()}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *input = f->arg_begin();
+
+        auto *out_storage = builder.CreateAlloca(builder.getInt32Ty());
+
+        detail::llvm_switch_u32(s, input, [&]() { builder.CreateStore(input, out_storage); }, {});
+
+        builder.CreateRet(builder.CreateLoad(builder.getInt32Ty(), out_storage));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<std::uint32_t (*)(std::uint32_t)>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr(0) == 0u);
+        REQUIRE(f_ptr(42) == 42u);
+    }
+
+    // Simple test with one extra case.
+    {
+        llvm_state s;
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {builder.getInt32Ty()}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *input = f->arg_begin();
+
+        auto *out_storage = builder.CreateAlloca(builder.getInt32Ty());
+
+        detail::llvm_switch_u32(s, input, [&]() { builder.CreateStore(input, out_storage); },
+                                {{5, [&]() { builder.CreateStore(builder.getInt32(10), out_storage); }}});
+
+        builder.CreateRet(builder.CreateLoad(builder.getInt32Ty(), out_storage));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<std::uint32_t (*)(std::uint32_t)>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr(0) == 0u);
+        REQUIRE(f_ptr(42) == 42u);
+        REQUIRE(f_ptr(5) == 10u);
+    }
+
+    // Simple test with two extra cases.
+    {
+        llvm_state s;
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {builder.getInt32Ty()}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *input = f->arg_begin();
+
+        auto *out_storage = builder.CreateAlloca(builder.getInt32Ty());
+
+        detail::llvm_switch_u32(s, input, [&]() { builder.CreateStore(input, out_storage); },
+                                {{5, [&]() { builder.CreateStore(builder.getInt32(10), out_storage); }},
+                                 {10, [&]() { builder.CreateStore(builder.getInt32(30), out_storage); }}});
+
+        builder.CreateRet(builder.CreateLoad(builder.getInt32Ty(), out_storage));
+
+        s.verify_function(f);
+
+        s.optimise();
+
+        s.compile();
+
+        auto f_ptr = reinterpret_cast<std::uint32_t (*)(std::uint32_t)>(s.jit_lookup("test"));
+
+        REQUIRE(f_ptr(0) == 0u);
+        REQUIRE(f_ptr(42) == 42u);
+        REQUIRE(f_ptr(5) == 10u);
+        REQUIRE(f_ptr(10) == 30u);
+    }
+
+    // NOTE: don't run the error handling test on OSX, as
+    // we occasionally experience hangs/errors when
+    // catching and re-throwing exceptions. Not sure whether
+    // this is an LLVM issue or some compiler/toolchain bug.
+    // Perhaps re-check this with later LLVM versions, different
+    // build types (e.g., Release) or different compiler flags.
+#if !defined(__APPLE__)
+
+    // Test exception cleanup for the default case.
+    {
+        llvm_state s;
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {builder.getInt32Ty()}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *input = f->arg_begin();
+
+        REQUIRE_THROWS_MATCHES(detail::llvm_switch_u32(s, input, []() { throw std::invalid_argument("aaaa"); }, {}),
+                               std::invalid_argument, Message("aaaa"));
+    }
+
+    // Test exception cleanup in the other cases.
+    {
+        llvm_state s;
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {builder.getInt32Ty()}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *input = f->arg_begin();
+
+        auto *out_storage = builder.CreateAlloca(builder.getInt32Ty());
+
+        REQUIRE_THROWS_MATCHES(
+            detail::llvm_switch_u32(s, input, [&]() { builder.CreateStore(input, out_storage); },
+                                    {{5, [&]() { throw std::invalid_argument("aaaa"); }},
+                                     {10, [&]() { builder.CreateStore(builder.getInt32(30), out_storage); }}}),
+            std::invalid_argument, Message("aaaa"));
+    }
+
+    {
+        llvm_state s;
+
+        auto &md = s.module();
+        auto &builder = s.builder();
+        auto &context = s.context();
+
+        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {builder.getInt32Ty()}, false);
+        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "test", &md);
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        auto *input = f->arg_begin();
+
+        auto *out_storage = builder.CreateAlloca(builder.getInt32Ty());
+
+        REQUIRE_THROWS_MATCHES(
+            detail::llvm_switch_u32(s, input, [&]() { builder.CreateStore(input, out_storage); },
+                                    {{5, [&]() { builder.CreateStore(builder.getInt32(30), out_storage); }},
+                                     {10, [&]() { throw std::invalid_argument("aaaa"); }}}),
+            std::invalid_argument, Message("aaaa"));
+    }
+
+#endif
+}
