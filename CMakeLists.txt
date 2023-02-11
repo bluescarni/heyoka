@@ -156,7 +156,7 @@ endif()
 find_package(fmt REQUIRED CONFIG)
 message(STATUS "fmt version: ${fmt_VERSION}")
 
-# List of source files.
+# List of source files for the main library.
 set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor_00.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor_01.cpp"
@@ -180,8 +180,47 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mascon.cpp"
     # "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
-    # VSOP2013.
+    # The VSOP2013 interface.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/celmec/vsop2013.cpp"
+    # Math functions.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/binary_op.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cos.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/exp.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/log.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/pow.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sigmoid.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sin.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sqrt.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/square.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/tan.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/asin.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/acos.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/atan.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/atan2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/time.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cosh.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sinh.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/tanh.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/asinh.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/acosh.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/atanh.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/erf.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/neg.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/tpoly.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sum.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sum_sq.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/constants.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/logging_impl.cpp"
+    # NOTE: sleef.cpp needs to be compiled even if we are not
+    # building with sleef support on.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
+)
+
+# List of source files for the vsop2013_data library.
+set(HEYOKA_VSOP2013_DATA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_1.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_2.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_3.cpp"
@@ -236,41 +275,6 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_4.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_5.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_6.cpp"
-    # Math functions.
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/binary_op.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cos.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/exp.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/log.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/pow.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sigmoid.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sin.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sqrt.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/square.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/tan.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/asin.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/acos.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/atan.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/atan2.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/time.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cosh.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sinh.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/tanh.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/asinh.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/acosh.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/atanh.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/erf.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/neg.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/tpoly.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sum.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sum_sq.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/constants.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/logging_impl.cpp"
-    # NOTE: sleef.cpp needs to be compiled even if we are not
-    # building with sleef support on.
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
 )
 
 if(HEYOKA_WITH_SLEEF)
@@ -286,16 +290,24 @@ endif()
 set(HEYOKA_ABI_VERSION 21)
 
 if(HEYOKA_BUILD_STATIC_LIBRARY)
-    # Setup of the heyoka static library.
+    # Setup of the static libraries.
     message(STATUS "heyoka will be built as a static library.")
+
     add_library(heyoka STATIC "${HEYOKA_SRC_FILES}")
+    add_library(heyoka_vsop2013_data STATIC "${HEYOKA_VSOP2013_DATA_SRC_FILES}")
 else()
-    # Setup of the heyoka shared library.
+    # Setup of the shared libraries.
     add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
     set_property(TARGET heyoka PROPERTY VERSION "${HEYOKA_ABI_VERSION}.0")
     set_property(TARGET heyoka PROPERTY SOVERSION ${HEYOKA_ABI_VERSION})
     set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
+
+    add_library(heyoka_vsop2013_data SHARED "${HEYOKA_VSOP2013_DATA_SRC_FILES}")
+    set_property(TARGET heyoka_vsop2013_data PROPERTY VERSION "${HEYOKA_ABI_VERSION}.0")
+    set_property(TARGET heyoka_vsop2013_data PROPERTY SOVERSION ${HEYOKA_ABI_VERSION})
+    set_target_properties(heyoka_vsop2013_data PROPERTIES CXX_VISIBILITY_PRESET hidden)
+    set_target_properties(heyoka_vsop2013_data PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
 endif()
 
 # Setup common to both the shared and static variants.
@@ -306,15 +318,30 @@ target_compile_options(heyoka PRIVATE
     "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
 )
 
-# Ensure that C++17 is employed when both compiling and consuming heyoka.
+target_compile_options(heyoka_vsop2013_data PRIVATE
+    "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
+    "$<$<CONFIG:Release>:${HEYOKA_CXX_FLAGS_RELEASE}>"
+    "$<$<CONFIG:RelWithDebInfo>:${HEYOKA_CXX_FLAGS_RELEASE}>"
+    "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
+)
+
+# Ensure that vanilla C++17 is employed when both compiling and consuming the libraries.
 target_compile_features(heyoka PUBLIC cxx_std_17)
-# Enforce vanilla C++17 when compiling heyoka.
 set_property(TARGET heyoka PROPERTY CXX_EXTENSIONS NO)
+
+target_compile_features(heyoka_vsop2013_data PUBLIC cxx_std_17)
+set_property(TARGET heyoka_vsop2013_data PROPERTY CXX_EXTENSIONS NO)
 
 target_include_directories(heyoka PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:include>)
+
+# NOTE: the vsop2013 data library just needs access to a couple
+# of heyoka headers at build time.
+target_include_directories(heyoka_vsop2013_data PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
 
 # IPO setup.
 if(HEYOKA_ENABLE_IPO)
@@ -323,12 +350,16 @@ if(HEYOKA_ENABLE_IPO)
     if (_HEYOKA_IPO_RESULT)
         message(STATUS "IPO requested and supported, enabling.")
         set_property(TARGET heyoka PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+        set_property(TARGET heyoka_vsop2013_data PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
     else()
         message(STATUS "IPO requested, but it is not supported by the compiler:\n${_HEYOKA_IPO_OUTPUT}")
     endif()
     unset(_HEYOKA_IPO_RESULT)
     unset(_HEYOKA_IPO_OUTPUT)
 endif()
+
+# Make heyoka depend privately on heyoka_vsop2013_data.
+target_link_libraries(heyoka PRIVATE heyoka_vsop2013_data)
 
 message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
 message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
@@ -486,8 +517,15 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/doc/conf.py.in" "${CMAKE_CURRENT_SOU
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/heyoka" DESTINATION include)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" DESTINATION include/heyoka)
 
-# Installation of the library.
+# Installation of the libraries.
 install(TARGETS heyoka
+    EXPORT heyoka_export
+    LIBRARY DESTINATION "${HEYOKA_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${HEYOKA_INSTALL_LIBDIR}"
+    RUNTIME DESTINATION bin
+)
+
+install(TARGETS heyoka_vsop2013_data
     EXPORT heyoka_export
     LIBRARY DESTINATION "${HEYOKA_INSTALL_LIBDIR}"
     ARCHIVE DESTINATION "${HEYOKA_INSTALL_LIBDIR}"
@@ -498,7 +536,10 @@ install(TARGETS heyoka
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/heyoka-config.cmake.in" "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config.cmake" @ONLY)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config.cmake"
     DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
+
+# Installation of the config-file packages.
 install(EXPORT heyoka_export NAMESPACE heyoka:: DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
+
 # Take care of versioning.
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" COMPATIBILITY SameMinorVersion)

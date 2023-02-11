@@ -10,6 +10,7 @@
 #define HEYOKA_DETAIL_VSOP2013_VSOP2013_6_HPP
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/visibility.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -29,12 +30,12 @@ inline constexpr unsigned long vsop2013_6_4_sizes[11]
 inline constexpr unsigned long vsop2013_6_5_sizes[9] = {6331ul, 3920ul, 2125ul, 1096ul, 570ul, 268ul, 113ul, 35ul, 2ul};
 inline constexpr unsigned long vsop2013_6_6_sizes[9] = {6262ul, 3948ul, 2159ul, 1110ul, 564ul, 271ul, 114ul, 32ul, 1ul};
 
-extern const double *const vsop2013_6_1_data[21];
-extern const double *const vsop2013_6_2_data[19];
-extern const double *const vsop2013_6_3_data[11];
-extern const double *const vsop2013_6_4_data[11];
-extern const double *const vsop2013_6_5_data[9];
-extern const double *const vsop2013_6_6_data[9];
+HEYOKA_DLL_PUBLIC extern const double *const vsop2013_6_1_data[21];
+HEYOKA_DLL_PUBLIC extern const double *const vsop2013_6_2_data[19];
+HEYOKA_DLL_PUBLIC extern const double *const vsop2013_6_3_data[11];
+HEYOKA_DLL_PUBLIC extern const double *const vsop2013_6_4_data[11];
+HEYOKA_DLL_PUBLIC extern const double *const vsop2013_6_5_data[9];
+HEYOKA_DLL_PUBLIC extern const double *const vsop2013_6_6_data[9];
 
 } // namespace detail
 
