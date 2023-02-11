@@ -127,6 +127,8 @@ void func_default_to_stream_impl(std::ostream &os, const func_base &f)
     os << ')';
 }
 
+func_inner_base::func_inner_base() = default;
+
 func_inner_base::~func_inner_base() = default;
 
 namespace
@@ -196,6 +198,11 @@ const void *func::get_ptr() const
 void *func::get_ptr()
 {
     return ptr()->get_ptr();
+}
+
+bool func::is_time_dependent() const
+{
+    return ptr()->is_time_dependent();
 }
 
 const std::string &func::get_name() const
