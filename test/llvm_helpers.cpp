@@ -3264,6 +3264,14 @@ TEST_CASE("switch")
         REQUIRE(f_ptr(10) == 30u);
     }
 
+    // NOTE: don't run the error handling test on OSX, as
+    // we occasionally experience hangs/errors when
+    // catching and re-throwing exceptions. Not sure whether
+    // this is an LLVM issue or some compiler/toolchain bug.
+    // Perhaps re-check this with later LLVM versions, different
+    // build types (e.g., Release) or different compiler flags.
+#if !defined(__APPLE__)
+
     // Test exception cleanup for the default case.
     {
         llvm_state s;
@@ -3329,4 +3337,6 @@ TEST_CASE("switch")
                                      {10, [&]() { throw std::invalid_argument("aaaa"); }}}),
             std::invalid_argument, Message("aaaa"));
     }
+
+#endif
 }
