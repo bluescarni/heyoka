@@ -194,7 +194,7 @@ expression copy_impl(std::unordered_map<const void *, expression> &func_map, con
 
                 // Construct the return value and put it into the cache.
                 auto ex = expression{std::move(f_copy)};
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ex});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ex);
                 // NOTE: an expression cannot contain itself.
                 assert(flag); // LCOV_EXCL_LINE
 
@@ -1047,7 +1047,7 @@ std::size_t get_n_nodes(std::unordered_map<const void *, std::size_t> &func_map,
 
                 // Store the number of nodes for the current function
                 // in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, retval});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, retval);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
 
@@ -1108,7 +1108,7 @@ expression diff(std::unordered_map<const void *, expression> &func_map, const ex
                 auto ret = arg.diff(func_map, s);
 
                 // Put the return value in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
 
@@ -1148,7 +1148,7 @@ expression diff(std::unordered_map<const void *, expression> &func_map, const ex
                 auto ret = arg.diff(func_map, p);
 
                 // Put the return value in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
 
@@ -1231,7 +1231,7 @@ expression subs(std::unordered_map<const void *, expression> &func_map, const ex
 
                 // Put the return value in the cache.
                 auto ret = expression{std::move(tmp)};
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
 
@@ -1582,46 +1582,49 @@ namespace detail
 namespace
 {
 
-bool has_time(std::unordered_set<const void *> &func_set, const expression &ex)
+bool is_time_dependent(std::unordered_map<const void *, bool> &func_map, const expression &ex)
 {
-    // If the expression itself is a time function or a tpoly,
-    // return true.
-    if (detail::is_time(ex) || detail::is_tpoly(ex)) {
-        return true;
-    }
-
-    // Otherwise:
-    // - if ex is a function, check if any of its arguments
-    //   is time-dependent,
+    // - If ex is a function, check if it is time-dependent, or
+    //   if any of its arguments is time-dependent,
     // - otherwise, return false.
     return std::visit(
-        [&func_set](const auto &v) {
+        [&func_map](const auto &v) {
             using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, func>) {
                 const auto f_id = v.get_ptr();
 
-                if (auto it = func_set.find(f_id); it != func_set.end()) {
-                    // We already determined if this function contains time,
-                    // return false (if the function does contain time, the first
-                    // time it was encountered we returned true and we could not
-                    // possibly end up here).
-                    return false;
+                // Did we already determine if v is time-dependent?
+                if (const auto it = func_map.find(f_id); it != func_map.end()) {
+                    return it->second;
+                }
+
+                // Check if the function is intrinsically time-dependent.
+                bool is_tm_dep = v.is_time_dependent();
+                if (!is_tm_dep) {
+                    // The function does **not** intrinsically depend on time.
+                    // Check its arguments.
+                    for (const auto &a : v.args()) {
+                        if (is_time_dependent(func_map, a)) {
+                            // A time-dependent argument was found. Update
+                            // is_tm_dep and break out, no point in checking
+                            // the other arguments.
+                            is_tm_dep = true;
+                            break;
+                        }
+                    }
                 }
 
                 // Update the cache.
-                // NOTE: do it earlier than usual in order to avoid having
-                // to repeat this code twice for the two paths below.
-                func_set.insert(f_id);
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, is_tm_dep);
 
-                for (const auto &a : v.args()) {
-                    if (has_time(func_set, a)) {
-                        return true;
-                    }
-                }
+                // An expression cannot contain itself.
+                assert(flag);
+
+                return is_tm_dep;
+            } else {
+                return false;
             }
-
-            return false;
         },
         ex.value());
 }
@@ -3282,11 +3285,11 @@ template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real>(llvm_st
 } // namespace detail
 
 // Determine if an expression is time-dependent.
-bool has_time(const expression &ex)
+bool is_time_dependent(const expression &ex)
 {
-    std::unordered_set<const void *> func_set;
+    std::unordered_map<const void *, bool> func_map;
 
-    return detail::has_time(func_set, ex);
+    return detail::is_time_dependent(func_map, ex);
 }
 
 HEYOKA_END_NAMESPACE

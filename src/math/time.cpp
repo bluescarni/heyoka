@@ -197,16 +197,9 @@ llvm::Function *time_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, s
     return taylor_c_diff_time_impl(s, fp_t, n_uvars, batch_size);
 }
 
-// Small helper to detect if an expression
-// is a time function.
-bool is_time(const expression &ex)
+bool time_impl::is_time_dependent() const
 {
-    if (const auto *func_ptr = std::get_if<func>(&ex.value());
-        func_ptr != nullptr && func_ptr->extract<time_impl>() != nullptr) {
-        return true;
-    } else {
-        return false;
-    }
+    return true;
 }
 
 } // namespace detail
