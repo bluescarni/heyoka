@@ -351,10 +351,10 @@ double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::si
 }
 
 llvm::Value *func::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                             llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                             llvm::Value *par_ptr, llvm::Value *time_ptr, llvm::Value *stride, std::uint32_t batch_size,
                              bool high_accuracy) const
 {
-    return ptr()->llvm_eval(s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    return ptr()->llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size, high_accuracy);
 }
 
 llvm::Function *func::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
@@ -772,9 +772,6 @@ llvm::Value *llvm_eval_helper(const std::function<llvm::Value *(const std::vecto
     return g(llvm_args, high_accuracy);
 }
 
-namespace
-{
-
 // NOTE: precondition on name: must be conforming to LLVM requirements for
 // function names, and must not contain "." (as we use it as a separator in
 // the mangling scheme).
@@ -796,9 +793,11 @@ std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llv
     // - idx of the u variable which is being evaluated,
     // - eval array (pointer to val_t),
     // - par ptr (pointer to scalar),
+    // - time ptr (pointer to scalar),
     // - stride value.
     std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(c), llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(ext_fp_t), to_llvm_type<std::size_t>(c)};
+                                    llvm::PointerType::getUnqual(ext_fp_t), llvm::PointerType::getUnqual(ext_fp_t),
+                                    to_llvm_type<std::size_t>(c)};
 
     // Add the mangling and LLVM arg types for the argument types.
     for (decltype(args.size()) i = 0; i < args.size(); ++i) {
@@ -845,8 +844,6 @@ std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llv
     return std::make_pair(std::move(fname), std::move(fargs));
 }
 
-} // namespace
-
 llvm::Function *llvm_c_eval_func_helper(const std::string &name,
                                         const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &g,
                                         const func_base &fb, llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
@@ -892,7 +889,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
         // Fetch the necessary arguments.
         auto *eval_arr = f->args().begin() + 1;
         auto *par_ptr = f->args().begin() + 2;
-        auto *stride = f->args().begin() + 3;
+        auto *stride = f->args().begin() + 4;
 
         // Create the arguments for g.
         std::vector<llvm::Value *> g_args;
@@ -901,7 +898,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
                 [&](const auto &v) -> llvm::Value * {
                     using type = detail::uncvref_t<decltype(v)>;
 
-                    auto *const cur_f_arg = f->args().begin() + 4 + i;
+                    auto *const cur_f_arg = f->args().begin() + 5 + i;
 
                     if constexpr (std::is_same_v<type, number>) {
                         // NOTE: number arguments are passed directly as

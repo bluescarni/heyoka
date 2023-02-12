@@ -92,7 +92,7 @@ expression atan2_impl::diff(std::unordered_map<const void *, expression> &func_m
 }
 
 llvm::Value *atan2_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                   llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                   llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                    bool high_accuracy) const
 {
     return llvm_eval_helper(

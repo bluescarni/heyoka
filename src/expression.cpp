@@ -2349,8 +2349,8 @@ namespace
 {
 
 void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
-                       llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars,
-                       std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
+                       llvm::Value *time_ptr, llvm::Value *stride, const std::vector<expression> &dc,
+                       std::uint32_t nvars, std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
 {
     auto &builder = s.builder();
 
@@ -2371,8 +2371,8 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, ll
     for (std::uint32_t i = nvars; i < nuvars; ++i) {
         assert(std::holds_alternative<func>(dc[i].value()));
 
-        eval_arr.push_back(
-            std::get<func>(dc[i].value()).llvm_eval(s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy));
+        eval_arr.push_back(std::get<func>(dc[i].value())
+                               .llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size, high_accuracy));
     }
 
     // Write the outputs.
@@ -2776,8 +2776,8 @@ cfunc_c_make_output_globals(llvm_state &s, llvm::Type *fp_t, const std::vector<e
     auto *g_num_indices = new llvm::GlobalVariable(md, num_indices_arr->getType(), true,
                                                    llvm::GlobalVariable::InternalLinkage, num_indices_arr);
 
-    auto nums_arr_type = llvm::ArrayType::get(fp_t, boost::numeric_cast<std::uint64_t>(nums.size()));
-    auto nums_arr = llvm::ConstantArray::get(nums_arr_type, nums);
+    auto *nums_arr_type = llvm::ArrayType::get(fp_t, boost::numeric_cast<std::uint64_t>(nums.size()));
+    auto *nums_arr = llvm::ConstantArray::get(nums_arr_type, nums);
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     auto *g_nums
         = new llvm::GlobalVariable(md, nums_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, nums_arr);
@@ -2905,8 +2905,9 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
 }
 
 void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, llvm::Value *in_ptr,
-                      llvm::Value *par_ptr, llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars,
-                      std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
+                      llvm::Value *par_ptr, llvm::Value *time_ptr, llvm::Value *stride,
+                      const std::vector<expression> &dc, std::uint32_t nvars, std::uint32_t nuvars,
+                      std::uint32_t batch_size, bool high_accuracy)
 {
     auto &builder = s.builder();
     auto &md = s.module();
@@ -2978,8 +2979,9 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
             // initial arguments are always present:
             // - eval array,
             // - pointer to the param values,
+            // - pointer to the time value(s),
             // - stride.
-            std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr, stride};
+            std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr, time_ptr, stride};
 
             // Create the other arguments via the generators.
             for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
@@ -3092,12 +3094,13 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // Fetch the current insertion block.
     auto *orig_bb = builder.GetInsertBlock();
 
-    // Prepare the function prototype:
+    // Prepare the arguments:
     //
-    // - the first argument is a write-only float pointer to the outputs,
-    // - the second argument is a const float pointer to the inputs,
-    // - the third argument is a const float pointer to the pars,
-    // - the fourth argument is the stride.
+    // - a write-only float pointer to the outputs,
+    // - a const float pointer to the inputs,
+    // - a const float pointer to the pars,
+    // - a const float pointer to the time value(s),
+    // - the stride.
     //
     // The pointer arguments cannot overlap.
     auto *fp_t = [&]() {
@@ -3112,7 +3115,7 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
 #endif
     }();
     auto *ext_fp_t = llvm_ext_type(fp_t);
-    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(ext_fp_t));
+    std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(ext_fp_t));
     fargs.push_back(to_llvm_type<std::size_t>(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -3146,7 +3149,13 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     par_ptr->addAttr(llvm::Attribute::NoAlias);
     par_ptr->addAttr(llvm::Attribute::ReadOnly);
 
-    auto *stride = out_ptr + 3;
+    auto *time_ptr = out_ptr + 3;
+    time_ptr->setName("time_ptr");
+    time_ptr->addAttr(llvm::Attribute::NoCapture);
+    time_ptr->addAttr(llvm::Attribute::NoAlias);
+    time_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto *stride = out_ptr + 4;
     stride->setName("stride");
 
     // Create a new basic block to start insertion into.
@@ -3155,9 +3164,11 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     builder.SetInsertPoint(bb);
 
     if (compact_mode) {
-        add_cfunc_c_mode(s, fp_t, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
+        add_cfunc_c_mode(s, fp_t, out_ptr, in_ptr, par_ptr, time_ptr, stride, dc, nvars, nuvars, batch_size,
+                         high_accuracy);
     } else {
-        add_cfunc_nc_mode(s, fp_t, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
+        add_cfunc_nc_mode(s, fp_t, out_ptr, in_ptr, par_ptr, time_ptr, stride, dc, nvars, nuvars, batch_size,
+                          high_accuracy);
     }
 
     // Finish off the function.
@@ -3199,13 +3210,19 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     par_ptr->addAttr(llvm::Attribute::NoAlias);
     par_ptr->addAttr(llvm::Attribute::ReadOnly);
 
+    time_ptr = out_ptr + 3;
+    time_ptr->setName("time_ptr");
+    time_ptr->addAttr(llvm::Attribute::NoCapture);
+    time_ptr->addAttr(llvm::Attribute::NoAlias);
+    time_ptr->addAttr(llvm::Attribute::ReadOnly);
+
     // Create a new basic block to start insertion into.
     bb = llvm::BasicBlock::Create(context, "entry", f);
     assert(bb != nullptr); // LCOV_EXCL_LINE
     builder.SetInsertPoint(bb);
 
     // Invoke the strided function with stride == batch_size.
-    builder.CreateCall(f_strided, {out_ptr, in_ptr, par_ptr, to_size_t(s, builder.getInt32(batch_size))});
+    builder.CreateCall(f_strided, {out_ptr, in_ptr, par_ptr, time_ptr, to_size_t(s, builder.getInt32(batch_size))});
 
     // Finish off the function.
     builder.CreateRetVoid();
