@@ -744,6 +744,10 @@ llvm_eval_helper(const std::function<llvm::Value *(const std::vector<llvm::Value
                  llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
                  std::uint32_t, bool);
 
+std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llvm::LLVMContext &, llvm::Type *,
+                                                                             const std::string &, std::uint32_t,
+                                                                             const std::vector<expression> &);
+
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *
 llvm_c_eval_func_helper(const std::string &,
                         const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,

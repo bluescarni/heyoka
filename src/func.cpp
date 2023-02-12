@@ -772,9 +772,6 @@ llvm::Value *llvm_eval_helper(const std::function<llvm::Value *(const std::vecto
     return g(llvm_args, high_accuracy);
 }
 
-namespace
-{
-
 // NOTE: precondition on name: must be conforming to LLVM requirements for
 // function names, and must not contain "." (as we use it as a separator in
 // the mangling scheme).
@@ -846,8 +843,6 @@ std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llv
 
     return std::make_pair(std::move(fname), std::move(fargs));
 }
-
-} // namespace
 
 llvm::Function *llvm_c_eval_func_helper(const std::string &name,
                                         const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &g,
