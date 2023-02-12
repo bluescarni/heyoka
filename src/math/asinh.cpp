@@ -95,7 +95,7 @@ mppp::real128 asinh_impl::eval_f128(const std::unordered_map<std::string, mppp::
 #endif
 
 llvm::Value *asinh_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                   llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                   llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                    bool high_accuracy) const
 {
     return llvm_eval_helper([&s](const std::vector<llvm::Value *> &args, bool) { return llvm_asinh(s, args[0]); },

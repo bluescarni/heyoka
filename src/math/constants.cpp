@@ -231,7 +231,7 @@ llvm::Constant *constant::make_llvm_const([[maybe_unused]] llvm_state &s, llvm::
 }
 
 llvm::Value *constant::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &, llvm::Value *,
-                                 llvm::Value *, std::uint32_t batch_size, bool) const
+                                 llvm::Value *, llvm::Value *, std::uint32_t batch_size, bool) const
 {
     return detail::vector_splat(s.builder(), make_llvm_const(s, fp_t), batch_size);
 }

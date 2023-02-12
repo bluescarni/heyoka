@@ -96,7 +96,7 @@ TEST_CASE("func minimal")
     REQUIRE_THROWS_MATCHES(f.deval_num_dbl({1., 1.}, 2), std::invalid_argument,
                            Message("Invalid index supplied to the double numerical evaluation of the derivative of "
                                    "function 'f': index 2 was supplied, but the number of arguments is only 2"));
-    REQUIRE_THROWS_MATCHES(f.llvm_eval(s, fp_t, {}, nullptr, nullptr, 1, false), not_implemented_error,
+    REQUIRE_THROWS_MATCHES(f.llvm_eval(s, fp_t, {}, nullptr, nullptr, nullptr, 1, false), not_implemented_error,
                            Message("llvm_eval() is not implemented for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.llvm_c_eval_func(s, fp_t, 1, false), not_implemented_error,
                            Message("llvm_c_eval_func() is not implemented for the function 'f'"));

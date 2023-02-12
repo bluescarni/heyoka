@@ -285,9 +285,10 @@ TEST_CASE("cfunc")
 
             s.compile();
 
-            auto *cf_ptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
+            auto *cf_ptr
+                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
 
-            cf_ptr(outs.data(), ins.data(), pars.data());
+            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(ins[i] + ins[i + batch_size], fp_t(100)));
@@ -347,9 +348,10 @@ TEST_CASE("cfunc mp")
 
                 s.compile();
 
-                auto *cf_ptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
+                auto *cf_ptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(
+                    s.jit_lookup("cfunc"));
 
-                cf_ptr(outs.data(), ins.data(), pars.data());
+                cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
 
                 for (auto i = 0u; i < batch_size; ++i) {
                     REQUIRE(outs[i] == approximately(ins[i] + ins[i + batch_size], fp_t(100)));

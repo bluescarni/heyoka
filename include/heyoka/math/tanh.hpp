@@ -38,10 +38,10 @@ public:
     tanh_impl();
     explicit tanh_impl(expression);
 
-    std::vector<expression> gradient() const;
+    [[nodiscard]] std::vector<expression> gradient() const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
-                                         llvm::Value *, std::uint32_t, bool) const;
+                                         llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 

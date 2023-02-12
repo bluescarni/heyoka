@@ -112,7 +112,7 @@ llvm::Value *kepE_llvm_eval_impl(llvm_state &s, llvm::Type *fp_t, const func_bas
 } // namespace
 
 llvm::Value *kepE_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                  llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                  llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                   bool high_accuracy) const
 {
     return kepE_llvm_eval_impl(s, fp_t, *this, eval_arr, par_ptr, stride, batch_size, high_accuracy);

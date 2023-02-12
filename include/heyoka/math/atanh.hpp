@@ -41,15 +41,16 @@ public:
     expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
     expression diff(std::unordered_map<const void *, expression> &, const param &) const;
 
-    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
-    long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
+    [[nodiscard]] double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
+    [[nodiscard]] long double eval_ldbl(const std::unordered_map<std::string, long double> &,
+                                        const std::vector<long double> &) const;
 #if defined(HEYOKA_HAVE_REAL128)
-    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                            const std::vector<mppp::real128> &) const;
+    [[nodiscard]] mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
+                                          const std::vector<mppp::real128> &) const;
 #endif
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
-                                         llvm::Value *, std::uint32_t, bool) const;
+                                         llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 
