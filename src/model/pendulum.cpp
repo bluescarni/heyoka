@@ -24,18 +24,18 @@ HEYOKA_BEGIN_NAMESPACE
 namespace model::detail
 {
 
-std::vector<std::pair<expression, expression>> pendulum_impl(const expression &gconst, const expression &L)
+std::vector<std::pair<expression, expression>> pendulum_impl(const expression &gconst, const expression &l)
 {
     auto [x, v] = make_vars("x", "v");
 
-    return {prime(x) = v, prime(v) = -gconst / L * sin(x)};
+    return {prime(x) = v, prime(v) = -gconst / l * sin(x)};
 }
 
-expression pendulum_energy_impl(const expression &gconst, const expression &L)
+expression pendulum_energy_impl(const expression &gconst, const expression &l)
 {
     auto [x, v] = make_vars("x", "v");
 
-    return 0.5_dbl * (L * L) * (v * v) + gconst * L * (1_dbl - cos(x));
+    return 0.5_dbl * (l * l) * (v * v) + gconst * l * (1_dbl - cos(x));
 }
 
 } // namespace model::detail

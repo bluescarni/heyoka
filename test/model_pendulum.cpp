@@ -36,7 +36,7 @@ TEST_CASE("basic")
     }
 
     {
-        auto dyn = model::pendulum(kw::gconst = .1l, kw::L = .3);
+        auto dyn = model::pendulum(kw::gconst = .1l, kw::l = .3);
 
         REQUIRE(dyn.size() == 2u);
 
@@ -46,13 +46,13 @@ TEST_CASE("basic")
         REQUIRE(dyn[1].first == "v"_var);
         REQUIRE(dyn[1].second == -(.1l / .3) * sin("x"_var));
 
-        auto E = model::pendulum_energy(kw::gconst = .1l, kw::L = .3);
+        auto E = model::pendulum_energy(kw::gconst = .1l, kw::l = .3);
 
         REQUIRE(E == (.5 * .3 * .3) * ("v"_var * "v"_var) + (.1l * .3) * (1. - cos("x"_var)));
     }
 
     {
-        auto dyn = model::pendulum(kw::gconst = .1l, kw::L = par[0]);
+        auto dyn = model::pendulum(kw::gconst = .1l, kw::l = par[0]);
 
         REQUIRE(dyn.size() == 2u);
 
@@ -62,7 +62,7 @@ TEST_CASE("basic")
         REQUIRE(dyn[1].first == "v"_var);
         REQUIRE(dyn[1].second == (-.1l / par[0]) * sin("x"_var));
 
-        auto E = model::pendulum_energy(kw::gconst = par[0], kw::L = .3);
+        auto E = model::pendulum_energy(kw::gconst = par[0], kw::l = .3);
 
         REQUIRE(E == (.5 * .3 * .3) * ("v"_var * "v"_var) + (par[0] * .3) * (1. - cos("x"_var)));
     }

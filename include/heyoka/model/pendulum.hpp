@@ -24,7 +24,7 @@ namespace kw
 {
 
 IGOR_MAKE_NAMED_ARGUMENT(gconst);
-IGOR_MAKE_NAMED_ARGUMENT(L);
+IGOR_MAKE_NAMED_ARGUMENT(l);
 
 } // namespace kw
 
@@ -40,8 +40,8 @@ auto pendulum_common_opts(KwArgs &&...kw_args)
     igor::parser p{kw_args...};
 
     static_assert(!p.has_unnamed_arguments(), "This function accepts only named arguments");
-    static_assert(!p.has_other_than(kw::gconst, kw::L),
-                  "This function accepts only the 'gconst' and 'L' named arguments.");
+    static_assert(!p.has_other_than(kw::gconst, kw::l),
+                  "This function accepts only the 'gconst' and 'l' named arguments.");
 
     // Gravitational constant (defaults to 1).
     auto gconst = [&p]() {
@@ -53,15 +53,15 @@ auto pendulum_common_opts(KwArgs &&...kw_args)
     }();
 
     // Length (defaults to 1).
-    auto L = [&p]() {
-        if constexpr (p.has(kw::L)) {
-            return expression{std::forward<decltype(p(kw::L))>(p(kw::L))};
+    auto l = [&p]() {
+        if constexpr (p.has(kw::l)) {
+            return expression{std::forward<decltype(p(kw::l))>(p(kw::l))};
         } else {
             return 1_dbl;
         }
     }();
 
-    return std::tuple{std::move(gconst), std::move(L)};
+    return std::tuple{std::move(gconst), std::move(l)};
 }
 
 HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> pendulum_impl(const expression &, const expression &);
