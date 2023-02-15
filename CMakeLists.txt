@@ -236,6 +236,8 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_4.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_5.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_6.cpp"
+    # Models.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/pendulum.cpp"
     # Math functions.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/binary_op.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"

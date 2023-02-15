@@ -1,0 +1,98 @@
+// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+//
+// This file is part of the heyoka library.
+//
+// This Source Code Form is subject to the terms of the Mozilla
+// Public License v. 2.0. If a copy of the MPL was not distributed
+// with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+#ifndef HEYOKA_MODEL_PENDULUM_HPP
+#define HEYOKA_MODEL_PENDULUM_HPP
+
+#include <functional>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <heyoka/config.hpp>
+#include <heyoka/detail/igor.hpp>
+#include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/visibility.hpp>
+#include <heyoka/expression.hpp>
+
+HEYOKA_BEGIN_NAMESPACE
+
+namespace kw
+{
+
+IGOR_MAKE_NAMED_ARGUMENT(gconst);
+IGOR_MAKE_NAMED_ARGUMENT(L);
+
+} // namespace kw
+
+namespace model
+{
+
+namespace detail
+{
+
+template <typename... KwArgs>
+auto pendulum_common_opts(KwArgs &&...kw_args)
+{
+    igor::parser p{kw_args...};
+
+    static_assert(!p.has_unnamed_arguments(), "This function accepts only named arguments");
+
+    // Gravitational constant (defaults to 1).
+    auto gconst = [&p]() {
+        if constexpr (p.has(kw::gconst)) {
+            if constexpr (std::is_same_v<expression, heyoka::detail::uncvref_t<decltype(p(kw::gconst))>>) {
+                return std::cref(static_cast<const expression &>(p(kw::gconst)));
+            } else {
+                return expression{std::forward<decltype(p(kw::gconst))>(p(kw::gconst))};
+            }
+        } else {
+            return 1_dbl;
+        }
+    }();
+
+    // Length (defaults to 1).
+    auto L = [&p]() {
+        if constexpr (p.has(kw::L)) {
+            if constexpr (std::is_same_v<expression, heyoka::detail::uncvref_t<decltype(p(kw::L))>>) {
+                return std::cref(static_cast<const expression &>(p(kw::L)));
+            } else {
+                return expression{std::forward<decltype(p(kw::L))>(p(kw::L))};
+            }
+        } else {
+            return 1_dbl;
+        }
+    }();
+
+    return std::make_tuple(std::move(gconst), std::move(L));
+}
+
+HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> pendulum_impl(const expression &, const expression &);
+HEYOKA_DLL_PUBLIC expression pendulum_energy_impl(const expression &, const expression &);
+
+} // namespace detail
+
+template <typename... KwArgs>
+std::vector<std::pair<expression, expression>> pendulum(KwArgs &&...kw_args)
+{
+
+    return std::apply(detail::pendulum_impl, detail::pendulum_common_opts(std::forward<KwArgs>(kw_args)...));
+}
+
+template <typename... KwArgs>
+expression pendulum_energy(KwArgs &&...kw_args)
+{
+    return std::apply(detail::pendulum_energy_impl, detail::pendulum_common_opts(std::forward<KwArgs>(kw_args)...));
+}
+
+} // namespace model
+
+HEYOKA_END_NAMESPACE
+
+#endif
