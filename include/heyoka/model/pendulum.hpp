@@ -9,15 +9,12 @@
 #ifndef HEYOKA_MODEL_PENDULUM_HPP
 #define HEYOKA_MODEL_PENDULUM_HPP
 
-#include <functional>
 #include <tuple>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/igor.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 
@@ -47,11 +44,7 @@ auto pendulum_common_opts(KwArgs &&...kw_args)
     // Gravitational constant (defaults to 1).
     auto gconst = [&p]() {
         if constexpr (p.has(kw::gconst)) {
-            if constexpr (std::is_same_v<expression, heyoka::detail::uncvref_t<decltype(p(kw::gconst))>>) {
-                return std::cref(static_cast<const expression &>(p(kw::gconst)));
-            } else {
-                return expression{std::forward<decltype(p(kw::gconst))>(p(kw::gconst))};
-            }
+            return expression{std::forward<decltype(p(kw::gconst))>(p(kw::gconst))};
         } else {
             return 1_dbl;
         }
@@ -60,11 +53,7 @@ auto pendulum_common_opts(KwArgs &&...kw_args)
     // Length (defaults to 1).
     auto L = [&p]() {
         if constexpr (p.has(kw::L)) {
-            if constexpr (std::is_same_v<expression, heyoka::detail::uncvref_t<decltype(p(kw::L))>>) {
-                return std::cref(static_cast<const expression &>(p(kw::L)));
-            } else {
-                return expression{std::forward<decltype(p(kw::L))>(p(kw::L))};
-            }
+            return expression{std::forward<decltype(p(kw::L))>(p(kw::L))};
         } else {
             return 1_dbl;
         }
