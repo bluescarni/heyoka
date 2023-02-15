@@ -6,8 +6,6 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <stdexcept>
-
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
@@ -68,12 +66,4 @@ TEST_CASE("basic")
 
         REQUIRE(E == (.5 * .3 * .3) * ("v"_var * "v"_var) + (par[0] * .3) * (1. - cos("x"_var)));
     }
-
-    // Error handling.
-    REQUIRE_THROWS_MATCHES(model::pendulum(kw::gconst = .1l, kw::L = "z"_var), std::invalid_argument,
-                           Message("The length of a pendulum must be a number or a parameter"));
-
-    REQUIRE_THROWS_MATCHES(
-        model::pendulum_energy(kw::gconst = cos("x"_var), kw::L = "z"_var), std::invalid_argument,
-        Message("The gravitational acceleration of a pendulum model must be a number or a parameter"));
 }

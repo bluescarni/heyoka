@@ -72,7 +72,6 @@ HEYOKA_DLL_PUBLIC expression pendulum_energy_impl(const expression &, const expr
 template <typename... KwArgs>
 std::vector<std::pair<expression, expression>> pendulum(KwArgs &&...kw_args)
 {
-
     return std::apply(detail::pendulum_impl, detail::pendulum_common_opts(std::forward<KwArgs>(kw_args)...));
 }
 

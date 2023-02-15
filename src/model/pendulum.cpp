@@ -24,27 +24,8 @@ HEYOKA_BEGIN_NAMESPACE
 namespace model::detail
 {
 
-namespace
-{
-
-void pendulum_check_params(const expression &gconst, const expression &L)
-{
-    if (!std::holds_alternative<number>(gconst.value()) && !std::holds_alternative<param>(gconst.value())) {
-        throw std::invalid_argument(
-            "The gravitational acceleration of a pendulum model must be a number or a parameter");
-    }
-
-    if (!std::holds_alternative<number>(L.value()) && !std::holds_alternative<param>(L.value())) {
-        throw std::invalid_argument("The length of a pendulum must be a number or a parameter");
-    }
-}
-
-} // namespace
-
 std::vector<std::pair<expression, expression>> pendulum_impl(const expression &gconst, const expression &L)
 {
-    pendulum_check_params(gconst, L);
-
     auto [x, v] = make_vars("x", "v");
 
     return {prime(x) = v, prime(v) = -gconst / L * sin(x)};
@@ -52,8 +33,6 @@ std::vector<std::pair<expression, expression>> pendulum_impl(const expression &g
 
 expression pendulum_energy_impl(const expression &gconst, const expression &L)
 {
-    pendulum_check_params(gconst, L);
-
     auto [x, v] = make_vars("x", "v");
 
     return 0.5_dbl * (L * L) * (v * v) + gconst * L * (1_dbl - cos(x));
