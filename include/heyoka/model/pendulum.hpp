@@ -40,6 +40,8 @@ auto pendulum_common_opts(KwArgs &&...kw_args)
     igor::parser p{kw_args...};
 
     static_assert(!p.has_unnamed_arguments(), "This function accepts only named arguments");
+    static_assert(!p.has_other_than(kw::gconst, kw::L),
+                  "This function accepts only the 'gconst' and 'L' named arguments.");
 
     // Gravitational constant (defaults to 1).
     auto gconst = [&p]() {
@@ -59,7 +61,7 @@ auto pendulum_common_opts(KwArgs &&...kw_args)
         }
     }();
 
-    return std::make_tuple(std::move(gconst), std::move(L));
+    return std::tuple{std::move(gconst), std::move(L)};
 }
 
 HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> pendulum_impl(const expression &, const expression &);
