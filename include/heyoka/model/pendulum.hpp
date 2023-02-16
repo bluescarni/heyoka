@@ -75,6 +75,8 @@ std::vector<std::pair<expression, expression>> pendulum(KwArgs &&...kw_args)
     return std::apply(detail::pendulum_impl, detail::pendulum_common_opts(std::forward<KwArgs>(kw_args)...));
 }
 
+// NOTE: this returns the energy per unit of mass - the actual energy
+// can be obtained by multiplying the result by the mass of the bob.
 template <typename... KwArgs>
 expression pendulum_energy(KwArgs &&...kw_args)
 {
