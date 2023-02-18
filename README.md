@@ -3,7 +3,7 @@ heyoka
 
 [![Build Status](https://img.shields.io/circleci/project/github/bluescarni/heyoka/master.svg?style=for-the-badge)](https://circleci.com/gh/bluescarni/heyoka)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/bluescarni/heyoka/gha_ci.yml?branch=master&style=for-the-badge)](https://github.com/bluescarni/heyoka/actions?query=workflow%3A%22GitHub+CI%22)
-[![Build Status](https://img.shields.io/travis/com/bluescarni/heyoka?style=for-the-badge)](https://travis-ci.com/bluescarni/heyoka)
+<!-- [![Build Status](https://img.shields.io/travis/com/bluescarni/heyoka?style=for-the-badge)](https://travis-ci.com/bluescarni/heyoka) -->
 ![language](https://img.shields.io/badge/language-C%2B%2B17-red.svg?style=for-the-badge)
 [![Code Coverage](https://img.shields.io/codecov/c/github/bluescarni/heyoka.svg?style=for-the-badge)](https://codecov.io/github/bluescarni/heyoka?branch=master)
 
