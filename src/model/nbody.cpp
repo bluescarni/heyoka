@@ -8,7 +8,9 @@
 
 #include <cassert>
 #include <cstdint>
+#include <initializer_list>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -20,6 +22,7 @@
 #include <heyoka/math/sum.hpp>
 #include <heyoka/math/sum_sq.hpp>
 #include <heyoka/model/nbody.hpp>
+#include <heyoka/number.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -65,55 +68,132 @@ std::vector<std::pair<expression, expression>> nbody_impl(std::uint32_t n, const
         retval.push_back(prime(y_vars[i]) = vy_vars[i]);
         retval.push_back(prime(z_vars[i]) = vz_vars[i]);
 
-        // Compute the total acceleration on body i,
-        // accumulating the result in x/y/z_acc. Part of the
-        // calculation will be re-used to compute
-        // the contribution from i to the total acceleration
-        // on body j.
+        // Compute all the gravitational interactions involving
+        // body i: that is, both the accelerations on i
+        // due to the other massive bodies, and the accelerations
+        // due to i on *all* the bodies.
         for (std::uint32_t j = i + 1u; j < n; ++j) {
-            auto diff_x = x_vars[j] - x_vars[i];
-            auto diff_y = y_vars[j] - y_vars[i];
-            auto diff_z = z_vars[j] - z_vars[i];
+            const auto diff_x = x_vars[j] - x_vars[i];
+            const auto diff_y = y_vars[j] - y_vars[i];
+            const auto diff_z = z_vars[j] - z_vars[i];
 
-            auto r_m3 = pow(sum_sq({diff_x, diff_y, diff_z}), expression{-3. / 2});
+            const auto r_m3 = pow(sum_sq({diff_x, diff_y, diff_z}), expression{-3. / 2});
 
-            if (j < n_massive) {
-                // Body j is massive and it interacts mutually with body i
-                // (which is also massive).
-                // NOTE: the idea here is that we want to help the CSE process
-                // when computing the Taylor decomposition. Thus, we try
-                // to maximise the re-use of an expression with the goal
-                // of having it simplified in the CSE.
-                auto fac_j = Gconst * masses_vec[j] * r_m3;
-                auto c_ij = -masses_vec[i] / masses_vec[j];
+            if (const auto *nptr = std::get_if<number>(&masses_vec[j].value()); nptr != nullptr && !is_zero(*nptr)) {
+                // NOTE: is masses_vec[j] is a non-zero number, then
+                // we compute the accelerations using a grouping
+                // of the operations optimised for the common case
+                // in which masses and G are numbers.
+                if (j < n_massive) {
+                    // Body j is massive and it interacts mutually with body i.
+                    // NOTE: if masses and G are numbers, then
+                    // Gconst * masses_vec[j] and -masses_vec[i] / masses_vec[j]
+                    // will be constant folded into the numerical result.
+                    const auto fac_j = Gconst * masses_vec[j] * r_m3;
+                    const auto c_ij = -masses_vec[i] / masses_vec[j];
 
-                // Acceleration exerted by j on i.
-                x_acc[i].push_back(diff_x * fac_j);
-                y_acc[i].push_back(diff_y * fac_j);
-                z_acc[i].push_back(diff_z * fac_j);
+                    // Acceleration exerted by j on i.
+                    x_acc[i].push_back(diff_x * fac_j);
+                    y_acc[i].push_back(diff_y * fac_j);
+                    z_acc[i].push_back(diff_z * fac_j);
 
-                // Acceleration exerted by i on j.
-                x_acc[j].push_back(x_acc[i].back() * c_ij);
-                y_acc[j].push_back(y_acc[i].back() * c_ij);
-                z_acc[j].push_back(z_acc[i].back() * c_ij);
+                    // Acceleration exerted by i on j.
+                    x_acc[j].push_back(x_acc[i].back() * c_ij);
+                    y_acc[j].push_back(y_acc[i].back() * c_ij);
+                    z_acc[j].push_back(z_acc[i].back() * c_ij);
+                } else {
+                    // Body j is massless, add the acceleration
+                    // on it due to the massive body i.
+                    const auto fac = -Gconst * masses_vec[i] * r_m3;
+
+                    x_acc[j].push_back(diff_x * fac);
+                    y_acc[j].push_back(diff_y * fac);
+                    z_acc[j].push_back(diff_z * fac);
+                }
             } else {
-                // Body j is massless, add the acceleration
-                // on it due to the massive body i.
-                auto fac = -Gconst * masses_vec[i] * r_m3;
+                const auto G_r_m3 = Gconst * r_m3;
 
-                x_acc[j].push_back(diff_x * fac);
-                y_acc[j].push_back(diff_y * fac);
-                z_acc[j].push_back(diff_z * fac);
+                // Acceleration due to i on j.
+                const auto fac_i = -masses_vec[i] * G_r_m3;
+                x_acc[j].push_back(diff_x * fac_i);
+                y_acc[j].push_back(diff_y * fac_i);
+                z_acc[j].push_back(diff_z * fac_i);
+
+                if (j < n_massive) {
+                    // Body j is massive and it interacts mutually with body i
+                    // (which is also massive).
+                    const auto fac_j = masses_vec[j] * G_r_m3;
+
+                    // Acceleration due to j on i.
+                    x_acc[i].push_back(diff_x * fac_j);
+                    y_acc[i].push_back(diff_y * fac_j);
+                    z_acc[i].push_back(diff_z * fac_j);
+                }
             }
         }
 
-        // Add the expressions of the accelerations to the system.
+        // Add the expressions of the accelerations on body i to the system.
+        retval.push_back(prime(vx_vars[i]) = sum(x_acc[i]));
+        retval.push_back(prime(vy_vars[i]) = sum(y_acc[i]));
+        retval.push_back(prime(vz_vars[i]) = sum(z_acc[i]));
+    }
+
+    // Now the dynamics of the massless particles.
+    // All the accelerations on the massless particles
+    // have already been accumulated in the loop above.
+    // We just need to perform the sums on x/y/z_acc.
+    for (std::uint32_t i = n_massive; i < n; ++i) {
+        retval.push_back(prime(x_vars[i]) = vx_vars[i]);
+        retval.push_back(prime(y_vars[i]) = vy_vars[i]);
+        retval.push_back(prime(z_vars[i]) = vz_vars[i]);
+
         retval.push_back(prime(vx_vars[i]) = sum(x_acc[i]));
         retval.push_back(prime(vy_vars[i]) = sum(y_acc[i]));
         retval.push_back(prime(vz_vars[i]) = sum(z_acc[i]));
     }
 
     return retval;
+}
+
+expression nbody_energy_impl(std::uint32_t n, const expression &Gconst, const std::vector<expression> &masses_vec)
+{
+    assert(n >= masses_vec.size());
+
+    // Create the state variables.
+    std::vector<expression> x_vars, y_vars, z_vars, vx_vars, vy_vars, vz_vars;
+
+    for (std::uint32_t i = 0; i < n; ++i) {
+        x_vars.emplace_back(fmt::format("x_{}", i));
+        y_vars.emplace_back(fmt::format("y_{}", i));
+        z_vars.emplace_back(fmt::format("z_{}", i));
+
+        vx_vars.emplace_back(fmt::format("vx_{}", i));
+        vy_vars.emplace_back(fmt::format("vy_{}", i));
+        vz_vars.emplace_back(fmt::format("vz_{}", i));
+    }
+
+    // Store the number of massive particles.
+    const auto n_massive = masses_vec.size();
+
+    // The kinetic terms.
+    std::vector<expression> kin;
+    for (std::uint32_t i = 0; i < n_massive; ++i) {
+        kin.push_back(masses_vec[i] * sum_sq({vx_vars[i], vy_vars[i], vz_vars[i]}));
+    }
+
+    // The potential terms.
+    std::vector<expression> pot;
+    for (std::uint32_t i = 0; i < n_massive; ++i) {
+        for (std::uint32_t j = i + 1u; j < n_massive; ++j) {
+            const auto diff_x = x_vars[j] - x_vars[i];
+            const auto diff_y = y_vars[j] - y_vars[i];
+            const auto diff_z = z_vars[j] - z_vars[i];
+
+            pot.push_back(masses_vec[i] * masses_vec[j] * pow(sum_sq({diff_x, diff_y, diff_z}), -.5_dbl));
+        }
+    }
+
+    return .5_dbl * sum(std::move(kin)) - Gconst * sum(std::move(pot));
 }
 
 } // namespace model::detail
