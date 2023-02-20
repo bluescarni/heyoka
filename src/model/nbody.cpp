@@ -142,7 +142,7 @@ std::vector<std::pair<expression, expression>> nbody_impl(std::uint32_t n, const
     // All the accelerations on the massless particles
     // have already been accumulated in the loop above.
     // We just need to perform the sums on x/y/z_acc.
-    for (std::uint32_t i = n_massive; i < n; ++i) {
+    for (auto i = n_massive; i < n; ++i) {
         retval.push_back(prime(x_vars[i]) = vx_vars[i]);
         retval.push_back(prime(y_vars[i]) = vy_vars[i]);
         retval.push_back(prime(z_vars[i]) = vz_vars[i]);
