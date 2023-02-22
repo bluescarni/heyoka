@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <stdexcept>
 #include <vector>
 
 #include <heyoka/expression.hpp>
@@ -145,8 +146,7 @@ TEST_CASE("basic")
 
     {
         auto dyn = model::nbody(
-            6,
-            kw::masses = {par[0], par[1], par[2], expression{0.}, expression{masses[4]}, expression{masses[5]}},
+            6, kw::masses = {par[0], par[1], par[2], expression{0.}, expression{masses[4]}, expression{masses[5]}},
             kw::Gconst = Gconst);
         auto new_masses = masses;
         new_masses[3] = 0;
@@ -179,4 +179,44 @@ TEST_CASE("basic")
 
         REQUIRE(en_out == approximately(orig_en));
     }
+
+    {
+        auto dyn = model::nbody(6);
+        auto en_ex = model::nbody_energy(6);
+
+        auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true};
+
+        llvm_state s;
+        std::vector<expression> vars;
+        for (const auto &p : dyn) {
+            vars.push_back(p.first);
+        }
+
+        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        s.optimise();
+        s.compile();
+
+        double en_out = 0;
+        auto *cf
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cf"));
+        cf(&en_out, ta.get_state_data(), nullptr, nullptr);
+        const auto orig_en = en_out;
+
+        auto res = ta.propagate_until(100.);
+
+        REQUIRE(std::get<0>(res) == taylor_outcome::time_limit);
+
+        cf(&en_out, ta.get_state_data(), nullptr, nullptr);
+
+        REQUIRE(en_out == approximately(orig_en));
+    }
+
+    // Error modes.
+    REQUIRE_THROWS_MATCHES(model::nbody(0), std::invalid_argument,
+                           Message("Cannot construct an N-body system with N == 0: at least 2 bodies are needed"));
+    REQUIRE_THROWS_MATCHES(model::nbody(1), std::invalid_argument,
+                           Message("Cannot construct an N-body system with N == 1: at least 2 bodies are needed"));
+    REQUIRE_THROWS_MATCHES(model::nbody(2, kw::masses = {1., 2., 3., 4.}), std::invalid_argument,
+                           Message("In an N-body system the number of particles with mass (4) cannot be "
+                                   "greater than the total number of particles (2)"));
 }

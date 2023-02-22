@@ -17,8 +17,6 @@ using namespace heyoka;
 
 TEST_CASE("basic")
 {
-    using Catch::Matchers::Message;
-
     {
         auto dyn = model::pendulum();
 
