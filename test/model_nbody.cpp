@@ -79,10 +79,74 @@ TEST_CASE("basic")
     }
 
     {
+        std::vector new_masses(masses.begin(), masses.begin() + 5);
+
+        auto dyn = model::nbody(6, kw::masses = new_masses, kw::Gconst = Gconst);
+        auto en_ex = model::nbody_energy(6, kw::masses = new_masses, kw::Gconst = Gconst);
+
+        auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true};
+
+        llvm_state s;
+        std::vector<expression> vars;
+        for (const auto &p : dyn) {
+            vars.push_back(p.first);
+        }
+
+        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        s.optimise();
+        s.compile();
+
+        double en_out = 0;
+        auto *cf
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cf"));
+        cf(&en_out, ta.get_state_data(), nullptr, nullptr);
+        const auto orig_en = en_out;
+
+        auto res = ta.propagate_until(100.);
+
+        REQUIRE(std::get<0>(res) == taylor_outcome::time_limit);
+
+        cf(&en_out, ta.get_state_data(), nullptr, nullptr);
+
+        REQUIRE(en_out == approximately(orig_en));
+    }
+
+    {
         auto dyn = model::nbody(6, kw::masses = {par[0], par[1], par[2], par[3], par[4], par[5]}, kw::Gconst = Gconst);
         auto en_ex = model::nbody_energy(6, kw::masses = masses, kw::Gconst = Gconst);
 
         auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true, kw::pars = masses};
+
+        llvm_state s;
+        std::vector<expression> vars;
+        for (const auto &p : dyn) {
+            vars.push_back(p.first);
+        }
+
+        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        s.optimise();
+        s.compile();
+
+        double en_out = 0;
+        auto *cf
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cf"));
+        cf(&en_out, ta.get_state_data(), nullptr, nullptr);
+        const auto orig_en = en_out;
+
+        auto res = ta.propagate_until(100.);
+
+        REQUIRE(std::get<0>(res) == taylor_outcome::time_limit);
+
+        cf(&en_out, ta.get_state_data(), nullptr, nullptr);
+
+        REQUIRE(en_out == approximately(orig_en));
+    }
+
+    {
+        auto dyn = model::nbody(6, kw::masses = {par[0], par[1], par[2], par[3], par[4]}, kw::Gconst = Gconst);
+        auto en_ex = model::nbody_energy(6, kw::masses = std::vector(masses.begin(), masses.begin() + 5), kw::Gconst = Gconst);
+
+        auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true, kw::pars = std::vector(masses.begin(), masses.begin() + 5)};
 
         llvm_state s;
         std::vector<expression> vars;
