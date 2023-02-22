@@ -44,7 +44,7 @@ int main()
     namespace chrono = std::chrono;
 
     // Create an nbody system with 6 particles.
-    auto sys = make_nbody_sys(6);
+    auto sys = model::nbody(6);
 
     // Create an initial state vector (6 values per body).
     auto sv = std::vector<double>(36);

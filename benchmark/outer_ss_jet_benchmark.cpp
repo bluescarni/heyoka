@@ -15,7 +15,7 @@
 #include <vector>
 
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 using namespace heyoka;
@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
 
     const auto G = 0.01720209895 * 0.01720209895;
 
-    auto sys = make_nbody_sys(6, kw::masses = masses, kw::Gconst = G);
+    auto sys = model::nbody(6, kw::masses = masses, kw::Gconst = G);
 
     llvm_state s;
 

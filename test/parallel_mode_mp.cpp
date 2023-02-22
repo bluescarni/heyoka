@@ -20,7 +20,7 @@
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/math/time.hpp>
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -57,7 +57,7 @@ TEST_CASE("parallel consistency")
 
         const auto G = fp_t(0.01720209895 * 0.01720209895 * 365 * 365, prec);
 
-        auto sys = make_nbody_sys(6, kw::masses = masses, kw::Gconst = G);
+        auto sys = model::nbody(6, kw::masses = masses, kw::Gconst = G);
 
         auto ic = std::vector<fp_t>{// Sun.
                                     -4.06428567034226e-3, -6.08813756435987e-3, -1.66162304225834e-6,

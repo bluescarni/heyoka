@@ -19,6 +19,7 @@
 #include <heyoka/logging.hpp>
 #include <heyoka/mascon.hpp>
 #include <heyoka/math.hpp>
+#include <heyoka/models.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>

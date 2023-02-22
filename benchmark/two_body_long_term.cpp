@@ -17,7 +17,7 @@
 #include <string>
 #include <vector>
 
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "benchmark_utils.hpp"
@@ -47,7 +47,7 @@ void run_integration()
     using std::log10;
     using std::pow;
 
-    auto sys = heyoka::make_nbody_sys(2);
+    auto sys = heyoka::model::nbody(2);
 
     const auto x0 = T(0.12753732455163191);
     const auto y0 = T(1.38595818266122);

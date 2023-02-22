@@ -14,7 +14,7 @@
 
 #include <boost/program_options.hpp>
 
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 using namespace heyoka;
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    taylor_adaptive<double> ta{make_nbody_sys(n_bodies), std::move(init_state), kw::high_accuracy = true,
+    taylor_adaptive<double> ta{model::nbody(n_bodies), std::move(init_state), kw::high_accuracy = true,
                                kw::compact_mode = compact_mode};
 
     auto elapsed = static_cast<double>(

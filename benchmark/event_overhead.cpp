@@ -12,7 +12,7 @@
 #include <iostream>
 #include <vector>
 
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "benchmark_utils.hpp"
@@ -22,7 +22,7 @@ using namespace heyoka_benchmark;
 
 int main()
 {
-    auto sys = make_nbody_sys(2, kw::masses = {1., 0.});
+    auto sys = model::nbody(2, kw::masses = {1., 0.});
 
     const auto ic = std::vector{0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 1., 0.};
 
