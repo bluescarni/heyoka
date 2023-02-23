@@ -79,37 +79,31 @@ std::vector<std::pair<expression, expression>> nbody_impl(std::uint32_t n, const
 
             const auto r_m3 = pow(sum_sq({diff_x, diff_y, diff_z}), expression{-3. / 2});
 
-            if (const auto *nptr = std::get_if<number>(&masses_vec[j].value()); nptr != nullptr && !is_zero(*nptr)) {
-                // NOTE: is masses_vec[j] is a non-zero number, then
-                // we compute the accelerations using a grouping
-                // of the operations optimised for the common case
-                // in which masses and G are numbers.
-                if (j < n_massive) {
-                    // Body j is massive and it interacts mutually with body i.
-                    // NOTE: if masses and G are numbers, then
-                    // Gconst * masses_vec[j] and -masses_vec[i] / masses_vec[j]
-                    // will be constant folded into the numerical result.
-                    const auto fac_j = Gconst * masses_vec[j] * r_m3;
-                    const auto c_ij = -masses_vec[i] / masses_vec[j];
+            // If j is massive and masses_vec[j] is a non-zero number,
+            // we compute the accelerations using a grouping
+            // of the operations optimised for the common case
+            // in which masses and G are numbers.
+            const auto j_massive = j < n_massive;
+            const auto opt_grouping = j_massive && std::holds_alternative<number>(masses_vec[j].value())
+                                      && !is_zero(std::get<number>(masses_vec[j].value()));
 
-                    // Acceleration exerted by j on i.
-                    x_acc[i].push_back(diff_x * fac_j);
-                    y_acc[i].push_back(diff_y * fac_j);
-                    z_acc[i].push_back(diff_z * fac_j);
+            if (opt_grouping) {
+                // NOTE: Gconst * masses_vec[j] and -masses_vec[i] / masses_vec[j]
+                // will be constant folded into the numerical result, if masses
+                // and Gconst are all numbers. This allows to reduce the number
+                // of operations wrt the other branch.
+                const auto fac_j = Gconst * masses_vec[j] * r_m3;
+                const auto c_ij = -masses_vec[i] / masses_vec[j];
 
-                    // Acceleration exerted by i on j.
-                    x_acc[j].push_back(x_acc[i].back() * c_ij);
-                    y_acc[j].push_back(y_acc[i].back() * c_ij);
-                    z_acc[j].push_back(z_acc[i].back() * c_ij);
-                } else {
-                    // Body j is massless, add the acceleration
-                    // on it due to the massive body i.
-                    const auto fac = -Gconst * masses_vec[i] * r_m3;
+                // Acceleration exerted by j on i.
+                x_acc[i].push_back(diff_x * fac_j);
+                y_acc[i].push_back(diff_y * fac_j);
+                z_acc[i].push_back(diff_z * fac_j);
 
-                    x_acc[j].push_back(diff_x * fac);
-                    y_acc[j].push_back(diff_y * fac);
-                    z_acc[j].push_back(diff_z * fac);
-                }
+                // Acceleration exerted by i on j.
+                x_acc[j].push_back(x_acc[i].back() * c_ij);
+                y_acc[j].push_back(y_acc[i].back() * c_ij);
+                z_acc[j].push_back(z_acc[i].back() * c_ij);
             } else {
                 const auto G_r_m3 = Gconst * r_m3;
 
@@ -119,7 +113,7 @@ std::vector<std::pair<expression, expression>> nbody_impl(std::uint32_t n, const
                 y_acc[j].push_back(diff_y * fac_i);
                 z_acc[j].push_back(diff_z * fac_i);
 
-                if (j < n_massive) {
+                if (j_massive) {
                     // Body j is massive and it interacts mutually with body i
                     // (which is also massive).
                     const auto fac_j = masses_vec[j] * G_r_m3;
