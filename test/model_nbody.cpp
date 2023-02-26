@@ -20,7 +20,7 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-TEST_CASE("basic")
+TEST_CASE("nbody")
 {
     using Catch::Matchers::Message;
 
@@ -144,9 +144,11 @@ TEST_CASE("basic")
 
     {
         auto dyn = model::nbody(6, kw::masses = {par[0], par[1], par[2], par[3], par[4]}, kw::Gconst = Gconst);
-        auto en_ex = model::nbody_energy(6, kw::masses = std::vector(masses.begin(), masses.begin() + 5), kw::Gconst = Gconst);
+        auto en_ex
+            = model::nbody_energy(6, kw::masses = std::vector(masses.begin(), masses.begin() + 5), kw::Gconst = Gconst);
 
-        auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true, kw::pars = std::vector(masses.begin(), masses.begin() + 5)};
+        auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true,
+                                          kw::pars = std::vector(masses.begin(), masses.begin() + 5)};
 
         llvm_state s;
         std::vector<expression> vars;
@@ -247,6 +249,46 @@ TEST_CASE("basic")
     {
         auto dyn = model::nbody(6);
         auto en_ex = model::nbody_energy(6);
+
+        auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true};
+
+        llvm_state s;
+        std::vector<expression> vars;
+        for (const auto &p : dyn) {
+            vars.push_back(p.first);
+        }
+
+        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        s.optimise();
+        s.compile();
+
+        double en_out = 0;
+        auto *cf
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cf"));
+        cf(&en_out, ta.get_state_data(), nullptr, nullptr);
+        const auto orig_en = en_out;
+
+        auto res = ta.propagate_until(100.);
+
+        REQUIRE(std::get<0>(res) == taylor_outcome::time_limit);
+
+        cf(&en_out, ta.get_state_data(), nullptr, nullptr);
+
+        REQUIRE(en_out == approximately(orig_en));
+    }
+
+    // Test with all zero masses.
+    {
+        const auto zero_masses = std::vector<double>(6u, 0.);
+
+        auto dyn = model::nbody(6, kw::masses = zero_masses);
+        auto en_ex = model::nbody_energy(6, kw::masses = zero_masses);
+
+        for (auto i = 0u; i < 6u; ++i) {
+            REQUIRE(dyn[i * 6u + 3u].second == 0_dbl);
+            REQUIRE(dyn[i * 6u + 4u].second == 0_dbl);
+            REQUIRE(dyn[i * 6u + 5u].second == 0_dbl);
+        }
 
         auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true};
 
