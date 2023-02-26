@@ -298,11 +298,10 @@ expression np1body_energy_impl([[maybe_unused]] std::uint32_t n, const expressio
     assert(n >= 2u);
     assert(n >= masses_vec.size());
 
-    if (masses_vec.empty()
-        || (std::holds_alternative<number>(masses_vec[0].value())
-            && is_zero(std::get<number>(masses_vec[0].value())))) {
-        throw std::invalid_argument(
-            "In the computation of the energy in an (N+1)-body problem, the zeroth body cannot have a zero mass");
+    // NOTE: if masses_vec is empty, then take a shortcut avoiding
+    // divisions by zero and out-of-bounds conditions.
+    if (masses_vec.empty()) {
+        return 0_dbl;
     }
 
     // Store the number of massive particles (including the zeroth particle).
