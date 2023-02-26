@@ -32,6 +32,7 @@ namespace model::detail
 std::vector<std::pair<expression, expression>> nbody_impl(std::uint32_t n, const expression &Gconst,
                                                           const std::vector<expression> &masses_vec)
 {
+    assert(n >= 2u);
     assert(n >= masses_vec.size());
 
     // Create the state variables.
@@ -149,14 +150,19 @@ std::vector<std::pair<expression, expression>> nbody_impl(std::uint32_t n, const
     return retval;
 }
 
-expression nbody_energy_impl(std::uint32_t n, const expression &Gconst, const std::vector<expression> &masses_vec)
+expression nbody_energy_impl([[maybe_unused]] std::uint32_t n, const expression &Gconst,
+                             const std::vector<expression> &masses_vec)
 {
+    assert(n >= 2u);
     assert(n >= masses_vec.size());
+
+    // Store the number of massive particles.
+    const auto n_massive = masses_vec.size();
 
     // Create the state variables.
     std::vector<expression> x_vars, y_vars, z_vars, vx_vars, vy_vars, vz_vars;
 
-    for (std::uint32_t i = 0; i < n; ++i) {
+    for (std::uint32_t i = 0; i < n_massive; ++i) {
         x_vars.emplace_back(fmt::format("x_{}", i));
         y_vars.emplace_back(fmt::format("y_{}", i));
         z_vars.emplace_back(fmt::format("z_{}", i));
@@ -165,9 +171,6 @@ expression nbody_energy_impl(std::uint32_t n, const expression &Gconst, const st
         vy_vars.emplace_back(fmt::format("vy_{}", i));
         vz_vars.emplace_back(fmt::format("vz_{}", i));
     }
-
-    // Store the number of massive particles.
-    const auto n_massive = masses_vec.size();
 
     // The kinetic terms.
     std::vector<expression> kin;
@@ -183,6 +186,10 @@ expression nbody_energy_impl(std::uint32_t n, const expression &Gconst, const st
             const auto diff_y = y_vars[j] - y_vars[i];
             const auto diff_z = z_vars[j] - z_vars[i];
 
+            // NOTE: this is not the most optimal grouping of terms,
+            // since if both masses and G are constants, it would be
+            // better to do the multiplication by G directly here.
+            // However, the difference is just a single multiplication.
             pot.push_back(masses_vec[i] * masses_vec[j] * pow(sum_sq({diff_x, diff_y, diff_z}), -.5_dbl));
         }
     }
