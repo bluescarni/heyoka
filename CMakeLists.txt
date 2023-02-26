@@ -176,7 +176,6 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/variable.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/param.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/nbody.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mascon.cpp"
     # "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
