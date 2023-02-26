@@ -1,6 +1,15 @@
 Changelog
 =========
 
+0.22.0 (unreleased)
+-------------------
+
+New
+~~~
+
+- New ``model`` module containing ready-made dynamical models
+  (`#295 <https://github.com/bluescarni/heyoka/pull/295>`__).
+
 0.21.0 (2023-02-16)
 -------------------
 
