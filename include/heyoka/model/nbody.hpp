@@ -82,6 +82,11 @@ HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> nbody_impl(std:
 
 HEYOKA_DLL_PUBLIC expression nbody_energy_impl(std::uint32_t, const expression &, const std::vector<expression> &);
 
+HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> np1body_impl(std::uint32_t, const expression &,
+                                                                              const std::vector<expression> &);
+
+HEYOKA_DLL_PUBLIC expression np1body_energy_impl(std::uint32_t, const expression &, const std::vector<expression> &);
+
 } // namespace detail
 
 template <typename... KwArgs>
@@ -94,6 +99,18 @@ template <typename... KwArgs>
 expression nbody_energy(std::uint32_t n, KwArgs &&...kw_args)
 {
     return std::apply(detail::nbody_energy_impl, detail::nbody_common_opts(n, std::forward<KwArgs>(kw_args)...));
+}
+
+template <typename... KwArgs>
+std::vector<std::pair<expression, expression>> np1body(std::uint32_t n, KwArgs &&...kw_args)
+{
+    return std::apply(detail::np1body_impl, detail::nbody_common_opts(n, std::forward<KwArgs>(kw_args)...));
+}
+
+template <typename... KwArgs>
+expression np1body_energy(std::uint32_t n, KwArgs &&...kw_args)
+{
+    return std::apply(detail::np1body_energy_impl, detail::nbody_common_opts(n, std::forward<KwArgs>(kw_args)...));
 }
 
 } // namespace model
