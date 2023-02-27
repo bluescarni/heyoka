@@ -40,7 +40,7 @@
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -1281,7 +1281,7 @@ TEST_CASE("events error")
 {
     using Catch::Matchers::Message;
 
-    auto sys = make_nbody_sys(2, kw::masses = {1., 0.});
+    auto sys = model::nbody(2, kw::masses = {1., 0.});
 
     using t_ev_t = t_event_batch<double>;
     using nt_ev_t = nt_event_batch<double>;

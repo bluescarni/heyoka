@@ -25,7 +25,7 @@
 #include <xtensor/xview.hpp>
 
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include <iostream>
@@ -236,8 +236,8 @@ int main()
 
     taylor_add_jet<double>(
         s, "jet",
-        make_nbody_sys(6, kw::masses = {1.00000597682, 1 / 1047.355, 1 / 3501.6, 1 / 22869., 1 / 19314., 7.4074074e-09},
-                       kw::Gconst = 0.01720209895 * 0.01720209895),
+        model::nbody(6, kw::masses = {1.00000597682, 1 / 1047.355, 1 / 3501.6, 1 / 22869., 1 / 19314., 7.4074074e-09},
+                     kw::Gconst = 0.01720209895 * 0.01720209895),
         order, 1, true, true);
 
     s.compile();

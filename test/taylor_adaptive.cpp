@@ -42,7 +42,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -321,7 +321,7 @@ TEST_CASE("streaming op")
     auto tester = [](auto fp_x) {
         using fp_t = decltype(fp_x);
 
-        auto sys = make_nbody_sys(2, kw::masses = {1., 0.});
+        auto sys = model::nbody(2, kw::masses = {1., 0.});
 
         std::ostringstream oss;
 
@@ -409,7 +409,7 @@ TEST_CASE("param scalar")
 
     const auto init_state = std::vector<double>{0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0};
 
-    auto tad = taylor_adaptive<double>{make_nbody_par_sys(2, kw::n_massive = 1), init_state, kw::tol = 1e-18};
+    auto tad = taylor_adaptive<double>{model::nbody(2, kw::masses = {par[0]}), init_state, kw::tol = 1e-18};
 
     REQUIRE(tad.get_pars().size() == 1u);
 
@@ -466,7 +466,7 @@ TEST_CASE("param batch")
 
     auto init_state = std::vector<double>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, a0, a1, 0, 0, 0, 0, 0, 0, v0, v1, 0, 0};
 
-    auto tad = taylor_adaptive_batch<double>{make_nbody_par_sys(2, kw::n_massive = 1), init_state, 2, kw::tol = 1e-18};
+    auto tad = taylor_adaptive_batch<double>{model::nbody(2, kw::masses = {par[0]}), init_state, 2, kw::tol = 1e-18};
 
     REQUIRE(tad.get_pars().size() == 2u);
 
@@ -1793,7 +1793,7 @@ TEST_CASE("no events error")
 {
     using Catch::Matchers::Message;
 
-    auto sys = make_nbody_sys(2, kw::masses = {1., 0.});
+    auto sys = model::nbody(2, kw::masses = {1., 0.});
 
     using t_ev_t = t_event<double>;
 

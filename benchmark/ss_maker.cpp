@@ -36,7 +36,7 @@
 #endif
 
 #include <heyoka/logging.hpp>
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "benchmark_utils.hpp"
@@ -61,7 +61,7 @@ void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_m
     const auto G = T(0.01720209895) * T(0.01720209895) * 365 * 365;
 
     // Create the nbody system.
-    auto sys = make_nbody_sys(nplanets + 1u, kw::masses = masses, kw::Gconst = G);
+    auto sys = model::nbody(nplanets + 1u, kw::masses = masses, kw::Gconst = G);
 
     // The initial state (zeroed out, change it later).
     std::vector<T> init_state((nplanets + 1u) * 6u);

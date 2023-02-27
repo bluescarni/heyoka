@@ -25,7 +25,7 @@
 
 #endif
 
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 using namespace heyoka;
@@ -34,7 +34,7 @@ template <typename T>
 void run_bench(T tol, bool high_accuracy, std::uint32_t batch_size, bool compact_mode, bool fast_math)
 {
     // NOTE: this setup mimics the 'simplest' test from rebound.
-    auto sys = make_nbody_sys(2, kw::masses = {1., 0.});
+    auto sys = model::nbody(2, kw::masses = {1., 0.});
 
     // Generate the initial state/time vector for the batch integrator.
     std::vector<T> init_states(batch_size * 12u);

@@ -12,7 +12,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math.hpp>
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -27,7 +27,7 @@ TEST_CASE("n body")
 
     const auto G = 0.01720209895 * 0.01720209895 * 365 * 365;
 
-    auto sys = make_nbody_sys(6, kw::masses = masses, kw::Gconst = G);
+    auto sys = model::nbody(6, kw::masses = masses, kw::Gconst = G);
 
     taylor_adaptive<double> ta{std::move(sys), std::vector<double>(36u), kw::compact_mode = true};
 

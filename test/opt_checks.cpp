@@ -11,7 +11,7 @@
 #include <boost/algorithm/string/find_iterator.hpp>
 #include <boost/algorithm/string/finder.hpp>
 
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -20,7 +20,7 @@ using namespace heyoka;
 
 TEST_CASE("function inlining")
 {
-    auto sys = make_nbody_sys(6);
+    auto sys = model::nbody(6);
 
     auto ta = taylor_adaptive<double>{sys, std::vector<double>(36u, 0.), kw::compact_mode = true};
 

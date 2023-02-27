@@ -18,7 +18,7 @@
 #include <boost/program_options.hpp>
 
 #include <heyoka/expression.hpp>
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "benchmark_utils.hpp"
@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
     auto masses = {1.00000597682, 1 / 1047.355, 1 / 3501.6};
     const auto G = 0.01720209895 * 0.01720209895 * 365 * 365;
 
-    auto sys = make_nbody_sys(3, kw::masses = masses, kw::Gconst = G);
+    auto sys = model::nbody(3, kw::masses = masses, kw::Gconst = G);
 
     auto ic = {// Sun.
                -5.137271893918405e-03, -5.288891104344273e-03, 6.180743702483316e-06, 2.3859757364179156e-03,

@@ -22,7 +22,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math.hpp>
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -80,7 +80,7 @@ TEST_CASE("three body")
         const auto sun_mu = fp_t{1.327e20};
         const auto G = fp_t{6.674e-11};
 
-        auto sys = make_nbody_sys(3, kw::masses = masses, kw::Gconst = G);
+        auto sys = model::nbody(3, kw::masses = masses, kw::Gconst = G);
 
         // Initial states in orbital elements for Jupiter and Saturn.
         // NOTE: a, e, i are realistic, the angles are random.

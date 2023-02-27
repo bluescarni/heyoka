@@ -16,7 +16,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/square.hpp>
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -150,7 +150,7 @@ TEST_CASE("decompose sys")
     REQUIRE(sv_funcs_dc[3] == 3u);
 
     // A more complex example with a 6-body system and collision-like events.
-    auto sys = make_nbody_sys(6);
+    auto sys = model::nbody(6);
 
     std::vector<expression> x_vars, y_vars, z_vars, vx_vars, vy_vars, vz_vars;
     std::vector<expression> sv_funcs;

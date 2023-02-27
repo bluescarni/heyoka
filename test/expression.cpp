@@ -30,7 +30,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -1015,7 +1015,7 @@ TEST_CASE("cfunc nbody")
 
     const auto G = 0.01720209895 * 0.01720209895 * 365 * 365;
 
-    auto sys = make_nbody_sys(6, kw::masses = masses, kw::Gconst = G);
+    auto sys = model::nbody(6, kw::masses = masses, kw::Gconst = G);
     std::vector<expression> exs;
     for (const auto &p : sys) {
         exs.push_back(p.second);
@@ -1109,7 +1109,7 @@ TEST_CASE("cfunc nbody mp")
 
     const auto G = mppp::real{0.01720209895 * 0.01720209895 * 365 * 365, prec};
 
-    auto sys = make_nbody_sys(6, kw::masses = masses, kw::Gconst = G);
+    auto sys = model::nbody(6, kw::masses = masses, kw::Gconst = G);
     std::vector<expression> exs;
     for (const auto &p : sys) {
         exs.push_back(p.second);
@@ -1200,7 +1200,7 @@ TEST_CASE("cfunc nbody par")
 
     const auto G = 0.01720209895 * 0.01720209895 * 365 * 365;
 
-    auto sys = make_nbody_par_sys(6, kw::Gconst = G);
+    auto sys = model::nbody(6, kw::Gconst = G, kw::masses = {par[0], par[1], par[2], par[3], par[4], par[5]});
     std::vector<expression> exs;
     for (const auto &p : sys) {
         exs.push_back(p.second);
@@ -1374,7 +1374,7 @@ TEST_CASE("cfunc nbody par mp")
 
     const auto G = mppp::real{0.01720209895 * 0.01720209895 * 365 * 365, prec};
 
-    auto sys = make_nbody_par_sys(6, kw::Gconst = G);
+    auto sys = model::nbody(6, kw::Gconst = G, kw::masses = {par[0], par[1], par[2], par[3], par[4], par[5]});
     std::vector<expression> exs;
     for (const auto &p : sys) {
         exs.push_back(p.second);
