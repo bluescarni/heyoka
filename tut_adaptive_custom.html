@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
-    <title>Customising the adaptive integrator &#8212; heyoka 0.21.0 documentation</title>
+    <title>Customising the adaptive integrator &#8212; heyoka 0.22.0 documentation</title>
     
   <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
 
@@ -59,7 +59,7 @@
 <a class="navbar-brand text-wrap" href="index.html">
   
   
-  <h1 class="site-logo" id="site-title">heyoka 0.21.0 documentation</h1>
+  <h1 class="site-logo" id="site-title">heyoka 0.22.0 documentation</h1>
   
 </a>
 </div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
@@ -395,10 +395,10 @@ mode, but it renders heyoka usable with ODE systems consisting
 of thousands of terms.</p>
 <p>Let’s try to quantify the performance difference in a concrete case.
 In this example, we first construct the ODE system corresponding
-to an N-body problem with 6 particles via the <code class="docutils literal notranslate"><span class="pre">make_nbody_sys()</span></code>
+to an N-body problem with 6 particles via the <code class="docutils literal notranslate"><span class="pre">model::nbody()</span></code>
 utility function:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create an nbody system with 6 particles.</span>
-<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">sys</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_nbody_sys</span><span class="p">(</span><span class="mi">6</span><span class="p">);</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">sys</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">model</span><span class="o">::</span><span class="n">nbody</span><span class="p">(</span><span class="mi">6</span><span class="p">);</span>
 </pre></div>
 </div>
 <p>Next, we create an initial state vector for our system.

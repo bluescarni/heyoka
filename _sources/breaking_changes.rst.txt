@@ -3,6 +3,14 @@
 Breaking changes
 ================
 
+.. _bchanges_0_22_0:
+
+0.22.0
+------
+
+- The ``make_nbody_sys()`` function has been replaced by
+  the ``model::nbody()`` function, with identical semantics.
+
 .. _bchanges_0_16_0:
 
 0.16.0

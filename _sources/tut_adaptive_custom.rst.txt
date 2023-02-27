@@ -85,7 +85,7 @@ of thousands of terms.
 
 Let's try to quantify the performance difference in a concrete case.
 In this example, we first construct the ODE system corresponding
-to an N-body problem with 6 particles via the ``make_nbody_sys()``
+to an N-body problem with 6 particles via the ``model::nbody()``
 utility function:
 
 .. literalinclude:: ../tutorial/adaptive_opt.cpp
