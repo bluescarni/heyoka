@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -89,29 +89,24 @@ HEYOKA_DLL_PUBLIC expression np1body_energy_impl(std::uint32_t, const expression
 
 } // namespace detail
 
-template <typename... KwArgs>
-std::vector<std::pair<expression, expression>> nbody(std::uint32_t n, KwArgs &&...kw_args)
-{
-    return std::apply(detail::nbody_impl, detail::nbody_common_opts(n, std::forward<KwArgs>(kw_args)...));
-}
+inline constexpr auto nbody = [](std::uint32_t n, auto &&...kw_args) -> std::vector<std::pair<expression, expression>> {
+    return std::apply(detail::nbody_impl, detail::nbody_common_opts(n, std::forward<decltype(kw_args)>(kw_args)...));
+};
 
-template <typename... KwArgs>
-expression nbody_energy(std::uint32_t n, KwArgs &&...kw_args)
-{
-    return std::apply(detail::nbody_energy_impl, detail::nbody_common_opts(n, std::forward<KwArgs>(kw_args)...));
-}
+inline constexpr auto nbody_energy = [](std::uint32_t n, auto &&...kw_args) -> expression {
+    return std::apply(detail::nbody_energy_impl,
+                      detail::nbody_common_opts(n, std::forward<decltype(kw_args)>(kw_args)...));
+};
 
-template <typename... KwArgs>
-std::vector<std::pair<expression, expression>> np1body(std::uint32_t n, KwArgs &&...kw_args)
-{
-    return std::apply(detail::np1body_impl, detail::nbody_common_opts(n, std::forward<KwArgs>(kw_args)...));
-}
+inline constexpr auto np1body
+    = [](std::uint32_t n, auto &&...kw_args) -> std::vector<std::pair<expression, expression>> {
+    return std::apply(detail::np1body_impl, detail::nbody_common_opts(n, std::forward<decltype(kw_args)>(kw_args)...));
+};
 
-template <typename... KwArgs>
-expression np1body_energy(std::uint32_t n, KwArgs &&...kw_args)
-{
-    return std::apply(detail::np1body_energy_impl, detail::nbody_common_opts(n, std::forward<KwArgs>(kw_args)...));
-}
+inline constexpr auto np1body_energy = [](std::uint32_t n, auto &&...kw_args) -> expression {
+    return std::apply(detail::np1body_energy_impl,
+                      detail::nbody_common_opts(n, std::forward<decltype(kw_args)>(kw_args)...));
+};
 
 } // namespace model
 
