@@ -69,19 +69,16 @@ HEYOKA_DLL_PUBLIC expression pendulum_energy_impl(const expression &, const expr
 
 } // namespace detail
 
-template <typename... KwArgs>
-std::vector<std::pair<expression, expression>> pendulum(KwArgs &&...kw_args)
-{
-    return std::apply(detail::pendulum_impl, detail::pendulum_common_opts(std::forward<KwArgs>(kw_args)...));
-}
+inline constexpr auto pendulum = [](auto &&...kw_args) -> std::vector<std::pair<expression, expression>> {
+    return std::apply(detail::pendulum_impl, detail::pendulum_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
+};
 
 // NOTE: this returns the energy per unit of mass - the actual energy
 // can be obtained by multiplying the result by the mass of the bob.
-template <typename... KwArgs>
-expression pendulum_energy(KwArgs &&...kw_args)
-{
-    return std::apply(detail::pendulum_energy_impl, detail::pendulum_common_opts(std::forward<KwArgs>(kw_args)...));
-}
+inline constexpr auto pendulum_energy = [](auto &&...kw_args) -> expression {
+    return std::apply(detail::pendulum_energy_impl,
+                      detail::pendulum_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
+};
 
 } // namespace model
 
