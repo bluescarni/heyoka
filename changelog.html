@@ -1,761 +1,507 @@
 
+
 <!DOCTYPE html>
 
-<html lang="en">
+
+<html lang="en" >
+
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
     <title>Changelog &#8212; heyoka 0.22.0 documentation</title>
-    
-  <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=12da95d707ffb74b382d" rel="stylesheet" />
+<link href="_static/styles/bootstrap.css?digest=12da95d707ffb74b382d" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=12da95d707ffb74b382d" rel="stylesheet" />
 
-    
-  <link rel="stylesheet"
-    href="_static/vendor/fontawesome/5.13.0/css/all.min.css">
-  <link rel="preload" as="font" type="font/woff2" crossorigin
-    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
-  <link rel="preload" as="font" type="font/woff2" crossorigin
-    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+  
+  <link href="_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=12da95d707ffb74b382d" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
 
-    
-      
-  <link rel="stylesheet"
-    href="_static/vendor/open-sans_all/1.44.1/index.css">
-  <link rel="stylesheet"
-    href="_static/vendor/lato_latin-ext/1.44.1/index.css">
-
-    
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/sphinx-book-theme.c441f2ba0852f4cabcb80105e3a46ae6.css" />
-    
-  <link rel="preload" as="script" href="_static/js/index.d3f166471bb80abb5163.js">
+    <link rel="stylesheet" href="_static/styles/sphinx-book-theme.css?digest=14f4ca6b54d191a8c7657f6c759bf11a5fb86285" type="text/css" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=12da95d707ffb74b382d" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=12da95d707ffb74b382d" />
 
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
     <script src="_static/doctools.js"></script>
     <script src="_static/sphinx_highlight.js"></script>
-    <script src="_static/sphinx-book-theme.7d483ff0a819d6edff12ce0b1ead3928.js"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?digest=5a5c038af52cf7bc1a1ec88eea08e6366ee68824"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'changelog';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Breaking changes" href="breaking_changes.html" />
     <link rel="prev" title="Notes on automatic differentiation" href="ad_notes.html" />
-
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="docsearch:language" content="en" />
-
-
-
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
   </head>
-  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
-    
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
 
-    <div class="container-xl">
-      <div class="row">
-          
-<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+  
+  
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+  
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+    </nav>
+  
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
     
-        <div class="navbar-brand-box">
-<a class="navbar-brand text-wrap" href="index.html">
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+  
+
+<a class="navbar-brand logo" href="index.html">
   
   
-  <h1 class="site-logo" id="site-title">heyoka 0.22.0 documentation</h1>
   
+  
+    
+    
+      
+    
+    
+    <img src="_static/white_logo.png" class="logo__image only-light" alt="Logo image"/>
+    <script>document.write(`<img src="_static/white_logo.png" class="logo__image only-dark" alt="Logo image"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item"><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="basic_tutorials.html">Basic tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-1"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="tut_taylor_method.html">Taylor’s method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_expression_system.html">The expression system</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_adaptive.html">The adaptive integrator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_adaptive_custom.html">Customising the adaptive integrator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_param.html">Runtime parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_nonauto.html">Non-autonomous systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_d_output.html">Dense &amp; continuous output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_events.html">Event detection</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="advanced_tutorials.html">Advanced tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-2"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="tut_batch_mode.html">Batch mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_extended_precision.html">Computations in extended precision</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_arbitrary_precision.html">Computations in arbitrary precision</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_s11n.html">Serialisation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_ensemble.html">Ensemble propagations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_parallel_mode.html">Parallel mode</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ad_notes.html">Notes on automatic differentiation</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="breaking_changes.html">Breaking changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="acknowledgement.html">Acknowledgement</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bibliography.html">Bibliography</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><label class="sidebar-toggle primary-toggle btn btn-sm" for="__primary" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</label></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/bluescarni/heyoka" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
 </a>
-</div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
-  <i class="icon fas fa-search"></i>
-  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
-</form>
-<nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
-    <ul class="current nav sidenav_l1">
- <li class="toctree-l1">
-  <a class="reference internal" href="install.html">
-   Installation
-  </a>
- </li>
- <li class="toctree-l1 collapsible-parent">
-  <a class="reference internal" href="basic_tutorials.html">
-   Basic tutorials
-  </a>
-  <ul class="collapse-ul">
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_taylor_method.html">
-     Taylor’s method
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_expression_system.html">
-     The expression system
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_adaptive.html">
-     The adaptive integrator
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_adaptive_custom.html">
-     Customising the adaptive integrator
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_param.html">
-     Runtime parameters
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_nonauto.html">
-     Non-autonomous systems
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_d_output.html">
-     Dense &amp; continuous output
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_events.html">
-     Event detection
-    </a>
-   </li>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fchangelog.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
   </ul>
-  <i class="fas fa-chevron-down">
-  </i>
- </li>
- <li class="toctree-l1 collapsible-parent">
-  <a class="reference internal" href="advanced_tutorials.html">
-   Advanced tutorials
-  </a>
-  <ul class="collapse-ul">
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_batch_mode.html">
-     Batch mode
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_extended_precision.html">
-     Computations in extended precision
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_arbitrary_precision.html">
-     Computations in arbitrary precision
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_s11n.html">
-     Serialisation
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_ensemble.html">
-     Ensemble propagations
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_parallel_mode.html">
-     Parallel mode
-    </a>
-   </li>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="_sources/changelog.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
   </ul>
-  <i class="fas fa-chevron-down">
-  </i>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="benchmarks.html">
-   Benchmarks
-  </a>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="ad_notes.html">
-   Notes on automatic differentiation
-  </a>
- </li>
- <li class="toctree-l1 current active">
-  <a class="current reference internal" href="#">
-   Changelog
-  </a>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="breaking_changes.html">
-   Breaking changes
-  </a>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="acknowledgement.html">
-   Acknowledgement
-  </a>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="bibliography.html">
-   Bibliography
-  </a>
- </li>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+<script>
+document.write(`
+  <button class="theme-switch-button btn btn-sm btn-outline-primary navbar-btn rounded-circle" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch" data-mode="light"><i class="fa-solid fa-sun"></i></span>
+    <span class="theme-switch" data-mode="dark"><i class="fa-solid fa-moon"></i></span>
+    <span class="theme-switch" data-mode="auto"><i class="fa-solid fa-circle-half-stroke"></i></span>
+  </button>
+`);
+</script>
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+  </button>
+`);
+</script>
+<label class="sidebar-toggle secondary-toggle btn btn-sm" for="__secondary"title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</label>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Changelog</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">0.22.0 (unreleased)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#new">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#changes">Changes</a></li>
 </ul>
-
-</nav> <!-- To handle the deprecated key -->
-
-<div class="navbar_extra_footer">
-  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
-</div>
-
-</div>
-
-
-          
-
-
-          
-<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
-    
-    <div class="topbar container-xl fixed-top">
-    <div class="topbar-contents row">
-        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
-        <div class="col pl-md-4 topbar-main">
-            
-            <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
-                data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
-                aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
-                title="Toggle navigation" data-toggle="tooltip" data-placement="left">
-                <i class="fas fa-bars"></i>
-                <i class="fas fa-arrow-left"></i>
-                <i class="fas fa-arrow-up"></i>
-            </button>
-            
-            
-<div class="dropdown-buttons-trigger">
-    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
-            class="fas fa-download"></i></button>
-
-    <div class="dropdown-buttons">
-        <!-- ipynb file if we had a myst markdown file -->
-        
-        <!-- Download raw file -->
-        <a class="dropdown-buttons" href="_sources/changelog.rst.txt"><button type="button"
-                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
-                data-placement="left">.rst</button></a>
-        <!-- Download PDF via print -->
-        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
-            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
-    </div>
-</div>
-
-            <!-- Source interaction buttons -->
-
-<div class="dropdown-buttons-trigger">
-    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn"
-        aria-label="Connect with source repository"><i class="fab fa-github"></i></button>
-    <div class="dropdown-buttons sourcebuttons">
-        <a class="repository-button"
-            href="https://github.com/bluescarni/heyoka"><button type="button" class="btn btn-secondary topbarbtn"
-                data-toggle="tooltip" data-placement="left" title="Source repository"><i
-                    class="fab fa-github"></i>repository</button></a>
-        <a class="issues-button"
-            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fchangelog.html&body=Your%20issue%20content%20here."><button
-                type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
-                title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
-        
-    </div>
-</div>
-
-
-            <!-- Full screen (wrap in <a> to have style consistency -->
-            <a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
-                    data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
-                    title="Fullscreen mode"><i
-                        class="fas fa-expand"></i></button></a>
-
-            <!-- Launch buttons -->
-
-        </div>
-
-        <!-- Table of contents -->
-        <div class="d-none d-md-block col-md-2 bd-toc show">
-            
-        <div class="tocsection onthispage pt-5 pb-3">
-            <i class="fas fa-list"></i>
-            Contents
-        </div>
-        <nav id="bd-toc-nav">
-            <ul class="nav section-nav flex-column">
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#unreleased">
-   0.22.0 (unreleased)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#new">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#changes">
-     Changes
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id1">
-   0.21.0 (2023-02-16)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id2">
-     New
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id3">
-   0.20.1 (2023-01-05)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id4">
-     Changes
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id5">
-   0.20.0 (2022-12-17)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id6">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id7">
-     Changes
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#fix">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id8">
-   0.19.0 (2022-09-18)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id9">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id10">
-     Changes
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id11">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id12">
-   0.18.0 (2022-05-11)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id13">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id14">
-     Changes
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id15">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id16">
-   0.17.1 (2022-02-13)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id17">
-     Changes
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id18">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id19">
-   0.17.0 (2022-01-20)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id20">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id21">
-     Changes
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id22">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id23">
-   0.16.0 (2021-11-20)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id24">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id25">
-     Changes
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id26">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id27">
-   0.15.0 (2021-09-28)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id28">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id29">
-     Changes
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id30">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id31">
-   0.14.0 (2021-08-03)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id32">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id33">
-     Changes
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id34">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id35">
-   0.12.0 (2021-07-21)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id36">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id37">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id38">
-   0.11.0 (2021-07-06)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id39">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id40">
-     Changes
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id41">
-   0.10.1 (2021-07-02)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id42">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id43">
-   0.10.0 (2021-06-09)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id44">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id45">
-     Changes
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id46">
-   0.9.0 (2021-05-25)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id47">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id48">
-     Changes
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id49">
-   0.8.0 (2021-04-28)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id50">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id51">
-     Changes
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id52">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id53">
-   0.7.0 (2021-04-21)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id54">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id55">
-     Changes
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id56">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id57">
-   0.6.1 (2021-04-08)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id58">
-     Changes
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id59">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id60">
-   0.6.0 (2021-04-06)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id61">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id62">
-     Changes
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id63">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id64">
-   0.5.0 (2021-02-25)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id65">
-     New
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id66">
-   0.4.0 (2021-02-20)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id67">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id68">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id69">
-   0.3.0 (2021-02-11)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id70">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id71">
-     Changes
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id72">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id73">
-   0.2.0 (2021-01-13)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id74">
-     New
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id75">
-     Changes
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id76">
-     Fix
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id77">
-   0.1.0 (2020-12-18)
-  </a>
- </li>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id1">0.21.0 (2023-02-16)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id2">New</a></li>
 </ul>
-
-        </nav>
-        
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id3">0.20.1 (2023-01-05)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id4">Changes</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id5">0.20.0 (2022-12-17)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id6">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id7">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fix">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id8">0.19.0 (2022-09-18)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id9">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id10">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id11">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id12">0.18.0 (2022-05-11)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id13">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id14">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id15">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id16">0.17.1 (2022-02-13)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id17">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id18">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id19">0.17.0 (2022-01-20)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id20">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id21">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id22">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id23">0.16.0 (2021-11-20)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id24">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id25">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id26">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id27">0.15.0 (2021-09-28)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id28">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id29">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id30">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id31">0.14.0 (2021-08-03)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id32">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id33">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id34">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id35">0.12.0 (2021-07-21)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id36">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id37">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id38">0.11.0 (2021-07-06)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id39">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id40">Changes</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id41">0.10.1 (2021-07-02)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id42">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id43">0.10.0 (2021-06-09)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id44">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id45">Changes</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id46">0.9.0 (2021-05-25)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id47">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id48">Changes</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id49">0.8.0 (2021-04-28)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id50">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id51">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id52">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id53">0.7.0 (2021-04-21)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id54">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id55">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id56">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id57">0.6.1 (2021-04-08)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id58">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id59">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id60">0.6.0 (2021-04-06)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id61">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id62">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id63">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id64">0.5.0 (2021-02-25)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id65">New</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id66">0.4.0 (2021-02-20)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id67">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id68">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id69">0.3.0 (2021-02-11)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id70">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id71">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id72">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id73">0.2.0 (2021-01-13)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id74">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id75">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id76">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id77">0.1.0 (2020-12-18)</a></li>
+</ul>
+            </nav>
         </div>
     </div>
 </div>
-    <div id="main-content" class="row">
-        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
-        
-              <div>
+
+              
                 
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+                  
   <section id="changelog">
-<h1>Changelog<a class="headerlink" href="#changelog" title="Permalink to this heading">¶</a></h1>
+<h1>Changelog<a class="headerlink" href="#changelog" title="Permalink to this heading">#</a></h1>
 <section id="unreleased">
-<h2>0.22.0 (unreleased)<a class="headerlink" href="#unreleased" title="Permalink to this heading">¶</a></h2>
+<h2>0.22.0 (unreleased)<a class="headerlink" href="#unreleased" title="Permalink to this heading">#</a></h2>
 <section id="new">
-<h3>New<a class="headerlink" href="#new" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#new" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>New <code class="docutils literal notranslate"><span class="pre">model</span></code> module containing ready-made dynamical models
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/295">#295</a>).</p></li>
 </ul>
 </section>
 <section id="changes">
-<h3>Changes<a class="headerlink" href="#changes" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#changes" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p><strong>BREAKING</strong>: the <code class="docutils literal notranslate"><span class="pre">make_nbody_sys()</span></code> helper has been replaced by an equivalent
 function in the new <code class="docutils literal notranslate"><span class="pre">model</span></code> module
@@ -765,9 +511,9 @@ This is a <a class="reference internal" href="breaking_changes.html#bchanges-0-2
 </section>
 </section>
 <section id="id1">
-<h2>0.21.0 (2023-02-16)<a class="headerlink" href="#id1" title="Permalink to this heading">¶</a></h2>
+<h2>0.21.0 (2023-02-16)<a class="headerlink" href="#id1" title="Permalink to this heading">#</a></h2>
 <section id="id2">
-<h3>New<a class="headerlink" href="#id2" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id2" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Compiled functions now support time-dependent expressions
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/294">#294</a>).</p></li>
@@ -777,9 +523,9 @@ This is a <a class="reference internal" href="breaking_changes.html#bchanges-0-2
 </section>
 </section>
 <section id="id3">
-<h2>0.20.1 (2023-01-05)<a class="headerlink" href="#id3" title="Permalink to this heading">¶</a></h2>
+<h2>0.20.1 (2023-01-05)<a class="headerlink" href="#id3" title="Permalink to this heading">#</a></h2>
 <section id="id4">
-<h3>Changes<a class="headerlink" href="#id4" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id4" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Mark as visible a couple of internal functions which
 had been marked as hidden by mistake
@@ -788,9 +534,9 @@ had been marked as hidden by mistake
 </section>
 </section>
 <section id="id5">
-<h2>0.20.0 (2022-12-17)<a class="headerlink" href="#id5" title="Permalink to this heading">¶</a></h2>
+<h2>0.20.0 (2022-12-17)<a class="headerlink" href="#id5" title="Permalink to this heading">#</a></h2>
 <section id="id6">
-<h3>New<a class="headerlink" href="#id6" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id6" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Add option in the build system to hide the exported LLVM symbols,
 when linking statically
@@ -805,14 +551,14 @@ when linking statically
 </ul>
 </section>
 <section id="id7">
-<h3>Changes<a class="headerlink" href="#id7" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id7" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>heyoka now depends on CMake &gt;= 3.18 when building from source
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/283">#283</a>).</p></li>
 </ul>
 </section>
 <section id="fix">
-<h3>Fix<a class="headerlink" href="#fix" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#fix" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Avoid accidental indirect inclusion of libquadmath’s header file
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/279">#279</a>).</p></li>
@@ -824,9 +570,9 @@ in the <code class="docutils literal notranslate"><span class="pre">propagate_*(
 </section>
 </section>
 <section id="id8">
-<h2>0.19.0 (2022-09-18)<a class="headerlink" href="#id8" title="Permalink to this heading">¶</a></h2>
+<h2>0.19.0 (2022-09-18)<a class="headerlink" href="#id8" title="Permalink to this heading">#</a></h2>
 <section id="id9">
-<h3>New<a class="headerlink" href="#id9" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id9" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Add a short tutorial on extended-precision computations
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/270">#270</a>).</p></li>
@@ -838,7 +584,7 @@ at runtime
 </ul>
 </section>
 <section id="id10">
-<h3>Changes<a class="headerlink" href="#id10" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id10" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>heyoka now builds against recent versions of the fmt library
 without deprecation warnings
@@ -846,7 +592,7 @@ without deprecation warnings
 </ul>
 </section>
 <section id="id11">
-<h3>Fix<a class="headerlink" href="#id11" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id11" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Fix compilation against recent LLVM 14.x releases on Windows
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/268">#268</a>).</p></li>
@@ -854,9 +600,9 @@ without deprecation warnings
 </section>
 </section>
 <section id="id12">
-<h2>0.18.0 (2022-05-11)<a class="headerlink" href="#id12" title="Permalink to this heading">¶</a></h2>
+<h2>0.18.0 (2022-05-11)<a class="headerlink" href="#id12" title="Permalink to this heading">#</a></h2>
 <section id="id13">
-<h3>New<a class="headerlink" href="#id13" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id13" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Add a timekeeping accuracy benchmark
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/254">#254</a>).</p></li>
@@ -870,7 +616,7 @@ for the automatic parallelisation of an individual integration step
 </ul>
 </section>
 <section id="id14">
-<h3>Changes<a class="headerlink" href="#id14" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id14" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>The Kepler solver now returns NaN in case of invalid input arguments
 or if the max number of iterations is exceeded
@@ -886,7 +632,7 @@ is interrupted by a stopping terminal event
 </ul>
 </section>
 <section id="id15">
-<h3>Fix<a class="headerlink" href="#id15" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id15" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Fix several warnings related to variable shadowing when
 compiling in debug mode
@@ -901,9 +647,9 @@ that could lead to invalid results in certain corner cases
 </section>
 </section>
 <section id="id16">
-<h2>0.17.1 (2022-02-13)<a class="headerlink" href="#id16" title="Permalink to this heading">¶</a></h2>
+<h2>0.17.1 (2022-02-13)<a class="headerlink" href="#id16" title="Permalink to this heading">#</a></h2>
 <section id="id17">
-<h3>Changes<a class="headerlink" href="#id17" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id17" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>The <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code> callbacks are now invoked also if the integration
 is interrupted by a stopping terminal event
@@ -911,7 +657,7 @@ is interrupted by a stopping terminal event
 </ul>
 </section>
 <section id="id18">
-<h3>Fix<a class="headerlink" href="#id18" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id18" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Fix two test failures on FreeBSD
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/231">#231</a>).</p></li>
@@ -919,9 +665,9 @@ is interrupted by a stopping terminal event
 </section>
 </section>
 <section id="id19">
-<h2>0.17.0 (2022-01-20)<a class="headerlink" href="#id19" title="Permalink to this heading">¶</a></h2>
+<h2>0.17.0 (2022-01-20)<a class="headerlink" href="#id19" title="Permalink to this heading">#</a></h2>
 <section id="id20">
-<h3>New<a class="headerlink" href="#id20" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id20" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>The LLVM version number against which heyoka was built
 is now exported in the CMake config-file package
@@ -943,14 +689,14 @@ the CPU in use
 </ul>
 </section>
 <section id="id21">
-<h3>Changes<a class="headerlink" href="#id21" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id21" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Avoid unnecessary copies of the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> callbacks
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/222">#222</a>).</p></li>
 </ul>
 </section>
 <section id="id22">
-<h3>Fix<a class="headerlink" href="#id22" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id22" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Fix compilation in debug mode when using recent versions
 of <code class="docutils literal notranslate"><span class="pre">fmt</span></code>
@@ -964,9 +710,9 @@ related to event detection are destroyed in the wrong order
 </section>
 </section>
 <section id="id23">
-<h2>0.16.0 (2021-11-20)<a class="headerlink" href="#id23" title="Permalink to this heading">¶</a></h2>
+<h2>0.16.0 (2021-11-20)<a class="headerlink" href="#id23" title="Permalink to this heading">#</a></h2>
 <section id="id24">
-<h3>New<a class="headerlink" href="#id24" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id24" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p><strong>BREAKING</strong>: add support for <a class="reference internal" href="tut_d_output.html#tut-c-output"><span class="std std-ref">continuous output</span></a>
 to the <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code> functions
@@ -983,7 +729,7 @@ This is a <a class="reference internal" href="breaking_changes.html#bchanges-0-1
 </ul>
 </section>
 <section id="id25">
-<h3>Changes<a class="headerlink" href="#id25" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id25" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>If <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> exits early in batch mode,
 the missing values are now set to NaN instead of zero
@@ -1007,7 +753,7 @@ This is a <a class="reference internal" href="breaking_changes.html#bchanges-0-1
 </ul>
 </section>
 <section id="id26">
-<h3>Fix<a class="headerlink" href="#id26" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id26" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Fix various corner-case issues in the integrator classes
 related to data aliasing
@@ -1019,9 +765,9 @@ integration is interrupted by a terminal event
 </section>
 </section>
 <section id="id27">
-<h2>0.15.0 (2021-09-28)<a class="headerlink" href="#id27" title="Permalink to this heading">¶</a></h2>
+<h2>0.15.0 (2021-09-28)<a class="headerlink" href="#id27" title="Permalink to this heading">#</a></h2>
 <section id="id28">
-<h3>New<a class="headerlink" href="#id28" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id28" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Implement derivatives with respect to the parameters
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/196">#196</a>).</p></li>
@@ -1049,7 +795,7 @@ to the expression system
 </ul>
 </section>
 <section id="id29">
-<h3>Changes<a class="headerlink" href="#id29" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id29" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Implement a fast exclusion check for event detection which
 improves performance when no event triggers in a timestep
@@ -1064,7 +810,7 @@ not deep copies. This is a <a class="reference internal" href="breaking_changes.
 </ul>
 </section>
 <section id="id30">
-<h3>Fix<a class="headerlink" href="#id30" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id30" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Don’t force the use of static MSVC runtime when
 compiling heyoka as a static library
@@ -1081,16 +827,16 @@ that would lead to an invalid decomposition for zero eccentricity
 </section>
 </section>
 <section id="id31">
-<h2>0.14.0 (2021-08-03)<a class="headerlink" href="#id31" title="Permalink to this heading">¶</a></h2>
+<h2>0.14.0 (2021-08-03)<a class="headerlink" href="#id31" title="Permalink to this heading">#</a></h2>
 <section id="id32">
-<h3>New<a class="headerlink" href="#id32" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id32" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>The tolerance value is now stored in the integrator objects
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/175">#175</a>).</p></li>
 </ul>
 </section>
 <section id="id33">
-<h3>Changes<a class="headerlink" href="#id33" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id33" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Improve the heuristic for the automatic deduction
 of the cooldown value for terminal events
@@ -1098,7 +844,7 @@ of the cooldown value for terminal events
 </ul>
 </section>
 <section id="id34">
-<h3>Fix<a class="headerlink" href="#id34" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id34" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Ensure that code generation in compact mode is platform-agnostic
 and deterministic across executions
@@ -1107,9 +853,9 @@ and deterministic across executions
 </section>
 </section>
 <section id="id35">
-<h2>0.12.0 (2021-07-21)<a class="headerlink" href="#id35" title="Permalink to this heading">¶</a></h2>
+<h2>0.12.0 (2021-07-21)<a class="headerlink" href="#id35" title="Permalink to this heading">#</a></h2>
 <section id="id36">
-<h3>New<a class="headerlink" href="#id36" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id36" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Add support for 64-bit PowerPC processors
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/171">#171</a>).</p></li>
@@ -1121,7 +867,7 @@ Boost.Serialization
 </ul>
 </section>
 <section id="id37">
-<h3>Fix<a class="headerlink" href="#id37" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id37" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Fix a bug in the move assignment operator of <code class="docutils literal notranslate"><span class="pre">llvm_state</span></code>
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/163">#163</a>).</p></li>
@@ -1129,9 +875,9 @@ Boost.Serialization
 </section>
 </section>
 <section id="id38">
-<h2>0.11.0 (2021-07-06)<a class="headerlink" href="#id38" title="Permalink to this heading">¶</a></h2>
+<h2>0.11.0 (2021-07-06)<a class="headerlink" href="#id38" title="Permalink to this heading">#</a></h2>
 <section id="id39">
-<h3>New<a class="headerlink" href="#id39" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id39" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>The <code class="docutils literal notranslate"><span class="pre">time</span></code> expression now supports symbolic
 differentiation
@@ -1139,7 +885,7 @@ differentiation
 </ul>
 </section>
 <section id="id40">
-<h3>Changes<a class="headerlink" href="#id40" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id40" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Various performance optimisations for the creation
 of large ODE systems
@@ -1148,9 +894,9 @@ of large ODE systems
 </section>
 </section>
 <section id="id41">
-<h2>0.10.1 (2021-07-02)<a class="headerlink" href="#id41" title="Permalink to this heading">¶</a></h2>
+<h2>0.10.1 (2021-07-02)<a class="headerlink" href="#id41" title="Permalink to this heading">#</a></h2>
 <section id="id42">
-<h3>Fix<a class="headerlink" href="#id42" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id42" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Parameters in event equations are now correctly counted
 when inferring the total number of parameters in an ODE system
@@ -1159,9 +905,9 @@ when inferring the total number of parameters in an ODE system
 </section>
 </section>
 <section id="id43">
-<h2>0.10.0 (2021-06-09)<a class="headerlink" href="#id43" title="Permalink to this heading">¶</a></h2>
+<h2>0.10.0 (2021-06-09)<a class="headerlink" href="#id43" title="Permalink to this heading">#</a></h2>
 <section id="id44">
-<h3>New<a class="headerlink" href="#id44" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id44" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>The callback that can be passed to the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions
 can now be used to stop the integration
@@ -1171,7 +917,7 @@ can now be used to stop the integration
 </ul>
 </section>
 <section id="id45">
-<h3>Changes<a class="headerlink" href="#id45" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id45" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p><strong>BREAKING</strong>: a <a class="reference internal" href="breaking_changes.html#bchanges-0-10-0"><span class="std std-ref">breaking change</span></a>
 in the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> callback API
@@ -1184,9 +930,9 @@ in the <code class="docutils literal notranslate"><span class="pre">propagate_*(
 </section>
 </section>
 <section id="id46">
-<h2>0.9.0 (2021-05-25)<a class="headerlink" href="#id46" title="Permalink to this heading">¶</a></h2>
+<h2>0.9.0 (2021-05-25)<a class="headerlink" href="#id46" title="Permalink to this heading">#</a></h2>
 <section id="id47">
-<h3>New<a class="headerlink" href="#id47" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id47" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Add time polynomials to the expression system
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/144">#144</a>).</p></li>
@@ -1200,7 +946,7 @@ system
 </ul>
 </section>
 <section id="id48">
-<h3>Changes<a class="headerlink" href="#id48" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id48" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Performance improvements for event detection in the linear
 and quadratic cases
@@ -1222,9 +968,9 @@ is an internal change that does not affect the integrators’ API.</p></li>
 </section>
 </section>
 <section id="id49">
-<h2>0.8.0 (2021-04-28)<a class="headerlink" href="#id49" title="Permalink to this heading">¶</a></h2>
+<h2>0.8.0 (2021-04-28)<a class="headerlink" href="#id49" title="Permalink to this heading">#</a></h2>
 <section id="id50">
-<h3>New<a class="headerlink" href="#id50" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id50" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>The <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code> functions now support writing
 the Taylor coefficients at the end of each timestep
@@ -1232,7 +978,7 @@ the Taylor coefficients at the end of each timestep
 </ul>
 </section>
 <section id="id51">
-<h3>Changes<a class="headerlink" href="#id51" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id51" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p><strong>BREAKING</strong>: various <a class="reference internal" href="breaking_changes.html#bchanges-0-8-0"><span class="std std-ref">breaking changes</span></a>
 in the event detection API
@@ -1242,7 +988,7 @@ in the event detection API
 </ul>
 </section>
 <section id="id52">
-<h3>Fix<a class="headerlink" href="#id52" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id52" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Don’t set the multiroot <code class="docutils literal notranslate"><span class="pre">mr</span></code> flag to <code class="docutils literal notranslate"><span class="pre">true</span></code> if
 a terminal event has a cooldown of zero
@@ -1251,9 +997,9 @@ a terminal event has a cooldown of zero
 </section>
 </section>
 <section id="id53">
-<h2>0.7.0 (2021-04-21)<a class="headerlink" href="#id53" title="Permalink to this heading">¶</a></h2>
+<h2>0.7.0 (2021-04-21)<a class="headerlink" href="#id53" title="Permalink to this heading">#</a></h2>
 <section id="id54">
-<h3>New<a class="headerlink" href="#id54" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id54" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Support LLVM 12
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/128">#128</a>).</p></li>
@@ -1274,7 +1020,7 @@ of the predicted state
 </ul>
 </section>
 <section id="id55">
-<h3>Changes<a class="headerlink" href="#id55" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id55" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Performance improvements for the event detection system
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/129">#129</a>).</p></li>
@@ -1285,7 +1031,7 @@ cannot be directly modified any more, and the new
 </ul>
 </section>
 <section id="id56">
-<h3>Fix<a class="headerlink" href="#id56" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id56" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Fix an issue in the automatic deduction of the cooldown time
 for terminal events
@@ -1294,9 +1040,9 @@ for terminal events
 </section>
 </section>
 <section id="id57">
-<h2>0.6.1 (2021-04-08)<a class="headerlink" href="#id57" title="Permalink to this heading">¶</a></h2>
+<h2>0.6.1 (2021-04-08)<a class="headerlink" href="#id57" title="Permalink to this heading">#</a></h2>
 <section id="id58">
-<h3>Changes<a class="headerlink" href="#id58" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id58" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>The event equations are now taken into account in the
 determination of the adaptive timestep
@@ -1304,7 +1050,7 @@ determination of the adaptive timestep
 </ul>
 </section>
 <section id="id59">
-<h3>Fix<a class="headerlink" href="#id59" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id59" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Fix an initialisation order issue in the event detection code
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/124">#124</a>).</p></li>
@@ -1314,9 +1060,9 @@ determination of the adaptive timestep
 </section>
 </section>
 <section id="id60">
-<h2>0.6.0 (2021-04-06)<a class="headerlink" href="#id60" title="Permalink to this heading">¶</a></h2>
+<h2>0.6.0 (2021-04-06)<a class="headerlink" href="#id60" title="Permalink to this heading">#</a></h2>
 <section id="id61">
-<h3>New<a class="headerlink" href="#id61" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id61" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Implement <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> for the batch integrator
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/119">#119</a>).</p></li>
@@ -1338,7 +1084,7 @@ objects such as <code class="docutils literal notranslate"><span class="pre">llv
 </ul>
 </section>
 <section id="id62">
-<h3>Changes<a class="headerlink" href="#id62" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id62" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p><strong>BREAKING</strong>: the <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> function now requires
 monotonically-ordered grid points
@@ -1348,7 +1094,7 @@ monotonically-ordered grid points
 </ul>
 </section>
 <section id="id63">
-<h3>Fix<a class="headerlink" href="#id63" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id63" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>In the batch integrator class, the outcomes in the result vectors
 are now initialised to <code class="docutils literal notranslate"><span class="pre">taylor_outcome::success</span></code> instead of
@@ -1358,9 +1104,9 @@ meaningless values
 </section>
 </section>
 <section id="id64">
-<h2>0.5.0 (2021-02-25)<a class="headerlink" href="#id64" title="Permalink to this heading">¶</a></h2>
+<h2>0.5.0 (2021-02-25)<a class="headerlink" href="#id64" title="Permalink to this heading">#</a></h2>
 <section id="id65">
-<h3>New<a class="headerlink" href="#id65" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id65" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Implement various missing symbolic derivatives
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/101">#101</a>,
@@ -1375,9 +1121,9 @@ to retrieve a pointer to the type-erased inner object
 </section>
 </section>
 <section id="id66">
-<h2>0.4.0 (2021-02-20)<a class="headerlink" href="#id66" title="Permalink to this heading">¶</a></h2>
+<h2>0.4.0 (2021-02-20)<a class="headerlink" href="#id66" title="Permalink to this heading">#</a></h2>
 <section id="id67">
-<h3>New<a class="headerlink" href="#id67" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id67" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Introduce a dedicated negation operator in the
 expression system
@@ -1397,7 +1143,7 @@ integrator classes
 </ul>
 </section>
 <section id="id68">
-<h3>Fix<a class="headerlink" href="#id68" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id68" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Avoid division by zero in certain corner cases
 when using <code class="docutils literal notranslate"><span class="pre">pow()</span></code> with small natural exponents
@@ -1406,9 +1152,9 @@ when using <code class="docutils literal notranslate"><span class="pre">pow()</s
 </section>
 </section>
 <section id="id69">
-<h2>0.3.0 (2021-02-11)<a class="headerlink" href="#id69" title="Permalink to this heading">¶</a></h2>
+<h2>0.3.0 (2021-02-11)<a class="headerlink" href="#id69" title="Permalink to this heading">#</a></h2>
 <section id="id70">
-<h3>New<a class="headerlink" href="#id70" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id70" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Implement the error function
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/89">#89</a>).</p></li>
@@ -1429,7 +1175,7 @@ more extensively
 </ul>
 </section>
 <section id="id71">
-<h3>Changes<a class="headerlink" href="#id71" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id71" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Small optimisations in the automatic differentiation
 formulae
@@ -1445,7 +1191,7 @@ object code of a module
 </ul>
 </section>
 <section id="id72">
-<h3>Fix<a class="headerlink" href="#id72" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id72" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Ensure that <code class="docutils literal notranslate"><span class="pre">pow(x</span> <span class="pre">,0)</span></code> always simplifies to 1,
 rather than producing an expression with null exponent
@@ -1464,9 +1210,9 @@ rather than producing an expression with null exponent
 </section>
 </section>
 <section id="id73">
-<h2>0.2.0 (2021-01-13)<a class="headerlink" href="#id73" title="Permalink to this heading">¶</a></h2>
+<h2>0.2.0 (2021-01-13)<a class="headerlink" href="#id73" title="Permalink to this heading">#</a></h2>
 <section id="id74">
-<h3>New<a class="headerlink" href="#id74" title="Permalink to this heading">¶</a></h3>
+<h3>New<a class="headerlink" href="#id74" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Extend the Taylor decomposition machinery to work
 on more general classes of functions, and add
@@ -1481,14 +1227,14 @@ on more general classes of functions, and add
 </ul>
 </section>
 <section id="id75">
-<h3>Changes<a class="headerlink" href="#id75" title="Permalink to this heading">¶</a></h3>
+<h3>Changes<a class="headerlink" href="#id75" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>heyoka now depends publicly on the Boost headers
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/68">#68</a>).</p></li>
 </ul>
 </section>
 <section id="id76">
-<h3>Fix<a class="headerlink" href="#id76" title="Permalink to this heading">¶</a></h3>
+<h3>Fix<a class="headerlink" href="#id76" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>Fix potential name mangling issues in compact mode
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/68">#68</a>).</p></li>
@@ -1496,44 +1242,233 @@ on more general classes of functions, and add
 </section>
 </section>
 <section id="id77">
-<h2>0.1.0 (2020-12-18)<a class="headerlink" href="#id77" title="Permalink to this heading">¶</a></h2>
+<h2>0.1.0 (2020-12-18)<a class="headerlink" href="#id77" title="Permalink to this heading">#</a></h2>
 <p>Initial release.</p>
 </section>
 </section>
 
 
-              </div>
+                </article>
               
-        
-        <div class='prev-next-bottom'>
-            
-    <a class='left-prev' id="prev-link" href="ad_notes.html" title="previous page">Notes on automatic differentiation</a>
-    <a class='right-next' id="next-link" href="breaking_changes.html" title="next page">Breaking changes</a>
 
-        </div>
-        
-        </div>
-    </div>
-    <footer class="footer mt-5 mt-md-0">
-    <div class="container">
-      <p>
-        
-          By Francesco Biscani, Dario Izzo<br/>
-        
-            &copy; Copyright 2020, 2021, 2022 Francesco Biscani, Dario Izzo.<br/>
-      </p>
-    </div>
-  </footer>
-</main>
-
-
+              
+              
+                <footer class="bd-footer-article">
+                  <!-- Previous / next buttons -->
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="ad_notes.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Notes on automatic differentiation</p>
       </div>
+    </a>
+    <a class="right-next"
+       href="breaking_changes.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Breaking changes</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">0.22.0 (unreleased)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#new">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#changes">Changes</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id1">0.21.0 (2023-02-16)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id2">New</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id3">0.20.1 (2023-01-05)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id4">Changes</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id5">0.20.0 (2022-12-17)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id6">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id7">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fix">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id8">0.19.0 (2022-09-18)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id9">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id10">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id11">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id12">0.18.0 (2022-05-11)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id13">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id14">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id15">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id16">0.17.1 (2022-02-13)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id17">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id18">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id19">0.17.0 (2022-01-20)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id20">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id21">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id22">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id23">0.16.0 (2021-11-20)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id24">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id25">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id26">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id27">0.15.0 (2021-09-28)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id28">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id29">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id30">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id31">0.14.0 (2021-08-03)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id32">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id33">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id34">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id35">0.12.0 (2021-07-21)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id36">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id37">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id38">0.11.0 (2021-07-06)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id39">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id40">Changes</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id41">0.10.1 (2021-07-02)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id42">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id43">0.10.0 (2021-06-09)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id44">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id45">Changes</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id46">0.9.0 (2021-05-25)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id47">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id48">Changes</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id49">0.8.0 (2021-04-28)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id50">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id51">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id52">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id53">0.7.0 (2021-04-21)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id54">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id55">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id56">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id57">0.6.1 (2021-04-08)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id58">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id59">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id60">0.6.0 (2021-04-06)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id61">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id62">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id63">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id64">0.5.0 (2021-02-25)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id65">New</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id66">0.4.0 (2021-02-20)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id67">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id68">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id69">0.3.0 (2021-02-11)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id70">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id71">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id72">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id73">0.2.0 (2021-01-13)</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id74">New</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id75">Changes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id76">Fix</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id77">0.1.0 (2020-12-18)</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            <div class="bd-footer-content__inner">
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Francesco Biscani, Dario Izzo
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  <p class="copyright">
+    
+      © Copyright 2020, 2021, 2022 Francesco Biscani, Dario Izzo.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div></div>
+          </footer>
+        
+
+      </main>
     </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/bootstrap.js?digest=12da95d707ffb74b382d"></script>
+<script src="_static/scripts/pydata-sphinx-theme.js?digest=12da95d707ffb74b382d"></script>
 
-    
-  <script src="_static/js/index.d3f166471bb80abb5163.js"></script>
-
-
-    
+  <footer class="bd-footer">
+  </footer>
   </body>
 </html>

@@ -1,707 +1,641 @@
 
+
 <!DOCTYPE html>
 
-<html lang="en">
+
+<html lang="en" >
+
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
     <title>Notes on automatic differentiation &#8212; heyoka 0.22.0 documentation</title>
-    
-  <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=12da95d707ffb74b382d" rel="stylesheet" />
+<link href="_static/styles/bootstrap.css?digest=12da95d707ffb74b382d" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=12da95d707ffb74b382d" rel="stylesheet" />
 
-    
-  <link rel="stylesheet"
-    href="_static/vendor/fontawesome/5.13.0/css/all.min.css">
-  <link rel="preload" as="font" type="font/woff2" crossorigin
-    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
-  <link rel="preload" as="font" type="font/woff2" crossorigin
-    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+  
+  <link href="_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=12da95d707ffb74b382d" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
 
-    
-      
-  <link rel="stylesheet"
-    href="_static/vendor/open-sans_all/1.44.1/index.css">
-  <link rel="stylesheet"
-    href="_static/vendor/lato_latin-ext/1.44.1/index.css">
-
-    
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/sphinx-book-theme.c441f2ba0852f4cabcb80105e3a46ae6.css" />
-    
-  <link rel="preload" as="script" href="_static/js/index.d3f166471bb80abb5163.js">
+    <link rel="stylesheet" href="_static/styles/sphinx-book-theme.css?digest=14f4ca6b54d191a8c7657f6c759bf11a5fb86285" type="text/css" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=12da95d707ffb74b382d" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=12da95d707ffb74b382d" />
 
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
     <script src="_static/doctools.js"></script>
     <script src="_static/sphinx_highlight.js"></script>
-    <script src="_static/sphinx-book-theme.7d483ff0a819d6edff12ce0b1ead3928.js"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?digest=5a5c038af52cf7bc1a1ec88eea08e6366ee68824"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'ad_notes';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Changelog" href="changelog.html" />
     <link rel="prev" title="Benchmarks" href="benchmarks.html" />
-
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="docsearch:language" content="en" />
-
-
-
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
   </head>
-  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
-    
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
 
-    <div class="container-xl">
-      <div class="row">
-          
-<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+  
+  
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+  
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+    </nav>
+  
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
     
-        <div class="navbar-brand-box">
-<a class="navbar-brand text-wrap" href="index.html">
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+  
+
+<a class="navbar-brand logo" href="index.html">
   
   
-  <h1 class="site-logo" id="site-title">heyoka 0.22.0 documentation</h1>
   
+  
+    
+    
+      
+    
+    
+    <img src="_static/white_logo.png" class="logo__image only-light" alt="Logo image"/>
+    <script>document.write(`<img src="_static/white_logo.png" class="logo__image only-dark" alt="Logo image"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item"><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="basic_tutorials.html">Basic tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-1"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="tut_taylor_method.html">Taylor’s method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_expression_system.html">The expression system</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_adaptive.html">The adaptive integrator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_adaptive_custom.html">Customising the adaptive integrator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_param.html">Runtime parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_nonauto.html">Non-autonomous systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_d_output.html">Dense &amp; continuous output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_events.html">Event detection</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="advanced_tutorials.html">Advanced tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-2"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="tut_batch_mode.html">Batch mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_extended_precision.html">Computations in extended precision</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_arbitrary_precision.html">Computations in arbitrary precision</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_s11n.html">Serialisation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_ensemble.html">Ensemble propagations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_parallel_mode.html">Parallel mode</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Notes on automatic differentiation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="breaking_changes.html">Breaking changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="acknowledgement.html">Acknowledgement</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bibliography.html">Bibliography</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><label class="sidebar-toggle primary-toggle btn btn-sm" for="__primary" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</label></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/bluescarni/heyoka" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
 </a>
-</div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
-  <i class="icon fas fa-search"></i>
-  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
-</form>
-<nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
-    <ul class="current nav sidenav_l1">
- <li class="toctree-l1">
-  <a class="reference internal" href="install.html">
-   Installation
-  </a>
- </li>
- <li class="toctree-l1 collapsible-parent">
-  <a class="reference internal" href="basic_tutorials.html">
-   Basic tutorials
-  </a>
-  <ul class="collapse-ul">
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_taylor_method.html">
-     Taylor’s method
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_expression_system.html">
-     The expression system
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_adaptive.html">
-     The adaptive integrator
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_adaptive_custom.html">
-     Customising the adaptive integrator
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_param.html">
-     Runtime parameters
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_nonauto.html">
-     Non-autonomous systems
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_d_output.html">
-     Dense &amp; continuous output
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_events.html">
-     Event detection
-    </a>
-   </li>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fad_notes.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
   </ul>
-  <i class="fas fa-chevron-down">
-  </i>
- </li>
- <li class="toctree-l1 collapsible-parent">
-  <a class="reference internal" href="advanced_tutorials.html">
-   Advanced tutorials
-  </a>
-  <ul class="collapse-ul">
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_batch_mode.html">
-     Batch mode
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_extended_precision.html">
-     Computations in extended precision
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_arbitrary_precision.html">
-     Computations in arbitrary precision
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_s11n.html">
-     Serialisation
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_ensemble.html">
-     Ensemble propagations
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_parallel_mode.html">
-     Parallel mode
-    </a>
-   </li>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="_sources/ad_notes.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
   </ul>
-  <i class="fas fa-chevron-down">
-  </i>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="benchmarks.html">
-   Benchmarks
-  </a>
- </li>
- <li class="toctree-l1 current active">
-  <a class="current reference internal" href="#">
-   Notes on automatic differentiation
-  </a>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="changelog.html">
-   Changelog
-  </a>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="breaking_changes.html">
-   Breaking changes
-  </a>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="acknowledgement.html">
-   Acknowledgement
-  </a>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="bibliography.html">
-   Bibliography
-  </a>
- </li>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+<script>
+document.write(`
+  <button class="theme-switch-button btn btn-sm btn-outline-primary navbar-btn rounded-circle" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch" data-mode="light"><i class="fa-solid fa-sun"></i></span>
+    <span class="theme-switch" data-mode="dark"><i class="fa-solid fa-moon"></i></span>
+    <span class="theme-switch" data-mode="auto"><i class="fa-solid fa-circle-half-stroke"></i></span>
+  </button>
+`);
+</script>
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+  </button>
+`);
+</script>
+<label class="sidebar-toggle secondary-toggle btn btn-sm" for="__secondary"title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</label>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Notes on automatic differentiation</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#preliminaries">Preliminaries</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#basic-arithmetic">Basic arithmetic</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#addition-and-subtraction">Addition and subtraction</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#multiplication">Multiplication</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#division">Division</a></li>
 </ul>
-
-</nav> <!-- To handle the deprecated key -->
-
-<div class="navbar_extra_footer">
-  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
-</div>
-
-</div>
-
-
-          
-
-
-          
-<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
-    
-    <div class="topbar container-xl fixed-top">
-    <div class="topbar-contents row">
-        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
-        <div class="col pl-md-4 topbar-main">
-            
-            <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
-                data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
-                aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
-                title="Toggle navigation" data-toggle="tooltip" data-placement="left">
-                <i class="fas fa-bars"></i>
-                <i class="fas fa-arrow-left"></i>
-                <i class="fas fa-arrow-up"></i>
-            </button>
-            
-            
-<div class="dropdown-buttons-trigger">
-    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
-            class="fas fa-download"></i></button>
-
-    <div class="dropdown-buttons">
-        <!-- ipynb file if we had a myst markdown file -->
-        
-        <!-- Download raw file -->
-        <a class="dropdown-buttons" href="_sources/ad_notes.rst.txt"><button type="button"
-                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
-                data-placement="left">.rst</button></a>
-        <!-- Download PDF via print -->
-        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
-            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
-    </div>
-</div>
-
-            <!-- Source interaction buttons -->
-
-<div class="dropdown-buttons-trigger">
-    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn"
-        aria-label="Connect with source repository"><i class="fab fa-github"></i></button>
-    <div class="dropdown-buttons sourcebuttons">
-        <a class="repository-button"
-            href="https://github.com/bluescarni/heyoka"><button type="button" class="btn btn-secondary topbarbtn"
-                data-toggle="tooltip" data-placement="left" title="Source repository"><i
-                    class="fab fa-github"></i>repository</button></a>
-        <a class="issues-button"
-            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fad_notes.html&body=Your%20issue%20content%20here."><button
-                type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
-                title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
-        
-    </div>
-</div>
-
-
-            <!-- Full screen (wrap in <a> to have style consistency -->
-            <a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
-                    data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
-                    title="Fullscreen mode"><i
-                        class="fas fa-expand"></i></button></a>
-
-            <!-- Launch buttons -->
-
-        </div>
-
-        <!-- Table of contents -->
-        <div class="d-none d-md-block col-md-2 bd-toc show">
-            
-        <div class="tocsection onthispage pt-5 pb-3">
-            <i class="fas fa-list"></i>
-            Contents
-        </div>
-        <nav id="bd-toc-nav">
-            <ul class="nav section-nav flex-column">
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#preliminaries">
-   Preliminaries
-  </a>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#basic-arithmetic">
-   Basic arithmetic
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#addition-and-subtraction">
-     Addition and subtraction
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#multiplication">
-     Multiplication
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#division">
-     Division
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#squaring">
-   Squaring
-  </a>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#square-root">
-   Square root
-  </a>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#exponentiation">
-   Exponentiation
-  </a>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#exponentials">
-   Exponentials
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#natural-exponential">
-     Natural exponential
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#standard-logistic-function">
-     Standard logistic function
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#logarithms">
-   Logarithms
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#natural-logarithm">
-     Natural logarithm
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#trigonometric-functions">
-   Trigonometric functions
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#tangent">
-     Tangent
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#inverse-trigonometric-functions">
-   Inverse trigonometric functions
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#inverse-sine">
-     Inverse sine
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#inverse-cosine">
-     Inverse cosine
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#inverse-tangent">
-     Inverse tangent
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#two-argument-inverse-tangent">
-     Two-argument inverse tangent
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#hyperbolic-functions">
-   Hyperbolic functions
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#hyperbolic-sine">
-     Hyperbolic sine
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#hyperbolic-cosine">
-     Hyperbolic cosine
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#hyperbolic-tangent">
-     Hyperbolic tangent
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#inverse-hyperbolic-functions">
-   Inverse hyperbolic functions
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#inverse-hyperbolic-sine">
-     Inverse hyperbolic sine
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#inverse-hyperbolic-cosine">
-     Inverse hyperbolic cosine
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#inverse-hyperbolic-tangent">
-     Inverse hyperbolic tangent
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#special-functions">
-   Special functions
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#error-function">
-     Error function
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#celestial-mechanics">
-   Celestial mechanics
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#inverse-of-kepler-s-elliptic-equation">
-     Inverse of Kepler’s elliptic equation
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#time-functions">
-   Time functions
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#time-polynomials">
-     Time polynomials
-    </a>
-   </li>
-  </ul>
- </li>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#squaring">Squaring</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#square-root">Square root</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#exponentiation">Exponentiation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#exponentials">Exponentials</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#natural-exponential">Natural exponential</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#standard-logistic-function">Standard logistic function</a></li>
 </ul>
-
-        </nav>
-        
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#logarithms">Logarithms</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#natural-logarithm">Natural logarithm</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#trigonometric-functions">Trigonometric functions</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#tangent">Tangent</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-trigonometric-functions">Inverse trigonometric functions</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-sine">Inverse sine</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-cosine">Inverse cosine</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-tangent">Inverse tangent</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#two-argument-inverse-tangent">Two-argument inverse tangent</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#hyperbolic-functions">Hyperbolic functions</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#hyperbolic-sine">Hyperbolic sine</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#hyperbolic-cosine">Hyperbolic cosine</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#hyperbolic-tangent">Hyperbolic tangent</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-hyperbolic-functions">Inverse hyperbolic functions</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-hyperbolic-sine">Inverse hyperbolic sine</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-hyperbolic-cosine">Inverse hyperbolic cosine</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-hyperbolic-tangent">Inverse hyperbolic tangent</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#special-functions">Special functions</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#error-function">Error function</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#celestial-mechanics">Celestial mechanics</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-of-kepler-s-elliptic-equation">Inverse of Kepler’s elliptic equation</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#time-functions">Time functions</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#time-polynomials">Time polynomials</a></li>
+</ul>
+</li>
+</ul>
+            </nav>
         </div>
     </div>
 </div>
-    <div id="main-content" class="row">
-        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
-        
-              <div>
+
+              
                 
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+                  
   <section id="notes-on-automatic-differentiation">
-<span id="ad-notes"></span><h1>Notes on automatic differentiation<a class="headerlink" href="#notes-on-automatic-differentiation" title="Permalink to this heading">¶</a></h1>
+<span id="ad-notes"></span><h1>Notes on automatic differentiation<a class="headerlink" href="#notes-on-automatic-differentiation" title="Permalink to this heading">#</a></h1>
 <section id="preliminaries">
-<h2>Preliminaries<a class="headerlink" href="#preliminaries" title="Permalink to this heading">¶</a></h2>
+<h2>Preliminaries<a class="headerlink" href="#preliminaries" title="Permalink to this heading">#</a></h2>
 <p>Definition of normalised derivative:</p>
 <div class="math notranslate nohighlight" id="equation-eq-norm-der-00">
-<span class="eqno">(1)<a class="headerlink" href="#equation-eq-norm-der-00" title="Permalink to this equation">¶</a></span>\[x^{\left[ n\right]}\left( t \right) = \frac{1}{n!} x^{\left( n\right)}\left( t \right).\]</div>
+<span class="eqno">(1)<a class="headerlink" href="#equation-eq-norm-der-00" title="Permalink to this equation">#</a></span>\[x^{\left[ n\right]}\left( t \right) = \frac{1}{n!} x^{\left( n\right)}\left( t \right).\]</div>
 <p><a class="reference external" href="https://en.wikipedia.org/wiki/General_Leibniz_rule">General Leibniz rule</a>: given
 <span class="math notranslate nohighlight">\(a\left( t \right) = b\left( t \right) c\left( t \right)\)</span>, then</p>
 <div class="math notranslate nohighlight" id="equation-eq-leibniz-00">
-<span class="eqno">(2)<a class="headerlink" href="#equation-eq-leibniz-00" title="Permalink to this equation">¶</a></span>\[a^{\left[ n\right]}\left( t \right) = \sum_{j=0}^n b^{\left[ n - j\right]}\left( t \right) c^{\left[ j\right]}\left( t \right).\]</div>
+<span class="eqno">(2)<a class="headerlink" href="#equation-eq-leibniz-00" title="Permalink to this equation">#</a></span>\[a^{\left[ n\right]}\left( t \right) = \sum_{j=0}^n b^{\left[ n - j\right]}\left( t \right) c^{\left[ j\right]}\left( t \right).\]</div>
 </section>
 <section id="basic-arithmetic">
-<h2>Basic arithmetic<a class="headerlink" href="#basic-arithmetic" title="Permalink to this heading">¶</a></h2>
+<h2>Basic arithmetic<a class="headerlink" href="#basic-arithmetic" title="Permalink to this heading">#</a></h2>
 <section id="addition-and-subtraction">
-<h3>Addition and subtraction<a class="headerlink" href="#addition-and-subtraction" title="Permalink to this heading">¶</a></h3>
+<h3>Addition and subtraction<a class="headerlink" href="#addition-and-subtraction" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = b\left( t \right) \pm c\left( t \right)\)</span>, trivially</p>
 <div class="math notranslate nohighlight" id="equation-eq-ad-addsub-00">
-<span class="eqno">(3)<a class="headerlink" href="#equation-eq-ad-addsub-00" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = b^{\left[ n \right]}\left( t \right) \pm c^{\left[ n \right]}\left( t \right).\]</div>
+<span class="eqno">(3)<a class="headerlink" href="#equation-eq-ad-addsub-00" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = b^{\left[ n \right]}\left( t \right) \pm c^{\left[ n \right]}\left( t \right).\]</div>
 </section>
 <section id="multiplication">
-<h3>Multiplication<a class="headerlink" href="#multiplication" title="Permalink to this heading">¶</a></h3>
+<h3>Multiplication<a class="headerlink" href="#multiplication" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = b\left( t \right) c\left( t \right)\)</span>, the derivative <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span>
 is given directly by the application of the general Leibniz rule <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a>.</p>
 </section>
 <section id="division">
-<h3>Division<a class="headerlink" href="#division" title="Permalink to this heading">¶</a></h3>
+<h3>Division<a class="headerlink" href="#division" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \frac{b\left( t \right)}{c\left( t \right)}\)</span>, we can write</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-0">
-<span class="eqno">(4)<a class="headerlink" href="#equation-ad-notes-0" title="Permalink to this equation">¶</a></span>\[a\left( t \right) c\left( t \right) = b\left( t \right).\]</div>
+<span class="eqno">(4)<a class="headerlink" href="#equation-ad-notes-0" title="Permalink to this equation">#</a></span>\[a\left( t \right) c\left( t \right) = b\left( t \right).\]</div>
 <p>We can now apply the normalised derivative of order <span class="math notranslate nohighlight">\(n\)</span> to both sides, use <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> and re-arrange to obtain:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-1">
-<span class="eqno">(5)<a class="headerlink" href="#equation-ad-notes-1" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{c^{\left[ 0 \right]}\left( t \right)}\left[ b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^n a^{\left[ n - j \right]}\left( t \right) c^{\left[ j \right]}\left( t \right)\right].\]</div>
+<span class="eqno">(5)<a class="headerlink" href="#equation-ad-notes-1" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{c^{\left[ 0 \right]}\left( t \right)}\left[ b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^n a^{\left[ n - j \right]}\left( t \right) c^{\left[ j \right]}\left( t \right)\right].\]</div>
 </section>
 </section>
 <section id="squaring">
-<h2>Squaring<a class="headerlink" href="#squaring" title="Permalink to this heading">¶</a></h2>
+<h2>Squaring<a class="headerlink" href="#squaring" title="Permalink to this heading">#</a></h2>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = b\left( t \right)^2\)</span>, the computation of <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is a special
 case of <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> in which we take advantage of the summation’s symmetry in order to halve the computational
 complexity:</p>
 <div class="math notranslate nohighlight" id="equation-eq-ad-square-00">
-<span class="eqno">(6)<a class="headerlink" href="#equation-eq-ad-square-00" title="Permalink to this equation">¶</a></span>\[\begin{split}a^{\left[ n \right]}\left( t \right) =
+<span class="eqno">(6)<a class="headerlink" href="#equation-eq-ad-square-00" title="Permalink to this equation">#</a></span>\[\begin{split}a^{\left[ n \right]}\left( t \right) =
 \begin{cases}
 2\sum_{j=0}^{\frac{n}{2}-1} b^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right) + \left( b^{\left[ \frac{n}{2} \right]}\left( t \right) \right)^2 \mbox{ if $n$ is even}, \\
 2\sum_{j=0}^{\frac{n-1}{2}} b^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right) \mbox{ if $n$ is odd}.
 \end{cases}\end{split}\]</div>
 </section>
 <section id="square-root">
-<h2>Square root<a class="headerlink" href="#square-root" title="Permalink to this heading">¶</a></h2>
+<h2>Square root<a class="headerlink" href="#square-root" title="Permalink to this heading">#</a></h2>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) =\sqrt{b\left( t \right)}\)</span>, we can write</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-2">
-<span class="eqno">(7)<a class="headerlink" href="#equation-ad-notes-2" title="Permalink to this equation">¶</a></span>\[a\left( t \right)^2 = b\left( t \right).\]</div>
+<span class="eqno">(7)<a class="headerlink" href="#equation-ad-notes-2" title="Permalink to this equation">#</a></span>\[a\left( t \right)^2 = b\left( t \right).\]</div>
 <p>We can apply the normalised derivative of order <span class="math notranslate nohighlight">\(n\)</span> to both sides, and, with the help of <a class="reference internal" href="#equation-eq-ad-square-00">(6)</a>, we obtain:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-3">
-<span class="eqno">(8)<a class="headerlink" href="#equation-ad-notes-3" title="Permalink to this equation">¶</a></span>\[\begin{split}b^{\left[ n \right]}\left( t \right) =
+<span class="eqno">(8)<a class="headerlink" href="#equation-ad-notes-3" title="Permalink to this equation">#</a></span>\[\begin{split}b^{\left[ n \right]}\left( t \right) =
 \begin{cases}
 2\sum_{j=0}^{\frac{n}{2}-1} a^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) + \left( a^{\left[ \frac{n}{2} \right]}\left( t \right) \right)^2 \mbox{ if $n$ is even}, \\
 2\sum_{j=0}^{\frac{n-1}{2}} a^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \mbox{ if $n$ is odd}.
 \end{cases}\end{split}\]</div>
 <p>We can then isolate <span class="math notranslate nohighlight">\(a^{\left[ n  \right]}\left( t \right)\)</span> to obtain:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-4">
-<span class="eqno">(9)<a class="headerlink" href="#equation-ad-notes-4" title="Permalink to this equation">¶</a></span>\[\begin{split}a^{\left[ n \right]}\left( t \right) =
+<span class="eqno">(9)<a class="headerlink" href="#equation-ad-notes-4" title="Permalink to this equation">#</a></span>\[\begin{split}a^{\left[ n \right]}\left( t \right) =
 \begin{cases}
 \frac{1}{2a^{\left[ 0 \right]}\left( t \right)} \left[ b^{\left[ n \right]}\left( t \right) - 2\sum_{j=1}^{\frac{n}{2}-1} a^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) - \left( a^{\left[ \frac{n}{2} \right]}\left( t \right) \right)^2 \right] \mbox{ if $n$ is even}, \\
 \frac{1}{2a^{\left[ 0 \right]}\left( t \right)} \left[ b^{\left[ n \right]}\left( t \right) - 2\sum_{j=0}^{\frac{n-1}{2}} a^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right] \mbox{ if $n$ is odd}.
 \end{cases}\end{split}\]</div>
 </section>
 <section id="exponentiation">
-<h2>Exponentiation<a class="headerlink" href="#exponentiation" title="Permalink to this heading">¶</a></h2>
+<h2>Exponentiation<a class="headerlink" href="#exponentiation" title="Permalink to this heading">#</a></h2>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = b\left( t \right)^\alpha\)</span>, with <span class="math notranslate nohighlight">\(\alpha \neq 0\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-5">
-<span class="eqno">(10)<a class="headerlink" href="#equation-ad-notes-5" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \alpha b\left( t \right)^{\alpha - 1} b^\prime\left( t \right).\]</div>
+<span class="eqno">(10)<a class="headerlink" href="#equation-ad-notes-5" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = \alpha b\left( t \right)^{\alpha - 1} b^\prime\left( t \right).\]</div>
 <p>By multiplying both sides by <span class="math notranslate nohighlight">\(b\left( t \right)\)</span> we obtain</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-6">
-<span class="eqno">(11)<a class="headerlink" href="#equation-ad-notes-6" title="Permalink to this equation">¶</a></span>\[\begin{split}\begin{aligned}
+<span class="eqno">(11)<a class="headerlink" href="#equation-ad-notes-6" title="Permalink to this equation">#</a></span>\[\begin{split}\begin{aligned}
 b\left( t \right) a^\prime\left( t \right) &amp; = b\left( t \right) \alpha b\left( t \right)^{\alpha - 1} b^\prime\left( t \right) \\
 &amp; = \alpha  b^\prime\left( t \right) a\left( t \right).
 \end{aligned}\end{split}\]</div>
 <p>We can now apply the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, use <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> and re-arrange to obtain,
 for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-7">
-<span class="eqno">(12)<a class="headerlink" href="#equation-ad-notes-7" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \sum_{j=0}^{n-1} \left[ n\alpha - j \left( \alpha + 1 \right) \right] b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right).\]</div>
+<span class="eqno">(12)<a class="headerlink" href="#equation-ad-notes-7" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \sum_{j=0}^{n-1} \left[ n\alpha - j \left( \alpha + 1 \right) \right] b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right).\]</div>
 </section>
 <section id="exponentials">
-<h2>Exponentials<a class="headerlink" href="#exponentials" title="Permalink to this heading">¶</a></h2>
+<h2>Exponentials<a class="headerlink" href="#exponentials" title="Permalink to this heading">#</a></h2>
 <section id="natural-exponential">
-<h3>Natural exponential<a class="headerlink" href="#natural-exponential" title="Permalink to this heading">¶</a></h3>
+<h3>Natural exponential<a class="headerlink" href="#natural-exponential" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = e^{b\left( t \right)}\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-8">
-<span class="eqno">(13)<a class="headerlink" href="#equation-ad-notes-8" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = e^{b\left( t \right)}b^\prime\left( t \right) = a\left( t \right) b^\prime\left( t \right).\]</div>
+<span class="eqno">(13)<a class="headerlink" href="#equation-ad-notes-8" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = e^{b\left( t \right)}b^\prime\left( t \right) = a\left( t \right) b^\prime\left( t \right).\]</div>
 <p>We can now apply the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, use <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a> and <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a>
 and obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-9">
-<span class="eqno">(14)<a class="headerlink" href="#equation-ad-notes-9" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n} \sum_{j=1}^{n} j a^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
+<span class="eqno">(14)<a class="headerlink" href="#equation-ad-notes-9" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n} \sum_{j=1}^{n} j a^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
 </section>
 <section id="standard-logistic-function">
-<h3>Standard logistic function<a class="headerlink" href="#standard-logistic-function" title="Permalink to this heading">¶</a></h3>
+<h3>Standard logistic function<a class="headerlink" href="#standard-logistic-function" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{sig} {b\left( t \right)}\)</span>, where <span class="math notranslate nohighlight">\(\operatorname{sig}\left( x \right)\)</span>
 is the <a class="reference external" href="https://en.wikipedia.org/wiki/Logistic_function">standard logistic function</a></p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-10">
-<span class="eqno">(15)<a class="headerlink" href="#equation-ad-notes-10" title="Permalink to this equation">¶</a></span>\[\operatorname{sig} \left( x \right) = \frac{1}{1+e^{-x}},\]</div>
+<span class="eqno">(15)<a class="headerlink" href="#equation-ad-notes-10" title="Permalink to this equation">#</a></span>\[\operatorname{sig} \left( x \right) = \frac{1}{1+e^{-x}},\]</div>
 <p>we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-11">
-<span class="eqno">(16)<a class="headerlink" href="#equation-ad-notes-11" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \operatorname{sig}{b\left( t \right)} \left[1 - \operatorname{sig}{b\left( t \right)} \right] b^\prime\left( t \right) = a\left( t \right) \left[1 - a\left( t \right) \right] b^\prime\left( t \right),\]</div>
+<span class="eqno">(16)<a class="headerlink" href="#equation-ad-notes-11" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = \operatorname{sig}{b\left( t \right)} \left[1 - \operatorname{sig}{b\left( t \right)} \right] b^\prime\left( t \right) = a\left( t \right) \left[1 - a\left( t \right) \right] b^\prime\left( t \right),\]</div>
 <p>which, after the introduction of the auxiliary function</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-12">
-<span class="eqno">(17)<a class="headerlink" href="#equation-ad-notes-12" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = a^2\left( t \right) ,\]</div>
+<span class="eqno">(17)<a class="headerlink" href="#equation-ad-notes-12" title="Permalink to this equation">#</a></span>\[c\left( t \right)  = a^2\left( t \right) ,\]</div>
 <p>becomes</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-13">
-<span class="eqno">(18)<a class="headerlink" href="#equation-ad-notes-13" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \left[ a\left( t \right) - c\left( t \right) \right] b^\prime\left( t \right).\]</div>
+<span class="eqno">(18)<a class="headerlink" href="#equation-ad-notes-13" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = \left[ a\left( t \right) - c\left( t \right) \right] b^\prime\left( t \right).\]</div>
 <p>After applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, we can use <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a>,
 <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> and <a class="reference internal" href="#equation-eq-ad-addsub-00">(3)</a> to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-14">
-<span class="eqno">(19)<a class="headerlink" href="#equation-ad-notes-14" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n}\sum_{j=1}^{n} j \left[ a^{\left[ n - j \right]} \left( t \right)- c^{\left[ n - j \right]}\left( t \right)\right] b^{\left[ j \right]}\left( t \right).\]</div>
+<span class="eqno">(19)<a class="headerlink" href="#equation-ad-notes-14" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n}\sum_{j=1}^{n} j \left[ a^{\left[ n - j \right]} \left( t \right)- c^{\left[ n - j \right]}\left( t \right)\right] b^{\left[ j \right]}\left( t \right).\]</div>
 </section>
 </section>
 <section id="logarithms">
-<h2>Logarithms<a class="headerlink" href="#logarithms" title="Permalink to this heading">¶</a></h2>
+<h2>Logarithms<a class="headerlink" href="#logarithms" title="Permalink to this heading">#</a></h2>
 <section id="natural-logarithm">
-<h3>Natural logarithm<a class="headerlink" href="#natural-logarithm" title="Permalink to this heading">¶</a></h3>
+<h3>Natural logarithm<a class="headerlink" href="#natural-logarithm" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \log b\left( t \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-15">
-<span class="eqno">(20)<a class="headerlink" href="#equation-ad-notes-15" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{b\left( t \right)},\]</div>
+<span class="eqno">(20)<a class="headerlink" href="#equation-ad-notes-15" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{b\left( t \right)},\]</div>
 <p>or, equivalently,</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-16">
-<span class="eqno">(21)<a class="headerlink" href="#equation-ad-notes-16" title="Permalink to this equation">¶</a></span>\[b\left( t \right) a^\prime\left( t \right) = b^\prime\left( t \right).\]</div>
+<span class="eqno">(21)<a class="headerlink" href="#equation-ad-notes-16" title="Permalink to this equation">#</a></span>\[b\left( t \right) a^\prime\left( t \right) = b^\prime\left( t \right).\]</div>
 <p>We can now apply the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, use <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a> and <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a>
 and re-arrange to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-17">
-<span class="eqno">(22)<a class="headerlink" href="#equation-ad-notes-17" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+<span class="eqno">(22)<a class="headerlink" href="#equation-ad-notes-17" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
 </section>
 </section>
 <section id="trigonometric-functions">
-<h2>Trigonometric functions<a class="headerlink" href="#trigonometric-functions" title="Permalink to this heading">¶</a></h2>
+<h2>Trigonometric functions<a class="headerlink" href="#trigonometric-functions" title="Permalink to this heading">#</a></h2>
 <section id="tangent">
-<span id="ad-tan"></span><h3>Tangent<a class="headerlink" href="#tangent" title="Permalink to this heading">¶</a></h3>
+<span id="ad-tan"></span><h3>Tangent<a class="headerlink" href="#tangent" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \tan b\left( t \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-18">
-<span class="eqno">(23)<a class="headerlink" href="#equation-ad-notes-18" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \left[ \tan^2 b\left( t \right) + 1 \right] b^\prime\left( t \right) = a^2\left( t \right)b^\prime\left( t \right) + b^\prime\left( t \right),\]</div>
+<span class="eqno">(23)<a class="headerlink" href="#equation-ad-notes-18" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = \left[ \tan^2 b\left( t \right) + 1 \right] b^\prime\left( t \right) = a^2\left( t \right)b^\prime\left( t \right) + b^\prime\left( t \right),\]</div>
 <p>which, after the introduction of the auxiliary function</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-19">
-<span class="eqno">(24)<a class="headerlink" href="#equation-ad-notes-19" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = a^2\left( t \right) ,\]</div>
+<span class="eqno">(24)<a class="headerlink" href="#equation-ad-notes-19" title="Permalink to this equation">#</a></span>\[c\left( t \right)  = a^2\left( t \right) ,\]</div>
 <p>becomes</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-20">
-<span class="eqno">(25)<a class="headerlink" href="#equation-ad-notes-20" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right) + b^\prime\left( t \right).\]</div>
+<span class="eqno">(25)<a class="headerlink" href="#equation-ad-notes-20" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right) + b^\prime\left( t \right).\]</div>
 <p>After applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, we can use <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a>,
 <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> and <a class="reference internal" href="#equation-eq-ad-addsub-00">(3)</a> to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-21">
-<span class="eqno">(26)<a class="headerlink" href="#equation-ad-notes-21" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right) + b^{\left[ n \right]}\left( t \right).\]</div>
+<span class="eqno">(26)<a class="headerlink" href="#equation-ad-notes-21" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right) + b^{\left[ n \right]}\left( t \right).\]</div>
 </section>
 </section>
 <section id="inverse-trigonometric-functions">
-<h2>Inverse trigonometric functions<a class="headerlink" href="#inverse-trigonometric-functions" title="Permalink to this heading">¶</a></h2>
+<h2>Inverse trigonometric functions<a class="headerlink" href="#inverse-trigonometric-functions" title="Permalink to this heading">#</a></h2>
 <section id="inverse-sine">
-<span id="ad-asin"></span><h3>Inverse sine<a class="headerlink" href="#inverse-sine" title="Permalink to this heading">¶</a></h3>
+<span id="ad-asin"></span><h3>Inverse sine<a class="headerlink" href="#inverse-sine" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \arcsin b\left( t \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-22">
-<span class="eqno">(27)<a class="headerlink" href="#equation-ad-notes-22" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{\sqrt{1 - b^2\left( t \right) }},\]</div>
+<span class="eqno">(27)<a class="headerlink" href="#equation-ad-notes-22" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{\sqrt{1 - b^2\left( t \right) }},\]</div>
 <p>or, equivalently,</p>
 <div class="math notranslate nohighlight" id="equation-eq-ad-asin00">
-<span class="eqno">(28)<a class="headerlink" href="#equation-eq-ad-asin00" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) \sqrt{1 - b^2\left( t \right) } = b^\prime\left( t \right).\]</div>
+<span class="eqno">(28)<a class="headerlink" href="#equation-eq-ad-asin00" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) \sqrt{1 - b^2\left( t \right) } = b^\prime\left( t \right).\]</div>
 <p>We introduce the auxiliary function</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-23">
-<span class="eqno">(29)<a class="headerlink" href="#equation-ad-notes-23" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{1 - b^2\left( t \right) },\]</div>
+<span class="eqno">(29)<a class="headerlink" href="#equation-ad-notes-23" title="Permalink to this equation">#</a></span>\[c\left( t \right)  = \sqrt{1 - b^2\left( t \right) },\]</div>
 <p>so that <a class="reference internal" href="#equation-eq-ad-asin00">(28)</a> can be rewritten as</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-24">
-<span class="eqno">(30)<a class="headerlink" href="#equation-ad-notes-24" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) c\left( t \right)  = b^\prime\left( t \right).\]</div>
+<span class="eqno">(30)<a class="headerlink" href="#equation-ad-notes-24" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) c\left( t \right)  = b^\prime\left( t \right).\]</div>
 <p>Applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides yields, via <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-25">
-<span class="eqno">(31)<a class="headerlink" href="#equation-ad-notes-25" title="Permalink to this equation">¶</a></span>\[\left[a^\prime\left( t \right) c\left( t \right)\right]^{\left[ n - 1 \right]}  = n b^{\left[ n \right]} \left( t \right).\]</div>
+<span class="eqno">(31)<a class="headerlink" href="#equation-ad-notes-25" title="Permalink to this equation">#</a></span>\[\left[a^\prime\left( t \right) c\left( t \right)\right]^{\left[ n - 1 \right]}  = n b^{\left[ n \right]} \left( t \right).\]</div>
 <p>We can now apply the general Leibniz rule <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> to the left-hand side and re-arrange
 the terms to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-26">
-<span class="eqno">(32)<a class="headerlink" href="#equation-ad-notes-26" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+<span class="eqno">(32)<a class="headerlink" href="#equation-ad-notes-26" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
 </section>
 <section id="inverse-cosine">
-<span id="ad-acos"></span><h3>Inverse cosine<a class="headerlink" href="#inverse-cosine" title="Permalink to this heading">¶</a></h3>
+<span id="ad-acos"></span><h3>Inverse cosine<a class="headerlink" href="#inverse-cosine" title="Permalink to this heading">#</a></h3>
 <p>The derivation is identical to the <a class="reference internal" href="#ad-asin"><span class="std std-ref">inverse sine</span></a>, apart from a sign change.
 Given <span class="math notranslate nohighlight">\(a\left( t \right) = \arccos b\left( t \right)\)</span>,
 the final result is, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-27">
-<span class="eqno">(33)<a class="headerlink" href="#equation-ad-notes-27" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = -\frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) + \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right],\]</div>
+<span class="eqno">(33)<a class="headerlink" href="#equation-ad-notes-27" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = -\frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) + \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right],\]</div>
 <p>with <span class="math notranslate nohighlight">\(c\left( t \right)\)</span> defined as:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-28">
-<span class="eqno">(34)<a class="headerlink" href="#equation-ad-notes-28" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{1 - b^2\left( t \right) }.\]</div>
+<span class="eqno">(34)<a class="headerlink" href="#equation-ad-notes-28" title="Permalink to this equation">#</a></span>\[c\left( t \right)  = \sqrt{1 - b^2\left( t \right) }.\]</div>
 </section>
 <section id="inverse-tangent">
-<span id="ad-atan"></span><h3>Inverse tangent<a class="headerlink" href="#inverse-tangent" title="Permalink to this heading">¶</a></h3>
+<span id="ad-atan"></span><h3>Inverse tangent<a class="headerlink" href="#inverse-tangent" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \arctan b\left( t \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-29">
-<span class="eqno">(35)<a class="headerlink" href="#equation-ad-notes-29" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{1 + b^2\left( t \right) },\]</div>
+<span class="eqno">(35)<a class="headerlink" href="#equation-ad-notes-29" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{1 + b^2\left( t \right) },\]</div>
 <p>or, equivalently,</p>
 <div class="math notranslate nohighlight" id="equation-eq-ad-atan00">
-<span class="eqno">(36)<a class="headerlink" href="#equation-eq-ad-atan00" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) \left[1 + b^2\left( t \right) \right] = b^\prime\left( t \right).\]</div>
+<span class="eqno">(36)<a class="headerlink" href="#equation-eq-ad-atan00" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) \left[1 + b^2\left( t \right) \right] = b^\prime\left( t \right).\]</div>
 <p>We introduce the auxiliary function</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-30">
-<span class="eqno">(37)<a class="headerlink" href="#equation-ad-notes-30" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = b^2\left( t \right),\]</div>
+<span class="eqno">(37)<a class="headerlink" href="#equation-ad-notes-30" title="Permalink to this equation">#</a></span>\[c\left( t \right)  = b^2\left( t \right),\]</div>
 <p>so that <a class="reference internal" href="#equation-eq-ad-atan00">(36)</a> can be rewritten as</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-31">
-<span class="eqno">(38)<a class="headerlink" href="#equation-ad-notes-31" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) + a^\prime\left( t \right) c\left( t \right)  = b^\prime\left( t \right).\]</div>
+<span class="eqno">(38)<a class="headerlink" href="#equation-ad-notes-31" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) + a^\prime\left( t \right) c\left( t \right)  = b^\prime\left( t \right).\]</div>
 <p>Applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides yields, via <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a> and <a class="reference internal" href="#equation-eq-ad-addsub-00">(3)</a>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-32">
-<span class="eqno">(39)<a class="headerlink" href="#equation-ad-notes-32" title="Permalink to this equation">¶</a></span>\[n a^{\left[ n \right]} \left( t \right) + \left[a^\prime\left( t \right) c\left( t \right)\right]^{\left[ n - 1 \right]}  = n b^{\left[ n \right]} \left( t \right).\]</div>
+<span class="eqno">(39)<a class="headerlink" href="#equation-ad-notes-32" title="Permalink to this equation">#</a></span>\[n a^{\left[ n \right]} \left( t \right) + \left[a^\prime\left( t \right) c\left( t \right)\right]^{\left[ n - 1 \right]}  = n b^{\left[ n \right]} \left( t \right).\]</div>
 <p>With the help of the general Leibniz rule <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a>, after re-arranging we obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-33">
-<span class="eqno">(40)<a class="headerlink" href="#equation-ad-notes-33" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[ c^{\left[ 0 \right]}\left( t \right) + 1 \right]}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+<span class="eqno">(40)<a class="headerlink" href="#equation-ad-notes-33" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[ c^{\left[ 0 \right]}\left( t \right) + 1 \right]}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
 </section>
 <section id="two-argument-inverse-tangent">
-<h3>Two-argument inverse tangent<a class="headerlink" href="#two-argument-inverse-tangent" title="Permalink to this heading">¶</a></h3>
+<h3>Two-argument inverse tangent<a class="headerlink" href="#two-argument-inverse-tangent" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{arctan2}\left( b\left( t \right), c\left( t \right) \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-eq-ad-atan200">
-<span class="eqno">(41)<a class="headerlink" href="#equation-eq-ad-atan200" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{c\left( t \right) b^\prime\left( t \right)-b\left( t \right)c^\prime \left( t \right)}
+<span class="eqno">(41)<a class="headerlink" href="#equation-eq-ad-atan200" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = \frac{c\left( t \right) b^\prime\left( t \right)-b\left( t \right)c^\prime \left( t \right)}
 {b^2\left( t \right)+c^2\left( t \right)}.\]</div>
 <p>After the introduction of the auxiliary function</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-34">
-<span class="eqno">(42)<a class="headerlink" href="#equation-ad-notes-34" title="Permalink to this equation">¶</a></span>\[d\left( t \right)  = b^2\left( t \right)+c^2\left( t \right),\]</div>
+<span class="eqno">(42)<a class="headerlink" href="#equation-ad-notes-34" title="Permalink to this equation">#</a></span>\[d\left( t \right)  = b^2\left( t \right)+c^2\left( t \right),\]</div>
 <p><a class="reference internal" href="#equation-eq-ad-atan200">(41)</a> can be rewritten as</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-35">
-<span class="eqno">(43)<a class="headerlink" href="#equation-ad-notes-35" title="Permalink to this equation">¶</a></span>\[d\left( t \right)a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right)-b\left( t \right)c^\prime \left( t \right).\]</div>
+<span class="eqno">(43)<a class="headerlink" href="#equation-ad-notes-35" title="Permalink to this equation">#</a></span>\[d\left( t \right)a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right)-b\left( t \right)c^\prime \left( t \right).\]</div>
 <p>We can now apply the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, and, via <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a>, obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-36">
-<span class="eqno">(44)<a class="headerlink" href="#equation-ad-notes-36" title="Permalink to this equation">¶</a></span>\[\begin{split}\begin{aligned}
+<span class="eqno">(44)<a class="headerlink" href="#equation-ad-notes-36" title="Permalink to this equation">#</a></span>\[\begin{split}\begin{aligned}
 a^{\left[ n \right]}\left( t \right) &amp;= \frac{1}{nd^{\left[ 0 \right]}\left( t \right)}\left[\vphantom{\sum_{j=1}^{n-1}j\left( \right)}
 n\left( c^{\left[ 0 \right]}\left( t \right) b^{\left[ n \right]}\left( t \right) - b^{\left[ 0 \right]}\left( t \right) c^{\left[ n \right]}\left( t \right)\right) \right.\\
 &amp;\left. + \sum_{j=1}^{n-1}j\left( c^{\left[ n-j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right) -
@@ -711,131 +645,131 @@ d^{\left[ n-j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \rig
 </section>
 </section>
 <section id="hyperbolic-functions">
-<h2>Hyperbolic functions<a class="headerlink" href="#hyperbolic-functions" title="Permalink to this heading">¶</a></h2>
+<h2>Hyperbolic functions<a class="headerlink" href="#hyperbolic-functions" title="Permalink to this heading">#</a></h2>
 <section id="hyperbolic-sine">
-<span id="ad-sinh"></span><h3>Hyperbolic sine<a class="headerlink" href="#hyperbolic-sine" title="Permalink to this heading">¶</a></h3>
+<span id="ad-sinh"></span><h3>Hyperbolic sine<a class="headerlink" href="#hyperbolic-sine" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \sinh b\left( t \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-eq-ad-sinh-00">
-<span class="eqno">(45)<a class="headerlink" href="#equation-eq-ad-sinh-00" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = b^\prime\left( t \right) \cosh b\left( t \right).\]</div>
+<span class="eqno">(45)<a class="headerlink" href="#equation-eq-ad-sinh-00" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = b^\prime\left( t \right) \cosh b\left( t \right).\]</div>
 <p>We introduce the auxiliary function</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-37">
-<span class="eqno">(46)<a class="headerlink" href="#equation-ad-notes-37" title="Permalink to this equation">¶</a></span>\[c\left( t \right) = \cosh b\left( t \right),\]</div>
+<span class="eqno">(46)<a class="headerlink" href="#equation-ad-notes-37" title="Permalink to this equation">#</a></span>\[c\left( t \right) = \cosh b\left( t \right),\]</div>
 <p>so that <a class="reference internal" href="#equation-eq-ad-sinh-00">(45)</a> can be rewritten as</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-38">
-<span class="eqno">(47)<a class="headerlink" href="#equation-ad-notes-38" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right).\]</div>
+<span class="eqno">(47)<a class="headerlink" href="#equation-ad-notes-38" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right).\]</div>
 <p>We can now apply the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, and, via <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a>, obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-39">
-<span class="eqno">(48)<a class="headerlink" href="#equation-ad-notes-39" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right)  = \frac{1}{n} \sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
+<span class="eqno">(48)<a class="headerlink" href="#equation-ad-notes-39" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right)  = \frac{1}{n} \sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
 </section>
 <section id="hyperbolic-cosine">
-<h3>Hyperbolic cosine<a class="headerlink" href="#hyperbolic-cosine" title="Permalink to this heading">¶</a></h3>
+<h3>Hyperbolic cosine<a class="headerlink" href="#hyperbolic-cosine" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \cosh b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
 identical to the <a class="reference internal" href="#ad-sinh"><span class="std std-ref">hyperbolic sine</span></a>. After the definition of the auxiliary function</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-40">
-<span class="eqno">(49)<a class="headerlink" href="#equation-ad-notes-40" title="Permalink to this equation">¶</a></span>\[s\left( t \right) = \sinh b\left( t \right),\]</div>
+<span class="eqno">(49)<a class="headerlink" href="#equation-ad-notes-40" title="Permalink to this equation">#</a></span>\[s\left( t \right) = \sinh b\left( t \right),\]</div>
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-41">
-<span class="eqno">(50)<a class="headerlink" href="#equation-ad-notes-41" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right)  = \frac{1}{n} \sum_{j=1}^{n} j s^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
+<span class="eqno">(50)<a class="headerlink" href="#equation-ad-notes-41" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right)  = \frac{1}{n} \sum_{j=1}^{n} j s^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
 </section>
 <section id="hyperbolic-tangent">
-<h3>Hyperbolic tangent<a class="headerlink" href="#hyperbolic-tangent" title="Permalink to this heading">¶</a></h3>
+<h3>Hyperbolic tangent<a class="headerlink" href="#hyperbolic-tangent" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \tanh b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
 identical to the <a class="reference internal" href="#ad-tan"><span class="std std-ref">tangent</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-42">
-<span class="eqno">(51)<a class="headerlink" href="#equation-ad-notes-42" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = a^2\left( t \right),\]</div>
+<span class="eqno">(51)<a class="headerlink" href="#equation-ad-notes-42" title="Permalink to this equation">#</a></span>\[c\left( t \right)  = a^2\left( t \right),\]</div>
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-43">
-<span class="eqno">(52)<a class="headerlink" href="#equation-ad-notes-43" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = b^{\left[ n \right]}\left( t \right) - \frac{1}{n}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
+<span class="eqno">(52)<a class="headerlink" href="#equation-ad-notes-43" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = b^{\left[ n \right]}\left( t \right) - \frac{1}{n}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
 </section>
 </section>
 <section id="inverse-hyperbolic-functions">
-<h2>Inverse hyperbolic functions<a class="headerlink" href="#inverse-hyperbolic-functions" title="Permalink to this heading">¶</a></h2>
+<h2>Inverse hyperbolic functions<a class="headerlink" href="#inverse-hyperbolic-functions" title="Permalink to this heading">#</a></h2>
 <section id="inverse-hyperbolic-sine">
-<span id="ad-asinh"></span><h3>Inverse hyperbolic sine<a class="headerlink" href="#inverse-hyperbolic-sine" title="Permalink to this heading">¶</a></h3>
+<span id="ad-asinh"></span><h3>Inverse hyperbolic sine<a class="headerlink" href="#inverse-hyperbolic-sine" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{arsinh} b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
 identical to the <a class="reference internal" href="#ad-asin"><span class="std std-ref">inverse sine</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-44">
-<span class="eqno">(53)<a class="headerlink" href="#equation-ad-notes-44" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{1 + b^2\left( t \right) },\]</div>
+<span class="eqno">(53)<a class="headerlink" href="#equation-ad-notes-44" title="Permalink to this equation">#</a></span>\[c\left( t \right)  = \sqrt{1 + b^2\left( t \right) },\]</div>
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-45">
-<span class="eqno">(54)<a class="headerlink" href="#equation-ad-notes-45" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+<span class="eqno">(54)<a class="headerlink" href="#equation-ad-notes-45" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
 </section>
 <section id="inverse-hyperbolic-cosine">
-<h3>Inverse hyperbolic cosine<a class="headerlink" href="#inverse-hyperbolic-cosine" title="Permalink to this heading">¶</a></h3>
+<h3>Inverse hyperbolic cosine<a class="headerlink" href="#inverse-hyperbolic-cosine" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{arcosh} b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
 identical to the <a class="reference internal" href="#ad-asinh"><span class="std std-ref">inverse hyperbolic sine</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-46">
-<span class="eqno">(55)<a class="headerlink" href="#equation-ad-notes-46" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{b^2\left( t \right) - 1 },\]</div>
+<span class="eqno">(55)<a class="headerlink" href="#equation-ad-notes-46" title="Permalink to this equation">#</a></span>\[c\left( t \right)  = \sqrt{b^2\left( t \right) - 1 },\]</div>
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-47">
-<span class="eqno">(56)<a class="headerlink" href="#equation-ad-notes-47" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+<span class="eqno">(56)<a class="headerlink" href="#equation-ad-notes-47" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
 </section>
 <section id="inverse-hyperbolic-tangent">
-<h3>Inverse hyperbolic tangent<a class="headerlink" href="#inverse-hyperbolic-tangent" title="Permalink to this heading">¶</a></h3>
+<h3>Inverse hyperbolic tangent<a class="headerlink" href="#inverse-hyperbolic-tangent" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{artanh} b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
 identical to the <a class="reference internal" href="#ad-atan"><span class="std std-ref">inverse tangent</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-48">
-<span class="eqno">(57)<a class="headerlink" href="#equation-ad-notes-48" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = b^2\left( t \right),\]</div>
+<span class="eqno">(57)<a class="headerlink" href="#equation-ad-notes-48" title="Permalink to this equation">#</a></span>\[c\left( t \right)  = b^2\left( t \right),\]</div>
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-49">
-<span class="eqno">(58)<a class="headerlink" href="#equation-ad-notes-49" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[1 - c^{\left[ 0 \right]}\left( t \right) \right]}\left[ n b^{\left[ n \right]}\left( t \right) + \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+<span class="eqno">(58)<a class="headerlink" href="#equation-ad-notes-49" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[1 - c^{\left[ 0 \right]}\left( t \right) \right]}\left[ n b^{\left[ n \right]}\left( t \right) + \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
 </section>
 </section>
 <section id="special-functions">
-<h2>Special functions<a class="headerlink" href="#special-functions" title="Permalink to this heading">¶</a></h2>
+<h2>Special functions<a class="headerlink" href="#special-functions" title="Permalink to this heading">#</a></h2>
 <section id="error-function">
-<span id="ad-erf"></span><h3>Error function<a class="headerlink" href="#error-function" title="Permalink to this heading">¶</a></h3>
+<span id="ad-erf"></span><h3>Error function<a class="headerlink" href="#error-function" title="Permalink to this heading">#</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{erf} b\left( t \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-50">
-<span class="eqno">(59)<a class="headerlink" href="#equation-ad-notes-50" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac 2{\sqrt\pi} \exp{\left[-b^2\left( t \right)\right]} b^\prime\left( t \right),\]</div>
+<span class="eqno">(59)<a class="headerlink" href="#equation-ad-notes-50" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = \frac 2{\sqrt\pi} \exp{\left[-b^2\left( t \right)\right]} b^\prime\left( t \right),\]</div>
 <p>which, after the introduction of the auxiliary function</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-51">
-<span class="eqno">(60)<a class="headerlink" href="#equation-ad-notes-51" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \exp{\left[ -b^2\left( t \right)\right]} ,\]</div>
+<span class="eqno">(60)<a class="headerlink" href="#equation-ad-notes-51" title="Permalink to this equation">#</a></span>\[c\left( t \right)  = \exp{\left[ -b^2\left( t \right)\right]} ,\]</div>
 <p>becomes</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-52">
-<span class="eqno">(61)<a class="headerlink" href="#equation-ad-notes-52" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac 2{\sqrt\pi}c\left( t \right) b^\prime\left( t \right).\]</div>
+<span class="eqno">(61)<a class="headerlink" href="#equation-ad-notes-52" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = \frac 2{\sqrt\pi}c\left( t \right) b^\prime\left( t \right).\]</div>
 <p>After applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, we can use <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a>
 and <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-53">
-<span class="eqno">(62)<a class="headerlink" href="#equation-ad-notes-53" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac 1n \frac 2{\sqrt\pi}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
+<span class="eqno">(62)<a class="headerlink" href="#equation-ad-notes-53" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac 1n \frac 2{\sqrt\pi}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
 </section>
 </section>
 <section id="celestial-mechanics">
-<h2>Celestial mechanics<a class="headerlink" href="#celestial-mechanics" title="Permalink to this heading">¶</a></h2>
+<h2>Celestial mechanics<a class="headerlink" href="#celestial-mechanics" title="Permalink to this heading">#</a></h2>
 <section id="inverse-of-kepler-s-elliptic-equation">
-<h3>Inverse of Kepler’s elliptic equation<a class="headerlink" href="#inverse-of-kepler-s-elliptic-equation" title="Permalink to this heading">¶</a></h3>
+<h3>Inverse of Kepler’s elliptic equation<a class="headerlink" href="#inverse-of-kepler-s-elliptic-equation" title="Permalink to this heading">#</a></h3>
 <p>The inverse of Kepler’s elliptic equation is the bivariate function <span class="math notranslate nohighlight">\(E = E\left( e, M \right)\)</span> implicitly defined by the
 trascendental equation</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-54">
-<span class="eqno">(63)<a class="headerlink" href="#equation-ad-notes-54" title="Permalink to this equation">¶</a></span>\[M = E - e \sin E,\]</div>
+<span class="eqno">(63)<a class="headerlink" href="#equation-ad-notes-54" title="Permalink to this equation">#</a></span>\[M = E - e \sin E,\]</div>
 <p>with <span class="math notranslate nohighlight">\(e \in \left[ 0, 1 \right)\)</span>. Given <span class="math notranslate nohighlight">\(a\left( t \right) = E\left( e\left( t \right), M \left( t \right) \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-55">
-<span class="eqno">(64)<a class="headerlink" href="#equation-ad-notes-55" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{\partial E}{\partial e}e^\prime\left( t \right) + \frac{\partial E}{\partial M}M^\prime\left( t \right),\]</div>
+<span class="eqno">(64)<a class="headerlink" href="#equation-ad-notes-55" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = \frac{\partial E}{\partial e}e^\prime\left( t \right) + \frac{\partial E}{\partial M}M^\prime\left( t \right),\]</div>
 <p>where the partial derivatives are</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-56">
-<span class="eqno">(65)<a class="headerlink" href="#equation-ad-notes-56" title="Permalink to this equation">¶</a></span>\[\begin{split}\begin{cases}
+<span class="eqno">(65)<a class="headerlink" href="#equation-ad-notes-56" title="Permalink to this equation">#</a></span>\[\begin{split}\begin{cases}
 \frac{\partial E}{\partial e} = \frac{\sin E}{1-e\cos E}, \\
 \frac{\partial E}{\partial M} = \frac{1}{1-e\cos E}. \\
 \end{cases}\end{split}\]</div>
 <p>Expanding the partial derivatives yields</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-57">
-<span class="eqno">(66)<a class="headerlink" href="#equation-ad-notes-57" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{e^\prime \left( t \right)\sin a\left(t \right) + M^\prime\left( t \right)}{1-e\left( t \right)\cos a\left(t \right)},\]</div>
+<span class="eqno">(66)<a class="headerlink" href="#equation-ad-notes-57" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = \frac{e^\prime \left( t \right)\sin a\left(t \right) + M^\prime\left( t \right)}{1-e\left( t \right)\cos a\left(t \right)},\]</div>
 <p>or, equivalently,</p>
 <div class="math notranslate nohighlight" id="equation-eq-ad-kepe-00">
-<span class="eqno">(67)<a class="headerlink" href="#equation-eq-ad-kepe-00" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) -  a^\prime\left( t \right) e \left( t \right) \cos a\left(t \right) = e^\prime \left( t \right)\sin a\left(t \right) + M^\prime\left( t \right).\]</div>
+<span class="eqno">(67)<a class="headerlink" href="#equation-eq-ad-kepe-00" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) -  a^\prime\left( t \right) e \left( t \right) \cos a\left(t \right) = e^\prime \left( t \right)\sin a\left(t \right) + M^\prime\left( t \right).\]</div>
 <p>We can now introduce the auxiliary functions</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-58">
-<span class="eqno">(68)<a class="headerlink" href="#equation-ad-notes-58" title="Permalink to this equation">¶</a></span>\[\begin{split}\begin{cases}
+<span class="eqno">(68)<a class="headerlink" href="#equation-ad-notes-58" title="Permalink to this equation">#</a></span>\[\begin{split}\begin{cases}
 c\left( t \right) = e\left( t \right) \cos a\left(t \right), \\
 d\left( t \right) = \sin a\left(t \right), \\
 \end{cases}\end{split}\]</div>
 <p>so that <a class="reference internal" href="#equation-eq-ad-kepe-00">(67)</a> can be rewritten as</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-59">
-<span class="eqno">(69)<a class="headerlink" href="#equation-ad-notes-59" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) -  a^\prime\left( t \right) c\left( t \right) = e^\prime \left( t \right)d\left(t \right) + M^\prime\left( t \right).\]</div>
+<span class="eqno">(69)<a class="headerlink" href="#equation-ad-notes-59" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) -  a^\prime\left( t \right) c\left( t \right) = e^\prime \left( t \right)d\left(t \right) + M^\prime\left( t \right).\]</div>
 <p>After applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, we can use <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a>
 and <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> and re-arrange to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-60">
-<span class="eqno">(70)<a class="headerlink" href="#equation-ad-notes-60" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left(1 - c^{\left[ 0 \right]}\left( t \right)\right)}
+<span class="eqno">(70)<a class="headerlink" href="#equation-ad-notes-60" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left(1 - c^{\left[ 0 \right]}\left( t \right)\right)}
 \left[
 n\left( e^{\left[ n \right]}\left( t \right) d^{\left[ 0 \right]}\left( t \right) + M^{\left[ n \right]}\left( t \right)\right) +
 \sum_{j=1}^{n-1}j\left( c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right)+
@@ -845,59 +779,173 @@ d^{\left[ n - j \right]}\left( t \right)e^{\left[ j \right]}\left( t \right)
 </section>
 </section>
 <section id="time-functions">
-<h2>Time functions<a class="headerlink" href="#time-functions" title="Permalink to this heading">¶</a></h2>
+<h2>Time functions<a class="headerlink" href="#time-functions" title="Permalink to this heading">#</a></h2>
 <section id="time-polynomials">
-<h3>Time polynomials<a class="headerlink" href="#time-polynomials" title="Permalink to this heading">¶</a></h3>
+<h3>Time polynomials<a class="headerlink" href="#time-polynomials" title="Permalink to this heading">#</a></h3>
 <p>Given the time polynomial of order <span class="math notranslate nohighlight">\(n\)</span></p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-61">
-<span class="eqno">(71)<a class="headerlink" href="#equation-ad-notes-61" title="Permalink to this equation">¶</a></span>\[p_n\left( t \right) = \sum_{i=0}^n a_i t^i,\]</div>
+<span class="eqno">(71)<a class="headerlink" href="#equation-ad-notes-61" title="Permalink to this equation">#</a></span>\[p_n\left( t \right) = \sum_{i=0}^n a_i t^i,\]</div>
 <p>its derivative of order <span class="math notranslate nohighlight">\(j\)</span> is</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-62">
-<span class="eqno">(72)<a class="headerlink" href="#equation-ad-notes-62" title="Permalink to this equation">¶</a></span>\[\left(p_n\left( t \right)\right)^{\left( j \right)} = \sum_{i=j}^n \left( i \right)_j a_i t^{i - j},\]</div>
+<span class="eqno">(72)<a class="headerlink" href="#equation-ad-notes-62" title="Permalink to this equation">#</a></span>\[\left(p_n\left( t \right)\right)^{\left( j \right)} = \sum_{i=j}^n \left( i \right)_j a_i t^{i - j},\]</div>
 <p>where <span class="math notranslate nohighlight">\(\left( i \right)_j\)</span> is the <a class="reference external" href="https://en.wikipedia.org/wiki/Falling_and_rising_factorials">falling factorial</a>.
 The normalised derivative of order <span class="math notranslate nohighlight">\(j\)</span> is</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-63">
-<span class="eqno">(73)<a class="headerlink" href="#equation-ad-notes-63" title="Permalink to this equation">¶</a></span>\[\left(p_n\left( t \right)\right)^{\left[ j \right]} = \frac{1}{j!}\sum_{i=j}^n \left( i \right)_j a_i t^{i - j},\]</div>
+<span class="eqno">(73)<a class="headerlink" href="#equation-ad-notes-63" title="Permalink to this equation">#</a></span>\[\left(p_n\left( t \right)\right)^{\left[ j \right]} = \frac{1}{j!}\sum_{i=j}^n \left( i \right)_j a_i t^{i - j},\]</div>
 <p>which, with the help of elementary relations involving factorials and after re-arranging the indices, can be rewritten as</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-64">
-<span class="eqno">(74)<a class="headerlink" href="#equation-ad-notes-64" title="Permalink to this equation">¶</a></span>\[\left(p_n\left( t \right)\right)^{\left[ j \right]} = \sum_{i=0}^{n-j} {i+j \choose j} a_{i+j} t^i.\]</div>
+<span class="eqno">(74)<a class="headerlink" href="#equation-ad-notes-64" title="Permalink to this equation">#</a></span>\[\left(p_n\left( t \right)\right)^{\left[ j \right]} = \sum_{i=0}^{n-j} {i+j \choose j} a_{i+j} t^i.\]</div>
 </section>
 </section>
 </section>
 
 
-              </div>
+                </article>
               
-        
-        <div class='prev-next-bottom'>
-            
-    <a class='left-prev' id="prev-link" href="benchmarks.html" title="previous page">Benchmarks</a>
-    <a class='right-next' id="next-link" href="changelog.html" title="next page">Changelog</a>
 
-        </div>
-        
-        </div>
-    </div>
-    <footer class="footer mt-5 mt-md-0">
-    <div class="container">
-      <p>
-        
-          By Francesco Biscani, Dario Izzo<br/>
-        
-            &copy; Copyright 2020, 2021, 2022 Francesco Biscani, Dario Izzo.<br/>
-      </p>
-    </div>
-  </footer>
-</main>
-
-
+              
+              
+                <footer class="bd-footer-article">
+                  <!-- Previous / next buttons -->
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="benchmarks.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Benchmarks</p>
       </div>
+    </a>
+    <a class="right-next"
+       href="changelog.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Changelog</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#preliminaries">Preliminaries</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#basic-arithmetic">Basic arithmetic</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#addition-and-subtraction">Addition and subtraction</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#multiplication">Multiplication</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#division">Division</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#squaring">Squaring</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#square-root">Square root</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#exponentiation">Exponentiation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#exponentials">Exponentials</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#natural-exponential">Natural exponential</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#standard-logistic-function">Standard logistic function</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#logarithms">Logarithms</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#natural-logarithm">Natural logarithm</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#trigonometric-functions">Trigonometric functions</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#tangent">Tangent</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-trigonometric-functions">Inverse trigonometric functions</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-sine">Inverse sine</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-cosine">Inverse cosine</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-tangent">Inverse tangent</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#two-argument-inverse-tangent">Two-argument inverse tangent</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#hyperbolic-functions">Hyperbolic functions</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#hyperbolic-sine">Hyperbolic sine</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#hyperbolic-cosine">Hyperbolic cosine</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#hyperbolic-tangent">Hyperbolic tangent</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-hyperbolic-functions">Inverse hyperbolic functions</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-hyperbolic-sine">Inverse hyperbolic sine</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-hyperbolic-cosine">Inverse hyperbolic cosine</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-hyperbolic-tangent">Inverse hyperbolic tangent</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#special-functions">Special functions</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#error-function">Error function</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#celestial-mechanics">Celestial mechanics</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-of-kepler-s-elliptic-equation">Inverse of Kepler’s elliptic equation</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#time-functions">Time functions</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#time-polynomials">Time polynomials</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            <div class="bd-footer-content__inner">
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Francesco Biscani, Dario Izzo
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  <p class="copyright">
+    
+      © Copyright 2020, 2021, 2022 Francesco Biscani, Dario Izzo.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div></div>
+          </footer>
+        
+
+      </main>
     </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/bootstrap.js?digest=12da95d707ffb74b382d"></script>
+<script src="_static/scripts/pydata-sphinx-theme.js?digest=12da95d707ffb74b382d"></script>
 
-    
-  <script src="_static/js/index.d3f166471bb80abb5163.js"></script>
-
-
-    
+  <footer class="bd-footer">
+  </footer>
   </body>
 </html>

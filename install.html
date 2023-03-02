@@ -1,354 +1,384 @@
 
+
 <!DOCTYPE html>
 
-<html lang="en">
+
+<html lang="en" >
+
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
     <title>Installation &#8212; heyoka 0.22.0 documentation</title>
-    
-  <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=12da95d707ffb74b382d" rel="stylesheet" />
+<link href="_static/styles/bootstrap.css?digest=12da95d707ffb74b382d" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=12da95d707ffb74b382d" rel="stylesheet" />
 
-    
-  <link rel="stylesheet"
-    href="_static/vendor/fontawesome/5.13.0/css/all.min.css">
-  <link rel="preload" as="font" type="font/woff2" crossorigin
-    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
-  <link rel="preload" as="font" type="font/woff2" crossorigin
-    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+  
+  <link href="_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=12da95d707ffb74b382d" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
 
-    
-      
-  <link rel="stylesheet"
-    href="_static/vendor/open-sans_all/1.44.1/index.css">
-  <link rel="stylesheet"
-    href="_static/vendor/lato_latin-ext/1.44.1/index.css">
-
-    
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/sphinx-book-theme.c441f2ba0852f4cabcb80105e3a46ae6.css" />
-    
-  <link rel="preload" as="script" href="_static/js/index.d3f166471bb80abb5163.js">
+    <link rel="stylesheet" href="_static/styles/sphinx-book-theme.css?digest=14f4ca6b54d191a8c7657f6c759bf11a5fb86285" type="text/css" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=12da95d707ffb74b382d" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=12da95d707ffb74b382d" />
 
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
     <script src="_static/doctools.js"></script>
     <script src="_static/sphinx_highlight.js"></script>
-    <script src="_static/sphinx-book-theme.7d483ff0a819d6edff12ce0b1ead3928.js"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?digest=5a5c038af52cf7bc1a1ec88eea08e6366ee68824"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'install';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Basic tutorials" href="basic_tutorials.html" />
     <link rel="prev" title="heyoka" href="index.html" />
-
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="docsearch:language" content="en" />
-
-
-
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
   </head>
-  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
-    
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
 
-    <div class="container-xl">
-      <div class="row">
-          
-<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+  
+  
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+  
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+    </nav>
+  
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
     
-        <div class="navbar-brand-box">
-<a class="navbar-brand text-wrap" href="index.html">
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+  
+
+<a class="navbar-brand logo" href="index.html">
   
   
-  <h1 class="site-logo" id="site-title">heyoka 0.22.0 documentation</h1>
   
+  
+    
+    
+      
+    
+    
+    <img src="_static/white_logo.png" class="logo__image only-light" alt="Logo image"/>
+    <script>document.write(`<img src="_static/white_logo.png" class="logo__image only-dark" alt="Logo image"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item"><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Installation</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="basic_tutorials.html">Basic tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-1"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="tut_taylor_method.html">Taylor’s method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_expression_system.html">The expression system</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_adaptive.html">The adaptive integrator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_adaptive_custom.html">Customising the adaptive integrator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_param.html">Runtime parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_nonauto.html">Non-autonomous systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_d_output.html">Dense &amp; continuous output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_events.html">Event detection</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="advanced_tutorials.html">Advanced tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-2"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="tut_batch_mode.html">Batch mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_extended_precision.html">Computations in extended precision</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_arbitrary_precision.html">Computations in arbitrary precision</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_s11n.html">Serialisation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_ensemble.html">Ensemble propagations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_parallel_mode.html">Parallel mode</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ad_notes.html">Notes on automatic differentiation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="breaking_changes.html">Breaking changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="acknowledgement.html">Acknowledgement</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bibliography.html">Bibliography</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><label class="sidebar-toggle primary-toggle btn btn-sm" for="__primary" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</label></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/bluescarni/heyoka" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
 </a>
-</div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
-  <i class="icon fas fa-search"></i>
-  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
-</form>
-<nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
-    <ul class="current nav sidenav_l1">
- <li class="toctree-l1 current active">
-  <a class="current reference internal" href="#">
-   Installation
-  </a>
- </li>
- <li class="toctree-l1 collapsible-parent">
-  <a class="reference internal" href="basic_tutorials.html">
-   Basic tutorials
-  </a>
-  <ul class="collapse-ul">
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_taylor_method.html">
-     Taylor’s method
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_expression_system.html">
-     The expression system
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_adaptive.html">
-     The adaptive integrator
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_adaptive_custom.html">
-     Customising the adaptive integrator
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_param.html">
-     Runtime parameters
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_nonauto.html">
-     Non-autonomous systems
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_d_output.html">
-     Dense &amp; continuous output
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_events.html">
-     Event detection
-    </a>
-   </li>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Finstall.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
   </ul>
-  <i class="fas fa-chevron-down">
-  </i>
- </li>
- <li class="toctree-l1 collapsible-parent">
-  <a class="reference internal" href="advanced_tutorials.html">
-   Advanced tutorials
-  </a>
-  <ul class="collapse-ul">
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_batch_mode.html">
-     Batch mode
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_extended_precision.html">
-     Computations in extended precision
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_arbitrary_precision.html">
-     Computations in arbitrary precision
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_s11n.html">
-     Serialisation
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_ensemble.html">
-     Ensemble propagations
-    </a>
-   </li>
-   <li class="toctree-l2">
-    <a class="reference internal" href="tut_parallel_mode.html">
-     Parallel mode
-    </a>
-   </li>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="_sources/install.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
   </ul>
-  <i class="fas fa-chevron-down">
-  </i>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="benchmarks.html">
-   Benchmarks
-  </a>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="ad_notes.html">
-   Notes on automatic differentiation
-  </a>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="changelog.html">
-   Changelog
-  </a>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="breaking_changes.html">
-   Breaking changes
-  </a>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="acknowledgement.html">
-   Acknowledgement
-  </a>
- </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="bibliography.html">
-   Bibliography
-  </a>
- </li>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+<script>
+document.write(`
+  <button class="theme-switch-button btn btn-sm btn-outline-primary navbar-btn rounded-circle" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch" data-mode="light"><i class="fa-solid fa-sun"></i></span>
+    <span class="theme-switch" data-mode="dark"><i class="fa-solid fa-moon"></i></span>
+    <span class="theme-switch" data-mode="auto"><i class="fa-solid fa-circle-half-stroke"></i></span>
+  </button>
+`);
+</script>
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+  </button>
+`);
+</script>
+<label class="sidebar-toggle secondary-toggle btn btn-sm" for="__secondary"title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</label>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Installation</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#introduction">Introduction</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#support-for-extended-precision">Support for extended precision</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#bit-precision">80-bit precision</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#id2">128-bit precision</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#arbitrary-precision">Arbitrary-precision</a></li>
 </ul>
-
-</nav> <!-- To handle the deprecated key -->
-
-<div class="navbar_extra_footer">
-  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
-</div>
-
-</div>
-
-
-          
-
-
-          
-<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
-    
-    <div class="topbar container-xl fixed-top">
-    <div class="topbar-contents row">
-        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
-        <div class="col pl-md-4 topbar-main">
-            
-            <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
-                data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
-                aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
-                title="Toggle navigation" data-toggle="tooltip" data-placement="left">
-                <i class="fas fa-bars"></i>
-                <i class="fas fa-arrow-left"></i>
-                <i class="fas fa-arrow-up"></i>
-            </button>
-            
-            
-<div class="dropdown-buttons-trigger">
-    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
-            class="fas fa-download"></i></button>
-
-    <div class="dropdown-buttons">
-        <!-- ipynb file if we had a myst markdown file -->
-        
-        <!-- Download raw file -->
-        <a class="dropdown-buttons" href="_sources/install.rst.txt"><button type="button"
-                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
-                data-placement="left">.rst</button></a>
-        <!-- Download PDF via print -->
-        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
-            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
-    </div>
-</div>
-
-            <!-- Source interaction buttons -->
-
-<div class="dropdown-buttons-trigger">
-    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn"
-        aria-label="Connect with source repository"><i class="fab fa-github"></i></button>
-    <div class="dropdown-buttons sourcebuttons">
-        <a class="repository-button"
-            href="https://github.com/bluescarni/heyoka"><button type="button" class="btn btn-secondary topbarbtn"
-                data-toggle="tooltip" data-placement="left" title="Source repository"><i
-                    class="fab fa-github"></i>repository</button></a>
-        <a class="issues-button"
-            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Finstall.html&body=Your%20issue%20content%20here."><button
-                type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
-                title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
-        
-    </div>
-</div>
-
-
-            <!-- Full screen (wrap in <a> to have style consistency -->
-            <a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
-                    data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
-                    title="Fullscreen mode"><i
-                        class="fas fa-expand"></i></button></a>
-
-            <!-- Launch buttons -->
-
-        </div>
-
-        <!-- Table of contents -->
-        <div class="d-none d-md-block col-md-2 bd-toc show">
-            
-        <div class="tocsection onthispage pt-5 pb-3">
-            <i class="fas fa-list"></i>
-            Contents
-        </div>
-        <nav id="bd-toc-nav">
-            <ul class="nav section-nav flex-column">
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#introduction">
-   Introduction
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#support-for-extended-precision">
-     Support for extended precision
-    </a>
-    <ul class="nav section-nav flex-column">
-     <li class="toc-h4 nav-item toc-entry">
-      <a class="reference internal nav-link" href="#bit-precision">
-       80-bit precision
-      </a>
-     </li>
-     <li class="toc-h4 nav-item toc-entry">
-      <a class="reference internal nav-link" href="#id2">
-       128-bit precision
-      </a>
-     </li>
-     <li class="toc-h4 nav-item toc-entry">
-      <a class="reference internal nav-link" href="#arbitrary-precision">
-       Arbitrary-precision
-      </a>
-     </li>
-    </ul>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#packages">
-   Packages
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#conda">
-     Conda
-    </a>
-   </li>
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#freebsd">
-     FreeBSD
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#installation-from-source">
-   Installation from source
-  </a>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#including-heyoka-in-your-project-via-cmake">
-   Including heyoka in your project via CMake
-  </a>
- </li>
+</li>
 </ul>
-
-        </nav>
-        
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#packages">Packages</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#conda">Conda</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#freebsd">FreeBSD</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#installation-from-source">Installation from source</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#including-heyoka-in-your-project-via-cmake">Including heyoka in your project via CMake</a></li>
+</ul>
+            </nav>
         </div>
     </div>
 </div>
-    <div id="main-content" class="row">
-        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
-        
-              <div>
+
+              
                 
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+                  
   <section id="installation">
-<span id="id1"></span><h1>Installation<a class="headerlink" href="#installation" title="Permalink to this heading">¶</a></h1>
+<span id="id1"></span><h1>Installation<a class="headerlink" href="#installation" title="Permalink to this heading">#</a></h1>
 <section id="introduction">
-<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading">¶</a></h2>
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading">#</a></h2>
 <p>heyoka is written in modern C++, and it requires a compiler able to understand
 at least C++17. The library is regularly tested on
 a continuous integration pipeline which currently includes:</p>
@@ -399,11 +429,11 @@ that may be present on the system. This situation can lead to build and/or runti
 to the same {fmt} installation.</p>
 </div>
 <section id="support-for-extended-precision">
-<span id="ep-support"></span><h3>Support for extended precision<a class="headerlink" href="#support-for-extended-precision" title="Permalink to this heading">¶</a></h3>
+<span id="ep-support"></span><h3>Support for extended precision<a class="headerlink" href="#support-for-extended-precision" title="Permalink to this heading">#</a></h3>
 <p>Whereas in heyoka double-precision computations are always supported, support for extended-precision
 computations varies depending on the software/hardware platform.</p>
 <section id="bit-precision">
-<h4>80-bit precision<a class="headerlink" href="#bit-precision" title="Permalink to this heading">¶</a></h4>
+<h4>80-bit precision<a class="headerlink" href="#bit-precision" title="Permalink to this heading">#</a></h4>
 <p>80-bit precision support requires an x86 processor. Additionally, the 80-bit floating-point
 type must be available in C++ as the <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> type. This is case for most compilers,
 with the notable exception of Microsoft Visual C++ (MSVC), where <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> is a synonym for <code class="docutils literal notranslate"><span class="pre">double</span></code>.
@@ -412,7 +442,7 @@ heyoka (and all its dependencies) have been compiled with a compiler supporting 
 80-bit floating-point type.</p>
 </section>
 <section id="id2">
-<h4>128-bit precision<a class="headerlink" href="#id2" title="Permalink to this heading">¶</a></h4>
+<h4>128-bit precision<a class="headerlink" href="#id2" title="Permalink to this heading">#</a></h4>
 <p>On platforms where <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> is a quadruple-precision floating-point datatype (e.g., 64-bit ARM),
 quadruple-precision integrations are always supported. Otherwise,
 on platforms such as x86-64, quadruple-precision computations are supported if:</p>
@@ -434,7 +464,7 @@ significant bits) is <strong>not</strong> supported by heyoka at this time.</p>
 </div>
 </section>
 <section id="arbitrary-precision">
-<h4>Arbitrary-precision<a class="headerlink" href="#arbitrary-precision" title="Permalink to this heading">¶</a></h4>
+<h4>Arbitrary-precision<a class="headerlink" href="#arbitrary-precision" title="Permalink to this heading">#</a></h4>
 <p>Arbitrary-precision integrations are supported on all platforms, provided that heyoka
 is compiled with the <code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_MPPP</span></code> option enabled (see <a class="reference internal" href="#installation-from-source"><span class="std std-ref">below</span></a>)
 and that the mp++ library is compiled with the <code class="docutils literal notranslate"><span class="pre">MPPP_WITH_MPFR</span></code> option enabled
@@ -443,9 +473,9 @@ and that the mp++ library is compiled with the <code class="docutils literal not
 </section>
 </section>
 <section id="packages">
-<h2>Packages<a class="headerlink" href="#packages" title="Permalink to this heading">¶</a></h2>
+<h2>Packages<a class="headerlink" href="#packages" title="Permalink to this heading">#</a></h2>
 <section id="conda">
-<h3>Conda<a class="headerlink" href="#conda" title="Permalink to this heading">¶</a></h3>
+<h3>Conda<a class="headerlink" href="#conda" title="Permalink to this heading">#</a></h3>
 <p>heyoka is available via the <a class="reference external" href="https://docs.conda.io/en/latest/">conda</a> package manager for Linux, OSX and Windows
 thanks to the infrastructure provided by <a class="reference external" href="https://conda-forge.org/">conda-forge</a>.</p>
 <p>In order to install heyoka via conda, you just need to add <code class="docutils literal notranslate"><span class="pre">conda-forge</span></code>
@@ -471,7 +501,7 @@ on how to setup and manage
 your conda installation.</p>
 </section>
 <section id="freebsd">
-<h3>FreeBSD<a class="headerlink" href="#freebsd" title="Permalink to this heading">¶</a></h3>
+<h3>FreeBSD<a class="headerlink" href="#freebsd" title="Permalink to this heading">#</a></h3>
 <p>A community-supported FreeBSD port via <a class="reference external" href="https://docs.freebsd.org/en/books/handbook/ports/#pkgng-intro">pkg</a> is available for
 heyoka. In order to install heyoka using pkg, execute the following command:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pkg<span class="w"> </span>install<span class="w"> </span>heyoka
@@ -480,7 +510,7 @@ heyoka. In order to install heyoka using pkg, execute the following command:</p>
 </section>
 </section>
 <section id="installation-from-source">
-<span id="id3"></span><h2>Installation from source<a class="headerlink" href="#installation-from-source" title="Permalink to this heading">¶</a></h2>
+<span id="id3"></span><h2>Installation from source<a class="headerlink" href="#installation-from-source" title="Permalink to this heading">#</a></h2>
 <p>Source releases of heyoka can be downloaded from
 <a class="reference external" href="https://github.com/bluescarni/heyoka/releases">github</a>.
 Once in the source tree
@@ -550,7 +580,7 @@ DLL (otherwise the tests will fail to run).</p>
 </div>
 </section>
 <section id="including-heyoka-in-your-project-via-cmake">
-<h2>Including heyoka in your project via CMake<a class="headerlink" href="#including-heyoka-in-your-project-via-cmake" title="Permalink to this heading">¶</a></h2>
+<h2>Including heyoka in your project via CMake<a class="headerlink" href="#including-heyoka-in-your-project-via-cmake" title="Permalink to this heading">#</a></h2>
 <p>As a part of the heyoka installation, a group of CMake files is installed into
 <code class="docutils literal notranslate"><span class="pre">CMAKE_INSTALL_PREFIX/lib/cmake/heyoka</span></code>.
 This bundle, which is known in the CMake lingo as a
@@ -603,38 +633,114 @@ then <code class="docutils literal notranslate"><span class="pre">heyoka_LLVM_VE
 </section>
 
 
-              </div>
+                </article>
               
-        
-        <div class='prev-next-bottom'>
-            
-    <a class='left-prev' id="prev-link" href="index.html" title="previous page">heyoka</a>
-    <a class='right-next' id="next-link" href="basic_tutorials.html" title="next page">Basic tutorials</a>
 
-        </div>
-        
-        </div>
-    </div>
-    <footer class="footer mt-5 mt-md-0">
-    <div class="container">
-      <p>
-        
-          By Francesco Biscani, Dario Izzo<br/>
-        
-            &copy; Copyright 2020, 2021, 2022 Francesco Biscani, Dario Izzo.<br/>
-      </p>
-    </div>
-  </footer>
-</main>
-
-
+              
+              
+                <footer class="bd-footer-article">
+                  <!-- Previous / next buttons -->
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">heyoka</p>
       </div>
+    </a>
+    <a class="right-next"
+       href="basic_tutorials.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Basic tutorials</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#introduction">Introduction</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#support-for-extended-precision">Support for extended precision</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#bit-precision">80-bit precision</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#id2">128-bit precision</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#arbitrary-precision">Arbitrary-precision</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#packages">Packages</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#conda">Conda</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#freebsd">FreeBSD</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#installation-from-source">Installation from source</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#including-heyoka-in-your-project-via-cmake">Including heyoka in your project via CMake</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            <div class="bd-footer-content__inner">
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Francesco Biscani, Dario Izzo
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  <p class="copyright">
+    
+      © Copyright 2020, 2021, 2022 Francesco Biscani, Dario Izzo.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div></div>
+          </footer>
+        
+
+      </main>
     </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/bootstrap.js?digest=12da95d707ffb74b382d"></script>
+<script src="_static/scripts/pydata-sphinx-theme.js?digest=12da95d707ffb74b382d"></script>
 
-    
-  <script src="_static/js/index.d3f166471bb80abb5163.js"></script>
-
-
-    
+  <footer class="bd-footer">
+  </footer>
   </body>
 </html>
