@@ -41,6 +41,27 @@ jobs:
           cmake --build . --config Release
           copy Release\heyoka.dll test\Release\
           ctest -j4 -V -C Release
+  windows_2019_clang:
+    runs-on: windows-2019
+    steps:
+      - uses: actions/checkout@v3
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.1
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          python-version: 3.8
+          channels: conda-forge
+          channel-priority: strict
+      - name: Build
+        shell: pwsh
+        run: |
+          conda install -y cmake 'llvmdev=14.*' clang ninja tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel fmt spdlog sleef zlib libzlib 'mppp>=0.27'
+          mkdir build
+          cd build
+          cmake ../ -G Ninja -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=Release -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_MPPP=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_WITH_SLEEF=yes -DMPPP_GMP_INCLUDE_DIR=C:\Miniconda\envs\test\Library\include -DMPPP_GMP_LIBRARY=C:\Miniconda\envs\test\Library\lib\mpir.lib
+          cmake --build . --target install
+          ctest -j4 -V
   conda_release_static:
     runs-on: ubuntu-latest
     steps:
