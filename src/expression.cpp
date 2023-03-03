@@ -1282,13 +1282,14 @@ expression subs(std::unordered_map<const void *, expression> &func_map, const ex
                 // arguments are shallow-copied.
                 auto tmp = arg.copy();
 
+                // Recursively run the substitution on all function arguments.
                 for (auto [b, e] = tmp.get_mutable_args_it(); b != e; ++b) {
                     *b = subs(func_map, *b, smap);
                 }
 
                 // Put the return value in the cache.
                 auto ret = expression{std::move(tmp)};
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
 
