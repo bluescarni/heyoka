@@ -1951,6 +1951,108 @@ std::uint32_t taylor_adaptive<T>::get_dim() const
 }
 
 template <typename T>
+T taylor_adaptive<T>::get_time() const
+{
+    return static_cast<T>(m_time);
+}
+
+template <typename T>
+std::pair<T, T> taylor_adaptive<T>::get_dtime() const
+{
+    return {m_time.hi, m_time.lo};
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive<T>::get_state() const
+{
+    return m_state;
+}
+
+template <typename T>
+const T *taylor_adaptive<T>::get_state_data() const
+{
+    return m_state.data();
+}
+
+template <typename T>
+T *taylor_adaptive<T>::get_state_data()
+{
+    return m_state.data();
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive<T>::get_pars() const
+{
+    return m_pars;
+}
+
+template <typename T>
+const T *taylor_adaptive<T>::get_pars_data() const
+{
+    return m_pars.data();
+}
+
+template <typename T>
+T *taylor_adaptive<T>::get_pars_data()
+{
+    return m_pars.data();
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive<T>::get_tc() const
+{
+    return m_tc;
+}
+
+template <typename T>
+T taylor_adaptive<T>::get_last_h() const
+{
+    return m_last_h;
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive<T>::get_d_output() const
+{
+    return m_d_out;
+}
+
+template <typename T>
+bool taylor_adaptive<T>::with_events() const
+{
+    return static_cast<bool>(m_ed_data);
+}
+
+template <typename T>
+const std::vector<typename taylor_adaptive<T>::t_event_t> &taylor_adaptive<T>::get_t_events() const
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    return m_ed_data->m_tes;
+}
+
+template <typename T>
+const std::vector<std::optional<std::pair<T, T>>> &taylor_adaptive<T>::get_te_cooldowns() const
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    return m_ed_data->m_te_cooldowns;
+}
+
+template <typename T>
+const std::vector<typename taylor_adaptive<T>::nt_event_t> &taylor_adaptive<T>::get_nt_events() const
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    return m_ed_data->m_ntes;
+}
+
+template <typename T>
 void taylor_adaptive<T>::set_time(T t)
 {
 #if defined(HEYOKA_HAVE_REAL)
@@ -3892,6 +3994,126 @@ template <typename T>
 std::uint32_t taylor_adaptive_batch<T>::get_dim() const
 {
     return m_dim;
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::get_time() const
+{
+    return m_time_hi;
+}
+
+template <typename T>
+const T *taylor_adaptive_batch<T>::get_time_data() const
+{
+    return m_time_hi.data();
+}
+
+template <typename T>
+std::pair<const std::vector<T> &, const std::vector<T> &> taylor_adaptive_batch<T>::get_dtime() const
+{
+    return std::make_pair(std::cref(m_time_hi), std::cref(m_time_lo));
+}
+
+template <typename T>
+std::pair<const T *, const T *> taylor_adaptive_batch<T>::get_dtime_data() const
+{
+    return std::make_pair(m_time_hi.data(), m_time_lo.data());
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::get_state() const
+{
+    return m_state;
+}
+
+template <typename T>
+const T *taylor_adaptive_batch<T>::get_state_data() const
+{
+    return m_state.data();
+}
+
+template <typename T>
+T *taylor_adaptive_batch<T>::get_state_data()
+{
+    return m_state.data();
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::get_pars() const
+{
+    return m_pars;
+}
+
+template <typename T>
+const T *taylor_adaptive_batch<T>::get_pars_data() const
+{
+    return m_pars.data();
+}
+
+template <typename T>
+T *taylor_adaptive_batch<T>::get_pars_data()
+{
+    return m_pars.data();
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::get_tc() const
+{
+    return m_tc;
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::get_last_h() const
+{
+    return m_last_h;
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::get_d_output() const
+{
+    return m_d_out;
+}
+
+template <typename T>
+bool taylor_adaptive_batch<T>::with_events() const
+{
+    return static_cast<bool>(m_ed_data);
+}
+
+template <typename T>
+const std::vector<typename taylor_adaptive_batch<T>::t_event_t> &taylor_adaptive_batch<T>::get_t_events() const
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    return m_ed_data->m_tes;
+}
+
+template <typename T>
+const std::vector<std::vector<std::optional<std::pair<T, T>>>> &taylor_adaptive_batch<T>::get_te_cooldowns() const
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    return m_ed_data->m_te_cooldowns;
+}
+
+template <typename T>
+const std::vector<typename taylor_adaptive_batch<T>::nt_event_t> &taylor_adaptive_batch<T>::get_nt_events() const
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    return m_ed_data->m_ntes;
+}
+
+template <typename T>
+const std::vector<std::tuple<taylor_outcome, T>> &taylor_adaptive_batch<T>::get_step_res() const
+{
+    return m_step_res;
 }
 
 template <typename T>

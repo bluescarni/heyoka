@@ -1725,6 +1725,9 @@ TEST_CASE("def ctor")
         REQUIRE(ta.get_time() == 0);
         REQUIRE(ta.get_high_accuracy() == false);
         REQUIRE(ta.get_compact_mode() == false);
+
+        REQUIRE(ta.get_state_data() == std::as_const(ta).get_state_data());
+        REQUIRE(ta.get_pars_data() == std::as_const(ta).get_pars_data());
     };
 
     tuple_for_each(fp_types, tester);
