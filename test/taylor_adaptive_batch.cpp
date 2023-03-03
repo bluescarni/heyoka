@@ -1142,6 +1142,11 @@ TEST_CASE("def ctor")
         REQUIRE(ta.get_batch_size() == 1u);
         REQUIRE(ta.get_high_accuracy() == false);
         REQUIRE(ta.get_compact_mode() == false);
+
+        REQUIRE(ta.get_state_data() == std::as_const(ta).get_state_data());
+        REQUIRE(ta.get_pars_data() == std::as_const(ta).get_pars_data());
+        REQUIRE(ta.get_dtime_data().first == ta.get_dtime().first.data());
+        REQUIRE(ta.get_dtime_data().second == ta.get_dtime().second.data());
     };
 
     tuple_for_each(fp_types, tester);
