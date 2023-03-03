@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -15,6 +15,7 @@
 #include <random>
 #include <sstream>
 #include <tuple>
+#include <variant>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -24,6 +25,7 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
@@ -104,17 +106,9 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     }
 }
 
-TEST_CASE("has_time")
+TEST_CASE("is_time_dependent")
 {
-    REQUIRE(!has_time(1_dbl));
-    REQUIRE(has_time(hy::time));
-    REQUIRE(has_time(1. + tpoly(par[0], par[1])));
-    REQUIRE(has_time(hy::time + tpoly(par[0], par[1])));
-
-    REQUIRE(!detail::is_tpoly(1_dbl));
-    REQUIRE(!detail::is_tpoly(hy::time));
-    REQUIRE(!detail::is_tpoly(1. + tpoly(par[0], par[1])));
-    REQUIRE(detail::is_tpoly(tpoly(par[0], par[1])));
+    REQUIRE(std::get<func>(tpoly(par[0], par[1]).value()).is_time_dependent());
 }
 
 TEST_CASE("ode test")

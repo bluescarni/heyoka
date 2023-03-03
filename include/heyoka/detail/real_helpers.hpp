@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -13,13 +13,16 @@
 #include <type_traits>
 #include <utility>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 
 #include <mp++/real.hpp>
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 // The integral type corresponding to the mpfr_rnd_t enum.
@@ -41,6 +44,8 @@ llvm::Value *llvm_real_sgn(llvm_state &, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC mppp::real eps_from_prec(mpfr_prec_t);
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

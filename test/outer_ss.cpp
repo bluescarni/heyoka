@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -19,7 +19,7 @@
 #include <xtensor/xview.hpp>
 
 #include <heyoka/detail/simple_timer.hpp>
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -38,7 +38,7 @@ TEST_CASE("outer solar system")
 
     const auto G = 0.01720209895 * 0.01720209895;
 
-    auto sys = make_nbody_sys(6, kw::masses = masses, kw::Gconst = G);
+    auto sys = model::nbody(6, kw::masses = masses, kw::Gconst = G);
 
     for (auto cm : {false, true}) {
         for (auto ha : {false, true}) {

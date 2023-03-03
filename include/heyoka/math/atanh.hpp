@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -20,8 +20,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/s11n.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -42,15 +41,16 @@ public:
     expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
     expression diff(std::unordered_map<const void *, expression> &, const param &) const;
 
-    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
-    long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
+    [[nodiscard]] double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
+    [[nodiscard]] long double eval_ldbl(const std::unordered_map<std::string, long double> &,
+                                        const std::vector<long double> &) const;
 #if defined(HEYOKA_HAVE_REAL128)
-    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                            const std::vector<mppp::real128> &) const;
+    [[nodiscard]] mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
+                                          const std::vector<mppp::real128> &) const;
 #endif
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
-                                         llvm::Value *, std::uint32_t, bool) const;
+                                         llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 
@@ -67,7 +67,7 @@ public:
 
 HEYOKA_DLL_PUBLIC expression atanh(expression);
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::atanh_impl)
 

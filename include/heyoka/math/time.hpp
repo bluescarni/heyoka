@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -23,8 +23,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/s11n.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -43,22 +42,27 @@ public:
 
     void to_stream(std::ostream &) const;
 
-    std::vector<expression> gradient() const;
+    [[nodiscard]] std::vector<expression> gradient() const;
+
+    [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
+                                         llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
+
+    [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 
     llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
 
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
-};
 
-HEYOKA_DLL_PUBLIC bool is_time(const expression &);
+    [[nodiscard]] bool is_time_dependent() const;
+};
 
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC extern const expression time;
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::time_impl)
 

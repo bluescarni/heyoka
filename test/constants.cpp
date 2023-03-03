@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -222,9 +222,10 @@ TEST_CASE("pi cfunc")
 
             s.compile();
 
-            auto *cf_ptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
+            auto *cf_ptr
+                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
 
-            cf_ptr(outs.data(), nullptr, nullptr);
+            cf_ptr(outs.data(), nullptr, nullptr, nullptr);
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == pi_const<fp_t>);
@@ -266,9 +267,10 @@ TEST_CASE("pi cfunc mp")
 
             s.compile();
 
-            auto *cf_ptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
+            auto *cf_ptr
+                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
 
-            cf_ptr(outs.data(), nullptr, nullptr);
+            cf_ptr(outs.data(), nullptr, nullptr, nullptr);
 
             REQUIRE(outs[0] == mppp::real_pi(prec));
         }

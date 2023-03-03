@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -12,9 +12,11 @@
 #include <cstdint>
 #include <string>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/visibility.hpp>
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+namespace detail
 {
 
 // Small helper to compute an index from the name
@@ -30,6 +32,8 @@ HEYOKA_DLL_PUBLIC std::uint32_t uname_to_index(const std::string &);
 template <typename T>
 HEYOKA_DLL_PUBLIC std::string fp_to_string(const T &);
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -44,8 +44,7 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -61,6 +60,79 @@ std::vector<expression> time_impl::gradient() const
 {
     assert(args().empty());
     return {};
+}
+
+llvm::Value *time_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &, llvm::Value *,
+                                  llvm::Value *time_ptr, llvm::Value *, std::uint32_t batch_size, bool) const
+{
+    return ext_load_vector_from_memory(s, fp_t, time_ptr, batch_size);
+}
+
+// NOTE: there's some repetition with llvm_c_eval_func_helper here.
+llvm::Function *time_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size, bool) const
+{
+    // LCOV_EXCL_START
+    assert(batch_size > 0u);
+    assert(args().empty());
+    // LCOV_EXCL_STOP
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+
+    const auto na_pair = llvm_c_eval_func_name_args(context, fp_t, "time", batch_size, args());
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
+
+    // Try to see if we already created the function.
+    auto *f = md.getFunction(fname);
+
+    if (f == nullptr) {
+        // The function was not created before, do it now.
+
+        // Fetch the current insertion block.
+        auto *orig_bb = builder.GetInsertBlock();
+
+        // The return type is val_t.
+        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+        // Create the function
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        assert(f != nullptr);
+
+        // Create a new basic block to start insertion into.
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Fetch the necessary arguments (only time needed).
+        auto *t_ptr = f->args().begin() + 3;
+
+        // Load the time value(s).
+        auto *ret = ext_load_vector_from_memory(s, fp_t, t_ptr, batch_size);
+
+        // Return it.
+        builder.CreateRet(ret);
+
+        // Verify.
+        s.verify_function(f);
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    } else {
+        // LCOV_EXCL_START
+        // The function was created before. Check if the signatures match.
+        // NOTE: there could be a mismatch if the function was created
+        // and then optimised - optimisation might remove arguments which are compile-time
+        // constants.
+        if (!compare_function_signature(f, val_t, fargs)) {
+            throw std::invalid_argument(fmt::format(
+                "Inconsistent function signature for the evaluation of {}() in compact mode detected", "time"));
+        }
+        // LCOV_EXCL_STOP
+    }
+
+    return f;
 }
 
 namespace
@@ -198,22 +270,15 @@ llvm::Function *time_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, s
     return taylor_c_diff_time_impl(s, fp_t, n_uvars, batch_size);
 }
 
-// Small helper to detect if an expression
-// is a time function.
-bool is_time(const expression &ex)
+bool time_impl::is_time_dependent() const
 {
-    if (const auto *func_ptr = std::get_if<func>(&ex.value());
-        func_ptr != nullptr && func_ptr->extract<time_impl>() != nullptr) {
-        return true;
-    } else {
-        return false;
-    }
+    return true;
 }
 
 } // namespace detail
 
 const expression time{func{detail::time_impl{}}};
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::time_impl)

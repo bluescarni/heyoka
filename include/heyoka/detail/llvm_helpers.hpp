@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -13,18 +13,22 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <map>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
 #include <vector>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 HEYOKA_DLL_PUBLIC llvm::Type *to_llvm_type_impl(llvm::LLVMContext &, const std::type_info &, bool);
@@ -100,6 +104,9 @@ HEYOKA_DLL_PUBLIC void llvm_while_loop(llvm_state &, const std::function<llvm::V
 
 HEYOKA_DLL_PUBLIC void llvm_if_then_else(llvm_state &, llvm::Value *, const std::function<void()> &,
                                          const std::function<void()> &);
+
+HEYOKA_DLL_PUBLIC void llvm_switch_u32(llvm_state &, llvm::Value *, const std::function<void()> &,
+                                       const std::map<std::uint32_t, std::function<void()>> &);
 
 HEYOKA_DLL_PUBLIC std::string llvm_type_name(llvm::Type *);
 
@@ -201,6 +208,8 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_lt(llvm_state &, llvm::Value *, llvm::Val
 // Greater-than.
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_gt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

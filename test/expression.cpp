@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -30,7 +30,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -694,59 +694,59 @@ TEST_CASE("div simpls")
     REQUIRE(std::get<func>((y / x).value()).extract<detail::binary_op>()->args() == std::vector{y, x});
 }
 
-TEST_CASE("has time")
+TEST_CASE("is_time_dependent")
 {
     namespace hy = heyoka;
 
     auto [x, y, z] = make_vars("x", "y", "z");
 
-    REQUIRE(!has_time(x));
-    REQUIRE(!has_time(y));
-    REQUIRE(!has_time(x + y));
-    REQUIRE(!has_time(1_dbl));
-    REQUIRE(!has_time(par[0]));
-    REQUIRE(!has_time(2_dbl - par[0]));
+    REQUIRE(!is_time_dependent(x));
+    REQUIRE(!is_time_dependent(y));
+    REQUIRE(!is_time_dependent(x + y));
+    REQUIRE(!is_time_dependent(1_dbl));
+    REQUIRE(!is_time_dependent(par[0]));
+    REQUIRE(!is_time_dependent(2_dbl - par[0]));
 
-    REQUIRE(has_time(hy::time));
-    REQUIRE(has_time(hy::time + 1_dbl));
-    REQUIRE(has_time(par[42] + hy::time));
-    REQUIRE(has_time((x + y) * (hy::time + 1_dbl)));
-    REQUIRE(has_time((x + y) * (par[0] * hy::time + 1_dbl)));
+    REQUIRE(is_time_dependent(hy::time));
+    REQUIRE(is_time_dependent(hy::time + 1_dbl));
+    REQUIRE(is_time_dependent(par[42] + hy::time));
+    REQUIRE(is_time_dependent((x + y) * (hy::time + 1_dbl)));
+    REQUIRE(is_time_dependent((x + y) * (par[0] * hy::time + 1_dbl)));
 
     // With common subexpressions.
     auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
 
-    REQUIRE(!has_time(bar));
+    REQUIRE(!is_time_dependent(bar));
 
     foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
     bar = (foo - x) / (2. * foo);
 
-    REQUIRE(has_time(bar));
+    REQUIRE(is_time_dependent(bar));
 
     foo = hy::time + ((x + y) * (z + x)) * ((z - x) * (y + x));
     bar = (foo - x) / (2. * foo);
 
-    REQUIRE(has_time(bar));
+    REQUIRE(is_time_dependent(bar));
 
     foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
     bar = hy::time + (foo - x) / (2. * foo);
 
-    REQUIRE(has_time(bar));
+    REQUIRE(is_time_dependent(bar));
 
     foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
     bar = (foo - x) / (2. * foo) + hy::time;
 
-    REQUIRE(has_time(bar));
+    REQUIRE(is_time_dependent(bar));
 
     foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
     bar = (foo - x) / (2. * foo) + hy::time;
 
-    REQUIRE(has_time(bar));
+    REQUIRE(is_time_dependent(bar));
 
     foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
     bar = hy::time + (foo - x) / (2. * foo) + hy::time;
 
-    REQUIRE(has_time(bar));
+    REQUIRE(is_time_dependent(bar));
 }
 
 TEST_CASE("pairwise_prod")
@@ -1046,7 +1046,7 @@ TEST_CASE("cfunc nbody")
 
     const auto G = 0.01720209895 * 0.01720209895 * 365 * 365;
 
-    auto sys = make_nbody_sys(6, kw::masses = masses, kw::Gconst = G);
+    auto sys = model::nbody(6, kw::masses = masses, kw::Gconst = G);
     std::vector<expression> exs;
     for (const auto &p : sys) {
         exs.push_back(p.second);
@@ -1072,10 +1072,10 @@ TEST_CASE("cfunc nbody")
 
                 s.compile();
 
-                auto *cf_ptr
-                    = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+                auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+                    s.jit_lookup("cfunc"));
 
-                cf_ptr(outs.data(), ins.data(), nullptr);
+                cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
 
                 for (auto i = 0u; i < 6u; ++i) {
                     for (auto j = 0u; j < batch_size; ++j) {
@@ -1140,7 +1140,7 @@ TEST_CASE("cfunc nbody mp")
 
     const auto G = mppp::real{0.01720209895 * 0.01720209895 * 365 * 365, prec};
 
-    auto sys = make_nbody_sys(6, kw::masses = masses, kw::Gconst = G);
+    auto sys = model::nbody(6, kw::masses = masses, kw::Gconst = G);
     std::vector<expression> exs;
     for (const auto &p : sys) {
         exs.push_back(p.second);
@@ -1168,10 +1168,11 @@ TEST_CASE("cfunc nbody mp")
 
             s.compile();
 
-            auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(
-                s.jit_lookup("cfunc"));
+            auto *cf_ptr
+                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
+                    s.jit_lookup("cfunc"));
 
-            cf_ptr(outs.data(), ins.data(), nullptr);
+            cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
 
             for (auto i = 0u; i < 6u; ++i) {
                 for (auto j = 0u; j < batch_size; ++j) {
@@ -1230,7 +1231,7 @@ TEST_CASE("cfunc nbody par")
 
     const auto G = 0.01720209895 * 0.01720209895 * 365 * 365;
 
-    auto sys = make_nbody_par_sys(6, kw::Gconst = G);
+    auto sys = model::nbody(6, kw::Gconst = G, kw::masses = {par[0], par[1], par[2], par[3], par[4], par[5]});
     std::vector<expression> exs;
     for (const auto &p : sys) {
         exs.push_back(p.second);
@@ -1263,10 +1264,10 @@ TEST_CASE("cfunc nbody par")
 
                 s.compile();
 
-                auto *cf_ptr
-                    = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+                auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+                    s.jit_lookup("cfunc"));
 
-                cf_ptr(outs.data(), ins.data(), pars.data());
+                cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
 
                 for (auto i = 0u; i < 6u; ++i) {
                     for (auto j = 0u; j < batch_size; ++j) {
@@ -1327,10 +1328,11 @@ TEST_CASE("cfunc nbody par")
 
                 std::generate(ins.begin(), ins.end(), gen);
 
-                auto *cfs_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, std::size_t)>(
-                    s.jit_lookup("cfunc.strided"));
+                auto *cfs_ptr
+                    = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
+                        s.jit_lookup("cfunc.strided"));
 
-                cfs_ptr(outs.data(), ins.data(), pars.data(), batch_size + extra_stride);
+                cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, batch_size + extra_stride);
 
                 for (auto i = 0u; i < 6u; ++i) {
                     for (auto j = 0u; j < batch_size; ++j) {
@@ -1403,7 +1405,7 @@ TEST_CASE("cfunc nbody par mp")
 
     const auto G = mppp::real{0.01720209895 * 0.01720209895 * 365 * 365, prec};
 
-    auto sys = make_nbody_par_sys(6, kw::Gconst = G);
+    auto sys = model::nbody(6, kw::Gconst = G, kw::masses = {par[0], par[1], par[2], par[3], par[4], par[5]});
     std::vector<expression> exs;
     for (const auto &p : sys) {
         exs.push_back(p.second);
@@ -1438,10 +1440,11 @@ TEST_CASE("cfunc nbody par mp")
 
             s.compile();
 
-            auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(
-                s.jit_lookup("cfunc"));
+            auto *cf_ptr
+                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
+                    s.jit_lookup("cfunc"));
 
-            cf_ptr(outs.data(), ins.data(), pars.data());
+            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
 
             for (auto i = 0u; i < 6u; ++i) {
                 for (auto j = 0u; j < batch_size; ++j) {
@@ -1503,11 +1506,10 @@ TEST_CASE("cfunc nbody par mp")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(outs.begin(), outs.end(), gen);
 
-            auto *cfs_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, std::size_t)>(
-                    s.jit_lookup("cfunc.strided"));
+            auto *cfs_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *,
+                                                      const mppp::real *, std::size_t)>(s.jit_lookup("cfunc.strided"));
 
-            cfs_ptr(outs.data(), ins.data(), pars.data(), batch_size + extra_stride);
+            cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, batch_size + extra_stride);
 
             for (auto i = 0u; i < 6u; ++i) {
                 for (auto j = 0u; j < batch_size; ++j) {
@@ -1590,10 +1592,10 @@ TEST_CASE("cfunc numparams")
 
                 s.compile();
 
-                auto *cf_ptr
-                    = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+                auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+                    s.jit_lookup("cfunc"));
 
-                cf_ptr(outs.data(), nullptr, pars.data());
+                cf_ptr(outs.data(), nullptr, pars.data(), nullptr);
 
                 for (auto j = 0u; j < batch_size; ++j) {
                     REQUIRE(outs[j] == 1);
@@ -1607,10 +1609,11 @@ TEST_CASE("cfunc numparams")
 
                 std::generate(pars.begin(), pars.end(), gen);
 
-                auto *cfs_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, std::size_t)>(
-                    s.jit_lookup("cfunc.strided"));
+                auto *cfs_ptr
+                    = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
+                        s.jit_lookup("cfunc.strided"));
 
-                cfs_ptr(outs.data(), nullptr, pars.data(), batch_size + extra_stride);
+                cfs_ptr(outs.data(), nullptr, pars.data(), nullptr, batch_size + extra_stride);
 
                 for (auto j = 0u; j < batch_size; ++j) {
                     REQUIRE(outs[j] == 1);
@@ -1650,10 +1653,11 @@ TEST_CASE("cfunc numparams mp")
 
             s.compile();
 
-            auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(
-                s.jit_lookup("cfunc"));
+            auto *cf_ptr
+                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
+                    s.jit_lookup("cfunc"));
 
-            cf_ptr(outs.data(), nullptr, pars.data());
+            cf_ptr(outs.data(), nullptr, pars.data(), nullptr);
 
             for (auto j = 0u; j < batch_size; ++j) {
                 REQUIRE(outs[j] == 1);
@@ -1670,11 +1674,10 @@ TEST_CASE("cfunc numparams mp")
             std::generate(pars.begin(), pars.end(), gen);
             std::generate(outs.begin(), outs.end(), gen);
 
-            auto *cfs_ptr
-                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, std::size_t)>(
-                    s.jit_lookup("cfunc.strided"));
+            auto *cfs_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *,
+                                                      const mppp::real *, std::size_t)>(s.jit_lookup("cfunc.strided"));
 
-            cfs_ptr(outs.data(), nullptr, pars.data(), batch_size + extra_stride);
+            cfs_ptr(outs.data(), nullptr, pars.data(), nullptr, batch_size + extra_stride);
 
             for (auto j = 0u; j < batch_size; ++j) {
                 REQUIRE(outs[j] == 1);
@@ -1699,12 +1702,13 @@ TEST_CASE("cfunc explicit")
 
     s.compile();
 
-    auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+    auto *cf_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cfunc"));
 
     double out = 0;
     std::vector<double> ins = {10, 11, 12};
 
-    cf_ptr(&out, ins.data(), nullptr);
+    cf_ptr(&out, ins.data(), nullptr, nullptr);
 
     REQUIRE(out == 12. + 2. * 11 + 3. * 10);
 }
@@ -1736,10 +1740,11 @@ TEST_CASE("cfunc bogus stride")
 
             s.compile();
 
-            auto *cfs_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, std::size_t)>(
-                s.jit_lookup("cfunc.strided"));
+            auto *cfs_ptr
+                = reinterpret_cast<void (*)(double *, const double *, const double *, const double *, std::size_t)>(
+                    s.jit_lookup("cfunc.strided"));
 
-            cfs_ptr(outs.data(), ins.data(), pars.data(), batch_size - 1u);
+            cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, batch_size - 1u);
 
             if (batch_size > 1u) {
                 for (auto j = 0u; j < batch_size - 1u; ++j) {
@@ -1751,7 +1756,7 @@ TEST_CASE("cfunc bogus stride")
                             == approximately(pars[(batch_size - 1u) + j] - ins[j] * ins[(batch_size - 1u) + j], 100.));
                 }
 
-                cfs_ptr(outs.data(), ins.data(), pars.data(), 0);
+                cfs_ptr(outs.data(), ins.data(), pars.data(), nullptr, 0);
 
                 for (auto j = 0u; j < batch_size; ++j) {
                     REQUIRE(outs[j] == approximately(pars[j] - ins[j] * ins[j], 100.));
@@ -1845,11 +1850,12 @@ TEST_CASE("cfunc vsop2013")
 
     s.compile();
 
-    auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+    auto *cf_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cfunc"));
 
     double out[3] = {};
 
-    cf_ptr(out, &date, nullptr);
+    cf_ptr(out, &date, nullptr, nullptr);
 
     REQUIRE(out[0] == approximately(ta.get_state()[0], 100.));
     REQUIRE(out[1] == approximately(ta.get_state()[1], 100.));

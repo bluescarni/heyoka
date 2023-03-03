@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -33,7 +33,9 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 std::uint32_t uname_to_index(const std::string &s)
@@ -81,4 +83,6 @@ template HEYOKA_DLL_PUBLIC std::string fp_to_string<mppp::real>(const mppp::real
 
 #endif
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE

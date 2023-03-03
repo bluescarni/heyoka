@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -12,7 +12,11 @@
 #include <chrono>
 #include <iostream>
 
-namespace heyoka::detail
+#include <heyoka/config.hpp>
+
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 class simple_timer
@@ -38,6 +42,8 @@ private:
     const std::chrono::high_resolution_clock::time_point m_start;
 };
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

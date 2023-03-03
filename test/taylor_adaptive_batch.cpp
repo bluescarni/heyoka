@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -40,7 +40,7 @@
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -1142,6 +1142,11 @@ TEST_CASE("def ctor")
         REQUIRE(ta.get_batch_size() == 1u);
         REQUIRE(ta.get_high_accuracy() == false);
         REQUIRE(ta.get_compact_mode() == false);
+
+        REQUIRE(ta.get_state_data() == std::as_const(ta).get_state_data());
+        REQUIRE(ta.get_pars_data() == std::as_const(ta).get_pars_data());
+        REQUIRE(ta.get_dtime_data().first == ta.get_dtime().first.data());
+        REQUIRE(ta.get_dtime_data().second == ta.get_dtime().second.data());
     };
 
     tuple_for_each(fp_types, tester);
@@ -1281,7 +1286,7 @@ TEST_CASE("events error")
 {
     using Catch::Matchers::Message;
 
-    auto sys = make_nbody_sys(2, kw::masses = {1., 0.});
+    auto sys = model::nbody(2, kw::masses = {1., 0.});
 
     using t_ev_t = t_event_batch<double>;
     using nt_ev_t = nt_event_batch<double>;

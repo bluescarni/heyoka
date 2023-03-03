@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -96,7 +96,7 @@ TEST_CASE("func minimal")
     REQUIRE_THROWS_MATCHES(f.deval_num_dbl({1., 1.}, 2), std::invalid_argument,
                            Message("Invalid index supplied to the double numerical evaluation of the derivative of "
                                    "function 'f': index 2 was supplied, but the number of arguments is only 2"));
-    REQUIRE_THROWS_MATCHES(f.llvm_eval(s, fp_t, {}, nullptr, nullptr, 1, false), not_implemented_error,
+    REQUIRE_THROWS_MATCHES(f.llvm_eval(s, fp_t, {}, nullptr, nullptr, nullptr, 1, false), not_implemented_error,
                            Message("llvm_eval() is not implemented for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.llvm_c_eval_func(s, fp_t, 1, false), not_implemented_error,
                            Message("llvm_c_eval_func() is not implemented for the function 'f'"));
@@ -767,6 +767,54 @@ TEST_CASE("null func s11n")
 
     REQUIRE(f.get_name() == "null_func");
     REQUIRE(f.args().empty());
+}
+
+struct func_20 : func_base {
+    func_20(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
+    {
+    }
+
+    bool is_time_dependent() const
+    {
+        return true;
+    }
+};
+
+struct func_21 : func_base {
+    func_21(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
+    {
+    }
+
+    bool is_time_dependent()
+    {
+        return true;
+    }
+};
+
+struct func_22 : func_base {
+    func_22(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
+    {
+    }
+
+    int is_time_dependent() const
+    {
+        return 1;
+    }
+};
+
+TEST_CASE("is_time_dependent")
+{
+    func f;
+    REQUIRE(!f.is_time_dependent());
+
+    f = func(func_20{});
+    REQUIRE(f.is_time_dependent());
+
+    f = func(func_21{});
+    REQUIRE(!f.is_time_dependent());
+
+    f = func(func_22{});
+    REQUIRE(!f.is_time_dependent());
 }
 
 #if defined(__GNUC__)

@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -32,12 +32,15 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/taylor.hpp>
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 // Implementation detail for taylor_c_diff_func_numpar(). np_tup is a tuple containing a sequence of numbers and/or
@@ -142,6 +145,8 @@ inline llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, llvm::Type *fp_t
     return f;
 }
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

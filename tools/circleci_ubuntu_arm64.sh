@@ -28,7 +28,7 @@ make -j2 VERBOSE=1
 ctest -V -j2
 
 # Upload coverage data.
-bash <(curl -s https://codecov.io/bash) -x gcov-9
+bash <(curl -s https://codecov.io/bash) -x $deps_dir/bin/gcov
 
 set +e
 set +x

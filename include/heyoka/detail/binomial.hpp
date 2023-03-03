@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -17,7 +17,11 @@
 #include <boost/math/tools/config.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
-namespace heyoka::detail
+#include <heyoka/config.hpp>
+
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 template <typename T>
@@ -50,6 +54,8 @@ inline auto binomial<long double>(std::uint32_t i, std::uint32_t j)
 
 #endif
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

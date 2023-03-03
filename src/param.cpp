@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -20,12 +20,12 @@
 
 #include <fmt/format.h>
 
+#include <heyoka/config.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/param.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 param::param() : param(0) {}
 
@@ -149,4 +149,4 @@ void update_grad_dbl(std::unordered_map<std::string, double> &, const param &,
     throw not_implemented_error("update_grad_dbl() not implemented for param");
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE

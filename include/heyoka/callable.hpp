@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -17,6 +17,7 @@
 #include <typeinfo>
 #include <utility>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
@@ -31,8 +32,7 @@
 // able to serialise the callbacks of the events, whose serialisation,
 // in turn, is needed in the serialisation of the integrator objects.
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -208,16 +208,13 @@ inline void swap(callable<R(Args...)> &c0, callable<R(Args...)> &c1) noexcept
     c0.swap(c1);
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 // Disable Boost.Serialization tracking for the implementation details of callable.
 // NOTE: these bits are taken verbatim from the BOOST_CLASS_TRACKING macro, which does not support
 // class templates.
 
-namespace boost
-{
-
-namespace serialization
+namespace boost::serialization
 {
 
 template <typename R, typename... Args>
@@ -238,9 +235,7 @@ struct tracking_level<heyoka::detail::callable_inner<T, R, Args...>> {
                                       mpl::int_<primitive_type>>::value));
 };
 
-} // namespace serialization
-
-} // namespace boost
+} // namespace boost::serialization
 
 // NOTE: these are verbatim re-implementations of the BOOST_CLASS_EXPORT_KEY
 // and BOOST_CLASS_EXPORT_IMPLEMENT macros, which do not work well with class templates.

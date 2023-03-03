@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -21,11 +21,14 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 // Comparision operator for LLVM functions based on their names.
@@ -92,6 +95,8 @@ std::string cm_mangle(const number &);
 std::string cm_mangle(const param &);
 [[noreturn]] std::string cm_mangle(const func &);
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

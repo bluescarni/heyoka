@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -52,8 +52,7 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -69,7 +68,7 @@ std::vector<expression> tanh_impl::gradient() const
 }
 
 llvm::Value *tanh_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                  llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                  llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                   bool high_accuracy) const
 {
     return llvm_eval_helper([&s](const std::vector<llvm::Value *> &args, bool) { return llvm_tanh(s, args[0]); }, *this,
@@ -361,6 +360,6 @@ expression tanh(expression e)
     return expression{func{detail::tanh_impl(std::move(e))}};
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::tanh_impl)

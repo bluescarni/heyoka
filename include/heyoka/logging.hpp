@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -9,10 +9,10 @@
 #ifndef HEYOKA_LOGGING_HPP
 #define HEYOKA_LOGGING_HPP
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/visibility.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 HEYOKA_DLL_PUBLIC void *create_logger();
 
@@ -23,6 +23,6 @@ HEYOKA_DLL_PUBLIC void set_logger_level_warn();
 HEYOKA_DLL_PUBLIC void set_logger_level_err();
 HEYOKA_DLL_PUBLIC void set_logger_level_critical();
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 #endif

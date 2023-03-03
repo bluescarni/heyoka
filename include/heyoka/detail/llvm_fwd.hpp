@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -8,6 +8,8 @@
 
 #ifndef HEYOKA_DETAIL_LLVM_FWD_HPP
 #define HEYOKA_DETAIL_LLVM_FWD_HPP
+
+#include <heyoka/config.hpp>
 
 namespace llvm
 {
@@ -33,11 +35,10 @@ class IRBuilder;
 
 } // namespace llvm
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 using ir_builder = llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>;
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 #endif

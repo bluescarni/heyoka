@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -28,8 +28,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/taylor.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -167,6 +166,6 @@ ensemble_propagate_grid_batch(const taylor_adaptive_batch<T> &ta, const std::vec
     return detail::ensemble_propagate_grid_batch_impl(ta, grid, n_iter, gen, max_steps, max_delta_ts, cb);
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 #endif

@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -65,8 +65,7 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -232,7 +231,7 @@ llvm::Constant *constant::make_llvm_const([[maybe_unused]] llvm_state &s, llvm::
 }
 
 llvm::Value *constant::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &, llvm::Value *,
-                                 llvm::Value *, std::uint32_t batch_size, bool) const
+                                 llvm::Value *, llvm::Value *, std::uint32_t batch_size, bool) const
 {
     return detail::vector_splat(s.builder(), make_llvm_const(s, fp_t), batch_size);
 }
@@ -348,7 +347,7 @@ llvm::Function *constant::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 // NOLINTNEXTLINE(cert-err58-cpp)
 const expression pi{func{constant{"pi", detail::pi_constant_func{}, u8"π"}}};
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::null_constant_func, std::string, unsigned)
 

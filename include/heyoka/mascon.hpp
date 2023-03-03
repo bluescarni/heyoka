@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -9,14 +9,15 @@
 #ifndef HEYOKA_MASCON_HPP
 #define HEYOKA_MASCON_HPP
 
+#include <vector>
+
+#include <heyoka/config.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/math.hpp>
-#include <vector>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -176,6 +177,6 @@ expression energy_mascon_system(KwArgs &&...kw_args)
     }
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 #endif

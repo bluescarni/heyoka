@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -24,6 +24,12 @@
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
 
 #endif
 
@@ -168,9 +174,10 @@ TEST_CASE("cfunc")
 
             s.compile();
 
-            auto *cf_ptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
+            auto *cf_ptr
+                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
 
-            cf_ptr(outs.data(), ins.data(), pars.data());
+            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(-(ins[i]), fp_t(100)));
@@ -189,3 +196,40 @@ TEST_CASE("cfunc")
         }
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("cfunc_mp")
+{
+    auto [x] = make_vars("x");
+
+    const auto prec = 237u;
+
+    for (auto compact_mode : {false, true}) {
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            add_cfunc<mppp::real>(s, "cfunc", {-x, -expression{mppp::real{-.5, prec}}, -par[0]},
+                                  kw::compact_mode = compact_mode, kw::prec = prec);
+
+            s.compile();
+
+            auto *cf_ptr
+                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
+                    s.jit_lookup("cfunc"));
+
+            const std::vector ins{mppp::real{".7", prec}};
+            const std::vector pars{mppp::real{"-.1", prec}};
+            std::vector<mppp::real> outs(3u, mppp::real{0, prec});
+
+            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+
+            auto i = 0u;
+            REQUIRE(outs[i] == -ins[i]);
+            REQUIRE(outs[i + 1u] == mppp::real{.5, prec});
+            REQUIRE(outs[i + 2u * 1u] == -pars[i]);
+        }
+    }
+}
+
+#endif

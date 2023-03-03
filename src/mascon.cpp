@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -10,15 +10,14 @@
 #include <utility>
 #include <vector>
 
+#include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/mascon.hpp>
 #include <heyoka/math.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
-
 {
 
 std::vector<std::pair<expression, expression>>
@@ -90,4 +89,4 @@ expression energy_mascon_system_impl(expression Gconst, std::vector<expression> 
 
 } // namespace detail
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE

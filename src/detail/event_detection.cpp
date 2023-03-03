@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -95,8 +95,7 @@ int sign(const mppp::real &z)
 
 #endif
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -2171,4 +2170,4 @@ template struct taylor_adaptive_batch<mppp::real128>::ed_data;
 
 #endif
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE

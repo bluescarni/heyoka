@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -30,7 +30,7 @@
 
 #endif
 
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "benchmark_utils.hpp"
@@ -44,7 +44,7 @@ void run_bench(T tol, bool high_accuracy, bool compact_mode, bool fast_math, lon
     warmup();
 
     // NOTE: this setup mimics the 'simplest' test from rebound.
-    auto sys = make_nbody_sys(2, kw::masses = {1., 0.});
+    auto sys = model::nbody(2, kw::masses = {1., 0.});
 
     std::vector init_state{T(0), T(0), T(0), T(0), T(0), T(0), T(1), T(0), T(0), T(0), T(1), T(0)};
 

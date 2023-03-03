@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -45,8 +45,7 @@
 // Current archive version is 1.
 BOOST_CLASS_VERSION(heyoka::func, 1)
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 class HEYOKA_DLL_PUBLIC func_base
 {
@@ -73,8 +72,8 @@ public:
 
     ~func_base();
 
-    const std::string &get_name() const;
-    const std::vector<expression> &args() const;
+    [[nodiscard]] const std::string &get_name() const;
+    [[nodiscard]] const std::vector<expression> &args() const;
     std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 };
 
@@ -82,55 +81,65 @@ namespace detail
 {
 
 struct HEYOKA_DLL_PUBLIC func_inner_base {
+    func_inner_base();
+    func_inner_base(const func_inner_base &) = delete;
+    func_inner_base(func_inner_base &&) noexcept = delete;
+    func_inner_base &operator=(const func_inner_base &) = delete;
+    func_inner_base &operator=(func_inner_base &&) noexcept = delete;
     virtual ~func_inner_base();
-    virtual std::unique_ptr<func_inner_base> clone() const = 0;
 
-    virtual std::type_index get_type_index() const = 0;
-    virtual const void *get_ptr() const = 0;
+    [[nodiscard]] virtual std::unique_ptr<func_inner_base> clone() const = 0;
+
+    [[nodiscard]] virtual std::type_index get_type_index() const = 0;
+    [[nodiscard]] virtual const void *get_ptr() const = 0;
     virtual void *get_ptr() = 0;
 
-    virtual const std::string &get_name() const = 0;
+    [[nodiscard]] virtual const std::string &get_name() const = 0;
 
     virtual void to_stream(std::ostream &) const = 0;
 
-    virtual bool extra_equal_to(const func &) const = 0;
+    [[nodiscard]] virtual bool extra_equal_to(const func &) const = 0;
 
-    virtual std::size_t extra_hash() const = 0;
+    [[nodiscard]] virtual bool is_time_dependent() const = 0;
 
-    virtual const std::vector<expression> &args() const = 0;
+    [[nodiscard]] virtual std::size_t extra_hash() const = 0;
+
+    [[nodiscard]] virtual const std::vector<expression> &args() const = 0;
     virtual std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it() = 0;
 
-    virtual bool has_diff_var() const = 0;
+    [[nodiscard]] virtual bool has_diff_var() const = 0;
     virtual expression diff(std::unordered_map<const void *, expression> &, const std::string &) const = 0;
-    virtual bool has_diff_par() const = 0;
+    [[nodiscard]] virtual bool has_diff_par() const = 0;
     virtual expression diff(std::unordered_map<const void *, expression> &, const param &) const = 0;
-    virtual bool has_gradient() const = 0;
-    virtual std::vector<expression> gradient() const = 0;
+    [[nodiscard]] virtual bool has_gradient() const = 0;
+    [[nodiscard]] virtual std::vector<expression> gradient() const = 0;
 
-    virtual double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const = 0;
-    virtual long double eval_ldbl(const std::unordered_map<std::string, long double> &,
-                                  const std::vector<long double> &) const
+    [[nodiscard]] virtual double eval_dbl(const std::unordered_map<std::string, double> &,
+                                          const std::vector<double> &) const
+        = 0;
+    [[nodiscard]] virtual long double eval_ldbl(const std::unordered_map<std::string, long double> &,
+                                                const std::vector<long double> &) const
         = 0;
 #if defined(HEYOKA_HAVE_REAL128)
-    virtual mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                                    const std::vector<mppp::real128> &) const
+    [[nodiscard]] virtual mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
+                                                  const std::vector<mppp::real128> &) const
         = 0;
 #endif
 
     virtual void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
                                 const std::vector<double> &) const
         = 0;
-    virtual double eval_num_dbl(const std::vector<double> &) const = 0;
-    virtual double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const = 0;
+    [[nodiscard]] virtual double eval_num_dbl(const std::vector<double> &) const = 0;
+    [[nodiscard]] virtual double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const = 0;
 
     [[nodiscard]] virtual llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &,
-                                                 llvm::Value *, llvm::Value *, std::uint32_t, bool) const
+                                                 llvm::Value *, llvm::Value *, llvm::Value *, std::uint32_t, bool) const
         = 0;
 
     [[nodiscard]] virtual llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const = 0;
 
     virtual taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) && = 0;
-    virtual bool has_taylor_decompose() const = 0;
+    [[nodiscard]] virtual bool has_taylor_decompose() const = 0;
 
     virtual llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                                      const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
@@ -162,6 +171,12 @@ using func_extra_equal_to_t
 
 template <typename T>
 inline constexpr bool func_has_extra_equal_to_v = std::is_same_v<detected_t<func_extra_equal_to_t, T>, bool>;
+
+template <typename T>
+using func_is_time_dependent_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().is_time_dependent());
+
+template <typename T>
+inline constexpr bool func_has_is_time_dependent_v = std::is_same_v<detected_t<func_is_time_dependent_t, T>, bool>;
 
 template <typename T>
 using func_extra_hash_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().extra_hash());
@@ -241,7 +256,8 @@ inline constexpr bool func_has_deval_num_dbl_v = std::is_same_v<detected_t<func_
 template <typename T>
 using func_llvm_eval_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_eval(
     std::declval<llvm_state &>(), std::declval<llvm::Type *>(), std::declval<const std::vector<llvm::Value *> &>(),
-    std::declval<llvm::Value *>(), std::declval<llvm::Value *>(), std::declval<std::uint32_t>(), std::declval<bool>()));
+    std::declval<llvm::Value *>(), std::declval<llvm::Value *>(), std::declval<llvm::Value *>(),
+    std::declval<std::uint32_t>(), std::declval<bool>()));
 
 template <typename T>
 inline constexpr bool func_has_llvm_eval_v = std::is_same_v<detected_t<func_llvm_eval_t, T>, llvm::Value *>;
@@ -293,24 +309,25 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     func_inner(func_inner &&) = delete;
     func_inner &operator=(const func_inner &) = delete;
     func_inner &operator=(func_inner &&) = delete;
+    ~func_inner() final = default;
 
     // Constructors from T (copy and move variants).
     explicit func_inner(const T &x) : m_value(x) {}
     explicit func_inner(T &&x) : m_value(std::move(x)) {}
 
     // The clone function.
-    std::unique_ptr<func_inner_base> clone() const final
+    [[nodiscard]] std::unique_ptr<func_inner_base> clone() const final
     {
         return std::make_unique<func_inner>(m_value);
     }
 
     // Get the type at runtime.
-    std::type_index get_type_index() const final
+    [[nodiscard]] std::type_index get_type_index() const final
     {
         return typeid(T);
     }
     // Raw getters for the internal instance.
-    const void *get_ptr() const final
+    [[nodiscard]] const void *get_ptr() const final
     {
         return &m_value;
     }
@@ -319,7 +336,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         return &m_value;
     }
 
-    const std::string &get_name() const final
+    [[nodiscard]] const std::string &get_name() const final
     {
         // NOTE: make sure we are invoking the member functions
         // from func_base (these functions could have been overriden
@@ -336,7 +353,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         }
     }
 
-    bool extra_equal_to(const func &f) const final
+    [[nodiscard]] bool extra_equal_to(const func &f) const final
     {
         if constexpr (func_has_extra_equal_to_v<T>) {
             return m_value.extra_equal_to(f);
@@ -345,7 +362,16 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         }
     }
 
-    std::size_t extra_hash() const final
+    [[nodiscard]] bool is_time_dependent() const final
+    {
+        if constexpr (func_has_is_time_dependent_v<T>) {
+            return m_value.is_time_dependent();
+        } else {
+            return false;
+        }
+    }
+
+    [[nodiscard]] std::size_t extra_hash() const final
     {
         if constexpr (func_has_extra_hash_v<T>) {
             return m_value.extra_hash();
@@ -354,7 +380,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         }
     }
 
-    const std::vector<expression> &args() const final
+    [[nodiscard]] const std::vector<expression> &args() const final
     {
         return static_cast<const func_base *>(&m_value)->args();
     }
@@ -364,23 +390,23 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     }
 
     // diff.
-    bool has_diff_var() const final
+    [[nodiscard]] bool has_diff_var() const final
     {
         return func_has_diff_var_v<T>;
     }
     expression diff(std::unordered_map<const void *, expression> &, const std::string &) const final;
-    bool has_diff_par() const final
+    [[nodiscard]] bool has_diff_par() const final
     {
         return func_has_diff_par_v<T>;
     }
     expression diff(std::unordered_map<const void *, expression> &, const param &) const final;
 
     // gradient.
-    bool has_gradient() const final
+    [[nodiscard]] bool has_gradient() const final
     {
         return func_has_gradient_v<T>;
     }
-    std::vector<expression> gradient() const final
+    [[nodiscard]] std::vector<expression> gradient() const final
     {
         if constexpr (func_has_gradient_v<T>) {
             return m_value.gradient();
@@ -393,7 +419,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     }
 
     // eval.
-    double eval_dbl(const std::unordered_map<std::string, double> &m, const std::vector<double> &pars) const final
+    [[nodiscard]] double eval_dbl(const std::unordered_map<std::string, double> &m,
+                                  const std::vector<double> &pars) const final
     {
         if constexpr (func_has_eval_dbl_v<T>) {
             return m_value.eval_dbl(m, pars);
@@ -401,8 +428,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
             throw not_implemented_error("double eval is not implemented for the function '" + get_name() + "'");
         }
     }
-    long double eval_ldbl(const std::unordered_map<std::string, long double> &m,
-                          const std::vector<long double> &pars) const final
+    [[nodiscard]] long double eval_ldbl(const std::unordered_map<std::string, long double> &m,
+                                        const std::vector<long double> &pars) const final
     {
         if constexpr (func_has_eval_ldbl_v<T>) {
             return m_value.eval_ldbl(m, pars);
@@ -411,8 +438,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         }
     }
 #if defined(HEYOKA_HAVE_REAL128)
-    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &m,
-                            const std::vector<mppp::real128> &pars) const final
+    [[nodiscard]] mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &m,
+                                          const std::vector<mppp::real128> &pars) const final
     {
         if constexpr (func_has_eval_f128_v<T>) {
             return m_value.eval_f128(m, pars);
@@ -430,7 +457,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
             throw not_implemented_error("double batch eval is not implemented for the function '" + get_name() + "'");
         }
     }
-    double eval_num_dbl(const std::vector<double> &v) const final
+    [[nodiscard]] double eval_num_dbl(const std::vector<double> &v) const final
     {
         if constexpr (func_has_eval_num_dbl_v<T>) {
             return m_value.eval_num_dbl(v);
@@ -439,7 +466,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
                                         + "'");
         }
     }
-    double deval_num_dbl(const std::vector<double> &v, std::vector<double>::size_type i) const final
+    [[nodiscard]] double deval_num_dbl(const std::vector<double> &v, std::vector<double>::size_type i) const final
     {
         if constexpr (func_has_deval_num_dbl_v<T>) {
             return m_value.deval_num_dbl(v, i);
@@ -450,11 +477,11 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     }
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                         llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
-                                         bool high_accuracy) const final
+                                         llvm::Value *par_ptr, llvm::Value *time_ptr, llvm::Value *stride,
+                                         std::uint32_t batch_size, bool high_accuracy) const final
     {
         if constexpr (func_has_llvm_eval_v<T>) {
-            return m_value.llvm_eval(s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+            return m_value.llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size, high_accuracy);
         } else {
             throw not_implemented_error("llvm_eval() is not implemented for the function '" + get_name() + "'");
         }
@@ -482,7 +509,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         throw;
         // LCOV_EXCL_STOP
     }
-    bool has_taylor_decompose() const final
+    [[nodiscard]] bool has_taylor_decompose() const final
     {
         return func_has_taylor_decompose_v<T>;
     }
@@ -535,7 +562,7 @@ HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const func &);
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 // fmt formatter for func, implemented
 // on top of the streaming operator.
@@ -548,8 +575,7 @@ struct formatter<heyoka::func> : heyoka::detail::ostream_formatter {
 
 } // namespace fmt
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 HEYOKA_DLL_PUBLIC std::size_t hash(const func &);
 
@@ -582,7 +608,7 @@ class HEYOKA_DLL_PUBLIC func
 
     // Just two small helpers to make sure that whenever we require
     // access to the pointer it actually points to something.
-    const detail::func_inner_base *ptr() const;
+    [[nodiscard]] const detail::func_inner_base *ptr() const;
     detail::func_inner_base *ptr();
 
     // Private constructor used in the copy() function.
@@ -590,7 +616,7 @@ class HEYOKA_DLL_PUBLIC func
 
     // Private helper to extract and check the gradient in the
     // diff() implementations.
-    HEYOKA_DLL_LOCAL std::vector<expression> fetch_gradient(const std::string &) const;
+    [[nodiscard]] HEYOKA_DLL_LOCAL std::vector<expression> fetch_gradient(const std::string &) const;
 
     template <typename T>
     using generic_ctor_enabler
@@ -618,7 +644,7 @@ public:
     // a copy of the inner object: this means that
     // the function arguments are shallow-copied and
     // NOT deep-copied.
-    func copy() const;
+    [[nodiscard]] func copy() const;
 
     // NOTE: like in pagmo, this may fail if invoked
     // from different DLLs in certain situations (e.g.,
@@ -629,44 +655,47 @@ public:
     // in the future, we can solve this in the same way as
     // in pagmo.
     template <typename T>
-    const T *extract() const noexcept
+    [[nodiscard]] const T *extract() const noexcept
     {
         auto p = dynamic_cast<const detail::func_inner<T> *>(ptr());
         return p == nullptr ? nullptr : &(p->m_value);
     }
     template <typename T>
-    T *extract() noexcept
+    [[nodiscard]] T *extract() noexcept
     {
         auto p = dynamic_cast<detail::func_inner<T> *>(ptr());
         return p == nullptr ? nullptr : &(p->m_value);
     }
 
-    std::type_index get_type_index() const;
-    const void *get_ptr() const;
-    void *get_ptr();
+    [[nodiscard]] std::type_index get_type_index() const;
+    [[nodiscard]] const void *get_ptr() const;
+    [[nodiscard]] void *get_ptr();
 
-    const std::string &get_name() const;
+    [[nodiscard]] bool is_time_dependent() const;
 
-    const std::vector<expression> &args() const;
+    [[nodiscard]] const std::string &get_name() const;
+
+    [[nodiscard]] const std::vector<expression> &args() const;
     std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 
     expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
     expression diff(std::unordered_map<const void *, expression> &, const param &) const;
 
-    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
-    long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
+    [[nodiscard]] double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
+    [[nodiscard]] long double eval_ldbl(const std::unordered_map<std::string, long double> &,
+                                        const std::vector<long double> &) const;
 #if defined(HEYOKA_HAVE_REAL128)
-    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                            const std::vector<mppp::real128> &) const;
+    [[nodiscard]] mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
+                                          const std::vector<mppp::real128> &) const;
 #endif
 
     void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
                         const std::vector<double> &) const;
-    double eval_num_dbl(const std::vector<double> &) const;
-    double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
+    [[nodiscard]] double eval_num_dbl(const std::vector<double> &) const;
+    [[nodiscard]] double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
-                                         llvm::Value *, std::uint32_t, bool) const;
+                                         llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 
@@ -715,6 +744,10 @@ llvm_eval_helper(const std::function<llvm::Value *(const std::vector<llvm::Value
                  llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
                  std::uint32_t, bool);
 
+std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llvm::LLVMContext &, llvm::Type *,
+                                                                             const std::string &, std::uint32_t,
+                                                                             const std::vector<expression> &);
+
 [[nodiscard]] HEYOKA_DLL_PUBLIC llvm::Function *
 llvm_c_eval_func_helper(const std::string &,
                         const std::function<llvm::Value *(const std::vector<llvm::Value *> &, bool)> &,
@@ -722,7 +755,7 @@ llvm_c_eval_func_helper(const std::string &,
 
 } // namespace detail
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 // Macros for the registration of s11n for concrete functions.
 #define HEYOKA_S11N_FUNC_EXPORT_KEY(f) BOOST_CLASS_EXPORT_KEY(heyoka::detail::func_inner<f>)

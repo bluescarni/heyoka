@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -19,7 +19,7 @@
 
 #endif
 
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 using namespace heyoka;
@@ -87,7 +87,7 @@ int main()
     // Cavendish constant
     const auto G = 6.6743e-11;
     // The 3-body system we will study
-    auto sys = make_nbody_sys(3u, kw::masses = masses, kw::Gconst = G);
+    auto sys = model::nbody(3u, kw::masses = masses, kw::Gconst = G);
     // The Taylor integrator in quadruple precision
     std::cout << "Constructing the Taylor integrator in quadruple precision ... " << std::flush;
     auto start = high_resolution_clock::now();

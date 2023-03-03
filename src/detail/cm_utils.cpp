@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -61,7 +61,9 @@
 
 #endif
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 bool llvm_func_name_compare::operator()(const llvm::Function *f0, const llvm::Function *f1) const
@@ -324,7 +326,9 @@ std::string cm_mangle(const func &)
 }
 // LCOV_EXCL_STOP
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #if defined(__GNUC__) && (__GNUC__ >= 11)
 

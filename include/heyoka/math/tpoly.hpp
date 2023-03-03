@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -20,8 +20,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/s11n.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -52,15 +51,15 @@ public:
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
 
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
-};
 
-HEYOKA_DLL_PUBLIC bool is_tpoly(const expression &);
+    [[nodiscard]] bool is_time_dependent() const;
+};
 
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression tpoly(expression, expression);
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::tpoly_impl)
 

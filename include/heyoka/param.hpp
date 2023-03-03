@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -29,8 +29,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 class HEYOKA_DLL_PUBLIC param
 {
@@ -96,6 +95,6 @@ HEYOKA_DLL_PUBLIC void update_connections(std::vector<std::vector<std::size_t>> 
                                                     const std::vector<std::vector<std::size_t>> &, std::size_t &,
                                                     double);
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 #endif

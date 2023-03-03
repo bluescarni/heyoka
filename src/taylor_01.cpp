@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -84,8 +84,7 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -2214,6 +2213,31 @@ const llvm_state &continuous_output<T>::get_llvm_state() const
 }
 
 template <typename T>
+const std::vector<T> &continuous_output<T>::operator()(T tm)
+{
+    call_impl(std::move(tm));
+    return m_output;
+}
+
+template <typename T>
+const std::vector<T> &continuous_output<T>::get_output() const
+{
+    return m_output;
+}
+
+template <typename T>
+const std::vector<T> &continuous_output<T>::get_times() const
+{
+    return m_times_hi;
+}
+
+template <typename T>
+const std::vector<T> &continuous_output<T>::get_tcs() const
+{
+    return m_tcs;
+}
+
+template <typename T>
 void continuous_output<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
     ar << m_llvm_state;
@@ -2920,6 +2944,33 @@ const llvm_state &continuous_output_batch<T>::get_llvm_state() const
 }
 
 template <typename T>
+const std::vector<T> &continuous_output_batch<T>::operator()(const T *tm)
+{
+    call_impl(tm);
+    return m_output;
+}
+
+template <typename T>
+const std::vector<T> &continuous_output_batch<T>::get_output() const
+{
+    return m_output;
+}
+
+// NOTE: when documenting this function,
+// we need to warn about the padding.
+template <typename T>
+const std::vector<T> &continuous_output_batch<T>::get_times() const
+{
+    return m_times_hi;
+}
+
+template <typename T>
+const std::vector<T> &continuous_output_batch<T>::get_tcs() const
+{
+    return m_tcs;
+}
+
+template <typename T>
 std::uint32_t continuous_output_batch<T>::get_batch_size() const
 {
     return m_batch_size;
@@ -3075,7 +3126,7 @@ std::ostream &operator<<(std::ostream &os, const continuous_output_batch<mppp::r
 
 #endif
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 // NOTE: this is the worker function that is invoked to compute
 // in parallel all the derivatives of a block in parallel mode.
@@ -3094,7 +3145,9 @@ extern "C" HEYOKA_DLL_PUBLIC void heyoka_cm_par_looper(std::uint32_t ncalls,
     // LCOV_EXCL_STOP
 }
 
-namespace heyoka::detail
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 namespace
@@ -3106,7 +3159,9 @@ using par_f_ptr = void (*)() noexcept;
 
 } // namespace
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 // NOTE: this is the parallel invoker that gets called from LLVM
 // to run multiple parallel workers within a segment at the same time, i.e.,

@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -68,8 +68,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 number::number() : number(0.) {}
 
@@ -640,4 +639,4 @@ number number_like(llvm_state &s, llvm::Type *tp, double val)
 
 } // namespace detail
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE

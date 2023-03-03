@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -22,7 +22,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sum_sq.hpp>
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -354,7 +354,7 @@ TEST_CASE("nbody")
 
     const auto G = 0.01720209895 * 0.01720209895 * 365 * 365;
 
-    auto sys = make_nbody_sys(6, kw::masses = masses, kw::Gconst = G);
+    auto sys = model::nbody(6, kw::masses = masses, kw::Gconst = G);
 
     // Create the state variables.
     std::vector<expression> x_vars, y_vars, z_vars, vx_vars, vy_vars, vz_vars;

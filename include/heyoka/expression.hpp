@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -54,8 +54,7 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 class HEYOKA_DLL_PUBLIC expression
 {
@@ -99,8 +98,8 @@ public:
     expression &operator=(const expression &);
     expression &operator=(expression &&) noexcept;
 
-    value_type &value();
-    const value_type &value() const;
+    [[nodiscard]] value_type &value();
+    [[nodiscard]] const value_type &value() const;
 };
 
 HEYOKA_DLL_PUBLIC expression copy(const expression &);
@@ -199,7 +198,7 @@ HEYOKA_DLL_PUBLIC std::size_t hash(const expression &);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression &);
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 // fmt formatter for expression, implemented
 // on top of the streaming operator.
@@ -212,8 +211,7 @@ struct formatter<heyoka::expression> : heyoka::detail::ostream_formatter {
 
 } // namespace fmt
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const expression &);
 HEYOKA_DLL_PUBLIC void rename_variables(expression &, const std::unordered_map<std::string, std::string> &);
@@ -433,7 +431,7 @@ HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *,
 
 HEYOKA_DLL_PUBLIC std::uint32_t get_param_size(const expression &);
 
-HEYOKA_DLL_PUBLIC bool has_time(const expression &);
+HEYOKA_DLL_PUBLIC bool is_time_dependent(const expression &);
 
 namespace detail
 {
@@ -568,7 +566,7 @@ inline std::vector<expression> add_cfunc(llvm_state &s, const std::string &name,
     }
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 namespace std
 {

@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -42,6 +42,7 @@
 #include <fmt/format.h>
 
 #include <heyoka/celmec/vsop2013.hpp>
+#include <heyoka/config.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_1.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_2.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_3.hpp>
@@ -62,8 +63,7 @@
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -430,4 +430,4 @@ std::array<double, 10> get_vsop2013_mus()
     return retval;
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE

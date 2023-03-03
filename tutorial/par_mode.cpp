@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -48,7 +48,7 @@ double run_benchmark(T final_time, bool parallel_mode)
     }
 
     // Create the nbody system.
-    auto sys = make_nbody_sys(nplanets + 1u, kw::masses = masses, kw::Gconst = G);
+    auto sys = model::nbody(nplanets + 1u, kw::masses = masses, kw::Gconst = G);
 
     // The initial state (zeroed out, we will change it later).
     std::vector<T> init_state((nplanets + 1u) * 6u);

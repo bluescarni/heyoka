@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -17,6 +17,7 @@
 #include <variant>
 #include <vector>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -25,8 +26,7 @@
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -346,4 +346,4 @@ void crossover(expression &e1, expression &e2, std::size_t node_id1, std::size_t
     swap(*e2_sub_ptr, *e1_sub_ptr);
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE

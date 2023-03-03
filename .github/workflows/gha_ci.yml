@@ -7,24 +7,24 @@ on:
     branches:
       - master
 jobs:
-  osx_10_15:
-    runs-on: macos-10.15
+  osx_11:
+    runs-on: macos-11
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Build
         run: bash tools/gha_osx.sh
-  osx_10_15_static:
-    runs-on: macos-10.15
+  osx_11_static:
+    runs-on: macos-11
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Build
         run: bash tools/gha_osx_static.sh
   windows_2019:
     runs-on: windows-2019
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v1.0.2
+        uses: microsoft/setup-msbuild@v1.1
       - uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
@@ -34,7 +34,7 @@ jobs:
       - name: Build
         shell: pwsh
         run: |
-          conda install -y cmake 'llvmdev=15.0.2' tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel fmt spdlog sleef zlib libzlib 'mppp>=0.27'
+          conda install -y cmake 'llvmdev=14.*' tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel fmt spdlog sleef zlib libzlib 'mppp>=0.27'
           mkdir build
           cd build
           cmake ../ -G "Visual Studio 16 2019" -A x64 -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_MPPP=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_WITH_SLEEF=yes -DMPPP_GMP_INCLUDE_DIR=C:\Miniconda\envs\test\Library\include -DMPPP_GMP_LIBRARY=C:\Miniconda\envs\test\Library\lib\mpir.lib
@@ -44,48 +44,53 @@ jobs:
   conda_release_static:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Build
         run: bash tools/gha_conda_release_static.sh
   conda_release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Build
         run: bash tools/gha_conda_release.sh
   conda_coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+        with:
+          # NOTE: this is needed by codecov
+          # apparently:
+          # https://github.com/codecov/codecov-action/issues/190
+          fetch-depth: 2
       - name: Build
         run: bash tools/gha_conda_coverage.sh
   conda_llvm14_asan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Build
         run: bash tools/gha_llvm14_conda_asan.sh
   conda_llvm13_asan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Build
         run: bash tools/gha_llvm13_conda_asan.sh
   conda_llvm12_asan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Build
         run: bash tools/gha_llvm12_conda_asan.sh
   conda_llvm11_asan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Build
         run: bash tools/gha_llvm11_conda_asan.sh
   conda_llvm10_asan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Build
         run: bash tools/gha_llvm10_conda_asan.sh

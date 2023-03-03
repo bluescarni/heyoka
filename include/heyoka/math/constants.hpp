@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -17,6 +17,7 @@
 #include <vector>
 
 #include <heyoka/callable.hpp>
+#include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -24,8 +25,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/s11n.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -96,7 +96,7 @@ public:
     [[nodiscard]] std::vector<expression> gradient() const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
-                                         llvm::Value *, std::uint32_t, bool) const;
+                                         llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 
@@ -110,7 +110,7 @@ public:
 
 HEYOKA_DLL_PUBLIC extern const expression pi;
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::null_constant_func, std::string, unsigned)
 

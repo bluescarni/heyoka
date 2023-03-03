@@ -1,8 +1,39 @@
 Changelog
 =========
 
+0.22.0 (unreleased)
+-------------------
+
+New
+~~~
+
+- New ``model`` module containing ready-made dynamical models
+  (`#295 <https://github.com/bluescarni/heyoka/pull/295>`__).
+
+Changes
+~~~~~~~
+
+- **BREAKING**: the ``make_nbody_sys()`` helper has been replaced by an equivalent
+  function in the new ``model`` module
+  (`#295 <https://github.com/bluescarni/heyoka/pull/295>`__).
+  This is a :ref:`breaking change <bchanges_0_22_0>`.
+
+0.21.0 (2023-02-16)
+-------------------
+
+New
+~~~
+
+- Compiled functions now support time-dependent expressions
+  (`#294 <https://github.com/bluescarni/heyoka/pull/294>`__).
+- The heyoka ABI is now properly versioned and tagged
+  (`#290 <https://github.com/bluescarni/heyoka/pull/290>`__).
+
 0.20.1 (2023-01-05)
 -------------------
+
+Changes
+~~~~~~~
 
 - Mark as visible a couple of internal functions which
   had been marked as hidden by mistake

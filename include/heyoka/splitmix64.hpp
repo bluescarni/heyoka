@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -16,8 +16,9 @@
 #include <cstdint>
 #include <limits>
 
-namespace heyoka
-{
+#include <heyoka/config.hpp>
+
+HEYOKA_BEGIN_NAMESPACE
 
 // NOTE: constexpr implementation, thus usable at compile-time.
 struct splitmix64 {
@@ -52,6 +53,6 @@ struct splitmix64 {
     std::uint64_t m_state;
 };
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 #endif

@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -20,7 +20,7 @@
 #include <xtensor/xadapt.hpp>
 #include <xtensor/xview.hpp>
 
-#include <heyoka/nbody.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "benchmark_utils.hpp"
@@ -39,7 +39,7 @@ void run_benchmark(double tol, bool high_accuracy, unsigned ntrials)
     const std::vector<T> masses = {5., 4., 3.},
                          ic = {1., -1., 0., 0., 0., 0., -2., -1., 0., 0., 0., 0., 1., 3., 0., 0., 0., 0.};
 
-    auto sys = make_nbody_sys(3, kw::masses = masses);
+    auto sys = model::nbody(3, kw::masses = masses);
 
     auto ta = taylor_adaptive<T>{sys, ic, kw::tol = tol, kw::high_accuracy = high_accuracy};
 

@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -9,7 +9,11 @@
 #ifndef HEYOKA_DETAIL_VSOP2013_VSOP2013_9_HPP
 #define HEYOKA_DETAIL_VSOP2013_VSOP2013_9_HPP
 
-namespace heyoka::detail
+#include <heyoka/config.hpp>
+
+HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
 {
 
 inline constexpr unsigned long vsop2013_9_1_sizes[13]
@@ -32,6 +36,8 @@ extern const double *const vsop2013_9_4_data[13];
 extern const double *const vsop2013_9_5_data[13];
 extern const double *const vsop2013_9_6_data[13];
 
-} // namespace heyoka::detail
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
 
 #endif

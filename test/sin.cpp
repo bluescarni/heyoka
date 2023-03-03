@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -158,9 +158,10 @@ TEST_CASE("cfunc")
 
             s.compile();
 
-            auto *cf_ptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
+            auto *cf_ptr
+                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
 
-            cf_ptr(outs.data(), ins.data(), pars.data());
+            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(sin(ins[i]), fp_t(100)));
@@ -197,14 +198,15 @@ TEST_CASE("cfunc_mp")
 
             s.compile();
 
-            auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *)>(
-                s.jit_lookup("cfunc"));
+            auto *cf_ptr
+                = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
+                    s.jit_lookup("cfunc"));
 
             const std::vector ins{mppp::real{".7", prec}};
             const std::vector pars{mppp::real{"-.1", prec}};
             std::vector<mppp::real> outs(3u, mppp::real{0, prec});
 
-            cf_ptr(outs.data(), ins.data(), pars.data());
+            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
 
             auto i = 0u;
             REQUIRE(outs[i] == sin(ins[i]));

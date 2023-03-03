@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -77,8 +77,7 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -632,12 +631,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     m_high_accuracy = high_accuracy;
     m_compact_mode = compact_mode;
 
-    // Check input params.
-    if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !isfinite(x); })) {
-        throw std::invalid_argument(
-            "A non-finite value was detected in the initial state of an adaptive Taylor integrator");
-    }
-
+    // Check the input state.
     if (m_state.size() != sys.size()) {
         throw std::invalid_argument(
             fmt::format("Inconsistent sizes detected in the initialization of an adaptive Taylor "
@@ -645,18 +639,14 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
                         m_state.size(), sys.size()));
     }
 
-    if (!isfinite(m_time)) {
-        throw std::invalid_argument(
-            fmt::format("Cannot initialise an adaptive Taylor integrator with a non-finite initial time of {}",
-                        detail::fp_to_string(static_cast<T>(m_time))));
-    }
-
+    // Check the tolerance value.
     if (tol && (!isfinite(*tol) || *tol < 0)) {
         throw std::invalid_argument(fmt::format(
             "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead",
             detail::fp_to_string(*tol)));
     }
 
+    // Check the consistency of parallel vs compact mode.
     if (parallel_mode && !compact_mode) {
         throw std::invalid_argument("Parallel mode can be activated only in conjunction with compact mode");
     }
@@ -1168,10 +1158,6 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         // end of the timestep.
         if (!isfinite(m_time)
             || std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !isfinite(x); })) {
-            // Let's also reset the cooldown values, as at this point
-            // they have become useless.
-            reset_cooldowns();
-
             return std::tuple{taylor_outcome::err_nf_state, std::move(h)};
         }
 
@@ -1965,6 +1951,108 @@ std::uint32_t taylor_adaptive<T>::get_dim() const
 }
 
 template <typename T>
+T taylor_adaptive<T>::get_time() const
+{
+    return static_cast<T>(m_time);
+}
+
+template <typename T>
+std::pair<T, T> taylor_adaptive<T>::get_dtime() const
+{
+    return {m_time.hi, m_time.lo};
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive<T>::get_state() const
+{
+    return m_state;
+}
+
+template <typename T>
+const T *taylor_adaptive<T>::get_state_data() const
+{
+    return m_state.data();
+}
+
+template <typename T>
+T *taylor_adaptive<T>::get_state_data()
+{
+    return m_state.data();
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive<T>::get_pars() const
+{
+    return m_pars;
+}
+
+template <typename T>
+const T *taylor_adaptive<T>::get_pars_data() const
+{
+    return m_pars.data();
+}
+
+template <typename T>
+T *taylor_adaptive<T>::get_pars_data()
+{
+    return m_pars.data();
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive<T>::get_tc() const
+{
+    return m_tc;
+}
+
+template <typename T>
+T taylor_adaptive<T>::get_last_h() const
+{
+    return m_last_h;
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive<T>::get_d_output() const
+{
+    return m_d_out;
+}
+
+template <typename T>
+bool taylor_adaptive<T>::with_events() const
+{
+    return static_cast<bool>(m_ed_data);
+}
+
+template <typename T>
+const std::vector<typename taylor_adaptive<T>::t_event_t> &taylor_adaptive<T>::get_t_events() const
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    return m_ed_data->m_tes;
+}
+
+template <typename T>
+const std::vector<std::optional<std::pair<T, T>>> &taylor_adaptive<T>::get_te_cooldowns() const
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    return m_ed_data->m_te_cooldowns;
+}
+
+template <typename T>
+const std::vector<typename taylor_adaptive<T>::nt_event_t> &taylor_adaptive<T>::get_nt_events() const
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    return m_ed_data->m_ntes;
+}
+
+template <typename T>
 void taylor_adaptive<T>::set_time(T t)
 {
 #if defined(HEYOKA_HAVE_REAL)
@@ -2166,14 +2254,9 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
     m_high_accuracy = high_accuracy;
     m_compact_mode = compact_mode;
 
-    // Check input params.
+    // Check several input params.
     if (m_batch_size == 0u) {
         throw std::invalid_argument("The batch size in an adaptive Taylor integrator cannot be zero");
-    }
-
-    if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !isfinite(x); })) {
-        throw std::invalid_argument(
-            "A non-finite value was detected in the initial state of an adaptive Taylor integrator");
     }
 
     if (m_state.size() % m_batch_size != 0u) {
@@ -2196,12 +2279,6 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
             fmt::format("Invalid size detected in the initialization of an adaptive Taylor "
                         "integrator: the time vector has a size of {}, which is not equal to the batch size ({})",
                         m_time_hi.size(), m_batch_size));
-    }
-    // NOTE: no need to check m_time_lo for finiteness, as it
-    // was inited to zero already.
-    if (std::any_of(m_time_hi.begin(), m_time_hi.end(), [](const auto &x) { return !isfinite(x); })) {
-        throw std::invalid_argument(
-            "A non-finite initial time was detected in the initialisation of an adaptive Taylor integrator");
     }
 
     if (tol && (!isfinite(*tol) || *tol < 0)) {
@@ -2809,10 +2886,6 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             // Check if the time or the state vector are non-finite at the
             // end of the timestep.
             if (!isfinite(new_time) || m_nf_detected[i] != 0) {
-                // Let's also reset the cooldown values for this batch index,
-                // as at this point they have become useless.
-                reset_cooldowns(i);
-
                 m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
 
                 // Move to the next batch element.
@@ -3924,6 +3997,126 @@ std::uint32_t taylor_adaptive_batch<T>::get_dim() const
 }
 
 template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::get_time() const
+{
+    return m_time_hi;
+}
+
+template <typename T>
+const T *taylor_adaptive_batch<T>::get_time_data() const
+{
+    return m_time_hi.data();
+}
+
+template <typename T>
+std::pair<const std::vector<T> &, const std::vector<T> &> taylor_adaptive_batch<T>::get_dtime() const
+{
+    return std::make_pair(std::cref(m_time_hi), std::cref(m_time_lo));
+}
+
+template <typename T>
+std::pair<const T *, const T *> taylor_adaptive_batch<T>::get_dtime_data() const
+{
+    return std::make_pair(m_time_hi.data(), m_time_lo.data());
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::get_state() const
+{
+    return m_state;
+}
+
+template <typename T>
+const T *taylor_adaptive_batch<T>::get_state_data() const
+{
+    return m_state.data();
+}
+
+template <typename T>
+T *taylor_adaptive_batch<T>::get_state_data()
+{
+    return m_state.data();
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::get_pars() const
+{
+    return m_pars;
+}
+
+template <typename T>
+const T *taylor_adaptive_batch<T>::get_pars_data() const
+{
+    return m_pars.data();
+}
+
+template <typename T>
+T *taylor_adaptive_batch<T>::get_pars_data()
+{
+    return m_pars.data();
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::get_tc() const
+{
+    return m_tc;
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::get_last_h() const
+{
+    return m_last_h;
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::get_d_output() const
+{
+    return m_d_out;
+}
+
+template <typename T>
+bool taylor_adaptive_batch<T>::with_events() const
+{
+    return static_cast<bool>(m_ed_data);
+}
+
+template <typename T>
+const std::vector<typename taylor_adaptive_batch<T>::t_event_t> &taylor_adaptive_batch<T>::get_t_events() const
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    return m_ed_data->m_tes;
+}
+
+template <typename T>
+const std::vector<std::vector<std::optional<std::pair<T, T>>>> &taylor_adaptive_batch<T>::get_te_cooldowns() const
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    return m_ed_data->m_te_cooldowns;
+}
+
+template <typename T>
+const std::vector<typename taylor_adaptive_batch<T>::nt_event_t> &taylor_adaptive_batch<T>::get_nt_events() const
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    return m_ed_data->m_ntes;
+}
+
+template <typename T>
+const std::vector<std::tuple<taylor_outcome, T>> &taylor_adaptive_batch<T>::get_step_res() const
+{
+    return m_step_res;
+}
+
+template <typename T>
 const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(const std::vector<T> &time, bool rel_time)
 {
     // Check the dimensionality of time.
@@ -4046,4 +4239,4 @@ template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<mppp::real128>::finalise_c
 
 #endif
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE

@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -105,8 +105,7 @@
 
 #endif
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 expression::expression() : expression(number{0.}) {}
 
@@ -195,7 +194,7 @@ expression copy_impl(std::unordered_map<const void *, expression> &func_map, con
 
                 // Construct the return value and put it into the cache.
                 auto ex = expression{std::move(f_copy)};
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ex});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ex);
                 // NOTE: an expression cannot contain itself.
                 assert(flag); // LCOV_EXCL_LINE
 
@@ -1048,7 +1047,7 @@ std::size_t get_n_nodes(std::unordered_map<const void *, std::size_t> &func_map,
 
                 // Store the number of nodes for the current function
                 // in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, retval});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, retval);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
 
@@ -1109,7 +1108,7 @@ expression diff(std::unordered_map<const void *, expression> &func_map, const ex
                 auto ret = arg.diff(func_map, s);
 
                 // Put the return value in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
 
@@ -1149,7 +1148,7 @@ expression diff(std::unordered_map<const void *, expression> &func_map, const ex
                 auto ret = arg.diff(func_map, p);
 
                 // Put the return value in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
 
@@ -1231,7 +1230,7 @@ expression subs(std::unordered_map<const void *, expression> &func_map, const ex
 
                 // Put the return value in the cache.
                 auto ret = expression{std::move(tmp)};
-                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
 
@@ -1645,46 +1644,49 @@ namespace detail
 namespace
 {
 
-bool has_time(std::unordered_set<const void *> &func_set, const expression &ex)
+bool is_time_dependent(std::unordered_map<const void *, bool> &func_map, const expression &ex)
 {
-    // If the expression itself is a time function or a tpoly,
-    // return true.
-    if (detail::is_time(ex) || detail::is_tpoly(ex)) {
-        return true;
-    }
-
-    // Otherwise:
-    // - if ex is a function, check if any of its arguments
-    //   is time-dependent,
+    // - If ex is a function, check if it is time-dependent, or
+    //   if any of its arguments is time-dependent,
     // - otherwise, return false.
     return std::visit(
-        [&func_set](const auto &v) {
+        [&func_map](const auto &v) {
             using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, func>) {
                 const auto f_id = v.get_ptr();
 
-                if (auto it = func_set.find(f_id); it != func_set.end()) {
-                    // We already determined if this function contains time,
-                    // return false (if the function does contain time, the first
-                    // time it was encountered we returned true and we could not
-                    // possibly end up here).
-                    return false;
+                // Did we already determine if v is time-dependent?
+                if (const auto it = func_map.find(f_id); it != func_map.end()) {
+                    return it->second;
+                }
+
+                // Check if the function is intrinsically time-dependent.
+                bool is_tm_dep = v.is_time_dependent();
+                if (!is_tm_dep) {
+                    // The function does **not** intrinsically depend on time.
+                    // Check its arguments.
+                    for (const auto &a : v.args()) {
+                        if (is_time_dependent(func_map, a)) {
+                            // A time-dependent argument was found. Update
+                            // is_tm_dep and break out, no point in checking
+                            // the other arguments.
+                            is_tm_dep = true;
+                            break;
+                        }
+                    }
                 }
 
                 // Update the cache.
-                // NOTE: do it earlier than usual in order to avoid having
-                // to repeat this code twice for the two paths below.
-                func_set.insert(f_id);
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, is_tm_dep);
 
-                for (const auto &a : v.args()) {
-                    if (has_time(func_set, a)) {
-                        return true;
-                    }
-                }
+                // An expression cannot contain itself.
+                assert(flag);
+
+                return is_tm_dep;
+            } else {
+                return false;
             }
-
-            return false;
         },
         ex.value());
 }
@@ -2409,8 +2411,8 @@ namespace
 {
 
 void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
-                       llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars,
-                       std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
+                       llvm::Value *time_ptr, llvm::Value *stride, const std::vector<expression> &dc,
+                       std::uint32_t nvars, std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
 {
     auto &builder = s.builder();
 
@@ -2431,8 +2433,8 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, ll
     for (std::uint32_t i = nvars; i < nuvars; ++i) {
         assert(std::holds_alternative<func>(dc[i].value()));
 
-        eval_arr.push_back(
-            std::get<func>(dc[i].value()).llvm_eval(s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy));
+        eval_arr.push_back(std::get<func>(dc[i].value())
+                               .llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size, high_accuracy));
     }
 
     // Write the outputs.
@@ -2836,8 +2838,8 @@ cfunc_c_make_output_globals(llvm_state &s, llvm::Type *fp_t, const std::vector<e
     auto *g_num_indices = new llvm::GlobalVariable(md, num_indices_arr->getType(), true,
                                                    llvm::GlobalVariable::InternalLinkage, num_indices_arr);
 
-    auto nums_arr_type = llvm::ArrayType::get(fp_t, boost::numeric_cast<std::uint64_t>(nums.size()));
-    auto nums_arr = llvm::ConstantArray::get(nums_arr_type, nums);
+    auto *nums_arr_type = llvm::ArrayType::get(fp_t, boost::numeric_cast<std::uint64_t>(nums.size()));
+    auto *nums_arr = llvm::ConstantArray::get(nums_arr_type, nums);
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     auto *g_nums
         = new llvm::GlobalVariable(md, nums_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, nums_arr);
@@ -2965,8 +2967,9 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
 }
 
 void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, llvm::Value *in_ptr,
-                      llvm::Value *par_ptr, llvm::Value *stride, const std::vector<expression> &dc, std::uint32_t nvars,
-                      std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
+                      llvm::Value *par_ptr, llvm::Value *time_ptr, llvm::Value *stride,
+                      const std::vector<expression> &dc, std::uint32_t nvars, std::uint32_t nuvars,
+                      std::uint32_t batch_size, bool high_accuracy)
 {
     auto &builder = s.builder();
     auto &md = s.module();
@@ -3038,8 +3041,9 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
             // initial arguments are always present:
             // - eval array,
             // - pointer to the param values,
+            // - pointer to the time value(s),
             // - stride.
-            std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr, stride};
+            std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr, time_ptr, stride};
 
             // Create the other arguments via the generators.
             for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
@@ -3152,12 +3156,13 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // Fetch the current insertion block.
     auto *orig_bb = builder.GetInsertBlock();
 
-    // Prepare the function prototype:
+    // Prepare the arguments:
     //
-    // - the first argument is a write-only float pointer to the outputs,
-    // - the second argument is a const float pointer to the inputs,
-    // - the third argument is a const float pointer to the pars,
-    // - the fourth argument is the stride.
+    // - a write-only float pointer to the outputs,
+    // - a const float pointer to the inputs,
+    // - a const float pointer to the pars,
+    // - a const float pointer to the time value(s),
+    // - the stride.
     //
     // The pointer arguments cannot overlap.
     auto *fp_t = [&]() {
@@ -3172,7 +3177,7 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
 #endif
     }();
     auto *ext_fp_t = llvm_ext_type(fp_t);
-    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(ext_fp_t));
+    std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(ext_fp_t));
     fargs.push_back(to_llvm_type<std::size_t>(context));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -3206,7 +3211,13 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     par_ptr->addAttr(llvm::Attribute::NoAlias);
     par_ptr->addAttr(llvm::Attribute::ReadOnly);
 
-    auto *stride = out_ptr + 3;
+    auto *time_ptr = out_ptr + 3;
+    time_ptr->setName("time_ptr");
+    time_ptr->addAttr(llvm::Attribute::NoCapture);
+    time_ptr->addAttr(llvm::Attribute::NoAlias);
+    time_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto *stride = out_ptr + 4;
     stride->setName("stride");
 
     // Create a new basic block to start insertion into.
@@ -3215,9 +3226,11 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     builder.SetInsertPoint(bb);
 
     if (compact_mode) {
-        add_cfunc_c_mode(s, fp_t, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
+        add_cfunc_c_mode(s, fp_t, out_ptr, in_ptr, par_ptr, time_ptr, stride, dc, nvars, nuvars, batch_size,
+                         high_accuracy);
     } else {
-        add_cfunc_nc_mode(s, fp_t, out_ptr, in_ptr, par_ptr, stride, dc, nvars, nuvars, batch_size, high_accuracy);
+        add_cfunc_nc_mode(s, fp_t, out_ptr, in_ptr, par_ptr, time_ptr, stride, dc, nvars, nuvars, batch_size,
+                          high_accuracy);
     }
 
     // Finish off the function.
@@ -3259,13 +3272,19 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     par_ptr->addAttr(llvm::Attribute::NoAlias);
     par_ptr->addAttr(llvm::Attribute::ReadOnly);
 
+    time_ptr = out_ptr + 3;
+    time_ptr->setName("time_ptr");
+    time_ptr->addAttr(llvm::Attribute::NoCapture);
+    time_ptr->addAttr(llvm::Attribute::NoAlias);
+    time_ptr->addAttr(llvm::Attribute::ReadOnly);
+
     // Create a new basic block to start insertion into.
     bb = llvm::BasicBlock::Create(context, "entry", f);
     assert(bb != nullptr); // LCOV_EXCL_LINE
     builder.SetInsertPoint(bb);
 
     // Invoke the strided function with stride == batch_size.
-    builder.CreateCall(f_strided, {out_ptr, in_ptr, par_ptr, to_size_t(s, builder.getInt32(batch_size))});
+    builder.CreateCall(f_strided, {out_ptr, in_ptr, par_ptr, time_ptr, to_size_t(s, builder.getInt32(batch_size))});
 
     // Finish off the function.
     builder.CreateRetVoid();
@@ -3345,14 +3364,14 @@ template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real>(llvm_st
 } // namespace detail
 
 // Determine if an expression is time-dependent.
-bool has_time(const expression &ex)
+bool is_time_dependent(const expression &ex)
 {
-    std::unordered_set<const void *> func_set;
+    std::unordered_map<const void *, bool> func_map;
 
-    return detail::has_time(func_set, ex);
+    return detail::is_time_dependent(func_map, ex);
 }
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 #if defined(__GNUC__) && (__GNUC__ >= 11)
 

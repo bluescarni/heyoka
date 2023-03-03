@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -40,8 +40,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 class HEYOKA_DLL_PUBLIC number
 {
@@ -96,7 +95,7 @@ HEYOKA_DLL_PUBLIC std::size_t hash(const number &);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const number &);
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 // fmt formatter for number, implemented
 // on top of the streaming operator.
@@ -109,8 +108,7 @@ struct formatter<heyoka::number> : heyoka::detail::ostream_formatter {
 
 } // namespace fmt
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 HEYOKA_DLL_PUBLIC bool is_zero(const number &);
 HEYOKA_DLL_PUBLIC bool is_one(const number &);
@@ -161,6 +159,6 @@ HEYOKA_DLL_PUBLIC number number_like(llvm_state &, llvm::Type *, double);
 
 } // namespace detail
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 #endif

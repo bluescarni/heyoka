@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -63,8 +63,7 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
@@ -170,7 +169,7 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, event_direction);
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 // fmt formatters for taylor_outcome and event_direction, implemented
 // on top of the streaming operator.
@@ -239,8 +238,7 @@ inline void serialize(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &
 
 } // namespace boost::serialization
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 namespace kw
 {
@@ -628,23 +626,10 @@ public:
 
     [[nodiscard]] const llvm_state &get_llvm_state() const;
 
-    const std::vector<T> &operator()(T tm)
-    {
-        call_impl(std::move(tm));
-        return m_output;
-    }
-    const std::vector<T> &get_output() const
-    {
-        return m_output;
-    }
-    const std::vector<T> &get_times() const
-    {
-        return m_times_hi;
-    }
-    const std::vector<T> &get_tcs() const
-    {
-        return m_tcs;
-    }
+    const std::vector<T> &operator()(T);
+    const std::vector<T> &get_output() const;
+    const std::vector<T> &get_times() const;
+    const std::vector<T> &get_tcs() const;
 
     std::pair<T, T> get_bounds() const;
     [[nodiscard]] std::size_t get_n_steps() const;
@@ -729,28 +714,15 @@ public:
 
     [[nodiscard]] const llvm_state &get_llvm_state() const;
 
-    const std::vector<T> &operator()(const T *tm)
-    {
-        call_impl(tm);
-        return m_output;
-    }
+    const std::vector<T> &operator()(const T *);
     const std::vector<T> &operator()(const std::vector<T> &);
     const std::vector<T> &operator()(T);
 
-    const std::vector<T> &get_output() const
-    {
-        return m_output;
-    }
+    const std::vector<T> &get_output() const;
     // NOTE: when documenting this function,
     // we need to warn about the padding.
-    const std::vector<T> &get_times() const
-    {
-        return m_times_hi;
-    }
-    const std::vector<T> &get_tcs() const
-    {
-        return m_tcs;
-    }
+    const std::vector<T> &get_times() const;
+    const std::vector<T> &get_tcs() const;
     [[nodiscard]] std::uint32_t get_batch_size() const;
 
     std::pair<std::vector<T>, std::vector<T>> get_bounds() const;
@@ -1158,90 +1130,33 @@ public:
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] std::uint32_t get_dim() const;
 
-    T get_time() const
-    {
-        return static_cast<T>(m_time);
-    }
+    T get_time() const;
     void set_time(T);
 
     // Time set/get in double-length format.
-    std::pair<T, T> get_dtime() const
-    {
-        return {m_time.hi, m_time.lo};
-    }
+    std::pair<T, T> get_dtime() const;
     void set_dtime(T, T);
 
-    const std::vector<T> &get_state() const
-    {
-        return m_state;
-    }
-    const T *get_state_data() const
-    {
-        return m_state.data();
-    }
-    T *get_state_data()
-    {
-        return m_state.data();
-    }
+    const std::vector<T> &get_state() const;
+    const T *get_state_data() const;
+    T *get_state_data();
 
-    const std::vector<T> &get_pars() const
-    {
-        return m_pars;
-    }
-    const T *get_pars_data() const
-    {
-        return m_pars.data();
-    }
-    T *get_pars_data()
-    {
-        return m_pars.data();
-    }
+    const std::vector<T> &get_pars() const;
+    const T *get_pars_data() const;
+    T *get_pars_data();
 
-    const std::vector<T> &get_tc() const
-    {
-        return m_tc;
-    }
+    const std::vector<T> &get_tc() const;
 
-    T get_last_h() const
-    {
-        return m_last_h;
-    }
+    T get_last_h() const;
 
-    const std::vector<T> &get_d_output() const
-    {
-        return m_d_out;
-    }
+    const std::vector<T> &get_d_output() const;
     const std::vector<T> &update_d_output(T, bool = false);
 
-    [[nodiscard]] bool with_events() const
-    {
-        return static_cast<bool>(m_ed_data);
-    }
+    [[nodiscard]] bool with_events() const;
     void reset_cooldowns();
-    const std::vector<t_event_t> &get_t_events() const
-    {
-        if (!m_ed_data) {
-            throw std::invalid_argument("No events were defined for this integrator");
-        }
-
-        return m_ed_data->m_tes;
-    }
-    const auto &get_te_cooldowns() const
-    {
-        if (!m_ed_data) {
-            throw std::invalid_argument("No events were defined for this integrator");
-        }
-
-        return m_ed_data->m_te_cooldowns;
-    }
-    const std::vector<nt_event_t> &get_nt_events() const
-    {
-        if (!m_ed_data) {
-            throw std::invalid_argument("No events were defined for this integrator");
-        }
-
-        return m_ed_data->m_ntes;
-    }
+    const std::vector<t_event_t> &get_t_events() const;
+    const std::vector<std::optional<std::pair<T, T>>> &get_te_cooldowns() const;
+    const std::vector<nt_event_t> &get_nt_events() const;
 
     std::tuple<taylor_outcome, T> step(bool = false);
     std::tuple<taylor_outcome, T> step_backward(bool = false);
@@ -1672,110 +1587,44 @@ public:
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] std::uint32_t get_dim() const;
 
-    const std::vector<T> &get_time() const
-    {
-        return m_time_hi;
-    }
-    const T *get_time_data() const
-    {
-        return m_time_hi.data();
-    }
+    const std::vector<T> &get_time() const;
+    const T *get_time_data() const;
     void set_time(const std::vector<T> &);
     void set_time(T);
 
     // Time set/get in double-length format.
-    auto get_dtime() const
-    {
-        return std::make_pair(std::cref(m_time_hi), std::cref(m_time_lo));
-    }
-    auto get_dtime_data() const
-    {
-        return std::make_pair(m_time_hi.data(), m_time_lo.data());
-    }
+    std::pair<const std::vector<T> &, const std::vector<T> &> get_dtime() const;
+    std::pair<const T *, const T *> get_dtime_data() const;
     void set_dtime(const std::vector<T> &, const std::vector<T> &);
     void set_dtime(T, T);
 
-    const std::vector<T> &get_state() const
-    {
-        return m_state;
-    }
-    const T *get_state_data() const
-    {
-        return m_state.data();
-    }
-    T *get_state_data()
-    {
-        return m_state.data();
-    }
+    const std::vector<T> &get_state() const;
+    const T *get_state_data() const;
+    T *get_state_data();
 
-    const std::vector<T> &get_pars() const
-    {
-        return m_pars;
-    }
-    const T *get_pars_data() const
-    {
-        return m_pars.data();
-    }
-    T *get_pars_data()
-    {
-        return m_pars.data();
-    }
+    const std::vector<T> &get_pars() const;
+    const T *get_pars_data() const;
+    T *get_pars_data();
 
-    const std::vector<T> &get_tc() const
-    {
-        return m_tc;
-    }
+    const std::vector<T> &get_tc() const;
 
-    const std::vector<T> &get_last_h() const
-    {
-        return m_last_h;
-    }
+    const std::vector<T> &get_last_h() const;
 
-    const std::vector<T> &get_d_output() const
-    {
-        return m_d_out;
-    }
+    const std::vector<T> &get_d_output() const;
     const std::vector<T> &update_d_output(const std::vector<T> &, bool = false);
     const std::vector<T> &update_d_output(T, bool = false);
 
-    [[nodiscard]] bool with_events() const
-    {
-        return static_cast<bool>(m_ed_data);
-    }
+    [[nodiscard]] bool with_events() const;
     void reset_cooldowns();
     void reset_cooldowns(std::uint32_t);
-    const std::vector<t_event_t> &get_t_events() const
-    {
-        if (!m_ed_data) {
-            throw std::invalid_argument("No events were defined for this integrator");
-        }
-
-        return m_ed_data->m_tes;
-    }
-    const auto &get_te_cooldowns() const
-    {
-        if (!m_ed_data) {
-            throw std::invalid_argument("No events were defined for this integrator");
-        }
-
-        return m_ed_data->m_te_cooldowns;
-    }
-    const std::vector<nt_event_t> &get_nt_events() const
-    {
-        if (!m_ed_data) {
-            throw std::invalid_argument("No events were defined for this integrator");
-        }
-
-        return m_ed_data->m_ntes;
-    }
+    const std::vector<t_event_t> &get_t_events() const;
+    const std::vector<std::vector<std::optional<std::pair<T, T>>>> &get_te_cooldowns() const;
+    const std::vector<nt_event_t> &get_nt_events() const;
 
     void step(bool = false);
     void step_backward(bool = false);
     void step(const std::vector<T> &, bool = false);
-    const std::vector<std::tuple<taylor_outcome, T>> &get_step_res() const
-    {
-        return m_step_res;
-    }
+    const std::vector<std::tuple<taylor_outcome, T>> &get_step_res() const;
 
 private:
     // Implementations of the propagate_*() functions.
@@ -1910,23 +1759,31 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive
 
 #endif
 
-} // namespace heyoka
-
-// NOTE: copy the implementation of the BOOST_CLASS_VERSION macro, as it does
-// not support class templates.
-// Version history:
-// - 1: added base class to taylor_adaptive.
-namespace boost::serialization
+namespace detail
 {
 
-template <typename T>
-struct version<heyoka::taylor_adaptive<T>> {
-    typedef mpl::int_<1> type;
-    typedef mpl::integral_c_tag tag;
-    BOOST_STATIC_CONSTANT(int, value = version::type::value);
-    BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<1>, boost::mpl::int_<256>>));
-};
+// Boost s11n class version history for taylor_adaptive:
+// - 1: added base class to taylor_adaptive.
+inline constexpr int taylor_adaptive_s11n_version = 1;
 
-} // namespace boost::serialization
+} // namespace detail
+
+HEYOKA_END_NAMESPACE
+
+// Set the Boost s11n class version for taylor_adaptive.
+BOOST_CLASS_VERSION(heyoka::taylor_adaptive<double>, heyoka::detail::taylor_adaptive_s11n_version);
+BOOST_CLASS_VERSION(heyoka::taylor_adaptive<long double>, heyoka::detail::taylor_adaptive_s11n_version);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+BOOST_CLASS_VERSION(heyoka::taylor_adaptive<mppp::real128>, heyoka::detail::taylor_adaptive_s11n_version);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+BOOST_CLASS_VERSION(heyoka::taylor_adaptive<mppp::real>, heyoka::detail::taylor_adaptive_s11n_version);
+
+#endif
 
 #endif

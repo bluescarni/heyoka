@@ -1,4 +1,4 @@
-// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022, 2023 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -14,12 +14,12 @@
 #include <string>
 #include <vector>
 
+#include <heyoka/config.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/splitmix64.hpp>
 
-namespace heyoka
-{
+HEYOKA_BEGIN_NAMESPACE
 
 class HEYOKA_DLL_PUBLIC expression_generator
 {
@@ -65,6 +65,6 @@ HEYOKA_DLL_PUBLIC void mutate(expression &, std::size_t, const expression_genera
 HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, splitmix64 &);
 HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, std::size_t, std::size_t);
 
-} // namespace heyoka
+HEYOKA_END_NAMESPACE
 
 #endif
