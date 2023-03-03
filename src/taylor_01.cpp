@@ -2213,6 +2213,31 @@ const llvm_state &continuous_output<T>::get_llvm_state() const
 }
 
 template <typename T>
+const std::vector<T> &continuous_output<T>::operator()(T tm)
+{
+    call_impl(std::move(tm));
+    return m_output;
+}
+
+template <typename T>
+const std::vector<T> &continuous_output<T>::get_output() const
+{
+    return m_output;
+}
+
+template <typename T>
+const std::vector<T> &continuous_output<T>::get_times() const
+{
+    return m_times_hi;
+}
+
+template <typename T>
+const std::vector<T> &continuous_output<T>::get_tcs() const
+{
+    return m_tcs;
+}
+
+template <typename T>
 void continuous_output<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
     ar << m_llvm_state;
@@ -2916,6 +2941,33 @@ template <typename T>
 const llvm_state &continuous_output_batch<T>::get_llvm_state() const
 {
     return m_llvm_state;
+}
+
+template <typename T>
+const std::vector<T> &continuous_output_batch<T>::operator()(const T *tm)
+{
+    call_impl(tm);
+    return m_output;
+}
+
+template <typename T>
+const std::vector<T> &continuous_output_batch<T>::get_output() const
+{
+    return m_output;
+}
+
+// NOTE: when documenting this function,
+// we need to warn about the padding.
+template <typename T>
+const std::vector<T> &continuous_output_batch<T>::get_times() const
+{
+    return m_times_hi;
+}
+
+template <typename T>
+const std::vector<T> &continuous_output_batch<T>::get_tcs() const
+{
+    return m_tcs;
 }
 
 template <typename T>
