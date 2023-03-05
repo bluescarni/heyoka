@@ -3222,7 +3222,13 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     builder.SetInsertPoint(bb);
 
     // Invoke the strided function with stride == batch_size.
-    builder.CreateCall(f_strided, {out_ptr, in_ptr, par_ptr, time_ptr, to_size_t(s, builder.getInt32(batch_size))});
+    auto *fcall = builder.CreateCall(f_strided,
+                                     {out_ptr, in_ptr, par_ptr, time_ptr, to_size_t(s, builder.getInt32(batch_size))});
+    // NOTE: forcibly inline the function call. This will increase
+    // compile time, but we want to make sure that the non-strided
+    // version of the compiled function is optimised as much as possible,
+    // so we accept the tradeoff.
+    fcall->addFnAttr(llvm::Attribute::AlwaysInline);
 
     // Finish off the function.
     builder.CreateRetVoid();
