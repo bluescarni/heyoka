@@ -53,7 +53,7 @@ public:
     variable &operator=(variable &&) noexcept;
 
     std::string &name();
-    const std::string &name() const;
+    [[nodiscard]] const std::string &name() const;
 };
 
 HEYOKA_DLL_PUBLIC void swap(variable &, variable &) noexcept;
