@@ -3281,7 +3281,7 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     fcall->addFnAttr(llvm::Attribute::AlwaysInline);
 #else
     auto attrs = fcall->getAttributes();
-    attrs = attrs.addAttributeAtIndex(context, llvm::AttributeList::FunctionIndex, llvm::Attribute::AlwaysInline);
+    attrs = attrs.addAttribute(context, llvm::AttributeList::FunctionIndex, llvm::Attribute::AlwaysInline);
     fcall->setAttributes(attrs);
 #endif
 
