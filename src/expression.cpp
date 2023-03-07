@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <exception>
 #include <functional>
 #include <iterator>
 #include <limits>
@@ -22,6 +23,7 @@
 #include <optional>
 #include <ostream>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -401,9 +403,55 @@ std::size_t hash(const expression &ex)
     return std::visit([](const auto &v) { return hash(v); }, ex.value());
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// Exception to signal that the stream output
+// for an expression has become too large.
+struct output_too_long : std::exception {
+};
+
+} // namespace
+
+// Helper to stream an expression to a stringstream, while
+// checking that the number of characters written so far
+// to the stream is not too large. If that is the case,
+// an exception will be thrown.
+void stream_expression(std::ostringstream &oss, const expression &e)
+{
+    if (oss.tellp() > 1000) {
+        throw output_too_long{};
+    }
+
+    std::visit(
+        [&oss](const auto &v) {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, func>) {
+                v.to_stream(oss);
+            } else {
+                oss << v;
+            }
+        },
+        e.value());
+}
+
+} // namespace detail
+
 std::ostream &operator<<(std::ostream &os, const expression &e)
 {
-    return std::visit([&os](const auto &arg) -> std::ostream & { return os << arg; }, e.value());
+    std::ostringstream oss;
+
+    try {
+        detail::stream_expression(oss, e);
+    } catch (const detail::output_too_long &) {
+        oss << "...";
+    }
+
+    return os << oss.str();
 }
 
 expression operator+(expression e)

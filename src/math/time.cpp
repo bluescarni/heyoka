@@ -11,7 +11,7 @@
 #include <cassert>
 #include <cstdint>
 #include <initializer_list>
-#include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -51,9 +51,9 @@ namespace detail
 
 time_impl::time_impl() : func_base("time", {}) {}
 
-void time_impl::to_stream(std::ostream &os) const
+void time_impl::to_stream(std::ostringstream &oss) const
 {
-    os << 't';
+    oss << 't';
 }
 
 std::vector<expression> time_impl::gradient() const

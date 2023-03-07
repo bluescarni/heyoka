@@ -13,7 +13,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <ostream>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -58,7 +58,7 @@ public:
     binary_op();
     explicit binary_op(type, expression, expression);
 
-    void to_stream(std::ostream &) const;
+    void to_stream(std::ostringstream &) const;
 
     bool extra_equal_to(const func &) const;
 

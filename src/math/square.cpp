@@ -10,7 +10,7 @@
 
 #include <cassert>
 #include <initializer_list>
-#include <ostream>
+#include <sstream>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -55,11 +55,12 @@ square_impl::square_impl(expression e) : func_base("square", std::vector{std::mo
 
 square_impl::square_impl() : square_impl(0_dbl) {}
 
-void square_impl::to_stream(std::ostream &os) const
+void square_impl::to_stream(std::ostringstream &oss) const
 {
     assert(args().size() == 1u);
 
-    os << args()[0] << "**2";
+    stream_expression(oss, args()[0]);
+    oss << "**2";
 }
 
 std::vector<expression> square_impl::gradient() const

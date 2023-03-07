@@ -56,7 +56,7 @@ public:
 
     ~param();
 
-    const std::uint32_t &idx() const;
+    [[nodiscard]] const std::uint32_t &idx() const;
 
     std::uint32_t &idx();
 };

@@ -11,7 +11,7 @@
 
 #include <cstdint>
 #include <optional>
-#include <ostream>
+#include <sstream>
 #include <string>
 #include <typeindex>
 #include <vector>
@@ -91,7 +91,7 @@ public:
 
     [[nodiscard]] std::string operator()(unsigned) const;
 
-    void to_stream(std::ostream &) const;
+    void to_stream(std::ostringstream &) const;
 
     [[nodiscard]] std::vector<expression> gradient() const;
 

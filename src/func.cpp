@@ -16,7 +16,7 @@
 #include <initializer_list>
 #include <limits>
 #include <memory>
-#include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -112,19 +112,19 @@ namespace detail
 {
 
 // Default implementation of to_stream() for func.
-void func_default_to_stream_impl(std::ostream &os, const func_base &f)
+void func_default_to_stream_impl(std::ostringstream &oss, const func_base &f)
 {
-    os << f.get_name() << '(';
+    oss << f.get_name() << '(';
 
     const auto &args = f.args();
     for (decltype(args.size()) i = 0; i < args.size(); ++i) {
-        os << args[i];
+        stream_expression(oss, args[i]);
         if (i != args.size() - 1u) {
-            os << ", ";
+            oss << ", ";
         }
     }
 
-    os << ')';
+    oss << ')';
 }
 
 func_inner_base::func_inner_base() = default;
@@ -212,6 +212,11 @@ bool func::is_time_dependent() const
 const std::string &func::get_name() const
 {
     return ptr()->get_name();
+}
+
+void func::to_stream(std::ostringstream &oss) const
+{
+    ptr()->to_stream(oss);
 }
 
 const std::vector<expression> &func::args() const
@@ -569,13 +574,6 @@ llvm::Function *func::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::u
 void swap(func &a, func &b) noexcept
 {
     std::swap(a.m_ptr, b.m_ptr);
-}
-
-std::ostream &operator<<(std::ostream &os, const func &f)
-{
-    f.ptr()->to_stream(os);
-
-    return os;
 }
 
 std::size_t hash(const func &f)

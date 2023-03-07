@@ -10,7 +10,7 @@
 #define HEYOKA_MATH_TIME_HPP
 
 #include <cstdint>
-#include <ostream>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -40,7 +40,7 @@ class HEYOKA_DLL_PUBLIC time_impl : public func_base
 public:
     time_impl();
 
-    void to_stream(std::ostream &) const;
+    void to_stream(std::ostringstream &) const;
 
     [[nodiscard]] std::vector<expression> gradient() const;
 
