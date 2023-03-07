@@ -40,6 +40,7 @@
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 
+#include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constant.h>
@@ -3276,7 +3277,13 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // compile time, but we want to make sure that the non-strided
     // version of the compiled function is optimised as much as possible,
     // so we accept the tradeoff.
+#if LLVM_VERSION_MAJOR >= 14
     fcall->addFnAttr(llvm::Attribute::AlwaysInline);
+#else
+    auto attrs = fcall->getAttributes();
+    attrs = attrs.addAttributeAtIndex(context, llvm::AttributeList::FunctionIndex, llvm::Attribute::AlwaysInline);
+    fcall->setAttributes(attrs);
+#endif
 
     // Finish off the function.
     builder.CreateRetVoid();
