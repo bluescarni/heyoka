@@ -378,7 +378,7 @@ std::vector<std::string> get_variables(const expression &e)
 
     detail::get_variables(func_set, s_set, e);
 
-    return std::vector<std::string>(s_set.begin(), s_set.end());
+    return {s_set.begin(), s_set.end()};
 }
 
 void rename_variables(expression &e, const std::unordered_map<std::string, std::string> &repl_map)
