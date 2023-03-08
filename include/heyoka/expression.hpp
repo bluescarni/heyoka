@@ -195,6 +195,13 @@ HEYOKA_DLL_PUBLIC detail::prime_wrapper operator""_p(const char *, std::size_t);
 
 HEYOKA_DLL_PUBLIC void swap(expression &, expression &) noexcept;
 
+namespace detail
+{
+
+std::size_t hash(funcptr_map<std::size_t> &, const expression &);
+
+} // namespace detail
+
 HEYOKA_DLL_PUBLIC std::size_t hash(const expression &);
 
 namespace detail

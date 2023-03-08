@@ -431,9 +431,10 @@ TEST_CASE("func hash")
 {
     auto f1 = func(func_10{{"x"_var, "y"_var}});
 
-    REQUIRE_NOTHROW(hash(f1));
+    detail::funcptr_map<std::size_t> tmp;
+    REQUIRE_NOTHROW(f1.hash(tmp));
 
-    std::cout << "Hash value for f1: " << hash(f1) << '\n';
+    std::cout << "Hash value for f1: " << f1.hash(tmp) << '\n';
 }
 
 struct func_14 : func_base {
@@ -447,9 +448,11 @@ TEST_CASE("func eq ineq")
 {
     auto f1 = func(func_10{{"x"_var, "y"_var}});
 
+    detail::funcptr_map<std::size_t> tmp;
+
     REQUIRE(f1 == f1);
     REQUIRE(!(f1 != f1));
-    REQUIRE(hash(f1) == hash(f1));
+    REQUIRE(f1.hash(tmp) == f1.hash(tmp));
 
     // Differing arguments.
     auto f2 = func(func_10{{"y"_var, "x"_var}});
@@ -639,12 +642,24 @@ struct func_18 : func_base {
 
 TEST_CASE("func extra_hash")
 {
+    detail::funcptr_map<std::size_t> tmp;
+
     auto f1 = func(func_18{0, {"x"_var, "y"_var}});
     auto f2 = func(func_18{0, {"x"_var, "y"_var}});
     auto f3 = func(func_18{-1, {"x"_var, "y"_var}});
 
-    REQUIRE(hash(f1) == hash(f2));
-    REQUIRE(hash(f1) != hash(f3));
+    REQUIRE(f1.hash(tmp) == f2.hash(tmp));
+    REQUIRE(f1.hash(tmp) != f3.hash(tmp));
+}
+
+TEST_CASE("func hash eq consistency")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    auto ex = x + y;
+
+    REQUIRE(z * ex + ex == z * (x + y) + (x + y));
+    REQUIRE(hash(z * ex + ex) == hash(z * (x + y) + (x + y)));
 }
 
 struct func_19 : func_base {

@@ -558,15 +558,12 @@ using is_func = std::conjunction<std::is_same<T, uncvref_t<T>>, std::is_default_
 
 HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
 
-HEYOKA_DLL_PUBLIC std::size_t hash(const func &);
-
 HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
 HEYOKA_DLL_PUBLIC bool operator!=(const func &, const func &);
 
 class HEYOKA_DLL_PUBLIC func
 {
     friend HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
-    friend HEYOKA_DLL_PUBLIC std::size_t hash(const func &);
     friend HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
 
     // Pointer to the inner base.
@@ -656,6 +653,8 @@ public:
     [[nodiscard]] const std::string &get_name() const;
 
     void to_stream(std::ostringstream &) const;
+
+    [[nodiscard]] std::size_t hash(detail::funcptr_map<std::size_t> &) const;
 
     [[nodiscard]] const std::vector<expression> &args() const;
     std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();

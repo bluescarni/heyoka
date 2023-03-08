@@ -402,15 +402,48 @@ void swap(expression &ex0, expression &ex1) noexcept
     std::swap(ex0.value(), ex1.value());
 }
 
-// NOTE: this implementation does not take advantage of potentially
-// repeating subexpressions. This is not currently a problem because
-// hashing is needed only in the CSE for the decomposition, which involves
-// only trivial expressions. However, this would likely be needed by a to_sympy()
-// implementation in heyoka.py which allows for a dictionary of custom
-// substitutions to be provided by the user.
+namespace detail
+{
+
+std::size_t hash(funcptr_map<std::size_t> &func_map, const expression &ex)
+{
+    return std::visit(
+        [&func_map](const auto &v) {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, func>) {
+                const auto f_id = v.get_ptr();
+
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already computed the hash for the current
+                    // function, return it.
+                    return it->second;
+                }
+
+                // Compute the hash of the current function.
+                auto retval = v.hash(func_map);
+
+                // Add it to the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, retval);
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return retval;
+            } else {
+                return hash(v);
+            }
+        },
+        ex.value());
+}
+
+} // namespace detail
+
 std::size_t hash(const expression &ex)
 {
-    return std::visit([](const auto &v) { return hash(v); }, ex.value());
+    thread_local detail::funcptr_map<std::size_t> func_map;
+    func_map.clear();
+
+    return detail::hash(func_map, ex);
 }
 
 namespace detail
