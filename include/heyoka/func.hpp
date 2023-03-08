@@ -32,6 +32,7 @@
 
 #endif
 
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -105,9 +106,9 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it() = 0;
 
     [[nodiscard]] virtual bool has_diff_var() const = 0;
-    virtual expression diff(std::unordered_map<const void *, expression> &, const std::string &) const = 0;
+    virtual expression diff(funcptr_map<expression> &, const std::string &) const = 0;
     [[nodiscard]] virtual bool has_diff_par() const = 0;
-    virtual expression diff(std::unordered_map<const void *, expression> &, const param &) const = 0;
+    virtual expression diff(funcptr_map<expression> &, const param &) const = 0;
     [[nodiscard]] virtual bool has_gradient() const = 0;
     [[nodiscard]] virtual std::vector<expression> gradient() const = 0;
 
@@ -183,14 +184,14 @@ inline constexpr bool func_has_extra_hash_v = std::is_same_v<detected_t<func_ext
 
 template <typename T>
 using func_diff_var_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(
-    std::declval<std::unordered_map<const void *, expression> &>(), std::declval<const std::string &>()));
+    std::declval<funcptr_map<expression> &>(), std::declval<const std::string &>()));
 
 template <typename T>
 inline constexpr bool func_has_diff_var_v = std::is_same_v<detected_t<func_diff_var_t, T>, expression>;
 
 template <typename T>
 using func_diff_par_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(
-    std::declval<std::unordered_map<const void *, expression> &>(), std::declval<const param &>()));
+    std::declval<funcptr_map<expression> &>(), std::declval<const param &>()));
 
 template <typename T>
 inline constexpr bool func_has_diff_par_v = std::is_same_v<detected_t<func_diff_par_t, T>, expression>;
@@ -391,12 +392,12 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     {
         return func_has_diff_var_v<T>;
     }
-    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const final;
+    expression diff(funcptr_map<expression> &, const std::string &) const final;
     [[nodiscard]] bool has_diff_par() const final
     {
         return func_has_diff_par_v<T>;
     }
-    expression diff(std::unordered_map<const void *, expression> &, const param &) const final;
+    expression diff(funcptr_map<expression> &, const param &) const final;
 
     // gradient.
     [[nodiscard]] bool has_gradient() const final
@@ -659,8 +660,8 @@ public:
     [[nodiscard]] const std::vector<expression> &args() const;
     std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 
-    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
-    expression diff(std::unordered_map<const void *, expression> &, const param &) const;
+    expression diff(detail::funcptr_map<expression> &, const std::string &) const;
+    expression diff(detail::funcptr_map<expression> &, const param &) const;
 
     [[nodiscard]] double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     [[nodiscard]] long double eval_ldbl(const std::unordered_map<std::string, long double> &,
@@ -680,11 +681,10 @@ public:
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 
-    std::vector<expression>::size_type decompose(std::unordered_map<const void *, std::vector<expression>::size_type> &,
+    std::vector<expression>::size_type decompose(detail::funcptr_map<std::vector<expression>::size_type> &,
                                                  std::vector<expression> &) const;
 
-    taylor_dc_t::size_type taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &,
-                                            taylor_dc_t &) const;
+    taylor_dc_t::size_type taylor_decompose(detail::funcptr_map<taylor_dc_t::size_type> &, taylor_dc_t &) const;
     llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;

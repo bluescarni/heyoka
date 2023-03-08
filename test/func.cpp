@@ -22,6 +22,7 @@
 #include <llvm/IR/IRBuilder.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
@@ -65,7 +66,7 @@ TEST_CASE("func minimal")
 
     auto *fp_t = s.builder().getDoubleTy();
 
-    std::unordered_map<const void *, expression> func_map;
+    detail::funcptr_map<expression> func_map;
     REQUIRE_THROWS_MATCHES(f.diff(func_map, ""), not_implemented_error,
                            Message("Cannot compute the derivative of the function 'f' with respect to a variable, "
                                    "because the function does not provide "
@@ -152,7 +153,7 @@ TEST_CASE("func minimal")
 
     taylor_dc_t dec{{"x"_var, {}}};
     f = func{func_00{{"x"_var, "y"_var}}};
-    std::unordered_map<const void *, taylor_dc_t::size_type> func_map2;
+    detail::funcptr_map<taylor_dc_t::size_type> func_map2;
     f.taylor_decompose(func_map2, dec);
 }
 
@@ -160,7 +161,7 @@ struct func_05 : func_base {
     func_05() : func_base("f", {}) {}
     explicit func_05(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const
+    expression diff(detail::funcptr_map<expression> &, const std::string &) const
     {
         return 42_dbl;
     }
@@ -180,7 +181,7 @@ struct func_05b : func_base {
     func_05b() : func_base("f", {}) {}
     explicit func_05b(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    expression diff(std::unordered_map<const void *, expression> &, const param &) const
+    expression diff(detail::funcptr_map<expression> &, const param &) const
     {
         return -42_dbl;
     }
@@ -192,7 +193,7 @@ TEST_CASE("func diff")
 
     auto f = func(func_05{});
 
-    std::unordered_map<const void *, expression> func_map;
+    detail::funcptr_map<expression> func_map;
     REQUIRE(f.diff(func_map, "x") == 42_dbl);
     REQUIRE_THROWS_MATCHES(func(func_05a{{"x"_var}}).diff(func_map, "x"), std::invalid_argument,
                            Message("Inconsistent gradient returned by the function 'f': a vector of 1 elements was "
@@ -323,7 +324,7 @@ TEST_CASE("func taylor_decompose")
     auto f = func(func_10{{"x"_var}});
 
     taylor_dc_t u_vars_defs{{"x"_var, {}}};
-    std::unordered_map<const void *, taylor_dc_t::size_type> func_map;
+    detail::funcptr_map<taylor_dc_t::size_type> func_map;
     REQUIRE(f.taylor_decompose(func_map, u_vars_defs) == 1u);
     REQUIRE(u_vars_defs == taylor_dc_t{{"x"_var, {}}, {"foo"_var, {}}});
 

@@ -73,6 +73,7 @@
 #endif
 
 #include <heyoka/detail/cm_utils.hpp>
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -164,7 +165,7 @@ namespace detail
 namespace
 {
 
-expression copy_impl(std::unordered_map<const void *, expression> &func_map, const expression &e)
+expression copy_impl(funcptr_map<expression> &func_map, const expression &e)
 {
     return std::visit(
         [&func_map](const auto &v) {
@@ -215,7 +216,7 @@ expression copy_impl(std::unordered_map<const void *, expression> &func_map, con
 
 expression copy(const expression &e)
 {
-    std::unordered_map<const void *, expression> func_map;
+    detail::funcptr_map<expression> func_map;
 
     return detail::copy_impl(func_map, e);
 }
@@ -302,7 +303,7 @@ namespace detail
 namespace
 {
 
-void get_variables(std::unordered_set<const void *> &func_set, std::set<std::string> &s_set, const expression &e)
+void get_variables(funcptr_set &func_set, std::set<std::string> &s_set, const expression &e)
 {
     std::visit(
         [&func_set, &s_set](const auto &arg) {
@@ -334,7 +335,7 @@ void get_variables(std::unordered_set<const void *> &func_set, std::set<std::str
         e.value());
 }
 
-void rename_variables(std::unordered_set<const void *> &func_set, expression &e,
+void rename_variables(funcptr_set &func_set, expression &e,
                       const std::unordered_map<std::string, std::string> &repl_map)
 {
     std::visit(
@@ -373,7 +374,7 @@ void rename_variables(std::unordered_set<const void *> &func_set, expression &e,
 
 std::vector<std::string> get_variables(const expression &e)
 {
-    std::unordered_set<const void *> func_set;
+    detail::funcptr_set func_set;
     std::set<std::string> s_set;
 
     detail::get_variables(func_set, s_set, e);
@@ -383,7 +384,7 @@ std::vector<std::string> get_variables(const expression &e)
 
 void rename_variables(expression &e, const std::unordered_map<std::string, std::string> &repl_map)
 {
-    std::unordered_set<const void *> func_set;
+    detail::funcptr_set func_set;
 
     detail::rename_variables(func_set, e, repl_map);
 }
@@ -1076,7 +1077,7 @@ namespace detail
 namespace
 {
 
-std::size_t get_n_nodes(std::unordered_map<const void *, std::size_t> &func_map, const expression &e)
+std::size_t get_n_nodes(funcptr_map<std::size_t> &func_map, const expression &e)
 {
     return std::visit(
         [&func_map](const auto &arg) -> std::size_t {
@@ -1114,7 +1115,7 @@ std::size_t get_n_nodes(std::unordered_map<const void *, std::size_t> &func_map,
 
 std::size_t get_n_nodes(const expression &e)
 {
-    std::unordered_map<const void *, std::size_t> func_map;
+    detail::funcptr_map<std::size_t> func_map;
 
     return detail::get_n_nodes(func_map, e);
 }
@@ -1122,7 +1123,7 @@ std::size_t get_n_nodes(const expression &e)
 namespace detail
 {
 
-expression diff(std::unordered_map<const void *, expression> &func_map, const expression &e, const std::string &s)
+expression diff(funcptr_map<expression> &func_map, const expression &e, const std::string &s)
 {
     return std::visit(
         [&func_map, &s](const auto &arg) {
@@ -1167,7 +1168,7 @@ expression diff(std::unordered_map<const void *, expression> &func_map, const ex
         e.value());
 }
 
-expression diff(std::unordered_map<const void *, expression> &func_map, const expression &e, const param &p)
+expression diff(funcptr_map<expression> &func_map, const expression &e, const param &p)
 {
     return std::visit(
         [&func_map, &p](const auto &arg) {
@@ -1211,14 +1212,14 @@ expression diff(std::unordered_map<const void *, expression> &func_map, const ex
 
 expression diff(const expression &e, const std::string &s)
 {
-    std::unordered_map<const void *, expression> func_map;
+    detail::funcptr_map<expression> func_map;
 
     return detail::diff(func_map, e, s);
 }
 
 expression diff(const expression &e, const param &p)
 {
-    std::unordered_map<const void *, expression> func_map;
+    detail::funcptr_map<expression> func_map;
 
     return detail::diff(func_map, e, p);
 }
@@ -1246,7 +1247,7 @@ namespace
 {
 
 // NOTE: an in-place API would perform better.
-expression subs(std::unordered_map<const void *, expression> &func_map, const expression &ex,
+expression subs(funcptr_map<expression> &func_map, const expression &ex,
                 const std::unordered_map<std::string, expression> &smap)
 {
     return std::visit(
@@ -1296,7 +1297,7 @@ expression subs(std::unordered_map<const void *, expression> &func_map, const ex
 
 expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
 {
-    std::unordered_map<const void *, expression> func_map;
+    detail::funcptr_map<expression> func_map;
 
     return detail::subs(func_map, e, smap);
 }
@@ -1447,8 +1448,8 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const expres
 namespace detail
 {
 
-taylor_dc_t::size_type taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &func_map,
-                                        const expression &ex, taylor_dc_t &dc)
+taylor_dc_t::size_type taylor_decompose(funcptr_map<taylor_dc_t::size_type> &func_map, const expression &ex,
+                                        taylor_dc_t &dc)
 {
     if (const auto *fptr = std::get_if<func>(&ex.value())) {
         return fptr->taylor_decompose(func_map, dc);
@@ -1464,7 +1465,7 @@ taylor_dc_t::size_type taylor_decompose(std::unordered_map<const void *, taylor_
 // If the return value is zero, ex was not decomposed.
 taylor_dc_t::size_type taylor_decompose(const expression &ex, taylor_dc_t &dc)
 {
-    std::unordered_map<const void *, taylor_dc_t::size_type> func_map;
+    detail::funcptr_map<taylor_dc_t::size_type> func_map;
 
     return detail::taylor_decompose(func_map, ex, dc);
 }
@@ -1573,7 +1574,7 @@ namespace detail
 namespace
 {
 
-std::uint32_t get_param_size(std::unordered_set<const void *> &func_set, const expression &ex)
+std::uint32_t get_param_size(detail::funcptr_set &func_set, const expression &ex)
 {
     std::uint32_t retval = 0;
 
@@ -1620,7 +1621,7 @@ std::uint32_t get_param_size(std::unordered_set<const void *> &func_set, const e
 // is zero, no params appear in the expression.
 std::uint32_t get_param_size(const expression &ex)
 {
-    std::unordered_set<const void *> func_set;
+    detail::funcptr_set func_set;
 
     return detail::get_param_size(func_set, ex);
 }
@@ -1631,7 +1632,7 @@ namespace detail
 namespace
 {
 
-bool is_time_dependent(std::unordered_map<const void *, bool> &func_map, const expression &ex)
+bool is_time_dependent(funcptr_map<bool> &func_map, const expression &ex)
 {
     // - If ex is a function, check if it is time-dependent, or
     //   if any of its arguments is time-dependent,
@@ -1703,9 +1704,8 @@ std::vector<std::pair<expression, expression>> copy(const std::vector<std::pair<
     return ret;
 }
 
-std::optional<std::vector<expression>::size_type>
-decompose(std::unordered_map<const void *, std::vector<expression>::size_type> &func_map, const expression &ex,
-          std::vector<expression> &dc)
+std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vector<expression>::size_type> &func_map,
+                                                            const expression &ex, std::vector<expression> &dc)
 {
     if (const auto *fptr = std::get_if<func>(&ex.value())) {
         return fptr->decompose(func_map, dc);
@@ -2091,7 +2091,7 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc, std::vecto
 
 std::optional<std::vector<expression>::size_type> decompose(const expression &ex, std::vector<expression> &dc)
 {
-    std::unordered_map<const void *, std::vector<expression>::size_type> func_map;
+    detail::funcptr_map<std::vector<expression>::size_type> func_map;
 
     return detail::decompose(func_map, ex, dc);
 }
@@ -3365,7 +3365,7 @@ template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real>(llvm_st
 // Determine if an expression is time-dependent.
 bool is_time_dependent(const expression &ex)
 {
-    std::unordered_map<const void *, bool> func_map;
+    detail::funcptr_map<bool> func_map;
 
     return detail::is_time_dependent(func_map, ex);
 }

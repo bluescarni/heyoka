@@ -40,6 +40,7 @@
 
 #endif
 
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -126,7 +127,7 @@ const expression &binary_op::rhs() const
 }
 
 template <typename T>
-expression binary_op::diff_impl(std::unordered_map<const void *, expression> &func_map, const T &x) const
+expression binary_op::diff_impl(funcptr_map<expression> &func_map, const T &x) const
 {
     assert(args().size() == 2u);
     assert(m_type >= type::add && m_type <= type::div);
@@ -144,12 +145,12 @@ expression binary_op::diff_impl(std::unordered_map<const void *, expression> &fu
     }
 }
 
-expression binary_op::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+expression binary_op::diff(funcptr_map<expression> &func_map, const std::string &s) const
 {
     return diff_impl(func_map, s);
 }
 
-expression binary_op::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+expression binary_op::diff(funcptr_map<expression> &func_map, const param &p) const
 {
     return diff_impl(func_map, p);
 }

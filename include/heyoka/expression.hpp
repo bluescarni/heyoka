@@ -43,6 +43,7 @@
 #endif
 
 #include <heyoka/detail/fmt_compat.hpp>
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -143,8 +144,7 @@ namespace detail
 // NOTE: these need to go here because
 // the definition of expression must be available.
 template <typename T>
-inline expression func_inner<T>::diff(std::unordered_map<const void *, expression> &func_map,
-                                      const std::string &s) const
+inline expression func_inner<T>::diff(funcptr_map<expression> &func_map, const std::string &s) const
 {
     if constexpr (func_has_diff_var_v<T>) {
         return m_value.diff(func_map, s);
@@ -157,7 +157,7 @@ inline expression func_inner<T>::diff(std::unordered_map<const void *, expressio
 }
 
 template <typename T>
-inline expression func_inner<T>::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+inline expression func_inner<T>::diff(funcptr_map<expression> &func_map, const param &p) const
 {
     if constexpr (func_has_diff_par_v<T>) {
         return m_value.diff(func_map, p);
@@ -349,9 +349,8 @@ HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<s
 namespace detail
 {
 
-HEYOKA_DLL_PUBLIC expression diff(std::unordered_map<const void *, expression> &, const expression &,
-                                  const std::string &);
-HEYOKA_DLL_PUBLIC expression diff(std::unordered_map<const void *, expression> &, const expression &, const param &);
+HEYOKA_DLL_PUBLIC expression diff(funcptr_map<expression> &, const expression &, const std::string &);
+HEYOKA_DLL_PUBLIC expression diff(funcptr_map<expression> &, const expression &, const param &);
 
 } // namespace detail
 
@@ -415,8 +414,7 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
 namespace detail
 {
 
-taylor_dc_t::size_type taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &, const expression &,
-                                        taylor_dc_t &);
+taylor_dc_t::size_type taylor_decompose(funcptr_map<taylor_dc_t::size_type> &, const expression &, taylor_dc_t &);
 
 } // namespace detail
 
@@ -459,9 +457,8 @@ namespace detail
 HEYOKA_DLL_PUBLIC bool is_integral(const expression &);
 HEYOKA_DLL_PUBLIC bool is_odd_integral_half(const expression &);
 
-std::optional<std::vector<expression>::size_type>
-decompose(std::unordered_map<const void *, std::vector<expression>::size_type> &, const expression &,
-          std::vector<expression> &);
+std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vector<expression>::size_type> &,
+                                                            const expression &, std::vector<expression> &);
 
 llvm::Value *cfunc_c_load_eval(llvm_state &, llvm::Type *, llvm::Value *, llvm::Value *);
 

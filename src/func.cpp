@@ -59,6 +59,7 @@
 #endif
 
 #include <heyoka/detail/cm_utils.hpp>
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -254,7 +255,7 @@ std::vector<expression> func::fetch_gradient(const std::string &target) const
     return grad;
 }
 
-expression func::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+expression func::diff(detail::funcptr_map<expression> &func_map, const std::string &s) const
 {
     // Run the specialised diff implementation,
     // if available.
@@ -277,7 +278,7 @@ expression func::diff(std::unordered_map<const void *, expression> &func_map, co
     return sum(std::move(prod));
 }
 
-expression func::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+expression func::diff(detail::funcptr_map<expression> &func_map, const param &p) const
 {
     // Run the specialised diff implementation,
     // if available.
@@ -379,7 +380,7 @@ namespace
 // - a variable,
 // - a number,
 // - a param.
-void func_td_args(func &fb, std::unordered_map<const void *, taylor_dc_t::size_type> &func_map, taylor_dc_t &dc)
+void func_td_args(func &fb, funcptr_map<taylor_dc_t::size_type> &func_map, taylor_dc_t &dc)
 {
     for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
         if (const auto dres = taylor_decompose(func_map, *r.first, dc)) {
@@ -400,8 +401,7 @@ void func_td_args(func &fb, std::unordered_map<const void *, taylor_dc_t::size_t
 // - a variable,
 // - a number,
 // - a param.
-void func_d_args(func &fb, std::unordered_map<const void *, std::vector<expression>::size_type> &func_map,
-                 std::vector<expression> &dc)
+void func_d_args(func &fb, funcptr_map<std::vector<expression>::size_type> &func_map, std::vector<expression> &dc)
 {
     for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
         if (const auto dres = decompose(func_map, *r.first, dc)) {
@@ -421,9 +421,8 @@ void func_d_args(func &fb, std::unordered_map<const void *, std::vector<expressi
 
 } // namespace detail
 
-std::vector<expression>::size_type
-func::decompose(std::unordered_map<const void *, std::vector<expression>::size_type> &func_map,
-                std::vector<expression> &dc) const
+std::vector<expression>::size_type func::decompose(detail::funcptr_map<std::vector<expression>::size_type> &func_map,
+                                                   std::vector<expression> &dc) const
 {
     const auto *const f_id = get_ptr();
 
@@ -452,7 +451,7 @@ func::decompose(std::unordered_map<const void *, std::vector<expression>::size_t
     return ret;
 }
 
-taylor_dc_t::size_type func::taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &func_map,
+taylor_dc_t::size_type func::taylor_decompose(detail::funcptr_map<taylor_dc_t::size_type> &func_map,
                                               taylor_dc_t &dc) const
 {
     const auto *const f_id = get_ptr();
