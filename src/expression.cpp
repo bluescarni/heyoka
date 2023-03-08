@@ -216,7 +216,8 @@ expression copy_impl(funcptr_map<expression> &func_map, const expression &e)
 
 expression copy(const expression &e)
 {
-    detail::funcptr_map<expression> func_map;
+    thread_local detail::funcptr_map<expression> func_map;
+    func_map.clear();
 
     return detail::copy_impl(func_map, e);
 }
@@ -374,8 +375,14 @@ void rename_variables(funcptr_set &func_set, expression &e,
 
 std::vector<std::string> get_variables(const expression &e)
 {
-    detail::funcptr_set func_set;
-    std::set<std::string> s_set;
+    thread_local detail::funcptr_set func_set;
+    func_set.clear();
+
+    // NOTE: it's probably better here to eventually
+    // change this to a fast unordered set, copy the items
+    // into a vector and sort it on output.
+    thread_local std::set<std::string> s_set;
+    s_set.clear();
 
     detail::get_variables(func_set, s_set, e);
 
@@ -384,7 +391,8 @@ std::vector<std::string> get_variables(const expression &e)
 
 void rename_variables(expression &e, const std::unordered_map<std::string, std::string> &repl_map)
 {
-    detail::funcptr_set func_set;
+    thread_local detail::funcptr_set func_set;
+    func_set.clear();
 
     detail::rename_variables(func_set, e, repl_map);
 }
@@ -1115,7 +1123,8 @@ std::size_t get_n_nodes(funcptr_map<std::size_t> &func_map, const expression &e)
 
 std::size_t get_n_nodes(const expression &e)
 {
-    detail::funcptr_map<std::size_t> func_map;
+    thread_local detail::funcptr_map<std::size_t> func_map;
+    func_map.clear();
 
     return detail::get_n_nodes(func_map, e);
 }
@@ -1212,14 +1221,16 @@ expression diff(funcptr_map<expression> &func_map, const expression &e, const pa
 
 expression diff(const expression &e, const std::string &s)
 {
-    detail::funcptr_map<expression> func_map;
+    thread_local detail::funcptr_map<expression> func_map;
+    func_map.clear();
 
     return detail::diff(func_map, e, s);
 }
 
 expression diff(const expression &e, const param &p)
 {
-    detail::funcptr_map<expression> func_map;
+    thread_local detail::funcptr_map<expression> func_map;
+    func_map.clear();
 
     return detail::diff(func_map, e, p);
 }
@@ -1297,7 +1308,8 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
 
 expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
 {
-    detail::funcptr_map<expression> func_map;
+    thread_local detail::funcptr_map<expression> func_map;
+    func_map.clear();
 
     return detail::subs(func_map, e, smap);
 }
@@ -1465,7 +1477,8 @@ taylor_dc_t::size_type taylor_decompose(funcptr_map<taylor_dc_t::size_type> &fun
 // If the return value is zero, ex was not decomposed.
 taylor_dc_t::size_type taylor_decompose(const expression &ex, taylor_dc_t &dc)
 {
-    detail::funcptr_map<taylor_dc_t::size_type> func_map;
+    thread_local detail::funcptr_map<taylor_dc_t::size_type> func_map;
+    func_map.clear();
 
     return detail::taylor_decompose(func_map, ex, dc);
 }
@@ -1621,7 +1634,8 @@ std::uint32_t get_param_size(detail::funcptr_set &func_set, const expression &ex
 // is zero, no params appear in the expression.
 std::uint32_t get_param_size(const expression &ex)
 {
-    detail::funcptr_set func_set;
+    thread_local detail::funcptr_set func_set;
+    func_set.clear();
 
     return detail::get_param_size(func_set, ex);
 }
@@ -2091,7 +2105,8 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc, std::vecto
 
 std::optional<std::vector<expression>::size_type> decompose(const expression &ex, std::vector<expression> &dc)
 {
-    detail::funcptr_map<std::vector<expression>::size_type> func_map;
+    thread_local detail::funcptr_map<std::vector<expression>::size_type> func_map;
+    func_map.clear();
 
     return detail::decompose(func_map, ex, dc);
 }
@@ -3365,7 +3380,8 @@ template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real>(llvm_st
 // Determine if an expression is time-dependent.
 bool is_time_dependent(const expression &ex)
 {
-    detail::funcptr_map<bool> func_map;
+    thread_local detail::funcptr_map<bool> func_map;
+    func_map.clear();
 
     return detail::is_time_dependent(func_map, ex);
 }
