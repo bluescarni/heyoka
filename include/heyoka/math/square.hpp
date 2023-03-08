@@ -10,7 +10,7 @@
 #define HEYOKA_MATH_SQUARE_HPP
 
 #include <cstdint>
-#include <ostream>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -40,7 +40,7 @@ public:
     square_impl();
     explicit square_impl(expression);
 
-    void to_stream(std::ostream &) const;
+    void to_stream(std::ostringstream &) const;
 
     [[nodiscard]] std::vector<expression> gradient() const;
 

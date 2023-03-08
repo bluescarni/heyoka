@@ -10,7 +10,7 @@
 #define HEYOKA_MATH_TPOLY_HPP
 
 #include <cstdint>
-#include <ostream>
+#include <sstream>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -44,7 +44,7 @@ public:
     tpoly_impl();
     explicit tpoly_impl(expression, expression);
 
-    void to_stream(std::ostream &) const;
+    void to_stream(std::ostringstream &) const;
 
     llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,

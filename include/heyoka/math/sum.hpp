@@ -10,7 +10,7 @@
 #define HEYOKA_MATH_SUM_HPP
 
 #include <cstdint>
-#include <ostream>
+#include <sstream>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -38,7 +38,7 @@ public:
     sum_impl();
     explicit sum_impl(std::vector<expression>);
 
-    void to_stream(std::ostream &) const;
+    void to_stream(std::ostringstream &) const;
 
     std::vector<expression> gradient() const;
 

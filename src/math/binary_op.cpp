@@ -14,7 +14,7 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
-#include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -79,29 +79,33 @@ std::size_t binary_op::extra_hash() const
     return std::hash<type>{}(m_type);
 }
 
-void binary_op::to_stream(std::ostream &os) const
+void binary_op::to_stream(std::ostringstream &oss) const
 {
     assert(args().size() == 2u);
     assert(m_type >= type::add && m_type <= type::div);
 
-    os << '(' << lhs() << ' ';
+    oss << '(';
+    stream_expression(oss, lhs());
+    oss << ' ';
 
     switch (m_type) {
         case type::add:
-            os << '+';
+            oss << '+';
             break;
         case type::sub:
-            os << '-';
+            oss << '-';
             break;
         case type::mul:
-            os << '*';
+            oss << '*';
             break;
         default:
-            os << '/';
+            oss << '/';
             break;
     }
 
-    os << ' ' << rhs() << ')';
+    oss << ' ';
+    stream_expression(oss, rhs());
+    oss << ')';
 }
 
 binary_op::type binary_op::op() const

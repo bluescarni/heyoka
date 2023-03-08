@@ -10,7 +10,7 @@
 #define HEYOKA_MATH_SUM_SQ_HPP
 
 #include <cstdint>
-#include <ostream>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -43,7 +43,7 @@ public:
     sum_sq_impl();
     explicit sum_sq_impl(std::vector<expression>);
 
-    void to_stream(std::ostream &) const;
+    void to_stream(std::ostringstream &) const;
 
     expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
     expression diff(std::unordered_map<const void *, expression> &, const param &) const;

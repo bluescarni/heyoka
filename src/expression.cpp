@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <exception>
 #include <functional>
 #include <iterator>
 #include <limits>
@@ -22,6 +23,7 @@
 #include <optional>
 #include <ostream>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -38,6 +40,7 @@
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 
+#include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constant.h>
@@ -375,7 +378,7 @@ std::vector<std::string> get_variables(const expression &e)
 
     detail::get_variables(func_set, s_set, e);
 
-    return std::vector<std::string>(s_set.begin(), s_set.end());
+    return {s_set.begin(), s_set.end()};
 }
 
 void rename_variables(expression &e, const std::unordered_map<std::string, std::string> &repl_map)
@@ -401,9 +404,55 @@ std::size_t hash(const expression &ex)
     return std::visit([](const auto &v) { return hash(v); }, ex.value());
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// Exception to signal that the stream output
+// for an expression has become too large.
+struct output_too_long : std::exception {
+};
+
+} // namespace
+
+// Helper to stream an expression to a stringstream, while
+// checking that the number of characters written so far
+// to the stream is not too large. If that is the case,
+// an exception will be thrown.
+void stream_expression(std::ostringstream &oss, const expression &e)
+{
+    if (oss.tellp() > 1000) {
+        throw output_too_long{};
+    }
+
+    std::visit(
+        [&oss](const auto &v) {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, func>) {
+                v.to_stream(oss);
+            } else {
+                oss << v;
+            }
+        },
+        e.value());
+}
+
+} // namespace detail
+
 std::ostream &operator<<(std::ostream &os, const expression &e)
 {
-    return std::visit([&os](const auto &arg) -> std::ostream & { return os << arg; }, e.value());
+    std::ostringstream oss;
+
+    try {
+        detail::stream_expression(oss, e);
+    } catch (const detail::output_too_long &) {
+        oss << "...";
+    }
+
+    return os << oss.str();
 }
 
 expression operator+(expression e)
@@ -3222,7 +3271,19 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     builder.SetInsertPoint(bb);
 
     // Invoke the strided function with stride == batch_size.
-    builder.CreateCall(f_strided, {out_ptr, in_ptr, par_ptr, time_ptr, to_size_t(s, builder.getInt32(batch_size))});
+    auto *fcall = builder.CreateCall(f_strided,
+                                     {out_ptr, in_ptr, par_ptr, time_ptr, to_size_t(s, builder.getInt32(batch_size))});
+    // NOTE: forcibly inline the function call. This will increase
+    // compile time, but we want to make sure that the non-strided
+    // version of the compiled function is optimised as much as possible,
+    // so we accept the tradeoff.
+#if LLVM_VERSION_MAJOR >= 14
+    fcall->addFnAttr(llvm::Attribute::AlwaysInline);
+#else
+    auto attrs = fcall->getAttributes();
+    attrs = attrs.addAttribute(context, llvm::AttributeList::FunctionIndex, llvm::Attribute::AlwaysInline);
+    fcall->setAttributes(attrs);
+#endif
 
     // Finish off the function.
     builder.CreateRetVoid();

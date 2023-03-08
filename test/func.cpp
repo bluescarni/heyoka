@@ -19,8 +19,6 @@
 #include <variant>
 #include <vector>
 
-#include <fmt/format.h>
-
 #include <llvm/IR/IRBuilder.h>
 
 #include <heyoka/config.hpp>
@@ -415,7 +413,7 @@ TEST_CASE("func ostream")
     auto f1 = func(func_10{{"x"_var, "y"_var}});
 
     std::ostringstream oss;
-    oss << f1;
+    oss << expression{f1};
 
     REQUIRE(oss.str() == "f(x, y)");
 
@@ -423,18 +421,9 @@ TEST_CASE("func ostream")
 
     f1 = func(func_10{{"y"_var}});
 
-    oss << f1;
+    oss << expression{f1};
 
     REQUIRE(oss.str() == "f(y)");
-}
-
-TEST_CASE("func fmt")
-{
-    auto f1 = func(func_10{{"x"_var, "y"_var}});
-
-    auto fmt_str = fmt::format("{}", f1);
-
-    REQUIRE(fmt_str == "f(x, y)");
 }
 
 TEST_CASE("func hash")
@@ -569,9 +558,9 @@ struct func_16 : func_base {
     }
     explicit func_16(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    void to_stream(std::ostream &os) const
+    void to_stream(std::ostringstream &oss) const
     {
-        os << "Custom to stream";
+        oss << "Custom to stream";
     }
 };
 
@@ -579,12 +568,12 @@ TEST_CASE("func to_stream")
 {
     auto f1 = func(func_15{{"x"_var, "y"_var}});
 
-    std::cout << "Default stream: " << f1 << '\n';
+    std::cout << "Default stream: " << expression{f1} << '\n';
 
     auto f2 = func(func_16{{"x"_var, "y"_var}});
 
     std::ostringstream oss;
-    oss << f2;
+    oss << expression{f2};
     REQUIRE(oss.str() == "Custom to stream");
 }
 

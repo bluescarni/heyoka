@@ -18,6 +18,7 @@
 #include <functional>
 #include <optional>
 #include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -195,6 +196,13 @@ HEYOKA_DLL_PUBLIC detail::prime_wrapper operator""_p(const char *, std::size_t);
 HEYOKA_DLL_PUBLIC void swap(expression &, expression &) noexcept;
 
 HEYOKA_DLL_PUBLIC std::size_t hash(const expression &);
+
+namespace detail
+{
+
+void stream_expression(std::ostringstream &, const expression &);
+
+} // namespace detail
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression &);
 

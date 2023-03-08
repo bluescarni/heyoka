@@ -11,7 +11,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
-#include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -63,22 +63,24 @@ sum_sq_impl::sum_sq_impl() : sum_sq_impl(std::vector<expression>{}) {}
 
 sum_sq_impl::sum_sq_impl(std::vector<expression> v) : func_base("sum_sq", std::move(v)) {}
 
-void sum_sq_impl::to_stream(std::ostream &os) const
+void sum_sq_impl::to_stream(std::ostringstream &oss) const
 {
     if (args().size() == 1u) {
         // NOTE: avoid brackets if there's only 1 argument.
-        os << args()[0] << "**2";
+        stream_expression(oss, args()[0]);
+        oss << "**2";
     } else {
-        os << '(';
+        oss << '(';
 
         for (decltype(args().size()) i = 0; i < args().size(); ++i) {
-            os << args()[i] << "**2";
+            stream_expression(oss, args()[i]);
+            oss << "**2";
             if (i != args().size() - 1u) {
-                os << " + ";
+                oss << " + ";
             }
         }
 
-        os << ')';
+        oss << ')';
     }
 }
 
