@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -38,8 +39,8 @@ public:
     atanh_impl();
     explicit atanh_impl(expression);
 
-    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
-    expression diff(std::unordered_map<const void *, expression> &, const param &) const;
+    expression diff(funcptr_map<expression> &, const std::string &) const;
+    expression diff(funcptr_map<expression> &, const param &) const;
 
     [[nodiscard]] double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     [[nodiscard]] long double eval_ldbl(const std::unordered_map<std::string, long double> &,

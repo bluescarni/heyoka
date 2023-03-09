@@ -37,6 +37,7 @@
 
 #endif
 
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
@@ -399,13 +400,13 @@ llvm::Function *log_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
     return taylor_c_diff_func_log(s, fp_t, *this, n_uvars, batch_size);
 }
 
-expression log_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+expression log_impl::diff(funcptr_map<expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 1u);
     return detail::diff(func_map, args()[0], s) / args()[0];
 }
 
-expression log_impl::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+expression log_impl::diff(funcptr_map<expression> &func_map, const param &p) const
 {
     assert(args().size() == 1u);
     return detail::diff(func_map, args()[0], p) / args()[0];

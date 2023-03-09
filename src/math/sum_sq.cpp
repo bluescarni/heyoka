@@ -15,7 +15,6 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
-#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -39,6 +38,7 @@
 
 #endif
 
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -85,7 +85,7 @@ void sum_sq_impl::to_stream(std::ostringstream &oss) const
 }
 
 template <typename T>
-expression sum_sq_impl::diff_impl(std::unordered_map<const void *, expression> &func_map, const T &x) const
+expression sum_sq_impl::diff_impl(funcptr_map<expression> &func_map, const T &x) const
 {
     std::vector<expression> terms;
     terms.reserve(args().size());
@@ -97,12 +97,12 @@ expression sum_sq_impl::diff_impl(std::unordered_map<const void *, expression> &
     return 2_dbl * sum(std::move(terms));
 }
 
-expression sum_sq_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+expression sum_sq_impl::diff(funcptr_map<expression> &func_map, const std::string &s) const
 {
     return diff_impl(func_map, s);
 }
 
-expression sum_sq_impl::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+expression sum_sq_impl::diff(funcptr_map<expression> &func_map, const param &p) const
 {
     return diff_impl(func_map, p);
 }

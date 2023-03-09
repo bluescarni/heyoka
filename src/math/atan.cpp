@@ -38,6 +38,7 @@
 
 #endif
 
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
@@ -62,14 +63,14 @@ atan_impl::atan_impl(expression e) : func_base("atan", std::vector{std::move(e)}
 
 atan_impl::atan_impl() : atan_impl(0_dbl) {}
 
-expression atan_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+expression atan_impl::diff(funcptr_map<expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 1u);
 
     return detail::diff(func_map, args()[0], s) / (1_dbl + square(args()[0]));
 }
 
-expression atan_impl::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+expression atan_impl::diff(funcptr_map<expression> &func_map, const param &p) const
 {
     assert(args().size() == 1u);
 
