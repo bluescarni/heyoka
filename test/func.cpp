@@ -660,6 +660,7 @@ TEST_CASE("func hash eq consistency")
 
     REQUIRE(z * ex + ex == z * (x + y) + (x + y));
     REQUIRE(hash(z * ex + ex) == hash(z * (x + y) + (x + y)));
+    REQUIRE(hash(z * copy(ex) + copy(ex)) == hash(z * (x + y) + (x + y)));
 }
 
 struct func_19 : func_base {
