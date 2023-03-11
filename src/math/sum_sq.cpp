@@ -11,11 +11,10 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
-#include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
-#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -39,6 +38,7 @@
 
 #endif
 
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -63,27 +63,29 @@ sum_sq_impl::sum_sq_impl() : sum_sq_impl(std::vector<expression>{}) {}
 
 sum_sq_impl::sum_sq_impl(std::vector<expression> v) : func_base("sum_sq", std::move(v)) {}
 
-void sum_sq_impl::to_stream(std::ostream &os) const
+void sum_sq_impl::to_stream(std::ostringstream &oss) const
 {
     if (args().size() == 1u) {
         // NOTE: avoid brackets if there's only 1 argument.
-        os << args()[0] << "**2";
+        stream_expression(oss, args()[0]);
+        oss << "**2";
     } else {
-        os << '(';
+        oss << '(';
 
         for (decltype(args().size()) i = 0; i < args().size(); ++i) {
-            os << args()[i] << "**2";
+            stream_expression(oss, args()[i]);
+            oss << "**2";
             if (i != args().size() - 1u) {
-                os << " + ";
+                oss << " + ";
             }
         }
 
-        os << ')';
+        oss << ')';
     }
 }
 
 template <typename T>
-expression sum_sq_impl::diff_impl(std::unordered_map<const void *, expression> &func_map, const T &x) const
+expression sum_sq_impl::diff_impl(funcptr_map<expression> &func_map, const T &x) const
 {
     std::vector<expression> terms;
     terms.reserve(args().size());
@@ -95,12 +97,12 @@ expression sum_sq_impl::diff_impl(std::unordered_map<const void *, expression> &
     return 2_dbl * sum(std::move(terms));
 }
 
-expression sum_sq_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+expression sum_sq_impl::diff(funcptr_map<expression> &func_map, const std::string &s) const
 {
     return diff_impl(func_map, s);
 }
 
-expression sum_sq_impl::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+expression sum_sq_impl::diff(funcptr_map<expression> &func_map, const param &p) const
 {
     return diff_impl(func_map, p);
 }

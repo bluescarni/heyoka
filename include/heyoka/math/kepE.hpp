@@ -13,7 +13,6 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -28,6 +27,7 @@
 
 #endif
 
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -52,8 +52,8 @@ public:
     kepE_impl();
     explicit kepE_impl(expression, expression);
 
-    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
-    expression diff(std::unordered_map<const void *, expression> &, const param &) const;
+    expression diff(funcptr_map<expression> &, const std::string &) const;
+    expression diff(funcptr_map<expression> &, const param &) const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;

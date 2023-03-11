@@ -11,7 +11,7 @@
 #include <cassert>
 #include <cstdint>
 #include <initializer_list>
-#include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <utility>
 #include <variant>
@@ -71,9 +71,9 @@ tpoly_impl::tpoly_impl(expression b, expression e)
     }
 }
 
-void tpoly_impl::to_stream(std::ostream &os) const
+void tpoly_impl::to_stream(std::ostringstream &oss) const
 {
-    os << fmt::format("tpoly({}, {})", m_b_idx, m_e_idx);
+    oss << fmt::format("tpoly({}, {})", m_b_idx, m_e_idx);
 }
 
 namespace

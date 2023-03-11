@@ -13,7 +13,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <ostream>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -24,6 +24,7 @@
 
 #endif
 
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -52,30 +53,31 @@ private:
     }
 
     template <typename T>
-    HEYOKA_DLL_LOCAL expression diff_impl(std::unordered_map<const void *, expression> &, const T &) const;
+    HEYOKA_DLL_LOCAL expression diff_impl(funcptr_map<expression> &, const T &) const;
 
 public:
     binary_op();
     explicit binary_op(type, expression, expression);
 
-    void to_stream(std::ostream &) const;
+    void to_stream(std::ostringstream &) const;
 
-    bool extra_equal_to(const func &) const;
+    [[nodiscard]] bool extra_equal_to(const func &) const;
 
-    std::size_t extra_hash() const;
+    [[nodiscard]] std::size_t extra_hash() const;
 
-    type op() const;
-    const expression &lhs() const;
-    const expression &rhs() const;
+    [[nodiscard]] type op() const;
+    [[nodiscard]] const expression &lhs() const;
+    [[nodiscard]] const expression &rhs() const;
 
-    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
-    expression diff(std::unordered_map<const void *, expression> &, const param &) const;
+    expression diff(funcptr_map<expression> &, const std::string &) const;
+    expression diff(funcptr_map<expression> &, const param &) const;
 
-    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
-    long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
+    [[nodiscard]] double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
+    [[nodiscard]] long double eval_ldbl(const std::unordered_map<std::string, long double> &,
+                                        const std::vector<long double> &) const;
 #if defined(HEYOKA_HAVE_REAL128)
-    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                            const std::vector<mppp::real128> &) const;
+    [[nodiscard]] mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
+                                          const std::vector<mppp::real128> &) const;
 #endif
 
     void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,

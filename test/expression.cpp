@@ -1910,3 +1910,23 @@ TEST_CASE("mp interop")
 }
 
 #endif
+
+TEST_CASE("output too long")
+{
+    auto [x] = make_vars("x");
+
+    auto ex = 1. + x;
+
+    for (auto i = 0; i < 1000; ++i) {
+        ex = x * ex;
+    }
+
+    std::ostringstream oss;
+    oss << ex;
+    auto str = oss.str();
+
+    REQUIRE(str.size() > 3u);
+    REQUIRE(str[str.size() - 1u] == '.');
+    REQUIRE(str[str.size() - 2u] == '.');
+    REQUIRE(str[str.size() - 3u] == '.');
+}

@@ -15,7 +15,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -26,15 +26,13 @@
 #include <utility>
 #include <vector>
 
-#include <fmt/core.h>
-
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
 
 #endif
 
-#include <heyoka/detail/fmt_compat.hpp>
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -96,7 +94,7 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
 
     [[nodiscard]] virtual const std::string &get_name() const = 0;
 
-    virtual void to_stream(std::ostream &) const = 0;
+    virtual void to_stream(std::ostringstream &) const = 0;
 
     [[nodiscard]] virtual bool extra_equal_to(const func &) const = 0;
 
@@ -108,9 +106,9 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it() = 0;
 
     [[nodiscard]] virtual bool has_diff_var() const = 0;
-    virtual expression diff(std::unordered_map<const void *, expression> &, const std::string &) const = 0;
+    virtual expression diff(funcptr_map<expression> &, const std::string &) const = 0;
     [[nodiscard]] virtual bool has_diff_par() const = 0;
-    virtual expression diff(std::unordered_map<const void *, expression> &, const param &) const = 0;
+    virtual expression diff(funcptr_map<expression> &, const param &) const = 0;
     [[nodiscard]] virtual bool has_gradient() const = 0;
     [[nodiscard]] virtual std::vector<expression> gradient() const = 0;
 
@@ -160,7 +158,7 @@ private:
 
 template <typename T>
 using func_to_stream_t
-    = decltype(std::declval<std::add_lvalue_reference_t<const T>>().to_stream(std::declval<std::ostream &>()));
+    = decltype(std::declval<std::add_lvalue_reference_t<const T>>().to_stream(std::declval<std::ostringstream &>()));
 
 template <typename T>
 inline constexpr bool func_has_to_stream_v = std::is_same_v<detected_t<func_to_stream_t, T>, void>;
@@ -186,14 +184,14 @@ inline constexpr bool func_has_extra_hash_v = std::is_same_v<detected_t<func_ext
 
 template <typename T>
 using func_diff_var_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(
-    std::declval<std::unordered_map<const void *, expression> &>(), std::declval<const std::string &>()));
+    std::declval<funcptr_map<expression> &>(), std::declval<const std::string &>()));
 
 template <typename T>
 inline constexpr bool func_has_diff_var_v = std::is_same_v<detected_t<func_diff_var_t, T>, expression>;
 
 template <typename T>
 using func_diff_par_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(
-    std::declval<std::unordered_map<const void *, expression> &>(), std::declval<const param &>()));
+    std::declval<funcptr_map<expression> &>(), std::declval<const param &>()));
 
 template <typename T>
 inline constexpr bool func_has_diff_par_v = std::is_same_v<detected_t<func_diff_par_t, T>, expression>;
@@ -297,7 +295,7 @@ template <typename T>
 inline constexpr bool func_has_taylor_c_diff_func_v
     = std::is_same_v<detected_t<func_taylor_c_diff_func_t, T>, llvm::Function *>;
 
-HEYOKA_DLL_PUBLIC void func_default_to_stream_impl(std::ostream &, const func_base &);
+HEYOKA_DLL_PUBLIC void func_default_to_stream_impl(std::ostringstream &, const func_base &);
 
 template <typename T>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
@@ -344,12 +342,12 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         return static_cast<const func_base *>(&m_value)->get_name();
     }
 
-    void to_stream(std::ostream &os) const final
+    void to_stream(std::ostringstream &oss) const final
     {
         if constexpr (func_has_to_stream_v<T>) {
-            m_value.to_stream(os);
+            m_value.to_stream(oss);
         } else {
-            func_default_to_stream_impl(os, static_cast<const func_base &>(m_value));
+            func_default_to_stream_impl(oss, static_cast<const func_base &>(m_value));
         }
     }
 
@@ -394,12 +392,12 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     {
         return func_has_diff_var_v<T>;
     }
-    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const final;
+    expression diff(funcptr_map<expression> &, const std::string &) const final;
     [[nodiscard]] bool has_diff_par() const final
     {
         return func_has_diff_par_v<T>;
     }
-    expression diff(std::unordered_map<const void *, expression> &, const param &) const final;
+    expression diff(funcptr_map<expression> &, const param &) const final;
 
     // gradient.
     [[nodiscard]] bool has_gradient() const final
@@ -560,33 +558,12 @@ using is_func = std::conjunction<std::is_same<T, uncvref_t<T>>, std::is_default_
 
 HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
 
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const func &);
-
-HEYOKA_END_NAMESPACE
-
-// fmt formatter for func, implemented
-// on top of the streaming operator.
-namespace fmt
-{
-
-template <>
-struct formatter<heyoka::func> : heyoka::detail::ostream_formatter {
-};
-
-} // namespace fmt
-
-HEYOKA_BEGIN_NAMESPACE
-
-HEYOKA_DLL_PUBLIC std::size_t hash(const func &);
-
 HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
 HEYOKA_DLL_PUBLIC bool operator!=(const func &, const func &);
 
 class HEYOKA_DLL_PUBLIC func
 {
     friend HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
-    friend HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const func &);
-    friend HEYOKA_DLL_PUBLIC std::size_t hash(const func &);
     friend HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
 
     // Pointer to the inner base.
@@ -675,11 +652,15 @@ public:
 
     [[nodiscard]] const std::string &get_name() const;
 
+    void to_stream(std::ostringstream &) const;
+
+    [[nodiscard]] std::size_t hash(detail::funcptr_map<std::size_t> &) const;
+
     [[nodiscard]] const std::vector<expression> &args() const;
     std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 
-    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
-    expression diff(std::unordered_map<const void *, expression> &, const param &) const;
+    expression diff(detail::funcptr_map<expression> &, const std::string &) const;
+    expression diff(detail::funcptr_map<expression> &, const param &) const;
 
     [[nodiscard]] double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     [[nodiscard]] long double eval_ldbl(const std::unordered_map<std::string, long double> &,
@@ -699,11 +680,10 @@ public:
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 
-    std::vector<expression>::size_type decompose(std::unordered_map<const void *, std::vector<expression>::size_type> &,
+    std::vector<expression>::size_type decompose(detail::funcptr_map<std::vector<expression>::size_type> &,
                                                  std::vector<expression> &) const;
 
-    taylor_dc_t::size_type taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &,
-                                            taylor_dc_t &) const;
+    taylor_dc_t::size_type taylor_decompose(detail::funcptr_map<taylor_dc_t::size_type> &, taylor_dc_t &) const;
     llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;

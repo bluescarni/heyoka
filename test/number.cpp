@@ -22,8 +22,6 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/math/constants/constants.hpp>
 
-#include <fmt/format.h>
-
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
@@ -326,14 +324,6 @@ TEST_CASE("number ostream")
     }
 
 #endif
-}
-
-TEST_CASE("number fmt")
-{
-    std::ostringstream oss;
-    oss << number(1.1);
-
-    REQUIRE(oss.str() == fmt::format("{}", number(1.1)));
 }
 
 TEST_CASE("llvm_codegen")

@@ -7,16 +7,33 @@ Changelog
 New
 ~~~
 
+- The screen output of expressions is now truncated for
+  very large expressions
+  (`#299 <https://github.com/bluescarni/heyoka/pull/299>`__).
 - New ``model`` module containing ready-made dynamical models
   (`#295 <https://github.com/bluescarni/heyoka/pull/295>`__).
 
 Changes
 ~~~~~~~
 
+- Improve hashing performance for large expressions by
+  caching the hashes of repeated subexpressions
+  (`#299 <https://github.com/bluescarni/heyoka/pull/299>`__).
+- The unstrided version of compiled functions is now forcibly
+  inlined, which leads to improved codegen and better performance
+  (`#299 <https://github.com/bluescarni/heyoka/pull/299>`__).
 - **BREAKING**: the ``make_nbody_sys()`` helper has been replaced by an equivalent
   function in the new ``model`` module
   (`#295 <https://github.com/bluescarni/heyoka/pull/295>`__).
   This is a :ref:`breaking change <bchanges_0_22_0>`.
+
+Fix
+~~~
+
+- Do not mix inline member functions with explicit class
+  template instantiations. This should fix linking issues
+  on Windows when mixing MSVC and clang-cl
+  (`#298 <https://github.com/bluescarni/heyoka/pull/298>`__).
 
 0.21.0 (2023-02-16)
 -------------------

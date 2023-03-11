@@ -10,12 +10,12 @@
 #define HEYOKA_MATH_SUM_SQ_HPP
 
 #include <cstdint>
-#include <ostream>
+#include <sstream>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -37,16 +37,16 @@ class HEYOKA_DLL_PUBLIC sum_sq_impl : public func_base
     }
 
     template <typename T>
-    HEYOKA_DLL_LOCAL expression diff_impl(std::unordered_map<const void *, expression> &, const T &) const;
+    HEYOKA_DLL_LOCAL expression diff_impl(funcptr_map<expression> &, const T &) const;
 
 public:
     sum_sq_impl();
     explicit sum_sq_impl(std::vector<expression>);
 
-    void to_stream(std::ostream &) const;
+    void to_stream(std::ostringstream &) const;
 
-    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
-    expression diff(std::unordered_map<const void *, expression> &, const param &) const;
+    expression diff(funcptr_map<expression> &, const std::string &) const;
+    expression diff(funcptr_map<expression> &, const param &) const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;

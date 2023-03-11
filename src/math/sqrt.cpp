@@ -33,6 +33,7 @@
 
 #endif
 
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -424,14 +425,14 @@ llvm::Function *sqrt_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, s
     return taylor_c_diff_func_sqrt(s, fp_t, *this, n_uvars, batch_size);
 }
 
-expression sqrt_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+expression sqrt_impl::diff(funcptr_map<expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 1u);
 
     return detail::diff(func_map, args()[0], s) / (2_dbl * sqrt(args()[0]));
 }
 
-expression sqrt_impl::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+expression sqrt_impl::diff(funcptr_map<expression> &func_map, const param &p) const
 {
     assert(args().size() == 1u);
 

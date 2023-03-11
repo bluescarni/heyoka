@@ -10,7 +10,7 @@
 
 #include <cassert>
 #include <initializer_list>
-#include <ostream>
+#include <sstream>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -55,11 +55,12 @@ neg_impl::neg_impl(expression e) : func_base("neg", std::vector{std::move(e)}) {
 
 neg_impl::neg_impl() : neg_impl(0_dbl) {}
 
-void neg_impl::to_stream(std::ostream &os) const
+void neg_impl::to_stream(std::ostringstream &oss) const
 {
     assert(!args().empty());
 
-    os << '-' << args()[0];
+    oss << '-';
+    stream_expression(oss, args()[0]);
 }
 
 // Derivative.

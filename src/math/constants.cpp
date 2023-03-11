@@ -14,7 +14,6 @@
 #include <ios>
 #include <limits>
 #include <locale>
-#include <ostream>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
@@ -152,12 +151,12 @@ std::type_index constant::get_str_func_t() const
     return m_str_func.get_type_index();
 }
 
-void constant::to_stream(std::ostream &os) const
+void constant::to_stream(std::ostringstream &oss) const
 {
     if (m_repr) {
-        os << *m_repr;
+        oss << *m_repr;
     } else {
-        os << get_name();
+        oss << get_name();
     }
 }
 

@@ -19,11 +19,10 @@
 #include <variant>
 #include <vector>
 
-#include <fmt/format.h>
-
 #include <llvm/IR/IRBuilder.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
@@ -67,7 +66,7 @@ TEST_CASE("func minimal")
 
     auto *fp_t = s.builder().getDoubleTy();
 
-    std::unordered_map<const void *, expression> func_map;
+    detail::funcptr_map<expression> func_map;
     REQUIRE_THROWS_MATCHES(f.diff(func_map, ""), not_implemented_error,
                            Message("Cannot compute the derivative of the function 'f' with respect to a variable, "
                                    "because the function does not provide "
@@ -154,7 +153,7 @@ TEST_CASE("func minimal")
 
     taylor_dc_t dec{{"x"_var, {}}};
     f = func{func_00{{"x"_var, "y"_var}}};
-    std::unordered_map<const void *, taylor_dc_t::size_type> func_map2;
+    detail::funcptr_map<taylor_dc_t::size_type> func_map2;
     f.taylor_decompose(func_map2, dec);
 }
 
@@ -162,7 +161,7 @@ struct func_05 : func_base {
     func_05() : func_base("f", {}) {}
     explicit func_05(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const
+    expression diff(detail::funcptr_map<expression> &, const std::string &) const
     {
         return 42_dbl;
     }
@@ -182,7 +181,7 @@ struct func_05b : func_base {
     func_05b() : func_base("f", {}) {}
     explicit func_05b(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    expression diff(std::unordered_map<const void *, expression> &, const param &) const
+    expression diff(detail::funcptr_map<expression> &, const param &) const
     {
         return -42_dbl;
     }
@@ -194,7 +193,7 @@ TEST_CASE("func diff")
 
     auto f = func(func_05{});
 
-    std::unordered_map<const void *, expression> func_map;
+    detail::funcptr_map<expression> func_map;
     REQUIRE(f.diff(func_map, "x") == 42_dbl);
     REQUIRE_THROWS_MATCHES(func(func_05a{{"x"_var}}).diff(func_map, "x"), std::invalid_argument,
                            Message("Inconsistent gradient returned by the function 'f': a vector of 1 elements was "
@@ -325,7 +324,7 @@ TEST_CASE("func taylor_decompose")
     auto f = func(func_10{{"x"_var}});
 
     taylor_dc_t u_vars_defs{{"x"_var, {}}};
-    std::unordered_map<const void *, taylor_dc_t::size_type> func_map;
+    detail::funcptr_map<taylor_dc_t::size_type> func_map;
     REQUIRE(f.taylor_decompose(func_map, u_vars_defs) == 1u);
     REQUIRE(u_vars_defs == taylor_dc_t{{"x"_var, {}}, {"foo"_var, {}}});
 
@@ -415,7 +414,7 @@ TEST_CASE("func ostream")
     auto f1 = func(func_10{{"x"_var, "y"_var}});
 
     std::ostringstream oss;
-    oss << f1;
+    oss << expression{f1};
 
     REQUIRE(oss.str() == "f(x, y)");
 
@@ -423,27 +422,19 @@ TEST_CASE("func ostream")
 
     f1 = func(func_10{{"y"_var}});
 
-    oss << f1;
+    oss << expression{f1};
 
     REQUIRE(oss.str() == "f(y)");
-}
-
-TEST_CASE("func fmt")
-{
-    auto f1 = func(func_10{{"x"_var, "y"_var}});
-
-    auto fmt_str = fmt::format("{}", f1);
-
-    REQUIRE(fmt_str == "f(x, y)");
 }
 
 TEST_CASE("func hash")
 {
     auto f1 = func(func_10{{"x"_var, "y"_var}});
 
-    REQUIRE_NOTHROW(hash(f1));
+    detail::funcptr_map<std::size_t> tmp;
+    REQUIRE_NOTHROW(f1.hash(tmp));
 
-    std::cout << "Hash value for f1: " << hash(f1) << '\n';
+    std::cout << "Hash value for f1: " << f1.hash(tmp) << '\n';
 }
 
 struct func_14 : func_base {
@@ -457,9 +448,11 @@ TEST_CASE("func eq ineq")
 {
     auto f1 = func(func_10{{"x"_var, "y"_var}});
 
+    detail::funcptr_map<std::size_t> tmp;
+
     REQUIRE(f1 == f1);
     REQUIRE(!(f1 != f1));
-    REQUIRE(hash(f1) == hash(f1));
+    REQUIRE(f1.hash(tmp) == f1.hash(tmp));
 
     // Differing arguments.
     auto f2 = func(func_10{{"y"_var, "x"_var}});
@@ -569,9 +562,9 @@ struct func_16 : func_base {
     }
     explicit func_16(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    void to_stream(std::ostream &os) const
+    void to_stream(std::ostringstream &oss) const
     {
-        os << "Custom to stream";
+        oss << "Custom to stream";
     }
 };
 
@@ -579,12 +572,12 @@ TEST_CASE("func to_stream")
 {
     auto f1 = func(func_15{{"x"_var, "y"_var}});
 
-    std::cout << "Default stream: " << f1 << '\n';
+    std::cout << "Default stream: " << expression{f1} << '\n';
 
     auto f2 = func(func_16{{"x"_var, "y"_var}});
 
     std::ostringstream oss;
-    oss << f2;
+    oss << expression{f2};
     REQUIRE(oss.str() == "Custom to stream");
 }
 
@@ -649,12 +642,25 @@ struct func_18 : func_base {
 
 TEST_CASE("func extra_hash")
 {
+    detail::funcptr_map<std::size_t> tmp;
+
     auto f1 = func(func_18{0, {"x"_var, "y"_var}});
     auto f2 = func(func_18{0, {"x"_var, "y"_var}});
     auto f3 = func(func_18{-1, {"x"_var, "y"_var}});
 
-    REQUIRE(hash(f1) == hash(f2));
-    REQUIRE(hash(f1) != hash(f3));
+    REQUIRE(f1.hash(tmp) == f2.hash(tmp));
+    REQUIRE(f1.hash(tmp) != f3.hash(tmp));
+}
+
+TEST_CASE("func hash eq consistency")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    auto ex = x + y;
+
+    REQUIRE(z * ex + ex == z * (x + y) + (x + y));
+    REQUIRE(hash(z * ex + ex) == hash(z * (x + y) + (x + y)));
+    REQUIRE(hash(z * copy(ex) + copy(ex)) == hash(z * (x + y) + (x + y)));
 }
 
 struct func_19 : func_base {

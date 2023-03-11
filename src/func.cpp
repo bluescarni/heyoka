@@ -16,7 +16,7 @@
 #include <initializer_list>
 #include <limits>
 #include <memory>
-#include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -59,6 +59,7 @@
 #endif
 
 #include <heyoka/detail/cm_utils.hpp>
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -112,19 +113,19 @@ namespace detail
 {
 
 // Default implementation of to_stream() for func.
-void func_default_to_stream_impl(std::ostream &os, const func_base &f)
+void func_default_to_stream_impl(std::ostringstream &oss, const func_base &f)
 {
-    os << f.get_name() << '(';
+    oss << f.get_name() << '(';
 
     const auto &args = f.args();
     for (decltype(args.size()) i = 0; i < args.size(); ++i) {
-        os << args[i];
+        stream_expression(oss, args[i]);
         if (i != args.size() - 1u) {
-            os << ", ";
+            oss << ", ";
         }
     }
 
-    os << ')';
+    oss << ')';
 }
 
 func_inner_base::func_inner_base() = default;
@@ -214,6 +215,11 @@ const std::string &func::get_name() const
     return ptr()->get_name();
 }
 
+void func::to_stream(std::ostringstream &oss) const
+{
+    ptr()->to_stream(oss);
+}
+
 const std::vector<expression> &func::args() const
 {
     return ptr()->args();
@@ -249,7 +255,7 @@ std::vector<expression> func::fetch_gradient(const std::string &target) const
     return grad;
 }
 
-expression func::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+expression func::diff(detail::funcptr_map<expression> &func_map, const std::string &s) const
 {
     // Run the specialised diff implementation,
     // if available.
@@ -272,7 +278,7 @@ expression func::diff(std::unordered_map<const void *, expression> &func_map, co
     return sum(std::move(prod));
 }
 
-expression func::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+expression func::diff(detail::funcptr_map<expression> &func_map, const param &p) const
 {
     // Run the specialised diff implementation,
     // if available.
@@ -374,7 +380,7 @@ namespace
 // - a variable,
 // - a number,
 // - a param.
-void func_td_args(func &fb, std::unordered_map<const void *, taylor_dc_t::size_type> &func_map, taylor_dc_t &dc)
+void func_td_args(func &fb, funcptr_map<taylor_dc_t::size_type> &func_map, taylor_dc_t &dc)
 {
     for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
         if (const auto dres = taylor_decompose(func_map, *r.first, dc)) {
@@ -395,8 +401,7 @@ void func_td_args(func &fb, std::unordered_map<const void *, taylor_dc_t::size_t
 // - a variable,
 // - a number,
 // - a param.
-void func_d_args(func &fb, std::unordered_map<const void *, std::vector<expression>::size_type> &func_map,
-                 std::vector<expression> &dc)
+void func_d_args(func &fb, funcptr_map<std::vector<expression>::size_type> &func_map, std::vector<expression> &dc)
 {
     for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
         if (const auto dres = decompose(func_map, *r.first, dc)) {
@@ -416,9 +421,8 @@ void func_d_args(func &fb, std::unordered_map<const void *, std::vector<expressi
 
 } // namespace detail
 
-std::vector<expression>::size_type
-func::decompose(std::unordered_map<const void *, std::vector<expression>::size_type> &func_map,
-                std::vector<expression> &dc) const
+std::vector<expression>::size_type func::decompose(detail::funcptr_map<std::vector<expression>::size_type> &func_map,
+                                                   std::vector<expression> &dc) const
 {
     const auto *const f_id = get_ptr();
 
@@ -447,7 +451,7 @@ func::decompose(std::unordered_map<const void *, std::vector<expression>::size_t
     return ret;
 }
 
-taylor_dc_t::size_type func::taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &func_map,
+taylor_dc_t::size_type func::taylor_decompose(detail::funcptr_map<taylor_dc_t::size_type> &func_map,
                                               taylor_dc_t &dc) const
 {
     const auto *const f_id = get_ptr();
@@ -571,29 +575,22 @@ void swap(func &a, func &b) noexcept
     std::swap(a.m_ptr, b.m_ptr);
 }
 
-std::ostream &operator<<(std::ostream &os, const func &f)
-{
-    f.ptr()->to_stream(os);
-
-    return os;
-}
-
-std::size_t hash(const func &f)
+std::size_t func::hash(detail::funcptr_map<std::size_t> &func_map) const
 {
     // NOTE: the initial hash value is computed by combining the hash values of:
     // - the function name,
     // - the function inner type index,
     // - the arguments' hashes.
-    std::size_t seed = std::hash<std::string>{}(f.get_name());
+    std::size_t seed = std::hash<std::string>{}(get_name());
 
-    boost::hash_combine(seed, f.get_type_index());
+    boost::hash_combine(seed, get_type_index());
 
-    for (const auto &arg : f.args()) {
-        boost::hash_combine(seed, hash(arg));
+    for (const auto &arg : args()) {
+        boost::hash_combine(seed, detail::hash(func_map, arg));
     }
 
     // Combine with the extra hash value too.
-    boost::hash_combine(seed, f.ptr()->extra_hash());
+    boost::hash_combine(seed, ptr()->extra_hash());
 
     return seed;
 }

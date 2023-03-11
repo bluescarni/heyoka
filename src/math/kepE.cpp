@@ -14,7 +14,6 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
-#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -44,6 +43,7 @@
 
 #endif
 
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -69,7 +69,7 @@ kepE_impl::kepE_impl() : kepE_impl(0_dbl, 0_dbl) {}
 
 kepE_impl::kepE_impl(expression e, expression M) : func_base("kepE", std::vector{std::move(e), std::move(M)}) {}
 
-expression kepE_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+expression kepE_impl::diff(funcptr_map<expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 2u);
 
@@ -81,7 +81,7 @@ expression kepE_impl::diff(std::unordered_map<const void *, expression> &func_ma
     return (detail::diff(func_map, e, s) * sin(E) + detail::diff(func_map, M, s)) / (1_dbl - e * cos(E));
 }
 
-expression kepE_impl::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+expression kepE_impl::diff(funcptr_map<expression> &func_map, const param &p) const
 {
     assert(args().size() == 2u);
 

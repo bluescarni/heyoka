@@ -11,7 +11,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
-#include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -60,22 +60,22 @@ sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v)) {
 // NOTE: a possible improvement here is to transform
 // "(x + y + -20)" into "(x + y - 20)".
 // Perhaps in sum_sq() as well?
-void sum_impl::to_stream(std::ostream &os) const
+void sum_impl::to_stream(std::ostringstream &oss) const
 {
     if (args().size() == 1u) {
         // NOTE: avoid brackets if there's only 1 argument.
-        os << args()[0];
+        stream_expression(oss, args()[0]);
     } else {
-        os << '(';
+        oss << '(';
 
         for (decltype(args().size()) i = 0; i < args().size(); ++i) {
-            os << args()[i];
+            stream_expression(oss, args()[i]);
             if (i != args().size() - 1u) {
-                os << " + ";
+                oss << " + ";
             }
         }
 
-        os << ')';
+        oss << ')';
     }
 }
 
