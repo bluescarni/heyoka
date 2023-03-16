@@ -22,6 +22,13 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
+namespace kw
+{
+
+IGOR_MAKE_NAMED_ARGUMENT(positions);
+
+} // namespace kw
+
 namespace model
 {
 
@@ -55,15 +62,19 @@ auto fixed_centres_common_opts(KwArgs &&...kw_args)
         }
     }
 
-    if (masses_vec.empty()) {
-        throw std::invalid_argument("In a fixed centres system the number of centres cannot be zero");
+    // The vector of positions.
+    std::vector<expression> positions_vec;
+    if constexpr (p.has(kw::positions)) {
+        for (const auto &mass_value : p(kw::positions)) {
+            positions_vec.emplace_back(mass_value);
+        }
     }
 
-    return std::tuple{std::move(Gconst), std::move(masses_vec)};
+    return std::tuple{std::move(Gconst), std::move(masses_vec), std::move(positions_vec)};
 }
 
-HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> fixed_centres_impl(const expression &,
-                                                                                    const std::vector<expression> &);
+HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>>
+fixed_centres_impl(const expression &, const std::vector<expression> &, const std::vector<expression> &);
 
 } // namespace detail
 
