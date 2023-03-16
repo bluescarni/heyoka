@@ -16,6 +16,7 @@
 #include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/pow.hpp>
+#include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/math/sum_sq.hpp>
 #include <heyoka/model/fixed_centres.hpp>
@@ -92,6 +93,38 @@ fixed_centres_impl(const expression &G, const std::vector<expression> &masses, c
     ret.push_back(prime(vz) = G * sum(std::move(acc_z)));
 
     return ret;
+}
+
+expression fixed_centres_energy_impl(const expression &G, const std::vector<expression> &masses,
+                                     const std::vector<expression> &positions)
+{
+    // Check masses/positions consistency.
+    fixed_centres_check_masses_pos(masses, positions);
+
+    // Compute the number of masses.
+    const auto n_masses = masses.size();
+
+    // Init the state variables,
+    auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
+
+    // Kinetic energy.
+    auto kin = 0.5_dbl * sum_sq({vx, vy, vz});
+
+    // Accumulate the potential energy.
+    std::vector<expression> pot;
+    pot.reserve(n_masses);
+
+    for (decltype(masses.size()) i = 0; i < n_masses; ++i) {
+        const auto diff_x = positions[3u * i] - x;
+        const auto diff_y = positions[3u * i + 1u] - y;
+        const auto diff_z = positions[3u * i + 2u] - z;
+
+        auto dist = sqrt(sum_sq({diff_x, diff_y, diff_z}));
+
+        pot.push_back(masses[i] / std::move(dist));
+    }
+
+    return std::move(kin) - G * sum(std::move(pot));
 }
 
 } // namespace model::detail

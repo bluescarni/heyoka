@@ -76,10 +76,18 @@ auto fixed_centres_common_opts(KwArgs &&...kw_args)
 HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>>
 fixed_centres_impl(const expression &, const std::vector<expression> &, const std::vector<expression> &);
 
+HEYOKA_DLL_PUBLIC expression fixed_centres_energy_impl(const expression &, const std::vector<expression> &,
+                                                       const std::vector<expression> &);
+
 } // namespace detail
 
 inline constexpr auto fixed_centres = [](auto &&...kw_args) -> std::vector<std::pair<expression, expression>> {
     return std::apply(detail::fixed_centres_impl,
+                      detail::fixed_centres_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
+};
+
+inline constexpr auto fixed_centres_energy = [](auto &&...kw_args) -> expression {
+    return std::apply(detail::fixed_centres_energy_impl,
                       detail::fixed_centres_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
 };
 
