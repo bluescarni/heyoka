@@ -96,27 +96,23 @@ std::vector<std::pair<expression, expression>> rotating_impl(const std::vector<e
     return ret;
 }
 
-expression rotating_energy_impl(const std::vector<expression> &omega)
+expression rotating_potential_impl(const std::vector<expression> &omega)
 {
     // Check the angular velocity vector.
     rotating_check_omega(omega);
 
-    // Init the state variables,
-    auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
-
-    // Kinetic energy x 2.
-    auto kin = sum_sq({vx, vy, vz});
+    // Init the position variables.
+    auto [x, y, z] = make_vars("x", "y", "z");
 
     if (omega.empty()) {
-        return 0.5_dbl * std::move(kin);
+        return 0_dbl;
     } else {
         // The components of the angular velocity.
         const auto &pe = omega[0];
         const auto &qe = omega[1];
         const auto &re = omega[2];
 
-        return 0.5_dbl
-               * (std::move(kin) + (square(sum({pe * x, qe * y, re * z})) - sum_sq({pe, qe, re}) * sum_sq({x, y, z})));
+        return 0.5_dbl * (square(sum({pe * x, qe * y, re * z})) - sum_sq({pe, qe, re}) * sum_sq({x, y, z}));
     }
 }
 

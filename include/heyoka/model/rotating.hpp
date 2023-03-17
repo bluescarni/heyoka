@@ -46,7 +46,7 @@ auto rotating_common_opts(KwArgs &&...kw_args)
 }
 
 HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> rotating_impl(const std::vector<expression> &);
-HEYOKA_DLL_PUBLIC expression rotating_energy_impl(const std::vector<expression> &);
+HEYOKA_DLL_PUBLIC expression rotating_potential_impl(const std::vector<expression> &);
 
 } // namespace detail
 
@@ -54,8 +54,8 @@ inline constexpr auto rotating = [](auto &&...kw_args) -> std::vector<std::pair<
     return std::apply(detail::rotating_impl, detail::rotating_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
 };
 
-inline constexpr auto rotating_energy = [](auto &&...kw_args) -> expression {
-    return std::apply(detail::rotating_energy_impl,
+inline constexpr auto rotating_potential = [](auto &&...kw_args) -> expression {
+    return std::apply(detail::rotating_potential_impl,
                       detail::rotating_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
 };
 
