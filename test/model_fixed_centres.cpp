@@ -150,4 +150,14 @@ TEST_CASE("basic")
     REQUIRE_THROWS_MATCHES(
         model::fixed_centres(kw::masses = {1.}, kw::positions = {2., 2., 2., 3., 3., 3., 4.}), std::invalid_argument,
         Message("In a fixed centres system the positions vector's size must be a multiple of 3, but instead it is 7"));
+    REQUIRE_THROWS_MATCHES(
+        model::fixed_centres_energy(kw::masses = {1.}, kw::positions = {2.}), std::invalid_argument,
+        Message("In a fixed centres system the positions vector's size must be a multiple of 3, but instead it is 1"));
+    REQUIRE_THROWS_MATCHES(
+        model::fixed_centres_energy(kw::masses = {1.}, kw::positions = {2., 2., 2., 3., 3., 3.}), std::invalid_argument,
+        Message("In a fixed centres system the number of masses (1) differs from the number of position vectors (2)"));
+    REQUIRE_THROWS_MATCHES(
+        model::fixed_centres_energy(kw::masses = {1.}, kw::positions = {2., 2., 2., 3., 3., 3., 4.}),
+        std::invalid_argument,
+        Message("In a fixed centres system the positions vector's size must be a multiple of 3, but instead it is 7"));
 }
