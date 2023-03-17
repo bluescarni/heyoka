@@ -56,20 +56,20 @@ std::vector<std::pair<expression, expression>> rotating_impl(const std::vector<e
         const auto &re = omega[2];
 
         // w x w x r -> centripetal.
-        acc_x.push_back(-(qe * qe * x));
-        acc_x.push_back(-(re * re * x));
-        acc_x.push_back(pe * qe * y);
-        acc_x.push_back(pe * re * z);
+        acc_x.push_back(-(qe * (qe * x)));
+        acc_x.push_back(-(re * (re * x)));
+        acc_x.push_back(pe * (qe * y));
+        acc_x.push_back(pe * (re * z));
 
         acc_y.push_back(-(pe * pe * y));
         acc_y.push_back(-(re * re * y));
-        acc_y.push_back(pe * qe * x);
-        acc_y.push_back(qe * re * z);
+        acc_y.push_back(pe * (qe * x));
+        acc_y.push_back(qe * (re * z));
 
         acc_z.push_back(-(pe * pe * z));
         acc_z.push_back(-(qe * qe * z));
-        acc_z.push_back(pe * re * x);
-        acc_z.push_back(qe * re * y);
+        acc_z.push_back(pe * (re * x));
+        acc_z.push_back(re * (qe * y));
 
         // 2 w x v -> coriolis.
         acc_x.push_back(2_dbl * (qe * vz - re * vy));
@@ -111,7 +111,7 @@ expression rotating_energy_impl(const std::vector<expression> &omega)
         const auto &re = omega[2];
 
         return 0.5_dbl
-               * (std::move(kin) + (square(sum({x * pe, y * qe, z * re})) - sum_sq({pe, qe, re}) * sum_sq({x, y, z})));
+               * (std::move(kin) + (square(sum({pe * x, qe * y, re * z})) - sum_sq({pe, qe, re}) * sum_sq({x, y, z})));
     }
 }
 
