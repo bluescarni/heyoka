@@ -239,6 +239,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/pendulum.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/nbody.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/fixed_centres.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/rotating.cpp"
     # Math functions.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/binary_op.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"
