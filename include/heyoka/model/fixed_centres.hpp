@@ -9,7 +9,6 @@
 #ifndef HEYOKA_MODEL_FIXED_CENTRES_HPP
 #define HEYOKA_MODEL_FIXED_CENTRES_HPP
 
-#include <stdexcept>
 #include <tuple>
 #include <utility>
 #include <vector>
