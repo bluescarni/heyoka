@@ -42,7 +42,7 @@ auto fixed_centres_common_opts(KwArgs &&...kw_args)
 
     static_assert(!p.has_unnamed_arguments(),
                   "Unnamed arguments cannot be passed in the variadic pack to this function.");
-    static_assert(!p.has_other_than(kw::Gconst, kw::masses),
+    static_assert(!p.has_other_than(kw::Gconst, kw::masses, kw::positions),
                   "This function accepts only the 'Gconst' and 'masses' named arguments.");
 
     // G constant (defaults to 1).
@@ -86,6 +86,8 @@ inline constexpr auto fixed_centres = [](auto &&...kw_args) -> std::vector<std::
                       detail::fixed_centres_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
 };
 
+// NOTE: this returns an energy per unit of mass. The actual energy can be obtained
+// by multiplying the return value by the mass of the particle.
 inline constexpr auto fixed_centres_energy = [](auto &&...kw_args) -> expression {
     return std::apply(detail::fixed_centres_energy_impl,
                       detail::fixed_centres_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
