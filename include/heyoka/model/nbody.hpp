@@ -45,8 +45,6 @@ auto nbody_common_opts(std::uint32_t n, KwArgs &&...kw_args)
 
     static_assert(!p.has_unnamed_arguments(),
                   "Unnamed arguments cannot be passed in the variadic pack to this function.");
-    static_assert(!p.has_other_than(kw::Gconst, kw::masses),
-                  "This function accepts only the 'Gconst' and 'masses' named arguments.");
 
     // G constant (defaults to 1).
     auto Gconst = [&p]() {

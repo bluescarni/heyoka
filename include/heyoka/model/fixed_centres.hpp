@@ -41,8 +41,6 @@ auto fixed_centres_common_opts(KwArgs &&...kw_args)
 
     static_assert(!p.has_unnamed_arguments(),
                   "Unnamed arguments cannot be passed in the variadic pack to this function.");
-    static_assert(!p.has_other_than(kw::Gconst, kw::masses, kw::positions),
-                  "This function accepts only the 'Gconst' and 'masses' named arguments.");
 
     // G constant (defaults to 1).
     auto Gconst = [&p]() {

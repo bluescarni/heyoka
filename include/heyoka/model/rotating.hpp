@@ -33,7 +33,6 @@ auto rotating_common_opts(KwArgs &&...kw_args)
     igor::parser p{kw_args...};
 
     static_assert(!p.has_unnamed_arguments(), "This function accepts only named arguments");
-    static_assert(!p.has_other_than(kw::omega), "This function accepts only the 'omega' named argument.");
 
     std::vector<expression> omega;
     if constexpr (p.has(kw::omega)) {

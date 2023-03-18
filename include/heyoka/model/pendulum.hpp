@@ -40,8 +40,6 @@ auto pendulum_common_opts(KwArgs &&...kw_args)
     igor::parser p{kw_args...};
 
     static_assert(!p.has_unnamed_arguments(), "This function accepts only named arguments");
-    static_assert(!p.has_other_than(kw::gconst, kw::l),
-                  "This function accepts only the 'gconst' and 'l' named arguments.");
 
     // Gravitational constant (defaults to 1).
     auto gconst = [&p]() {
