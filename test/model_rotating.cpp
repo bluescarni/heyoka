@@ -47,6 +47,7 @@ TEST_CASE("basic")
         REQUIRE(pot == 0_dbl);
     }
 
+    // Energy conservation.
     {
         auto dyn = model::rotating(kw::omega = {.1, .2, .3});
 
@@ -60,6 +61,7 @@ TEST_CASE("basic")
 
         llvm_state s;
         add_cfunc<double>(s, "en",
+                          // NOTE: need to add the kinetic energy per unit of mass.
                           {0.5 * (vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {.1, .2, .3})},
                           kw::vars = {x, y, z, vx, vy, vz});
         s.optimise();
@@ -74,9 +76,16 @@ TEST_CASE("basic")
         cf(&E, ta.get_state().data(), nullptr, nullptr);
 
         REQUIRE(E == approximately(E0));
-
-        std::cout.precision(16);
-        std::cout << E << '\n';
-        std::cout << E0 << '\n';
     }
+
+    // Error modes.
+    REQUIRE_THROWS_MATCHES(model::rotating(kw::omega = {.1, .2}), std::invalid_argument,
+                           Message("In a rotating reference frame model the angular velocity must be a "
+                                   "3-dimensional vector, but instead it is a 2-dimensional vector"));
+    REQUIRE_THROWS_MATCHES(model::rotating(kw::omega = {.1}), std::invalid_argument,
+                           Message("In a rotating reference frame model the angular velocity must be a "
+                                   "3-dimensional vector, but instead it is a 1-dimensional vector"));
+    REQUIRE_THROWS_MATCHES(model::rotating(kw::omega = {.1, .2, .3, .4}), std::invalid_argument,
+                           Message("In a rotating reference frame model the angular velocity must be a "
+                                   "3-dimensional vector, but instead it is a 4-dimensional vector"));
 }

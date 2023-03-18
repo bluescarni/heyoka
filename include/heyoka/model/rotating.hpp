@@ -50,10 +50,15 @@ HEYOKA_DLL_PUBLIC expression rotating_potential_impl(const std::vector<expressio
 
 } // namespace detail
 
+// NOTE: dynamics of a free particle in a reference frame rotating with uniform angular
+// velocity omega. Accounts for the centrifugal and Coriolis accelerations (but not the
+// Euler acceleration as omega is assumed to be constant).
 inline constexpr auto rotating = [](auto &&...kw_args) -> std::vector<std::pair<expression, expression>> {
     return std::apply(detail::rotating_impl, detail::rotating_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
 };
 
+// NOTE: this is the generalised potential per unit of mass originating from the centrifugal
+// and Coriolis accelerations.
 inline constexpr auto rotating_potential = [](auto &&...kw_args) -> expression {
     return std::apply(detail::rotating_potential_impl,
                       detail::rotating_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
