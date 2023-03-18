@@ -130,6 +130,7 @@ ADD_HEYOKA_TESTCASE(function_decompose)
 ADD_HEYOKA_TESTCASE(model_pendulum)
 ADD_HEYOKA_TESTCASE(model_nbody)
 ADD_HEYOKA_TESTCASE(model_fixed_centres)
+ADD_HEYOKA_TESTCASE(model_rotating)
 
 if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
   ADD_HEYOKA_TESTCASE(event_detection_mp)

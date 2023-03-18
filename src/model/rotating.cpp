@@ -55,31 +55,31 @@ std::vector<std::pair<expression, expression>> rotating_impl(const std::vector<e
         const auto &qe = omega[1];
         const auto &re = omega[2];
 
-        // w x w x r -> centripetal.
+        // -(w x w x r) -> centripetal.
         // NOTE: pre-compute a few common subexpressions.
         const auto qe_x = qe * x;
         const auto re_x = re * x;
         const auto qe_y = qe * y;
         const auto re_z = re * z;
-        acc_x.push_back(-(qe * qe_x));
-        acc_x.push_back(-(re * re_x));
-        acc_x.push_back(pe * qe_y);
-        acc_x.push_back(pe * re_z);
+        acc_x.push_back(qe * qe_x);
+        acc_x.push_back(re * re_x);
+        acc_x.push_back(-(pe * qe_y));
+        acc_x.push_back(-(pe * re_z));
 
-        acc_y.push_back(-(pe * pe * y));
-        acc_y.push_back(-(re * re * y));
-        acc_y.push_back(pe * qe_x);
-        acc_y.push_back(qe * re_z);
+        acc_y.push_back(pe * pe * y);
+        acc_y.push_back(re * re * y);
+        acc_y.push_back(-(pe * qe_x));
+        acc_y.push_back(-(qe * re_z));
 
-        acc_z.push_back(-(pe * pe * z));
-        acc_z.push_back(-(qe * qe * z));
-        acc_z.push_back(pe * re_x);
-        acc_z.push_back(re * qe_y);
+        acc_z.push_back(pe * pe * z);
+        acc_z.push_back(qe * qe * z);
+        acc_z.push_back(-(pe * re_x));
+        acc_z.push_back(-(re * qe_y));
 
-        // 2 w x v -> coriolis.
-        acc_x.push_back(2_dbl * (qe * vz - re * vy));
-        acc_y.push_back(2_dbl * (re * vx - pe * vz));
-        acc_z.push_back(2_dbl * (pe * vy - qe * vx));
+        // -(2 w x v) -> coriolis.
+        acc_x.push_back(-2_dbl * (qe * vz - re * vy));
+        acc_y.push_back(-2_dbl * (re * vx - pe * vz));
+        acc_z.push_back(-2_dbl * (pe * vy - qe * vx));
     }
 
     // Create the equations of motion.
