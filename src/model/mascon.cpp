@@ -13,6 +13,7 @@
 #include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/model/fixed_centres.hpp>
+#include <heyoka/model/mascon.hpp>
 #include <heyoka/model/rotating.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -31,7 +32,8 @@ std::vector<std::pair<expression, expression>> mascon_impl(const expression &Gco
     assert(fc_dyn.size() == 6u);
     assert(rot_dyn.size() == 6u);
 
-    for (auto i = 0u; i < 6u; ++i) {
+    // NOTE: need to alter only the accelerations.
+    for (auto i = 3u; i < 6u; ++i) {
         fc_dyn[i].second = std::move(fc_dyn[i].second) + std::move(rot_dyn[i].second);
     }
 
