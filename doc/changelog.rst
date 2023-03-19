@@ -7,6 +7,7 @@ Changelog
 New
 ~~~
 
+- Support LLVM 16.
 - The screen output of expressions is now truncated for
   very large expressions
   (`#299 <https://github.com/bluescarni/heyoka/pull/299>`__).
