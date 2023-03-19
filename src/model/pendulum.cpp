@@ -6,9 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <stdexcept>
 #include <utility>
-#include <variant>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -16,8 +14,6 @@
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/model/pendulum.hpp>
-#include <heyoka/number.hpp>
-#include <heyoka/param.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 

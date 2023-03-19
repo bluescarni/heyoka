@@ -116,6 +116,14 @@ expression rotating_potential_impl(const std::vector<expression> &omega)
     }
 }
 
+expression rotating_energy_impl(const std::vector<expression> &omega)
+{
+    // Init the velocity variables.
+    auto [vx, vy, vz] = make_vars("vx", "vy", "vz");
+
+    return 0.5_dbl * sum_sq({vx, vy, vz}) + rotating_potential_impl(omega);
+}
+
 } // namespace model::detail
 
 HEYOKA_END_NAMESPACE

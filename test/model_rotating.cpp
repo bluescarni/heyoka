@@ -13,6 +13,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/sum_sq.hpp>
 #include <heyoka/model/rotating.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -76,6 +77,9 @@ TEST_CASE("basic")
         cf(&E, ta.get_state().data(), nullptr, nullptr);
 
         REQUIRE(E == approximately(E0));
+
+        REQUIRE(0.5 * sum_sq({vx, vy, vz}) + model::rotating_potential(kw::omega = {.1, .2, .3})
+                == model::rotating_energy(kw::omega = {.1, .2, .3}));
     }
 
     // Error modes.
@@ -86,6 +90,12 @@ TEST_CASE("basic")
                            Message("In a rotating reference frame model the angular velocity must be a "
                                    "3-dimensional vector, but instead it is a 1-dimensional vector"));
     REQUIRE_THROWS_MATCHES(model::rotating(kw::omega = {.1, .2, .3, .4}), std::invalid_argument,
+                           Message("In a rotating reference frame model the angular velocity must be a "
+                                   "3-dimensional vector, but instead it is a 4-dimensional vector"));
+    REQUIRE_THROWS_MATCHES(model::rotating_potential(kw::omega = {.1, .2, .3, .4}), std::invalid_argument,
+                           Message("In a rotating reference frame model the angular velocity must be a "
+                                   "3-dimensional vector, but instead it is a 4-dimensional vector"));
+    REQUIRE_THROWS_MATCHES(model::rotating_energy(kw::omega = {.1, .2, .3, .4}), std::invalid_argument,
                            Message("In a rotating reference frame model the angular velocity must be a "
                                    "3-dimensional vector, but instead it is a 4-dimensional vector"));
 }

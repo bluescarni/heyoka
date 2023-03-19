@@ -35,7 +35,7 @@ namespace detail
 {
 
 template <typename... KwArgs>
-auto fixed_centres_common_opts(KwArgs &&...kw_args)
+auto fixed_centres_common_opts(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
@@ -45,7 +45,7 @@ auto fixed_centres_common_opts(KwArgs &&...kw_args)
     // G constant (defaults to 1).
     auto Gconst = [&p]() {
         if constexpr (p.has(kw::Gconst)) {
-            return expression{std::forward<decltype(p(kw::Gconst))>(p(kw::Gconst))};
+            return expression{p(kw::Gconst)};
         } else {
             return 1_dbl;
         }
@@ -76,18 +76,23 @@ fixed_centres_impl(const expression &, const std::vector<expression> &, const st
 HEYOKA_DLL_PUBLIC expression fixed_centres_energy_impl(const expression &, const std::vector<expression> &,
                                                        const std::vector<expression> &);
 
+HEYOKA_DLL_PUBLIC expression fixed_centres_potential_impl(const expression &, const std::vector<expression> &,
+                                                          const std::vector<expression> &);
+
 } // namespace detail
 
-inline constexpr auto fixed_centres = [](auto &&...kw_args) -> std::vector<std::pair<expression, expression>> {
-    return std::apply(detail::fixed_centres_impl,
-                      detail::fixed_centres_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
+inline constexpr auto fixed_centres = [](const auto &...kw_args) -> std::vector<std::pair<expression, expression>> {
+    return std::apply(detail::fixed_centres_impl, detail::fixed_centres_common_opts(kw_args...));
 };
 
-// NOTE: this returns an energy per unit of mass. The actual energy can be obtained
-// by multiplying the return value by the mass of the particle.
-inline constexpr auto fixed_centres_energy = [](auto &&...kw_args) -> expression {
-    return std::apply(detail::fixed_centres_energy_impl,
-                      detail::fixed_centres_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
+// NOTE: these return specific energy and potential.
+
+inline constexpr auto fixed_centres_energy = [](const auto &...kw_args) -> expression {
+    return std::apply(detail::fixed_centres_energy_impl, detail::fixed_centres_common_opts(kw_args...));
+};
+
+inline constexpr auto fixed_centres_potential = [](const auto &...kw_args) -> expression {
+    return std::apply(detail::fixed_centres_potential_impl, detail::fixed_centres_common_opts(kw_args...));
 };
 
 } // namespace model

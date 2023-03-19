@@ -35,7 +35,7 @@ namespace detail
 {
 
 template <typename... KwArgs>
-auto pendulum_common_opts(KwArgs &&...kw_args)
+auto pendulum_common_opts(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
@@ -44,7 +44,7 @@ auto pendulum_common_opts(KwArgs &&...kw_args)
     // Gravitational constant (defaults to 1).
     auto gconst = [&p]() {
         if constexpr (p.has(kw::gconst)) {
-            return expression{std::forward<decltype(p(kw::gconst))>(p(kw::gconst))};
+            return expression{p(kw::gconst)};
         } else {
             return 1_dbl;
         }
@@ -53,7 +53,7 @@ auto pendulum_common_opts(KwArgs &&...kw_args)
     // Length (defaults to 1).
     auto l = [&p]() {
         if constexpr (p.has(kw::l)) {
-            return expression{std::forward<decltype(p(kw::l))>(p(kw::l))};
+            return expression{p(kw::l)};
         } else {
             return 1_dbl;
         }
@@ -67,15 +67,13 @@ HEYOKA_DLL_PUBLIC expression pendulum_energy_impl(const expression &, const expr
 
 } // namespace detail
 
-inline constexpr auto pendulum = [](auto &&...kw_args) -> std::vector<std::pair<expression, expression>> {
-    return std::apply(detail::pendulum_impl, detail::pendulum_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
+inline constexpr auto pendulum = [](const auto &...kw_args) -> std::vector<std::pair<expression, expression>> {
+    return std::apply(detail::pendulum_impl, detail::pendulum_common_opts(kw_args...));
 };
 
-// NOTE: this returns the energy per unit of mass - the actual energy
-// can be obtained by multiplying the result by the mass of the bob.
-inline constexpr auto pendulum_energy = [](auto &&...kw_args) -> expression {
-    return std::apply(detail::pendulum_energy_impl,
-                      detail::pendulum_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
+// NOTE: this returns a specific energy.
+inline constexpr auto pendulum_energy = [](const auto &...kw_args) -> expression {
+    return std::apply(detail::pendulum_energy_impl, detail::pendulum_common_opts(kw_args...));
 };
 
 } // namespace model

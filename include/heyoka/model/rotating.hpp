@@ -28,7 +28,7 @@ namespace detail
 {
 
 template <typename... KwArgs>
-auto rotating_common_opts(KwArgs &&...kw_args)
+auto rotating_common_opts(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
@@ -45,6 +45,9 @@ auto rotating_common_opts(KwArgs &&...kw_args)
 }
 
 HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> rotating_impl(const std::vector<expression> &);
+
+HEYOKA_DLL_PUBLIC expression rotating_energy_impl(const std::vector<expression> &);
+
 HEYOKA_DLL_PUBLIC expression rotating_potential_impl(const std::vector<expression> &);
 
 } // namespace detail
@@ -52,15 +55,19 @@ HEYOKA_DLL_PUBLIC expression rotating_potential_impl(const std::vector<expressio
 // NOTE: dynamics of a free particle in a reference frame rotating with uniform angular
 // velocity omega. Accounts for the centrifugal and Coriolis accelerations (but not the
 // Euler acceleration as omega is assumed to be constant).
-inline constexpr auto rotating = [](auto &&...kw_args) -> std::vector<std::pair<expression, expression>> {
-    return std::apply(detail::rotating_impl, detail::rotating_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
+inline constexpr auto rotating = [](const auto &...kw_args) -> std::vector<std::pair<expression, expression>> {
+    return std::apply(detail::rotating_impl, detail::rotating_common_opts(kw_args...));
 };
 
-// NOTE: this is the generalised potential per unit of mass originating from the centrifugal
+// NOTE: this returns a specific energy.
+inline constexpr auto rotating_energy = [](const auto &...kw_args) -> expression {
+    return std::apply(detail::rotating_energy_impl, detail::rotating_common_opts(kw_args...));
+};
+
+// NOTE: this is the generalised potential originating from the centrifugal
 // and Coriolis accelerations.
-inline constexpr auto rotating_potential = [](auto &&...kw_args) -> expression {
-    return std::apply(detail::rotating_potential_impl,
-                      detail::rotating_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
+inline constexpr auto rotating_potential = [](const auto &...kw_args) -> expression {
+    return std::apply(detail::rotating_potential_impl, detail::rotating_common_opts(kw_args...));
 };
 
 } // namespace model

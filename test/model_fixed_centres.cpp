@@ -138,6 +138,11 @@ TEST_CASE("basic")
         cf(&E, ta.get_state().data(), nullptr, nullptr);
 
         REQUIRE(E == approximately(E0));
+
+        // Test also the fixed_centres_potential implementation.
+        auto kin = 0.5_dbl * sum_sq({"vx"_var, "vy"_var, "vz"_var});
+        REQUIRE(model::fixed_centres_energy(kw::Gconst = 1.2, kw::masses = masses, kw::positions = pos)
+                == kin + model::fixed_centres_potential(kw::masses = masses, kw::positions = pos, kw::Gconst = 1.2));
     }
 
     // Error modes.
@@ -158,6 +163,17 @@ TEST_CASE("basic")
         Message("In a fixed centres system the number of masses (1) differs from the number of position vectors (2)"));
     REQUIRE_THROWS_MATCHES(
         model::fixed_centres_energy(kw::masses = {1.}, kw::positions = {2., 2., 2., 3., 3., 3., 4.}),
+        std::invalid_argument,
+        Message("In a fixed centres system the positions vector's size must be a multiple of 3, but instead it is 7"));
+    REQUIRE_THROWS_MATCHES(
+        model::fixed_centres_potential(kw::masses = {1.}, kw::positions = {2.}), std::invalid_argument,
+        Message("In a fixed centres system the positions vector's size must be a multiple of 3, but instead it is 1"));
+    REQUIRE_THROWS_MATCHES(
+        model::fixed_centres_potential(kw::masses = {1.}, kw::positions = {2., 2., 2., 3., 3., 3.}),
+        std::invalid_argument,
+        Message("In a fixed centres system the number of masses (1) differs from the number of position vectors (2)"));
+    REQUIRE_THROWS_MATCHES(
+        model::fixed_centres_potential(kw::masses = {1.}, kw::positions = {2., 2., 2., 3., 3., 3., 4.}),
         std::invalid_argument,
         Message("In a fixed centres system the positions vector's size must be a multiple of 3, but instead it is 7"));
 }

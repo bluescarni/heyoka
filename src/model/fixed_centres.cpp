@@ -95,8 +95,8 @@ fixed_centres_impl(const expression &G, const std::vector<expression> &masses, c
     return ret;
 }
 
-expression fixed_centres_energy_impl(const expression &G, const std::vector<expression> &masses,
-                                     const std::vector<expression> &positions)
+expression fixed_centres_potential_impl(const expression &G, const std::vector<expression> &masses,
+                                        const std::vector<expression> &positions)
 {
     // Check masses/positions consistency.
     fixed_centres_check_masses_pos(masses, positions);
@@ -104,13 +104,10 @@ expression fixed_centres_energy_impl(const expression &G, const std::vector<expr
     // Compute the number of masses.
     const auto n_masses = masses.size();
 
-    // Init the state variables,
-    auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
+    // Init the position variables,
+    auto [x, y, z] = make_vars("x", "y", "z");
 
-    // Kinetic energy.
-    auto kin = 0.5_dbl * sum_sq({vx, vy, vz});
-
-    // Accumulate the potential energy.
+    // Accumulate the potential.
     std::vector<expression> pot;
     pot.reserve(n_masses);
 
@@ -124,7 +121,19 @@ expression fixed_centres_energy_impl(const expression &G, const std::vector<expr
         pot.push_back(masses[i] / std::move(dist));
     }
 
-    return std::move(kin) - G * sum(std::move(pot));
+    return -G * sum(std::move(pot));
+}
+
+expression fixed_centres_energy_impl(const expression &G, const std::vector<expression> &masses,
+                                     const std::vector<expression> &positions)
+{
+    // Init the velocity variables,
+    auto [vx, vy, vz] = make_vars("vx", "vy", "vz");
+
+    // Kinetic energy.
+    auto kin = 0.5_dbl * sum_sq({vx, vy, vz});
+
+    return std::move(kin) + fixed_centres_potential_impl(G, masses, positions);
 }
 
 } // namespace model::detail
