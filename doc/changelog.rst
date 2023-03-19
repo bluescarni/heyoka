@@ -7,15 +7,20 @@ Changelog
 New
 ~~~
 
+- Support LLVM 16.
+- New ``model`` module containing ready-made dynamical models
+  (`#302 <https://github.com/bluescarni/heyoka/pull/302>`__,
+  `#295 <https://github.com/bluescarni/heyoka/pull/295>`__).
 - The screen output of expressions is now truncated for
   very large expressions
   (`#299 <https://github.com/bluescarni/heyoka/pull/299>`__).
-- New ``model`` module containing ready-made dynamical models
-  (`#295 <https://github.com/bluescarni/heyoka/pull/295>`__).
 
 Changes
 ~~~~~~~
 
+- Performance improvements for several primitives in the
+  expression API
+  (`#300 <https://github.com/bluescarni/heyoka/pull/300>`__).
 - Improve hashing performance for large expressions by
   caching the hashes of repeated subexpressions
   (`#299 <https://github.com/bluescarni/heyoka/pull/299>`__).
