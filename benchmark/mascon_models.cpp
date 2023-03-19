@@ -17,9 +17,10 @@
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/logging.hpp>
-#include <heyoka/mascon.hpp>
 #include <heyoka/math.hpp>
+#include <heyoka/model/mascon.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "data/mascon_67p.hpp"
@@ -137,8 +138,15 @@ taylor_adaptive<double> taylor_factory(const P &mascon_points, const M &mascon_m
     auto v0z = std::sin(incl / 360 * 6.28) * std::sqrt(1. / r0);
     std::vector<double> ic = {r0, 0., 0., 0., v0y, v0z};
     // Constructing the integrator.
-    auto eom = make_mascon_system(kw::points = mascon_points, kw::masses = mascon_masses,
-                                  kw::omega = std::vector<double>{0., 0., wz}, kw::Gconst = G);
+    // NOTE: need to transform the points from the old format to the new one.
+    std::vector<double> positions;
+    for (const auto &mass_pos : mascon_points) {
+        positions.push_back(mass_pos[0]);
+        positions.push_back(mass_pos[1]);
+        positions.push_back(mass_pos[2]);
+    }
+    auto eom = model::mascon(kw::positions = positions, kw::masses = mascon_masses,
+                             kw::omega = std::vector<double>{0., 0., wz}, kw::Gconst = G);
     auto start = high_resolution_clock::now();
     taylor_adaptive<double> taylor{eom, ic, kw::compact_mode = true, kw::tol = 1e-14};
     auto stop = high_resolution_clock::now();
@@ -148,14 +156,15 @@ taylor_adaptive<double> taylor_factory(const P &mascon_points, const M &mascon_m
     return taylor;
 }
 
-template <typename P, typename M>
-double compute_energy(const std::vector<double> x, const P &mascon_points, const M &mascon_masses, double p, double q,
-                      double r, double G)
-{
-    auto energy = energy_mascon_system(kw::state = x, kw::points = mascon_points, kw::masses = mascon_masses,
-                                       kw::omega = std::vector<double>{p, q, r}, kw::Gconst = G);
-    return eval_dbl(energy, std::unordered_map<std::string, double>());
-}
+// template <typename P, typename M>
+// double compute_energy(const std::vector<double> x, const P &mascon_points, const M &mascon_masses, double p, double
+// q,
+//                       double r, double G)
+// {
+//     auto energy = energy_mascon_system(kw::state = x, kw::points = mascon_points, kw::masses = mascon_masses,
+//                                        kw::omega = std::vector<double>{p, q, r}, kw::Gconst = G);
+//     return eval_dbl(energy, std::unordered_map<std::string, double>());
+// }
 
 template <typename P, typename M>
 void compare_taylor_vs_rkf(const P &mascon_points, const M &mascon_masses, taylor_adaptive<double> &taylor, double wz,
@@ -163,11 +172,11 @@ void compare_taylor_vs_rkf(const P &mascon_points, const M &mascon_masses, taylo
 {
     // 1 - Initional conditions
     auto ic = taylor.get_state();
-    double E0 = compute_energy(ic, mascon_points, mascon_masses, 0., 0., wz, 1.);
+    // double E0 = compute_energy(ic, mascon_points, mascon_masses, 0., 0., wz, 1.);
     // Declarations
     decltype(high_resolution_clock::now()) start, stop;
     decltype(duration_cast<microseconds>(stop - start)) duration;
-    double energy;
+    // double energy;
 
     // TAYLOR ------------------------------------------------------------------------------
     start = high_resolution_clock::now();
@@ -175,8 +184,8 @@ void compare_taylor_vs_rkf(const P &mascon_points, const M &mascon_masses, taylo
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);
     std::cout << "Integration time (Taylor): " << duration.count() / 1e6 << "s" << std::endl;
-    energy = compute_energy(taylor.get_state(), mascon_points, mascon_masses, 0., 0., wz, 1.);
-    fmt::print("Energy error: {}\n", (energy - E0) / E0);
+    // energy = compute_energy(taylor.get_state(), mascon_points, mascon_masses, 0., 0., wz, 1.);
+    // fmt::print("Energy error: {}\n", (energy - E0) / E0);
     // TAYLOR ------------------------------------------------------------------------------
 
     // RKF7(8) -----------------------------------------------------------------------------
@@ -193,8 +202,8 @@ void compare_taylor_vs_rkf(const P &mascon_points, const M &mascon_masses, taylo
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);
     std::cout << "Integration time (RKF7(8)): " << duration.count() / 1e6 << "s" << std::endl;
-    energy = compute_energy(ic, mascon_points, mascon_masses, 0., 0., wz, 1.);
-    fmt::print("Energy error: {}\n", (energy - E0) / E0);
+    // energy = compute_energy(ic, mascon_points, mascon_masses, 0., 0., wz, 1.);
+    // fmt::print("Energy error: {}\n", (energy - E0) / E0);
     // RKF7(8) -----------------------------------------------------------------------------
 }
 
@@ -205,7 +214,8 @@ void plot_data_taylor(const P &mascon_points, const M &mascon_masses, taylor_ada
     double dt = integration_time / N;
     for (decltype(N) i = 0u; i < N + 1; ++i) {
         auto state = taylor.get_state();
-        auto energy = compute_energy(state, mascon_points, mascon_masses, 0., 0., wz, 1.);
+        // auto energy = compute_energy(state, mascon_points, mascon_masses, 0., 0., wz, 1.);
+        auto energy = 0.;
         fmt::print("[{}, {}, {}, {}, {}, {}, {}],\n", state[0], state[1], state[2], state[3], state[4], state[5],
                    energy);
         taylor.propagate_for(dt);
@@ -223,7 +233,8 @@ void plot_data_rkf78(const P &mascon_points, const M &mascon_masses, taylor_adap
     // The dynamics
     mascon_dynamics dynamics(mascon_points, mascon_masses, 0., 0., wz, 1.);
     for (decltype(N) i = 0u; i < N + 1; ++i) {
-        auto energy = compute_energy(ic, mascon_points, mascon_masses, 0., 0., wz, 1.);
+        // auto energy = compute_energy(ic, mascon_points, mascon_masses, 0., 0., wz, 1.);
+        auto energy = 0.;
         fmt::print("[{}, {}, {}, {}, {}, {}, {}],\n", ic[0], ic[1], ic[2], ic[3], ic[4], ic[5], energy);
         odeint::integrate_adaptive(odeint::make_controlled<error_stepper_type>(1.0e-14, 1.0e-14), dynamics, ic, 0.0, dt,
                                    1e-8);
