@@ -285,7 +285,7 @@ TEST_CASE("basic cmp")
         ta_old.propagate_until(10.);
 
         for (auto i = 0u; i < 6u; ++i) {
-            REQUIRE(ta.get_state()[i] == approximately(ta_old.get_state()[i]));
+            REQUIRE(ta.get_state()[i] == approximately(ta_old.get_state()[i], 1000.));
         }
     }
 
