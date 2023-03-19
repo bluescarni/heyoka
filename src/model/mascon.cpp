@@ -47,6 +47,15 @@ expression mascon_energy_impl(const expression &Gconst, const std::vector<expres
     return std::move(fc_en) + std::move(rot_pot);
 }
 
+expression mascon_potential_impl(const expression &Gconst, const std::vector<expression> &masses,
+                                 const std::vector<expression> &positions, const std::vector<expression> &omega)
+{
+    auto fc_pot = fixed_centres_potential_impl(Gconst, masses, positions);
+    auto rot_pot = rotating_potential_impl(omega);
+
+    return std::move(fc_pot) + std::move(rot_pot);
+}
+
 } // namespace model::detail
 
 HEYOKA_END_NAMESPACE
