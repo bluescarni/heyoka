@@ -23,6 +23,7 @@ class CallInst;
 class GlobalVariable;
 class ArrayType;
 class Constant;
+class BasicBlock;
 
 // NOTE: IRBuilder is a template with default
 // parameters, hence we declare the default parameters
