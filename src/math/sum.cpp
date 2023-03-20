@@ -377,7 +377,7 @@ expression sum(std::vector<expression> args, std::uint32_t split)
         // NOTE: there cannot be zero numbers here because
         // the numbers were compactified earlier and
         // compactification also removes the result if zero.
-        if (auto nptr = std::get_if<number>(&arg.value()); nptr && is_zero(*nptr)) {
+        if (auto *nptr = std::get_if<number>(&arg.value()); (nptr != nullptr) && is_zero(*nptr)) {
             assert(false);
         }
 #endif

@@ -555,6 +555,7 @@ llvm::Function *sum_sq_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t,
 {
     return sum_sq_taylor_c_diff_func_impl(s, fp_t, *this, n_uvars, batch_size);
 }
+
 } // namespace detail
 
 expression sum_sq(std::vector<expression> args, std::uint32_t split)
@@ -592,7 +593,7 @@ expression sum_sq(std::vector<expression> args, std::uint32_t split)
 #if !defined(NDEBUG)
         // NOTE: there cannot be zero numbers here because
         // we removed them.
-        if (auto nptr = std::get_if<number>(&arg.value()); nptr && is_zero(*nptr)) {
+        if (auto *nptr = std::get_if<number>(&arg.value()); (nptr != nullptr) && is_zero(*nptr)) {
             assert(false);
         }
 #endif
