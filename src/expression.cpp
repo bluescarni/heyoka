@@ -961,6 +961,15 @@ expression operator/(mppp::real x, expression ex)
 
 expression &operator+=(expression &x, expression e)
 {
+    // NOTE: it is important that compound operators
+    // are implemented as x = x op e, so that we properly
+    // take into account arithmetic promotions for
+    // numbers (and, in case of mppp::real numbers,
+    // precision propagation).
+    // NOTE: using std::move() on both operands is fine:
+    // there cannot be aliasing as "e" is a copy
+    // of some expression that cannot possibly overlap
+    // with x.
     return x = std::move(x) + std::move(e);
 }
 
@@ -1176,11 +1185,6 @@ expression diff(funcptr_map<expression> &func_map, const expression &e, const st
                     [](const auto &v) { return expression{number{static_cast<uncvref_t<decltype(v)>>(0)}}; },
                     arg.value());
             } else if constexpr (std::is_same_v<type, param>) {
-                // NOTE: if we ever implement single-precision support,
-                // this should be probably changed into 0_flt (i.e., the lowest
-                // precision numerical type), so that it does not trigger
-                // type promotions in numerical constants. Other similar
-                // occurrences as well (e.g., diff for variable).
                 return 0_dbl;
             } else if constexpr (std::is_same_v<type, variable>) {
                 if (s == arg.name()) {
