@@ -424,6 +424,17 @@ number nextafter(const number &from, const number &to)
         from.value(), to.value());
 }
 
+number sqrt(number n)
+{
+    return std::visit(
+        [](auto &&arg) {
+            using std::sqrt;
+
+            return number{sqrt(std::forward<decltype(arg)>(arg))};
+        },
+        std::move(n.value()));
+}
+
 namespace detail
 {
 

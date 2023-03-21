@@ -443,7 +443,12 @@ expression sqrt_impl::diff(funcptr_map<expression> &func_map, const param &p) co
 
 expression sqrt(expression e)
 {
-    return expression{func{detail::sqrt_impl(std::move(e))}};
+    // Simplify sqrt(number) to its value.
+    if (auto *num_ptr = std::get_if<number>(&e.value())) {
+        return expression{sqrt(std::move(*num_ptr))};
+    } else {
+        return expression{func{detail::sqrt_impl(std::move(e))}};
+    }
 }
 
 HEYOKA_END_NAMESPACE

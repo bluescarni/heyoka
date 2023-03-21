@@ -340,11 +340,12 @@ expression sum(std::vector<expression> args, std::uint32_t split)
     const auto n_end_it = std::stable_partition(
         args.begin(), args.end(), [](const expression &ex) { return !std::holds_alternative<number>(ex.value()); });
 
-    // If we have two or more numbers, accumulate them
-    // into the first number in the second partition.
+    // If we have numbers, make sure they are all
+    // accumulated in the last one, and ensure that
+    // the accumulated value is not zero.
     if (n_end_it != args.end()) {
         for (auto it = n_end_it + 1; it != args.end(); ++it) {
-            *n_end_it += *it;
+            *n_end_it += std::move(*it);
         }
 
         // Remove all numbers but the first one.
@@ -356,6 +357,7 @@ expression sum(std::vector<expression> args, std::uint32_t split)
         }
     }
 
+    // Special case.
     if (args.empty()) {
         return 0_dbl;
     }
@@ -377,7 +379,7 @@ expression sum(std::vector<expression> args, std::uint32_t split)
         // NOTE: there cannot be zero numbers here because
         // the numbers were compactified earlier and
         // compactification also removes the result if zero.
-        if (auto nptr = std::get_if<number>(&arg.value()); nptr && is_zero(*nptr)) {
+        if (auto *nptr = std::get_if<number>(&arg.value()); (nptr != nullptr) && is_zero(*nptr)) {
             assert(false);
         }
 #endif
