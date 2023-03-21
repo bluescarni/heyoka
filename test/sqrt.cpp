@@ -70,7 +70,7 @@ TEST_CASE("sqrt basic")
 {
     REQUIRE(sqrt(3_dbl) == expression{std::sqrt(3.)});
 
-#if defined(HEYOKA_HAVE_REAL)
+#if defined(HEYOKA_HAVE_REAL128)
 
     REQUIRE(sqrt(3_f128) == expression{sqrt(mppp::real128{3.})});
 
