@@ -118,7 +118,8 @@ TEST_CASE("taylor sum_sq")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {sum_sq({1_dbl, par[0], 2_dbl}), x + y}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sum_sq({expression{fp_t(1)}, par[0], 2_dbl}), x + y}, 1, 1, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -133,7 +134,7 @@ TEST_CASE("taylor sum_sq")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == 14);
+            REQUIRE(jet[2] == approximately(fp_t(14)));
             REQUIRE(jet[3] == 5);
         }
 
@@ -167,7 +168,8 @@ TEST_CASE("taylor sum_sq")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {sum_sq({1_dbl, par[1], 2_dbl}), x + y}, 1, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sum_sq({expression{fp_t(1)}, par[1], 2_dbl}), x + y}, 1, 2, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -186,8 +188,8 @@ TEST_CASE("taylor sum_sq")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == -3);
 
-            REQUIRE(jet[4] == 9);
-            REQUIRE(jet[5] == 9);
+            REQUIRE(jet[4] == approximately(fp_t(9)));
+            REQUIRE(jet[5] == approximately(fp_t(9)));
 
             REQUIRE(jet[6] == 5);
             REQUIRE(jet[7] == -5);
@@ -298,7 +300,8 @@ TEST_CASE("taylor sum_sq")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {sum_sq({1_dbl, par[0], 2_dbl}), x + y}, 3, 3, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sum_sq({expression{fp_t(1)}, par[0], 2_dbl}), x + y}, 3, 3, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -319,9 +322,9 @@ TEST_CASE("taylor sum_sq")
             REQUIRE(jet[4] == -3);
             REQUIRE(jet[5] == 0);
 
-            REQUIRE(jet[6] == 14);
-            REQUIRE(jet[7] == 14);
-            REQUIRE(jet[8] == 9);
+            REQUIRE(jet[6] == approximately(fp_t(14)));
+            REQUIRE(jet[7] == approximately(fp_t(14)));
+            REQUIRE(jet[8] == approximately(fp_t(9)));
 
             REQUIRE(jet[9] == 5);
             REQUIRE(jet[10] == -5);

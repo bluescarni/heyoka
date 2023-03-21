@@ -45,7 +45,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/square.hpp>
+#include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/math/sum_sq.hpp>
 #include <heyoka/number.hpp>
@@ -117,6 +117,7 @@ llvm::Value *sum_sq_llvm_eval_impl(llvm_state &s, llvm::Type *fp_t, const func_b
     return llvm_eval_helper(
         [&s](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
             std::vector<llvm::Value *> sqs;
+            sqs.reserve(args.size());
 
             for (auto *val : args) {
                 sqs.push_back(llvm_square(s, val));
@@ -146,6 +147,7 @@ namespace
         "sum_sq",
         [&s](const std::vector<llvm::Value *> &args, bool) {
             std::vector<llvm::Value *> sqs;
+            sqs.reserve(args.size());
 
             for (auto *val : args) {
                 sqs.push_back(llvm_square(s, val));
@@ -356,7 +358,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = md.getFunction(fname);
+    auto *f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -373,10 +375,10 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
         f->addFnAttr(llvm::Attribute::AlwaysInline);
 
         // Fetch the necessary function arguments.
-        auto order = f->args().begin();
-        auto diff_arr = f->args().begin() + 2;
-        auto par_ptr = f->args().begin() + 3;
-        auto terms = f->args().begin() + 5;
+        auto *order = f->args().begin();
+        auto *diff_arr = f->args().begin() + 2;
+        auto *par_ptr = f->args().begin() + 3;
+        auto *terms = f->args().begin() + 5;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -390,7 +392,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
         }
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         // This function calculates the j-th term in the summation in the formula for the
         // Taylor derivative of square() for each k-th argument in sf, and accumulates the result
@@ -403,9 +405,9 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
 
                         if constexpr (std::is_same_v<type, variable>) {
                             // Variable.
-                            auto v0 = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, builder.CreateSub(order, j),
-                                                         terms + k);
-                            auto v1 = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, j, terms + k);
+                            auto *v0 = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, builder.CreateSub(order, j),
+                                                          terms + k);
+                            auto *v1 = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, j, terms + k);
 
                             // Update the k-th accumulator.
                             builder.CreateStore(
@@ -425,14 +427,13 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
         };
 
         // Distinguish odd/even cases.
-        const auto odd_or_even
-            = builder.CreateICmpEQ(builder.CreateURem(order, builder.getInt32(2)), builder.getInt32(1));
+        auto *odd_or_even = builder.CreateICmpEQ(builder.CreateURem(order, builder.getInt32(2)), builder.getInt32(1));
 
         llvm_if_then_else(
             s, odd_or_even,
             [&]() {
                 // Odd order.
-                const auto loop_end = builder.CreateAdd(
+                auto *loop_end = builder.CreateAdd(
                     builder.CreateUDiv(builder.CreateSub(order, builder.getInt32(1)), builder.getInt32(2)),
                     builder.getInt32(1));
 
@@ -444,7 +445,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
                 for (auto &acc : v_accs) {
                     tmp.push_back(builder.CreateLoad(val_t, acc));
                 }
-                auto ret = pairwise_sum(s, tmp);
+                auto *ret = pairwise_sum(s, tmp);
 
                 // Return 2 * ret.
                 builder.CreateStore(llvm_fadd(s, ret, ret), retval);
@@ -459,7 +460,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
                     },
                     [&]() {
                         // Order 2 or higher.
-                        const auto loop_end = builder.CreateAdd(
+                        auto *loop_end = builder.CreateAdd(
                             builder.CreateUDiv(builder.CreateSub(order, builder.getInt32(2)), builder.getInt32(2)),
                             builder.getInt32(1));
 
@@ -471,23 +472,23 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
                 tmp.reserve(v_accs.size());
                 for (decltype(sf.args().size()) k = 0; k < sf.args().size(); ++k) {
                     // Load the current accumulator and multiply it by 2.
-                    auto acc_val = builder.CreateLoad(val_t, v_accs[k]);
-                    auto acc2 = llvm_fadd(s, acc_val, acc_val);
+                    auto *acc_val = builder.CreateLoad(val_t, v_accs[k]);
+                    auto *acc2 = llvm_fadd(s, acc_val, acc_val);
 
                     // Load the external term.
-                    auto ex_term = std::visit( // LCOV_EXCL_LINE
+                    auto *ex_term = std::visit( // LCOV_EXCL_LINE
                         [&](const auto &v) -> llvm::Value * {
                             using type = detail::uncvref_t<decltype(v)>;
 
                             if constexpr (std::is_same_v<type, variable>) {
                                 // Variable.
-                                auto val
+                                auto *val
                                     = taylor_c_load_diff(s, val_t, diff_arr, n_uvars,
                                                          builder.CreateUDiv(order, builder.getInt32(2)), terms + k);
                                 return llvm_fmul(s, val, val);
                             } else if constexpr (is_num_param_v<type>) {
                                 // Number/param.
-                                auto ret = builder.CreateAlloca(val_t);
+                                auto *ret = builder.CreateAlloca(val_t);
 
                                 llvm_if_then_else(
                                     s, builder.CreateICmpEQ(order, builder.getInt32(0)),
@@ -503,7 +504,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, 
                                             vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), ret);
                                     });
 
-                                auto val = builder.CreateLoad(val_t, ret);
+                                auto *val = builder.CreateLoad(val_t, ret);
 
                                 return llvm_fmul(s, val, val);
                             } else {
@@ -565,21 +566,51 @@ expression sum_sq(std::vector<expression> args, std::uint32_t split)
             fmt::format("The 'split' value for a sum of squares must be at least 2, but it is {} instead", split));
     }
 
-    // Partition args so that all zeroes are at the end.
-    const auto n_end_it = std::stable_partition(args.begin(), args.end(), [](const expression &ex) {
-        return !std::holds_alternative<number>(ex.value()) || !is_zero(std::get<number>(ex.value()));
-    });
+    // Partition args so that all numbers are at the end.
+    const auto n_end_it = std::stable_partition(
+        args.begin(), args.end(), [](const expression &ex) { return !std::holds_alternative<number>(ex.value()); });
 
-    // If we have one or more zeroes, eliminate them
-    args.erase(n_end_it, args.end());
+    // If we have numbers, make sure they are all
+    // accumulated in the last one, and ensure that
+    // the accumulated value is not zero.
+    if (n_end_it != args.end()) {
+        if (n_end_it + 1 != args.end()) {
+            // We have more than 1 number at the end.
+            // Accumulate the squares of the numbers in n_end_it.
+            *n_end_it *= *n_end_it;
 
-    // Special cases.
+            for (auto it = n_end_it + 1; it != args.end(); ++it) {
+                *n_end_it += *it * *it;
+            }
+
+            // Check if the *entire* summation consists
+            // of numbers. In such a case, just return
+            // the accumulated value.
+            if (n_end_it == args.begin()) {
+                return std::move(*n_end_it);
+            }
+
+            // Restore the square root.
+            *n_end_it = sqrt(std::move(*n_end_it));
+        }
+
+        // Remove all numbers but the first one.
+        args.erase(n_end_it + 1, args.end());
+
+        // Remove the remaining number if it is zero.
+        if (is_zero(std::get<number>(n_end_it->value()))) {
+            args.pop_back();
+        }
+    }
+
+    // Special case.
     if (args.empty()) {
         return 0_dbl;
     }
 
+    // NOTE: this terminates the recursion.
     if (args.size() == 1u) {
-        return square(std::move(args[0]));
+        return args[0] * args[0];
     }
 
     // NOTE: ret_seq will contain a sequence
@@ -616,7 +647,7 @@ expression sum_sq(std::vector<expression> args, std::uint32_t split)
         // term. In such a case, for consistency with the general
         // behaviour of sum_sq({arg}), return arg*arg directly.
         if (tmp.size() == 1u) {
-            ret_seq.emplace_back(square(std::move(tmp[0])));
+            ret_seq.emplace_back(tmp[0] * tmp[0]);
         } else {
             ret_seq.emplace_back(func{detail::sum_sq_impl{std::move(tmp)}});
         }
