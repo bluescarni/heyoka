@@ -59,12 +59,23 @@ const auto fp_types = std::tuple<double
                                  >{};
 
 constexpr bool skip_batch_ld =
-#if LLVM_VERSION_MAJOR == 13 || LLVM_VERSION_MAJOR == 14 || LLVM_VERSION_MAJOR == 15
+#if LLVM_VERSION_MAJOR >= 13 && LLVM_VERSION_MAJOR <= 16
     std::numeric_limits<long double>::digits == 64
 #else
     false
 #endif
     ;
+
+TEST_CASE("sqrt basic")
+{
+    REQUIRE(sqrt(3_dbl) == expression{std::sqrt(3.)});
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    REQUIRE(sqrt(3_f128) == expression{sqrt(mppp::real128{3.})});
+
+#endif
+}
 
 TEST_CASE("sqrt s11n")
 {
@@ -176,7 +187,7 @@ TEST_CASE("cfunc_mp")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<mppp::real>(s, "cfunc", {sqrt(x), sqrt(expression{1.5}), sqrt(par[0])},
+            add_cfunc<mppp::real>(s, "cfunc", {sqrt(x), sqrt(expression{mppp::real{"1.5", prec}}), sqrt(par[0])},
                                   kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();

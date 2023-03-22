@@ -176,7 +176,6 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/variable.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/param.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/mascon.cpp"
     # "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
     # VSOP2013.
@@ -238,6 +237,9 @@ set(HEYOKA_SRC_FILES
     # Models.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/pendulum.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/nbody.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/fixed_centres.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/rotating.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/mascon.cpp"
     # Math functions.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/binary_op.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"

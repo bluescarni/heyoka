@@ -321,12 +321,26 @@ TEST_CASE("nbody")
         REQUIRE(en_out == 0.);
     }
 
+    // Direct invocation of the potential top level helper.
+    REQUIRE(model::nbody_potential(2, kw::masses = std::vector<double>{}) == 0_dbl);
+    REQUIRE(model::nbody_potential(10, kw::masses = std::vector<double>{}) == 0_dbl);
+
     // Error modes.
     REQUIRE_THROWS_MATCHES(model::nbody(0), std::invalid_argument,
+                           Message("Cannot construct an N-body system with N == 0: at least 2 bodies are needed"));
+    REQUIRE_THROWS_MATCHES(model::nbody_energy(0), std::invalid_argument,
+                           Message("Cannot construct an N-body system with N == 0: at least 2 bodies are needed"));
+    REQUIRE_THROWS_MATCHES(model::nbody_potential(0), std::invalid_argument,
                            Message("Cannot construct an N-body system with N == 0: at least 2 bodies are needed"));
     REQUIRE_THROWS_MATCHES(model::nbody(1), std::invalid_argument,
                            Message("Cannot construct an N-body system with N == 1: at least 2 bodies are needed"));
     REQUIRE_THROWS_MATCHES(model::nbody(2, kw::masses = {1., 2., 3., 4.}), std::invalid_argument,
+                           Message("In an N-body system the number of particles with mass (4) cannot be "
+                                   "greater than the total number of particles (2)"));
+    REQUIRE_THROWS_MATCHES(model::nbody_energy(2, kw::masses = {1., 2., 3., 4.}), std::invalid_argument,
+                           Message("In an N-body system the number of particles with mass (4) cannot be "
+                                   "greater than the total number of particles (2)"));
+    REQUIRE_THROWS_MATCHES(model::nbody_potential(2, kw::masses = {1., 2., 3., 4.}), std::invalid_argument,
                            Message("In an N-body system the number of particles with mass (4) cannot be "
                                    "greater than the total number of particles (2)"));
 }
@@ -656,6 +670,29 @@ TEST_CASE("np1body")
 
         REQUIRE(en_out == approximately(orig_en));
     }
+
+    // Direct invocation of the potential top level helper.
+    REQUIRE(model::np1body_potential(2, kw::masses = std::vector<double>{}) == 0_dbl);
+    REQUIRE(model::np1body_potential(10, kw::masses = std::vector<double>{}) == 0_dbl);
+
+    // Error modes.
+    REQUIRE_THROWS_MATCHES(model::np1body(0), std::invalid_argument,
+                           Message("Cannot construct an N-body system with N == 0: at least 2 bodies are needed"));
+    REQUIRE_THROWS_MATCHES(model::np1body_energy(0), std::invalid_argument,
+                           Message("Cannot construct an N-body system with N == 0: at least 2 bodies are needed"));
+    REQUIRE_THROWS_MATCHES(model::np1body_potential(0), std::invalid_argument,
+                           Message("Cannot construct an N-body system with N == 0: at least 2 bodies are needed"));
+    REQUIRE_THROWS_MATCHES(model::np1body(1), std::invalid_argument,
+                           Message("Cannot construct an N-body system with N == 1: at least 2 bodies are needed"));
+    REQUIRE_THROWS_MATCHES(model::np1body(2, kw::masses = {1., 2., 3., 4.}), std::invalid_argument,
+                           Message("In an N-body system the number of particles with mass (4) cannot be "
+                                   "greater than the total number of particles (2)"));
+    REQUIRE_THROWS_MATCHES(model::np1body_energy(2, kw::masses = {1., 2., 3., 4.}), std::invalid_argument,
+                           Message("In an N-body system the number of particles with mass (4) cannot be "
+                                   "greater than the total number of particles (2)"));
+    REQUIRE_THROWS_MATCHES(model::np1body_potential(2, kw::masses = {1., 2., 3., 4.}), std::invalid_argument,
+                           Message("In an N-body system the number of particles with mass (4) cannot be "
+                                   "greater than the total number of particles (2)"));
 }
 
 // Integrate the usual outer Solar System setup in both the N-body and (N+1)-body

@@ -6,9 +6,9 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MASCON_HPP
-#define HEYOKA_MASCON_HPP
-
+#include <initializer_list>
+#include <random>
+#include <utility>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -16,19 +16,94 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/math.hpp>
+#include <heyoka/model/mascon.hpp>
+#include <heyoka/taylor.hpp>
+
+#include "catch.hpp"
+#include "test_utils.hpp"
+
+// NOTE: original code implementing the mascon model.
+// We will be using it to check the new implementation.
 
 HEYOKA_BEGIN_NAMESPACE
+
+namespace kw
+{
+
+IGOR_MAKE_NAMED_ARGUMENT(points);
+IGOR_MAKE_NAMED_ARGUMENT(state);
+
+} // namespace kw
 
 namespace detail
 {
 
-HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>>
-    make_mascon_system_impl(expression, std::vector<std::vector<expression>>, std::vector<expression>, expression,
-                            expression, expression);
+std::vector<std::pair<expression, expression>>
+make_mascon_system_impl(expression Gconst, std::vector<std::vector<expression>> mascon_points,
+                        std::vector<expression> mascon_masses, expression pe, expression qe, expression re)
+{
+    // 3 - Create the return value.
+    std::vector<std::pair<expression, expression>> retval;
+    // 4 - Main code
+    auto dim = std::size(mascon_masses);
+    auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
+    // Assemble the contributions to the x/y/z accelerations from each mass.
+    std::vector<expression> x_acc, y_acc, z_acc;
+    // Assembling the r.h.s.
+    // FIRST: the acceleration due to the mascon points
+    for (decltype(dim) i = 0; i < dim; ++i) {
+        auto x_masc = mascon_points[i][0];
+        auto y_masc = mascon_points[i][1];
+        auto z_masc = mascon_points[i][2];
+        auto m_masc = mascon_masses[i];
+        auto xdiff = (x - x_masc);
+        auto ydiff = (y - y_masc);
+        auto zdiff = (z - z_masc);
+        auto r2 = sum({square(xdiff), square(ydiff), square(zdiff)});
+        auto common_factor = -Gconst * m_masc * pow(r2, expression{-3. / 2.});
+        x_acc.push_back(common_factor * xdiff);
+        y_acc.push_back(common_factor * ydiff);
+        z_acc.push_back(common_factor * zdiff);
+    }
+    // SECOND: centripetal and Coriolis
+    // w x w x r
+    auto centripetal_x = -qe * qe * x - re * re * x + qe * y * pe + re * z * pe;
+    auto centripetal_y = -pe * pe * y - re * re * y + pe * x * qe + re * z * qe;
+    auto centripetal_z = -pe * pe * z - qe * qe * z + pe * x * re + qe * y * re;
+    // 2 w x v
+    auto coriolis_x = expression{2.} * (qe * vz - re * vy);
+    auto coriolis_y = expression{2.} * (re * vx - pe * vz);
+    auto coriolis_z = expression{2.} * (pe * vy - qe * vx);
 
-HEYOKA_DLL_PUBLIC expression energy_mascon_system_impl(expression, std::vector<expression>,
-                                                       std::vector<std::vector<expression>>, std::vector<expression>,
-                                                       expression, expression, expression);
+    // Assembling the return vector containing l.h.s. and r.h.s. (note the fundamental use of sum() for
+    // efficiency and to allow compact mode to do his job)
+    retval.push_back(prime(x) = vx);
+    retval.push_back(prime(y) = vy);
+    retval.push_back(prime(z) = vz);
+    retval.push_back(prime(vx) = sum(x_acc) - centripetal_x - coriolis_x);
+    retval.push_back(prime(vy) = sum(y_acc) - centripetal_y - coriolis_y);
+    retval.push_back(prime(vz) = sum(z_acc) - centripetal_z - coriolis_z);
+
+    return retval;
+}
+
+expression energy_mascon_system_impl(expression Gconst, std::vector<expression> x,
+                                     std::vector<std::vector<expression>> mascon_points,
+                                     std::vector<expression> mascon_masses, expression pe, expression qe, expression re)
+{
+    auto kinetic = expression{(x[3] * x[3] + x[4] * x[4] + x[5] * x[5]) / expression{2.}};
+    auto potential_g = expression{0.};
+    for (decltype(mascon_masses.size()) i = 0u; i < mascon_masses.size(); ++i) {
+        auto distance = expression{sqrt((x[0] - mascon_points[i][0]) * (x[0] - mascon_points[i][0])
+                                        + (x[1] - mascon_points[i][1]) * (x[1] - mascon_points[i][1])
+                                        + (x[2] - mascon_points[i][2]) * (x[2] - mascon_points[i][2]))};
+        potential_g -= Gconst * mascon_masses[i] / distance;
+    }
+    auto potential_c
+        = -expression{number{0.5}} * (pe * pe + qe * qe + re * re) * (x[0] * x[0] + x[1] * x[1] + x[2] * x[2])
+          + expression{number{0.5}} * (x[0] * pe + x[1] * qe + x[2] * re) * (x[0] * pe + x[1] * qe + x[2] * re);
+    return kinetic + potential_g + potential_c;
+}
 
 } // namespace detail
 
@@ -179,4 +254,86 @@ expression energy_mascon_system(KwArgs &&...kw_args)
 
 HEYOKA_END_NAMESPACE
 
-#endif
+using namespace heyoka;
+using namespace heyoka_test;
+
+TEST_CASE("basic cmp")
+{
+    std::mt19937 rng;
+    std::uniform_real_distribution<double> rdist(-1e-2, 1e-2);
+
+    const auto n_masses = 1u;
+    std::vector<double> pos, masses;
+    std::vector<std::vector<double>> points(n_masses);
+    for (auto i = 0u; i < n_masses; ++i) {
+        masses.push_back(rdist(rng));
+
+        for (auto j = 0u; j < 3u; ++j) {
+            const auto tmp = rdist(rng);
+
+            pos.push_back(tmp);
+            points[i].push_back(tmp);
+        }
+    }
+
+    const std::vector omega = {.1, .11, .12};
+
+    // Randomly generate a fixed centres problem and check against the old implementation.
+    {
+        auto dyn = model::mascon(kw::masses = masses, kw::positions = pos, kw::Gconst = 1.01, kw::omega = omega);
+        auto dyn_old
+            = make_mascon_system(kw::masses = masses, kw::points = points, kw::Gconst = 1.01, kw::omega = omega);
+
+        const std::vector init_state = {1., 0., 0., 0., 1., 0.};
+
+        auto ta = taylor_adaptive{dyn, init_state, kw::compact_mode = true};
+        auto ta_old = taylor_adaptive{dyn_old, init_state, kw::compact_mode = true};
+
+        ta.propagate_until(10.);
+        ta_old.propagate_until(10.);
+
+        for (auto i = 0u; i < 6u; ++i) {
+            REQUIRE(ta.get_state()[i] == approximately(ta_old.get_state()[i], 1000.));
+        }
+    }
+
+    // Do an energy conservation check as well.
+    {
+        auto dyn = model::mascon(kw::masses = masses, kw::positions = pos, kw::Gconst = 1.01, kw::omega = omega);
+        const std::vector init_state = {1., 0., 0., 0., 1., 0.};
+
+        auto ta = taylor_adaptive{dyn, init_state, kw::compact_mode = true};
+
+        llvm_state s;
+        add_cfunc<double>(
+            s, "en",
+            {model::mascon_energy(kw::masses = masses, kw::positions = pos, kw::Gconst = 1.01, kw::omega = omega)},
+            kw::vars = {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
+        add_cfunc<double>(
+            s, "en2",
+            {0.5 * ("vx"_var * "vx"_var + "vy"_var * "vy"_var + "vz"_var * "vz"_var)
+             + model::mascon_potential(kw::masses = masses, kw::positions = pos, kw::Gconst = 1.01, kw::omega = omega)},
+            kw::vars = {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
+        s.optimise();
+        s.compile();
+
+        auto *cf
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("en"));
+        auto *cf2
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("en2"));
+
+        double E0 = 0;
+        cf(&E0, ta.get_state().data(), nullptr, nullptr);
+
+        ta.propagate_until(10.);
+
+        double E = 0;
+        cf(&E, ta.get_state().data(), nullptr, nullptr);
+
+        REQUIRE(E == approximately(E0));
+
+        cf2(&E, ta.get_state().data(), nullptr, nullptr);
+
+        REQUIRE(E == approximately(E0));
+    }
+}
