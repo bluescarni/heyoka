@@ -267,6 +267,20 @@ std::uint64_t get_alignment(llvm::Module &md, llvm::Type *tp)
 #endif
 }
 
+// Fetch the alloc size of a type. This should be
+// equivalent to the sizeof() operator in C++.
+// Requires a non-scalable type.
+std::uint64_t get_size(llvm::Module &md, llvm::Type *tp)
+{
+    assert(!md.getDataLayout().getTypeAllocSize(tp).isScalable());
+
+#if LLVM_VERSION_MAJOR >= 12
+    return boost::numeric_cast<std::uint64_t>(md.getDataLayout().getTypeAllocSize(tp).getFixedValue());
+#else
+    return boost::numeric_cast<std::uint64_t>(md.getDataLayout().getTypeAllocSize(tp).getFixedSize());
+#endif
+}
+
 // Convert the input integral value n to the type std::size_t.
 // If an upcast is needed, it will be performed via zero extension.
 llvm::Value *to_size_t(llvm_state &s, llvm::Value *n)

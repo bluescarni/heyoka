@@ -3048,9 +3048,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
     auto *eval_arr = builder.CreateInBoundsGEP(array_type, eval_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
 
     // Compute the size in bytes of eval_arr.
-    assert(!md.getDataLayout().getTypeAllocSize(array_type).isScalable());
-    const auto eval_arr_size
-        = boost::numeric_cast<std::uint64_t>(md.getDataLayout().getTypeAllocSize(array_type).getFixedValue());
+    const auto eval_arr_size = get_size(md, array_type);
 
     // NOTE: eval_arr is used as temporary storage for the current function,
     // but it is declared as a global variable in order to avoid stack overflow.
