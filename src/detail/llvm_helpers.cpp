@@ -274,11 +274,14 @@ std::uint64_t get_size(llvm::Module &md, llvm::Type *tp)
 {
     assert(!md.getDataLayout().getTypeAllocSize(tp).isScalable());
 
+    return boost::numeric_cast<std::uint64_t>(md.getDataLayout()
+                                                  .getTypeAllocSize(tp)
 #if LLVM_VERSION_MAJOR >= 12
-    return boost::numeric_cast<std::uint64_t>(md.getDataLayout().getTypeAllocSize(tp).getFixedValue());
+                                                  .getFixedValue()
 #else
-    return boost::numeric_cast<std::uint64_t>(md.getDataLayout().getTypeAllocSize(tp).getFixedSize());
+                                                  .getFixedSize()
 #endif
+    );
 }
 
 // Convert the input integral value n to the type std::size_t.
