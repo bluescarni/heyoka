@@ -929,6 +929,17 @@ std::pair<llvm::Value *, llvm::Type *> taylor_compute_jet_compact_mode(
     auto *diff_arr
         = builder.CreateInBoundsGEP(diff_array_type, diff_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
 
+    // NOTE: diff_arr is used as temporary storage for the current function,
+    // but it is declared as a global variable in order to avoid stack overflow.
+    // This creates a situation in which LLVM cannot elide stores into diff_arr
+    // (even if it figures out a way to avoid storing intermediate results into
+    // diff_arr) because LLVM must assume that some other function may
+    // use these stored values later. Thus, we declare via an intrinsic that the
+    // lifetime of diff_arr begins here and ends at the end of the function,
+    // so that LLVM can assume that any value stored in it cannot be possibly
+    // used outside this function.
+    builder.CreateLifetimeStart(diff_arr, builder.getInt64(get_size(md, diff_array_type)));
+
     // Copy over the order-0 derivatives of the state variables.
     // NOTE: overflow checking is already done in the parent function.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
@@ -1777,6 +1788,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 
     auto &builder = s.builder();
     auto &context = s.context();
+    auto &md = s.module();
 
     // Record the number of equations/variables.
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -1822,11 +1834,13 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &md);
     if (f == nullptr) {
         throw std::invalid_argument(fmt::format(
             "Unable to create a function for the computation of the jet of Taylor derivatives with name '{}'", name));
     }
+    // NOTE: a jet function cannot call itself recursively.
+    f->addFnAttr(llvm::Attribute::NoRecurse);
 
     // Set the names/attributes of the function arguments.
     auto *in_out = f->args().begin();
@@ -1933,6 +1947,9 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
                     });
                 }
             });
+
+        // End the lifetime of diff_arr.
+        builder.CreateLifetimeEnd(diff_arr, builder.getInt64(get_size(md, std::get<0>(diff_variant).second)));
     } else {
         const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_variant);
 

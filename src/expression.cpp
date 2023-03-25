@@ -3247,6 +3247,8 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
         throw std::invalid_argument(fmt::format("Unable to create a compiled function with name '{}'", sname));
         // LCOV_EXCL_STOP
     }
+    // NOTE: a cfunc cannot call itself recursively.
+    f->addFnAttr(llvm::Attribute::NoRecurse);
 
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
