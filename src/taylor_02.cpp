@@ -243,11 +243,12 @@ number taylor_determine_h_rhofac(llvm_state &s, llvm::Type *fp_t, std::uint32_t 
 // the clamping values for the timesteps. svf_ptr is a pointer to the first element of an LLVM array containing the
 // values in sv_funcs_dc. If max_abs_state_ptr is not nullptr, the computed norm infinity of the
 // state vector (including sv_funcs, if any) will be written into it (max_abs_state_ptr is an external pointer).
-llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
-                                const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
-                                const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *h_ptr,
-                                std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
-                                std::uint32_t batch_size, llvm::Value *max_abs_state_ptr)
+llvm::Value *
+taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
+                   const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &diff_variant,
+                   const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *h_ptr,
+                   std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
+                   llvm::Value *max_abs_state_ptr)
 {
     assert(batch_size != 0u);
 #if !defined(NDEBUG)
@@ -271,7 +272,7 @@ llvm::Value *taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
 
     if (diff_variant.index() == 0u) {
         // Compact mode.
-        auto *diff_arr = std::get<llvm::Value *>(diff_variant);
+        auto *diff_arr = std::get<0>(diff_variant).first;
 
         // These will end up containing the norm infinity of the state vector + sv_funcs and the
         // norm infinity of the derivatives at orders order and order - 1.
@@ -870,11 +871,10 @@ auto taylor_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vect
 // Helper for the computation of a jet of derivatives in compact mode,
 // used in taylor_compute_jet().
 // NOTE: order0, par_ptr and time_ptr are external pointers.
-llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *order0,
-                                             llvm::Value *par_ptr, llvm::Value *time_ptr, const taylor_dc_t &dc,
-                                             const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq,
-                                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
-                                             bool high_accuracy, bool parallel_mode)
+std::pair<llvm::Value *, llvm::Type *> taylor_compute_jet_compact_mode(
+    llvm_state &s, llvm::Type *fp_type, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
+    const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq, std::uint32_t n_uvars,
+    std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool parallel_mode)
 {
     auto &builder = s.builder();
     auto &context = s.context();
@@ -917,7 +917,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Type *fp_type,
     // another full column of derivatives, as it is complicated at this stage
     // to know exactly how many slots we will need.
     auto *fp_vec_type = make_vector_type(fp_type, batch_size);
-    auto *array_type
+    auto *diff_array_type
         = llvm::ArrayType::get(fp_vec_type, (max_svf_idx < n_eq) ? (n_uvars * order + n_eq) : (n_uvars * (order + 1u)));
 
     // Make the global array and fetch a pointer to its first element.
@@ -925,8 +925,9 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Type *fp_type,
     // its size can grow quite large, which can lead to stack overflow issues.
     // This has of course consequences in terms of thread safety, which
     // we will have to document.
-    auto *diff_arr_gvar = make_global_zero_array(md, array_type);
-    auto *diff_arr = builder.CreateInBoundsGEP(array_type, diff_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
+    auto *diff_arr_gvar = make_global_zero_array(md, diff_array_type);
+    auto *diff_arr
+        = builder.CreateInBoundsGEP(diff_array_type, diff_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
 
     // Copy over the order-0 derivatives of the state variables.
     // NOTE: overflow checking is already done in the parent function.
@@ -1244,8 +1245,8 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Type *fp_type,
 
     get_logger()->trace("Taylor IR creation compact mode runtime: {}", sw);
 
-    // Return the array of derivatives of the u variables.
-    return diff_arr;
+    // Return the array of derivatives of the u variables and its type.
+    return std::make_pair(diff_arr, static_cast<llvm::Type *>(diff_array_type));
 }
 
 // Given an input pointer 'in', load the first n * batch_size values in it as n vectors
@@ -1291,7 +1292,7 @@ auto taylor_load_values(llvm_state &s, llvm::Type *fp_t, llvm::Value *in, std::u
 // - in compact mode, the array containing the derivatives of all u variables,
 // - otherwise, the jet of derivatives of the state variables and sv_funcs
 //   up to order 'order'.
-std::variant<llvm::Value *, std::vector<llvm::Value *>>
+std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>>
 taylor_compute_jet(llvm_state &s, llvm::Type *fp_t, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
                    const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq,
                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool compact_mode,
@@ -1426,10 +1427,11 @@ taylor_compute_jet(llvm_state &s, llvm::Type *fp_t, llvm::Value *order0, llvm::V
 // the sv funcs into an external array. The Taylor polynomials are stored in row-major order,
 // first the state variables and after the sv funcs. For use in the adaptive timestepper implementations.
 // tc_ptr is an external pointer.
-void taylor_write_tc(llvm_state &s, llvm::Type *fp_t,
-                     const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
-                     const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *tc_ptr,
-                     std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
+void taylor_write_tc(
+    llvm_state &s, llvm::Type *fp_t,
+    const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &diff_variant,
+    const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *tc_ptr, std::uint32_t n_eq,
+    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
     // LCOV_EXCL_START
     assert(batch_size != 0u);
@@ -1471,7 +1473,7 @@ void taylor_write_tc(llvm_state &s, llvm::Type *fp_t,
     if (diff_variant.index() == 0u) {
         // Compact mode.
 
-        auto *diff_arr = std::get<llvm::Value *>(diff_variant);
+        auto *diff_arr = std::get<0>(diff_variant).first;
 
         // Write out the Taylor coefficients for the state variables.
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var) {
@@ -1549,15 +1551,15 @@ void taylor_write_tc(llvm_state &s, llvm::Type *fp_t,
 // variables.
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_run_multihorner(llvm_state &s, llvm::Type *fp_t,
-                       const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_var, llvm::Value *h,
-                       std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
-                       bool compact_mode)
+                       const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &diff_var,
+                       llvm::Value *h, std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
+                       std::uint32_t batch_size, bool compact_mode)
 {
     auto &builder = s.builder();
 
     if (compact_mode) {
         // Compact mode.
-        auto *diff_arr = std::get<llvm::Value *>(diff_var);
+        auto *diff_arr = std::get<0>(diff_var).first;
 
         // Create the array storing the results of the evaluation.
         auto *fp_vec_t = make_vector_type(fp_t, batch_size);
@@ -1619,15 +1621,15 @@ taylor_run_multihorner(llvm_state &s, llvm::Type *fp_t,
 // a compensated summation over the naive evaluation of monomials.
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
-                 const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_var, llvm::Value *h,
-                 std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, bool, std::uint32_t batch_size,
-                 bool compact_mode)
+                 const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &diff_var,
+                 llvm::Value *h, std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, bool,
+                 std::uint32_t batch_size, bool compact_mode)
 {
     auto &builder = s.builder();
 
     if (compact_mode) {
         // Compact mode.
-        auto *diff_arr = std::get<llvm::Value *>(diff_var);
+        auto *diff_arr = std::get<0>(diff_var).first;
 
         // Create the arrays storing the results of the evaluation and the running compensations.
         auto *fp_vec_t = make_vector_type(fp_t, batch_size);
@@ -1867,7 +1869,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     // LCOV_EXCL_STOP
 
     if (compact_mode) {
-        auto diff_arr = std::get<llvm::Value *>(diff_variant);
+        auto diff_arr = std::get<0>(diff_variant).first;
 
         // Create a global read-only array containing the values in sv_funcs_dc, if any
         // (otherwise, svf_ptr will be null).
