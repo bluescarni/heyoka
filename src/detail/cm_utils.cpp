@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -20,12 +21,14 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Value.h>
 
@@ -153,6 +156,138 @@ std::uint32_t is_consecutive_strided(const std::vector<std::uint32_t> &v)
     return candidate;
 }
 
+// A struct representing a subrange into a vector of indices.
+// Indices in the subrange consist of consecutive strided
+// values, that is:
+//
+// [n, n + s, n + 2*s, n + 3*s, ...],
+//
+// where s is the stride value.
+struct strided_range {
+    // Positions into the vector of indices.
+    std::vector<std::uint32_t>::size_type idx_begin = 0, idx_end = 0;
+
+    // Stride value.
+    std::int64_t stride = 0;
+
+    [[nodiscard]] bool is_singleton() const
+    {
+        return idx_end - idx_begin == 1u;
+    }
+};
+
+// Partition a vector of indices into a set of strided ranges. The ranges
+// are either singletons (that is, they contain a single index),
+// or they have at least 3 indices.
+// The function will fail if the number of strided ranges exceeds a limit.
+std::optional<std::vector<strided_range>> strided_range_partition(const std::vector<std::uint32_t> &v)
+{
+    return {};
+
+    assert(!v.empty());
+
+    using size_type = std::vector<std::uint32_t>::size_type;
+
+    size_type cur_idx_v = 0;
+    const auto v_size = v.size();
+
+    std::vector<strided_range> retval;
+
+    // Small helper to compute the difference between two indices
+    // as a 64-bit signed integer.
+    auto signed_idx_diff
+        = [](std::uint32_t a, std::uint32_t b) { return static_cast<std::int64_t>(a) - static_cast<std::int64_t>(b); };
+
+    while (cur_idx_v < v_size) {
+        if (retval.size() >= 5u) {
+            return {};
+        }
+
+        // NOTE: if we are towards the end of v
+        // (specifically, we have less than 3 elemnts
+        // left, including the current one), then just keep on
+        // adding singleton ranges.
+        if (v_size - cur_idx_v < 3u) {
+            retval.push_back({cur_idx_v, cur_idx_v + 1u, 0});
+            ++cur_idx_v;
+            continue;
+        }
+
+        // Check if we can build a range of at least 3 elements.
+        const auto diff1 = signed_idx_diff(v[cur_idx_v + 1u], v[cur_idx_v]);
+        const auto diff2 = signed_idx_diff(v[cur_idx_v + 2u], v[cur_idx_v + 1u]);
+
+        if (diff1 != diff2) {
+            // We cannot build a range of at least 3 elements,
+            // add a singleton and move on.
+            retval.push_back({cur_idx_v, cur_idx_v + 1u, 0});
+            ++cur_idx_v;
+            continue;
+        }
+
+        // We can build a range of at least 3 elements.
+        // Keep on peeking forward.
+        size_type i = cur_idx_v + 3u;
+        for (; i < v_size; ++i) {
+            const auto cur_diff = signed_idx_diff(v[i], v[i - 1u]);
+
+            if (cur_diff != diff1) {
+                break;
+            }
+        }
+
+        // Add the range.
+        retval.push_back({cur_idx_v, i, diff1});
+
+        // Update cur_idx_v.
+        cur_idx_v = i;
+    }
+
+#if !defined(NDEBUG)
+
+    // Check retval in debug mode.
+    for (decltype(retval.size()) i = 0; i < retval.size(); ++i) {
+        const auto [begin, end, stride] = retval[i];
+
+        if (retval[i].is_singleton()) {
+            assert(stride == 0);
+        }
+
+        assert(begin < v_size);
+        assert(end <= v_size);
+        assert(begin < end);
+        assert(end - begin == 1u || end - begin >= 3u);
+
+        if (i == 0u) {
+            assert(begin == 0u);
+        }
+
+        if (i == retval.size() - 1u) {
+            assert(end == v_size);
+        }
+
+        if (i > 0u) {
+            assert(retval[i - 1u].idx_end == begin);
+        }
+
+        for (auto idx = begin; idx < end; ++idx) {
+            auto tmp = v[begin];
+
+            if (stride >= 0) {
+                tmp += static_cast<std::uint32_t>(stride) * static_cast<std::uint32_t>(idx - begin);
+            } else {
+                tmp -= static_cast<std::uint32_t>(-stride) * static_cast<std::uint32_t>(idx - begin);
+            }
+
+            assert(tmp == v[idx]);
+        }
+    }
+
+#endif
+
+    return std::move(retval);
+}
+
 } // namespace
 
 // This helper returns the argument generator for compact mode functions when the argument is
@@ -165,6 +300,8 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vidx(llvm_state &s, 
     assert(!ind.empty()); // LCOV_EXCL_LINE
 
     auto &builder = s.builder();
+    auto &md = s.module();
+    auto &context = s.context();
 
     // Check if all indices in ind are the same.
     if (std::all_of(ind.begin() + 1, ind.end(), [&ind](const auto &n) { return n == ind[0]; })) {
@@ -248,7 +385,69 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vidx(llvm_state &s, 
         }
     }
 
-    auto &md = s.module();
+    if (auto v_seg = strided_range_partition(ind)) {
+        auto *orig_bb = builder.GetInsertBlock();
+
+        auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {builder.getInt32Ty()}, false);
+        auto *func = llvm::Function::Create(ft, llvm::Function::InternalLinkage, "", &md);
+
+        auto *cur_call_idx = func->args().begin();
+
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", func));
+
+        // TODO put poison value in here.
+        auto *ret_storage = builder.CreateAlloca(builder.getInt32Ty());
+
+        for (const auto &seg : *v_seg) {
+            if (seg.is_singleton()) {
+                llvm_if_then_else(
+                    s, builder.CreateICmpEQ(cur_call_idx, builder.getInt32(static_cast<std::uint32_t>(seg.idx_begin))),
+                    [&]() { builder.CreateStore(builder.getInt32(ind[seg.idx_begin]), ret_storage); }, []() {});
+            } else {
+                auto *cmp1
+                    = builder.CreateICmpUGE(cur_call_idx, builder.getInt32(static_cast<std::uint32_t>(seg.idx_begin)));
+                auto *cmp2
+                    = builder.CreateICmpULT(cur_call_idx, builder.getInt32(static_cast<std::uint32_t>(seg.idx_end)));
+
+                // NOTE: this is a way of creating a logical AND between cmp1 and cmp2. LLVM 13 has a specific
+                // function for this.
+                auto *cmp = builder.CreateSelect(cmp1, cmp2, llvm::ConstantInt::get(cmp1->getType(), 0u));
+
+                llvm_if_then_else(
+                    s, cmp,
+                    [&]() {
+                        const auto [begin, end, stride] = seg;
+
+                        auto *tmp1 = builder.getInt32(ind[begin]);
+                        auto *tmp2
+                            = builder.CreateSub(cur_call_idx, builder.getInt32(static_cast<std::uint32_t>(begin)));
+
+                        if (stride >= 0) {
+                            auto *tmp3 = builder.getInt32(static_cast<std::uint32_t>(stride));
+
+                            builder.CreateStore(builder.CreateAdd(tmp1, builder.CreateMul(tmp3, tmp2)), ret_storage);
+                        } else {
+                            auto *tmp3 = builder.getInt32(static_cast<std::uint32_t>(-stride));
+
+                            builder.CreateStore(builder.CreateSub(tmp1, builder.CreateMul(tmp3, tmp2)), ret_storage);
+                        }
+                    },
+                    []() {});
+            }
+        }
+
+        // Return.
+        builder.CreateRet(builder.CreateLoad(builder.getInt32Ty(), ret_storage));
+
+        // Verify.
+        s.verify_function(func);
+
+        builder.SetInsertPoint(orig_bb);
+
+        return [&builder, func](llvm::Value *cur_call_idx) -> llvm::Value * {
+            return builder.CreateCall(func, {cur_call_idx});
+        };
+    }
 
     // Generate the array of indices as llvm constants.
     std::vector<llvm::Constant *> tmp_c_vec;
