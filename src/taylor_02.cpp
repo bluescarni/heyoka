@@ -1553,11 +1553,11 @@ std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_run_multihorner(llvm_state &s, llvm::Type *fp_t,
                        const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &diff_var,
                        llvm::Value *h, std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
-                       std::uint32_t batch_size, bool compact_mode)
+                       std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
-    if (compact_mode) {
+    if (diff_var.index() == 0u) {
         // Compact mode.
         auto *diff_arr = std::get<0>(diff_var).first;
 
@@ -1623,11 +1623,11 @@ std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
                  const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &diff_var,
                  llvm::Value *h, std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, bool,
-                 std::uint32_t batch_size, bool compact_mode)
+                 std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
-    if (compact_mode) {
+    if (diff_var.index() == 0u) {
         // Compact mode.
         auto *diff_arr = std::get<0>(diff_var).first;
 

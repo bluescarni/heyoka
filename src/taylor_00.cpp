@@ -395,10 +395,9 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
                                  nullptr);
 
     // Evaluate the Taylor polynomials, producing the updated state of the system.
-    auto new_state_var = high_accuracy ? taylor_run_ceval(s, fp_t, diff_variant, h, n_eq, n_uvars, order, high_accuracy,
-                                                          batch_size, compact_mode)
-                                       : taylor_run_multihorner(s, fp_t, diff_variant, h, n_eq, n_uvars, order,
-                                                                batch_size, compact_mode);
+    auto new_state_var
+        = high_accuracy ? taylor_run_ceval(s, fp_t, diff_variant, h, n_eq, n_uvars, order, high_accuracy, batch_size)
+                        : taylor_run_multihorner(s, fp_t, diff_variant, h, n_eq, n_uvars, order, batch_size);
 
     // Store the new state.
     // NOTE: no need to perform overflow check on n_eq * batch_size,

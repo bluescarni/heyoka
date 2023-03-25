@@ -119,12 +119,12 @@ void taylor_write_tc(llvm_state &, llvm::Type *,
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_run_multihorner(llvm_state &, llvm::Type *,
                        const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &,
-                       llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool);
+                       llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t);
 
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_run_ceval(llvm_state &, llvm::Type *,
                  const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &,
-                 llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, bool, std::uint32_t, bool);
+                 llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, bool, std::uint32_t);
 
 std::pair<std::string, std::vector<llvm::Type *>>
 taylor_c_diff_func_name_args(llvm::LLVMContext &, llvm::Type *, const std::string &, std::uint32_t, std::uint32_t,
