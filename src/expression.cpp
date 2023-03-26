@@ -3047,6 +3047,20 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
     auto *eval_arr_gvar = make_global_zero_array(md, array_type);
     auto *eval_arr = builder.CreateInBoundsGEP(array_type, eval_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
 
+    // Compute the size in bytes of eval_arr.
+    const auto eval_arr_size = get_size(md, array_type);
+
+    // NOTE: eval_arr is used as temporary storage for the current function,
+    // but it is declared as a global variable in order to avoid stack overflow.
+    // This creates a situation in which LLVM cannot elide stores into eval_arr
+    // (even if it figures out a way to avoid storing intermediate results into
+    // eval_arr) because LLVM must assume that some other function may
+    // use these stored values later. Thus, we declare via an intrinsic that the
+    // lifetime of eval_arr begins here and ends at the end of the function,
+    // so that LLVM can assume that any value stored in it cannot be possibly
+    // used outside this function.
+    builder.CreateLifetimeStart(eval_arr, builder.getInt64(eval_arr_size));
+
     // Copy over the values of the variables.
     // NOTE: overflow checking is already done in the parent function.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(nvars), [&](llvm::Value *cur_var_idx) {
@@ -3104,6 +3118,9 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
 
     // Write the results to the output pointer.
     cfunc_c_write_outputs(s, fp_type, out_ptr, cout_gl, eval_arr, par_ptr, stride, batch_size);
+
+    // End the lifetime of eval_arr.
+    builder.CreateLifetimeEnd(eval_arr, builder.getInt64(eval_arr_size));
 
     get_logger()->trace("cfunc IR creation compact mode runtime: {}", sw);
 }
@@ -3230,6 +3247,8 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
         throw std::invalid_argument(fmt::format("Unable to create a compiled function with name '{}'", sname));
         // LCOV_EXCL_STOP
     }
+    // NOTE: a cfunc cannot call itself recursively.
+    f->addFnAttr(llvm::Attribute::NoRecurse);
 
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();

@@ -56,7 +56,7 @@ public:
 
 // NOTE: the default split value is a power of two so that the
 // internal pairwise sums are rounded up exactly.
-inline constexpr std::uint32_t default_sum_split = 64;
+inline constexpr std::uint32_t default_sum_split = 8;
 
 } // namespace detail
 

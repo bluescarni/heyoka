@@ -61,6 +61,8 @@ HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(llvm::Value *);
 
 HEYOKA_DLL_PUBLIC std::uint64_t get_alignment(llvm::Module &, llvm::Type *);
 
+HEYOKA_DLL_PUBLIC std::uint64_t get_size(llvm::Module &, llvm::Type *);
+
 HEYOKA_DLL_PUBLIC llvm::Value *to_size_t(llvm_state &, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC llvm::GlobalVariable *make_global_zero_array(llvm::Module &, llvm::ArrayType *);

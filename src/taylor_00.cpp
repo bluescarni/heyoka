@@ -190,6 +190,7 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
 
     auto &builder = s.builder();
     auto &context = s.context();
+    auto &md = s.module();
 
     // Prepare the function prototype. The arguments are:
     // - pointer to the output jet of derivative (write only),
@@ -209,13 +210,15 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
     // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &md);
     // LCOV_EXCL_START
     if (f == nullptr) {
         throw std::invalid_argument(
             fmt::format("Unable to create a function for an adaptive Taylor stepper with name '{}'", name));
     }
     // LCOV_EXCL_STOP
+    // NOTE: a step function cannot call itself recursively.
+    f->addFnAttr(llvm::Attribute::NoRecurse);
 
     // Set the names/attributes of the function arguments.
     auto *jet_ptr = f->args().begin();
@@ -276,6 +279,12 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     // Copy the jet of derivatives to jet_ptr.
     taylor_write_tc(s, fp_t, diff_variant, ev_dc, svf_ptr, jet_ptr, n_eq, n_uvars, order, batch_size);
 
+    // End the lifetime of the array of derivatives, if we are in compact mode.
+    if (compact_mode) {
+        builder.CreateLifetimeEnd(std::get<0>(diff_variant).first,
+                                  builder.getInt64(get_size(md, std::get<0>(diff_variant).second)));
+    }
+
     // Create the return value.
     builder.CreateRetVoid();
 
@@ -327,6 +336,7 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
 
     auto &builder = s.builder();
     auto &context = s.context();
+    auto &md = s.module();
 
     // Prepare the function prototype. The arguments are:
     // - pointer to the current state vector (read & write),
@@ -346,11 +356,13 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
     // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &md);
     if (f == nullptr) {
         throw std::invalid_argument(
             fmt::format("Unable to create a function for an adaptive Taylor stepper with name '{}'", name));
     }
+    // NOTE: a step function cannot call itself recursively.
+    f->addFnAttr(llvm::Attribute::NoRecurse);
 
     // Set the names/attributes of the function arguments.
     auto *state_ptr = f->args().begin();
@@ -395,10 +407,9 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
                                  nullptr);
 
     // Evaluate the Taylor polynomials, producing the updated state of the system.
-    auto new_state_var = high_accuracy ? taylor_run_ceval(s, fp_t, diff_variant, h, n_eq, n_uvars, order, high_accuracy,
-                                                          batch_size, compact_mode)
-                                       : taylor_run_multihorner(s, fp_t, diff_variant, h, n_eq, n_uvars, order,
-                                                                batch_size, compact_mode);
+    auto new_state_var
+        = high_accuracy ? taylor_run_ceval(s, fp_t, diff_variant, h, n_eq, n_uvars, order, high_accuracy, batch_size)
+                        : taylor_run_multihorner(s, fp_t, diff_variant, h, n_eq, n_uvars, order, batch_size);
 
     // Store the new state.
     // NOTE: no need to perform overflow check on n_eq * batch_size,
@@ -442,6 +453,12 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
             // Taylor coefficients were not requested,
             // don't do anything in this branch.
         });
+
+    // End the lifetime of the array of derivatives, if we are in compact mode.
+    if (compact_mode) {
+        builder.CreateLifetimeEnd(std::get<0>(diff_variant).first,
+                                  builder.getInt64(get_size(md, std::get<0>(diff_variant).second)));
+    }
 
     // Create the return value.
     builder.CreateRetVoid();
