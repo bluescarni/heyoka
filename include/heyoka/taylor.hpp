@@ -349,7 +349,7 @@ public:
 private:
     expression eq;
     callback_t callback;
-    event_direction dir;
+    event_direction dir = event_direction::any;
 
     // Serialization.
     friend class boost::serialization::access;
@@ -454,8 +454,8 @@ public:
 private:
     expression eq;
     callback_t callback;
-    T cooldown;
-    event_direction dir;
+    T cooldown = 0;
+    event_direction dir = event_direction::any;
 
     // Serialization.
     friend class boost::serialization::access;
