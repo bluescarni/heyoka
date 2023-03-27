@@ -349,7 +349,7 @@ public:
 private:
     expression eq;
     callback_t callback;
-    event_direction dir;
+    event_direction dir = event_direction::any;
 
     // Serialization.
     friend class boost::serialization::access;
@@ -454,8 +454,8 @@ public:
 private:
     expression eq;
     callback_t callback;
-    T cooldown;
-    event_direction dir;
+    T cooldown = 0;
+    event_direction dir = event_direction::any;
 
     // Serialization.
     friend class boost::serialization::access;
@@ -885,6 +885,9 @@ public:
 
 #endif
 
+template <typename TA, typename U>
+void taylor_adaptive_setup_sv_rhs(TA &, const U &);
+
 } // namespace detail
 
 template <typename T>
@@ -893,6 +896,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive : public detail::taylor_adaptive_base<T,
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
     friend class HEYOKA_DLL_PUBLIC detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
     using base_t = detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
+    template <typename TA, typename U>
+    friend void detail::taylor_adaptive_setup_sv_rhs(TA &, const U &);
 
 public:
     using nt_event_t = nt_event<T>;
@@ -1009,6 +1014,8 @@ private:
     std::vector<T> m_d_out;
     // Auxiliary data/functions for event detection.
     std::unique_ptr<ed_data> m_ed_data;
+    // The state variables and the rhs.
+    std::vector<expression> m_state_vars, m_rhs;
 
     // Serialization.
     template <typename Archive>
@@ -1161,6 +1168,9 @@ public:
     const std::vector<t_event_t> &get_t_events() const;
     const std::vector<std::optional<std::pair<T, T>>> &get_te_cooldowns() const;
     const std::vector<nt_event_t> &get_nt_events() const;
+
+    [[nodiscard]] const std::vector<expression> &get_state_vars() const;
+    [[nodiscard]] const std::vector<expression> &get_rhs() const;
 
     std::tuple<taylor_outcome, T> step(bool = false);
     std::tuple<taylor_outcome, T> step_backward(bool = false);
@@ -1328,6 +1338,9 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch
 {
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
 
+    template <typename TA, typename U>
+    friend void detail::taylor_adaptive_setup_sv_rhs(TA &, const U &);
+
 public:
     using nt_event_t = nt_event_batch<T>;
     using t_event_t = t_event_batch<T>;
@@ -1478,6 +1491,8 @@ private:
     std::vector<T> m_d_out_time;
     // Auxiliary data/functions for event detection.
     std::unique_ptr<ed_data> m_ed_data;
+    // The state variables and the rhs.
+    std::vector<expression> m_state_vars, m_rhs;
 
     // Serialization.
     template <typename Archive>
@@ -1625,6 +1640,9 @@ public:
     const std::vector<std::vector<std::optional<std::pair<T, T>>>> &get_te_cooldowns() const;
     const std::vector<nt_event_t> &get_nt_events() const;
 
+    [[nodiscard]] const std::vector<expression> &get_state_vars() const;
+    [[nodiscard]] const std::vector<expression> &get_rhs() const;
+
     void step(bool = false);
     void step_backward(bool = false);
     void step(const std::vector<T> &, bool = false);
@@ -1768,25 +1786,39 @@ namespace detail
 
 // Boost s11n class version history for taylor_adaptive:
 // - 1: added base class to taylor_adaptive.
-inline constexpr int taylor_adaptive_s11n_version = 1;
+// - 2: added the m_state_vars and m_rhs members.
+inline constexpr int taylor_adaptive_s11n_version = 2;
+
+// Boost s11n class version history for taylor_adaptive_batch:
+// - 1: added the m_state_vars and m_rhs members.
+inline constexpr int taylor_adaptive_batch_s11n_version = 1;
 
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
 
-// Set the Boost s11n class version for taylor_adaptive.
+// Set the Boost s11n class version for taylor_adaptive and taylor_adaptive_batch.
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive<double>, heyoka::detail::taylor_adaptive_s11n_version);
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive<long double>, heyoka::detail::taylor_adaptive_s11n_version);
+
+BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<double>, heyoka::detail::taylor_adaptive_batch_s11n_version);
+BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<long double>, heyoka::detail::taylor_adaptive_batch_s11n_version);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive<mppp::real128>, heyoka::detail::taylor_adaptive_s11n_version);
+
+BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<mppp::real128>, heyoka::detail::taylor_adaptive_batch_s11n_version);
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive<mppp::real>, heyoka::detail::taylor_adaptive_s11n_version);
+
+// NOTE: this is not really necessary as the batch integrator cannot be used with real, but let's
+// just leave it for consistency.
+BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<mppp::real>, heyoka::detail::taylor_adaptive_batch_s11n_version);
 
 #endif
 
