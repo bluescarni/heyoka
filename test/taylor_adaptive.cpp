@@ -2256,4 +2256,6 @@ TEST_CASE("state_vars rhs")
 
     REQUIRE(ta3.get_state_vars() == std::vector{v, x});
     REQUIRE(ta3.get_rhs() == std::vector{rhs_v, rhs_x});
+
+    REQUIRE(std::get<func>(rhs_v.value()).get_ptr() != std::get<func>(ta3.get_rhs()[0].value()).get_ptr());
 }
