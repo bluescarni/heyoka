@@ -426,23 +426,23 @@ struct llvm_state::jit {
     {
         return *m_ctx->getContext();
     }
-    const llvm::LLVMContext &get_context() const
+    [[nodiscard]] const llvm::LLVMContext &get_context() const
     {
         return *m_ctx->getContext();
     }
-    std::string get_target_cpu() const
+    [[nodiscard]] std::string get_target_cpu() const
     {
         return m_tm->getTargetCPU().str();
     }
-    std::string get_target_features() const
+    [[nodiscard]] std::string get_target_features() const
     {
         return m_tm->getTargetFeatureString().str();
     }
-    llvm::TargetIRAnalysis get_target_ir_analysis() const
+    [[nodiscard]] llvm::TargetIRAnalysis get_target_ir_analysis() const
     {
         return m_tm->getTargetIRAnalysis();
     }
-    const llvm::Triple &get_target_triple() const
+    [[nodiscard]] const llvm::Triple &get_target_triple() const
     {
 #if LLVM_VERSION_MAJOR == 10
         return *m_triple;
@@ -451,7 +451,7 @@ struct llvm_state::jit {
 #endif
     }
 
-    void add_module(std::unique_ptr<llvm::Module> m)
+    void add_module(std::unique_ptr<llvm::Module> m) const
     {
         auto err = m_lljit->addIRModule(llvm::orc::ThreadSafeModule(std::move(m), *m_ctx));
 
@@ -522,10 +522,10 @@ void llvm_state_add_obj_to_jit(Jit &j, const std::string &obj)
 }
 
 // Helper to create an LLVM module from a IR in string representation.
-auto llvm_state_ir_to_module(std::string &&ir, llvm::LLVMContext &ctx)
+auto llvm_state_ir_to_module(const std::string &ir, llvm::LLVMContext &ctx)
 {
     // Create the corresponding memory buffer.
-    auto mb = llvm::MemoryBuffer::getMemBuffer(std::move(ir));
+    auto mb = llvm::MemoryBuffer::getMemBuffer(ir);
 
     // Construct a new module from the parsed IR.
     llvm::SMDiagnostic err;
@@ -594,10 +594,10 @@ llvm_state::llvm_state(const llvm_state &other)
         // Get the IR of other.
         // NOTE: this works regardless of the compiled
         // status of other.
-        auto other_ir = other.get_ir();
+        const auto other_ir = other.get_ir();
 
         // Create the module from the IR.
-        m_module = detail::llvm_state_ir_to_module(std::move(other_ir), context());
+        m_module = detail::llvm_state_ir_to_module(other_ir, context());
 
         // Create a new builder for the module.
         m_builder = std::make_unique<ir_builder>(context());
@@ -765,7 +765,7 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
             m_ir_snapshot.clear();
 
             // Create the module from the IR.
-            m_module = detail::llvm_state_ir_to_module(std::move(ir), context());
+            m_module = detail::llvm_state_ir_to_module(ir, context());
 
             // Create a new builder for the module.
             m_builder = std::make_unique<ir_builder>(context());
