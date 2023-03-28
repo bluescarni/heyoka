@@ -1256,7 +1256,7 @@ expression diff(funcptr_map<expression> &func_map, const expression &e, const pa
 
 } // namespace detail
 
-expression diff(const expression &e, const std::string &s)
+expression diff(const expression &e, const std::string &s, diff_mode)
 {
     thread_local detail::funcptr_map<expression> func_map;
     func_map.clear();
@@ -1264,7 +1264,7 @@ expression diff(const expression &e, const std::string &s)
     return detail::diff(func_map, e, s);
 }
 
-expression diff(const expression &e, const param &p)
+expression diff(const expression &e, const param &p, diff_mode)
 {
     thread_local detail::funcptr_map<expression> func_map;
     func_map.clear();
@@ -1272,7 +1272,7 @@ expression diff(const expression &e, const param &p)
     return detail::diff(func_map, e, p);
 }
 
-expression diff(const expression &e, const expression &x)
+expression diff(const expression &e, const expression &x, diff_mode)
 {
     return std::visit(
         [&e](const auto &v) -> expression {
@@ -1287,6 +1287,8 @@ expression diff(const expression &e, const expression &x)
         },
         x.value());
 }
+
+expression diff(const expression &e, const std::vector<expression> &args, diff_mode) {}
 
 namespace detail
 {

@@ -353,6 +353,8 @@ HEYOKA_DLL_PUBLIC std::size_t get_n_nodes(const expression &);
 
 HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &);
 
+enum class diff_mode { forward, reverse };
+
 namespace detail
 {
 
@@ -361,9 +363,10 @@ HEYOKA_DLL_PUBLIC expression diff(funcptr_map<expression> &, const expression &,
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression diff(const expression &, const param &);
-HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
-HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &);
+HEYOKA_DLL_PUBLIC expression diff(const expression &, const param &, diff_mode = diff_mode::forward);
+HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &, diff_mode = diff_mode::forward);
+HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &, diff_mode = diff_mode::forward);
+HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::vector<expression> &, diff_mode = diff_mode::forward);
 
 HEYOKA_DLL_PUBLIC expression pairwise_prod(std::vector<expression>);
 
