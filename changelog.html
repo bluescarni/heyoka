@@ -497,6 +497,10 @@ document.write(`
 <section id="new">
 <h3>New<a class="headerlink" href="#new" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>The state variables and right-hand side of a system of ODEs
+are now available as read-only properties in the integrator
+classes
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/305">#305</a>).</p></li>
 <li><p>Support LLVM 16.</p></li>
 <li><p>New <code class="docutils literal notranslate"><span class="pre">model</span></code> module containing ready-made dynamical models
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/302">#302</a>,
@@ -509,6 +513,11 @@ very large expressions
 <section id="changes">
 <h3>Changes<a class="headerlink" href="#changes" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">sum_sq()</span></code> function now performs constant folding
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/304">#304</a>).</p></li>
+<li><p>Performance improvements in compact mode for Taylor
+integrators and compiled functions
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/303">#303</a>).</p></li>
 <li><p>Performance improvements for several primitives in the
 expression API
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/300">#300</a>).</p></li>
