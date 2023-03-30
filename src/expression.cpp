@@ -1940,8 +1940,8 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex, st
         retval.push_back(std::move(ex));
     }
 
-    get_logger()->debug("cfunc CSE reduced decomposition size from {} to {}", orig_size, retval.size());
-    get_logger()->trace("cfunc CSE runtime: {}", sw);
+    get_logger()->debug("function CSE reduced decomposition size from {} to {}", orig_size, retval.size());
+    get_logger()->trace("function CSE runtime: {}", sw);
 
     return retval;
 }
@@ -2122,7 +2122,7 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc, std::vecto
         retval.push_back(std::move(dc[idx]));
     }
 
-    get_logger()->trace("cfunc topological sort runtime: {}", sw);
+    get_logger()->trace("function topological sort runtime: {}", sw);
 
     return retval;
 }
@@ -2229,7 +2229,7 @@ function_decompose(const std::vector<expression> &v_ex_)
         ret.emplace_back(std::move(ex));
     }
 
-    detail::get_logger()->trace("cfunc decomposition construction runtime: {}", sw);
+    detail::get_logger()->trace("function decomposition construction runtime: {}", sw);
 
 #if !defined(NDEBUG)
 
@@ -2395,7 +2395,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
         ret.emplace_back(std::move(ex));
     }
 
-    detail::get_logger()->trace("cfunc decomposition construction runtime: {}", sw);
+    detail::get_logger()->trace("function decomposition construction runtime: {}", sw);
 
 #if !defined(NDEBUG)
 
