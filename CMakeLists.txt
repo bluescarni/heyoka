@@ -448,6 +448,19 @@ target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 
+# NOTE: recent versions of libcxx remove std::unary_function/std::binary_function
+# (which have been deprecated since long) in C++17 mode. This breaks, e.g., hashing
+# functionality on older Boost versions. See:
+# https://github.com/boostorg/container_hash/issues/22
+# Note that the better approach here would be to detect libcxx rather than
+# just Apple, but at this time it seems like there's no easy way to detect
+# the stdlib implementation/version from CMake.
+if(APPLE AND Boost_VERSION VERSION_LESS "1.81.0")
+    # NOTE: make this a PUBLIC definition just to err on the side
+    # of caution.
+    target_compile_definitions(heyoka PUBLIC BOOST_NO_CXX98_FUNCTION_BASE)
+endif()
+
 # Optional dependency on mp++.
 # NOTE: put this into a separate variable for reuse later.
 set(_HEYOKA_MIN_MPPP_VERSION "0.27")
