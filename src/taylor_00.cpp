@@ -190,6 +190,7 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
 
     auto &builder = s.builder();
     auto &context = s.context();
+    auto &md = s.module();
 
     // Prepare the function prototype. The arguments are:
     // - pointer to the output jet of derivative (write only),
@@ -209,13 +210,15 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
     // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &md);
     // LCOV_EXCL_START
     if (f == nullptr) {
         throw std::invalid_argument(
             fmt::format("Unable to create a function for an adaptive Taylor stepper with name '{}'", name));
     }
     // LCOV_EXCL_STOP
+    // NOTE: a step function cannot call itself recursively.
+    f->addFnAttr(llvm::Attribute::NoRecurse);
 
     // Set the names/attributes of the function arguments.
     auto *jet_ptr = f->args().begin();
@@ -276,6 +279,12 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     // Copy the jet of derivatives to jet_ptr.
     taylor_write_tc(s, fp_t, diff_variant, ev_dc, svf_ptr, jet_ptr, n_eq, n_uvars, order, batch_size);
 
+    // End the lifetime of the array of derivatives, if we are in compact mode.
+    if (compact_mode) {
+        builder.CreateLifetimeEnd(std::get<0>(diff_variant).first,
+                                  builder.getInt64(get_size(md, std::get<0>(diff_variant).second)));
+    }
+
     // Create the return value.
     builder.CreateRetVoid();
 
@@ -327,6 +336,7 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
 
     auto &builder = s.builder();
     auto &context = s.context();
+    auto &md = s.module();
 
     // Prepare the function prototype. The arguments are:
     // - pointer to the current state vector (read & write),
@@ -346,11 +356,13 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
     // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &md);
     if (f == nullptr) {
         throw std::invalid_argument(
             fmt::format("Unable to create a function for an adaptive Taylor stepper with name '{}'", name));
     }
+    // NOTE: a step function cannot call itself recursively.
+    f->addFnAttr(llvm::Attribute::NoRecurse);
 
     // Set the names/attributes of the function arguments.
     auto *state_ptr = f->args().begin();
@@ -395,10 +407,9 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
                                  nullptr);
 
     // Evaluate the Taylor polynomials, producing the updated state of the system.
-    auto new_state_var = high_accuracy ? taylor_run_ceval(s, fp_t, diff_variant, h, n_eq, n_uvars, order, high_accuracy,
-                                                          batch_size, compact_mode)
-                                       : taylor_run_multihorner(s, fp_t, diff_variant, h, n_eq, n_uvars, order,
-                                                                batch_size, compact_mode);
+    auto new_state_var
+        = high_accuracy ? taylor_run_ceval(s, fp_t, diff_variant, h, n_eq, n_uvars, order, high_accuracy, batch_size)
+                        : taylor_run_multihorner(s, fp_t, diff_variant, h, n_eq, n_uvars, order, batch_size);
 
     // Store the new state.
     // NOTE: no need to perform overflow check on n_eq * batch_size,
@@ -442,6 +453,12 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
             // Taylor coefficients were not requested,
             // don't do anything in this branch.
         });
+
+    // End the lifetime of the array of derivatives, if we are in compact mode.
+    if (compact_mode) {
+        builder.CreateLifetimeEnd(std::get<0>(diff_variant).first,
+                                  builder.getInt64(get_size(md, std::get<0>(diff_variant).second)));
+    }
 
     // Create the return value.
     builder.CreateRetVoid();
@@ -516,6 +533,30 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
 }
 
 #endif
+
+// Small helper to set up the m_state_vars and m_rhs members
+// of an integrator. Shared among scalar and batch integrators.
+template <typename TA, typename U>
+void taylor_adaptive_setup_sv_rhs(TA &ta, const U &sys)
+{
+    for (std::uint32_t i = 0; i < ta.m_dim; ++i) {
+        // NOTE: take the state variables from the
+        // decomposition.
+        assert(std::holds_alternative<variable>(ta.m_dc[i].first.value()));
+        ta.m_state_vars.push_back(ta.m_dc[i].first);
+
+        // NOTE: we make copies for the same reason we make copies
+        // during decomposition - we want to prevent modifications
+        // to these expression from the outside using the mutable API.
+        // Once the expression API is purely functional (or close to it...)
+        // we can remove these copies.
+        if constexpr (std::is_same_v<U, std::vector<expression>>) {
+            ta.m_rhs.push_back(copy(sys[i]));
+        } else {
+            ta.m_rhs.push_back(copy(sys[i].second));
+        }
+    }
+}
 
 } // namespace detail
 
@@ -814,6 +855,9 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     }
 
 #endif
+
+    // Setup the state variables and the rhs.
+    detail::taylor_adaptive_setup_sv_rhs(*this, sys);
 }
 
 template <typename T>
@@ -827,12 +871,18 @@ taylor_adaptive<T>::taylor_adaptive(const taylor_adaptive &other)
     : base_t(static_cast<const base_t &>(other)), m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm),
       m_dim(other.m_dim), m_order(other.m_order), m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy),
       m_compact_mode(other.m_compact_mode), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h),
-      m_d_out(other.m_d_out), m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
+      m_d_out(other.m_d_out), m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr),
+      m_state_vars(other.m_state_vars)
 {
-    // NOTE: make explicit deep copy of the decomposition.
+    // NOTE: make explicit deep copies of the decomposition and the rhs.
     m_dc.reserve(other.m_dc.size());
     for (const auto &[ex, deps] : other.m_dc) {
         m_dc.emplace_back(copy(ex), deps);
+    }
+
+    m_rhs.reserve(other.m_rhs.size());
+    for (const auto &ex : other.m_rhs) {
+        m_rhs.push_back(copy(ex));
     }
 
     if (m_ed_data) {
@@ -883,6 +933,8 @@ void taylor_adaptive<T>::save_impl(Archive &ar, unsigned) const
     ar << m_last_h;
     ar << m_d_out;
     ar << m_ed_data;
+    ar << m_state_vars;
+    ar << m_rhs;
 }
 
 template <typename T>
@@ -913,6 +965,8 @@ void taylor_adaptive<T>::load_impl(Archive &ar, unsigned version)
     ar >> m_last_h;
     ar >> m_d_out;
     ar >> m_ed_data;
+    ar >> m_state_vars;
+    ar >> m_rhs;
 
     // Recover the function pointers.
     if (m_ed_data) {
@@ -1200,9 +1254,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             const auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
             assert(cb); // LCOV_EXCL_LINE
 
-            // NOTE: use new_time, instead of m_time, in order to prevent
+                        // NOTE: use new_time, instead of m_time, in order to prevent
             // passing the wrong time coordinate to the callback if an earlier
             // callback changed it.
+
 #if defined(HEYOKA_HAVE_REAL)
             if constexpr (std::is_same_v<T, mppp::real>) {
                 // NOTE: for mppp::real, we must ensure that the time coordinate
@@ -2053,6 +2108,18 @@ const std::vector<typename taylor_adaptive<T>::nt_event_t> &taylor_adaptive<T>::
 }
 
 template <typename T>
+const std::vector<expression> &taylor_adaptive<T>::get_state_vars() const
+{
+    return m_state_vars;
+}
+
+template <typename T>
+const std::vector<expression> &taylor_adaptive<T>::get_rhs() const
+{
+    return m_rhs;
+}
+
+template <typename T>
 void taylor_adaptive<T>::set_time(T t)
 {
 #if defined(HEYOKA_HAVE_REAL)
@@ -2444,6 +2511,9 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
         m_ed_data = std::make_unique<ed_data>(m_llvm.make_similar(), std::move(tes), std::move(ntes), m_order, m_dim,
                                               m_batch_size);
     }
+
+    // Setup the state variables and the rhs.
+    detail::taylor_adaptive_setup_sv_rhs(*this, sys);
 }
 
 template <typename T>
@@ -2464,12 +2534,18 @@ taylor_adaptive_batch<T>::taylor_adaptive_batch(const taylor_adaptive_batch &oth
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
       m_rem_time(other.m_rem_time), m_time_copy_hi(other.m_time_copy_hi), m_time_copy_lo(other.m_time_copy_lo),
       m_nf_detected(other.m_nf_detected), m_d_out_time(other.m_d_out_time),
-      m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
+      m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr),
+      m_state_vars(other.m_state_vars)
 {
-    // NOTE: make explicit deep copy of the decomposition.
+    // NOTE: make explicit deep copies of the decomposition and the rhs.
     m_dc.reserve(other.m_dc.size());
     for (const auto &[ex, deps] : other.m_dc) {
         m_dc.emplace_back(copy(ex), deps);
+    }
+
+    m_rhs.reserve(other.m_rhs.size());
+    for (const auto &ex : other.m_rhs) {
+        m_rhs.push_back(copy(ex));
     }
 
     if (m_ed_data) {
@@ -2537,6 +2613,8 @@ void taylor_adaptive_batch<T>::save_impl(Archive &ar, unsigned) const
     ar << m_nf_detected;
     ar << m_d_out_time;
     ar << m_ed_data;
+    ar << m_state_vars;
+    ar << m_rhs;
 }
 
 template <typename T>
@@ -2583,6 +2661,8 @@ void taylor_adaptive_batch<T>::load_impl(Archive &ar, unsigned version)
     ar >> m_nf_detected;
     ar >> m_d_out_time;
     ar >> m_ed_data;
+    ar >> m_state_vars;
+    ar >> m_rhs;
 
     // Recover the function pointers.
     if (m_ed_data) {
@@ -4108,6 +4188,18 @@ const std::vector<typename taylor_adaptive_batch<T>::nt_event_t> &taylor_adaptiv
     }
 
     return m_ed_data->m_ntes;
+}
+
+template <typename T>
+const std::vector<expression> &taylor_adaptive_batch<T>::get_state_vars() const
+{
+    return m_state_vars;
+}
+
+template <typename T>
+const std::vector<expression> &taylor_adaptive_batch<T>::get_rhs() const
+{
+    return m_rhs;
 }
 
 template <typename T>

@@ -61,6 +61,8 @@ HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(llvm::Value *);
 
 HEYOKA_DLL_PUBLIC std::uint64_t get_alignment(llvm::Module &, llvm::Type *);
 
+HEYOKA_DLL_PUBLIC std::uint64_t get_size(llvm::Module &, llvm::Type *);
+
 HEYOKA_DLL_PUBLIC llvm::Value *to_size_t(llvm_state &, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC llvm::GlobalVariable *make_global_zero_array(llvm::Module &, llvm::ArrayType *);
@@ -113,6 +115,8 @@ HEYOKA_DLL_PUBLIC std::string llvm_type_name(llvm::Type *);
 HEYOKA_DLL_PUBLIC bool compare_function_signature(llvm::Function *, llvm::Type *, const std::vector<llvm::Type *> &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *call_extern_vec(llvm_state &, const std::vector<llvm::Value *> &, const std::string &);
+
+void llvm_append_block(llvm::Function *, llvm::BasicBlock *);
 
 // Math helpers.
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_fadd(llvm_state &, llvm::Value *, llvm::Value *);

@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -62,7 +63,7 @@ const auto fp_types = std::tuple<double
                                  >{};
 
 constexpr bool skip_batch_ld =
-#if LLVM_VERSION_MAJOR == 13 || LLVM_VERSION_MAJOR == 14 || LLVM_VERSION_MAJOR == 15
+#if LLVM_VERSION_MAJOR >= 13 && LLVM_VERSION_MAJOR <= 16
     std::numeric_limits<long double>::digits == 64
 #else
     false
@@ -244,16 +245,26 @@ TEST_CASE("sum_sq s11n")
 TEST_CASE("sum_sq zero ignore")
 {
     REQUIRE(sum_sq({1_dbl, 2_dbl, 0_dbl}) == sum_sq({1_dbl, 2_dbl}));
+    REQUIRE(sum_sq({1_dbl, 2_dbl, 0_dbl}) == 5_dbl);
+    REQUIRE(sum_sq({0_dbl, 0_dbl, 0_dbl}) == 0_dbl);
     REQUIRE(sum_sq({1_dbl, 0_dbl, 1_dbl}) == sum_sq({1_dbl, 1_dbl}));
     REQUIRE(sum_sq({0_dbl, 0_dbl, 0_dbl}) == 0_dbl);
-    REQUIRE(sum_sq({0_dbl, -1_dbl, 0_dbl}) == square(-1_dbl));
+    REQUIRE(sum_sq({0_dbl, -1_dbl, 0_dbl}) == 1_dbl);
 
     REQUIRE(sum_sq({0_dbl, 2_dbl, "x"_var}) == sum_sq({2_dbl, "x"_var}));
+    REQUIRE(sum_sq({1_dbl, 2_dbl, "x"_var}) == sum_sq({expression{std::sqrt(5.)}, "x"_var}));
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    REQUIRE(sum_sq({1_f128, 2_f128, "x"_var}) == sum_sq({expression{sqrt(mppp::real128{5})}, "x"_var}));
+
+#endif
+
     REQUIRE(sum_sq({0_dbl, 2_dbl, "x"_var, 0_dbl}) == sum_sq({2_dbl, "x"_var}));
     REQUIRE(sum_sq({0_dbl, 2_dbl, 0_dbl, "x"_var, 0_dbl}) == sum_sq({2_dbl, "x"_var}));
 
     REQUIRE(std::get<func>(sum_sq({"y"_var, 0_dbl, "x"_var, -21_dbl}).value()).args()
-            == std::vector{"y"_var, "x"_var, -21_dbl});
+            == std::vector{"y"_var, "x"_var, 21_dbl});
 }
 
 TEST_CASE("cfunc")

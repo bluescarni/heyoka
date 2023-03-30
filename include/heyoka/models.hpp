@@ -9,7 +9,10 @@
 #ifndef HEYOKA_MODELS_HPP
 #define HEYOKA_MODELS_HPP
 
+#include <heyoka/model/fixed_centres.hpp>
+#include <heyoka/model/mascon.hpp>
 #include <heyoka/model/nbody.hpp>
 #include <heyoka/model/pendulum.hpp>
+#include <heyoka/model/rotating.hpp>
 
 #endif

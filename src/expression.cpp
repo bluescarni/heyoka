@@ -216,8 +216,7 @@ expression copy_impl(funcptr_map<expression> &func_map, const expression &e)
 
 expression copy(const expression &e)
 {
-    thread_local detail::funcptr_map<expression> func_map;
-    func_map.clear();
+    detail::funcptr_map<expression> func_map;
 
     return detail::copy_impl(func_map, e);
 }
@@ -375,14 +374,12 @@ void rename_variables(funcptr_set &func_set, expression &e,
 
 std::vector<std::string> get_variables(const expression &e)
 {
-    thread_local detail::funcptr_set func_set;
-    func_set.clear();
+    detail::funcptr_set func_set;
 
     // NOTE: it's probably better here to eventually
     // change this to a fast unordered set, copy the items
     // into a vector and sort it on output.
-    thread_local std::set<std::string> s_set;
-    s_set.clear();
+    std::set<std::string> s_set;
 
     detail::get_variables(func_set, s_set, e);
 
@@ -391,8 +388,7 @@ std::vector<std::string> get_variables(const expression &e)
 
 void rename_variables(expression &e, const std::unordered_map<std::string, std::string> &repl_map)
 {
-    thread_local detail::funcptr_set func_set;
-    func_set.clear();
+    detail::funcptr_set func_set;
 
     detail::rename_variables(func_set, e, repl_map);
 }
@@ -440,8 +436,7 @@ std::size_t hash(funcptr_map<std::size_t> &func_map, const expression &ex)
 
 std::size_t hash(const expression &ex)
 {
-    thread_local detail::funcptr_map<std::size_t> func_map;
-    func_map.clear();
+    detail::funcptr_map<std::size_t> func_map;
 
     return detail::hash(func_map, ex);
 }
@@ -961,6 +956,15 @@ expression operator/(mppp::real x, expression ex)
 
 expression &operator+=(expression &x, expression e)
 {
+    // NOTE: it is important that compound operators
+    // are implemented as x = x op e, so that we properly
+    // take into account arithmetic promotions for
+    // numbers (and, in case of mppp::real numbers,
+    // precision propagation).
+    // NOTE: using std::move() on both operands is fine:
+    // there cannot be aliasing as "e" is a copy
+    // of some expression that cannot possibly overlap
+    // with x.
     return x = std::move(x) + std::move(e);
 }
 
@@ -1156,8 +1160,7 @@ std::size_t get_n_nodes(funcptr_map<std::size_t> &func_map, const expression &e)
 
 std::size_t get_n_nodes(const expression &e)
 {
-    thread_local detail::funcptr_map<std::size_t> func_map;
-    func_map.clear();
+    detail::funcptr_map<std::size_t> func_map;
 
     return detail::get_n_nodes(func_map, e);
 }
@@ -1176,11 +1179,6 @@ expression diff(funcptr_map<expression> &func_map, const expression &e, const st
                     [](const auto &v) { return expression{number{static_cast<uncvref_t<decltype(v)>>(0)}}; },
                     arg.value());
             } else if constexpr (std::is_same_v<type, param>) {
-                // NOTE: if we ever implement single-precision support,
-                // this should be probably changed into 0_flt (i.e., the lowest
-                // precision numerical type), so that it does not trigger
-                // type promotions in numerical constants. Other similar
-                // occurrences as well (e.g., diff for variable).
                 return 0_dbl;
             } else if constexpr (std::is_same_v<type, variable>) {
                 if (s == arg.name()) {
@@ -1254,16 +1252,14 @@ expression diff(funcptr_map<expression> &func_map, const expression &e, const pa
 
 expression diff(const expression &e, const std::string &s)
 {
-    thread_local detail::funcptr_map<expression> func_map;
-    func_map.clear();
+    detail::funcptr_map<expression> func_map;
 
     return detail::diff(func_map, e, s);
 }
 
 expression diff(const expression &e, const param &p)
 {
-    thread_local detail::funcptr_map<expression> func_map;
-    func_map.clear();
+    detail::funcptr_map<expression> func_map;
 
     return detail::diff(func_map, e, p);
 }
@@ -1340,8 +1336,7 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
 
 expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
 {
-    thread_local detail::funcptr_map<expression> func_map;
-    func_map.clear();
+    detail::funcptr_map<expression> func_map;
 
     return detail::subs(func_map, e, smap);
 }
@@ -1573,8 +1568,7 @@ taylor_dc_t::size_type taylor_decompose(funcptr_map<taylor_dc_t::size_type> &fun
 // If the return value is zero, ex was not decomposed.
 taylor_dc_t::size_type taylor_decompose(const expression &ex, taylor_dc_t &dc)
 {
-    thread_local detail::funcptr_map<taylor_dc_t::size_type> func_map;
-    func_map.clear();
+    detail::funcptr_map<taylor_dc_t::size_type> func_map;
 
     return detail::taylor_decompose(func_map, ex, dc);
 }
@@ -1730,8 +1724,7 @@ std::uint32_t get_param_size(detail::funcptr_set &func_set, const expression &ex
 // is zero, no params appear in the expression.
 std::uint32_t get_param_size(const expression &ex)
 {
-    thread_local detail::funcptr_set func_set;
-    func_set.clear();
+    detail::funcptr_set func_set;
 
     return detail::get_param_size(func_set, ex);
 }
@@ -2201,8 +2194,7 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc, std::vecto
 
 std::optional<std::vector<expression>::size_type> decompose(const expression &ex, std::vector<expression> &dc)
 {
-    thread_local detail::funcptr_map<std::vector<expression>::size_type> func_map;
-    func_map.clear();
+    detail::funcptr_map<std::vector<expression>::size_type> func_map;
 
     return detail::decompose(func_map, ex, dc);
 }
@@ -3106,6 +3098,20 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
     auto *eval_arr_gvar = make_global_zero_array(md, array_type);
     auto *eval_arr = builder.CreateInBoundsGEP(array_type, eval_arr_gvar, {builder.getInt32(0), builder.getInt32(0)});
 
+    // Compute the size in bytes of eval_arr.
+    const auto eval_arr_size = get_size(md, array_type);
+
+    // NOTE: eval_arr is used as temporary storage for the current function,
+    // but it is declared as a global variable in order to avoid stack overflow.
+    // This creates a situation in which LLVM cannot elide stores into eval_arr
+    // (even if it figures out a way to avoid storing intermediate results into
+    // eval_arr) because LLVM must assume that some other function may
+    // use these stored values later. Thus, we declare via an intrinsic that the
+    // lifetime of eval_arr begins here and ends at the end of the function,
+    // so that LLVM can assume that any value stored in it cannot be possibly
+    // used outside this function.
+    builder.CreateLifetimeStart(eval_arr, builder.getInt64(eval_arr_size));
+
     // Copy over the values of the variables.
     // NOTE: overflow checking is already done in the parent function.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(nvars), [&](llvm::Value *cur_var_idx) {
@@ -3163,6 +3169,9 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
 
     // Write the results to the output pointer.
     cfunc_c_write_outputs(s, fp_type, out_ptr, cout_gl, eval_arr, par_ptr, stride, batch_size);
+
+    // End the lifetime of eval_arr.
+    builder.CreateLifetimeEnd(eval_arr, builder.getInt64(eval_arr_size));
 
     get_logger()->trace("cfunc IR creation compact mode runtime: {}", sw);
 }
@@ -3289,6 +3298,8 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
         throw std::invalid_argument(fmt::format("Unable to create a compiled function with name '{}'", sname));
         // LCOV_EXCL_STOP
     }
+    // NOTE: a cfunc cannot call itself recursively.
+    f->addFnAttr(llvm::Attribute::NoRecurse);
 
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
@@ -3476,8 +3487,7 @@ template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real>(llvm_st
 // Determine if an expression is time-dependent.
 bool is_time_dependent(const expression &ex)
 {
-    thread_local detail::funcptr_map<bool> func_map;
-    func_map.clear();
+    detail::funcptr_map<bool> func_map;
 
     return detail::is_time_dependent(func_map, ex);
 }

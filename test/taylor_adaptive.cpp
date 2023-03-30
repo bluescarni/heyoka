@@ -1641,6 +1641,9 @@ void s11n_test_impl()
         REQUIRE(ta.get_nt_events()[0].get_callback().get_type_index()
                 == ta_copy.get_nt_events()[0].get_callback().get_type_index());
 
+        REQUIRE(ta.get_state_vars() == ta_copy.get_state_vars());
+        REQUIRE(ta.get_rhs() == ta_copy.get_rhs());
+
         // Take a step in ta and in ta_copy.
         ta.step(true);
         ta_copy.step(true);
@@ -2222,4 +2225,37 @@ TEST_CASE("bug prop_cb time")
         std::runtime_error,
         Message("The invocation of the callback passed to propagate_until() resulted in the alteration of the "
                 "time coordinate of the integrator - this is not supported"));
+}
+
+// Handling of the state_vars and rhs members
+TEST_CASE("state_vars rhs")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto rhs_x = v;
+    auto rhs_v = -9.8 * sin(x);
+
+    auto ta = taylor_adaptive<double>{{prime(x) = rhs_x, prime(v) = rhs_v}, std::vector<double>(2u, 0.)};
+
+    REQUIRE(ta.get_state_vars() == std::vector{x, v});
+    REQUIRE(ta.get_rhs() == std::vector{rhs_x, rhs_v});
+
+    // Check that the rhs has been deep-copied.
+    REQUIRE(std::get<func>(rhs_v.value()).get_ptr() != std::get<func>(ta.get_rhs()[1].value()).get_ptr());
+
+    // Test with copy too.
+    auto ta2 = ta;
+
+    REQUIRE(ta.get_state_vars() == ta2.get_state_vars());
+    REQUIRE(ta.get_rhs() == ta2.get_rhs());
+
+    REQUIRE(std::get<func>(ta2.get_rhs()[1].value()).get_ptr() != std::get<func>(ta.get_rhs()[1].value()).get_ptr());
+
+    // Check automatic variable deduction.
+    auto ta3 = taylor_adaptive<double>{{rhs_v, rhs_x}, std::vector<double>(2u, 0.)};
+
+    REQUIRE(ta3.get_state_vars() == std::vector{v, x});
+    REQUIRE(ta3.get_rhs() == std::vector{rhs_v, rhs_x});
+
+    REQUIRE(std::get<func>(rhs_v.value()).get_ptr() != std::get<func>(ta3.get_rhs()[0].value()).get_ptr());
 }

@@ -7,15 +7,29 @@ Changelog
 New
 ~~~
 
+- The state variables and right-hand side of a system of ODEs
+  are now available as read-only properties in the integrator
+  classes
+  (`#305 <https://github.com/bluescarni/heyoka/pull/305>`__).
+- Support LLVM 16.
+- New ``model`` module containing ready-made dynamical models
+  (`#302 <https://github.com/bluescarni/heyoka/pull/302>`__,
+  `#295 <https://github.com/bluescarni/heyoka/pull/295>`__).
 - The screen output of expressions is now truncated for
   very large expressions
   (`#299 <https://github.com/bluescarni/heyoka/pull/299>`__).
-- New ``model`` module containing ready-made dynamical models
-  (`#295 <https://github.com/bluescarni/heyoka/pull/295>`__).
 
 Changes
 ~~~~~~~
 
+- The ``sum_sq()`` function now performs constant folding
+  (`#304 <https://github.com/bluescarni/heyoka/pull/304>`__).
+- Performance improvements in compact mode for Taylor
+  integrators and compiled functions
+  (`#303 <https://github.com/bluescarni/heyoka/pull/303>`__).
+- Performance improvements for several primitives in the
+  expression API
+  (`#300 <https://github.com/bluescarni/heyoka/pull/300>`__).
 - Improve hashing performance for large expressions by
   caching the hashes of repeated subexpressions
   (`#299 <https://github.com/bluescarni/heyoka/pull/299>`__).

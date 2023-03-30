@@ -31,11 +31,31 @@ HEYOKA_BEGIN_NAMESPACE
 namespace model::detail
 {
 
+namespace
+{
+
+// Sanity checks for the N-body helpers.
+void nbody_checks(std::uint32_t n, const std::vector<expression> &masses_vec)
+{
+    if (n < 2u) {
+        throw std::invalid_argument(
+            fmt::format("Cannot construct an N-body system with N == {}: at least 2 bodies are needed", n));
+    }
+
+    if (masses_vec.size() > n) {
+        throw std::invalid_argument(fmt::format("In an N-body system the number of particles with mass ({}) cannot be "
+                                                "greater than the total number of particles ({})",
+                                                masses_vec.size(), n));
+    }
+}
+
+} // namespace
+
 std::vector<std::pair<expression, expression>> nbody_impl(std::uint32_t n, const expression &Gconst,
                                                           const std::vector<expression> &masses_vec)
 {
-    assert(n >= 2u);
-    assert(n >= masses_vec.size());
+    // Sanity checks.
+    nbody_checks(n, masses_vec);
 
     // Create the state variables.
     std::vector<expression> x_vars, y_vars, z_vars, vx_vars, vy_vars, vz_vars;
@@ -152,35 +172,24 @@ std::vector<std::pair<expression, expression>> nbody_impl(std::uint32_t n, const
     return retval;
 }
 
-expression nbody_energy_impl([[maybe_unused]] std::uint32_t n, const expression &Gconst,
-                             const std::vector<expression> &masses_vec)
+expression nbody_potential_impl([[maybe_unused]] std::uint32_t n, const expression &Gconst,
+                                const std::vector<expression> &masses_vec)
 {
-    assert(n >= 2u);
-    assert(n >= masses_vec.size());
+    // Sanity checks.
+    nbody_checks(n, masses_vec);
 
     // Store the number of massive particles.
     const auto n_massive = masses_vec.size();
 
-    // Create the state variables.
-    std::vector<expression> x_vars, y_vars, z_vars, vx_vars, vy_vars, vz_vars;
+    // Create the position variables.
+    std::vector<expression> x_vars, y_vars, z_vars;
 
     for (std::uint32_t i = 0; i < n_massive; ++i) {
         x_vars.emplace_back(fmt::format("x_{}", i));
         y_vars.emplace_back(fmt::format("y_{}", i));
         z_vars.emplace_back(fmt::format("z_{}", i));
-
-        vx_vars.emplace_back(fmt::format("vx_{}", i));
-        vy_vars.emplace_back(fmt::format("vy_{}", i));
-        vz_vars.emplace_back(fmt::format("vz_{}", i));
     }
 
-    // The kinetic terms.
-    std::vector<expression> kin;
-    for (std::uint32_t i = 0; i < n_massive; ++i) {
-        kin.push_back(masses_vec[i] * sum_sq({vx_vars[i], vy_vars[i], vz_vars[i]}));
-    }
-
-    // The potential terms.
     std::vector<expression> pot;
     for (std::uint32_t i = 0; i < n_massive; ++i) {
         for (std::uint32_t j = i + 1u; j < n_massive; ++j) {
@@ -196,14 +205,41 @@ expression nbody_energy_impl([[maybe_unused]] std::uint32_t n, const expression 
         }
     }
 
-    return .5_dbl * sum(std::move(kin)) - Gconst * sum(std::move(pot));
+    return -Gconst * sum(std::move(pot));
+}
+
+expression nbody_energy_impl([[maybe_unused]] std::uint32_t n, const expression &Gconst,
+                             const std::vector<expression> &masses_vec)
+{
+    // Sanity checks.
+    nbody_checks(n, masses_vec);
+
+    // Store the number of massive particles.
+    const auto n_massive = masses_vec.size();
+
+    // Create the velocity variables.
+    std::vector<expression> vx_vars, vy_vars, vz_vars;
+
+    for (std::uint32_t i = 0; i < n_massive; ++i) {
+        vx_vars.emplace_back(fmt::format("vx_{}", i));
+        vy_vars.emplace_back(fmt::format("vy_{}", i));
+        vz_vars.emplace_back(fmt::format("vz_{}", i));
+    }
+
+    // The kinetic terms.
+    std::vector<expression> kin;
+    for (std::uint32_t i = 0; i < n_massive; ++i) {
+        kin.push_back(masses_vec[i] * sum_sq({vx_vars[i], vy_vars[i], vz_vars[i]}));
+    }
+
+    return .5_dbl * sum(std::move(kin)) + nbody_potential_impl(n, Gconst, masses_vec);
 }
 
 std::vector<std::pair<expression, expression>> np1body_impl(std::uint32_t n, const expression &Gconst,
                                                             const std::vector<expression> &masses_vec)
 {
-    assert(n >= 2u);
-    assert(n >= masses_vec.size());
+    // Sanity checks.
+    nbody_checks(n, masses_vec);
 
     // Create the state variables.
     // NOTE: the zeroth body is **not** included in the state.
@@ -292,11 +328,11 @@ std::vector<std::pair<expression, expression>> np1body_impl(std::uint32_t n, con
     return retval;
 }
 
-expression np1body_energy_impl([[maybe_unused]] std::uint32_t n, const expression &Gconst,
-                               const std::vector<expression> &masses_vec)
+expression np1body_potential_impl([[maybe_unused]] std::uint32_t n, const expression &Gconst,
+                                  const std::vector<expression> &masses_vec)
 {
-    assert(n >= 2u);
-    assert(n >= masses_vec.size());
+    // Sanity checks.
+    nbody_checks(n, masses_vec);
 
     // NOTE: if masses_vec is empty, then take a shortcut avoiding
     // divisions by zero and out-of-bounds conditions.
@@ -307,52 +343,15 @@ expression np1body_energy_impl([[maybe_unused]] std::uint32_t n, const expressio
     // Store the number of massive particles (including the zeroth particle).
     const auto n_massive = masses_vec.size();
 
-    // Create the state variables.
-    std::vector<expression> x_vars, y_vars, z_vars, vx_vars, vy_vars, vz_vars;
+    // Create the position variables.
+    std::vector<expression> x_vars, y_vars, z_vars;
 
     for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
         x_vars.emplace_back(fmt::format("x_{}", i + 1u));
         y_vars.emplace_back(fmt::format("y_{}", i + 1u));
         z_vars.emplace_back(fmt::format("z_{}", i + 1u));
-
-        vx_vars.emplace_back(fmt::format("vx_{}", i + 1u));
-        vy_vars.emplace_back(fmt::format("vy_{}", i + 1u));
-        vz_vars.emplace_back(fmt::format("vz_{}", i + 1u));
     }
 
-    // Compute position and velocity of the zeroth particle in the barycentric reference frame.
-    std::vector<expression> u0_x_terms, u0_y_terms, u0_z_terms, ud0_x_terms, ud0_y_terms, ud0_z_terms,
-        tot_mass_terms{masses_vec[0]};
-
-    for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
-        u0_x_terms.push_back(masses_vec[i + 1u] * x_vars[i]);
-        u0_y_terms.push_back(masses_vec[i + 1u] * y_vars[i]);
-        u0_z_terms.push_back(masses_vec[i + 1u] * z_vars[i]);
-
-        ud0_x_terms.push_back(masses_vec[i + 1u] * vx_vars[i]);
-        ud0_y_terms.push_back(masses_vec[i + 1u] * vy_vars[i]);
-        ud0_z_terms.push_back(masses_vec[i + 1u] * vz_vars[i]);
-
-        tot_mass_terms.push_back(masses_vec[i + 1u]);
-    }
-
-    const auto tot_mass = sum(std::move(tot_mass_terms));
-
-    const auto u0_x = -sum(std::move(u0_x_terms)) / tot_mass;
-    const auto u0_y = -sum(std::move(u0_y_terms)) / tot_mass;
-    const auto u0_z = -sum(std::move(u0_z_terms)) / tot_mass;
-
-    const auto ud0_x = -sum(std::move(ud0_x_terms)) / tot_mass;
-    const auto ud0_y = -sum(std::move(ud0_y_terms)) / tot_mass;
-    const auto ud0_z = -sum(std::move(ud0_z_terms)) / tot_mass;
-
-    // The kinetic terms.
-    std::vector<expression> kin{masses_vec[0] * sum_sq({ud0_x, ud0_y, ud0_z})};
-    for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
-        kin.push_back(masses_vec[i + 1u] * sum_sq({vx_vars[i] + ud0_x, vy_vars[i] + ud0_y, vz_vars[i] + ud0_z}));
-    }
-
-    // The potential terms.
     std::vector<expression> pot;
     // Add the potential between the zeroth body and the rest.
     for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
@@ -369,7 +368,57 @@ expression np1body_energy_impl([[maybe_unused]] std::uint32_t n, const expressio
         }
     }
 
-    return .5_dbl * sum(std::move(kin)) - Gconst * sum(std::move(pot));
+    return -Gconst * sum(std::move(pot));
+}
+
+expression np1body_energy_impl([[maybe_unused]] std::uint32_t n, const expression &Gconst,
+                               const std::vector<expression> &masses_vec)
+{
+    // Sanity checks.
+    nbody_checks(n, masses_vec);
+
+    // NOTE: if masses_vec is empty, then take a shortcut avoiding
+    // divisions by zero and out-of-bounds conditions.
+    if (masses_vec.empty()) {
+        return 0_dbl;
+    }
+
+    // Store the number of massive particles (including the zeroth particle).
+    const auto n_massive = masses_vec.size();
+
+    // Create the velocity variables.
+    std::vector<expression> vx_vars, vy_vars, vz_vars;
+
+    for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
+        vx_vars.emplace_back(fmt::format("vx_{}", i + 1u));
+        vy_vars.emplace_back(fmt::format("vy_{}", i + 1u));
+        vz_vars.emplace_back(fmt::format("vz_{}", i + 1u));
+    }
+
+    // Compute the velocity of the zeroth particle in the barycentric reference frame.
+    std::vector<expression> ud0_x_terms, ud0_y_terms, ud0_z_terms, tot_mass_terms{masses_vec[0]};
+
+    for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
+        ud0_x_terms.push_back(masses_vec[i + 1u] * vx_vars[i]);
+        ud0_y_terms.push_back(masses_vec[i + 1u] * vy_vars[i]);
+        ud0_z_terms.push_back(masses_vec[i + 1u] * vz_vars[i]);
+
+        tot_mass_terms.push_back(masses_vec[i + 1u]);
+    }
+
+    const auto tot_mass = sum(std::move(tot_mass_terms));
+
+    const auto ud0_x = -sum(std::move(ud0_x_terms)) / tot_mass;
+    const auto ud0_y = -sum(std::move(ud0_y_terms)) / tot_mass;
+    const auto ud0_z = -sum(std::move(ud0_z_terms)) / tot_mass;
+
+    // The kinetic terms.
+    std::vector<expression> kin{masses_vec[0] * sum_sq({ud0_x, ud0_y, ud0_z})};
+    for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
+        kin.push_back(masses_vec[i + 1u] * sum_sq({vx_vars[i] + ud0_x, vy_vars[i] + ud0_y, vz_vars[i] + ud0_z}));
+    }
+
+    return .5_dbl * sum(std::move(kin)) + np1body_potential_impl(n, Gconst, masses_vec);
 }
 
 } // namespace model::detail

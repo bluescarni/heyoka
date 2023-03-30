@@ -64,6 +64,12 @@ jobs:
           fetch-depth: 2
       - name: Build
         run: bash tools/gha_conda_coverage.sh
+  conda_llvm15_asan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build
+        run: bash tools/gha_llvm15_conda_asan.sh
   conda_llvm14_asan:
     runs-on: ubuntu-latest
     steps:

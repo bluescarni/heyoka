@@ -260,7 +260,28 @@ std::uint32_t get_vector_size(llvm::Value *x)
 // Fetch the alignment of a type.
 std::uint64_t get_alignment(llvm::Module &md, llvm::Type *tp)
 {
+#if LLVM_VERSION_MAJOR >= 16
+    return md.getDataLayout().getABITypeAlign(tp).value();
+#else
     return md.getDataLayout().getABITypeAlignment(tp);
+#endif
+}
+
+// Fetch the alloc size of a type. This should be
+// equivalent to the sizeof() operator in C++.
+// Requires a non-scalable type.
+std::uint64_t get_size(llvm::Module &md, llvm::Type *tp)
+{
+    assert(!md.getDataLayout().getTypeAllocSize(tp).isScalable());
+
+    return boost::numeric_cast<std::uint64_t>(md.getDataLayout()
+                                                  .getTypeAllocSize(tp)
+#if LLVM_VERSION_MAJOR >= 12
+                                                  .getFixedValue()
+#else
+                                                  .getFixedSize()
+#endif
+    );
 }
 
 // Convert the input integral value n to the type std::size_t.
@@ -805,6 +826,16 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
     return r;
 }
 
+// Append bb to the list of blocks of the function f
+void llvm_append_block(llvm::Function *f, llvm::BasicBlock *bb)
+{
+#if LLVM_VERSION_MAJOR >= 16
+    f->insert(f->end(), bb);
+#else
+    f->getBasicBlockList().push_back(bb);
+#endif
+}
+
 // Create an LLVM for loop in the form:
 //
 // for (auto i = begin; i < end; i = next_cur(i)) {
@@ -847,7 +878,7 @@ void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const st
     auto preheader_bb = builder.GetInsertBlock();
 
     // Add the loop block and start insertion into it.
-    f->getBasicBlockList().push_back(loop_bb);
+    llvm_append_block(f, loop_bb);
     builder.SetInsertPoint(loop_bb);
 
     // Create the phi node and add the first pair of arguments.
@@ -879,7 +910,7 @@ void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const st
     // Get a reference to the current block for later use,
     // and insert the "after loop" block.
     auto loop_end_bb = builder.GetInsertBlock();
-    f->getBasicBlockList().push_back(after_bb);
+    llvm_append_block(f, after_bb);
 
     // Insert the conditional branch into the end of loop_end_bb.
     builder.CreateCondBr(end_cond, loop_bb, after_bb);
@@ -984,7 +1015,7 @@ void llvm_if_then_else(llvm_state &s, llvm::Value *cond, const std::function<voi
     builder.CreateBr(merge_bb);
 
     // Emit the "else" block.
-    f->getBasicBlockList().push_back(else_bb);
+    llvm_append_block(f, else_bb);
     builder.SetInsertPoint(else_bb);
     try {
         else_f();
@@ -1001,7 +1032,7 @@ void llvm_if_then_else(llvm_state &s, llvm::Value *cond, const std::function<voi
     builder.CreateBr(merge_bb);
 
     // Emit the merge block.
-    f->getBasicBlockList().push_back(merge_bb);
+    llvm_append_block(f, merge_bb);
     builder.SetInsertPoint(merge_bb);
 }
 
@@ -1076,7 +1107,7 @@ void llvm_switch_u32(llvm_state &s, llvm::Value *val, const std::function<void()
         auto *cur_bb = cases_blocks.front();
 
         // Insert it.
-        f->getBasicBlockList().push_back(cur_bb);
+        llvm_append_block(f, cur_bb);
         builder.SetInsertPoint(cur_bb);
 
         // Pop it from cases_blocks, as now cur_bb is managed
@@ -1102,7 +1133,7 @@ void llvm_switch_u32(llvm_state &s, llvm::Value *val, const std::function<void()
     }
 
     // Emit the merge block.
-    f->getBasicBlockList().push_back(merge_bb);
+    llvm_append_block(f, merge_bb);
     builder.SetInsertPoint(merge_bb);
 }
 
@@ -1204,7 +1235,7 @@ void llvm_while_loop(llvm_state &s, const std::function<llvm::Value *()> &cond, 
     auto preheader_bb = builder.GetInsertBlock();
 
     // Add the loop block and start insertion into it.
-    f->getBasicBlockList().push_back(loop_bb);
+    llvm_append_block(f, loop_bb);
     builder.SetInsertPoint(loop_bb);
 
     // Create the phi node and add the first pair of arguments.
@@ -1231,7 +1262,7 @@ void llvm_while_loop(llvm_state &s, const std::function<llvm::Value *()> &cond, 
     // Get a reference to the current block for later use,
     // and insert the "after loop" block.
     auto loop_end_bb = builder.GetInsertBlock();
-    f->getBasicBlockList().push_back(after_bb);
+    llvm_append_block(f, after_bb);
 
     // Insert the conditional branch into the end of loop_end_bb.
     builder.CreateCondBr(cmp, loop_bb, after_bb);

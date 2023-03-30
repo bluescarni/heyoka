@@ -176,7 +176,6 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/variable.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/param.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/mascon.cpp"
     # "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
     # VSOP2013.
@@ -238,6 +237,9 @@ set(HEYOKA_SRC_FILES
     # Models.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/pendulum.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/nbody.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/fixed_centres.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/rotating.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/mascon.cpp"
     # Math functions.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/binary_op.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"
@@ -445,6 +447,19 @@ find_package(Boost 1.60 REQUIRED serialization)
 target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
+
+# NOTE: recent versions of libcxx remove std::unary_function/std::binary_function
+# (which have been deprecated since long) in C++17 mode. This breaks, e.g., hashing
+# functionality on older Boost versions. See:
+# https://github.com/boostorg/container_hash/issues/22
+# Note that the better approach here would be to detect libcxx rather than
+# just Apple, but at this time it seems like there's no easy way to detect
+# the stdlib implementation/version from CMake.
+if(APPLE AND Boost_VERSION VERSION_LESS "1.81.0")
+    # NOTE: make this a PUBLIC definition just to err on the side
+    # of caution.
+    target_compile_definitions(heyoka PUBLIC BOOST_NO_CXX98_FUNCTION_BASE)
+endif()
 
 # Optional dependency on mp++.
 # NOTE: put this into a separate variable for reuse later.

@@ -122,22 +122,35 @@ std::vector<std::variant<std::uint32_t, number>> udef_to_variants(const expressi
 namespace
 {
 
-// Helper to check if a vector of indices consists of consecutive values:
-// [n, n + 1, n + 2, ...]
-// NOTE: requires a non-empty vector.
-bool is_consecutive(const std::vector<std::uint32_t> &v)
+// Helper to check if a vector of indices consists of consecutive
+// strided values:
+//
+// [n, n + s, n + 2*s, n + 3*s, ...],
+//
+// where s > 0 is the stride value. The function returns the stride value,
+// or zero if either:
+// - v has only 1 element, or
+// - the detected stride value is not strictly positive, or
+// - the values in the vector do not match the strided consecutive pattern.
+std::uint32_t is_consecutive_strided(const std::vector<std::uint32_t> &v)
 {
     assert(!v.empty());
 
-    for (decltype(v.size()) i = 1; i < v.size(); ++i) {
+    if (v.size() == 1u || v[1] <= v[0]) {
+        return 0;
+    }
+
+    const std::uint32_t candidate = v[1] - v[0];
+
+    for (decltype(v.size()) i = 2; i < v.size(); ++i) {
         // NOTE: the first check is to avoid potential
         // negative overflow in the second check.
-        if (v[i] <= v[i - 1u] || v[i] - v[i - 1u] != 1u) {
-            return false;
+        if (v[i] <= v[i - 1u] || v[i] - v[i - 1u] != candidate) {
+            return 0;
         }
     }
 
-    return true;
+    return candidate;
 }
 
 } // namespace
@@ -160,16 +173,18 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vidx(llvm_state &s, 
         return [&builder, num = ind[0]](llvm::Value *) -> llvm::Value * { return builder.getInt32(num); };
     }
 
-    // If ind consists of consecutive indices, we can replace
+    // If ind consists of consecutive (possibly strided) indices, we can replace
     // the index array with a simple offset computation.
-    if (is_consecutive(ind)) {
-        return [&builder, start_idx = ind[0]](llvm::Value *cur_call_idx) -> llvm::Value * {
-            return builder.CreateAdd(builder.getInt32(start_idx), cur_call_idx);
+    if (const auto stride = is_consecutive_strided(ind); stride != 0u) {
+        return [&builder, start_idx = ind[0], stride](llvm::Value *cur_call_idx) -> llvm::Value * {
+            return builder.CreateAdd(builder.getInt32(start_idx),
+                                     builder.CreateMul(builder.getInt32(stride), cur_call_idx));
         };
     }
 
     // Check if ind consists of a repeated pattern like [a, a, a, b, b, b, c, c, c, ...],
-    // that is, [a X n, b X n, c X n, ...], such that [a, b, c, ...] are consecutive numbers.
+    // that is, [a X n, b X n, c X n, ...], such that [a, b, c, ...] are consecutive (possibly
+    // strided) numbers.
     if (ind.size() > 1u) {
         // Determine the candidate number of repetitions.
         decltype(ind.size()) n_reps = 1;
@@ -208,24 +223,26 @@ std::function<llvm::Value *(llvm::Value *)> cm_make_arg_gen_vidx(llvm_state &s, 
                 }
             }
 
-            if (rep_flag && is_consecutive(rep_indices)) {
+            if (const auto stride = is_consecutive_strided(rep_indices); rep_flag && stride != 0u) {
                 // The pattern is  [a X n, b X n, c X n, ...] and [a, b, c, ...]
-                // are consecutive numbers. The m-th value in the array can thus
-                // be computed as a + floor(m / n).
+                // are consecutive (possibly strided) numbers. The m-th value in the array can thus
+                // be computed as a + floor(m / n) * stride.
 
 #if !defined(NDEBUG)
                 // Double-check the result in debug mode.
                 std::vector<std::uint32_t> checker;
                 for (decltype(ind.size()) i = 0; i < ind.size(); ++i) {
-                    checker.push_back(boost::numeric_cast<std::uint32_t>(ind[0] + i / n_reps));
+                    checker.push_back(boost::numeric_cast<std::uint32_t>(ind[0] + (i / n_reps) * stride));
                 }
                 assert(checker == ind); // LCOV_EXCL_LINE
 #endif
 
-                return [&builder, start_idx = rep_indices[0], n_reps = boost::numeric_cast<std::uint32_t>(n_reps)](
-                           llvm::Value *cur_call_idx) -> llvm::Value * {
-                    return builder.CreateAdd(builder.getInt32(start_idx),
-                                             builder.CreateUDiv(cur_call_idx, builder.getInt32(n_reps)));
+                return [&builder, start_idx = rep_indices[0], n_reps = boost::numeric_cast<std::uint32_t>(n_reps),
+                        stride](llvm::Value *cur_call_idx) -> llvm::Value * {
+                    return builder.CreateAdd(
+                        builder.getInt32(start_idx),
+                        builder.CreateMul(builder.CreateUDiv(cur_call_idx, builder.getInt32(n_reps)),
+                                          builder.getInt32(stride)));
                 };
             }
         }

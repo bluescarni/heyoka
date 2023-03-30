@@ -694,6 +694,37 @@ TEST_CASE("div simpls")
     REQUIRE(std::get<func>((y / x).value()).extract<detail::binary_op>()->args() == std::vector{y, x});
 }
 
+// Check that compound ops correctly
+// propagate number types.
+TEST_CASE("compound ops")
+{
+    auto x = 1.1_dbl;
+    x *= 1.1_ldbl;
+
+    REQUIRE(std::holds_alternative<long double>(std::get<number>(x.value()).value()));
+    REQUIRE(x == expression(1.1l * 1.1));
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    x = 1.1_dbl;
+    x *= 1.1_f128;
+
+    REQUIRE(std::holds_alternative<mppp::real128>(std::get<number>(x.value()).value()));
+    REQUIRE(x == expression(mppp::real128{"1.1"} * 1.1));
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    x = expression{mppp::real{"1.1", 128}};
+    x *= expression{mppp::real{"1.1", 256}};
+
+    REQUIRE(std::holds_alternative<mppp::real>(std::get<number>(x.value()).value()));
+    REQUIRE(x == expression(mppp::real{"1.1", 128} * mppp::real{"1.1", 256}));
+
+#endif
+}
+
 TEST_CASE("is_time_dependent")
 {
     namespace hy = heyoka;
