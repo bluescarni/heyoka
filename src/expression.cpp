@@ -1248,30 +1248,48 @@ expression diff(funcptr_map<expression> &func_map, const expression &e, const pa
         e.value());
 }
 
+namespace
+{
+
+std::vector<expression> reverse_diff(const expression &e, const std::vector<expression> &args)
+{
+    const auto [dc, nvars] = function_decompose({e});
+}
+
+} // namespace
+
 } // namespace detail
 
-expression diff(const expression &e, const std::string &s, diff_mode)
+expression diff(const expression &e, const std::string &s, diff_mode dm)
 {
-    detail::funcptr_map<expression> func_map;
+    if (dm == diff_mode::forward) {
+        detail::funcptr_map<expression> func_map;
 
-    return detail::diff(func_map, e, s);
+        return detail::diff(func_map, e, s);
+    } else {
+        return detail::reverse_diff(e, {expression{s}})[0];
+    }
 }
 
-expression diff(const expression &e, const param &p, diff_mode)
+expression diff(const expression &e, const param &p, diff_mode dm)
 {
-    detail::funcptr_map<expression> func_map;
+    if (dm == diff_mode::forward) {
+        detail::funcptr_map<expression> func_map;
 
-    return detail::diff(func_map, e, p);
+        return detail::diff(func_map, e, p);
+    } else {
+        return detail::reverse_diff(e, {expression{p}})[0];
+    }
 }
 
-expression diff(const expression &e, const expression &x, diff_mode)
+expression diff(const expression &e, const expression &x, diff_mode dm)
 {
     return std::visit(
-        [&e](const auto &v) -> expression {
+        [&](const auto &v) -> expression {
             if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
-                return diff(e, v.name());
+                return diff(e, v.name(), dm);
             } else if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, param>) {
-                return diff(e, v);
+                return diff(e, v, dm);
             } else {
                 throw std::invalid_argument(
                     "Derivatives are currently supported only with respect to variables and parameters");
@@ -1280,7 +1298,30 @@ expression diff(const expression &e, const expression &x, diff_mode)
         x.value());
 }
 
-expression diff(const expression &e, const std::vector<expression> &args, diff_mode) {}
+std::vector<expression> grad(const expression &e, const std::vector<expression> &args, diff_mode dm)
+{
+    // Check if there are repeated entries in args.
+    std::unordered_set args_set(args.begin(), args.end());
+    if (args_set.size() != args.size()) {
+        throw std::invalid_argument("Duplicate entries detected in the list of variables with respect to which the "
+                                    "gradient is to be computed");
+    }
+
+    if (dm == diff_mode::forward) {
+        std::vector<expression> retval;
+        retval.reserve(args.size());
+
+        // NOTE: this can clearly be easily parallelised,
+        // if needed.
+        for (const auto &arg : args) {
+            retval.push_back(diff(e, arg));
+        }
+
+        return retval;
+    } else {
+        return detail::reverse_diff(e, args);
+    }
+}
 
 namespace detail
 {

@@ -366,7 +366,8 @@ HEYOKA_DLL_PUBLIC expression diff(funcptr_map<expression> &, const expression &,
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const param &, diff_mode = diff_mode::forward);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &, diff_mode = diff_mode::forward);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &, diff_mode = diff_mode::forward);
-HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::vector<expression> &, diff_mode = diff_mode::forward);
+HEYOKA_DLL_PUBLIC std::vector<expression> grad(const expression &, const std::vector<expression> &,
+                                               diff_mode = diff_mode::forward);
 
 HEYOKA_DLL_PUBLIC expression pairwise_prod(std::vector<expression>);
 
