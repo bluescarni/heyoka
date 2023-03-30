@@ -1753,6 +1753,66 @@ namespace detail
 namespace
 {
 
+void get_params(std::unordered_set<std::uint32_t> &idx_set, detail::funcptr_set &func_set, const expression &ex)
+{
+    std::visit(
+        [&](const auto &v) {
+            using type = uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, param>) {
+                idx_set.insert(v.idx());
+            } else if constexpr (std::is_same_v<type, func>) {
+                const auto f_id = v.get_ptr();
+
+                if (auto it = func_set.find(f_id); it != func_set.end()) {
+                    // We already got the params for the current function, exit.
+                    return;
+                }
+
+                for (const auto &a : v.args()) {
+                    get_params(idx_set, func_set, a);
+                }
+
+                // Update the cache.
+                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+} // namespace detail
+
+// Determine the list of parameters appearing in the
+// expression ex. The result is a list of parameter
+// expressions sorted according to the indices.
+std::vector<expression> get_params(const expression &ex)
+{
+    std::unordered_set<std::uint32_t> idx_set;
+    detail::funcptr_set func_set;
+
+    detail::get_params(idx_set, func_set, ex);
+
+    std::vector<std::uint32_t> idx_vec(idx_set.begin(), idx_set.end());
+    std::sort(idx_vec.begin(), idx_vec.end());
+
+    std::vector<expression> retval;
+    retval.reserve(static_cast<decltype(retval.size())>(idx_vec.size()));
+
+    std::transform(idx_vec.begin(), idx_vec.end(), std::back_inserter(retval), [](auto idx) { return par[idx]; });
+
+    return retval;
+}
+
+namespace detail
+{
+
+namespace
+{
+
 bool is_time_dependent(funcptr_map<bool> &func_map, const expression &ex)
 {
     // - If ex is a function, check if it is time-dependent, or

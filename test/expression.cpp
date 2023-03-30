@@ -1909,7 +1909,7 @@ TEST_CASE("mp interop")
     REQUIRE(x - 1.1_r256 == x - expression{1.1_r256});
     REQUIRE(1.1_r256 - x == expression{1.1_r256} - x);
 
-    REQUIRE(x * 1.1_r256 == x * expression{1.1_r256});
+    REQUIRE(x * 1.1_r256 == x *expression{1.1_r256});
     REQUIRE(1.1_r256 * x == expression{1.1_r256} * x);
 
     REQUIRE(x / 1.1_r256 == x / expression{1.1_r256});
@@ -1960,4 +1960,20 @@ TEST_CASE("output too long")
     REQUIRE(str[str.size() - 1u] == '.');
     REQUIRE(str[str.size() - 2u] == '.');
     REQUIRE(str[str.size() - 3u] == '.');
+}
+
+TEST_CASE("get_params")
+{
+    REQUIRE(get_params({}).empty());
+    REQUIRE(get_params("x"_var).empty());
+    REQUIRE(get_params("x"_var + "y"_var).empty());
+    REQUIRE(get_params(par[0]) == std::vector{par[0]});
+    REQUIRE(get_params("x"_var - par[10]) == std::vector{par[10]});
+    REQUIRE(get_params(("x"_var + par[1]) - ("y"_var - par[10])) == std::vector{par[1], par[10]});
+
+    auto tmp1 = "x"_var + par[3];
+    auto tmp2 = par[56] / "y"_var;
+    auto ex = "z"_var * (tmp1 - tmp2) + "y"_var * tmp1 / tmp2;
+
+    REQUIRE(get_params(ex) == std::vector{par[3], par[56]});
 }
