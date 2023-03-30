@@ -1338,7 +1338,25 @@ expression subs(const expression &e, const std::unordered_map<std::string, expre
 {
     detail::funcptr_map<expression> func_map;
 
-    return detail::subs(func_map, e, smap);
+    auto ret = detail::subs(func_map, e, smap);
+
+#if !defined(NDEBUG)
+
+    if (get_n_nodes(e) > 1000u) {
+        // Cross-check with generic substitution in debug mode.
+        std::unordered_map<expression, expression> emap;
+        for (const auto &[s, ex] : smap) {
+            emap[expression{s}] = ex;
+        }
+
+        auto ret2 = subs(e, emap);
+
+        assert(ret2 == ret);
+    }
+
+#endif
+
+    return ret;
 }
 
 namespace detail
@@ -1347,7 +1365,7 @@ namespace detail
 namespace
 {
 
-expression subs(std::unordered_map<const void *, expression> &func_map, const expression &ex,
+expression subs(funcptr_map<expression> &func_map, const expression &ex,
                 const std::unordered_map<expression, expression> &smap)
 {
     if (auto it = smap.find(ex); it != smap.end()) {
@@ -1385,9 +1403,9 @@ expression subs(std::unordered_map<const void *, expression> &func_map, const ex
 
                 return ret;
             } else {
-                // ex is not a function, i.e., it is a var/num/... which does not show
-                // up in the substitution map. Thus, we can just return a copy of it
-                // unchanged.
+                // ex is not a function and it does not show
+                // up in the substitution map. Thus, we can just
+                // return a copy of it unchanged.
                 return expression{arg};
             }
         },
@@ -1400,7 +1418,7 @@ expression subs(std::unordered_map<const void *, expression> &func_map, const ex
 
 expression subs(const expression &e, const std::unordered_map<expression, expression> &smap)
 {
-    std::unordered_map<const void *, expression> func_map;
+    detail::funcptr_map<expression> func_map;
 
     return detail::subs(func_map, e, smap);
 }
