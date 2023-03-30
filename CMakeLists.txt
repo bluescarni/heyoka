@@ -456,7 +456,9 @@ target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 # just Apple, but at this time it seems like there's no easy way to detect
 # the stdlib implementation/version from CMake.
 if(APPLE AND Boost_VERSION VERSION_LESS "1.81.0")
-    target_compile_definitions(heyoka PRIVATE BOOST_NO_CXX98_FUNCTION_BASE)
+    # NOTE: make this a PUBLIC definition just to err on the side
+    # of caution.
+    target_compile_definitions(heyoka PUBLIC BOOST_NO_CXX98_FUNCTION_BASE)
 endif()
 
 # Optional dependency on mp++.
