@@ -907,6 +907,14 @@ TEST_CASE("get_n_nodes")
 
     REQUIRE(get_n_nodes(bar) == 35u);
     REQUIRE(get_n_nodes(bar2) == 35u);
+
+    // Build a very large expression such that
+    // get_n_nodes() will return 0.
+    for (auto i = 0; i < 8; ++i) {
+        foo = subs(foo, {{x, foo}});
+    }
+
+    REQUIRE(get_n_nodes(foo) == 0u);
 }
 
 TEST_CASE("equality")

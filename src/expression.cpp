@@ -36,6 +36,7 @@
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -1122,6 +1123,11 @@ namespace detail
 namespace
 {
 
+// Exception to signal that the computation
+// of the number of nodes resulted in overflow.
+struct too_many_nodes : std::exception {
+};
+
 std::size_t get_n_nodes(funcptr_map<std::size_t> &func_map, const expression &e)
 {
     return std::visit(
@@ -1135,9 +1141,14 @@ std::size_t get_n_nodes(funcptr_map<std::size_t> &func_map, const expression &e)
                     return it->second;
                 }
 
-                std::size_t retval = 1;
+                boost::safe_numerics::safe<std::size_t> retval = 1;
+
                 for (const auto &ex : arg.args()) {
-                    retval += get_n_nodes(func_map, ex);
+                    try {
+                        retval += get_n_nodes(func_map, ex);
+                    } catch (...) {
+                        throw too_many_nodes{};
+                    }
                 }
 
                 // Store the number of nodes for the current function
@@ -1158,11 +1169,18 @@ std::size_t get_n_nodes(funcptr_map<std::size_t> &func_map, const expression &e)
 
 } // namespace detail
 
+// NOTE: this always returns a number > 0, unless an overflow
+// occurs due to the expression being too large. In such case,
+// zero is returned.
 std::size_t get_n_nodes(const expression &e)
 {
     detail::funcptr_map<std::size_t> func_map;
 
-    return detail::get_n_nodes(func_map, e);
+    try {
+        return detail::get_n_nodes(func_map, e);
+    } catch (const detail::too_many_nodes &) {
+        return 0;
+    }
 }
 
 namespace detail
@@ -1338,25 +1356,7 @@ expression subs(const expression &e, const std::unordered_map<std::string, expre
 {
     detail::funcptr_map<expression> func_map;
 
-    auto ret = detail::subs(func_map, e, smap);
-
-#if !defined(NDEBUG)
-
-    if (get_n_nodes(e) > 1000u) {
-        // Cross-check with generic substitution in debug mode.
-        std::unordered_map<expression, expression> emap;
-        for (const auto &[s, ex] : smap) {
-            emap[expression{s}] = ex;
-        }
-
-        auto ret2 = subs(e, emap);
-
-        assert(ret2 == ret);
-    }
-
-#endif
-
-    return ret;
+    return detail::subs(func_map, e, smap);
 }
 
 namespace detail
