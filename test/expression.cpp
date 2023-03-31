@@ -910,7 +910,8 @@ TEST_CASE("get_n_nodes")
 
     // Build a very large expression such that
     // get_n_nodes() will return 0.
-    for (auto i = 0; i < 8; ++i) {
+    // NOTE: this has been calibrated for a 64-bit size_t.
+    for (auto i = 0; i < 5; ++i) {
         foo = subs(foo, {{x, foo}});
     }
 
