@@ -1794,14 +1794,18 @@ std::vector<expression> get_params(const expression &ex)
     std::unordered_set<std::uint32_t> idx_set;
     detail::funcptr_set func_set;
 
+    // Write the indices of all parameters appearing in ex
+    // into idx_set.
     detail::get_params(idx_set, func_set, ex);
 
+    // Transform idx_set into a sorted vector.
     std::vector<std::uint32_t> idx_vec(idx_set.begin(), idx_set.end());
     std::sort(idx_vec.begin(), idx_vec.end());
 
+    // Transform the sorted indices into a vector of
+    // sorted parameter expressions.
     std::vector<expression> retval;
     retval.reserve(static_cast<decltype(retval.size())>(idx_vec.size()));
-
     std::transform(idx_vec.begin(), idx_vec.end(), std::back_inserter(retval), [](auto idx) { return par[idx]; });
 
     return retval;
