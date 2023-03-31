@@ -6,7 +6,7 @@ set(heyoka_WITH_REAL @_HEYOKA_WITH_REAL@)
 set(heyoka_ABI_VERSION @HEYOKA_ABI_VERSION@)
 
 # Mandatory public dependencies on Boost and fmt.
-find_package(Boost 1.60 REQUIRED serialization)
+find_package(Boost @_HEYOKA_MIN_BOOST_VERSION@ REQUIRED serialization)
 find_package(fmt REQUIRED CONFIG)
 
 # Optional public dependency on mp++.

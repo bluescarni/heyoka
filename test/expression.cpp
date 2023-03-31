@@ -907,6 +907,15 @@ TEST_CASE("get_n_nodes")
 
     REQUIRE(get_n_nodes(bar) == 35u);
     REQUIRE(get_n_nodes(bar2) == 35u);
+
+    // Build a very large expression such that
+    // get_n_nodes() will return 0.
+    // NOTE: this has been calibrated for a 64-bit size_t.
+    for (auto i = 0; i < 5; ++i) {
+        foo = subs(foo, {{x, foo}});
+    }
+
+    REQUIRE(get_n_nodes(foo) == 0u);
 }
 
 TEST_CASE("equality")
@@ -1007,7 +1016,7 @@ TEST_CASE("copy")
             != std::get<func>(std::get<func>(bar.value()).args()[1].value()).get_ptr());
 }
 
-TEST_CASE("subs")
+TEST_CASE("subs str")
 {
     auto [x, y, z, a] = make_vars("x", "y", "z", "a");
 
@@ -1037,6 +1046,37 @@ TEST_CASE("subs")
         std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[0].value()).args()[0].value()).get_ptr()
         == std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[1].value()).args()[1].value())
                .get_ptr());
+}
+
+TEST_CASE("subs")
+{
+    auto [x, y, z, a] = make_vars("x", "y", "z", "a");
+
+    REQUIRE(subs(x, {{z, x + y}}) == x);
+    REQUIRE(subs(1_dbl, {{z, x + y}}) == 1_dbl);
+    REQUIRE(subs(x, {{x, x + y}}) == x + y);
+    REQUIRE(subs(1_dbl, {{1_dbl, x + y}}) == x + y);
+
+    REQUIRE(subs(x + y, {{x + y, z}}) == z);
+    REQUIRE(subs(x + z, {{x + y, z}}) == x + z);
+
+    auto tmp = x + y;
+    auto tmp2 = x - y;
+    auto *tmp2_id = std::get<func>(tmp2.value()).get_ptr();
+    auto ex = tmp - 2_dbl * tmp;
+    auto subs_res = subs(ex, {{tmp, tmp2}});
+
+    REQUIRE(subs_res == tmp2 - 2_dbl * tmp2);
+    REQUIRE(tmp2_id == std::get<func>(std::get<func>(subs_res.value()).args()[0].value()).get_ptr());
+    REQUIRE(tmp2_id
+            == std::get<func>(std::get<func>(std::get<func>(subs_res.value()).args()[1].value()).args()[1].value())
+                   .get_ptr());
+
+    subs_res = subs(ex, {{x, z}});
+    REQUIRE(subs_res == (z + y) - 2_dbl * (z + y));
+    REQUIRE(std::get<func>(std::get<func>(subs_res.value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(subs_res.value()).args()[1].value()).args()[1].value())
+                   .get_ptr());
 }
 
 // cfunc N-body with fixed masses.
@@ -1878,7 +1918,7 @@ TEST_CASE("mp interop")
     REQUIRE(x - 1.1_r256 == x - expression{1.1_r256});
     REQUIRE(1.1_r256 - x == expression{1.1_r256} - x);
 
-    REQUIRE(x * 1.1_r256 == x * expression{1.1_r256});
+    REQUIRE(x * 1.1_r256 == x *expression{1.1_r256});
     REQUIRE(1.1_r256 * x == expression{1.1_r256} * x);
 
     REQUIRE(x / 1.1_r256 == x / expression{1.1_r256});
@@ -1929,4 +1969,20 @@ TEST_CASE("output too long")
     REQUIRE(str[str.size() - 1u] == '.');
     REQUIRE(str[str.size() - 2u] == '.');
     REQUIRE(str[str.size() - 3u] == '.');
+}
+
+TEST_CASE("get_params")
+{
+    REQUIRE(get_params({}).empty());
+    REQUIRE(get_params("x"_var).empty());
+    REQUIRE(get_params("x"_var + "y"_var).empty());
+    REQUIRE(get_params(par[0]) == std::vector{par[0]});
+    REQUIRE(get_params("x"_var - par[10]) == std::vector{par[10]});
+    REQUIRE(get_params(("x"_var + par[1]) - ("y"_var - par[10])) == std::vector{par[1], par[10]});
+
+    auto tmp1 = "x"_var + par[3];
+    auto tmp2 = par[56] / "y"_var;
+    auto ex = "z"_var * (tmp1 - tmp2) + "y"_var * tmp1 / tmp2;
+
+    REQUIRE(get_params(ex) == std::vector{par[3], par[56]});
 }
