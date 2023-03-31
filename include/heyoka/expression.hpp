@@ -352,6 +352,7 @@ HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC std::size_t get_n_nodes(const expression &);
 
 HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &);
+HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<expression, expression> &);
 
 namespace detail
 {
@@ -442,6 +443,8 @@ HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *,
                                                      std::uint32_t, bool);
 
 HEYOKA_DLL_PUBLIC std::uint32_t get_param_size(const expression &);
+
+HEYOKA_DLL_PUBLIC std::vector<expression> get_params(const expression &);
 
 HEYOKA_DLL_PUBLIC bool is_time_dependent(const expression &);
 

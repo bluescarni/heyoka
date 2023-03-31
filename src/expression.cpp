@@ -36,6 +36,7 @@
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -1122,6 +1123,11 @@ namespace detail
 namespace
 {
 
+// Exception to signal that the computation
+// of the number of nodes resulted in overflow.
+struct too_many_nodes : std::exception {
+};
+
 std::size_t get_n_nodes(funcptr_map<std::size_t> &func_map, const expression &e)
 {
     return std::visit(
@@ -1135,9 +1141,14 @@ std::size_t get_n_nodes(funcptr_map<std::size_t> &func_map, const expression &e)
                     return it->second;
                 }
 
-                std::size_t retval = 1;
+                boost::safe_numerics::safe<std::size_t> retval = 1;
+
                 for (const auto &ex : arg.args()) {
-                    retval += get_n_nodes(func_map, ex);
+                    try {
+                        retval += get_n_nodes(func_map, ex);
+                    } catch (...) {
+                        throw too_many_nodes{};
+                    }
                 }
 
                 // Store the number of nodes for the current function
@@ -1158,11 +1169,18 @@ std::size_t get_n_nodes(funcptr_map<std::size_t> &func_map, const expression &e)
 
 } // namespace detail
 
+// NOTE: this always returns a number > 0, unless an overflow
+// occurs due to the expression being too large. In such case,
+// zero is returned.
 std::size_t get_n_nodes(const expression &e)
 {
     detail::funcptr_map<std::size_t> func_map;
 
-    return detail::get_n_nodes(func_map, e);
+    try {
+        return detail::get_n_nodes(func_map, e);
+    } catch (const detail::too_many_nodes &) {
+        return 0;
+    }
 }
 
 namespace detail
@@ -1286,7 +1304,6 @@ namespace detail
 namespace
 {
 
-// NOTE: an in-place API would perform better.
 expression subs(funcptr_map<expression> &func_map, const expression &ex,
                 const std::unordered_map<std::string, expression> &smap)
 {
@@ -1336,6 +1353,70 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
 } // namespace detail
 
 expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
+{
+    detail::funcptr_map<expression> func_map;
+
+    return detail::subs(func_map, e, smap);
+}
+
+namespace detail
+{
+
+namespace
+{
+
+expression subs(funcptr_map<expression> &func_map, const expression &ex,
+                const std::unordered_map<expression, expression> &smap)
+{
+    if (auto it = smap.find(ex); it != smap.end()) {
+        // ex is in the substitution map, return the value it maps to.
+        return it->second;
+    }
+
+    return std::visit(
+        [&](const auto &arg) {
+            using type = uncvref_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<type, func>) {
+                const auto f_id = arg.get_ptr();
+
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already performed substitution on the current function,
+                    // fetch the result from the cache.
+                    return it->second;
+                }
+
+                // NOTE: this creates a separate instance of arg, but its
+                // arguments are shallow-copied.
+                auto tmp = arg.copy();
+
+                // Recursively run the substitution on all function arguments.
+                for (auto [b, e] = tmp.get_mutable_args_it(); b != e; ++b) {
+                    *b = subs(func_map, *b, smap);
+                }
+
+                // Put the return value in the cache.
+                auto ret = expression{std::move(tmp)};
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return ret;
+            } else {
+                // ex is not a function and it does not show
+                // up in the substitution map. Thus, we can just
+                // return a copy of it unchanged.
+                return expression{arg};
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+} // namespace detail
+
+expression subs(const expression &e, const std::unordered_map<expression, expression> &smap)
 {
     detail::funcptr_map<expression> func_map;
 
@@ -1672,6 +1753,70 @@ namespace detail
 namespace
 {
 
+void get_params(std::unordered_set<std::uint32_t> &idx_set, detail::funcptr_set &func_set, const expression &ex)
+{
+    std::visit(
+        [&](const auto &v) {
+            using type = uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, param>) {
+                idx_set.insert(v.idx());
+            } else if constexpr (std::is_same_v<type, func>) {
+                const auto f_id = v.get_ptr();
+
+                if (auto it = func_set.find(f_id); it != func_set.end()) {
+                    // We already got the params for the current function, exit.
+                    return;
+                }
+
+                for (const auto &a : v.args()) {
+                    get_params(idx_set, func_set, a);
+                }
+
+                // Update the cache.
+                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+} // namespace detail
+
+// Determine the list of parameters appearing in the
+// expression ex. The result is a list of parameter
+// expressions sorted according to the indices.
+std::vector<expression> get_params(const expression &ex)
+{
+    std::unordered_set<std::uint32_t> idx_set;
+    detail::funcptr_set func_set;
+
+    // Write the indices of all parameters appearing in ex
+    // into idx_set.
+    detail::get_params(idx_set, func_set, ex);
+
+    // Transform idx_set into a sorted vector.
+    std::vector<std::uint32_t> idx_vec(idx_set.begin(), idx_set.end());
+    std::sort(idx_vec.begin(), idx_vec.end());
+
+    // Transform the sorted indices into a vector of
+    // sorted parameter expressions.
+    std::vector<expression> retval;
+    retval.reserve(static_cast<decltype(retval.size())>(idx_vec.size()));
+    std::transform(idx_vec.begin(), idx_vec.end(), std::back_inserter(retval), [](auto idx) { return par[idx]; });
+
+    return retval;
+}
+
+namespace detail
+{
+
+namespace
+{
+
 bool is_time_dependent(funcptr_map<bool> &func_map, const expression &ex)
 {
     // - If ex is a function, check if it is time-dependent, or
@@ -1938,8 +2083,8 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex, st
         retval.push_back(std::move(ex));
     }
 
-    get_logger()->debug("cfunc CSE reduced decomposition size from {} to {}", orig_size, retval.size());
-    get_logger()->trace("cfunc CSE runtime: {}", sw);
+    get_logger()->debug("function CSE reduced decomposition size from {} to {}", orig_size, retval.size());
+    get_logger()->trace("function CSE runtime: {}", sw);
 
     return retval;
 }
@@ -2120,7 +2265,7 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc, std::vecto
         retval.push_back(std::move(dc[idx]));
     }
 
-    get_logger()->trace("cfunc topological sort runtime: {}", sw);
+    get_logger()->trace("function topological sort runtime: {}", sw);
 
     return retval;
 }
@@ -2227,7 +2372,7 @@ function_decompose(const std::vector<expression> &v_ex_)
         ret.emplace_back(std::move(ex));
     }
 
-    detail::get_logger()->trace("cfunc decomposition construction runtime: {}", sw);
+    detail::get_logger()->trace("function decomposition construction runtime: {}", sw);
 
 #if !defined(NDEBUG)
 
@@ -2393,7 +2538,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
         ret.emplace_back(std::move(ex));
     }
 
-    detail::get_logger()->trace("cfunc decomposition construction runtime: {}", sw);
+    detail::get_logger()->trace("function decomposition construction runtime: {}", sw);
 
 #if !defined(NDEBUG)
 

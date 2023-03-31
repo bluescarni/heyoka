@@ -546,7 +546,7 @@ TEST_CASE("func subs")
 {
     auto f1 = func(func_15{{"x"_var, "y"_var}});
 
-    auto f2 = subs(expression{f1}, {{}});
+    auto f2 = subs(expression{f1}, std::unordered_map<std::string, expression>{});
     REQUIRE(f2 == expression{f1});
 
     f2 = subs(expression{f1}, {{"x", "z"_var}});
