@@ -2430,30 +2430,30 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     // LCOV_EXCL_STOP
 
     // Set the names/attributes of the function arguments.
-    auto out_ptr = f->args().begin();
+    auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
     out_ptr->addAttr(llvm::Attribute::NoCapture);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
 
-    auto tm_ptr = f->args().begin() + 1;
+    auto *tm_ptr = f->args().begin() + 1;
     tm_ptr->setName("tm_ptr");
     tm_ptr->addAttr(llvm::Attribute::NoCapture);
     tm_ptr->addAttr(llvm::Attribute::NoAlias);
     tm_ptr->addAttr(llvm::Attribute::ReadOnly);
 
-    auto tc_ptr = f->args().begin() + 2;
+    auto *tc_ptr = f->args().begin() + 2;
     tc_ptr->setName("tc_ptr");
     tc_ptr->addAttr(llvm::Attribute::NoCapture);
     tc_ptr->addAttr(llvm::Attribute::NoAlias);
     tc_ptr->addAttr(llvm::Attribute::ReadOnly);
 
-    auto times_ptr_hi = f->args().begin() + 3;
+    auto *times_ptr_hi = f->args().begin() + 3;
     times_ptr_hi->setName("times_ptr_hi");
     times_ptr_hi->addAttr(llvm::Attribute::NoCapture);
     times_ptr_hi->addAttr(llvm::Attribute::NoAlias);
     times_ptr_hi->addAttr(llvm::Attribute::ReadOnly);
 
-    auto times_ptr_lo = f->args().begin() + 4;
+    auto *times_ptr_lo = f->args().begin() + 4;
     times_ptr_lo->setName("times_ptr_lo");
     times_ptr_lo->addAttr(llvm::Attribute::NoCapture);
     times_ptr_lo->addAttr(llvm::Attribute::NoAlias);
@@ -2465,7 +2465,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     builder.SetInsertPoint(bb);
 
     // Establish the time directions.
-    auto bool_vector_t = detail::make_vector_type(builder.getInt1Ty(), m_batch_size);
+    auto *bool_vector_t = detail::make_vector_type(builder.getInt1Ty(), m_batch_size);
     assert(bool_vector_t != nullptr); // LCOV_EXCL_LINE
     llvm::Value *dir_vec{};
     if (m_batch_size == 1u) {
@@ -2493,11 +2493,11 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     // a time greater than tm (less than tm in backwards integration).
     // This is essentially an implementation of std::upper_bound:
     // https://en.cppreference.com/w/cpp/algorithm/upper_bound
-    auto int32_vec_t = detail::make_vector_type(builder.getInt32Ty(), m_batch_size);
-    auto tidx = builder.CreateAlloca(int32_vec_t);
-    auto count = builder.CreateAlloca(int32_vec_t);
-    auto step = builder.CreateAlloca(int32_vec_t);
-    auto first = builder.CreateAlloca(int32_vec_t);
+    auto *int32_vec_t = detail::make_vector_type(builder.getInt32Ty(), m_batch_size);
+    auto *tidx = builder.CreateAlloca(int32_vec_t);
+    auto *count = builder.CreateAlloca(int32_vec_t);
+    auto *step = builder.CreateAlloca(int32_vec_t);
+    auto *first = builder.CreateAlloca(int32_vec_t);
 
     // count is inited with the size of the range.
     // NOTE: count includes the padding.
@@ -2507,7 +2507,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
         count);
 
     // first is inited to zero.
-    auto zero_vec_i32 = detail::vector_splat(builder, builder.getInt32(0), m_batch_size);
+    auto *zero_vec_i32 = detail::vector_splat(builder, builder.getInt32(0), m_batch_size);
     builder.CreateStore(zero_vec_i32, first);
 
     // Load the time value from tm_ptr.
@@ -2526,23 +2526,23 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     }
 
     // Splatted version of the batch size.
-    auto batch_splat = detail::vector_splat(builder, builder.getInt32(m_batch_size), m_batch_size);
+    auto *batch_splat = detail::vector_splat(builder, builder.getInt32(m_batch_size), m_batch_size);
 
     // Splatted versions of the base pointers for the time data.
-    auto times_ptr_hi_vec = detail::vector_splat(builder, times_ptr_hi, m_batch_size);
-    auto times_ptr_lo_vec = detail::vector_splat(builder, times_ptr_lo, m_batch_size);
+    auto *times_ptr_hi_vec = detail::vector_splat(builder, times_ptr_hi, m_batch_size);
+    auto *times_ptr_lo_vec = detail::vector_splat(builder, times_ptr_lo, m_batch_size);
 
     // fp vector of zeroes.
     auto *zero_vec_fp = detail::llvm_constantfp(m_llvm_state, fp_vec_t, 0.);
 
     // Vector of i32 ones.
-    auto one_vec_i32 = detail::vector_splat(builder, builder.getInt32(1), m_batch_size);
+    auto *one_vec_i32 = detail::vector_splat(builder, builder.getInt32(1), m_batch_size);
 
     detail::llvm_while_loop(
         m_llvm_state,
         [&]() -> llvm::Value * {
             // NOTE: the condition here is that any value in count is not zero.
-            auto cmp = builder.CreateICmpNE(builder.CreateLoad(int32_vec_t, count), zero_vec_i32);
+            auto *cmp = builder.CreateICmpNE(builder.CreateLoad(int32_vec_t, count), zero_vec_i32);
 
             // NOTE: in scalar mode, no reduction is needed.
             return (m_batch_size == 1u) ? cmp : builder.CreateOrReduce(cmp);
@@ -2551,15 +2551,15 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
             // tidx = first.
             builder.CreateStore(builder.CreateLoad(int32_vec_t, first), tidx);
             // step = count / 2.
-            auto two_vec_i32 = detail::vector_splat(builder, builder.getInt32(2), m_batch_size);
+            auto *two_vec_i32 = detail::vector_splat(builder, builder.getInt32(2), m_batch_size);
             builder.CreateStore(builder.CreateUDiv(builder.CreateLoad(int32_vec_t, count), two_vec_i32), step);
             // tidx = tidx + step.
             builder.CreateStore(
                 builder.CreateAdd(builder.CreateLoad(int32_vec_t, tidx), builder.CreateLoad(int32_vec_t, step)), tidx);
 
             // Compute the indices for loading the times from the pointers.
-            auto tl_idx = builder.CreateAdd(builder.CreateMul(builder.CreateLoad(int32_vec_t, tidx), batch_splat),
-                                            batch_offset);
+            auto *tl_idx = builder.CreateAdd(builder.CreateMul(builder.CreateLoad(int32_vec_t, tidx), batch_splat),
+                                             batch_offset);
 
             // Compute the pointers for loading the time data.
             auto tptr_hi = builder.CreateInBoundsGEP(fp_t, times_ptr_hi_vec, tl_idx);
@@ -2589,7 +2589,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
                                 first);
 
             // count = count - (step or count).
-            auto old_count = builder.CreateLoad(int32_vec_t, count);
+            auto *old_count = builder.CreateLoad(int32_vec_t, count);
             auto new_count = builder.CreateSub(
                 old_count, builder.CreateSelect(cond, builder.CreateLoad(int32_vec_t, step), old_count));
 
@@ -2613,8 +2613,8 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     // like in the scalar case) due to padding.
     // In order to vectorise the check, we compute:
     // tc_idx = tc_idx - (tc_idx != 0) - (tc_idx == range size - 1).
-    auto tc_idx_cmp1 = builder.CreateZExt(builder.CreateICmpNE(tc_idx, zero_vec_i32), int32_vec_t);
-    auto tc_idx_cmp2 = builder.CreateZExt(
+    auto *tc_idx_cmp1 = builder.CreateZExt(builder.CreateICmpNE(tc_idx, zero_vec_i32), int32_vec_t);
+    auto *tc_idx_cmp2 = builder.CreateZExt(
         builder.CreateICmpEQ(
             tc_idx, detail::vector_splat(
                         builder, builder.getInt32(static_cast<std::uint32_t>(m_times_hi.size() / m_batch_size - 1u)),
@@ -2628,8 +2628,8 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     {
         // In debug mode, invoke the index checking function.
         auto *array_t = llvm::ArrayType::get(builder.getInt32Ty(), m_batch_size);
-        auto tc_idx_debug_ptr = builder.CreateInBoundsGEP(array_t, builder.CreateAlloca(array_t),
-                                                          {builder.getInt32(0), builder.getInt32(0)});
+        auto *tc_idx_debug_ptr = builder.CreateInBoundsGEP(array_t, builder.CreateAlloca(array_t),
+                                                           {builder.getInt32(0), builder.getInt32(0)});
         detail::store_vector_to_memory(builder, tc_idx_debug_ptr, tc_idx);
         detail::llvm_invoke_external(m_llvm_state, "heyoka_continuous_output_batch_tc_idx_debug", builder.getVoidTy(),
                                      {tc_idx_debug_ptr, builder.getInt32(static_cast<std::uint32_t>(m_times_hi.size())),
@@ -2639,7 +2639,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
 #endif
 
     // Convert tc_idx into an index for loading from the time vectors.
-    auto tc_l_idx = builder.CreateAdd(builder.CreateMul(tc_idx, batch_splat), batch_offset);
+    auto *tc_l_idx = builder.CreateAdd(builder.CreateMul(tc_idx, batch_splat), batch_offset);
 
     // Load the times corresponding to tc_idx.
     auto start_tm_hi = detail::gather_vector_from_memory(builder, fp_vec_t,
