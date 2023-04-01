@@ -361,6 +361,7 @@ namespace detail
 
 HEYOKA_DLL_PUBLIC expression diff(funcptr_map<expression> &, const expression &, const std::string &);
 HEYOKA_DLL_PUBLIC expression diff(funcptr_map<expression> &, const expression &, const param &);
+std::vector<expression> reverse_diff(const expression &, const std::vector<expression> &);
 
 } // namespace detail
 

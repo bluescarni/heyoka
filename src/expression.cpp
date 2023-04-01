@@ -1266,16 +1266,6 @@ expression diff(funcptr_map<expression> &func_map, const expression &e, const pa
         e.value());
 }
 
-namespace
-{
-
-std::vector<expression> reverse_diff(const expression &e, const std::vector<expression> &args)
-{
-    const auto [dc, nvars] = function_decompose({e});
-}
-
-} // namespace
-
 } // namespace detail
 
 expression diff(const expression &e, const std::string &s, diff_mode dm)
@@ -1314,31 +1304,6 @@ expression diff(const expression &e, const expression &x, diff_mode dm)
             }
         },
         x.value());
-}
-
-std::vector<expression> grad(const expression &e, const std::vector<expression> &args, diff_mode dm)
-{
-    // Check if there are repeated entries in args.
-    std::unordered_set args_set(args.begin(), args.end());
-    if (args_set.size() != args.size()) {
-        throw std::invalid_argument("Duplicate entries detected in the list of variables with respect to which the "
-                                    "gradient is to be computed");
-    }
-
-    if (dm == diff_mode::forward) {
-        std::vector<expression> retval;
-        retval.reserve(args.size());
-
-        // NOTE: this can clearly be easily parallelised,
-        // if needed.
-        for (const auto &arg : args) {
-            retval.push_back(diff(e, arg));
-        }
-
-        return retval;
-    } else {
-        return detail::reverse_diff(e, args);
-    }
 }
 
 namespace detail
