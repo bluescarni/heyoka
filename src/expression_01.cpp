@@ -340,6 +340,8 @@ std::vector<expression> reverse_diff(const expression &e, const std::vector<expr
     if (std::holds_alternative<number>(e.value())) {
         return {args.size(), 0_dbl};
     }
+
+    return {};
 }
 
 } // namespace detail
