@@ -1940,7 +1940,7 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
 
                 if constexpr (std::is_same_v<type, func>) {
                     for (const auto &arg : v.args()) {
-                        if (auto p_var = std::get_if<variable>(&arg.value())) {
+                        if (auto *p_var = std::get_if<variable>(&arg.value())) {
                             assert(p_var->name().rfind("u_", 0) == 0);
                             assert(uname_to_index(p_var->name()) < i);
                         } else if (std::get_if<number>(&arg.value()) == nullptr
