@@ -472,6 +472,9 @@ namespace detail
 HEYOKA_DLL_PUBLIC bool is_integral(const expression &);
 HEYOKA_DLL_PUBLIC bool is_odd_integral_half(const expression &);
 
+std::vector<expression> function_sort_dc(std::vector<expression> &, std::vector<expression>::size_type,
+                                         std::vector<expression>::size_type);
+
 std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vector<expression>::size_type> &,
                                                             const expression &, std::vector<expression> &);
 

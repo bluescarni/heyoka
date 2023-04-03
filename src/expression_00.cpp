@@ -2093,6 +2093,8 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex, st
     return retval;
 }
 
+} // namespace
+
 // Perform a topological sort on a graph representation
 // of a function decomposition. This can improve performance
 // by grouping together operations that can be performed in parallel,
@@ -2273,8 +2275,6 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc, std::vecto
 
     return retval;
 }
-
-} // namespace
 
 } // namespace detail
 
