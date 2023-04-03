@@ -1910,8 +1910,6 @@ std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vec
 namespace
 {
 
-// LCOV_EXCL_START
-
 #if !defined(NDEBUG)
 
 // Helper to verify a function decomposition.
@@ -1947,11 +1945,11 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
                             assert(uname_to_index(p_var->name()) < i);
                         } else if (std::get_if<number>(&arg.value()) == nullptr
                                    && std::get_if<param>(&arg.value()) == nullptr) {
-                            assert(false);
+                            assert(false); // LCOV_EXCL_LINE
                         }
                     }
                 } else {
-                    assert(false);
+                    assert(false); // LCOV_EXCL_LINE
                 }
             },
             dc[i].value());
@@ -1969,7 +1967,7 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
                     assert(v.name().rfind("u_", 0) == 0);
                     assert(uname_to_index(v.name()) < i);
                 } else if constexpr (!std::is_same_v<type, number> && !std::is_same_v<type, param>) {
-                    assert(false);
+                    assert(false); // LCOV_EXCL_LINE
                 }
             },
             dc[i].value());
@@ -1992,8 +1990,6 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
 }
 
 #endif
-
-// LCOV_EXCL_STOP
 
 // Simplify a function decomposition by removing
 // common subexpressions.
