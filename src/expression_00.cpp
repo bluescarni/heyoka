@@ -2202,7 +2202,7 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc, std::vecto
         // Fetch all the out edges of v and sort them according
         // to the target vertex.
         // NOTE: the sorting is important to ensure that all the original
-        // variables are insered into v_idx in the correct order.
+        // variables are inserted into v_idx in the correct order.
         const auto e_range = boost::out_edges(v, g);
         tmp_edges.assign(e_range.first, e_range.second);
         std::sort(tmp_edges.begin(), tmp_edges.end(),
@@ -2375,7 +2375,7 @@ function_decompose(const std::vector<expression> &v_ex_)
     }
 
     // Append the definitions of the outputs
-    // in terms of u variables.
+    // in terms of u variables or numbers/params.
     for (auto &ex : v_ex) {
         ret.emplace_back(std::move(ex));
     }
@@ -2541,7 +2541,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
     }
 
     // Append the definitions of the outputs
-    // in terms of u variables.
+    // in terms of u variables or numbers/params.
     for (auto &ex : v_ex) {
         ret.emplace_back(std::move(ex));
     }

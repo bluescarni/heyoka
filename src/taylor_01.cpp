@@ -527,7 +527,7 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
         // Fetch all the out edges of v and sort them according
         // to the target vertex.
         // NOTE: the sorting is important to ensure that all the state
-        // variables are insered into v_idx in the correct order.
+        // variables are inserted into v_idx in the correct order.
         const auto e_range = boost::out_edges(v, g);
         tmp_edges.assign(e_range.first, e_range.second);
         std::sort(tmp_edges.begin(), tmp_edges.end(),
