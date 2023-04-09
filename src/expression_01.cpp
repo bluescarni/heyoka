@@ -11,12 +11,14 @@
 #include <cstddef>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <variant>
 #include <vector>
 
+#include <boost/numeric/conversion/cast.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/core.h>
@@ -27,6 +29,7 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
@@ -214,7 +217,7 @@ std::vector<expression> revdiff_decompose_cse(std::vector<expression> &v_ex, std
 
 } // namespace
 
-std::vector<expression> revdiff_decompose(const expression &e)
+std::pair<std::vector<expression>, std::vector<expression>::size_type> revdiff_decompose(const expression &e)
 {
     // Determine the list of variables and params.
     const auto vars = get_variables(e);
@@ -324,8 +327,98 @@ std::vector<expression> revdiff_decompose(const expression &e)
 
 #endif
 
-    return ret;
+    return {std::move(ret), nvars + npars};
 }
+
+namespace
+{
+
+auto revdiff_make_adj_revdep(const std::vector<expression> &dc, std::vector<expression>::size_type nvars)
+{
+    assert(dc.size() >= 2u);
+    assert(nvars < dc.size());
+
+    using idx_t = std::vector<expression>::size_type;
+
+    // Do an initial pass to create the adjoints, the (unsorted)
+    // vectors of reverse dependencies and the substitution map.
+    std::vector<std::unordered_map<std::uint32_t, expression>> adj;
+    adj.resize(boost::numeric_cast<decltype(adj.size())>(dc.size()));
+
+    std::vector<std::vector<std::uint32_t>> revdep;
+    revdep.resize(boost::numeric_cast<decltype(revdep.size())>(dc.size()));
+
+    std::unordered_map<std::string, expression> subs_map;
+
+    for (idx_t i = 0; i < nvars; ++i) {
+        // NOTE: no adjoints or reverse dependencies needed for the initial definitions.
+        subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map));
+    }
+
+    for (idx_t i = nvars; i < dc.size(); ++i) {
+        auto &cur_adj_dict = adj[i];
+
+        for (const auto &var : get_variables(dc[i])) {
+            const auto idx = uname_to_index(var);
+
+            assert(cur_adj_dict.count(idx) == 0u);
+            cur_adj_dict[idx] = diff(dc[i], var);
+
+            assert(idx < revdep.size());
+            revdep[idx].push_back(boost::numeric_cast<std::uint32_t>(i));
+        }
+
+        subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map));
+    }
+
+    // Sort the vectors of reverse dependencies.
+    // NOTE: this is not strictly necessary for the correctness
+    // of the algorithm. It will just ensure that when we eventually
+    // compute the derivative of the output wrt a subexpression, the
+    // summation over the reverse dependencies happens in index order.
+    for (auto &rvec : revdep) {
+        std::sort(rvec.begin(), rvec.end());
+
+        // Check that there are no duplicates.
+        assert(std::adjacent_find(rvec.begin(), rvec.end()) == rvec.end());
+    }
+
+#if !defined(NDEBUG)
+
+    // Sanity checks in debug mode.
+    for (idx_t i = 0; i < nvars; ++i) {
+        // No adjoints for the vars/params definitions.
+        assert(adj[i].empty());
+
+        // Each var/param must be a dependency for some
+        // other subexpression.
+        assert(!revdep[i].empty());
+    }
+
+    for (idx_t i = nvars; i < dc.size() - 1u; ++i) {
+        // The only possibility for an adjoint dict to be empty
+        // is if all the subexpression arguments are numbers.
+        assert(!adj[i].empty() || get_variables(dc[i]).empty());
+
+        // Every subexpression apart from the last (i.e., the output)
+        // must be a dependency for some other subexpression.
+        assert(!revdep[i].empty());
+    }
+
+    // The last subexpression is the output: it must have only
+    // 1 element in the adjoints dict, that element must be the constant 1,
+    // and it cannot be the dependency for any other subexpression.
+    assert(adj.back().size() == 1u);
+    assert(adj.back().count(boost::numeric_cast<std::uint32_t>(dc.size() - 2u)) == 1u);
+    assert(adj.back().at(boost::numeric_cast<std::uint32_t>(dc.size() - 2u)) == 1_dbl);
+    assert(revdep.back().empty());
+
+#endif
+
+    return std::tuple{std::move(adj), std::move(revdep), std::move(subs_map)};
+}
+
+} // namespace
 
 // Implementation of reverse-mode differentiation.
 std::vector<expression> reverse_diff(const expression &e, const std::vector<expression> &args)
@@ -341,13 +434,98 @@ std::vector<expression> reverse_diff(const expression &e, const std::vector<expr
         return {args.size(), 0_dbl};
     }
 
-    return {};
+    // Run the decomposition.
+    const auto [dc, nvars] = revdiff_decompose(e);
+
+    // Create the adjoints, the reverse dependencies and the substitution map.
+    const auto [adj, revdep, subs_map] = revdiff_make_adj_revdep(dc, nvars);
+
+    // Create the list of derivatives of the output wrt every
+    // subexpression. Init the last element with the constant 1.
+    std::vector<expression> diffs(dc.size());
+    diffs.back() = 1_dbl;
+
+    // Fill in the remaining derivatives, including those wrt the
+    // original vars and params.
+    for (std::vector<expression>::size_type i = 1; i < dc.size(); ++i) {
+        // NOTE: iterate backwards (this is the reverse pass).
+        const auto cur_idx = dc.size() - 1u - i;
+
+        std::vector<expression> tmp_sum;
+        for (const auto rd_idx : revdep[cur_idx]) {
+            assert(rd_idx < diffs.size());
+            assert(rd_idx < adj.size());
+            // NOTE: the reverse dependency must point
+            // to a subexpression *after* the current one.
+            assert(rd_idx > cur_idx);
+
+            tmp_sum.push_back(diffs[rd_idx] * adj[rd_idx].at(boost::numeric_cast<std::uint32_t>(cur_idx)));
+        }
+
+        assert(!tmp_sum.empty());
+
+        diffs[cur_idx] = sum(std::move(tmp_sum));
+    }
+
+    // Create a dict mapping the vars/params in e to the derivatives
+    // wrt them.
+    std::unordered_map<expression, expression> diff_map;
+    for (std::vector<expression>::size_type i = 0; i < nvars; ++i) {
+        [[maybe_unused]] const auto [_, flag] = diff_map.try_emplace(dc[i], diffs[i]);
+        assert(flag);
+    }
+
+    // Assemble the return value.
+    std::vector<expression> retval;
+    retval.reserve(args.size());
+    for (const auto &diff_arg : args) {
+        if (auto it = diff_map.find(diff_arg); it != diff_map.end()) {
+            retval.push_back(subs(it->second, subs_map));
+        } else {
+            retval.push_back(0_dbl);
+        }
+    }
+
+    return retval;
 }
 
-} // namespace detail
-
-std::vector<expression> grad(const expression &e, const std::vector<expression> &args, diff_mode dm)
+std::vector<expression> grad_impl(const expression &e, diff_mode dm,
+                                  const std::variant<diff_args, std::vector<expression>> &d_args)
 {
+    // Extract/build the arguments.
+    std::vector<expression> args;
+
+    if (std::holds_alternative<std::vector<expression>>(d_args)) {
+        args = std::get<std::vector<expression>>(d_args);
+    } else {
+        switch (std::get<diff_args>(d_args)) {
+            case diff_args::all:
+                for (const auto &var : get_variables(e)) {
+                    args.emplace_back(var);
+                }
+
+                for (const auto &par : get_params(e)) {
+                    args.push_back(par);
+                }
+
+                break;
+            case diff_args::vars:
+                for (const auto &var : get_variables(e)) {
+                    args.emplace_back(var);
+                }
+
+                break;
+            case diff_args::params:
+                for (const auto &par : get_params(e)) {
+                    args.push_back(par);
+                }
+
+                break;
+            default:
+                throw std::invalid_argument("Invalid diff_args enumerator");
+        }
+    }
+
     // Handle empty args.
     if (args.empty()) {
         return {};
@@ -384,5 +562,7 @@ std::vector<expression> grad(const expression &e, const std::vector<expression> 
         return detail::reverse_diff(e, args);
     }
 }
+
+} // namespace detail
 
 HEYOKA_END_NAMESPACE

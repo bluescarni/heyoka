@@ -105,12 +105,11 @@ public:
 };
 
 HEYOKA_DLL_PUBLIC expression copy(const expression &);
+HEYOKA_DLL_PUBLIC std::vector<expression> copy(const std::vector<expression> &);
 
 namespace detail
 {
 
-// A couple of helpers for deep-copying containers of expressions.
-std::vector<expression> copy(const std::vector<expression> &);
 std::vector<std::pair<expression, expression>> copy(const std::vector<std::pair<expression, expression>> &);
 
 } // namespace detail
@@ -229,7 +228,10 @@ struct formatter<heyoka::expression> : heyoka::detail::ostream_formatter {
 HEYOKA_BEGIN_NAMESPACE
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const expression &);
+HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const std::vector<expression> &);
 HEYOKA_DLL_PUBLIC void rename_variables(expression &, const std::unordered_map<std::string, std::string> &);
+HEYOKA_DLL_PUBLIC void rename_variables(std::vector<expression> &,
+                                        const std::unordered_map<std::string, std::string> &);
 
 HEYOKA_DLL_PUBLIC expression operator+(expression);
 HEYOKA_DLL_PUBLIC expression operator-(expression);
@@ -356,21 +358,67 @@ HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<e
 
 enum class diff_mode { forward, reverse };
 
+enum class diff_args { vars, params, all };
+
 namespace detail
 {
 
 HEYOKA_DLL_PUBLIC expression diff(funcptr_map<expression> &, const expression &, const std::string &);
 HEYOKA_DLL_PUBLIC expression diff(funcptr_map<expression> &, const expression &, const param &);
-HEYOKA_DLL_PUBLIC std::vector<expression> revdiff_decompose(const expression &);
+
+HEYOKA_DLL_PUBLIC std::pair<std::vector<expression>, std::vector<expression>::size_type>
+revdiff_decompose(const expression &);
+
 std::vector<expression> reverse_diff(const expression &, const std::vector<expression> &);
+
+HEYOKA_DLL_PUBLIC std::vector<expression> grad_impl(const expression &, diff_mode,
+                                                    const std::variant<diff_args, std::vector<expression>> &);
 
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const param &, diff_mode = diff_mode::forward);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &, diff_mode = diff_mode::forward);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &, diff_mode = diff_mode::forward);
-HEYOKA_DLL_PUBLIC std::vector<expression> grad(const expression &, const std::vector<expression> &,
-                                               diff_mode = diff_mode::forward);
+
+namespace kw
+{
+
+IGOR_MAKE_NAMED_ARGUMENT(diff_mode);
+IGOR_MAKE_NAMED_ARGUMENT(diff_args);
+
+} // namespace kw
+
+template <typename... KwArgs>
+std::vector<expression> grad(const expression &e, KwArgs &&...kw_args)
+{
+    igor::parser p{kw_args...};
+
+    static_assert(!p.has_unnamed_arguments(), "The variadic arguments in grad() contain unnamed arguments.");
+
+    // Diff mode (defaults to reverse).
+    auto dm = [&p]() -> diff_mode {
+        if constexpr (p.has(kw::diff_mode)) {
+            return p(kw::diff_mode);
+        } else {
+            return diff_mode::reverse;
+        }
+    }();
+
+    // Variables and/or params wrt which the gradient will be computed.
+    // Defaults to all variables.
+    std::variant<diff_args, std::vector<expression>> d_args = diff_args::vars;
+    if constexpr (p.has(kw::diff_args)) {
+        if constexpr (std::is_same_v<detail::uncvref_t<decltype(p(kw::diff_args))>, diff_args>) {
+            d_args = p(kw::diff_args);
+        } else if constexpr (std::is_constructible_v<std::vector<expression>, decltype(p(kw::diff_args))>) {
+            d_args = std::vector<expression>(std::forward<decltype(p(kw::diff_args))>(p(kw::diff_args)));
+        } else {
+            static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the diff_args keyword argument");
+        }
+    }
+
+    return detail::grad_impl(e, dm, d_args);
+}
 
 HEYOKA_DLL_PUBLIC expression pairwise_prod(std::vector<expression>);
 
@@ -484,6 +532,7 @@ llvm::Value *cfunc_c_load_eval(llvm_state &, llvm::Type *, llvm::Value *, llvm::
 } // namespace detail
 
 std::optional<std::vector<expression>::size_type> decompose(const expression &, std::vector<expression> &);
+void decompose(std::vector<expression> &, std::vector<expression> &);
 
 HEYOKA_DLL_PUBLIC std::pair<std::vector<expression>, std::vector<expression>::size_type>
 function_decompose(const std::vector<expression> &);

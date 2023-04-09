@@ -761,11 +761,10 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
 {
     // Need to operate on copies due to in-place mutation
     // via rename_variables().
-    // NOTE: this is suboptimal, as expressions which are shared
-    // across different elements of v_ex/sv_funcs will be not shared any more
-    // after the copy.
-    auto v_ex = detail::copy(v_ex_);
-    auto sv_funcs = detail::copy(sv_funcs_);
+    // NOTE: here we are creating unnecessary copies of potentially
+    // shared subexpressions between v_ex_ and sv_funcs_.
+    auto v_ex = copy(v_ex_);
+    auto sv_funcs = copy(sv_funcs_);
 
     if (v_ex.empty()) {
         throw std::invalid_argument("Cannot decompose a system of zero equations");
@@ -816,8 +815,8 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
 
     // Store a copy of the original system and
     // sv_funcs for checking later.
-    auto orig_v_ex = detail::copy(v_ex);
-    auto orig_sv_funcs = detail::copy(sv_funcs);
+    auto orig_v_ex = copy(v_ex);
+    auto orig_sv_funcs = copy(sv_funcs);
 
 #endif
 
@@ -929,11 +928,13 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 {
     // Need to operate on copies due to in-place mutation
     // via rename_variables().
-    // NOTE: this is suboptimal, as expressions which are shared
-    // across different elements of sys/sv_funcs will be not shared any more
-    // after the copy.
+    // NOTE: several inefficiencies here: the copy
+    // on sys_ performs copies on individual expressions
+    // (thus duplicating common subexpressions), and
+    // common subexpressions between sys_ and sv_funcs_
+    // are also duplicated.
     auto sys = detail::copy(sys_);
-    auto sv_funcs = detail::copy(sv_funcs_);
+    auto sv_funcs = copy(sv_funcs_);
 
     if (sys.empty()) {
         throw std::invalid_argument("Cannot decompose a system of zero equations");
@@ -1038,7 +1039,7 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
         orig_rhs.push_back(copy(rhs_ex));
     }
 
-    auto orig_sv_funcs = detail::copy(sv_funcs);
+    auto orig_sv_funcs = copy(sv_funcs);
 
 #endif
 

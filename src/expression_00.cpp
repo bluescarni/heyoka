@@ -222,6 +222,20 @@ expression copy(const expression &e)
     return detail::copy_impl(func_map, e);
 }
 
+std::vector<expression> copy(const std::vector<expression> &v_ex)
+{
+    detail::funcptr_map<expression> func_map;
+
+    std::vector<expression> ret;
+    ret.reserve(v_ex.size());
+
+    for (const auto &ex : v_ex) {
+        ret.push_back(detail::copy_impl(func_map, ex));
+    }
+
+    return ret;
+}
+
 inline namespace literals
 {
 
@@ -304,7 +318,7 @@ namespace detail
 namespace
 {
 
-void get_variables(funcptr_set &func_set, std::set<std::string> &s_set, const expression &e)
+void get_variables(funcptr_set &func_set, std::unordered_set<std::string> &s_set, const expression &e)
 {
     std::visit(
         [&func_set, &s_set](const auto &arg) {
@@ -377,14 +391,32 @@ std::vector<std::string> get_variables(const expression &e)
 {
     detail::funcptr_set func_set;
 
-    // NOTE: it's probably better here to eventually
-    // change this to a fast unordered set, copy the items
-    // into a vector and sort it on output.
-    std::set<std::string> s_set;
+    std::unordered_set<std::string> s_set;
 
     detail::get_variables(func_set, s_set, e);
 
-    return {s_set.begin(), s_set.end()};
+    // Turn the set into an ordered vector.
+    std::vector retval(s_set.begin(), s_set.end());
+    std::sort(retval.begin(), retval.end());
+
+    return retval;
+}
+
+std::vector<std::string> get_variables(const std::vector<expression> &v_ex)
+{
+    detail::funcptr_set func_set;
+
+    std::unordered_set<std::string> s_set;
+
+    for (const auto &ex : v_ex) {
+        detail::get_variables(func_set, s_set, ex);
+    }
+
+    // Turn the set into an ordered vector.
+    std::vector retval(s_set.begin(), s_set.end());
+    std::sort(retval.begin(), retval.end());
+
+    return retval;
 }
 
 void rename_variables(expression &e, const std::unordered_map<std::string, std::string> &repl_map)
@@ -392,6 +424,15 @@ void rename_variables(expression &e, const std::unordered_map<std::string, std::
     detail::funcptr_set func_set;
 
     detail::rename_variables(func_set, e, repl_map);
+}
+
+void rename_variables(std::vector<expression> &v_ex, const std::unordered_map<std::string, std::string> &repl_map)
+{
+    detail::funcptr_set func_set;
+
+    for (auto &ex : v_ex) {
+        detail::rename_variables(func_set, ex, repl_map);
+    }
 }
 
 void swap(expression &ex0, expression &ex1) noexcept
@@ -1874,17 +1915,6 @@ bool is_time_dependent(funcptr_map<bool> &func_map, const expression &ex)
 
 } // namespace
 
-// A couple of helpers for deep-copying containers of expressions.
-std::vector<expression> copy(const std::vector<expression> &v_ex)
-{
-    std::vector<expression> ret;
-    ret.reserve(v_ex.size());
-
-    std::transform(v_ex.begin(), v_ex.end(), std::back_inserter(ret), [](const expression &e) { return copy(e); });
-
-    return ret;
-}
-
 std::vector<std::pair<expression, expression>> copy(const std::vector<std::pair<expression, expression>> &v)
 {
     std::vector<std::pair<expression, expression>> ret;
@@ -2285,28 +2315,57 @@ std::optional<std::vector<expression>::size_type> decompose(const expression &ex
     return detail::decompose(func_map, ex, dc);
 }
 
+void decompose(std::vector<expression> &v_ex, std::vector<expression> &dc)
+{
+    detail::funcptr_map<std::vector<expression>::size_type> func_map;
+
+    for (auto &ex : v_ex) {
+        const auto dres = detail::decompose(func_map, ex, dc);
+
+        if (dres) {
+            // NOTE: if the component was decomposed
+            // (that is, it is not constant or a single variable),
+            // we have to update the original definition
+            // of the component in v_ex
+            // so that it points to the u variable
+            // that now represents it.
+            // NOTE: all functions are forced to return
+            // a non-empty dres
+            // in the func API, so the only entities that
+            // can return an empty dres are const/params or
+            // variables.
+            ex = expression{fmt::format("u_{}", *dres)};
+        } else {
+            assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
+                   || std::holds_alternative<param>(ex.value()));
+        }
+    }
+}
+
 // Decomposition with automatic deduction of variables.
 std::pair<std::vector<expression>, std::vector<expression>::size_type>
 function_decompose(const std::vector<expression> &v_ex_)
 {
-    // Need to operate on a copy due to in-place mutation
-    // via rename_variables().
-    // NOTE: this is suboptimal, as expressions which are shared
-    // across different elements of v_ex will be not shared any more
-    // after the copy.
-    auto v_ex = detail::copy(v_ex_);
-
-    if (v_ex.empty()) {
+    if (v_ex_.empty()) {
         throw std::invalid_argument("Cannot decompose a function with no outputs");
     }
 
+    spdlog::stopwatch sw;
+
+    // Need to operate on a copy due to in-place mutation
+    // via rename_variables().
+    auto v_ex = copy(v_ex_);
+
+    detail::get_logger()->trace("function decomposition copy runtime: {}", sw);
+
+    sw.reset();
+
     // Determine the variables.
-    std::set<std::string> vars;
-    for (const auto &ex : v_ex) {
-        for (const auto &var : get_variables(ex)) {
-            vars.emplace(var);
-        }
-    }
+    const auto vars = get_variables(v_ex);
+
+    detail::get_logger()->trace("function decomposition identify variables runtime: {}", sw);
+
+    sw.reset();
 
     // Cache the number of variables.
     const auto nvars = vars.size();
@@ -2328,14 +2387,20 @@ function_decompose(const std::vector<expression> &v_ex_)
 #if !defined(NDEBUG)
 
     // Store a copy of the original function for checking later.
-    auto orig_v_ex = detail::copy(v_ex);
+    auto orig_v_ex = copy(v_ex);
 
 #endif
 
+    detail::get_logger()->trace("function decomposition repl map creation runtime: {}", sw);
+
+    sw.reset();
+
     // Rename the variables in the original function.
-    for (auto &ex : v_ex) {
-        rename_variables(ex, repl_map);
-    }
+    rename_variables(v_ex, repl_map);
+
+    detail::get_logger()->trace("function decomposition variable rename runtime: {}", sw);
+
+    sw.reset();
 
     // Init the decomposition. It begins with a list
     // of the original variables of the function.
@@ -2345,30 +2410,8 @@ function_decompose(const std::vector<expression> &v_ex_)
         ret.emplace_back(var);
     }
 
-    // Log the construction runtime in trace mode.
-    spdlog::stopwatch sw;
-
     // Run the decomposition on each component of the function.
-    for (auto &ex : v_ex) {
-        // Decompose the current component.
-        if (const auto dres = decompose(ex, ret)) {
-            // NOTE: if the component was decomposed
-            // (that is, it is not constant or a single variable),
-            // we have to update the original definition
-            // of the component in v_ex
-            // so that it points to the u variable
-            // that now represents it.
-            // NOTE: all functions are forced to return
-            // a non-empty dres
-            // in the func API, so the only entities that
-            // can return an empty dres are const/params or
-            // variables.
-            ex = expression{fmt::format("u_{}", *dres)};
-        } else {
-            assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
-                   || std::holds_alternative<param>(ex.value()));
-        }
-    }
+    decompose(v_ex, ret);
 
     // Append the definitions of the outputs
     // in terms of u variables or numbers/params.
@@ -2420,10 +2463,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
 {
     // Need to operate on copies due to in-place mutation
     // via rename_variables().
-    // NOTE: this is suboptimal, as expressions which are shared
-    // across different elements of v_ex will be not shared any more
-    // after the copy.
-    auto v_ex = detail::copy(v_ex_);
+    auto v_ex = copy(v_ex_);
 
     if (v_ex.empty()) {
         throw std::invalid_argument("Cannot decompose a function with no outputs");
@@ -2494,7 +2534,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
 #if !defined(NDEBUG)
 
     // Store a copy of the original function for checking later.
-    auto orig_v_ex = detail::copy(v_ex);
+    auto orig_v_ex = copy(v_ex);
 
 #endif
 
