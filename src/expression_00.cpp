@@ -1309,36 +1309,28 @@ expression diff(funcptr_map<expression> &func_map, const expression &e, const pa
 
 } // namespace detail
 
-expression diff(const expression &e, const std::string &s, diff_mode dm)
+expression diff(const expression &e, const std::string &s)
 {
-    if (dm == diff_mode::forward) {
-        detail::funcptr_map<expression> func_map;
+    detail::funcptr_map<expression> func_map;
 
-        return detail::diff(func_map, e, s);
-    } else {
-        return detail::reverse_diff(e, {expression{s}})[0];
-    }
+    return detail::diff(func_map, e, s);
 }
 
-expression diff(const expression &e, const param &p, diff_mode dm)
+expression diff(const expression &e, const param &p)
 {
-    if (dm == diff_mode::forward) {
-        detail::funcptr_map<expression> func_map;
+    detail::funcptr_map<expression> func_map;
 
-        return detail::diff(func_map, e, p);
-    } else {
-        return detail::reverse_diff(e, {expression{p}})[0];
-    }
+    return detail::diff(func_map, e, p);
 }
 
-expression diff(const expression &e, const expression &x, diff_mode dm)
+expression diff(const expression &e, const expression &x)
 {
     return std::visit(
         [&](const auto &v) -> expression {
             if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
-                return diff(e, v.name(), dm);
+                return diff(e, v.name());
             } else if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, param>) {
-                return diff(e, v, dm);
+                return diff(e, v);
             } else {
                 throw std::invalid_argument(
                     "Derivatives are currently supported only with respect to variables and parameters");

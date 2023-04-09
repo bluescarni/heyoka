@@ -489,8 +489,7 @@ std::vector<expression> reverse_diff(const expression &e, const std::vector<expr
     return retval;
 }
 
-std::vector<expression> grad_impl(const expression &e, diff_mode dm,
-                                  const std::variant<diff_args, std::vector<expression>> &d_args)
+std::vector<expression> grad_impl(const expression &e, const std::variant<diff_args, std::vector<expression>> &d_args)
 {
     // Extract/build the arguments.
     std::vector<expression> args;
@@ -547,20 +546,7 @@ std::vector<expression> grad_impl(const expression &e, diff_mode dm,
                                     "gradient is to be computed");
     }
 
-    if (dm == diff_mode::forward) {
-        std::vector<expression> retval;
-        retval.reserve(args.size());
-
-        // NOTE: this can clearly be easily parallelised,
-        // if needed.
-        for (const auto &arg : args) {
-            retval.push_back(diff(e, arg));
-        }
-
-        return retval;
-    } else {
-        return detail::reverse_diff(e, args);
-    }
+    return detail::reverse_diff(e, args);
 }
 
 } // namespace detail

@@ -56,6 +56,8 @@ TEST_CASE("revdiff basic")
     // fmt::print("{}\n", grad(x + y, {x, y}, diff_mode::reverse));
 }
 
+#if 0
+
 TEST_CASE("speelpenning")
 {
     fmt::print("Speelpenning's example\n");
@@ -104,3 +106,5 @@ TEST_CASE("speelpenning")
         }
     }
 }
+
+#endif

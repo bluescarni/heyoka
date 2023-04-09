@@ -356,8 +356,6 @@ HEYOKA_DLL_PUBLIC std::size_t get_n_nodes(const expression &);
 HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &);
 HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<expression, expression> &);
 
-enum class diff_mode { forward, reverse };
-
 enum class diff_args { vars, params, all };
 
 namespace detail
@@ -371,19 +369,18 @@ revdiff_decompose(const expression &);
 
 std::vector<expression> reverse_diff(const expression &, const std::vector<expression> &);
 
-HEYOKA_DLL_PUBLIC std::vector<expression> grad_impl(const expression &, diff_mode,
+HEYOKA_DLL_PUBLIC std::vector<expression> grad_impl(const expression &,
                                                     const std::variant<diff_args, std::vector<expression>> &);
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression diff(const expression &, const param &, diff_mode = diff_mode::forward);
-HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &, diff_mode = diff_mode::forward);
-HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &, diff_mode = diff_mode::forward);
+HEYOKA_DLL_PUBLIC expression diff(const expression &, const param &);
+HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
+HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &);
 
 namespace kw
 {
 
-IGOR_MAKE_NAMED_ARGUMENT(diff_mode);
 IGOR_MAKE_NAMED_ARGUMENT(diff_args);
 
 } // namespace kw
@@ -395,16 +392,7 @@ std::vector<expression> grad(const expression &e, KwArgs &&...kw_args)
 
     static_assert(!p.has_unnamed_arguments(), "The variadic arguments in grad() contain unnamed arguments.");
 
-    // Diff mode (defaults to reverse).
-    auto dm = [&p]() -> diff_mode {
-        if constexpr (p.has(kw::diff_mode)) {
-            return p(kw::diff_mode);
-        } else {
-            return diff_mode::reverse;
-        }
-    }();
-
-    // Variables and/or params wrt which the gradient will be computed.
+    // Variables and/or params wrt which the derivatives will be computed.
     // Defaults to all variables.
     std::variant<diff_args, std::vector<expression>> d_args = diff_args::vars;
     if constexpr (p.has(kw::diff_args)) {
@@ -417,7 +405,7 @@ std::vector<expression> grad(const expression &e, KwArgs &&...kw_args)
         }
     }
 
-    return detail::grad_impl(e, dm, d_args);
+    return detail::grad_impl(e, d_args);
 }
 
 HEYOKA_DLL_PUBLIC expression pairwise_prod(std::vector<expression>);
