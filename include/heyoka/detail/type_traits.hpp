@@ -12,8 +12,6 @@
 #include <heyoka/config.hpp>
 
 #include <initializer_list>
-#include <string>
-#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -125,30 +123,6 @@ struct is_any_ilist<std::initializer_list<T>> : std::true_type {
 
 template <typename T>
 inline constexpr bool is_any_ilist_v = is_any_ilist<T>::value;
-
-// NOTE: remove_pointer_t removes the top level qualifiers of the pointer as well:
-// http://en.cppreference.com/w/cpp/types/remove_pointer
-// After removal of pointer, we could still have a type which is cv qualified. Thus,
-// we remove cv qualifications after pointer removal.
-template <typename T>
-using is_char_pointer
-    = std::conjunction<std::is_pointer<T>, std::is_same<std::remove_cv_t<std::remove_pointer_t<T>>, char>>;
-
-// This type trait is satisfied by C++ string-like types. Specifically, the type trait will be true if T, after the
-// removal of cv qualifiers, is one of the following types:
-// - std::string,
-// - a pointer to (possibly cv qualified) char,
-// - a char array of any size,
-// - std::string_view.
-template <typename T>
-using is_string_type = std::disjunction<
-    std::is_same<std::remove_cv_t<T>, std::string>, is_char_pointer<T>,
-    // NOTE: std::remove_cv_t does remove cv qualifiers from arrays.
-    std::conjunction<std::is_array<std::remove_cv_t<T>>, std::is_same<std::remove_extent_t<std::remove_cv_t<T>>, char>>,
-    std::is_same<std::remove_cv_t<T>, std::string_view>>;
-
-template <typename T>
-inline constexpr bool is_string_type_v = is_string_type<T>::value;
 
 } // namespace detail
 
