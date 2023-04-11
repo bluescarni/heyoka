@@ -1929,11 +1929,6 @@ std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vec
     }
 }
 
-namespace
-{
-
-#if !defined(NDEBUG)
-
 // Helper to verify a function decomposition.
 void verify_function_dec(const std::vector<expression> &orig, const std::vector<expression> &dc,
                          std::vector<expression>::size_type nvars)
@@ -1978,16 +1973,16 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
     }
 
     // From dc.size() - nouts to dc.size(), the expressions
-    // must be either variables in the u_n form, where n < i,
+    // must be either variables in the u_n form, where n < dc.size() - nouts,
     // or numbers/params.
     for (auto i = dc.size() - nouts; i < dc.size(); ++i) {
         std::visit(
-            [i](const auto &v) {
+            [&dc, nouts](const auto &v) {
                 using type = uncvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, variable>) {
                     assert(v.name().rfind("u_", 0) == 0);
-                    assert(uname_to_index(v.name()) < i);
+                    assert(uname_to_index(v.name()) < dc.size() - nouts);
                 } else if constexpr (!std::is_same_v<type, number> && !std::is_same_v<type, param>) {
                     assert(false); // LCOV_EXCL_LINE
                 }
@@ -2010,8 +2005,6 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
         assert(subs(dc[i], subs_map) == orig[i - (dc.size() - nouts)]);
     }
 }
-
-#endif
 
 // Simplify a function decomposition by removing
 // common subexpressions.
@@ -2114,8 +2107,6 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex, st
 
     return retval;
 }
-
-} // namespace
 
 // Perform a topological sort on a graph representation
 // of a function decomposition. This can improve performance

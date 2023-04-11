@@ -676,16 +676,16 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
     }
 
     // From dc.size() - n_eq to dc.size(), the expressions
-    // must be either variables in the u_n form, where n < i,
+    // must be either variables in the u_n form, where n < dc.size() - n_eq,
     // or numbers/params.
     for (auto i = dc.size() - n_eq; i < dc.size(); ++i) {
         std::visit(
-            [i](const auto &v) {
+            [&dc, n_eq](const auto &v) {
                 using type = detail::uncvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, variable>) {
                     assert(v.name().rfind("u_", 0) == 0);
-                    assert(uname_to_index(v.name()) < i);
+                    assert(uname_to_index(v.name()) < dc.size() - n_eq);
                 } else if constexpr (!std::is_same_v<type, number> && !std::is_same_v<type, param>) {
                     assert(false);
                 }
