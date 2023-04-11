@@ -2402,7 +2402,7 @@ function_decompose(const std::vector<expression> &v_ex_)
         ret.emplace_back(var);
     }
 
-    // Run the decomposition on each component of the function.
+    // Run the decomposition.
     decompose(v_ex, ret);
 
     // Append the definitions of the outputs
