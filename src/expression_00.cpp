@@ -1931,7 +1931,10 @@ std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vec
 
 // Helper to verify a function decomposition.
 void verify_function_dec(const std::vector<expression> &orig, const std::vector<expression> &dc,
-                         std::vector<expression>::size_type nvars)
+                         std::vector<expression>::size_type nvars,
+                         // NOTE: this flags establishes if parameters are allowed
+                         // in the initial definitions of the u variables.
+                         bool allow_pars)
 {
     using idx_t = std::vector<expression>::size_type;
 
@@ -1941,9 +1944,10 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
     assert(dc.size() >= nouts);
 
     // The first nvars expressions of u variables
-    // must be just variables.
+    // must be just variables or possibly parameters.
     for (idx_t i = 0; i < nvars; ++i) {
-        assert(std::holds_alternative<variable>(dc[i].value()));
+        assert(std::holds_alternative<variable>(dc[i].value())
+               || (allow_pars && std::holds_alternative<param>(dc[i].value())));
     }
 
     // From nvars to dc.size() - nouts, the expressions
@@ -2041,7 +2045,6 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex, st
     // The first nvars definitions are just renaming
     // of the original variables into u variables.
     for (idx_t i = 0; i < nvars; ++i) {
-        assert(std::holds_alternative<variable>(v_ex[i].value()));
         retval.push_back(std::move(v_ex[i]));
 
         // NOTE: the u vars that correspond to the original
