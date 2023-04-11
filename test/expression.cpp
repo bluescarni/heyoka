@@ -1973,7 +1973,7 @@ TEST_CASE("output too long")
 
 TEST_CASE("get_params")
 {
-    REQUIRE(get_params({}).empty());
+    REQUIRE(get_params(expression{}).empty());
     REQUIRE(get_params("x"_var).empty());
     REQUIRE(get_params("x"_var + "y"_var).empty());
     REQUIRE(get_params(par[0]) == std::vector{par[0]});
