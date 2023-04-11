@@ -1553,6 +1553,21 @@ expression subs(const expression &e, const std::unordered_map<std::string, expre
     return detail::subs(func_map, e, smap);
 }
 
+std::vector<expression> subs(const std::vector<expression> &v_ex,
+                             const std::unordered_map<std::string, expression> &smap)
+{
+    detail::funcptr_map<expression> func_map;
+
+    std::vector<expression> ret;
+    ret.reserve(v_ex.size());
+
+    for (const auto &e : v_ex) {
+        ret.push_back(detail::subs(func_map, e, smap));
+    }
+
+    return ret;
+}
+
 namespace detail
 {
 
@@ -1617,6 +1632,21 @@ expression subs(const expression &e, const std::unordered_map<expression, expres
     detail::funcptr_map<expression> func_map;
 
     return detail::subs(func_map, e, smap);
+}
+
+std::vector<expression> subs(const std::vector<expression> &v_ex,
+                             const std::unordered_map<expression, expression> &smap)
+{
+    detail::funcptr_map<expression> func_map;
+
+    std::vector<expression> ret;
+    ret.reserve(v_ex.size());
+
+    for (const auto &e : v_ex) {
+        ret.push_back(detail::subs(func_map, e, smap));
+    }
+
+    return ret;
 }
 
 namespace detail
@@ -1993,6 +2023,30 @@ std::vector<expression> get_params(const expression &ex)
     // Write the indices of all parameters appearing in ex
     // into idx_set.
     detail::get_params(idx_set, func_set, ex);
+
+    // Transform idx_set into a sorted vector.
+    std::vector<std::uint32_t> idx_vec(idx_set.begin(), idx_set.end());
+    std::sort(idx_vec.begin(), idx_vec.end());
+
+    // Transform the sorted indices into a vector of
+    // sorted parameter expressions.
+    std::vector<expression> retval;
+    retval.reserve(static_cast<decltype(retval.size())>(idx_vec.size()));
+    std::transform(idx_vec.begin(), idx_vec.end(), std::back_inserter(retval), [](auto idx) { return par[idx]; });
+
+    return retval;
+}
+
+std::vector<expression> get_params(const std::vector<expression> &v_ex)
+{
+    std::unordered_set<std::uint32_t> idx_set;
+    detail::funcptr_set func_set;
+
+    // Write the indices of all parameters appearing in v_ex
+    // into idx_set.
+    for (const auto &e : v_ex) {
+        detail::get_params(idx_set, func_set, e);
+    }
 
     // Transform idx_set into a sorted vector.
     std::vector<std::uint32_t> idx_vec(idx_set.begin(), idx_set.end());
