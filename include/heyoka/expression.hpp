@@ -357,8 +357,8 @@ HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<e
 namespace detail
 {
 
-HEYOKA_DLL_PUBLIC expression diff(funcptr_map<expression> &, const expression &, const std::string &);
-HEYOKA_DLL_PUBLIC expression diff(funcptr_map<expression> &, const expression &, const param &);
+expression diff(funcptr_map<expression> &, const expression &, const std::string &);
+expression diff(funcptr_map<expression> &, const expression &, const param &);
 
 } // namespace detail
 
