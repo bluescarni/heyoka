@@ -101,12 +101,16 @@ TEST_CASE("speelpenning")
         auto dc_reverse = add_cfunc<double>(s, "f_reverse", diff_tensors({prod}, kw::diff_order = 1).get_tensors()[1],
                                             kw::compact_mode = true);
 
+        std::cout << std::endl;
+
         fmt::print("nvars={:<5} decomposition size={:<6}\n", nvars, dc_reverse.size() - nvars - nvars);
+
+        std::cout << "IR BEFORE OPTIMIZATION" << std::endl;
+        std::cout << s.get_ir() << std::endl;
 
         s.optimise();
 
-        std::cout << "optimised!!!" << std::endl;
-
+        std::cout << "IR AFTER OPTIMIZATION" << std::endl;
         std::cout << s.get_ir() << std::endl;
 
         s.compile();
