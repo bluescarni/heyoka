@@ -1013,8 +1013,8 @@ void llvm_state::optimise()
 
         // NOTE: this additional pass measurably helps performance
         // in some benchmarks when dense output is activated.
-        PB.registerVectorizerStartEPCallback(
-            [](llvm::FunctionPassManager &FPM, olevel) { FPM.addPass(llvm::LoadStoreVectorizerPass()); });
+        // PB.registerVectorizerStartEPCallback(
+        //     [](llvm::FunctionPassManager &FPM, olevel) { FPM.addPass(llvm::LoadStoreVectorizerPass()); });
 
         // Register all the basic analyses with the managers.
         PB.registerModuleAnalyses(MAM);
