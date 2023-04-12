@@ -379,7 +379,7 @@ HEYOKA_DLL_PUBLIC std::pair<std::vector<expression>, std::vector<expression>::si
 revdiff_decompose(const std::vector<expression> &);
 
 // NOTE: the implementation of diff_tensors() happens in
-// two stages, the second function needs to be declared here because
+// two stages. The second function needs to be declared here because
 // it must be a friend of dtens::impl.
 HEYOKA_DLL_PUBLIC dtens diff_tensors_impl(const std::vector<expression> &,
                                           const std::variant<diff_args, std::vector<expression>> &, std::uint32_t);
