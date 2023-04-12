@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <ostream>
 #include <sstream>
@@ -27,6 +28,8 @@
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/core.h>
 
@@ -362,19 +365,25 @@ HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
 
 enum class diff_args { vars, params, all };
 
+// Fwd declaration.
+class HEYOKA_DLL_PUBLIC dtens;
+
 namespace detail
 {
 
 HEYOKA_DLL_PUBLIC expression diff(funcptr_map<expression> &, const expression &, const std::string &);
 HEYOKA_DLL_PUBLIC expression diff(funcptr_map<expression> &, const expression &, const param &);
 
+// NOTE: public only for testing purposes.
 HEYOKA_DLL_PUBLIC std::pair<std::vector<expression>, std::vector<expression>::size_type>
-revdiff_decompose(const expression &);
+revdiff_decompose(const std::vector<expression> &);
 
-std::vector<expression> reverse_diff(const expression &, const std::vector<expression> &);
-
-HEYOKA_DLL_PUBLIC std::vector<expression> grad_impl(const expression &,
-                                                    const std::variant<diff_args, std::vector<expression>> &);
+// NOTE: the implementation of diff_tensors() happens in
+// two stages, the second function needs to be declared here because
+// it must be a friend of dtens::impl.
+HEYOKA_DLL_PUBLIC dtens diff_tensors_impl(const std::vector<expression> &,
+                                          const std::variant<diff_args, std::vector<expression>> &, std::uint32_t);
+dtens diff_tensors_impl2(const std::vector<expression> &, const std::vector<expression> &, std::uint32_t);
 
 } // namespace detail
 
@@ -386,15 +395,39 @@ namespace kw
 {
 
 IGOR_MAKE_NAMED_ARGUMENT(diff_args);
+IGOR_MAKE_NAMED_ARGUMENT(diff_order);
 
 } // namespace kw
 
+class HEYOKA_DLL_PUBLIC dtens
+{
+    friend dtens detail::diff_tensors_impl2(const std::vector<expression> &, const std::vector<expression> &,
+                                            std::uint32_t);
+
+    struct impl;
+
+    std::unique_ptr<impl> p_impl;
+
+    explicit dtens(impl);
+
+public:
+    dtens();
+    dtens(const dtens &);
+    dtens(dtens &&) noexcept;
+    dtens &operator=(const dtens &);
+    dtens &operator=(dtens &&) noexcept;
+    ~dtens();
+
+    [[nodiscard]] const std::vector<std::vector<expression>> &get_tensors() const;
+    [[nodiscard]] const expression &operator[](const std::vector<std::uint32_t> &) const;
+};
+
 template <typename... KwArgs>
-std::vector<expression> grad(const expression &e, KwArgs &&...kw_args)
+dtens diff_tensors(const std::vector<expression> &v_ex, KwArgs &&...kw_args)
 {
     igor::parser p{kw_args...};
 
-    static_assert(!p.has_unnamed_arguments(), "The variadic arguments in grad() contain unnamed arguments.");
+    static_assert(!p.has_unnamed_arguments(), "diff_tensors() accepts only named arguments in the variadic pack.");
 
     // Variables and/or params wrt which the derivatives will be computed.
     // Defaults to all variables.
@@ -405,11 +438,22 @@ std::vector<expression> grad(const expression &e, KwArgs &&...kw_args)
         } else if constexpr (std::is_constructible_v<std::vector<expression>, decltype(p(kw::diff_args))>) {
             d_args = std::vector<expression>(std::forward<decltype(p(kw::diff_args))>(p(kw::diff_args)));
         } else {
-            static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the diff_args keyword argument");
+            static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the diff_args keyword argument.");
         }
     }
 
-    return detail::grad_impl(e, d_args);
+    // Order of derivatives. Defaults to 1.
+    std::uint32_t order = 1;
+    if constexpr (p.has(kw::diff_order)) {
+        if constexpr (std::is_integral_v<detail::uncvref_t<decltype(p(kw::diff_order))>>) {
+            order = boost::numeric_cast<std::uint32_t>(p(kw::diff_order));
+        } else {
+            static_assert(detail::always_false_v<KwArgs...>,
+                          "The diff_order keyword argument must be of integral type.");
+        }
+    }
+
+    return detail::diff_tensors_impl(v_ex, d_args, order);
 }
 
 HEYOKA_DLL_PUBLIC expression pairwise_prod(std::vector<expression>);

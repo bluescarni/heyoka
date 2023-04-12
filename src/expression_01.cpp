@@ -9,19 +9,25 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <variant>
 #include <vector>
 
+#include <boost/container_hash/hash.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/core.h>
+#include <fmt/ranges.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/logging_impl.hpp>
@@ -39,192 +45,19 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-namespace
-{
-
-#if !defined(NDEBUG)
-
-// Helper to verify a revdiff decomposition.
-// NOTE: here nvars refers to the total number of variables
-// *and* params in orig.
-void verify_revdiff_dec(const expression &orig, const std::vector<expression> &dc,
-                        std::vector<expression>::size_type nvars)
-{
-    assert(!dc.empty());
-
-    using idx_t = std::vector<expression>::size_type;
-
-    // The first nvars expressions must be just variables or params.
-    for (idx_t i = 0; i < nvars; ++i) {
-        assert(std::holds_alternative<variable>(dc[i].value()) || std::holds_alternative<param>(dc[i].value()));
-    }
-
-    // From nvars to dc.size() - 1, the expressions
-    // must be functions whose arguments
-    // are either variables in the u_n form,
-    // where n < i, or numbers.
-    // NOTE: arguments cannot be params because these
-    // were turned into variables previously.
-    for (auto i = nvars; i < dc.size() - 1u; ++i) {
-        std::visit(
-            [i](const auto &v) {
-                using type = uncvref_t<decltype(v)>;
-
-                if constexpr (std::is_same_v<type, func>) {
-                    for (const auto &arg : v.args()) {
-                        if (auto *p_var = std::get_if<variable>(&arg.value())) {
-                            assert(p_var->name().rfind("u_", 0) == 0);
-                            assert(uname_to_index(p_var->name()) < i);
-                        } else {
-                            assert(std::holds_alternative<number>(arg.value()));
-                        }
-                    }
-                } else {
-                    assert(false); // LCOV_EXCL_LINE
-                }
-            },
-            dc[i].value());
-    }
-
-    // The last element of the decomposition must be
-    // a variable in the u_n form.
-    // NOTE: the last element cannot be a number because
-    // this special case has been dealt with previously.
-    std::visit(
-        [&dc](const auto &v) {
-            using type = uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, variable>) {
-                assert(v.name().rfind("u_", 0) == 0);
-                assert(uname_to_index(v.name()) < dc.size() - 1u);
-            } else {
-                assert(false); // LCOV_EXCL_LINE
-            }
-        },
-        dc.back().value());
-
-    std::unordered_map<std::string, expression> subs_map;
-
-    // For each u variable, expand its definition
-    // in terms of the original variables or other u variables,
-    // and store it in subs_map.
-    for (idx_t i = 0; i < dc.size() - 1u; ++i) {
-        subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map));
-    }
-
-    // Reconstruct the expression and compare it to the original one.
-    assert(subs(dc.back(), subs_map) == orig);
-}
-
-#endif
-
-// Simplify a revdiff decomposition by removing
-// common subexpressions.
-// NOTE: here nvars refers to the total number of variables
-// *and* params.
-std::vector<expression> revdiff_decompose_cse(std::vector<expression> &v_ex, std::vector<expression>::size_type nvars)
-{
-    using idx_t = std::vector<expression>::size_type;
-
-    // Log runtime in trace mode.
-    spdlog::stopwatch sw;
-
-    // Cache the original size for logging later.
-    const auto orig_size = v_ex.size();
-
-    // A function decomposition is supposed
-    // to have nvars variables + params at the beginning,
-    // 1 variable at the end and possibly
-    // extra variables in the middle.
-    assert(v_ex.size() >= nvars + 1u);
-
-    // Init the return value.
-    std::vector<expression> retval;
-
-    // expression -> idx map. This will end up containing
-    // all the unique expressions from v_ex, and it will
-    // map them to their indices in retval (which will
-    // in general differ from their indices in v_ex).
-    std::unordered_map<expression, idx_t> ex_map;
-
-    // Map for the renaming of u variables
-    // in the expressions.
-    std::unordered_map<std::string, std::string> uvars_rename;
-
-    // The first nvars definitions are just renaming
-    // of the original variables/params into u variables.
-    for (idx_t i = 0; i < nvars; ++i) {
-        assert(std::holds_alternative<variable>(v_ex[i].value()) || std::holds_alternative<param>(v_ex[i].value()));
-        retval.push_back(std::move(v_ex[i]));
-
-        // NOTE: the u vars that correspond to the original
-        // variables/params are never simplified,
-        // thus map them onto themselves.
-        [[maybe_unused]] const auto res = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", i));
-        assert(res.second);
-    }
-
-    // Handle the u variables which do not correspond to the original variables/params.
-    for (auto i = nvars; i < v_ex.size() - 1u; ++i) {
-        auto &ex = v_ex[i];
-
-        // Rename the u variables in ex.
-        rename_variables(ex, uvars_rename);
-
-        if (auto it = ex_map.find(ex); it == ex_map.end()) {
-            // This is the first occurrence of ex in the
-            // decomposition. Add it to retval.
-            retval.push_back(ex);
-
-            // Add ex to ex_map, mapping it to
-            // the index it corresponds to in retval
-            // (let's call it j).
-            ex_map.emplace(std::move(ex), retval.size() - 1u);
-
-            // Update uvars_rename. This will ensure that
-            // occurrences of the variable 'u_i' in the next
-            // elements of v_ex will be renamed to 'u_j'.
-            [[maybe_unused]] const auto res
-                = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", retval.size() - 1u));
-            assert(res.second);
-        } else {
-            // ex is redundant. This means
-            // that it already appears in retval at index
-            // it->second. Don't add anything to retval,
-            // and remap the variable name 'u_i' to
-            // 'u_{it->second}'.
-            [[maybe_unused]] const auto res
-                = uvars_rename.emplace(fmt::format("u_{}", i), fmt::format("u_{}", it->second));
-            assert(res.second); // LCOV_EXCL_LINE
-        }
-    }
-
-    // Handle the last element of the decomposition. We just need to
-    // adjust the u index.
-    // NOTE: the last element can be only a variable - params were turned
-    // into variables and the special case of a number expression was dealt
-    // with previously.
-    assert(std::holds_alternative<variable>(v_ex.back().value()));
-    rename_variables(v_ex.back(), uvars_rename);
-
-    retval.push_back(std::move(v_ex.back()));
-
-    get_logger()->debug("revdiff CSE reduced decomposition size from {} to {}", orig_size, retval.size());
-    get_logger()->trace("revdiff CSE runtime: {}", sw);
-
-    return retval;
-}
-
-} // namespace
-
-std::pair<std::vector<expression>, std::vector<expression>::size_type> revdiff_decompose(const expression &e)
+std::pair<std::vector<expression>, std::vector<expression>::size_type>
+revdiff_decompose(const std::vector<expression> &v_ex_)
 {
     // Determine the list of variables and params.
-    const auto vars = get_variables(e);
+    const auto vars = get_variables(v_ex_);
     const auto nvars = vars.size();
 
-    const auto params = get_params(e);
+    const auto params = get_params(v_ex_);
     const auto npars = params.size();
+
+    // Cache the number of outputs.
+    const auto nouts = v_ex_.size();
+    assert(nouts > 0u);
 
     // Create the map for renaming variables and params to u_i.
     // The variables will precede the params. The renaming will be
@@ -250,47 +83,38 @@ std::pair<std::vector<expression>, std::vector<expression>::size_type> revdiff_d
 #if !defined(NDEBUG)
 
     // Store a copy of the original function for checking later.
-    auto orig_ex = copy(e);
+    auto orig_v_ex = copy(v_ex_);
 
 #endif
 
     // Rename variables and params.
-    // NOTE: this creates a new deep copy of e.
-    auto ex = subs(e, repl_map);
+    // NOTE: this creates a new deep copy of v_ex_.
+    auto v_ex = subs(v_ex_, repl_map);
 
     // Init the decomposition. It begins with a list
     // of the original variables and params of the function.
     std::vector<expression> ret;
     ret.reserve(boost::safe_numerics::safe<decltype(ret.size())>(nvars) + npars);
     for (const auto &var : vars) {
+        // NOTE: transform into push_back() once get_variables() returns
+        // expressions rather than strings.
         ret.emplace_back(var);
     }
     for (const auto &par : params) {
-        ret.emplace_back(par);
+        ret.push_back(par);
     }
 
     // Log the construction runtime in trace mode.
     spdlog::stopwatch sw;
 
     // Run the decomposition.
-    if (const auto dres = decompose(ex, ret)) {
-        // NOTE: if the expression was decomposed
-        // we have to update the original definition of ex
-        // so that it points to the u variable
-        // that now represents it.
-        // NOTE: all functions are forced to return
-        // a non-empty dres in the func API.
-        ex = expression{fmt::format("u_{}", *dres)};
-    } else {
-        // NOTE: ex can only be a variable because the case in which
-        // ex is a number was handled at the beginning of this function,
-        // and if e was originally a param, it was turned into
-        // a variable when invoking subs() earlier.
-        assert(std::holds_alternative<variable>(ex.value()));
-    }
+    decompose(v_ex, ret);
 
-    // Append the definition of ex
-    ret.emplace_back(std::move(ex));
+    // Append the definitions of the outputs
+    // in terms of u variables or numbers.
+    for (auto &ex : v_ex) {
+        ret.emplace_back(std::move(ex));
+    }
 
     get_logger()->trace("revdiff decomposition construction runtime: {}", sw);
 
@@ -299,31 +123,31 @@ std::pair<std::vector<expression>, std::vector<expression>::size_type> revdiff_d
     // Verify the decomposition.
     // NOTE: nvars + npars is implicitly converted to std::vector<expression>::size_type here.
     // This is fine, as the decomposition must contain at least nvars + npars items.
-    verify_revdiff_dec(orig_ex, ret, nvars + npars);
+    verify_function_dec(orig_v_ex, ret, nvars + npars, true);
 
 #endif
 
     // Simplify the decomposition.
     // NOTE: nvars + npars is implicitly converted to std::vector<expression>::size_type here.
     // This is fine, as the decomposition must contain at least nvars + npars items.
-    ret = revdiff_decompose_cse(ret, nvars + npars);
+    ret = function_decompose_cse(ret, nvars + npars, nouts);
 
 #if !defined(NDEBUG)
 
     // Verify the decomposition.
-    verify_revdiff_dec(orig_ex, ret, nvars + npars);
+    verify_function_dec(orig_v_ex, ret, nvars + npars, true);
 
 #endif
 
     // Run the breadth-first topological sort on the decomposition.
     // NOTE: nvars + npars is implicitly converted to std::vector<expression>::size_type here.
     // This is fine, as the decomposition must contain at least nvars + npars items.
-    ret = function_sort_dc(ret, nvars + npars, 1);
+    ret = function_sort_dc(ret, nvars + npars, nouts);
 
 #if !defined(NDEBUG)
 
     // Verify the decomposition.
-    verify_revdiff_dec(orig_ex, ret, nvars + npars);
+    verify_function_dec(orig_v_ex, ret, nvars + npars, true);
 
 #endif
 
@@ -333,10 +157,16 @@ std::pair<std::vector<expression>, std::vector<expression>::size_type> revdiff_d
 namespace
 {
 
-auto revdiff_make_adj_revdep(const std::vector<expression> &dc, std::vector<expression>::size_type nvars)
+auto revdiff_make_adj_revdep(const std::vector<expression> &dc, std::vector<expression>::size_type nvars,
+                             [[maybe_unused]] std::vector<expression>::size_type nouts)
 {
-    assert(dc.size() >= 2u);
+    // NOTE: the shortest possible dc is for a scalar
+    // function identically equal to a number. In this case,
+    // dc will have a size of 1.
+    assert(!dc.empty());
     assert(nvars < dc.size());
+    assert(nouts >= 1u);
+    assert(nouts <= dc.size());
 
     using idx_t = std::vector<expression>::size_type;
 
@@ -395,139 +225,286 @@ auto revdiff_make_adj_revdep(const std::vector<expression> &dc, std::vector<expr
         assert(!revdep[i].empty());
     }
 
-    for (idx_t i = nvars; i < dc.size() - 1u; ++i) {
+    for (idx_t i = nvars; i < dc.size() - nouts; ++i) {
         // The only possibility for an adjoint dict to be empty
         // is if all the subexpression arguments are numbers.
+        // NOTE: params have been turned into variables, so that
+        // get_variables() will also list param args.
         assert(!adj[i].empty() || get_variables(dc[i]).empty());
 
-        // Every subexpression apart from the last (i.e., the output)
-        // must be a dependency for some other subexpression.
+        // Every subexpression must be a dependency for some other subexpression.
         assert(!revdep[i].empty());
     }
 
-    // The last subexpression is the output: it must have only
-    // 1 element in the adjoints dict, that element must be the constant 1,
-    // and it cannot be the dependency for any other subexpression.
-    assert(adj.back().size() == 1u);
-    assert(adj.back().count(boost::numeric_cast<std::uint32_t>(dc.size() - 2u)) == 1u);
-    assert(adj.back().at(boost::numeric_cast<std::uint32_t>(dc.size() - 2u)) == 1_dbl);
-    assert(revdep.back().empty());
+    // Each output:
+    // - cannot be the dependency for any subexpression,
+    // - must either be a number or have only 1 element in the adjoints dict, and:
+    //   - the key of such element cannot be another output,
+    //   - the value of such element must be the constant 1_dbl
+    //     (this comes from the derivative of a variables wrt itself
+    //     returning 1_dbl).
+    for (idx_t i = dc.size() - nouts; i < dc.size(); ++i) {
+        if (adj[i].empty()) {
+            assert(std::holds_alternative<number>(dc[i].value()));
+        } else {
+            assert(adj[i].size() == 1u);
+            assert(adj[i].begin()->first < dc.size() - nouts);
+            assert(adj[i].begin()->second == 1_dbl);
+        }
+
+        assert(revdep[i].empty());
+    }
 
 #endif
 
     return std::tuple{std::move(adj), std::move(revdep), std::move(subs_map)};
 }
 
+// Hasher for a vector of 32-bit unsigned integers.
+struct vec32_hasher {
+    std::size_t operator()(const std::vector<std::uint32_t> &v) const noexcept
+    {
+        // Initial seed taken from the size of v.
+        std::size_t seed = std::hash<decltype(v.size())>{}(v.size());
+
+        for (const auto idx : v) {
+            boost::hash_combine(seed, idx);
+        }
+
+        return seed;
+    }
+};
+
+using dtens_diff_map_t = std::unordered_map<std::vector<std::uint32_t>, expression, vec32_hasher>;
+
+using dtens_list_t = std::vector<std::vector<expression>>;
+
 } // namespace
 
-// Implementation of reverse-mode differentiation.
-std::vector<expression> reverse_diff(const expression &e, const std::vector<expression> &args)
+} // namespace detail
+
+struct dtens::impl {
+    detail::dtens_diff_map_t m_map;
+    detail::dtens_list_t m_list;
+};
+
+namespace detail
 {
+
+dtens diff_tensors_impl2(const std::vector<expression> &v_ex, const std::vector<expression> &args, std::uint32_t order)
+{
+    spdlog::stopwatch sw;
+
     assert(!args.empty());
     assert(std::all_of(args.begin(), args.end(), [](const auto &arg) {
         return std::holds_alternative<variable>(arg.value()) || std::holds_alternative<param>(arg.value());
     }));
     assert(std::unordered_set(args.begin(), args.end()).size() == args.size());
 
-    // Handle the trivial case first.
-    if (std::holds_alternative<number>(e.value())) {
-        return {args.size(), 0_dbl};
+    // Cache the number of outputs and diff arguments.
+    const auto orig_nouts = v_ex.size();
+    const auto nargs = args.size();
+
+    assert(orig_nouts > 0u);
+    assert(nargs > 0u);
+
+    // Map to associate a vector of indices to a derivative.
+    // The first element in each vector is the component index,
+    // the rest of the indices are the derivative orders for
+    // each diff argument. E.g., with args = [x, y, z],
+    // then [0, 1, 2, 1] means d4f0/(dx dy**2 dz) (where f0 is the
+    // first component of the vector function f).
+    dtens_diff_map_t diff_map;
+
+    // List of tensors of derivatives.
+    dtens_list_t tensor_list;
+
+    // List of indices vectors. This is used to facilitate the
+    // iterative construction of the indices vectors order
+    // by order.
+    std::vector<std::vector<std::uint32_t>> v_indices;
+
+    // A temporary indices vector.
+    std::vector<std::uint32_t> tmp_v_idx;
+    tmp_v_idx.resize(1 + boost::safe_numerics::safe<decltype(tmp_v_idx.size())>(nargs));
+
+    // Init tensor_list and diff_map with the order 0 derivatives
+    // (i.e., the original function components).
+    tensor_list.emplace_back();
+
+    for (decltype(v_ex.size()) i = 0; i < orig_nouts; ++i) {
+        tmp_v_idx[0] = boost::numeric_cast<std::uint32_t>(i);
+        v_indices.push_back(tmp_v_idx);
+
+        assert(diff_map.count(tmp_v_idx) == 0u);
+        diff_map[tmp_v_idx] = v_ex[i];
+
+        tensor_list.back().push_back(v_ex[i]);
     }
 
-    // Run the decomposition.
-    const auto [dc, nvars] = revdiff_decompose(e);
+    // Fetch the range in v_indices corresponding to the
+    // current order (i.e., order-0) indices.
+    decltype(v_indices.size()) cur_idx_begin = 0, cur_idx_end = v_indices.size();
 
-    // Create the adjoints, the reverse dependencies and the substitution map.
-    const auto [adj, revdep, subs_map] = revdiff_make_adj_revdep(dc, nvars);
+    // Iterate over the orders.
+    for (std::uint32_t cur_order = 0; cur_order < order; ++cur_order) {
+        // Prepare the new tensor.
+        tensor_list.emplace_back();
+        auto &new_tensor = tensor_list.back();
+        const auto &prev_tensor = *(tensor_list.end() - 2);
 
-    // Create the list of derivatives of the output wrt every
-    // subexpression. Init the last element with the constant 1.
-    std::vector<expression> diffs(dc.size());
-    diffs.back() = 1_dbl;
+        // The current number of outputs is the number of components
+        // in the previous order tensor.
+        const auto cur_nouts = prev_tensor.size();
 
-    // Fill in the remaining derivatives, including those wrt the
-    // original vars and params.
-    for (std::vector<expression>::size_type i = 1; i < dc.size(); ++i) {
-        // NOTE: iterate backwards (this is the reverse pass).
-        const auto cur_idx = dc.size() - 1u - i;
+        // Run the decomposition on the tensor of the previous order.
+        const auto [dc, nvars] = revdiff_decompose(prev_tensor);
 
-        std::vector<expression> tmp_sum;
-        for (const auto rd_idx : revdep[cur_idx]) {
-            assert(rd_idx < diffs.size());
-            assert(rd_idx < adj.size());
-            // NOTE: the reverse dependency must point
-            // to a subexpression *after* the current one.
-            assert(rd_idx > cur_idx);
+        // Create the adjoints, the reverse dependencies and the substitution map.
+        const auto [adj, revdep, subs_map] = revdiff_make_adj_revdep(dc, nvars, cur_nouts);
 
-            tmp_sum.push_back(diffs[rd_idx] * adj[rd_idx].at(boost::numeric_cast<std::uint32_t>(cur_idx)));
+        spdlog::stopwatch sw_inner;
+
+        // Run the reverse pass for each output. The derivatives of all subexpressions
+        // wrt the output will be stored into diffs.
+        std::vector<expression> diffs(dc.size());
+        for (decltype(v_ex.size()) i = 0; i < cur_nouts; ++i) {
+            // Init the derivatives of all outputs to zero, except the one we are
+            // currently operating on (whose derivative will be 1). In other words,
+            // we are setting the seed value for the reverse pass.
+            std::fill(diffs.data() + diffs.size() - cur_nouts, diffs.data() + diffs.size(), 0_dbl);
+            diffs[diffs.size() - cur_nouts + i] = 1_dbl;
+
+            // Fill in the remaining derivatives, including those wrt the
+            // original vars and params.
+            for (auto j = cur_nouts; j < dc.size(); ++j) {
+                // NOTE: this is the reverse pass, we are iterating
+                // backwards starting from the last non-output subexpression.
+                const auto cur_idx = boost::numeric_cast<std::uint32_t>(dc.size() - j - 1u);
+
+                std::vector<expression> tmp_sum;
+                for (const auto rd_idx : revdep[cur_idx]) {
+                    assert(rd_idx < diffs.size());
+                    assert(rd_idx < adj.size());
+                    // NOTE: the reverse dependency must point
+                    // to a subexpression *after* the current one.
+                    assert(rd_idx > cur_idx);
+                    assert(adj[rd_idx].count(cur_idx) == 1u);
+
+                    tmp_sum.push_back(diffs[rd_idx] * adj[rd_idx].find(cur_idx)->second);
+                }
+
+                assert(!tmp_sum.empty());
+
+                diffs[cur_idx] = sum(std::move(tmp_sum));
+            }
+
+            // Create a dict mapping the vars/params in the decomposition
+            // to the derivatives of the current output wrt them. This is used
+            // to fetch from diffs only the derivatives we are interested in
+            // (since there may be vars/params in the decomposition wrt which
+            // the derivatives are not requested).
+            std::unordered_map<expression, expression> dmap;
+            for (std::vector<expression>::size_type j = 0; j < nvars; ++j) {
+                [[maybe_unused]] const auto [_, flag] = dmap.try_emplace(dc[j], diffs[j]);
+                assert(flag);
+            }
+
+            // Add the derivatives to the new tensor and to diff_map.
+            for (decltype(args.size()) j = 0; j < nargs; ++j) {
+                // Compute the indices vector for the current derivative.
+                tmp_v_idx = v_indices[cur_idx_begin];
+                assert(j + 1u < tmp_v_idx.size());
+                tmp_v_idx[j + 1u] = boost::safe_numerics::safe<std::uint32_t>(tmp_v_idx[j + 1u]) + 1;
+
+                // Check if we already computed this derivative.
+                // NOTE: if the derivative has NOT been computed before and
+                // the diff argument is NOT present in the decomposition, then
+                // cur_der will remain zero.
+                expression cur_der = 0_dbl;
+                bool already_computed = false;
+                if (auto it = diff_map.find(tmp_v_idx); it != diff_map.end()) {
+                    cur_der = it->second;
+                    already_computed = true;
+                } else if (auto it = dmap.find(args[j]); it != dmap.end()) {
+                    cur_der = subs(it->second, subs_map);
+                }
+
+                // Add the derivative to the current tensor and diff_map, if needed.
+                new_tensor.push_back(cur_der);
+
+                if (!already_computed) {
+                    [[maybe_unused]] const auto [_, flag] = diff_map.try_emplace(tmp_v_idx, cur_der);
+                    assert(flag);
+                }
+
+                // Add the new indices vector
+                v_indices.push_back(tmp_v_idx);
+            }
+
+            // Update cur_idx_begin as we move to the next output.
+            ++cur_idx_begin;
         }
 
-        assert(!tmp_sum.empty());
+        get_logger()->trace("dtens reverse passes runtime for order {}: {}", cur_order, sw_inner);
 
-        diffs[cur_idx] = sum(std::move(tmp_sum));
+        assert(cur_idx_begin == cur_idx_end);
+
+        // Update cur_idx_begin and cur_idx_end for the next order.
+        cur_idx_begin = cur_idx_end;
+        cur_idx_end = v_indices.size();
     }
 
-    // Create a dict mapping the vars/params in e to the derivatives
-    // wrt them.
-    std::unordered_map<expression, expression> diff_map;
-    for (std::vector<expression>::size_type i = 0; i < nvars; ++i) {
-        [[maybe_unused]] const auto [_, flag] = diff_map.try_emplace(dc[i], diffs[i]);
-        assert(flag);
-    }
+    get_logger()->trace("dtens creation runtime: {}", sw);
 
-    // Assemble the return value.
-    std::vector<expression> retval;
-    retval.reserve(args.size());
-    for (const auto &diff_arg : args) {
-        if (auto it = diff_map.find(diff_arg); it != diff_map.end()) {
-            retval.push_back(subs(it->second, subs_map));
-        } else {
-            retval.push_back(0_dbl);
-        }
-    }
-
-    return retval;
+    // Assemble and return the result.
+    return dtens(dtens::impl{std::move(diff_map), std::move(tensor_list)});
 }
 
-std::vector<expression> grad_impl(const expression &e, const std::variant<diff_args, std::vector<expression>> &d_args)
+dtens diff_tensors_impl(const std::vector<expression> &v_ex,
+                        const std::variant<diff_args, std::vector<expression>> &d_args, std::uint32_t order)
 {
-    // Extract/build the arguments.
+    if (v_ex.empty()) {
+        throw std::invalid_argument("Cannot compute the derivatives of a function with zero components");
+    }
+
+    // Extract/build the diff arguments.
     std::vector<expression> args;
 
     if (std::holds_alternative<std::vector<expression>>(d_args)) {
         args = std::get<std::vector<expression>>(d_args);
     } else {
         switch (std::get<diff_args>(d_args)) {
-            case diff_args::all:
-                for (const auto &var : get_variables(e)) {
+            case diff_args::all: {
+                // NOTE: this can be simplified once get_variables() returns
+                // a list of expressions, rather than strings.
+                for (const auto &var : get_variables(v_ex)) {
                     args.emplace_back(var);
                 }
 
-                for (const auto &par : get_params(e)) {
-                    args.push_back(par);
-                }
+                const auto params = get_params(v_ex);
+                args.insert(args.end(), params.begin(), params.end());
 
                 break;
+            }
             case diff_args::vars:
-                for (const auto &var : get_variables(e)) {
+                for (const auto &var : get_variables(v_ex)) {
                     args.emplace_back(var);
                 }
 
                 break;
             case diff_args::params:
-                for (const auto &par : get_params(e)) {
-                    args.push_back(par);
-                }
+                args = get_params(v_ex);
 
                 break;
             default:
-                throw std::invalid_argument("Invalid diff_args enumerator");
+                throw std::invalid_argument("An invalid diff_args enumerator was passed to diff_tensors()");
         }
     }
 
     // Handle empty args.
     if (args.empty()) {
-        return {};
+        throw std::invalid_argument("Cannot compute derivatives with respect to an empty set of arguments");
     }
 
     // Ensure that every expression in args is either a variable
@@ -535,20 +512,57 @@ std::vector<expression> grad_impl(const expression &e, const std::variant<diff_a
     if (std::any_of(args.begin(), args.end(), [](const auto &arg) {
             return !std::holds_alternative<variable>(arg.value()) && !std::holds_alternative<param>(arg.value());
         })) {
-        throw std::invalid_argument("The list of expressions with respect to which the "
-                                    "gradient is to be computed can contain only variables and parameters");
+        throw std::invalid_argument("Derivatives can be computed only with respect to variables and/or parameters");
     }
 
     // Check if there are repeated entries in args.
     std::unordered_set args_set(args.begin(), args.end());
     if (args_set.size() != args.size()) {
-        throw std::invalid_argument("Duplicate entries detected in the list of variables with respect to which the "
-                                    "gradient is to be computed");
+        throw std::invalid_argument(
+            "Duplicate entries detected in the list of variables/parameters with respect to which the "
+            "derivatives are to be computed");
     }
 
-    return detail::reverse_diff(e, args);
+    return detail::diff_tensors_impl2(v_ex, args, order);
 }
 
 } // namespace detail
+
+dtens::dtens(impl x) : p_impl(std::make_unique<impl>(std::move(x))) {}
+
+dtens::dtens() : dtens(impl{}) {}
+
+dtens::dtens(const dtens &other) : dtens(*other.p_impl) {}
+
+dtens::dtens(dtens &&) noexcept = default;
+
+dtens &dtens::operator=(const dtens &other)
+{
+    if (&other != this) {
+        *this = dtens(other);
+    }
+
+    return *this;
+}
+
+dtens &dtens::operator=(dtens &&) noexcept = default;
+
+dtens::~dtens() = default;
+
+const std::vector<std::vector<expression>> &dtens::get_tensors() const
+{
+    return p_impl->m_list;
+}
+
+const expression &dtens::operator[](const std::vector<std::uint32_t> &vidx) const
+{
+    const auto it = p_impl->m_map.find(vidx);
+
+    if (it == p_impl->m_map.end()) {
+        throw std::invalid_argument(fmt::format("Cannot locate the derivative at indices {}", vidx));
+    }
+
+    return it->second;
+}
 
 HEYOKA_END_NAMESPACE

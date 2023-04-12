@@ -20,6 +20,8 @@
 #include "heyoka/logging.hpp"
 #include "test_utils.hpp"
 
+#include <fmt/ranges.h>
+
 std::mt19937 rng;
 
 using namespace heyoka;
@@ -29,24 +31,24 @@ TEST_CASE("revdiff decompose")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(detail::revdiff_decompose(x).first == std::vector{x, "u_0"_var});
-    REQUIRE(detail::revdiff_decompose(x).second == 1u);
+    REQUIRE(detail::revdiff_decompose({x}).first == std::vector{x, "u_0"_var});
+    REQUIRE(detail::revdiff_decompose({x}).second == 1u);
 
-    REQUIRE(detail::revdiff_decompose(par[0]).first == std::vector{par[0], "u_0"_var});
-    REQUIRE(detail::revdiff_decompose(par[0]).second == 1u);
+    REQUIRE(detail::revdiff_decompose({par[0]}).first == std::vector{par[0], "u_0"_var});
+    REQUIRE(detail::revdiff_decompose({par[0]}).second == 1u);
 
-    REQUIRE(detail::revdiff_decompose(par[0] + x).first == std::vector{x, par[0], "u_1"_var + "u_0"_var, "u_2"_var});
-    REQUIRE(detail::revdiff_decompose(par[0] + x).second == 2u);
+    REQUIRE(detail::revdiff_decompose({par[0] + x}).first == std::vector{x, par[0], "u_1"_var + "u_0"_var, "u_2"_var});
+    REQUIRE(detail::revdiff_decompose({par[0] + x}).second == 2u);
 
-    REQUIRE(detail::revdiff_decompose((par[1] + y) * (par[0] + x)).first
+    REQUIRE(detail::revdiff_decompose({(par[1] + y) * (par[0] + x)}).first
             == std::vector{x, y, par[0], par[1], ("u_2"_var + "u_0"_var), ("u_3"_var + "u_1"_var),
                            ("u_5"_var * "u_4"_var), "u_6"_var});
-    REQUIRE(detail::revdiff_decompose((par[1] + y) * (par[0] + x)).second == 4u);
+    REQUIRE(detail::revdiff_decompose({(par[1] + y) * (par[0] + x)}).second == 4u);
 
-    REQUIRE(detail::revdiff_decompose(subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})).first
+    REQUIRE(detail::revdiff_decompose({subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})}).first
             == std::vector{x, par[0], par[1], ("u_1"_var + "u_0"_var), subs("u_2"_var + y, {{y, 1_dbl}}),
                            ("u_4"_var * "u_3"_var), "u_5"_var});
-    REQUIRE(detail::revdiff_decompose(subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})).second == 3u);
+    REQUIRE(detail::revdiff_decompose({subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})}).second == 3u);
 }
 
 TEST_CASE("revdiff basic")
@@ -56,12 +58,21 @@ TEST_CASE("revdiff basic")
     // fmt::print("{}\n", grad(x + y, {x, y}, diff_mode::reverse));
 }
 
-#if 0
+TEST_CASE("diff_tensors")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    auto dt = diff_tensors({x * x + y}, kw::diff_order = 2);
+
+    fmt::print("{}\n", dt.get_tensors());
+}
 
 TEST_CASE("speelpenning")
 {
     fmt::print("Speelpenning's example\n");
     fmt::print("======================\n");
+
+    set_logger_level_trace();
 
     std::uniform_real_distribution<double> rdist(-10., 10.);
 
@@ -82,29 +93,30 @@ TEST_CASE("speelpenning")
             outputs_r.push_back(0.);
         }
 
-        llvm_state s;
-        auto dc_forward = add_cfunc<double>(s, "f_forward", grad(prod, kw::diff_mode = diff_mode::forward));
-        auto dc_reverse = add_cfunc<double>(s, "f_reverse", grad(prod, kw::diff_mode = diff_mode::reverse));
+        prod = pairwise_prod(vars);
 
-        fmt::print("nvars={:<5} forward decomposition size={:<6} reverse decomposition size={:<6}\n", nvars,
-                   dc_forward.size() - nvars - nvars, dc_reverse.size() - nvars - nvars);
+        llvm_state s;
+        // auto dc_forward = add_cfunc<double>(s, "f_forward", grad(prod, kw::diff_mode = diff_mode::forward));
+        // auto dc_reverse = add_cfunc<double>(s, "f_reverse", grad(prod, kw::diff_mode = diff_mode::reverse));
+        auto dc_reverse = add_cfunc<double>(s, "f_reverse", diff_tensors({prod}, kw::diff_order = 1).get_tensors()[1],
+                                            kw::compact_mode = true);
+
+        fmt::print("nvars={:<5} decomposition size={:<6}\n", nvars, dc_reverse.size() - nvars - nvars);
 
         s.optimise();
         s.compile();
 
-        auto *ff = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-            s.jit_lookup("f_forward"));
+        // auto *ff = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+        //     s.jit_lookup("f_forward"));
 
-        auto *fr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-            s.jit_lookup("f_reverse"));
+        // auto *fr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+        //     s.jit_lookup("f_reverse"));
 
-        ff(outputs_f.data(), inputs.data(), nullptr, nullptr);
-        fr(outputs_r.data(), inputs.data(), nullptr, nullptr);
+        // ff(outputs_f.data(), inputs.data(), nullptr, nullptr);
+        // fr(outputs_r.data(), inputs.data(), nullptr, nullptr);
 
-        for (auto i = 0u; i < nvars; ++i) {
-            REQUIRE(outputs_f[i] == approximately(outputs_r[i]));
-        }
+        // for (auto i = 0u; i < nvars; ++i) {
+        //     REQUIRE(outputs_f[i] == approximately(outputs_r[i]));
+        // }
     }
 }
-
-#endif
