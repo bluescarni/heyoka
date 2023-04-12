@@ -104,6 +104,11 @@ TEST_CASE("speelpenning")
         fmt::print("nvars={:<5} decomposition size={:<6}\n", nvars, dc_reverse.size() - nvars - nvars);
 
         s.optimise();
+
+        std::cout << "optimised!!!" << std::endl;
+
+        std::cout << s.get_ir() << std::endl;
+
         s.compile();
 
         // auto *ff = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
