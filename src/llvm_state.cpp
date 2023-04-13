@@ -1011,10 +1011,21 @@ void llvm_state::optimise()
         // argument to this constructor.
         llvm::PassBuilder PB(m_jitter->m_tm.get());
 
+        // NOTE: this additional pass triggers an LLVM errror during the optimisation phase
+        // on 64-bit ARM similar to this one:
+        //
+        // https://github.com/llvm/llvm-project/issues/54423
+        //
+        // It seems like this is related to the use of scalable
+        // vector extensions. Let's keep this disabled on ARM for now.
+#if !defined(HEYOKA_ARCH_ARM)
+
         // NOTE: this additional pass measurably helps performance
         // in some benchmarks when dense output is activated.
-        // PB.registerVectorizerStartEPCallback(
-        //     [](llvm::FunctionPassManager &FPM, olevel) { FPM.addPass(llvm::LoadStoreVectorizerPass()); });
+        PB.registerVectorizerStartEPCallback(
+            [](llvm::FunctionPassManager &FPM, olevel) { FPM.addPass(llvm::LoadStoreVectorizerPass()); });
+
+#endif
 
         // Register all the basic analyses with the managers.
         PB.registerModuleAnalyses(MAM);
@@ -1062,6 +1073,15 @@ void llvm_state::optimise()
         auto f_pm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
         f_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
 
+        // NOTE: this additional pass triggers an LLVM errror during the optimisation phase
+        // on 64-bit ARM similar to this one:
+        //
+        // https://github.com/llvm/llvm-project/issues/54423
+        //
+        // It seems like this is related to the use of scalable
+        // vector extensions. Let's keep this disabled on ARM for now.
+#if !defined(HEYOKA_ARCH_ARM)
+
         // Add an initial pass to vectorize load/stores.
         // This is useful to ensure that the
         // pattern adopted in load_vector_from_memory() and
@@ -1069,6 +1089,8 @@ void llvm_state::optimise()
         // vectorized store/load instructions.
         auto lsv_pass = std::unique_ptr<llvm::Pass>(llvm::createLoadStoreVectorizerPass());
         f_pm->add(lsv_pass.release());
+
+#endif
 
         // We use the helper class PassManagerBuilder to populate the module
         // pass manager with standard options.
