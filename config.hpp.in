@@ -45,9 +45,17 @@
 
 #endif
 
+// NOTE: handy Boost library for this since 1.73:
+// https://www.boost.org/doc/libs/1_73_0/libs/predef/doc/index.html
 #if defined(_ARCH_PPC) || defined(_M_PPC)
 
 #define HEYOKA_ARCH_PPC
+
+#endif
+
+#if defined(__arm__) || defined(_M_ARM) || defined(__arm) || defined(__aarch64__)
+
+#define HEYOKA_ARCH_ARM
 
 #endif
 
