@@ -311,7 +311,7 @@ dtens diff_tensors_impl2(const std::vector<expression> &v_ex, const std::vector<
     // Map to associate a vector of indices to a derivative.
     // The first element in each vector is the component index,
     // the rest of the indices are the derivative orders for
-    // each diff argument. E.g., with args = [x, y, z],
+    // each diff args. E.g., with args = [x, y, z],
     // then [0, 1, 2, 1] means d4f0/(dx dy**2 dz) (where f0 is the
     // first component of the vector function f).
     dtens_diff_map_t diff_map;
@@ -324,7 +324,8 @@ dtens diff_tensors_impl2(const std::vector<expression> &v_ex, const std::vector<
     // by order.
     std::vector<std::vector<std::uint32_t>> v_indices;
 
-    // A temporary indices vector.
+    // An indices vector with preallocated storage,
+    // used as temporary variable in several places below.
     std::vector<std::uint32_t> tmp_v_idx;
     tmp_v_idx.resize(1 + boost::safe_numerics::safe<decltype(tmp_v_idx.size())>(nargs));
 
