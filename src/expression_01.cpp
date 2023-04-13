@@ -426,8 +426,8 @@ dtens diff_tensors_impl2(const std::vector<expression> &v_ex, const std::vector<
                 if (auto it = diff_map.find(tmp_v_idx); it != diff_map.end()) {
                     cur_der = it->second;
                     already_computed = true;
-                } else if (auto it = dmap.find(args[j]); it != dmap.end()) {
-                    cur_der = subs(it->second, subs_map);
+                } else if (auto it_dmap = dmap.find(args[j]); it_dmap != dmap.end()) {
+                    cur_der = subs(it_dmap->second, subs_map);
                 }
 
                 // Add the derivative to the current tensor and diff_map, if needed.
