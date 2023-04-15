@@ -16,11 +16,11 @@
 #include <fmt/core.h>
 
 #include "catch.hpp"
-#include "heyoka/kw.hpp"
-#include "heyoka/logging.hpp"
 #include "test_utils.hpp"
 
 #include <fmt/ranges.h>
+
+#include "heyoka/logging.hpp"
 
 std::mt19937 rng;
 
@@ -51,14 +51,7 @@ TEST_CASE("revdiff decompose")
     REQUIRE(detail::revdiff_decompose({subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})}).second == 3u);
 }
 
-TEST_CASE("revdiff basic")
-{
-    auto [x, y] = make_vars("x", "y");
-
-    // fmt::print("{}\n", grad(x + y, {x, y}, diff_mode::reverse));
-}
-
-TEST_CASE("diff_tensors")
+TEST_CASE("diff_tensors basic")
 {
     auto [x, y] = make_vars("x", "y");
 

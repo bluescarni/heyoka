@@ -378,12 +378,8 @@ expression diff(funcptr_map<expression> &, const expression &, const param &);
 HEYOKA_DLL_PUBLIC std::pair<std::vector<expression>, std::vector<expression>::size_type>
 revdiff_decompose(const std::vector<expression> &);
 
-// NOTE: the implementation of diff_tensors() happens in
-// two stages. The second function needs to be declared here because
-// it must be a friend of dtens::impl.
-HEYOKA_DLL_PUBLIC dtens diff_tensors_impl(const std::vector<expression> &,
-                                          const std::variant<diff_args, std::vector<expression>> &, std::uint32_t);
-dtens diff_tensors_impl2(const std::vector<expression> &, const std::vector<expression> &, std::uint32_t);
+HEYOKA_DLL_PUBLIC dtens diff_tensors(const std::vector<expression> &,
+                                     const std::variant<diff_args, std::vector<expression>> &, std::uint32_t);
 
 } // namespace detail
 
@@ -401,8 +397,9 @@ IGOR_MAKE_NAMED_ARGUMENT(diff_order);
 
 class HEYOKA_DLL_PUBLIC dtens
 {
-    friend dtens detail::diff_tensors_impl2(const std::vector<expression> &, const std::vector<expression> &,
-                                            std::uint32_t);
+    // NOTE: detail::diff_tensors() needs access to the private ctor.
+    friend dtens detail::diff_tensors(const std::vector<expression> &,
+                                      const std::variant<diff_args, std::vector<expression>> &, std::uint32_t);
 
     struct impl;
 
@@ -453,7 +450,7 @@ dtens diff_tensors(const std::vector<expression> &v_ex, KwArgs &&...kw_args)
         }
     }
 
-    return detail::diff_tensors_impl(v_ex, d_args, order);
+    return detail::diff_tensors(v_ex, d_args, order);
 }
 
 HEYOKA_DLL_PUBLIC expression pairwise_prod(std::vector<expression>);

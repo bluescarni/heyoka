@@ -315,7 +315,10 @@ struct dtens::impl {
 namespace detail
 {
 
-dtens diff_tensors_impl2(const std::vector<expression> &v_ex, const std::vector<expression> &args, std::uint32_t order)
+namespace
+{
+
+auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<expression> &args, std::uint32_t order)
 {
     spdlog::stopwatch sw;
 
@@ -555,11 +558,13 @@ dtens diff_tensors_impl2(const std::vector<expression> &v_ex, const std::vector<
     get_logger()->trace("dtens creation runtime: {}", sw);
 
     // Assemble and return the result.
-    return dtens(dtens::impl{std::move(diff_map), std::move(tensor_list)});
+    return std::tuple{std::move(diff_map), std::move(tensor_list)};
 }
 
-dtens diff_tensors_impl(const std::vector<expression> &v_ex,
-                        const std::variant<diff_args, std::vector<expression>> &d_args, std::uint32_t order)
+} // namespace
+
+dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_args, std::vector<expression>> &d_args,
+                   std::uint32_t order)
 {
     if (v_ex.empty()) {
         throw std::invalid_argument("Cannot compute the derivatives of a function with zero components");
@@ -620,7 +625,9 @@ dtens diff_tensors_impl(const std::vector<expression> &v_ex,
             "derivatives are to be computed");
     }
 
-    return detail::diff_tensors_impl2(v_ex, args, order);
+    auto [diff_map, tensor_list] = diff_tensors_impl(v_ex, args, order);
+
+    return dtens{dtens::impl{std::move(diff_map), std::move(tensor_list)}};
 }
 
 } // namespace detail
@@ -656,7 +663,8 @@ const expression &dtens::operator[](const std::vector<std::uint32_t> &vidx) cons
     const auto it = p_impl->m_map.find(vidx);
 
     if (it == p_impl->m_map.end()) {
-        throw std::invalid_argument(fmt::format("Cannot locate the derivative at indices {}", vidx));
+        throw std::invalid_argument(
+            fmt::format("Cannot locate the derivative corresponding to the index vector {}", vidx));
     }
 
     return it->second;
