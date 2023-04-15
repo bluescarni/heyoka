@@ -407,6 +407,12 @@ class HEYOKA_DLL_PUBLIC dtens
 
     explicit dtens(impl);
 
+    // Serialisation.
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+
 public:
     dtens();
     dtens(const dtens &);

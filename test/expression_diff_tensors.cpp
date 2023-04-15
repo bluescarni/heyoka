@@ -9,11 +9,13 @@
 #include <cstdint>
 #include <initializer_list>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <vector>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/s11n.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -98,13 +100,44 @@ TEST_CASE("diff_tensors basic")
     //  auto dt = diff_tensors({x * x + y}, kw::diff_order = 2);
 }
 
-// A few tests on a default-constructed dtens instance.
-TEST_CASE("dtens default")
+// A few tests for the dtens API.
+TEST_CASE("dtens basics")
 {
     dtens dt;
 
     REQUIRE(dt.get_tensors().empty());
     REQUIRE(dt.n_diffs() == 0u);
+
+    auto [x, y] = make_vars("x", "y");
+
+    auto dt2 = diff_tensors({x + y, x * y}, kw::diff_order = 1);
+    auto dt3(dt2);
+
+    REQUIRE(dt3.get_tensors() == dt2.get_tensors());
+
+    auto dt4(std::move(dt3));
+    dt3 = dt4;
+
+    REQUIRE(dt3.get_tensors() == dt2.get_tensors());
+
+    // s11n.
+    std::stringstream ss;
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << dt3;
+    }
+
+    dt3 = dtens();
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> dt3;
+    }
+
+    REQUIRE(dt3.get_tensors() == dt2.get_tensors());
+    REQUIRE(dt3[{1, 0, 1}] == x);
 }
 
 TEST_CASE("speelpenning")

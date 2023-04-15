@@ -26,6 +26,7 @@
 #include <boost/container_hash/hash.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
+#include <boost/serialization/unordered_map.hpp>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -39,6 +40,7 @@
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -310,6 +312,26 @@ using dtens_list_t = std::vector<std::vector<expression>>;
 struct dtens::impl {
     detail::dtens_diff_map_t m_map;
     detail::dtens_list_t m_list;
+
+    // Serialisation.
+    void save(boost::archive::binary_oarchive &ar, unsigned) const
+    {
+        ar << m_map;
+        ar << m_list;
+    }
+    void load(boost::archive::binary_iarchive &ar, unsigned)
+    {
+        try {
+            ar >> m_map;
+            ar >> m_list;
+        } catch (...) {
+            // LCOV_EXCL_START
+            *this = impl{};
+            throw;
+            // LCOV_EXCL_STOP
+        }
+    }
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 };
 
 namespace detail
@@ -673,6 +695,23 @@ const expression &dtens::operator[](const std::vector<std::uint32_t> &vidx) cons
 std::size_t dtens::n_diffs() const
 {
     return boost::numeric_cast<std::size_t>(p_impl->m_map.size());
+}
+
+void dtens::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << p_impl;
+}
+
+void dtens::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    try {
+        ar >> p_impl;
+    } catch (...) {
+        // LCOV_EXCL_START
+        *this = dtens{};
+        throw;
+        // LCOV_EXCL_STOP
+    }
 }
 
 HEYOKA_END_NAMESPACE
