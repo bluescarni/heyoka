@@ -6,21 +6,20 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cstdint>
 #include <initializer_list>
 #include <random>
+#include <stdexcept>
 #include <vector>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 
 #include <fmt/core.h>
+#include <fmt/ranges.h>
 
 #include "catch.hpp"
 #include "test_utils.hpp"
-
-#include <fmt/ranges.h>
-
-#include "heyoka/logging.hpp"
 
 std::mt19937 rng;
 
@@ -53,19 +52,65 @@ TEST_CASE("revdiff decompose")
 
 TEST_CASE("diff_tensors basic")
 {
+    using Catch::Matchers::Message;
+
     auto [x, y] = make_vars("x", "y");
 
-    auto dt = diff_tensors({x * x + y}, kw::diff_order = 2);
+    // Let's begin with some trivial expressions.
+    REQUIRE_THROWS_MATCHES(diff_tensors({1_dbl}, kw::diff_order = 0), std::invalid_argument,
+                           Message("Cannot compute derivatives with respect to an empty set of arguments"));
 
-    fmt::print("{}\n", dt.get_tensors());
+    auto dt = diff_tensors({1_dbl}, kw::diff_order = 0, kw::diff_args = {x});
+    REQUIRE(dt.get_tensors().size() == 1u);
+    REQUIRE(dt.get_tensors()[0].size() == 1u);
+    REQUIRE(dt.get_tensors()[0][0] == 1_dbl);
+    REQUIRE(dt[{0, 0}] == 1_dbl);
+    REQUIRE(dt.n_diffs() == 1u);
+
+    REQUIRE_THROWS_MATCHES(
+        (dt[{1, 0}]), std::out_of_range,
+        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{1, 0})));
+    REQUIRE_THROWS_MATCHES(
+        (dt[{0, 1}]), std::out_of_range,
+        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{0, 1})));
+    REQUIRE_THROWS_MATCHES(
+        (dt[{0, 2}]), std::out_of_range,
+        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{0, 2})));
+
+    dt = diff_tensors({1_dbl}, kw::diff_order = 1, kw::diff_args = {par[0]});
+    REQUIRE(dt.get_tensors().size() == 2u);
+    REQUIRE(dt.get_tensors()[0].size() == 1u);
+    REQUIRE(dt.get_tensors()[0][0] == 1_dbl);
+    REQUIRE(dt.get_tensors()[1].size() == 1u);
+    REQUIRE(dt.get_tensors()[1][0] == 0_dbl);
+    REQUIRE(dt[{0, 0}] == 1_dbl);
+    REQUIRE(dt[{0, 1}] == 0_dbl);
+    REQUIRE(dt.n_diffs() == 2u);
+
+    REQUIRE_THROWS_MATCHES(
+        (dt[{1, 0}]), std::out_of_range,
+        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{1, 0})));
+    REQUIRE_THROWS_MATCHES(
+        (dt[{0, 2}]), std::out_of_range,
+        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{0, 2})));
+
+    // dt = diff_tensors({1_dbl, x}, kw::diff_order = 0, kw::diff_args = {x});
+    //  auto dt = diff_tensors({x * x + y}, kw::diff_order = 2);
+}
+
+// A few tests on a default-constructed dtens instance.
+TEST_CASE("dtens default")
+{
+    dtens dt;
+
+    REQUIRE(dt.get_tensors().empty());
+    REQUIRE(dt.n_diffs() == 0u);
 }
 
 TEST_CASE("speelpenning")
 {
     fmt::print("Speelpenning's example\n");
     fmt::print("======================\n");
-
-    set_logger_level_trace();
 
     std::uniform_real_distribution<double> rdist(-10., 10.);
 

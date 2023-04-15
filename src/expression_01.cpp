@@ -664,11 +664,15 @@ const expression &dtens::operator[](const std::vector<std::uint32_t> &vidx) cons
     const auto it = p_impl->m_map.find(vidx);
 
     if (it == p_impl->m_map.end()) {
-        throw std::invalid_argument(
-            fmt::format("Cannot locate the derivative corresponding to the index vector {}", vidx));
+        throw std::out_of_range(fmt::format("Cannot locate the derivative corresponding to the index vector {}", vidx));
     }
 
     return it->second;
+}
+
+std::size_t dtens::n_diffs() const
+{
+    return boost::numeric_cast<std::size_t>(p_impl->m_map.size());
 }
 
 HEYOKA_END_NAMESPACE

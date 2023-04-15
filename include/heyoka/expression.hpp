@@ -417,6 +417,7 @@ public:
 
     [[nodiscard]] const std::vector<std::vector<expression>> &get_tensors() const;
     [[nodiscard]] const expression &operator[](const std::vector<std::uint32_t> &) const;
+    [[nodiscard]] std::size_t n_diffs() const;
 };
 
 template <typename... KwArgs>
