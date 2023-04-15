@@ -96,6 +96,39 @@ TEST_CASE("diff_tensors basic")
         (dt[{0, 2}]), std::out_of_range,
         Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{0, 2})));
 
+    dt = diff_tensors({1_dbl}, kw::diff_order = 2, kw::diff_args = {par[0]});
+    REQUIRE(dt.get_tensors().size() == 3u);
+    REQUIRE(dt.get_tensors()[0].size() == 1u);
+    REQUIRE(dt.get_tensors()[0][0] == 1_dbl);
+    REQUIRE(dt.get_tensors()[1].size() == 1u);
+    REQUIRE(dt.get_tensors()[1][0] == 0_dbl);
+    REQUIRE(dt.get_tensors()[2].size() == 1u);
+    REQUIRE(dt.get_tensors()[2][0] == 0_dbl);
+    REQUIRE(dt[{0, 0}] == 1_dbl);
+    REQUIRE(dt[{0, 1}] == 0_dbl);
+    REQUIRE(dt[{0, 2}] == 0_dbl);
+    REQUIRE(dt.n_diffs() == 3u);
+
+    REQUIRE_THROWS_MATCHES(
+        (dt[{1, 0}]), std::out_of_range,
+        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{1, 0})));
+    REQUIRE_THROWS_MATCHES(
+        (dt[{0, 3}]), std::out_of_range,
+        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{0, 3})));
+
+    // Error modes.
+    REQUIRE_THROWS_MATCHES(diff_tensors({1_dbl}, kw::diff_order = 1, kw::diff_args = {x + y}), std::invalid_argument,
+                           Message("Derivatives can be computed only with respect to variables and/or parameters"));
+    REQUIRE_THROWS_MATCHES(
+        diff_tensors({1_dbl}, kw::diff_order = 1, kw::diff_args = {x, x}), std::invalid_argument,
+        Message("Duplicate entries detected in the list of variables/parameters with respect to which the "
+                "derivatives are to be computed: [x, x]"));
+    REQUIRE_THROWS_MATCHES(diff_tensors({1_dbl}, kw::diff_order = 1, kw::diff_args = diff_args{100}),
+                           std::invalid_argument,
+                           Message("An invalid diff_args enumerator was passed to diff_tensors()"));
+    REQUIRE_THROWS_MATCHES(diff_tensors({}), std::invalid_argument,
+                           Message("Cannot compute the derivatives of a function with zero components"));
+
     // dt = diff_tensors({1_dbl, x}, kw::diff_order = 0, kw::diff_args = {x});
     //  auto dt = diff_tensors({x * x + y}, kw::diff_order = 2);
 }

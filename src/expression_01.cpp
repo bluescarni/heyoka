@@ -324,12 +324,12 @@ struct dtens::impl {
         try {
             ar >> m_map;
             ar >> m_list;
-        } catch (...) {
             // LCOV_EXCL_START
+        } catch (...) {
             *this = impl{};
             throw;
-            // LCOV_EXCL_STOP
         }
+        // LCOV_EXCL_STOP
     }
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 };
@@ -706,12 +706,12 @@ void dtens::load(boost::archive::binary_iarchive &ar, unsigned)
 {
     try {
         ar >> p_impl;
-    } catch (...) {
         // LCOV_EXCL_START
+    } catch (...) {
         *this = dtens{};
         throw;
-        // LCOV_EXCL_STOP
     }
+    // LCOV_EXCL_STOP
 }
 
 HEYOKA_END_NAMESPACE
