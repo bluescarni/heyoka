@@ -56,6 +56,8 @@ Changes
 Fix
 ~~~
 
+- Work around a likely LLVM bug on ARM
+  (`#310 <https://github.com/bluescarni/heyoka/pull/310>`__).
 - Fix compilation on OSX when mixing recent libcxx versions with
   old Boost versions
   (`#308 <https://github.com/bluescarni/heyoka/pull/308>`__).
