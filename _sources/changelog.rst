@@ -15,6 +15,11 @@ New
 - New ``model`` module containing ready-made dynamical models
   (`#302 <https://github.com/bluescarni/heyoka/pull/302>`__,
   `#295 <https://github.com/bluescarni/heyoka/pull/295>`__).
+- Implement substitution of generic subexpressions
+  (`#301 <https://github.com/bluescarni/heyoka/pull/301>`__).
+- Add a function to fetch the list of parameters in
+  an expression
+  (`#301 <https://github.com/bluescarni/heyoka/pull/301>`__).
 - The screen output of expressions is now truncated for
   very large expressions
   (`#299 <https://github.com/bluescarni/heyoka/pull/299>`__).
@@ -27,6 +32,13 @@ Changes
 - Performance improvements in compact mode for Taylor
   integrators and compiled functions
   (`#303 <https://github.com/bluescarni/heyoka/pull/303>`__).
+- Update Catch to version 2.13.10
+  (`#301 <https://github.com/bluescarni/heyoka/pull/301>`__).
+- The ``get_n_nodes()`` function now returns ``0``
+  instead of overflowing
+  (`#301 <https://github.com/bluescarni/heyoka/pull/301>`__).
+- heyoka now requires Boost >= 1.69
+  (`#301 <https://github.com/bluescarni/heyoka/pull/301>`__).
 - Performance improvements for several primitives in the
   expression API
   (`#300 <https://github.com/bluescarni/heyoka/pull/300>`__).
@@ -44,6 +56,11 @@ Changes
 Fix
 ~~~
 
+- Work around a likely LLVM bug on ARM
+  (`#310 <https://github.com/bluescarni/heyoka/pull/310>`__).
+- Fix compilation on OSX when mixing recent libcxx versions with
+  old Boost versions
+  (`#308 <https://github.com/bluescarni/heyoka/pull/308>`__).
 - Do not mix inline member functions with explicit class
   template instantiations. This should fix linking issues
   on Windows when mixing MSVC and clang-cl
