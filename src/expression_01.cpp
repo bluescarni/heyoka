@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <stdexcept>
@@ -170,10 +171,14 @@ auto revdiff_make_adj_revdep(const std::vector<expression> &dc, std::vector<expr
 
     using idx_t = std::vector<expression>::size_type;
 
-    // Do an initial pass to create the adjoints, the (unsorted)
-    // vectors of reverse dependencies and the substitution map.
+    // Do an initial pass to create the adjoints, the
+    // vectors of direct and reverse dependencies,
+    // and the substitution map.
     std::vector<std::unordered_map<std::uint32_t, expression>> adj;
     adj.resize(boost::numeric_cast<decltype(adj.size())>(dc.size()));
+
+    std::vector<std::vector<std::uint32_t>> dep;
+    dep.resize(boost::numeric_cast<decltype(dep.size())>(dc.size()));
 
     std::vector<std::vector<std::uint32_t>> revdep;
     revdep.resize(boost::numeric_cast<decltype(revdep.size())>(dc.size()));
@@ -181,12 +186,13 @@ auto revdiff_make_adj_revdep(const std::vector<expression> &dc, std::vector<expr
     std::unordered_map<std::string, expression> subs_map;
 
     for (idx_t i = 0; i < nvars; ++i) {
-        // NOTE: no adjoints or reverse dependencies needed for the initial definitions.
+        // NOTE: no adjoints or direct/reverse dependencies needed for the initial definitions.
         subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map));
     }
 
     for (idx_t i = nvars; i < dc.size(); ++i) {
         auto &cur_adj_dict = adj[i];
+        auto &cur_dep = dep[i];
 
         for (const auto &var : get_variables(dc[i])) {
             const auto idx = uname_to_index(var);
@@ -196,6 +202,8 @@ auto revdiff_make_adj_revdep(const std::vector<expression> &dc, std::vector<expr
 
             assert(idx < revdep.size());
             revdep[idx].push_back(boost::numeric_cast<std::uint32_t>(i));
+
+            cur_dep.push_back(idx);
         }
 
         subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map));
@@ -223,6 +231,10 @@ auto revdiff_make_adj_revdep(const std::vector<expression> &dc, std::vector<expr
         // Each var/param must be a dependency for some
         // other subexpression.
         assert(!revdep[i].empty());
+
+        // No direct dependencies in the
+        // initial definitions.
+        assert(dep[i].empty());
     }
 
     for (idx_t i = nvars; i < dc.size() - nouts; ++i) {
@@ -234,10 +246,16 @@ auto revdiff_make_adj_revdep(const std::vector<expression> &dc, std::vector<expr
 
         // Every subexpression must be a dependency for some other subexpression.
         assert(!revdep[i].empty());
+
+        // Every subexpression must depend on another subexpression,
+        // unless all the subexpression arguments are numbers.
+        assert(!dep[i].empty() || get_variables(dc[i]).empty());
     }
 
     // Each output:
     // - cannot be the dependency for any subexpression,
+    // - must depend on 1 subexpression, unless the output
+    //   itself is a number,
     // - must either be a number or have only 1 element in the adjoints dict, and:
     //   - the key of such element cannot be another output,
     //   - the value of such element must be the constant 1_dbl
@@ -253,11 +271,17 @@ auto revdiff_make_adj_revdep(const std::vector<expression> &dc, std::vector<expr
         }
 
         assert(revdep[i].empty());
+
+        if (std::holds_alternative<number>(dc[i].value())) {
+            assert(dep[i].empty());
+        } else {
+            assert(dep[i].size() == 1u);
+        }
     }
 
 #endif
 
-    return std::tuple{std::move(adj), std::move(revdep), std::move(subs_map)};
+    return std::tuple{std::move(adj), std::move(dep), std::move(revdep), std::move(subs_map)};
 }
 
 // Hasher for a vector of 32-bit unsigned integers.
@@ -301,7 +325,7 @@ dtens diff_tensors_impl2(const std::vector<expression> &v_ex, const std::vector<
     }));
     assert(std::unordered_set(args.begin(), args.end()).size() == args.size());
 
-    // Cache the number of outputs and diff arguments.
+    // Cache the original number of outputs and the diff arguments.
     const auto orig_nouts = v_ex.size();
     const auto nargs = args.size();
 
@@ -361,29 +385,94 @@ dtens diff_tensors_impl2(const std::vector<expression> &v_ex, const std::vector<
         // Run the decomposition on the tensor of the previous order.
         const auto [dc, nvars] = revdiff_decompose(prev_tensor);
 
-        // Create the adjoints, the reverse dependencies and the substitution map.
-        const auto [adj, revdep, subs_map] = revdiff_make_adj_revdep(dc, nvars, cur_nouts);
+        // Create the adjoints, the direct/reverse dependencies and the substitution map.
+        const auto [adj, dep, revdep, subs_map] = revdiff_make_adj_revdep(dc, nvars, cur_nouts);
+
+        // These two containers will be used to store the list of subexpressions
+        // on which an output depends. They are used in the reverse pass
+        // to avoid iterating over those subexpressions on which the output
+        // does not depend (recall that the decomposition contains the subexpressions
+        // for ALL outputs). We need two containers (with identical content)
+        // because we need both ordered iteration AND fast lookup.
+        std::unordered_set<std::uint32_t> out_deps;
+        std::vector<std::uint32_t> sorted_out_deps;
+
+        // A stack to be used when filling up out_deps/sorted_out_deps.
+        std::deque<std::uint32_t> stack;
 
         spdlog::stopwatch sw_inner;
 
-        // Run the reverse pass for each output. The derivatives of all subexpressions
+        // Run the reverse pass for each output. The derivatives
         // wrt the output will be stored into diffs.
         std::vector<expression> diffs(dc.size());
         for (decltype(v_ex.size()) i = 0; i < cur_nouts; ++i) {
-            // Init the derivatives of all outputs to zero, except the one we are
-            // currently operating on (whose derivative will be 1). In other words,
-            // we are setting the seed value for the reverse pass.
-            std::fill(diffs.data() + diffs.size() - cur_nouts, diffs.data() + diffs.size(), 0_dbl);
-            diffs[diffs.size() - cur_nouts + i] = 1_dbl;
+            // Compute the index of the current output in the decomposition.
+            const auto out_idx = boost::numeric_cast<std::uint32_t>(diffs.size() - cur_nouts + i);
 
-            // Fill in the remaining derivatives, including those wrt the
-            // original vars and params.
-            for (auto j = cur_nouts; j < dc.size(); ++j) {
-                // NOTE: this is the reverse pass, we are iterating
-                // backwards starting from the last non-output subexpression.
-                const auto cur_idx = boost::numeric_cast<std::uint32_t>(dc.size() - j - 1u);
+            // Seed the stack and out_deps/sorted_out_deps with the
+            // current output's dependency.
+            stack.assign(dep[out_idx].begin(), dep[out_idx].end());
+            sorted_out_deps.assign(dep[out_idx].begin(), dep[out_idx].end());
+            out_deps.clear();
+            out_deps.insert(dep[out_idx].begin(), dep[out_idx].end());
 
+#if !defined(NDEBUG)
+
+            // NOTE: an output can only have 0 or 1 dependencies.
+            if (stack.empty()) {
+                assert(std::holds_alternative<number>(dc[out_idx].value()));
+            } else {
+                assert(stack.size() == 1u);
+            }
+
+#endif
+
+            // Build out_deps/sorted_out_deps by traversing
+            // the decomposition backwards.
+            while (!stack.empty()) {
+                // Pop the first element from the stack.
+                const auto cur_idx = stack.front();
+                stack.pop_front();
+
+                // Push into the stack and out_deps/sorted_out_deps
+                // the dependencies of cur_idx.
+                for (const auto next_idx : dep[cur_idx]) {
+                    // NOTE: if next_idx is already in out_deps,
+                    // it means that it was visited already and thus
+                    // it does not need to be put in the stack.
+                    if (out_deps.count(next_idx) == 0u) {
+                        stack.push_back(next_idx);
+                        sorted_out_deps.push_back(next_idx);
+                        out_deps.insert(next_idx);
+                    }
+                }
+            }
+
+            // Sort sorted_out_deps in decreasing order.
+            std::sort(sorted_out_deps.begin(), sorted_out_deps.end(), std::greater{});
+
+            // sorted_out_deps cannot have duplicate values.
+            assert(std::adjacent_find(sorted_out_deps.begin(), sorted_out_deps.end()) == sorted_out_deps.end());
+            // sorted_out_deps either must be empty, or its last index
+            // must refer to a variable/param (i.e., the current output
+            // must have a var/param as last element in the chain of dependencies).
+            assert(sorted_out_deps.empty() || *sorted_out_deps.rbegin() < nvars);
+            assert(sorted_out_deps.size() == out_deps.size());
+
+            // Set the seed value for the current output.
+            diffs[out_idx] = 1_dbl;
+
+            // Set the derivatives wrt all vars/params for the current output
+            // to zero, so that if the current output does not depend on a
+            // var/param then the derivative wrt that var/param is pre-emptively
+            // set to zero.
+            std::fill(diffs.data(), diffs.data() + nvars, 0_dbl);
+
+            // Run the reverse pass on all subexpressions which
+            // the current output depends on.
+            for (const auto cur_idx : sorted_out_deps) {
                 std::vector<expression> tmp_sum;
+
                 for (const auto rd_idx : revdep[cur_idx]) {
                     assert(rd_idx < diffs.size());
                     assert(rd_idx < adj.size());
@@ -392,7 +481,14 @@ dtens diff_tensors_impl2(const std::vector<expression> &v_ex, const std::vector<
                     assert(rd_idx > cur_idx);
                     assert(adj[rd_idx].count(cur_idx) == 1u);
 
-                    tmp_sum.push_back(diffs[rd_idx] * adj[rd_idx].find(cur_idx)->second);
+                    // NOTE: if the current subexpression is a dependency
+                    // for another subexpression which is neither the current output
+                    // nor one of its dependencies, then the derivative is zero.
+                    if (rd_idx != out_idx && out_deps.count(rd_idx) == 0u) {
+                        tmp_sum.push_back(0_dbl);
+                    } else {
+                        tmp_sum.push_back(diffs[rd_idx] * adj[rd_idx].find(cur_idx)->second);
+                    }
                 }
 
                 assert(!tmp_sum.empty());
@@ -447,7 +543,7 @@ dtens diff_tensors_impl2(const std::vector<expression> &v_ex, const std::vector<
             ++cur_idx_begin;
         }
 
-        get_logger()->trace("dtens reverse passes runtime for order {}: {}", cur_order, sw_inner);
+        get_logger()->trace("dtens reverse passes runtime for order {}: {}", cur_order + 1u, sw_inner);
 
         assert(cur_idx_begin == cur_idx_end);
 
