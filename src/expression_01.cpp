@@ -621,8 +621,9 @@ dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_
     std::unordered_set args_set(args.begin(), args.end());
     if (args_set.size() != args.size()) {
         throw std::invalid_argument(
-            "Duplicate entries detected in the list of variables/parameters with respect to which the "
-            "derivatives are to be computed");
+            fmt::format("Duplicate entries detected in the list of variables/parameters with respect to which the "
+                        "derivatives are to be computed: {}",
+                        args));
     }
 
     auto [diff_map, tensor_list] = diff_tensors_impl(v_ex, args, order);
