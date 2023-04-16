@@ -530,13 +530,13 @@ expression operator+(expression e1, expression e2)
             // Both are numbers, add them and return the result.
             return expression{std::forward<decltype(v1)>(v1) + std::forward<decltype(v2)>(v2)};
         } else if constexpr (std::is_same_v<type1, number>) {
-            // e1 number, e2 symbolic.
+            // e1 number, e2 non-number.
             if (is_zero(v1)) {
                 // 0 + e2 = e2.
                 return expression{std::forward<decltype(v2)>(v2)};
             }
             if constexpr (std::is_same_v<func, type2>) {
-                if (auto pbop = v2.template extract<detail::binary_op>();
+                if (auto *pbop = v2.template extract<detail::binary_op>();
                     pbop != nullptr && pbop->op() == detail::binary_op::type::add
                     && std::holds_alternative<number>(pbop->args()[0].value())) {
                     // e2 = a + x, where a is a number. Simplify e1 + (a + x) -> c + x, where c = e1 + a.
@@ -546,8 +546,16 @@ expression operator+(expression e1, expression e2)
 
             // NOTE: fall through the standard case.
         } else if constexpr (std::is_same_v<type2, number>) {
-            // e1 symbolic, e2 number. Swap the operands so that the number comes first.
+            // e1 non-number, e2 number. Swap the operands so that the number comes first.
             return expression{std::forward<decltype(v2)>(v2)} + expression{std::forward<decltype(v1)>(v1)};
+        } else if constexpr (std::is_same_v<type1, variable> && std::is_same_v<type2, variable>) {
+            // e1 and e2 are both variables: ensure that the two operands
+            // are sorted in lexicographic order.
+            if (v1.name() > v2.name()) {
+                return add(expression{std::forward<decltype(v2)>(v2)}, expression{std::forward<decltype(v1)>(v1)});
+            }
+
+            // NOTE: fall through the standard case.
         }
 
         // The standard case.
@@ -573,14 +581,14 @@ expression operator-(expression e1, expression e2)
             // Both are numbers, subtract them.
             return expression{std::forward<decltype(v1)>(v1) - std::forward<decltype(v2)>(v2)};
         } else if constexpr (std::is_same_v<type1, number>) {
-            // e1 number, e2 symbolic.
+            // e1 number, e2 non-number.
             if (is_zero(v1)) {
                 // 0 - e2 = -e2.
                 return -expression{std::forward<decltype(v2)>(v2)};
             }
             // NOTE: fall through the standard case if e1 is not zero.
         } else if constexpr (std::is_same_v<type2, number>) {
-            // e1 symbolic, e2 number. Turn e1 - e2 into e1 + (-e2),
+            // e1 non-number, e2 number. Turn e1 - e2 into e1 + (-e2),
             // because addition provides more simplification capabilities.
             return expression{std::forward<decltype(v1)>(v1)} + expression{-std::forward<decltype(v2)>(v2)};
         }
@@ -618,7 +626,7 @@ expression operator*(expression e1, expression e2)
             // Both are numbers, multiply them.
             return expression{std::forward<decltype(v1)>(v1) * std::forward<decltype(v2)>(v2)};
         } else if constexpr (std::is_same_v<type1, number>) {
-            // e1 number, e2 symbolic.
+            // e1 number, e2 non-number.
             if (is_zero(v1)) {
                 // 0 * e2 = 0.
                 return expression{number{0.}};
@@ -637,7 +645,7 @@ expression operator*(expression e1, expression e2)
                 return expression{-std::forward<decltype(v1)>(v1)} * fptr2->args()[0];
             }
             if constexpr (std::is_same_v<func, type2>) {
-                if (auto pbop = v2.template extract<detail::binary_op>();
+                if (auto *pbop = v2.template extract<detail::binary_op>();
                     pbop != nullptr && pbop->op() == detail::binary_op::type::mul
                     && std::holds_alternative<number>(pbop->args()[0].value())) {
                     // e2 = a * x, where a is a number. Simplify e1 * (a * x) -> c * x, where c = e1 * a.
@@ -647,8 +655,16 @@ expression operator*(expression e1, expression e2)
 
             // NOTE: fall through the standard case.
         } else if constexpr (std::is_same_v<type2, number>) {
-            // e1 symbolic, e2 number. Swap the operands so that the number comes first.
+            // e1 non-number, e2 number. Swap the operands so that the number comes first.
             return expression{std::forward<decltype(v2)>(v2)} * expression{std::forward<decltype(v1)>(v1)};
+        } else if constexpr (std::is_same_v<type1, variable> && std::is_same_v<type2, variable>) {
+            // e1 and e2 are both variables: ensure that the two operands
+            // are sorted in lexicographic order.
+            if (v1.name() > v2.name()) {
+                return mul(expression{std::forward<decltype(v2)>(v2)}, expression{std::forward<decltype(v1)>(v1)});
+            }
+
+            // NOTE: fall through the standard case.
         }
 
         // The standard case.
@@ -685,7 +701,7 @@ expression operator/(expression e1, expression e2)
             // Both are numbers, divide them.
             return expression{std::forward<decltype(v1)>(v1) / std::forward<decltype(v2)>(v2)};
         } else if constexpr (std::is_same_v<type2, number>) {
-            // e1 is symbolic, e2 a number.
+            // e1 is non-number, e2 a number.
             if (is_one(v2)) {
                 // e1 / 1 = e1.
                 return expression{std::forward<decltype(v1)>(v1)};
@@ -700,7 +716,7 @@ expression operator/(expression e1, expression e2)
                 return fptr1->args()[0] / expression{-std::forward<decltype(v2)>(v2)};
             }
             if constexpr (std::is_same_v<func, type1>) {
-                if (auto pbop = v1.template extract<detail::binary_op>();
+                if (auto *pbop = v1.template extract<detail::binary_op>();
                     pbop != nullptr && pbop->op() == detail::binary_op::type::div
                     && std::holds_alternative<number>(pbop->args()[1].value())) {
                     // e1 = x / a, where a is a number. Simplify (x / a) / b -> x / (a * b).
@@ -710,7 +726,7 @@ expression operator/(expression e1, expression e2)
 
             // NOTE: fall through to the standard case.
         } else if constexpr (std::is_same_v<type1, number>) {
-            // e1 is a number, e2 is symbolic.
+            // e1 is a number, e2 is non-number.
             if (is_zero(v1)) {
                 // 0 / e2 == 0.
                 return expression{number{0.}};
