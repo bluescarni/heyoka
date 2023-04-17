@@ -847,15 +847,14 @@ expression operator/(expression e1, expression e2)
                         }
                     }
 
-                    if (pbop->op() == detail::binary_op::type::mul) {
-                        if (std::holds_alternative<number>(pbop->args()[0].value())) {
-                            // e1 = a * x, where a is a number. Simplify (a * x) / b -> (a / b) * x.
-                            return pbop->args()[0] / expression{std::forward<decltype(v2)>(v2)} * pbop->args()[1];
-                        }
-
-                        // NOTE: no need to handle (x * a) / b as x * a is transformed
-                        // into a * x by the multiplication operator.
+                    if (pbop->op() == detail::binary_op::type::mul
+                        && std::holds_alternative<number>(pbop->args()[0].value())) {
+                        // e1 = a * x, where a is a number. Simplify (a * x) / b -> (a / b) * x.
+                        return pbop->args()[0] / expression{std::forward<decltype(v2)>(v2)} * pbop->args()[1];
                     }
+
+                    // NOTE: no need to handle (x * a) / b as x * a is transformed
+                    // into a * x by the multiplication operator.
                 }
             }
 
@@ -887,11 +886,10 @@ expression operator/(expression e1, expression e2)
                         }
                     }
 
-                    if (pbop->op() == detail::binary_op::type::mul) {
-                        if (std::holds_alternative<number>(pbop->args()[0].value())) {
-                            // e2 = a * x, where a is a number. Simplify e1 / (a * x) -> c / x, where c = e1 / a.
-                            return expression{std::forward<decltype(v1)>(v1)} / pbop->args()[0] / pbop->args()[1];
-                        }
+                    if (pbop->op() == detail::binary_op::type::mul
+                        && std::holds_alternative<number>(pbop->args()[0].value())) {
+                        // e2 = a * x, where a is a number. Simplify e1 / (a * x) -> c / x, where c = e1 / a.
+                        return expression{std::forward<decltype(v1)>(v1)} / pbop->args()[0] / pbop->args()[1];
                     }
 
                     // NOTE: no need to handle e1 / (x * a) as x * a is transformed
