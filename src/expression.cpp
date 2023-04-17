@@ -593,7 +593,7 @@ expression expression_plus(expression e1, expression e2)
                     }
 
                     // NOTE: no need to deal with e1 + (x + a) because x + a is
-                    // turned into a + x by the addition operator.
+                    // transformed into a + x by the addition operator.
 
                     if (pbop->op() == detail::binary_op::type::sub
                         && std::holds_alternative<number>(pbop->args()[0].value())) {
@@ -602,7 +602,7 @@ expression expression_plus(expression e1, expression e2)
                     }
 
                     // NOTE: no need to deal with e1 + (x - a) because x - a is
-                    // turned into x + (-a) by the subtraction operator.
+                    // transformed into (-a) + x by the subtraction operator.
                 }
             }
 
@@ -660,7 +660,7 @@ expression operator-(expression e1, expression e2)
                     }
 
                     // NOTE: no need to deal with e1 - (x + a) because x + a is
-                    // turned into a + x by the addition operator.
+                    // transformed into a + x by the addition operator.
 
                     if (pbop->op() == detail::binary_op::type::sub
                         && std::holds_alternative<number>(pbop->args()[0].value())) {
@@ -669,7 +669,7 @@ expression operator-(expression e1, expression e2)
                     }
 
                     // NOTE: no need to deal with e1 - (x - a) because x - a is
-                    // turned into x + (-a) by the subtraction operator.
+                    // transformed into (-a) + x by the subtraction operator.
                 }
             }
 
@@ -750,7 +750,7 @@ expression expression_mul(expression e1, expression e2)
                     }
 
                     // NOTE: no need to deal with e1 * (x * a) because x * a is
-                    // turned into a * x by the multiplication operator.
+                    // transformed into a * x by the multiplication operator.
 
                     if (pbop->op() == detail::binary_op::type::div) {
                         if (std::holds_alternative<number>(pbop->args()[0].value())) {
