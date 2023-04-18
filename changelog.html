@@ -497,6 +497,12 @@ document.write(`
 <section id="new">
 <h3>New<a class="headerlink" href="#new" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>The add/mul operators of the expression class now enforce
+a canonical ordering for their operands
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/311">#311</a>).</p></li>
+<li><p>The arithmetic operators of the expression class
+can now fold constants through call chains
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/311">#311</a>).</p></li>
 <li><p>The state variables and right-hand side of a system of ODEs
 are now available as read-only properties in the integrator
 classes
