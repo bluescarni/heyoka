@@ -79,7 +79,10 @@ TEST_CASE("basic auto")
     REQUIRE(dc[2] == heyoka::time);
     REQUIRE(dc[3] == "u_0"_var + "u_1"_var);
     REQUIRE(dc[4] == "u_3"_var + "u_3"_var);
-    REQUIRE(dc[5] == "u_3"_var * "u_2"_var);
+    // NOTE: need to go through a subs because
+    // otherwise operator*() reorders
+    // u_2 and u_3 in lexical order.
+    REQUIRE(dc[5] == subs("u_3"_var * "u_2"_var, {{"u_3"_var, "u_2"_var}, {"u_2"_var, "u_3"_var}}));
     REQUIRE(dc[6] == "u_4"_var);
     REQUIRE(dc[7] == "u_5"_var);
     REQUIRE(nvars == 2u);
@@ -163,7 +166,7 @@ TEST_CASE("basic explicit")
     REQUIRE(dc.size() == 5u);
     REQUIRE(dc[0] == y);
     REQUIRE(dc[1] == x);
-    REQUIRE(dc[2] == "u_1"_var + "u_0"_var);
+    REQUIRE(dc[2] == subs("u_1"_var + "u_0"_var, {{"u_1"_var, "u_0"_var}, {"u_0"_var, "u_1"_var}}));
     REQUIRE(dc[3] == "u_2"_var + "u_2"_var);
     REQUIRE(dc[4] == "u_3"_var);
 
@@ -172,7 +175,7 @@ TEST_CASE("basic explicit")
     REQUIRE(dc[0] == y);
     REQUIRE(dc[1] == x);
     REQUIRE(dc[2] == z);
-    REQUIRE(dc[3] == "u_1"_var + "u_0"_var);
+    REQUIRE(dc[3] == subs("u_1"_var + "u_0"_var, {{"u_1"_var, "u_0"_var}, {"u_0"_var, "u_1"_var}}));
     REQUIRE(dc[4] == "u_3"_var + "u_3"_var);
     REQUIRE(dc[5] == "u_4"_var);
 
@@ -184,7 +187,7 @@ TEST_CASE("basic explicit")
     REQUIRE(dc[2] == heyoka::time);
     REQUIRE(dc[3] == "u_0"_var + "u_1"_var);
     REQUIRE(dc[4] == "u_3"_var + "u_3"_var);
-    REQUIRE(dc[5] == "u_3"_var * "u_2"_var);
+    REQUIRE(dc[5] == subs("u_3"_var * "u_2"_var, {{"u_3"_var, "u_2"_var}, {"u_2"_var, "u_3"_var}}));
     REQUIRE(dc[6] == "u_4"_var);
     REQUIRE(dc[7] == "u_5"_var);
 
@@ -194,9 +197,9 @@ TEST_CASE("basic explicit")
     REQUIRE(dc[1] == y);
     REQUIRE(dc[2] == x);
     REQUIRE(dc[3] == heyoka::time);
-    REQUIRE(dc[4] == "u_2"_var + "u_1"_var);
+    REQUIRE(dc[4] == subs("u_2"_var + "u_1"_var, {{"u_1"_var, "u_2"_var}, {"u_2"_var, "u_1"_var}}));
     REQUIRE(dc[5] == "u_4"_var + "u_4"_var);
-    REQUIRE(dc[6] == "u_4"_var * "u_3"_var);
+    REQUIRE(dc[6] == subs("u_4"_var * "u_3"_var, {{"u_4"_var, "u_3"_var}, {"u_3"_var, "u_4"_var}}));
     REQUIRE(dc[7] == "u_5"_var);
     REQUIRE(dc[8] == "u_6"_var);
 }
