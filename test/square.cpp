@@ -139,14 +139,14 @@ TEST_CASE("square stream")
         std::ostringstream oss;
         oss << square(x + par[0]);
 
-        REQUIRE(oss.str() == "(x + p0)**2");
+        REQUIRE(oss.str() == "(p0 + x)**2");
     }
 
     {
         std::ostringstream oss;
         oss << square(cos(x + par[0]));
 
-        REQUIRE(oss.str() == "cos((x + p0))**2");
+        REQUIRE(oss.str() == "cos((p0 + x))**2");
     }
 }
 

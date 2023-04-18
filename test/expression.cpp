@@ -1073,7 +1073,7 @@ TEST_CASE("subs")
                    .get_ptr());
 
     subs_res = subs(ex, {{x, z}});
-    REQUIRE(subs_res == (z + y) - 2_dbl * (z + y));
+    REQUIRE(subs_res == subs((z + y) - 2_dbl * (z + y), {{z, y}, {y, z}}));
     REQUIRE(std::get<func>(std::get<func>(subs_res.value()).args()[0].value()).get_ptr()
             == std::get<func>(std::get<func>(std::get<func>(subs_res.value()).args()[1].value()).args()[1].value())
                    .get_ptr());

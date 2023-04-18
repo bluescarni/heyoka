@@ -7,6 +7,12 @@ Changelog
 New
 ~~~
 
+- The add/mul operators of the expression class now enforce
+  a canonical ordering for their operands
+  (`#311 <https://github.com/bluescarni/heyoka/pull/311>`__).
+- The arithmetic operators of the expression class
+  can now fold constants through call chains
+  (`#311 <https://github.com/bluescarni/heyoka/pull/311>`__).
 - The state variables and right-hand side of a system of ODEs
   are now available as read-only properties in the integrator
   classes

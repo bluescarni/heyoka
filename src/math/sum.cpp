@@ -81,7 +81,7 @@ void sum_impl::to_stream(std::ostringstream &oss) const
 
 std::vector<expression> sum_impl::gradient() const
 {
-    return std::vector<expression>(args().size(), 1_dbl);
+    return {args().size(), 1_dbl};
 }
 
 namespace
