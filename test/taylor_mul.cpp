@@ -324,7 +324,8 @@ TEST_CASE("taylor mul")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {y * 2_dbl, x * -4_dbl}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {y * 2_dbl, subs(x * -4_dbl, {{x, -4_dbl}, {-4_dbl, x}})}, 1, 1,
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
