@@ -1049,6 +1049,7 @@ TEST_CASE("subs str")
 
     // Check the vectorised version too.
     auto vec_subs = subs({bar, (foo - x) / (2. * foo)}, {{"x", a}});
+    REQUIRE(vec_subs.size() == 2u);
     REQUIRE(std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).args()[0].value())
                 .get_ptr()
             == std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[1].value()).args()[1].value())
@@ -1061,6 +1062,10 @@ TEST_CASE("subs str")
                 .get_ptr()
             == std::get<func>(std::get<func>(std::get<func>(vec_subs[1].value()).args()[0].value()).args()[0].value())
                    .get_ptr());
+
+    // Check canonicalisation.
+    REQUIRE(subs(x + y, {{"x", "b"_var}, {"y", "a"_var}}, true) == "a"_var + "b"_var);
+    REQUIRE(subs(std::vector{x + y}, {{"x", "b"_var}, {"y", "a"_var}}, true)[0] == "a"_var + "b"_var);
 }
 
 TEST_CASE("subs")
@@ -1095,6 +1100,7 @@ TEST_CASE("subs")
 
     // Check the vectorised version too.
     auto vec_subs = subs({ex, tmp - 2_dbl * tmp}, {{x, z}});
+    REQUIRE(vec_subs.size() == 2u);
     REQUIRE(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).get_ptr()
             == std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[1].value()).args()[1].value())
                    .get_ptr());
@@ -1103,6 +1109,10 @@ TEST_CASE("subs")
                    .get_ptr());
     REQUIRE(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).get_ptr()
             == std::get<func>(std::get<func>(vec_subs[1].value()).args()[0].value()).get_ptr());
+
+    // Check canonicalisation.
+    REQUIRE(subs(x + y, {{x, "b"_var}, {y, "a"_var}}, true) == "a"_var + "b"_var);
+    REQUIRE(subs(std::vector{x + y}, {{x, "b"_var}, {y, "a"_var}}, true)[0] == "a"_var + "b"_var);
 }
 
 // cfunc N-body with fixed masses.

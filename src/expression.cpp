@@ -1500,10 +1500,10 @@ namespace
 {
 
 expression subs(funcptr_map<expression> &func_map, const expression &ex,
-                const std::unordered_map<std::string, expression> &smap)
+                const std::unordered_map<std::string, expression> &smap, bool canonicalise)
 {
     return std::visit(
-        [&func_map, &smap](const auto &arg) {
+        [&func_map, &smap, canonicalise](const auto &arg) {
             using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, number> || std::is_same_v<type, param>) {
@@ -1528,7 +1528,13 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
                 std::vector<expression> new_args;
                 new_args.reserve(arg.args().size());
                 for (const auto &orig_arg : arg.args()) {
-                    new_args.push_back(subs(func_map, orig_arg, smap));
+                    new_args.push_back(subs(func_map, orig_arg, smap, canonicalise));
+                }
+
+                // Canonicalise the new arguments vector,
+                // if requested and if the function is commutative.
+                if (canonicalise && arg.is_commutative()) {
+                    std::stable_sort(new_args.begin(), new_args.end(), comm_ops_lt);
                 }
 
                 // Create a copy of arg with the new arguments.
@@ -1550,15 +1556,15 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
 
 } // namespace detail
 
-expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
+expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap, bool canonicalise)
 {
     detail::funcptr_map<expression> func_map;
 
-    return detail::subs(func_map, e, smap);
+    return detail::subs(func_map, e, smap, canonicalise);
 }
 
 std::vector<expression> subs(const std::vector<expression> &v_ex,
-                             const std::unordered_map<std::string, expression> &smap)
+                             const std::unordered_map<std::string, expression> &smap, bool canonicalise)
 {
     detail::funcptr_map<expression> func_map;
 
@@ -1566,7 +1572,7 @@ std::vector<expression> subs(const std::vector<expression> &v_ex,
     ret.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        ret.push_back(detail::subs(func_map, e, smap));
+        ret.push_back(detail::subs(func_map, e, smap, canonicalise));
     }
 
     return ret;
@@ -1579,7 +1585,7 @@ namespace
 {
 
 expression subs(funcptr_map<expression> &func_map, const expression &ex,
-                const std::unordered_map<expression, expression> &smap)
+                const std::unordered_map<expression, expression> &smap, bool canonicalise)
 {
     if (auto it = smap.find(ex); it != smap.end()) {
         // ex is in the substitution map, return the value it maps to.
@@ -1604,7 +1610,13 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
                 std::vector<expression> new_args;
                 new_args.reserve(arg.args().size());
                 for (const auto &orig_arg : arg.args()) {
-                    new_args.push_back(subs(func_map, orig_arg, smap));
+                    new_args.push_back(subs(func_map, orig_arg, smap, canonicalise));
+                }
+
+                // Canonicalise the new arguments vector,
+                // if requested and if the function is commutative.
+                if (canonicalise && arg.is_commutative()) {
+                    std::stable_sort(new_args.begin(), new_args.end(), comm_ops_lt);
                 }
 
                 // Create a copy of arg with the new arguments.
@@ -1631,15 +1643,15 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
 
 } // namespace detail
 
-expression subs(const expression &e, const std::unordered_map<expression, expression> &smap)
+expression subs(const expression &e, const std::unordered_map<expression, expression> &smap, bool canonicalise)
 {
     detail::funcptr_map<expression> func_map;
 
-    return detail::subs(func_map, e, smap);
+    return detail::subs(func_map, e, smap, canonicalise);
 }
 
 std::vector<expression> subs(const std::vector<expression> &v_ex,
-                             const std::unordered_map<expression, expression> &smap)
+                             const std::unordered_map<expression, expression> &smap, bool canonicalise)
 {
     detail::funcptr_map<expression> func_map;
 
@@ -1647,7 +1659,7 @@ std::vector<expression> subs(const std::vector<expression> &v_ex,
     ret.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        ret.push_back(detail::subs(func_map, e, smap));
+        ret.push_back(detail::subs(func_map, e, smap, canonicalise));
     }
 
     return ret;
