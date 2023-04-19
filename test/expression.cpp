@@ -1021,8 +1021,8 @@ TEST_CASE("subs str")
     auto [x, y, z, a] = make_vars("x", "y", "z", "a");
 
     auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
-    const auto foo_id = std::get<func>(foo.value()).get_ptr();
-    const auto bar_id = std::get<func>(bar.value()).get_ptr();
+    const auto *foo_id = std::get<func>(foo.value()).get_ptr();
+    const auto *bar_id = std::get<func>(bar.value()).get_ptr();
 
     auto foo_a = ((a + y) * (z + a)) * ((z - a) * (y + a)), bar_a = (foo_a - a) / (2. * foo_a);
 
@@ -1046,6 +1046,21 @@ TEST_CASE("subs str")
         std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[0].value()).args()[0].value()).get_ptr()
         == std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[1].value()).args()[1].value())
                .get_ptr());
+
+    // Check the vectorised version too.
+    auto vec_subs = subs({bar, (foo - x) / (2. * foo)}, {{"x", a}});
+    REQUIRE(std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).args()[0].value())
+                .get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[1].value()).args()[1].value())
+                   .get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).args()[0].value())
+                .get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[1].value()).args()[1].value())
+                   .get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).args()[0].value())
+                .get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(vec_subs[1].value()).args()[0].value()).args()[0].value())
+                   .get_ptr());
 }
 
 TEST_CASE("subs")
@@ -1077,6 +1092,17 @@ TEST_CASE("subs")
     REQUIRE(std::get<func>(std::get<func>(subs_res.value()).args()[0].value()).get_ptr()
             == std::get<func>(std::get<func>(std::get<func>(subs_res.value()).args()[1].value()).args()[1].value())
                    .get_ptr());
+
+    // Check the vectorised version too.
+    auto vec_subs = subs({ex, tmp - 2_dbl * tmp}, {{x, z}});
+    REQUIRE(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[1].value()).args()[1].value())
+                   .get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(vec_subs[1].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(vec_subs[1].value()).args()[1].value()).args()[1].value())
+                   .get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(vec_subs[1].value()).args()[0].value()).get_ptr());
 }
 
 // cfunc N-body with fixed masses.
@@ -1985,4 +2011,8 @@ TEST_CASE("get_params")
     auto ex = "z"_var * (tmp1 - tmp2) + "y"_var * tmp1 / tmp2;
 
     REQUIRE(get_params(ex) == std::vector{par[3], par[56]});
+
+    // Test the vectorised version too.
+    auto ex2 = 3_dbl + par[4];
+    REQUIRE(get_params({ex, ex2}) == std::vector{par[3], par[4], par[56]});
 }
