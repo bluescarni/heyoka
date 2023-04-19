@@ -84,7 +84,7 @@ TEST_CASE("linear box")
     REQUIRE(ta_ev.get_state()[0] == 1.);
 }
 
-TEST_CASE("deep copy semantics")
+TEST_CASE("copy semantics")
 {
     using ev_t = taylor_adaptive<double>::t_event_t;
 
@@ -92,24 +92,24 @@ TEST_CASE("deep copy semantics")
 
     auto ex = v + 3_dbl;
 
-    // Expression is copied on construction.
+    // Expression is shallow copied on construction.
     ev_t ev(ex);
-    REQUIRE(std::get<func>(ex.value()).get_ptr() != std::get<func>(ev.get_expression().value()).get_ptr());
+    REQUIRE(std::get<func>(ex.value()).get_ptr() == std::get<func>(ev.get_expression().value()).get_ptr());
 
-    // Deep copy ctor.
+    // Copy ctor.
     auto ev2 = ev;
 
     REQUIRE(std::get<func>(ev.get_expression().value()).get_ptr()
-            != std::get<func>(ev2.get_expression().value()).get_ptr());
+            == std::get<func>(ev2.get_expression().value()).get_ptr());
 
     // Self assignment.
     auto orig_id = std::get<func>(ev2.get_expression().value()).get_ptr();
     ev2 = *&ev2;
     REQUIRE(orig_id == std::get<func>(ev2.get_expression().value()).get_ptr());
 
-    // Deep copy assignment.
+    // Copy assignment.
     ev2 = ev;
-    REQUIRE(orig_id != std::get<func>(ev2.get_expression().value()).get_ptr());
+    REQUIRE(orig_id == std::get<func>(ev2.get_expression().value()).get_ptr());
 }
 
 TEST_CASE("taylor te")

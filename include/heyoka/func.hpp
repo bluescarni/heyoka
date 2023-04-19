@@ -151,6 +151,9 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
 
     [[nodiscard]] virtual llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const = 0;
 
+    // NOTE: this is the last remaining trace of mutability
+    // related to decomposition. Note, however, that this is never
+    // exposed in the public API.
     virtual taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) && = 0;
     [[nodiscard]] virtual bool has_taylor_decompose() const = 0;
 

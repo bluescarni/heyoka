@@ -1403,9 +1403,7 @@ void nt_event_impl<T, B>::finalise_ctor(event_direction d)
 }
 
 template <typename T, bool B>
-nt_event_impl<T, B>::nt_event_impl(const nt_event_impl &o) : eq(copy(o.eq)), callback(o.callback), dir(o.dir)
-{
-}
+nt_event_impl<T, B>::nt_event_impl(const nt_event_impl &) = default;
 
 template <typename T, bool B>
 nt_event_impl<T, B>::nt_event_impl(nt_event_impl &&) noexcept = default;
@@ -1468,10 +1466,7 @@ void t_event_impl<T, B>::finalise_ctor(callback_t cb, T cd, event_direction d)
 }
 
 template <typename T, bool B>
-t_event_impl<T, B>::t_event_impl(const t_event_impl &o)
-    : eq(copy(o.eq)), callback(o.callback), cooldown(o.cooldown), dir(o.dir)
-{
-}
+t_event_impl<T, B>::t_event_impl(const t_event_impl &) = default;
 
 template <typename T, bool B>
 t_event_impl<T, B>::t_event_impl(t_event_impl &&) noexcept = default;
