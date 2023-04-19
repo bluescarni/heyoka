@@ -375,7 +375,7 @@ expression rename_variables(detail::funcptr_map<expression> &func_map, const exp
                     return expression{it->second};
                 }
 
-                // NOTE: fall back to the default case of returning a copy
+                // NOTE: fall through to the default case of returning a copy
                 // of the original variable if no renaming took place.
             }
 
