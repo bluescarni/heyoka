@@ -150,11 +150,6 @@ expression &expression::operator=(const expression &) = default;
 
 expression &expression::operator=(expression &&) noexcept = default;
 
-expression::value_type &expression::value()
-{
-    return m_value;
-}
-
 const expression::value_type &expression::value() const
 {
     return m_value;
@@ -407,11 +402,6 @@ expression rename_variables(const expression &e, const std::unordered_map<std::s
     detail::funcptr_map<expression> func_map;
 
     return detail::rename_variables(func_map, e, repl_map);
-}
-
-void swap(expression &ex0, expression &ex1) noexcept
-{
-    std::swap(ex0.value(), ex1.value());
 }
 
 namespace detail

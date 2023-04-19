@@ -100,8 +100,12 @@ public:
     expression &operator=(const expression &);
     expression &operator=(expression &&) noexcept;
 
-    [[nodiscard]] value_type &value();
     [[nodiscard]] const value_type &value() const;
+
+    friend void swap(expression &ex0, expression &ex1) noexcept
+    {
+        std::swap(ex0.m_value, ex1.m_value);
+    }
 };
 
 HEYOKA_DLL_PUBLIC expression copy(const expression &);
@@ -192,8 +196,6 @@ inline namespace literals
 HEYOKA_DLL_PUBLIC detail::prime_wrapper operator""_p(const char *, std::size_t);
 
 } // namespace literals
-
-HEYOKA_DLL_PUBLIC void swap(expression &, expression &) noexcept;
 
 namespace detail
 {
