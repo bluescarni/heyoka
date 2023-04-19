@@ -113,6 +113,7 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     [[nodiscard]] virtual bool extra_equal_to(const func &) const = 0;
 
     [[nodiscard]] virtual bool is_time_dependent() const = 0;
+    [[nodiscard]] virtual bool is_commutative() const = 0;
 
     [[nodiscard]] virtual std::size_t extra_hash() const = 0;
 
@@ -189,6 +190,12 @@ using func_is_time_dependent_t = decltype(std::declval<std::add_lvalue_reference
 
 template <typename T>
 inline constexpr bool func_has_is_time_dependent_v = std::is_same_v<detected_t<func_is_time_dependent_t, T>, bool>;
+
+template <typename T>
+using func_is_commutative_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().is_commutative());
+
+template <typename T>
+inline constexpr bool func_has_is_commutative_v = std::is_same_v<detected_t<func_is_commutative_t, T>, bool>;
 
 template <typename T>
 using func_extra_hash_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().extra_hash());
@@ -378,6 +385,15 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     {
         if constexpr (func_has_is_time_dependent_v<T>) {
             return m_value.is_time_dependent();
+        } else {
+            return false;
+        }
+    }
+
+    [[nodiscard]] bool is_commutative() const final
+    {
+        if constexpr (func_has_is_commutative_v<T>) {
+            return m_value.is_commutative();
         } else {
             return false;
         }
@@ -663,6 +679,7 @@ public:
     [[nodiscard]] void *get_ptr();
 
     [[nodiscard]] bool is_time_dependent() const;
+    [[nodiscard]] bool is_commutative() const;
 
     [[nodiscard]] const std::string &get_name() const;
 

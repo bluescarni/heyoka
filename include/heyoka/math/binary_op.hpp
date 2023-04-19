@@ -65,6 +65,8 @@ public:
 
     [[nodiscard]] std::size_t extra_hash() const;
 
+    [[nodiscard]] bool is_commutative() const;
+
     [[nodiscard]] type op() const;
     [[nodiscard]] const expression &lhs() const;
     [[nodiscard]] const expression &rhs() const;

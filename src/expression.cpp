@@ -532,12 +532,14 @@ expression operator-(expression e)
 namespace detail
 {
 
-namespace
-{
-
-// Helper to check if the operands of a commutative binary operator
-// should be switched in order to satisfy a canonical ordering.
-bool comm_op_need_switch(const expression &e1, const expression &e2)
+// A comparison operator intended for sorting in a canonical
+// way the operands to a commutative operator/function.
+// NOTE: this cannot make a set of function arguments unique, as:
+// - two number arguments are considered equal to each other
+//   (this could be fixed by introducing an ordering on numbers),
+// - two func arguments are considered equal to each other
+//   (no idea how one would implement an ordering on functions).
+bool comm_ops_lt(const expression &e1, const expression &e2)
 {
     return std::visit(
         [](const auto &v1, const auto &v2) {
@@ -547,35 +549,37 @@ bool comm_op_need_switch(const expression &e1, const expression &e2)
             // Both arguments are variables: they need to be ordered
             // in lexicographic fashion.
             if constexpr (std::is_same_v<variable, type1> && std::is_same_v<variable, type2>) {
-                return v1.name() > v2.name();
+                return v1.name() < v2.name();
             }
 
             // Both arguments are params: they need to be ordered
             // in ascending index order.
             if constexpr (std::is_same_v<param, type1> && std::is_same_v<param, type2>) {
-                return v1.idx() > v2.idx();
+                return v1.idx() < v2.idx();
             }
 
-            // The first argument is a non-number, the second argument
-            // is a number -> always needs switching.
+            // non-number > number.
             if constexpr (!std::is_same_v<number, type1> && std::is_same_v<number, type2>) {
-                return true;
+                return false;
             }
 
-            // (var, param) -> switch to (param, var).
+            // var > param.
             if constexpr (std::is_same_v<variable, type1> && std::is_same_v<param, type2>) {
-                return true;
+                return false;
             }
 
-            // (func, non-func) -> switch to (non-func, func).
+            // func > non-func.
             if constexpr (std::is_same_v<func, type1> && !std::is_same_v<func, type2>) {
-                return true;
+                return false;
             }
 
-            return false;
+            return true;
         },
         e1.value(), e2.value());
 }
+
+namespace
+{
 
 expression expression_plus(expression e1, expression e2)
 {
@@ -637,10 +641,10 @@ expression expression_plus(expression e1, expression e2)
 
 expression operator+(expression e1, expression e2)
 {
-    if (detail::comm_op_need_switch(e1, e2)) {
-        return detail::expression_plus(std::move(e2), std::move(e1));
-    } else {
+    if (detail::comm_ops_lt(e1, e2)) {
         return detail::expression_plus(std::move(e1), std::move(e2));
+    } else {
+        return detail::expression_plus(std::move(e2), std::move(e1));
     }
 }
 
@@ -797,10 +801,10 @@ expression expression_mul(expression e1, expression e2)
 
 expression operator*(expression e1, expression e2)
 {
-    if (detail::comm_op_need_switch(e1, e2)) {
-        return detail::expression_mul(std::move(e2), std::move(e1));
-    } else {
+    if (detail::comm_ops_lt(e1, e2)) {
         return detail::expression_mul(std::move(e1), std::move(e2));
+    } else {
+        return detail::expression_mul(std::move(e2), std::move(e1));
     }
 }
 

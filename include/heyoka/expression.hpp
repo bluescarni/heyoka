@@ -209,6 +209,8 @@ namespace detail
 
 void stream_expression(std::ostringstream &, const expression &);
 
+bool comm_ops_lt(const expression &, const expression &);
+
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression &);

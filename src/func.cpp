@@ -236,6 +236,11 @@ bool func::is_time_dependent() const
     return ptr()->is_time_dependent();
 }
 
+bool func::is_commutative() const
+{
+    return ptr()->is_commutative();
+}
+
 const std::string &func::get_name() const
 {
     return ptr()->get_name();
