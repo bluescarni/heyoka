@@ -944,6 +944,10 @@ TEST_CASE("get_variables")
 
     auto tmp = x * z, foo = x - z - 5_dbl;
     REQUIRE(get_variables((y + tmp) / foo * tmp - foo) == std::vector<std::string>{"x", "y", "z"});
+
+    // The vectorised version
+    REQUIRE(get_variables({(y + tmp) / foo * tmp - foo, "a"_var + "b"_var})
+            == std::vector<std::string>{"a", "b", "x", "y", "z"});
 }
 
 TEST_CASE("rename_variables")
@@ -970,6 +974,16 @@ TEST_CASE("rename_variables")
     ex = (y + tmp) / foo * tmp - foo;
     ex = rename_variables(ex, {{"x", "a"}, {"y", "b"}});
     REQUIRE(ex == ("b"_var + "a"_var * z) / ("a"_var - z - 5_dbl) * ("a"_var * z) - ("a"_var - z - 5_dbl));
+
+    // The vectorised version.
+    ex = (y + tmp) / foo * tmp - foo;
+    auto v_ex = rename_variables({ex, tmp}, {{"x", "a"}, {"y", "b"}});
+    REQUIRE(v_ex[0] == ("b"_var + "a"_var * z) / ("a"_var - z - 5_dbl) * ("a"_var * z) - ("a"_var - z - 5_dbl));
+    REQUIRE(v_ex[1] == "a"_var * z);
+
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(v_ex[0].value()).args()[0].value()).args()[1].value()).get_ptr()
+        == std::get<func>(v_ex[1].value()).get_ptr());
 }
 
 TEST_CASE("copy")
@@ -1014,6 +1028,20 @@ TEST_CASE("copy")
             == std::get<func>(std::get<func>(bar_copy.value()).args()[1].value()).get_ptr());
     REQUIRE(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).get_ptr()
             != std::get<func>(std::get<func>(bar.value()).args()[1].value()).get_ptr());
+
+    // Vectorised version.
+    auto vec_copy = copy({bar, foo + foo});
+
+    REQUIRE(std::get<func>(std::get<func>(vec_copy[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(vec_copy[0].value()).args()[1].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(vec_copy[0].value()).args()[0].value()).get_ptr()
+            != std::get<func>(std::get<func>(bar.value()).args()[1].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(vec_copy[1].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(vec_copy[1].value()).args()[1].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(vec_copy[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(vec_copy[1].value()).args()[0].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(vec_copy[0].value()).args()[1].value()).get_ptr()
+            == std::get<func>(std::get<func>(vec_copy[1].value()).args()[1].value()).get_ptr());
 }
 
 TEST_CASE("subs str")

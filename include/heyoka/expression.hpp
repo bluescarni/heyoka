@@ -109,12 +109,12 @@ public:
 };
 
 HEYOKA_DLL_PUBLIC expression copy(const expression &);
+HEYOKA_DLL_PUBLIC std::vector<expression> copy(const std::vector<expression> &);
 
 namespace detail
 {
 
 // A couple of helpers for deep-copying containers of expressions.
-std::vector<expression> copy(const std::vector<expression> &);
 std::vector<std::pair<expression, expression>> copy(const std::vector<std::pair<expression, expression>> &);
 
 } // namespace detail
@@ -233,7 +233,10 @@ struct formatter<heyoka::expression> : heyoka::detail::ostream_formatter {
 HEYOKA_BEGIN_NAMESPACE
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const expression &);
+HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const std::vector<expression> &);
 HEYOKA_DLL_PUBLIC expression rename_variables(const expression &, const std::unordered_map<std::string, std::string> &);
+HEYOKA_DLL_PUBLIC std::vector<expression> rename_variables(const std::vector<expression> &,
+                                                           const std::unordered_map<std::string, std::string> &);
 
 HEYOKA_DLL_PUBLIC expression operator+(expression);
 HEYOKA_DLL_PUBLIC expression operator-(expression);
