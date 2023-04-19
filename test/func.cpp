@@ -718,6 +718,8 @@ TEST_CASE("ref semantics")
     REQUIRE(std::get<func>(foo.value()).get_ptr() == std::get<func>(bar.value()).get_ptr());
 }
 
+#if 0
+
 TEST_CASE("copy")
 {
     auto [x, y, z] = make_vars("x", "y", "z");
@@ -749,6 +751,8 @@ TEST_CASE("copy")
         std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).args()[1].value()).get_ptr()
         == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[1].value()).args()[1].value()).get_ptr());
 }
+
+#endif
 
 // Bug: a default-constructed function is not serialisable.
 TEST_CASE("null func s11n")

@@ -618,10 +618,10 @@ public:
     ~func();
 
     // NOTE: this creates a new func containing
-    // a copy of the inner object: this means that
-    // the function arguments are shallow-copied and
-    // NOT deep-copied.
-    [[nodiscard]] func copy() const;
+    // a copy of the inner object in which the original
+    // function arguments have been replaced by the
+    // provided vector of arguments.
+    [[nodiscard]] func copy(const std::vector<expression> &) const;
 
     // NOTE: like in pagmo, this may fail if invoked
     // from different DLLs in certain situations (e.g.,

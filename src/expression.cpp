@@ -179,23 +179,23 @@ expression copy_impl(funcptr_map<expression> &func_map, const expression &e)
                     return it->second;
                 }
 
-                // Create a copy of v. Note that this will copy
-                // the arguments of v via their copy constructor,
-                // and thus any argument which is itself a function
-                // will be shallow-copied.
-                auto f_copy = v.copy();
-
-                // Perform a copy of the arguments of v which are functions.
-                assert(v.args().size() == f_copy.args().size()); // LCOV_EXCL_LINE
-                auto b1 = v.args().begin();
-                for (auto [b2, e2] = f_copy.get_mutable_args_it(); b2 != e2; ++b1, ++b2) {
+                // Create the new args vector by making a deep copy
+                // of the original function arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(v.args().size());
+                for (const auto &orig_arg : v.args()) {
                     // NOTE: the argument needs to be copied via a recursive
-                    // call to copy_impl() only if it is a func. Otherwise, the copy
-                    // we made earlier via the copy constructor is already a deep copy.
-                    if (std::holds_alternative<func>(b1->value())) {
-                        *b2 = copy_impl(func_map, *b1);
+                    // call to copy_impl() only if it is a func. Otherwise, a normal
+                    // copy will suffice.
+                    if (std::holds_alternative<func>(orig_arg.value())) {
+                        new_args.push_back(copy_impl(func_map, orig_arg));
+                    } else {
+                        new_args.push_back(orig_arg);
                     }
                 }
+
+                // Create a copy of v with the new arguments.
+                auto f_copy = v.copy(new_args);
 
                 // Construct the return value and put it into the cache.
                 auto ex = expression{std::move(f_copy)};
@@ -1504,13 +1504,16 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
                     return it->second;
                 }
 
-                // NOTE: this creates a separate instance of arg, but its
-                // arguments are shallow-copied.
-                auto tmp = arg.copy();
-
-                for (auto [b, e] = tmp.get_mutable_args_it(); b != e; ++b) {
-                    *b = subs(func_map, *b, smap);
+                // Create the new args vector by running the
+                // substitution on all arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(arg.args().size());
+                for (const auto &orig_arg : arg.args()) {
+                    new_args.push_back(subs(func_map, orig_arg, smap));
                 }
+
+                // Create a copy of arg with the new arguments.
+                auto tmp = arg.copy(new_args);
 
                 // Put the return value in the cache.
                 auto ret = expression{std::move(tmp)};
@@ -1562,14 +1565,16 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
                     return it->second;
                 }
 
-                // NOTE: this creates a separate instance of arg, but its
-                // arguments are shallow-copied.
-                auto tmp = arg.copy();
-
-                // Recursively run the substitution on all function arguments.
-                for (auto [b, e] = tmp.get_mutable_args_it(); b != e; ++b) {
-                    *b = subs(func_map, *b, smap);
+                // Create the new args vector by running the
+                // substitution on all arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(arg.args().size());
+                for (const auto &orig_arg : arg.args()) {
+                    new_args.push_back(subs(func_map, orig_arg, smap));
                 }
+
+                // Create a copy of arg with the new arguments.
+                auto tmp = arg.copy(new_args);
 
                 // Put the return value in the cache.
                 auto ret = expression{std::move(tmp)};
