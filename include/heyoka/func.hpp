@@ -667,16 +667,9 @@ public:
         auto p = dynamic_cast<const detail::func_inner<T> *>(ptr());
         return p == nullptr ? nullptr : &(p->m_value);
     }
-    template <typename T>
-    [[nodiscard]] T *extract() noexcept
-    {
-        auto p = dynamic_cast<detail::func_inner<T> *>(ptr());
-        return p == nullptr ? nullptr : &(p->m_value);
-    }
 
     [[nodiscard]] std::type_index get_type_index() const;
     [[nodiscard]] const void *get_ptr() const;
-    [[nodiscard]] void *get_ptr();
 
     [[nodiscard]] bool is_time_dependent() const;
     [[nodiscard]] bool is_commutative() const;

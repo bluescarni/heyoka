@@ -222,11 +222,6 @@ const void *func::get_ptr() const
     return ptr()->get_ptr();
 }
 
-void *func::get_ptr()
-{
-    return ptr()->get_ptr();
-}
-
 // NOTE: time dependency here means **intrinsic** time
 // dependence of the function. That is, we are not concerned
 // with the arguments' time dependence and, e.g., cos(time)
