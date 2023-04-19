@@ -496,22 +496,22 @@ TEST_CASE("func rename_variables")
 {
     auto f1 = expression{func(func_10{{}})};
     auto f2 = f1;
-    rename_variables(f1, {{}});
+    f1 = rename_variables(f1, {{}});
     REQUIRE(f2 == f1);
 
     f1 = expression{func(func_10{{0_dbl, "x"_var}})};
     f2 = f1;
-    rename_variables(f1, {{}});
+    f1 = rename_variables(f1, {{}});
     REQUIRE(f2 == f1);
 
-    rename_variables(f1, {{"x", "y"}});
-    REQUIRE(f2 == f1);
+    f1 = rename_variables(f1, {{"x", "y"}});
+    REQUIRE(f2 != f1);
     REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"y"});
-    rename_variables(f1, {{"x", "y"}});
+    f1 = rename_variables(f1, {{"x", "y"}});
     REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"y"});
 
     f1 = expression{func(func_10{{"x"_var, 0_dbl, "z"_var, "y"_var}})};
-    rename_variables(f1, {{"x", "y"}});
+    f1 = rename_variables(f1, {{"x", "y"}});
     REQUIRE(f2 != f1);
     REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"y", "z"});
 }
@@ -718,41 +718,28 @@ TEST_CASE("ref semantics")
     REQUIRE(std::get<func>(foo.value()).get_ptr() == std::get<func>(bar.value()).get_ptr());
 }
 
-#if 0
-
 TEST_CASE("copy")
 {
+    using Catch::Matchers::Message;
+
     auto [x, y, z] = make_vars("x", "y", "z");
 
     auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
 
-    auto foo_copy = expression{std::get<func>(foo.value()).copy()};
+    // Error mode.
+    REQUIRE_THROWS_MATCHES(
+        expression{std::get<func>(foo.value()).copy({x, y, z})}, std::invalid_argument,
+        Message("The set of new arguments passed to func::copy() has a size of 3, but the number of arguments "
+                "of the original function is 2 (the two sizes must be equal)"));
 
-    // Copy creates a new obejct...
+    auto foo_copy = expression{std::get<func>(foo.value()).copy({x, y})};
+
+    // Check that copy creates a new obejct.
     REQUIRE(std::get<func>(foo_copy.value()).get_ptr() != std::get<func>(foo.value()).get_ptr());
 
-    // ... but it does not deep copy the arguments.
-    REQUIRE(std::get<func>(std::get<func>(foo_copy.value()).args()[0].value()).get_ptr()
-            == std::get<func>(std::get<func>(foo.value()).args()[0].value()).get_ptr());
-    REQUIRE(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).get_ptr()
-            == std::get<func>(std::get<func>(foo.value()).args()[1].value()).get_ptr());
-
-    REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[0].value()).args()[0].value()).get_ptr()
-        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[0].value()).args()[0].value()).get_ptr());
-    REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[0].value()).args()[1].value()).get_ptr()
-        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[0].value()).args()[1].value()).get_ptr());
-
-    REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).args()[0].value()).get_ptr()
-        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[1].value()).args()[0].value()).get_ptr());
-    REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).args()[1].value()).get_ptr()
-        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[1].value()).args()[1].value()).get_ptr());
+    // Check the new arguments.
+    REQUIRE(std::get<func>(foo_copy.value()).args() == std::vector{x, y});
 }
-
-#endif
 
 // Bug: a default-constructed function is not serialisable.
 TEST_CASE("null func s11n")

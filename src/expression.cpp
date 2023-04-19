@@ -336,35 +336,50 @@ void get_variables(funcptr_set &func_set, std::set<std::string> &s_set, const ex
         e.value());
 }
 
-void rename_variables(funcptr_set &func_set, expression &e,
-                      const std::unordered_map<std::string, std::string> &repl_map)
+expression rename_variables(detail::funcptr_map<expression> &func_map, const expression &e,
+                            const std::unordered_map<std::string, std::string> &repl_map)
 {
-    std::visit(
-        [&func_set, &repl_map](auto &arg) {
+    return std::visit(
+        [&func_map, &repl_map](const auto &arg) {
             using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, func>) {
                 const auto f_id = arg.get_ptr();
 
-                if (func_set.find(f_id) != func_set.end()) {
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
                     // We already renamed variables for the current function,
-                    // just return.
-                    return;
+                    // fetch the result from the cache.
+                    return it->second;
                 }
 
-                for (auto [beg, end] = arg.get_mutable_args_it(); beg != end; ++beg) {
-                    rename_variables(func_set, *beg, repl_map);
+                // Prepare the new args vector by renaming variables
+                // for all arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(arg.args().size());
+                for (const auto &orig_arg : arg.args()) {
+                    new_args.push_back(rename_variables(func_map, orig_arg, repl_map));
                 }
 
-                // Add the id of f to the set.
-                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
+                // Create a copy of arg with the new arguments.
+                auto tmp = arg.copy(new_args);
+
+                // Put the return value in the cache.
+                auto ret = expression{std::move(tmp)};
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
+
+                return ret;
             } else if constexpr (std::is_same_v<type, variable>) {
                 if (auto it = repl_map.find(arg.name()); it != repl_map.end()) {
-                    arg.name() = it->second;
+                    return expression{it->second};
                 }
+
+                // NOTE: fall back to the default case of returning a copy
+                // of the original variable if no renaming took place.
             }
+
+            return expression{arg};
         },
         e.value());
 }
@@ -387,11 +402,11 @@ std::vector<std::string> get_variables(const expression &e)
     return {s_set.begin(), s_set.end()};
 }
 
-void rename_variables(expression &e, const std::unordered_map<std::string, std::string> &repl_map)
+expression rename_variables(const expression &e, const std::unordered_map<std::string, std::string> &repl_map)
 {
-    detail::funcptr_set func_set;
+    detail::funcptr_map<expression> func_map;
 
-    detail::rename_variables(func_set, e, repl_map);
+    return detail::rename_variables(func_map, e, repl_map);
 }
 
 void swap(expression &ex0, expression &ex1) noexcept
@@ -2218,7 +2233,7 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex, st
         auto &ex = v_ex[i];
 
         // Rename the u variables in ex.
-        rename_variables(ex, uvars_rename);
+        ex = rename_variables(ex, uvars_rename);
 
         if (auto it = ex_map.find(ex); it == ex_map.end()) {
             // This is the first occurrence of ex in the
@@ -2259,7 +2274,7 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex, st
         assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
                || std::holds_alternative<param>(ex.value()));
 
-        rename_variables(ex, uvars_rename);
+        ex = rename_variables(ex, uvars_rename);
 
         retval.push_back(std::move(ex));
     }
@@ -2436,7 +2451,7 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc, std::vecto
     // Do the remap for the definitions of the u variables and of the components.
     for (auto *it = dc.data() + nvars; it != dc.data() + dc.size(); ++it) {
         // Remap the expression.
-        rename_variables(*it, remap);
+        *it = rename_variables(*it, remap);
     }
 
     // Reorder the decomposition.
@@ -2511,7 +2526,7 @@ function_decompose(const std::vector<expression> &v_ex_)
 
     // Rename the variables in the original function.
     for (auto &ex : v_ex) {
-        rename_variables(ex, repl_map);
+        ex = rename_variables(ex, repl_map);
     }
 
     // Init the decomposition. It begins with a list
@@ -2677,7 +2692,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
 
     // Rename the variables in the original function.
     for (auto &ex : v_ex) {
-        rename_variables(ex, repl_map);
+        ex = rename_variables(ex, repl_map);
     }
 
     // Init the decomposition. It begins with a list

@@ -104,9 +104,9 @@ const std::vector<expression> &func_base::args() const
     return m_args;
 }
 
-std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> func_base::get_mutable_args_it()
+std::pair<expression *, expression *> func_base::get_mutable_args_range()
 {
-    return {m_args.begin(), m_args.end()};
+    return {m_args.data(), m_args.data() + m_args.size()};
 }
 
 namespace detail
@@ -181,14 +181,16 @@ func func::copy(const std::vector<expression> &new_args) const
     // NOTE: a user-defined function might have a funky
     // implementation of the copy constructor which, e.g.,
     // changes the arity.
+    // LCOV_EXCL_START
     if (ret.args().size() != orig_size) {
         throw std::invalid_argument(fmt::format("The copy constructor of a user-defined function changed the arity"
                                                 "from {} to {} - this is not allowed",
                                                 orig_size, ret.args().size()));
     }
+    // LCOV_EXCL_STOP
 
     // Copy over the new arguments.
-    auto it = ret.get_mutable_args_it().first;
+    auto *it = ret.ptr()->get_mutable_args_range().first;
     for (decltype(new_args.size()) i = 0; i < new_args.size(); ++i, ++it) {
         *it = new_args[i];
     }
@@ -247,11 +249,6 @@ void func::to_stream(std::ostringstream &oss) const
 const std::vector<expression> &func::args() const
 {
     return ptr()->args();
-}
-
-std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> func::get_mutable_args_it()
-{
-    return ptr()->get_mutable_args_it();
 }
 
 std::vector<expression> func::fetch_gradient(const std::string &target) const

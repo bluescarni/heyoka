@@ -351,7 +351,7 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
         auto &[ex, deps] = v_ex[i];
 
         // Rename the u variables in ex.
-        rename_variables(ex, uvars_rename);
+        ex = rename_variables(ex, uvars_rename);
 
         if (auto it = ex_map.find(ex); it == ex_map.end()) {
             // This is the first occurrence of ex in the
@@ -394,7 +394,7 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
                || std::holds_alternative<param>(ex.value()));
         assert(deps.empty());
 
-        rename_variables(ex, uvars_rename);
+        ex = rename_variables(ex, uvars_rename);
 
         retval.emplace_back(std::move(ex), std::move(deps));
     }
@@ -589,7 +589,7 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
     // derivatives and the hidden deps.
     for (auto *it = dc.data() + n_eq; it != dc.data() + dc.size(); ++it) {
         // Remap the expression.
-        rename_variables(it->first, remap);
+        it->first = rename_variables(it->first, remap);
 
         // Remap the hidden dependencies.
         for (auto &idx : it->second) {
@@ -823,12 +823,12 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
 
     // Rename the variables in the original equations.
     for (auto &ex : v_ex) {
-        rename_variables(ex, repl_map);
+        ex = rename_variables(ex, repl_map);
     }
 
     // Rename the variables in sv_funcs.
     for (auto &ex : sv_funcs) {
-        rename_variables(ex, repl_map);
+        ex = rename_variables(ex, repl_map);
     }
 
     // Init the decomposition. It begins with a list
@@ -1044,12 +1044,12 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 
     // Rename the variables in the original equations.
     for (auto &[_, rhs_ex] : sys) {
-        rename_variables(rhs_ex, repl_map);
+        rhs_ex = rename_variables(rhs_ex, repl_map);
     }
 
     // Rename the variables in sv_funcs.
     for (auto &ex : sv_funcs) {
-        rename_variables(ex, repl_map);
+        ex = rename_variables(ex, repl_map);
     }
 
     // Init the decomposition. It begins with a list

@@ -951,24 +951,24 @@ TEST_CASE("rename_variables")
     auto [x, y, z] = make_vars("x", "y", "z");
 
     auto ex = 1_dbl;
-    rename_variables(ex, {{"x", "a"}});
+    ex = rename_variables(ex, {{"x", "a"}});
     REQUIRE(ex == 1_dbl);
 
     ex = par[0];
-    rename_variables(ex, {{"x", "a"}});
+    ex = rename_variables(ex, {{"x", "a"}});
     REQUIRE(ex == par[0]);
 
     ex = x;
-    rename_variables(ex, {{"x", "a"}});
+    ex = rename_variables(ex, {{"x", "a"}});
     REQUIRE(ex == "a"_var);
 
     ex = x + y;
-    rename_variables(ex, {{"x", "a"}, {"y", "b"}});
+    ex = rename_variables(ex, {{"x", "a"}, {"y", "b"}});
     REQUIRE(ex == "a"_var + "b"_var);
 
     auto tmp = x * z, foo = x - z - 5_dbl;
     ex = (y + tmp) / foo * tmp - foo;
-    rename_variables(ex, {{"x", "a"}, {"y", "b"}});
+    ex = rename_variables(ex, {{"x", "a"}, {"y", "b"}});
     REQUIRE(ex == ("b"_var + "a"_var * z) / ("a"_var - z - 5_dbl) * ("a"_var * z) - ("a"_var - z - 5_dbl));
 }
 

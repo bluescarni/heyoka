@@ -45,6 +45,15 @@ BOOST_CLASS_VERSION(heyoka::func, 1)
 
 HEYOKA_BEGIN_NAMESPACE
 
+namespace detail
+{
+
+// Fwd declaration.
+template <typename>
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner;
+
+} // namespace detail
+
 class HEYOKA_DLL_PUBLIC func_base
 {
     std::string m_name;
@@ -59,6 +68,12 @@ class HEYOKA_DLL_PUBLIC func_base
         ar &m_args;
     }
 
+    // NOTE: func_inner needs access to get_mutable_args_range().
+    template <typename>
+    friend struct HEYOKA_DLL_PUBLIC_INLINE_CLASS detail::func_inner;
+
+    std::pair<expression *, expression *> get_mutable_args_range();
+
 public:
     explicit func_base(std::string, std::vector<expression>);
 
@@ -72,7 +87,6 @@ public:
 
     [[nodiscard]] const std::string &get_name() const;
     [[nodiscard]] const std::vector<expression> &args() const;
-    std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 };
 
 namespace detail
@@ -103,7 +117,7 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     [[nodiscard]] virtual std::size_t extra_hash() const = 0;
 
     [[nodiscard]] virtual const std::vector<expression> &args() const = 0;
-    virtual std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it() = 0;
+    virtual std::pair<expression *, expression *> get_mutable_args_range() = 0;
 
     [[nodiscard]] virtual bool has_diff_var() const = 0;
     virtual expression diff(funcptr_map<expression> &, const std::string &) const = 0;
@@ -382,9 +396,9 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     {
         return static_cast<const func_base *>(&m_value)->args();
     }
-    std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it() final
+    std::pair<expression *, expression *> get_mutable_args_range() final
     {
-        return static_cast<func_base *>(&m_value)->get_mutable_args_it();
+        return static_cast<func_base *>(&m_value)->get_mutable_args_range();
     }
 
     // diff.
@@ -657,7 +671,6 @@ public:
     [[nodiscard]] std::size_t hash(detail::funcptr_map<std::size_t> &) const;
 
     [[nodiscard]] const std::vector<expression> &args() const;
-    std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 
     expression diff(detail::funcptr_map<expression> &, const std::string &) const;
     expression diff(detail::funcptr_map<expression> &, const param &) const;
