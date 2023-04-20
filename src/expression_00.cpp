@@ -2531,33 +2531,6 @@ std::optional<std::vector<expression>::size_type> decompose(const expression &ex
     return detail::decompose(func_map, ex, dc);
 }
 
-void decompose(std::vector<expression> &v_ex, std::vector<expression> &dc)
-{
-    detail::funcptr_map<std::vector<expression>::size_type> func_map;
-
-    for (auto &ex : v_ex) {
-        const auto dres = detail::decompose(func_map, ex, dc);
-
-        if (dres) {
-            // NOTE: if the component was decomposed
-            // (that is, it is not constant or a single variable),
-            // we have to update the original definition
-            // of the component in v_ex
-            // so that it points to the u variable
-            // that now represents it.
-            // NOTE: all functions are forced to return
-            // a non-empty dres
-            // in the func API, so the only entities that
-            // can return an empty dres are const/params or
-            // variables.
-            ex = expression{fmt::format("u_{}", *dres)};
-        } else {
-            assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
-                   || std::holds_alternative<param>(ex.value()));
-        }
-    }
-}
-
 // Decomposition with automatic deduction of variables.
 std::pair<std::vector<expression>, std::vector<expression>::size_type>
 function_decompose(const std::vector<expression> &v_ex_)

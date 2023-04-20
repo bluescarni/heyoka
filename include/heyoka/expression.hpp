@@ -579,7 +579,6 @@ llvm::Value *cfunc_c_load_eval(llvm_state &, llvm::Type *, llvm::Value *, llvm::
 } // namespace detail
 
 std::optional<std::vector<expression>::size_type> decompose(const expression &, std::vector<expression> &);
-void decompose(std::vector<expression> &, std::vector<expression> &);
 
 HEYOKA_DLL_PUBLIC std::pair<std::vector<expression>, std::vector<expression>::size_type>
 function_decompose(const std::vector<expression> &);
