@@ -545,15 +545,10 @@ void taylor_adaptive_setup_sv_rhs(TA &ta, const U &sys)
         assert(std::holds_alternative<variable>(ta.m_dc[i].first.value()));
         ta.m_state_vars.push_back(ta.m_dc[i].first);
 
-        // NOTE: we make copies for the same reason we make copies
-        // during decomposition - we want to prevent modifications
-        // to these expression from the outside using the mutable API.
-        // Once the expression API is purely functional (or close to it...)
-        // we can remove these copies.
         if constexpr (std::is_same_v<U, std::vector<expression>>) {
-            ta.m_rhs.push_back(copy(sys[i]));
+            ta.m_rhs.push_back(sys[i]);
         } else {
-            ta.m_rhs.push_back(copy(sys[i].second));
+            ta.m_rhs.push_back(sys[i].second);
         }
     }
 }
@@ -869,22 +864,12 @@ taylor_adaptive<T>::taylor_adaptive()
 template <typename T>
 taylor_adaptive<T>::taylor_adaptive(const taylor_adaptive &other)
     : base_t(static_cast<const base_t &>(other)), m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm),
-      m_dim(other.m_dim), m_order(other.m_order), m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy),
-      m_compact_mode(other.m_compact_mode), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h),
-      m_d_out(other.m_d_out), m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr),
-      m_state_vars(other.m_state_vars)
+      m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_tol(other.m_tol),
+      m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode), m_pars(other.m_pars),
+      m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
+      m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr),
+      m_state_vars(other.m_state_vars), m_rhs(other.m_rhs)
 {
-    // NOTE: make explicit deep copies of the decomposition and the rhs.
-    m_dc.reserve(other.m_dc.size());
-    for (const auto &[ex, deps] : other.m_dc) {
-        m_dc.emplace_back(copy(ex), deps);
-    }
-
-    m_rhs.reserve(other.m_rhs.size());
-    for (const auto &ex : other.m_rhs) {
-        m_rhs.push_back(copy(ex));
-    }
-
     if (m_ed_data) {
         m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
     } else {
@@ -2526,7 +2511,7 @@ template <typename T>
 taylor_adaptive_batch<T>::taylor_adaptive_batch(const taylor_adaptive_batch &other)
     // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time_hi(other.m_time_hi), m_time_lo(other.m_time_lo),
-      m_llvm(other.m_llvm), m_dim(other.m_dim), m_order(other.m_order), m_tol(other.m_tol),
+      m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_tol(other.m_tol),
       m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode), m_pars(other.m_pars),
       m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
       m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
@@ -2535,19 +2520,8 @@ taylor_adaptive_batch<T>::taylor_adaptive_batch(const taylor_adaptive_batch &oth
       m_rem_time(other.m_rem_time), m_time_copy_hi(other.m_time_copy_hi), m_time_copy_lo(other.m_time_copy_lo),
       m_nf_detected(other.m_nf_detected), m_d_out_time(other.m_d_out_time),
       m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr),
-      m_state_vars(other.m_state_vars)
+      m_state_vars(other.m_state_vars), m_rhs(other.m_rhs)
 {
-    // NOTE: make explicit deep copies of the decomposition and the rhs.
-    m_dc.reserve(other.m_dc.size());
-    for (const auto &[ex, deps] : other.m_dc) {
-        m_dc.emplace_back(copy(ex), deps);
-    }
-
-    m_rhs.reserve(other.m_rhs.size());
-    for (const auto &ex : other.m_rhs) {
-        m_rhs.push_back(copy(ex));
-    }
-
     if (m_ed_data) {
         m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
     } else {

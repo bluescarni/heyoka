@@ -136,61 +136,6 @@ TEST_CASE("kepE diff")
     }
 }
 
-TEST_CASE("kepE decompose")
-{
-    {
-        auto [u0, u1] = make_vars("u_0", "u_1");
-
-        taylor_dc_t dec;
-        dec.emplace_back("e"_var, std::vector<std::uint32_t>{});
-        dec.emplace_back("M"_var, std::vector<std::uint32_t>{});
-        taylor_decompose(kepE(u0, u1), dec);
-
-        REQUIRE(dec.size() == 6u);
-
-        REQUIRE(dec[2].first == kepE(u0, u1));
-        REQUIRE(dec[2].second == std::vector<std::uint32_t>{5, 3});
-
-        REQUIRE(dec[3].first == sin("u_2"_var));
-        REQUIRE(dec[3].second == std::vector<std::uint32_t>{4});
-
-        REQUIRE(dec[4].first == cos("u_2"_var));
-        REQUIRE(dec[4].second == std::vector<std::uint32_t>{3});
-
-        REQUIRE(dec[5].first == "u_0"_var * "u_4"_var);
-        REQUIRE(dec[5].second.empty());
-    }
-
-    {
-        auto [u0, u1] = make_vars("u_0", "u_1");
-
-        taylor_dc_t dec;
-        dec.emplace_back("e"_var, std::vector<std::uint32_t>{});
-        dec.emplace_back("M"_var, std::vector<std::uint32_t>{});
-        taylor_decompose(kepE(u0 + u1, u1 - u0), dec);
-
-        REQUIRE(dec.size() == 8u);
-
-        REQUIRE(dec[2].first == "u_0"_var + "u_1"_var);
-        REQUIRE(dec[2].second.empty());
-
-        REQUIRE(dec[3].first == "u_1"_var - "u_0"_var);
-        REQUIRE(dec[3].second.empty());
-
-        REQUIRE(dec[4].first == kepE("u_2"_var, "u_3"_var));
-        REQUIRE(dec[4].second == std::vector<std::uint32_t>{7, 5});
-
-        REQUIRE(dec[5].first == sin("u_4"_var));
-        REQUIRE(dec[5].second == std::vector<std::uint32_t>{6});
-
-        REQUIRE(dec[6].first == cos("u_4"_var));
-        REQUIRE(dec[6].second == std::vector<std::uint32_t>{5});
-
-        REQUIRE(dec[7].first == "u_2"_var * "u_6"_var);
-        REQUIRE(dec[7].second.empty());
-    }
-}
-
 TEST_CASE("kepE overloads")
 {
     auto k = kepE("x"_var, 1.1);

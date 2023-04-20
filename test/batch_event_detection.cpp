@@ -32,7 +32,7 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-TEST_CASE("nte deep copy semantics")
+TEST_CASE("nte copy semantics")
 {
     using ev_t = taylor_adaptive_batch<double>::nt_event_t;
 
@@ -40,27 +40,27 @@ TEST_CASE("nte deep copy semantics")
 
     auto ex = v + 3_dbl;
 
-    // Expression is copied on construction.
+    // Expression is shallow-copied on construction.
     ev_t ev(ex, [](auto &, double, int, std::uint32_t) {});
-    REQUIRE(std::get<func>(ex.value()).get_ptr() != std::get<func>(ev.get_expression().value()).get_ptr());
+    REQUIRE(std::get<func>(ex.value()).get_ptr() == std::get<func>(ev.get_expression().value()).get_ptr());
 
-    // Deep copy ctor.
+    // Copy ctor.
     auto ev2 = ev;
 
     REQUIRE(std::get<func>(ev.get_expression().value()).get_ptr()
-            != std::get<func>(ev2.get_expression().value()).get_ptr());
+            == std::get<func>(ev2.get_expression().value()).get_ptr());
 
     // Self assignment.
     auto orig_id = std::get<func>(ev2.get_expression().value()).get_ptr();
     ev2 = *&ev2;
     REQUIRE(orig_id == std::get<func>(ev2.get_expression().value()).get_ptr());
 
-    // Deep copy assignment.
+    // Copy assignment.
     ev2 = ev;
-    REQUIRE(orig_id != std::get<func>(ev2.get_expression().value()).get_ptr());
+    REQUIRE(orig_id == std::get<func>(ev2.get_expression().value()).get_ptr());
 }
 
-TEST_CASE("te deep copy semantics")
+TEST_CASE("te copy semantics")
 {
     using ev_t = taylor_adaptive_batch<double>::t_event_t;
 
@@ -68,24 +68,24 @@ TEST_CASE("te deep copy semantics")
 
     auto ex = v + 3_dbl;
 
-    // Expression is copied on construction.
+    // Expression is shallow-copied on construction.
     ev_t ev(ex);
-    REQUIRE(std::get<func>(ex.value()).get_ptr() != std::get<func>(ev.get_expression().value()).get_ptr());
+    REQUIRE(std::get<func>(ex.value()).get_ptr() == std::get<func>(ev.get_expression().value()).get_ptr());
 
-    // Deep copy ctor.
+    // Copy ctor.
     auto ev2 = ev;
 
     REQUIRE(std::get<func>(ev.get_expression().value()).get_ptr()
-            != std::get<func>(ev2.get_expression().value()).get_ptr());
+            == std::get<func>(ev2.get_expression().value()).get_ptr());
 
     // Self assignment.
     auto orig_id = std::get<func>(ev2.get_expression().value()).get_ptr();
     ev2 = *&ev2;
     REQUIRE(orig_id == std::get<func>(ev2.get_expression().value()).get_ptr());
 
-    // Deep copy assignment.
+    // Copy assignment.
     ev2 = ev;
-    REQUIRE(orig_id != std::get<func>(ev2.get_expression().value()).get_ptr());
+    REQUIRE(orig_id == std::get<func>(ev2.get_expression().value()).get_ptr());
 }
 
 TEST_CASE("nte single step")

@@ -150,11 +150,6 @@ expression &expression::operator=(const expression &) = default;
 
 expression &expression::operator=(expression &&) noexcept = default;
 
-expression::value_type &expression::value()
-{
-    return m_value;
-}
-
 const expression::value_type &expression::value() const
 {
     return m_value;
@@ -179,23 +174,23 @@ expression copy_impl(funcptr_map<expression> &func_map, const expression &e)
                     return it->second;
                 }
 
-                // Create a copy of v. Note that this will copy
-                // the arguments of v via their copy constructor,
-                // and thus any argument which is itself a function
-                // will be shallow-copied.
-                auto f_copy = v.copy();
-
-                // Perform a copy of the arguments of v which are functions.
-                assert(v.args().size() == f_copy.args().size()); // LCOV_EXCL_LINE
-                auto b1 = v.args().begin();
-                for (auto [b2, e2] = f_copy.get_mutable_args_it(); b2 != e2; ++b1, ++b2) {
+                // Create the new args vector by making a deep copy
+                // of the original function arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(v.args().size());
+                for (const auto &orig_arg : v.args()) {
                     // NOTE: the argument needs to be copied via a recursive
-                    // call to copy_impl() only if it is a func. Otherwise, the copy
-                    // we made earlier via the copy constructor is already a deep copy.
-                    if (std::holds_alternative<func>(b1->value())) {
-                        *b2 = copy_impl(func_map, *b1);
+                    // call to copy_impl() only if it is a func. Otherwise, a normal
+                    // copy will suffice.
+                    if (std::holds_alternative<func>(orig_arg.value())) {
+                        new_args.push_back(copy_impl(func_map, orig_arg));
+                    } else {
+                        new_args.push_back(orig_arg);
                     }
                 }
+
+                // Create a copy of v with the new arguments.
+                auto f_copy = v.copy(new_args);
 
                 // Construct the return value and put it into the cache.
                 auto ex = expression{std::move(f_copy)};
@@ -350,35 +345,50 @@ void get_variables(funcptr_set &func_set, std::unordered_set<std::string> &s_set
         e.value());
 }
 
-void rename_variables(funcptr_set &func_set, expression &e,
-                      const std::unordered_map<std::string, std::string> &repl_map)
+expression rename_variables(detail::funcptr_map<expression> &func_map, const expression &e,
+                            const std::unordered_map<std::string, std::string> &repl_map)
 {
-    std::visit(
-        [&func_set, &repl_map](auto &arg) {
+    return std::visit(
+        [&func_map, &repl_map](const auto &arg) {
             using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, func>) {
                 const auto f_id = arg.get_ptr();
 
-                if (func_set.find(f_id) != func_set.end()) {
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
                     // We already renamed variables for the current function,
-                    // just return.
-                    return;
+                    // fetch the result from the cache.
+                    return it->second;
                 }
 
-                for (auto [beg, end] = arg.get_mutable_args_it(); beg != end; ++beg) {
-                    rename_variables(func_set, *beg, repl_map);
+                // Prepare the new args vector by renaming variables
+                // for all arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(arg.args().size());
+                for (const auto &orig_arg : arg.args()) {
+                    new_args.push_back(rename_variables(func_map, orig_arg, repl_map));
                 }
 
-                // Add the id of f to the set.
-                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
+                // Create a copy of arg with the new arguments.
+                auto tmp = arg.copy(new_args);
+
+                // Put the return value in the cache.
+                auto ret = expression{std::move(tmp)};
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
+
+                return ret;
             } else if constexpr (std::is_same_v<type, variable>) {
                 if (auto it = repl_map.find(arg.name()); it != repl_map.end()) {
-                    arg.name() = it->second;
+                    return expression{it->second};
                 }
+
+                // NOTE: fall through to the default case of returning a copy
+                // of the original variable if no renaming took place.
             }
+
+            return expression{arg};
         },
         e.value());
 }
@@ -419,25 +429,26 @@ std::vector<std::string> get_variables(const std::vector<expression> &v_ex)
     return retval;
 }
 
-void rename_variables(expression &e, const std::unordered_map<std::string, std::string> &repl_map)
+expression rename_variables(const expression &e, const std::unordered_map<std::string, std::string> &repl_map)
 {
-    detail::funcptr_set func_set;
+    detail::funcptr_map<expression> func_map;
 
-    detail::rename_variables(func_set, e, repl_map);
+    return detail::rename_variables(func_map, e, repl_map);
 }
 
-void rename_variables(std::vector<expression> &v_ex, const std::unordered_map<std::string, std::string> &repl_map)
+std::vector<expression> rename_variables(const std::vector<expression> &v_ex,
+                                         const std::unordered_map<std::string, std::string> &repl_map)
 {
-    detail::funcptr_set func_set;
+    detail::funcptr_map<expression> func_map;
 
-    for (auto &ex : v_ex) {
-        detail::rename_variables(func_set, ex, repl_map);
+    std::vector<expression> retval;
+    retval.reserve(v_ex.size());
+
+    for (const auto &ex : v_ex) {
+        retval.push_back(detail::rename_variables(func_map, ex, repl_map));
     }
-}
 
-void swap(expression &ex0, expression &ex1) noexcept
-{
-    std::swap(ex0.value(), ex1.value());
+    return retval;
 }
 
 namespace detail
@@ -558,12 +569,14 @@ expression operator-(expression e)
 namespace detail
 {
 
-namespace
-{
-
-// Helper to check if the operands of a commutative binary operator
-// should be switched in order to satisfy a canonical ordering.
-bool comm_op_need_switch(const expression &e1, const expression &e2)
+// A comparison operator intended for sorting in a canonical
+// way the operands to a commutative operator/function.
+// NOTE: this cannot make a set of function arguments unique, as:
+// - two number arguments are considered equal to each other
+//   (this could be fixed by introducing an ordering on numbers),
+// - two func arguments are considered equal to each other
+//   (no idea how one would implement an ordering on functions).
+bool comm_ops_lt(const expression &e1, const expression &e2)
 {
     return std::visit(
         [](const auto &v1, const auto &v2) {
@@ -573,35 +586,37 @@ bool comm_op_need_switch(const expression &e1, const expression &e2)
             // Both arguments are variables: they need to be ordered
             // in lexicographic fashion.
             if constexpr (std::is_same_v<variable, type1> && std::is_same_v<variable, type2>) {
-                return v1.name() > v2.name();
+                return v1.name() < v2.name();
             }
 
             // Both arguments are params: they need to be ordered
             // in ascending index order.
             if constexpr (std::is_same_v<param, type1> && std::is_same_v<param, type2>) {
-                return v1.idx() > v2.idx();
+                return v1.idx() < v2.idx();
             }
 
-            // The first argument is a non-number, the second argument
-            // is a number -> always needs switching.
+            // non-number > number.
             if constexpr (!std::is_same_v<number, type1> && std::is_same_v<number, type2>) {
-                return true;
+                return false;
             }
 
-            // (var, param) -> switch to (param, var).
+            // var > param.
             if constexpr (std::is_same_v<variable, type1> && std::is_same_v<param, type2>) {
-                return true;
+                return false;
             }
 
-            // (func, non-func) -> switch to (non-func, func).
+            // func > non-func.
             if constexpr (std::is_same_v<func, type1> && !std::is_same_v<func, type2>) {
-                return true;
+                return false;
             }
 
-            return false;
+            return true;
         },
         e1.value(), e2.value());
 }
+
+namespace
+{
 
 expression expression_plus(expression e1, expression e2)
 {
@@ -663,10 +678,10 @@ expression expression_plus(expression e1, expression e2)
 
 expression operator+(expression e1, expression e2)
 {
-    if (detail::comm_op_need_switch(e1, e2)) {
-        return detail::expression_plus(std::move(e2), std::move(e1));
-    } else {
+    if (detail::comm_ops_lt(e1, e2)) {
         return detail::expression_plus(std::move(e1), std::move(e2));
+    } else {
+        return detail::expression_plus(std::move(e2), std::move(e1));
     }
 }
 
@@ -823,10 +838,10 @@ expression expression_mul(expression e1, expression e2)
 
 expression operator*(expression e1, expression e2)
 {
-    if (detail::comm_op_need_switch(e1, e2)) {
-        return detail::expression_mul(std::move(e2), std::move(e1));
-    } else {
+    if (detail::comm_ops_lt(e1, e2)) {
         return detail::expression_mul(std::move(e1), std::move(e2));
+    } else {
+        return detail::expression_mul(std::move(e2), std::move(e1));
     }
 }
 
@@ -1522,10 +1537,10 @@ namespace
 {
 
 expression subs(funcptr_map<expression> &func_map, const expression &ex,
-                const std::unordered_map<std::string, expression> &smap)
+                const std::unordered_map<std::string, expression> &smap, bool canonicalise)
 {
     return std::visit(
-        [&func_map, &smap](const auto &arg) {
+        [&func_map, &smap, canonicalise](const auto &arg) {
             using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, number> || std::is_same_v<type, param>) {
@@ -1545,13 +1560,22 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
                     return it->second;
                 }
 
-                // NOTE: this creates a separate instance of arg, but its
-                // arguments are shallow-copied.
-                auto tmp = arg.copy();
-
-                for (auto [b, e] = tmp.get_mutable_args_it(); b != e; ++b) {
-                    *b = subs(func_map, *b, smap);
+                // Create the new args vector by running the
+                // substitution on all arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(arg.args().size());
+                for (const auto &orig_arg : arg.args()) {
+                    new_args.push_back(subs(func_map, orig_arg, smap, canonicalise));
                 }
+
+                // Canonicalise the new arguments vector,
+                // if requested and if the function is commutative.
+                if (canonicalise && arg.is_commutative()) {
+                    std::stable_sort(new_args.begin(), new_args.end(), comm_ops_lt);
+                }
+
+                // Create a copy of arg with the new arguments.
+                auto tmp = arg.copy(new_args);
 
                 // Put the return value in the cache.
                 auto ret = expression{std::move(tmp)};
@@ -1569,11 +1593,26 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
 
 } // namespace detail
 
-expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
+expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap, bool canonicalise)
 {
     detail::funcptr_map<expression> func_map;
 
-    return detail::subs(func_map, e, smap);
+    return detail::subs(func_map, e, smap, canonicalise);
+}
+
+std::vector<expression> subs(const std::vector<expression> &v_ex,
+                             const std::unordered_map<std::string, expression> &smap, bool canonicalise)
+{
+    detail::funcptr_map<expression> func_map;
+
+    std::vector<expression> ret;
+    ret.reserve(v_ex.size());
+
+    for (const auto &e : v_ex) {
+        ret.push_back(detail::subs(func_map, e, smap, canonicalise));
+    }
+
+    return ret;
 }
 
 std::vector<expression> subs(const std::vector<expression> &v_ex,
@@ -1598,7 +1637,7 @@ namespace
 {
 
 expression subs(funcptr_map<expression> &func_map, const expression &ex,
-                const std::unordered_map<expression, expression> &smap)
+                const std::unordered_map<expression, expression> &smap, bool canonicalise)
 {
     if (auto it = smap.find(ex); it != smap.end()) {
         // ex is in the substitution map, return the value it maps to.
@@ -1618,14 +1657,22 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
                     return it->second;
                 }
 
-                // NOTE: this creates a separate instance of arg, but its
-                // arguments are shallow-copied.
-                auto tmp = arg.copy();
-
-                // Recursively run the substitution on all function arguments.
-                for (auto [b, e] = tmp.get_mutable_args_it(); b != e; ++b) {
-                    *b = subs(func_map, *b, smap);
+                // Create the new args vector by running the
+                // substitution on all arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(arg.args().size());
+                for (const auto &orig_arg : arg.args()) {
+                    new_args.push_back(subs(func_map, orig_arg, smap, canonicalise));
                 }
+
+                // Canonicalise the new arguments vector,
+                // if requested and if the function is commutative.
+                if (canonicalise && arg.is_commutative()) {
+                    std::stable_sort(new_args.begin(), new_args.end(), comm_ops_lt);
+                }
+
+                // Create a copy of arg with the new arguments.
+                auto tmp = arg.copy(new_args);
 
                 // Put the return value in the cache.
                 auto ret = expression{std::move(tmp)};
@@ -1648,11 +1695,26 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
 
 } // namespace detail
 
-expression subs(const expression &e, const std::unordered_map<expression, expression> &smap)
+expression subs(const expression &e, const std::unordered_map<expression, expression> &smap, bool canonicalise)
 {
     detail::funcptr_map<expression> func_map;
 
-    return detail::subs(func_map, e, smap);
+    return detail::subs(func_map, e, smap, canonicalise);
+}
+
+std::vector<expression> subs(const std::vector<expression> &v_ex,
+                             const std::unordered_map<expression, expression> &smap, bool canonicalise)
+{
+    detail::funcptr_map<expression> func_map;
+
+    std::vector<expression> ret;
+    ret.reserve(v_ex.size());
+
+    for (const auto &e : v_ex) {
+        ret.push_back(detail::subs(func_map, e, smap, canonicalise));
+    }
+
+    return ret;
 }
 
 std::vector<expression> subs(const std::vector<expression> &v_ex,
@@ -1827,16 +1889,6 @@ taylor_dc_t::size_type taylor_decompose(funcptr_map<taylor_dc_t::size_type> &fun
 }
 
 } // namespace detail
-
-// Decompose ex into dc. The return value is the index, in dc,
-// which corresponds to the decomposed version of ex.
-// If the return value is zero, ex was not decomposed.
-taylor_dc_t::size_type taylor_decompose(const expression &ex, taylor_dc_t &dc)
-{
-    detail::funcptr_map<taylor_dc_t::size_type> func_map;
-
-    return detail::taylor_decompose(func_map, ex, dc);
-}
 
 llvm::Value *taylor_diff(llvm_state &s, llvm::Type *fp_t, const expression &ex, const std::vector<std::uint32_t> &deps,
                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
@@ -2137,18 +2189,6 @@ bool is_time_dependent(funcptr_map<bool> &func_map, const expression &ex)
 
 } // namespace
 
-std::vector<std::pair<expression, expression>> copy(const std::vector<std::pair<expression, expression>> &v)
-{
-    std::vector<std::pair<expression, expression>> ret;
-    ret.reserve(v.size());
-
-    std::transform(v.begin(), v.end(), std::back_inserter(ret), [](const auto &p) {
-        return std::pair{copy(p.first), copy(p.second)};
-    });
-
-    return ret;
-}
-
 std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vector<expression>::size_type> &func_map,
                                                             const expression &ex, std::vector<expression> &dc)
 {
@@ -2289,7 +2329,7 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex, st
         auto &ex = v_ex[i];
 
         // Rename the u variables in ex.
-        rename_variables(ex, uvars_rename);
+        ex = rename_variables(ex, uvars_rename);
 
         if (auto it = ex_map.find(ex); it == ex_map.end()) {
             // This is the first occurrence of ex in the
@@ -2330,7 +2370,7 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex, st
         assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
                || std::holds_alternative<param>(ex.value()));
 
-        rename_variables(ex, uvars_rename);
+        ex = rename_variables(ex, uvars_rename);
 
         retval.push_back(std::move(ex));
     }
@@ -2507,7 +2547,7 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc, std::vecto
     // Do the remap for the definitions of the u variables and of the components.
     for (auto *it = dc.data() + nvars; it != dc.data() + dc.size(); ++it) {
         // Remap the expression.
-        rename_variables(*it, remap);
+        *it = rename_variables(*it, remap);
     }
 
     // Reorder the decomposition.
@@ -2524,13 +2564,6 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc, std::vecto
 
 } // namespace detail
 
-std::optional<std::vector<expression>::size_type> decompose(const expression &ex, std::vector<expression> &dc)
-{
-    detail::funcptr_map<std::vector<expression>::size_type> func_map;
-
-    return detail::decompose(func_map, ex, dc);
-}
-
 // Decomposition with automatic deduction of variables.
 std::pair<std::vector<expression>, std::vector<expression>::size_type>
 function_decompose(const std::vector<expression> &v_ex_)
@@ -2539,28 +2572,13 @@ function_decompose(const std::vector<expression> &v_ex_)
         throw std::invalid_argument("Cannot decompose a function with no outputs");
     }
 
-    spdlog::stopwatch sw;
-
-    // Need to operate on a copy due to in-place mutation
-    // via rename_variables().
-    auto v_ex = copy(v_ex_);
-
-    detail::get_logger()->trace("function decomposition copy runtime: {}", sw);
-
-    sw.reset();
-
-    // Determine the variables.
-    const auto vars = get_variables(v_ex);
-
-    detail::get_logger()->trace("function decomposition identify variables runtime: {}", sw);
-
-    sw.reset();
+    const auto vars = get_variables(v_ex_);
 
     // Cache the number of variables.
     const auto nvars = vars.size();
 
     // Cache the number of outputs.
-    const auto nouts = v_ex.size();
+    const auto nouts = v_ex_.size();
 
     // Create the map for renaming the variables to u_i.
     // The renaming will be done in alphabetical order.
@@ -2573,23 +2591,8 @@ function_decompose(const std::vector<expression> &v_ex_)
         }
     }
 
-#if !defined(NDEBUG)
-
-    // Store a copy of the original function for checking later.
-    auto orig_v_ex = copy(v_ex);
-
-#endif
-
-    detail::get_logger()->trace("function decomposition repl map creation runtime: {}", sw);
-
-    sw.reset();
-
     // Rename the variables in the original function.
-    rename_variables(v_ex, repl_map);
-
-    detail::get_logger()->trace("function decomposition variable rename runtime: {}", sw);
-
-    sw.reset();
+    const auto v_ex = rename_variables(v_ex_, repl_map);
 
     // Init the decomposition. It begins with a list
     // of the original variables of the function.
@@ -2599,14 +2602,39 @@ function_decompose(const std::vector<expression> &v_ex_)
         ret.emplace_back(var);
     }
 
-    // Run the decomposition.
-    decompose(v_ex, ret);
+    // Prepare the outputs vector.
+    std::vector<expression> outs;
+    outs.reserve(nouts);
 
-    // Append the definitions of the outputs
-    // in terms of u variables or numbers/params.
-    for (auto &ex : v_ex) {
-        ret.emplace_back(std::move(ex));
+    // Log the construction runtime in trace mode.
+    spdlog::stopwatch sw;
+
+    // Run the decomposition on each component of the function.
+    detail::funcptr_map<std::vector<expression>::size_type> func_map;
+    for (const auto &ex : v_ex) {
+        // Decompose the current component.
+        if (const auto dres = detail::decompose(func_map, ex, ret)) {
+            // NOTE: if the component was decomposed
+            // (that is, it is not constant or a single variable),
+            // then the output is a u variable.
+            // NOTE: all functions are forced to return
+            // a non-empty dres
+            // in the func API, so the only entities that
+            // can return an empty dres are const/params or
+            // variables.
+            outs.emplace_back(fmt::format("u_{}", *dres));
+        } else {
+            assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
+                   || std::holds_alternative<param>(ex.value()));
+
+            outs.push_back(ex);
+        }
     }
+
+    assert(outs.size() == nouts);
+
+    // Append the definitions of the outputs.
+    ret.insert(ret.end(), outs.begin(), outs.end());
 
     detail::get_logger()->trace("function decomposition construction runtime: {}", sw);
 
@@ -2615,23 +2643,10 @@ function_decompose(const std::vector<expression> &v_ex_)
     // Verify the decomposition.
     // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
     // This is fine, as the decomposition must contain at least nvars items.
-    detail::verify_function_dec(orig_v_ex, ret, nvars);
+    detail::verify_function_dec(v_ex_, ret, nvars);
 
 #endif
 
-    // Simplify the decomposition.
-    // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
-    // This is fine, as the decomposition must contain at least nvars items.
-    ret = detail::function_decompose_cse(ret, nvars, nouts);
-
-#if !defined(NDEBUG)
-
-    // Verify the simplified decomposition.
-    detail::verify_function_dec(orig_v_ex, ret, nvars);
-
-#endif
-
-    // Run the breadth-first topological sort on the decomposition.
     // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
     // This is fine, as the decomposition must contain at least nvars items.
     ret = detail::function_sort_dc(ret, nvars, nouts);
@@ -2639,7 +2654,7 @@ function_decompose(const std::vector<expression> &v_ex_)
 #if !defined(NDEBUG)
 
     // Verify the reordered decomposition.
-    detail::verify_function_dec(orig_v_ex, ret, nvars);
+    detail::verify_function_dec(v_ex_, ret, nvars);
 
 #endif
 
@@ -2650,25 +2665,21 @@ function_decompose(const std::vector<expression> &v_ex_)
 // Function decomposition from with explicit list of input variables.
 std::vector<expression> function_decompose(const std::vector<expression> &v_ex_, const std::vector<expression> &vars)
 {
-    // Need to operate on copies due to in-place mutation
-    // via rename_variables().
-    auto v_ex = copy(v_ex_);
-
-    if (v_ex.empty()) {
+    if (v_ex_.empty()) {
         throw std::invalid_argument("Cannot decompose a function with no outputs");
     }
 
     // Sanity check vars. We need to ensure that:
     // - all the expressions in vars are variables
     //   and there are no duplicates,
-    // - all the variables appearing in v_ex
+    // - all the variables appearing in v_ex_
     //   are present in vars.
     // Note that vars is allowed to contain extra variables
-    // (that is, variables which are not present in v_ex).
+    // (that is, variables which are not present in v_ex_).
 
     // A set to check for duplicates in vars.
     std::unordered_set<std::string> var_set;
-    // This set will contain all the variables in v_ex.
+    // This set will contain all the variables in v_ex_.
     std::unordered_set<std::string> v_ex_vars;
 
     for (const auto &ex : vars) {
@@ -2689,11 +2700,8 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
     }
 
     // Build v_ex_vars.
-    for (const auto &ex : v_ex) {
-        for (auto &var : get_variables(ex)) {
-            v_ex_vars.emplace(std::move(var));
-        }
-    }
+    const auto detected_vars = get_variables(v_ex_);
+    v_ex_vars.insert(detected_vars.begin(), detected_vars.end());
 
     // Check that all variables in v_ex_vars appear in var_set.
     for (const auto &var : v_ex_vars) {
@@ -2709,7 +2717,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
     const auto nvars = vars.size();
 
     // Cache the number of outputs.
-    const auto nouts = v_ex.size();
+    const auto nouts = v_ex_.size();
 
     // Create the map for renaming the variables to u_i.
     // The renaming will be done following the order of vars.
@@ -2720,17 +2728,8 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
         assert(eres.second);
     }
 
-#if !defined(NDEBUG)
-
-    // Store a copy of the original function for checking later.
-    auto orig_v_ex = copy(v_ex);
-
-#endif
-
     // Rename the variables in the original function.
-    for (auto &ex : v_ex) {
-        rename_variables(ex, repl_map);
-    }
+    const auto v_ex = rename_variables(v_ex_, repl_map);
 
     // Init the decomposition. It begins with a list
     // of the original variables of the function.
@@ -2740,36 +2739,39 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
         ret.push_back(var);
     }
 
+    // Prepare the outputs vector.
+    std::vector<expression> outs;
+    outs.reserve(nouts);
+
     // Log the construction runtime in trace mode.
     spdlog::stopwatch sw;
 
     // Run the decomposition on each component of the function.
-    for (auto &ex : v_ex) {
+    detail::funcptr_map<std::vector<expression>::size_type> func_map;
+    for (const auto &ex : v_ex) {
         // Decompose the current component.
-        if (const auto dres = decompose(ex, ret)) {
+        if (const auto dres = detail::decompose(func_map, ex, ret)) {
             // NOTE: if the component was decomposed
             // (that is, it is not constant or a single variable),
-            // we have to update the original definition
-            // of the component in v_ex
-            // so that it points to the u variable
-            // that now represents it.
+            // then the output is a u variable.
             // NOTE: all functions are forced to return
             // a non-empty dres
             // in the func API, so the only entities that
             // can return an empty dres are const/params or
             // variables.
-            ex = expression{fmt::format("u_{}", *dres)};
+            outs.emplace_back(fmt::format("u_{}", *dres));
         } else {
             assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
                    || std::holds_alternative<param>(ex.value()));
+
+            outs.push_back(ex);
         }
     }
 
-    // Append the definitions of the outputs
-    // in terms of u variables or numbers/params.
-    for (auto &ex : v_ex) {
-        ret.emplace_back(std::move(ex));
-    }
+    assert(outs.size() == nouts);
+
+    // Append the definitions of the outputs.
+    ret.insert(ret.end(), outs.begin(), outs.end());
 
     detail::get_logger()->trace("function decomposition construction runtime: {}", sw);
 
@@ -2778,7 +2780,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
     // Verify the decomposition.
     // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
     // This is fine, as the decomposition must contain at least nvars items.
-    detail::verify_function_dec(orig_v_ex, ret, nvars);
+    detail::verify_function_dec(v_ex_, ret, nvars);
 
 #endif
 
@@ -2790,7 +2792,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
 #if !defined(NDEBUG)
 
     // Verify the simplified decomposition.
-    detail::verify_function_dec(orig_v_ex, ret, nvars);
+    detail::verify_function_dec(v_ex_, ret, nvars);
 
 #endif
 
@@ -2802,7 +2804,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
 #if !defined(NDEBUG)
 
     // Verify the reordered decomposition.
-    detail::verify_function_dec(orig_v_ex, ret, nvars);
+    detail::verify_function_dec(v_ex_, ret, nvars);
 
 #endif
 

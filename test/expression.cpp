@@ -15,6 +15,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -944,6 +945,10 @@ TEST_CASE("get_variables")
 
     auto tmp = x * z, foo = x - z - 5_dbl;
     REQUIRE(get_variables((y + tmp) / foo * tmp - foo) == std::vector<std::string>{"x", "y", "z"});
+
+    // The vectorised version
+    REQUIRE(get_variables({(y + tmp) / foo * tmp - foo, "a"_var + "b"_var})
+            == std::vector<std::string>{"a", "b", "x", "y", "z"});
 }
 
 TEST_CASE("rename_variables")
@@ -951,25 +956,35 @@ TEST_CASE("rename_variables")
     auto [x, y, z] = make_vars("x", "y", "z");
 
     auto ex = 1_dbl;
-    rename_variables(ex, {{"x", "a"}});
+    ex = rename_variables(ex, {{"x", "a"}});
     REQUIRE(ex == 1_dbl);
 
     ex = par[0];
-    rename_variables(ex, {{"x", "a"}});
+    ex = rename_variables(ex, {{"x", "a"}});
     REQUIRE(ex == par[0]);
 
     ex = x;
-    rename_variables(ex, {{"x", "a"}});
+    ex = rename_variables(ex, {{"x", "a"}});
     REQUIRE(ex == "a"_var);
 
     ex = x + y;
-    rename_variables(ex, {{"x", "a"}, {"y", "b"}});
+    ex = rename_variables(ex, {{"x", "a"}, {"y", "b"}});
     REQUIRE(ex == "a"_var + "b"_var);
 
     auto tmp = x * z, foo = x - z - 5_dbl;
     ex = (y + tmp) / foo * tmp - foo;
-    rename_variables(ex, {{"x", "a"}, {"y", "b"}});
+    ex = rename_variables(ex, {{"x", "a"}, {"y", "b"}});
     REQUIRE(ex == ("b"_var + "a"_var * z) / ("a"_var - z - 5_dbl) * ("a"_var * z) - ("a"_var - z - 5_dbl));
+
+    // The vectorised version.
+    ex = (y + tmp) / foo * tmp - foo;
+    auto v_ex = rename_variables({ex, tmp}, {{"x", "a"}, {"y", "b"}});
+    REQUIRE(v_ex[0] == ("b"_var + "a"_var * z) / ("a"_var - z - 5_dbl) * ("a"_var * z) - ("a"_var - z - 5_dbl));
+    REQUIRE(v_ex[1] == "a"_var * z);
+
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(v_ex[0].value()).args()[0].value()).args()[1].value()).get_ptr()
+        == std::get<func>(v_ex[1].value()).get_ptr());
 }
 
 TEST_CASE("copy")
@@ -1014,6 +1029,20 @@ TEST_CASE("copy")
             == std::get<func>(std::get<func>(bar_copy.value()).args()[1].value()).get_ptr());
     REQUIRE(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).get_ptr()
             != std::get<func>(std::get<func>(bar.value()).args()[1].value()).get_ptr());
+
+    // Vectorised version.
+    auto vec_copy = copy({bar, foo + foo});
+
+    REQUIRE(std::get<func>(std::get<func>(vec_copy[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(vec_copy[0].value()).args()[1].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(vec_copy[0].value()).args()[0].value()).get_ptr()
+            != std::get<func>(std::get<func>(bar.value()).args()[1].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(vec_copy[1].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(vec_copy[1].value()).args()[1].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(vec_copy[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(vec_copy[1].value()).args()[0].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(vec_copy[0].value()).args()[1].value()).get_ptr()
+            == std::get<func>(std::get<func>(vec_copy[1].value()).args()[1].value()).get_ptr());
 }
 
 TEST_CASE("subs str")
@@ -1021,8 +1050,8 @@ TEST_CASE("subs str")
     auto [x, y, z, a] = make_vars("x", "y", "z", "a");
 
     auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
-    const auto foo_id = std::get<func>(foo.value()).get_ptr();
-    const auto bar_id = std::get<func>(bar.value()).get_ptr();
+    const auto *foo_id = std::get<func>(foo.value()).get_ptr();
+    const auto *bar_id = std::get<func>(bar.value()).get_ptr();
 
     auto foo_a = ((a + y) * (z + a)) * ((z - a) * (y + a)), bar_a = (foo_a - a) / (2. * foo_a);
 
@@ -1046,6 +1075,26 @@ TEST_CASE("subs str")
         std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[0].value()).args()[0].value()).get_ptr()
         == std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[1].value()).args()[1].value())
                .get_ptr());
+
+    // Check the vectorised version too.
+    auto vec_subs = subs({bar, (foo - x) / (2. * foo)}, {{"x", a}});
+    REQUIRE(vec_subs.size() == 2u);
+    REQUIRE(std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).args()[0].value())
+                .get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[1].value()).args()[1].value())
+                   .get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).args()[0].value())
+                .get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[1].value()).args()[1].value())
+                   .get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).args()[0].value())
+                .get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(vec_subs[1].value()).args()[0].value()).args()[0].value())
+                   .get_ptr());
+
+    // Check canonicalisation.
+    REQUIRE(subs(x + y, {{"x", "b"_var}, {"y", "a"_var}}, true) == "a"_var + "b"_var);
+    REQUIRE(subs(std::vector{x + y}, {{"x", "b"_var}, {"y", "a"_var}}, true)[0] == "a"_var + "b"_var);
 }
 
 TEST_CASE("subs")
@@ -1077,6 +1126,22 @@ TEST_CASE("subs")
     REQUIRE(std::get<func>(std::get<func>(subs_res.value()).args()[0].value()).get_ptr()
             == std::get<func>(std::get<func>(std::get<func>(subs_res.value()).args()[1].value()).args()[1].value())
                    .get_ptr());
+
+    // Check the vectorised version too.
+    auto vec_subs = subs({ex, tmp - 2_dbl * tmp}, {{x, z}});
+    REQUIRE(vec_subs.size() == 2u);
+    REQUIRE(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[1].value()).args()[1].value())
+                   .get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(vec_subs[1].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(std::get<func>(vec_subs[1].value()).args()[1].value()).args()[1].value())
+                   .get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(vec_subs[1].value()).args()[0].value()).get_ptr());
+
+    // Check canonicalisation.
+    REQUIRE(subs(x + y, {{x, "b"_var}, {y, "a"_var}}, true) == "a"_var + "b"_var);
+    REQUIRE(subs(std::vector{x + y}, {{x, "b"_var}, {y, "a"_var}}, true)[0] == "a"_var + "b"_var);
 }
 
 // cfunc N-body with fixed masses.
@@ -1985,4 +2050,22 @@ TEST_CASE("get_params")
     auto ex = "z"_var * (tmp1 - tmp2) + "y"_var * tmp1 / tmp2;
 
     REQUIRE(get_params(ex) == std::vector{par[3], par[56]});
+
+    // Test the vectorised version too.
+    auto ex2 = 3_dbl + par[4];
+    REQUIRE(get_params({ex, ex2}) == std::vector{par[3], par[4], par[56]});
+}
+
+TEST_CASE("swap")
+{
+    using std::swap;
+
+    REQUIRE(std::is_nothrow_swappable_v<expression>);
+
+    auto [x, y] = make_vars("x", "y");
+
+    swap(x, y);
+
+    REQUIRE(x == "y"_var);
+    REQUIRE(y == "x"_var);
 }

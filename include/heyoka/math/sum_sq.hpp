@@ -45,6 +45,8 @@ public:
 
     void to_stream(std::ostringstream &) const;
 
+    [[nodiscard]] bool is_commutative() const;
+
     expression diff(funcptr_map<expression> &, const std::string &) const;
     expression diff(funcptr_map<expression> &, const param &) const;
 

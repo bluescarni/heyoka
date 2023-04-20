@@ -103,19 +103,16 @@ public:
     expression &operator=(const expression &);
     expression &operator=(expression &&) noexcept;
 
-    [[nodiscard]] value_type &value();
     [[nodiscard]] const value_type &value() const;
+
+    friend void swap(expression &ex0, expression &ex1) noexcept
+    {
+        std::swap(ex0.m_value, ex1.m_value);
+    }
 };
 
 HEYOKA_DLL_PUBLIC expression copy(const expression &);
 HEYOKA_DLL_PUBLIC std::vector<expression> copy(const std::vector<expression> &);
-
-namespace detail
-{
-
-std::vector<std::pair<expression, expression>> copy(const std::vector<std::pair<expression, expression>> &);
-
-} // namespace detail
 
 inline namespace literals
 {
@@ -195,8 +192,6 @@ HEYOKA_DLL_PUBLIC detail::prime_wrapper operator""_p(const char *, std::size_t);
 
 } // namespace literals
 
-HEYOKA_DLL_PUBLIC void swap(expression &, expression &) noexcept;
-
 namespace detail
 {
 
@@ -210,6 +205,8 @@ namespace detail
 {
 
 void stream_expression(std::ostringstream &, const expression &);
+
+bool comm_ops_lt(const expression &, const expression &);
 
 } // namespace detail
 
@@ -232,9 +229,9 @@ HEYOKA_BEGIN_NAMESPACE
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const expression &);
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const std::vector<expression> &);
-HEYOKA_DLL_PUBLIC void rename_variables(expression &, const std::unordered_map<std::string, std::string> &);
-HEYOKA_DLL_PUBLIC void rename_variables(std::vector<expression> &,
-                                        const std::unordered_map<std::string, std::string> &);
+HEYOKA_DLL_PUBLIC expression rename_variables(const expression &, const std::unordered_map<std::string, std::string> &);
+HEYOKA_DLL_PUBLIC std::vector<expression> rename_variables(const std::vector<expression> &,
+                                                           const std::unordered_map<std::string, std::string> &);
 
 HEYOKA_DLL_PUBLIC expression operator+(expression);
 HEYOKA_DLL_PUBLIC expression operator-(expression);
@@ -356,12 +353,13 @@ HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &);
 
 HEYOKA_DLL_PUBLIC std::size_t get_n_nodes(const expression &);
 
-HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &);
-HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<expression, expression> &);
+HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &,
+                                  bool = false);
+HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<expression, expression> &, bool = false);
 HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
-                                               const std::unordered_map<std::string, expression> &);
+                                               const std::unordered_map<std::string, expression> &, bool = false);
 HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
-                                               const std::unordered_map<expression, expression> &);
+                                               const std::unordered_map<expression, expression> &, bool = false);
 
 enum class diff_args { vars, params, all };
 
@@ -520,8 +518,6 @@ taylor_dc_t::size_type taylor_decompose(funcptr_map<taylor_dc_t::size_type> &, c
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose(const expression &, taylor_dc_t &);
-
 template <typename... Args>
 inline std::array<expression, sizeof...(Args)> make_vars(const Args &...strs)
 {
@@ -577,8 +573,6 @@ std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vec
 llvm::Value *cfunc_c_load_eval(llvm_state &, llvm::Type *, llvm::Value *, llvm::Value *);
 
 } // namespace detail
-
-std::optional<std::vector<expression>::size_type> decompose(const expression &, std::vector<expression> &);
 
 HEYOKA_DLL_PUBLIC std::pair<std::vector<expression>, std::vector<expression>::size_type>
 function_decompose(const std::vector<expression> &);

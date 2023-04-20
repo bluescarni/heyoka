@@ -29,6 +29,8 @@
 
 #include <boost/version.hpp>
 
+#include <fmt/format.h>
+
 // NOTE: the header for hash_combine changed in version 1.67.
 #if (BOOST_VERSION / 100000 > 1) || (BOOST_VERSION / 100000 == 1 && BOOST_VERSION / 100 % 1000 >= 67)
 
@@ -49,8 +51,6 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
-
-#include <fmt/format.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -104,9 +104,9 @@ const std::vector<expression> &func_base::args() const
     return m_args;
 }
 
-std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> func_base::get_mutable_args_it()
+std::pair<expression *, expression *> func_base::get_mutable_args_range()
 {
-    return {m_args.begin(), m_args.end()};
+    return {m_args.data(), m_args.data() + m_args.size()};
 }
 
 namespace detail
@@ -163,13 +163,39 @@ func &func::operator=(func &&) noexcept = default;
 
 func::~func() = default;
 
-// NOTE: this creates a new func containing
-// a copy of the inner object: this means that
-// the function arguments are shallow-copied and
-// NOT deep-copied.
-func func::copy() const
+func func::copy(const std::vector<expression> &new_args) const
 {
-    return func{m_ptr->clone()};
+    const auto orig_size = args().size();
+
+    if (new_args.size() != orig_size) {
+        throw std::invalid_argument(
+            fmt::format("The set of new arguments passed to func::copy() has a size of {}, but the number of arguments "
+                        "of the original function is {} (the two sizes must be equal)",
+                        new_args.size(), orig_size));
+    }
+
+    // NOTE: this will end up invoking the copy constructor
+    // of the internal user-defined function.
+    func ret{m_ptr->clone()};
+
+    // NOTE: a user-defined function might have a funky
+    // implementation of the copy constructor which, e.g.,
+    // changes the arity.
+    // LCOV_EXCL_START
+    if (ret.args().size() != orig_size) {
+        throw std::invalid_argument(fmt::format("The copy constructor of a user-defined function changed the arity"
+                                                "from {} to {} - this is not allowed",
+                                                orig_size, ret.args().size()));
+    }
+    // LCOV_EXCL_STOP
+
+    // Copy over the new arguments.
+    auto *it = ret.ptr()->get_mutable_args_range().first;
+    for (decltype(new_args.size()) i = 0; i < new_args.size(); ++i, ++it) {
+        *it = new_args[i];
+    }
+
+    return ret;
 }
 
 // Just two small helpers to make sure that whenever we require
@@ -196,11 +222,6 @@ const void *func::get_ptr() const
     return ptr()->get_ptr();
 }
 
-void *func::get_ptr()
-{
-    return ptr()->get_ptr();
-}
-
 // NOTE: time dependency here means **intrinsic** time
 // dependence of the function. That is, we are not concerned
 // with the arguments' time dependence and, e.g., cos(time)
@@ -208,6 +229,11 @@ void *func::get_ptr()
 bool func::is_time_dependent() const
 {
     return ptr()->is_time_dependent();
+}
+
+bool func::is_commutative() const
+{
+    return ptr()->is_commutative();
 }
 
 const std::string &func::get_name() const
@@ -223,11 +249,6 @@ void func::to_stream(std::ostringstream &oss) const
 const std::vector<expression> &func::args() const
 {
     return ptr()->args();
-}
-
-std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> func::get_mutable_args_it()
-{
-    return ptr()->get_mutable_args_it();
 }
 
 std::vector<expression> func::fetch_gradient(const std::string &target) const
@@ -375,46 +396,57 @@ namespace detail
 namespace
 {
 
-// Perform the Taylor decomposition of the arguments of a function. After this operation,
-// each argument will be either:
+// Perform the Taylor decomposition of the arguments of a function. This function
+// will return a vector of arguments in which each element will be either:
 // - a variable,
 // - a number,
 // - a param.
-void func_td_args(func &fb, funcptr_map<taylor_dc_t::size_type> &func_map, taylor_dc_t &dc)
+std::vector<expression> func_td_args(const func &fb, funcptr_map<taylor_dc_t::size_type> &func_map, taylor_dc_t &dc)
 {
-    for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
-        if (const auto dres = taylor_decompose(func_map, *r.first, dc)) {
-            *r.first = expression{fmt::format("u_{}", dres)};
-        } else {
-            assert(std::holds_alternative<variable>(r.first->value())
-                   || std::holds_alternative<number>(r.first->value())
-                   || std::holds_alternative<param>(r.first->value()));
-        }
+    std::vector<expression> retval;
+    retval.reserve(fb.args().size());
 
-        assert(std::holds_alternative<variable>(r.first->value()) || std::holds_alternative<number>(r.first->value())
-               || std::holds_alternative<param>(r.first->value()));
+    for (const auto &arg : fb.args()) {
+        const auto dres = taylor_decompose(func_map, arg, dc);
+
+        if (dres == 0u) {
+            assert(std::holds_alternative<variable>(arg.value()) || std::holds_alternative<number>(arg.value())
+                   || std::holds_alternative<param>(arg.value()));
+
+            retval.push_back(arg);
+        } else {
+            retval.emplace_back(fmt::format("u_{}", dres));
+        }
     }
+
+    return retval;
 }
 
-// Perform the decomposition of the arguments of a function. After this operation,
-// each argument will be either:
+// Perform the decomposition of the arguments of a function. This function
+// will return a vector of arguments in which each element will be either:
 // - a variable,
 // - a number,
 // - a param.
-void func_d_args(func &fb, funcptr_map<std::vector<expression>::size_type> &func_map, std::vector<expression> &dc)
+std::vector<expression> func_d_args(const func &fb, funcptr_map<std::vector<expression>::size_type> &func_map,
+                                    std::vector<expression> &dc)
 {
-    for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
-        if (const auto dres = decompose(func_map, *r.first, dc)) {
-            *r.first = expression{fmt::format("u_{}", *dres)};
-        } else {
-            assert(std::holds_alternative<variable>(r.first->value())
-                   || std::holds_alternative<number>(r.first->value())
-                   || std::holds_alternative<param>(r.first->value()));
-        }
+    std::vector<expression> retval;
+    retval.reserve(fb.args().size());
 
-        assert(std::holds_alternative<variable>(r.first->value()) || std::holds_alternative<number>(r.first->value())
-               || std::holds_alternative<param>(r.first->value()));
+    for (const auto &arg : fb.args()) {
+        const auto dres = decompose(func_map, arg, dc);
+
+        if (dres) {
+            retval.emplace_back(fmt::format("u_{}", *dres));
+        } else {
+            assert(std::holds_alternative<variable>(arg.value()) || std::holds_alternative<number>(arg.value())
+                   || std::holds_alternative<param>(arg.value()));
+
+            retval.push_back(arg);
+        }
     }
+
+    return retval;
 }
 
 } // namespace
@@ -432,13 +464,11 @@ std::vector<expression>::size_type func::decompose(detail::funcptr_map<std::vect
         return it->second;
     }
 
-    // Make a shallow copy: this will be a new function,
-    // but its arguments will be shallow-copied from this.
-    auto f_copy = copy();
+    // Compute the decomposed arguments.
+    const auto new_args = detail::func_d_args(*this, func_map, dc);
 
-    // Decompose the arguments. This will overwrite
-    // the arguments in f_copy with their decomposition.
-    detail::func_d_args(f_copy, func_map, dc);
+    // Make a copy of this containing the new arguments.
+    auto f_copy = copy(new_args);
 
     // Append f_copy and return the index at which it was appended.
     const auto ret = dc.size();
@@ -462,13 +492,11 @@ taylor_dc_t::size_type func::taylor_decompose(detail::funcptr_map<taylor_dc_t::s
         return it->second;
     }
 
-    // Make a shallow copy: this will be a new function,
-    // but its arguments will be shallow-copied from this.
-    auto f_copy = copy();
+    // Compute the decomposed arguments.
+    const auto new_args = detail::func_td_args(*this, func_map, dc);
 
-    // Decompose the arguments. This will overwrite
-    // the arguments in f_copy with their decomposition.
-    detail::func_td_args(f_copy, func_map, dc);
+    // Make a copy of this containing the new arguments.
+    auto f_copy = copy(new_args);
 
     // Run the decomposition.
     taylor_dc_t::size_type ret = 0;

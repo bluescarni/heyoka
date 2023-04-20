@@ -66,7 +66,7 @@ const auto fp_types = std::tuple<double
 #endif
                                  >{};
 
-TEST_CASE("dc deep copy")
+TEST_CASE("dc copy")
 {
     auto [x, v] = make_vars("x", "v");
 
@@ -77,7 +77,7 @@ TEST_CASE("dc deep copy")
 
     for (unsigned i = 2; i < ta.get_decomposition().size() - 2u; ++i) {
         REQUIRE(std::get<func>(ta.get_decomposition()[i].first.value()).get_ptr()
-                != std::get<func>(ta2.get_decomposition()[i].first.value()).get_ptr());
+                == std::get<func>(ta2.get_decomposition()[i].first.value()).get_ptr());
     }
 }
 
@@ -2050,8 +2050,8 @@ TEST_CASE("state_vars rhs")
     REQUIRE(ta.get_state_vars() == std::vector{x, v});
     REQUIRE(ta.get_rhs() == std::vector{rhs_x, rhs_v});
 
-    // Check that the rhs has been deep-copied.
-    REQUIRE(std::get<func>(rhs_v.value()).get_ptr() != std::get<func>(ta.get_rhs()[1].value()).get_ptr());
+    // Check that the rhs has been shallow-copied.
+    REQUIRE(std::get<func>(rhs_v.value()).get_ptr() == std::get<func>(ta.get_rhs()[1].value()).get_ptr());
 
     // Test with copy too.
     auto ta2 = ta;
@@ -2059,7 +2059,7 @@ TEST_CASE("state_vars rhs")
     REQUIRE(ta.get_state_vars() == ta2.get_state_vars());
     REQUIRE(ta.get_rhs() == ta2.get_rhs());
 
-    REQUIRE(std::get<func>(ta2.get_rhs()[1].value()).get_ptr() != std::get<func>(ta.get_rhs()[1].value()).get_ptr());
+    REQUIRE(std::get<func>(ta2.get_rhs()[1].value()).get_ptr() == std::get<func>(ta.get_rhs()[1].value()).get_ptr());
 
     // Check automatic variable deduction.
     auto ta3 = taylor_adaptive_batch<double>{{rhs_v, rhs_x}, std::vector<double>(4u, 0.), 2u};
@@ -2067,5 +2067,5 @@ TEST_CASE("state_vars rhs")
     REQUIRE(ta3.get_state_vars() == std::vector{v, x});
     REQUIRE(ta3.get_rhs() == std::vector{rhs_v, rhs_x});
 
-    REQUIRE(std::get<func>(rhs_v.value()).get_ptr() != std::get<func>(ta3.get_rhs()[0].value()).get_ptr());
+    REQUIRE(std::get<func>(rhs_v.value()).get_ptr() == std::get<func>(ta3.get_rhs()[0].value()).get_ptr());
 }
