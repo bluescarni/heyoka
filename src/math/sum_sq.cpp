@@ -84,6 +84,11 @@ void sum_sq_impl::to_stream(std::ostringstream &oss) const
     }
 }
 
+bool sum_sq_impl::is_commutative() const
+{
+    return true;
+}
+
 template <typename T>
 expression sum_sq_impl::diff_impl(funcptr_map<expression> &func_map, const T &x) const
 {

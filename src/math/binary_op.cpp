@@ -75,6 +75,11 @@ bool binary_op::extra_equal_to(const func &f) const
     return static_cast<const binary_op *>(f.get_ptr())->m_type == m_type;
 }
 
+bool binary_op::is_commutative() const
+{
+    return m_type == type::add || m_type == type::mul;
+}
+
 std::size_t binary_op::extra_hash() const
 {
     return std::hash<type>{}(m_type);

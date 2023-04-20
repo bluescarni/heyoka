@@ -298,11 +298,10 @@ llvm::Function *neg_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 }
 
 // Small helper to detect if an expression
-// is a neg function. Mutable so we can extract
-// the function arguments from the return value.
-func *is_neg(expression &ex)
+// is a neg function.
+const func *is_neg(const expression &ex)
 {
-    if (auto func_ptr = std::get_if<func>(&ex.value());
+    if (const auto *func_ptr = std::get_if<func>(&ex.value());
         func_ptr != nullptr && func_ptr->extract<neg_impl>() != nullptr) {
         return func_ptr;
     } else {

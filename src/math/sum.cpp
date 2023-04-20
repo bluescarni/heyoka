@@ -84,6 +84,11 @@ std::vector<expression> sum_impl::gradient() const
     return {args().size(), 1_dbl};
 }
 
+bool sum_impl::is_commutative() const
+{
+    return true;
+}
+
 namespace
 {
 

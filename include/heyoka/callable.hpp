@@ -39,13 +39,18 @@ namespace detail
 
 template <typename R, typename... Args>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_inner_base {
-    virtual ~callable_inner_base() {}
+    callable_inner_base() = default;
+    callable_inner_base(const callable_inner_base &) = delete;
+    callable_inner_base(callable_inner_base &&) = delete;
+    callable_inner_base &operator=(const callable_inner_base &) = delete;
+    callable_inner_base &operator=(callable_inner_base &&) = delete;
+    virtual ~callable_inner_base() = default;
 
     virtual std::unique_ptr<callable_inner_base> clone() const = 0;
 
     virtual R operator()(Args...) const = 0;
 
-    virtual std::type_index get_type_index() const = 0;
+    [[nodiscard]] virtual std::type_index get_type_index() const = 0;
 
 private:
     // Serialization (empty, no data members).
@@ -66,6 +71,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_inner final : callable_inner_base
     callable_inner(callable_inner &&) = delete;
     callable_inner &operator=(const callable_inner &) = delete;
     callable_inner &operator=(callable_inner &&) = delete;
+    ~callable_inner() final = default;
 
     // Constructors from T (copy and move variants).
     explicit callable_inner(const T &x) : m_value(x) {}
@@ -82,7 +88,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_inner final : callable_inner_base
         return m_value(std::forward<Args>(args)...);
     }
 
-    std::type_index get_type_index() const final
+    [[nodiscard]] std::type_index get_type_index() const final
     {
         return typeid(T);
     }
@@ -136,7 +142,7 @@ public:
     // NOTE: default construction builds an empty callable.
     callable() = default;
     callable(const callable &other) : m_ptr(other ? other.m_ptr->clone() : nullptr) {}
-    callable(callable &&) = default;
+    callable(callable &&) noexcept = default;
 
     // NOTE: generic ctor is enabled only if it does not
     // compete with copy/move ctors.
@@ -145,11 +151,17 @@ public:
     {
     }
 
+    ~callable() = default;
+
     callable &operator=(const callable &other)
     {
-        return *this = callable(other);
+        if (this != &other) {
+            *this = callable(other);
+        }
+
+        return *this;
     }
-    callable &operator=(callable &&) = default;
+    callable &operator=(callable &&) noexcept = default;
 
     R operator()(Args... args) const
     {
@@ -170,7 +182,7 @@ public:
         return static_cast<bool>(m_ptr);
     }
 
-    std::type_index get_type_index() const
+    [[nodiscard]] std::type_index get_type_index() const
     {
         if (m_ptr) {
             return m_ptr->get_type_index();
@@ -219,8 +231,8 @@ namespace boost::serialization
 
 template <typename R, typename... Args>
 struct tracking_level<heyoka::detail::callable_inner_base<R, Args...>> {
-    typedef mpl::integral_c_tag tag;
-    typedef mpl::int_<track_never> type;
+    using tag = mpl::integral_c_tag;
+    using type = mpl::int_<track_never>;
     BOOST_STATIC_CONSTANT(int, value = tracking_level::type::value);
     BOOST_STATIC_ASSERT((mpl::greater<implementation_level<heyoka::detail::callable_inner_base<R, Args...>>,
                                       mpl::int_<primitive_type>>::value));
@@ -228,8 +240,8 @@ struct tracking_level<heyoka::detail::callable_inner_base<R, Args...>> {
 
 template <typename T, typename R, typename... Args>
 struct tracking_level<heyoka::detail::callable_inner<T, R, Args...>> {
-    typedef mpl::integral_c_tag tag;
-    typedef mpl::int_<track_never> type;
+    using tag = mpl::integral_c_tag;
+    using type = mpl::int_<track_never>;
     BOOST_STATIC_CONSTANT(int, value = tracking_level::type::value);
     BOOST_STATIC_ASSERT((mpl::greater<implementation_level<heyoka::detail::callable_inner<T, R, Args...>>,
                                       mpl::int_<primitive_type>>::value));

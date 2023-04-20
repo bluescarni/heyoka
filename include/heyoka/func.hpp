@@ -45,6 +45,15 @@ BOOST_CLASS_VERSION(heyoka::func, 1)
 
 HEYOKA_BEGIN_NAMESPACE
 
+namespace detail
+{
+
+// Fwd declaration.
+template <typename>
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner;
+
+} // namespace detail
+
 class HEYOKA_DLL_PUBLIC func_base
 {
     std::string m_name;
@@ -59,6 +68,12 @@ class HEYOKA_DLL_PUBLIC func_base
         ar &m_args;
     }
 
+    // NOTE: func_inner needs access to get_mutable_args_range().
+    template <typename>
+    friend struct HEYOKA_DLL_PUBLIC_INLINE_CLASS detail::func_inner;
+
+    std::pair<expression *, expression *> get_mutable_args_range();
+
 public:
     explicit func_base(std::string, std::vector<expression>);
 
@@ -72,7 +87,6 @@ public:
 
     [[nodiscard]] const std::string &get_name() const;
     [[nodiscard]] const std::vector<expression> &args() const;
-    std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 };
 
 namespace detail
@@ -99,11 +113,12 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     [[nodiscard]] virtual bool extra_equal_to(const func &) const = 0;
 
     [[nodiscard]] virtual bool is_time_dependent() const = 0;
+    [[nodiscard]] virtual bool is_commutative() const = 0;
 
     [[nodiscard]] virtual std::size_t extra_hash() const = 0;
 
     [[nodiscard]] virtual const std::vector<expression> &args() const = 0;
-    virtual std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it() = 0;
+    virtual std::pair<expression *, expression *> get_mutable_args_range() = 0;
 
     [[nodiscard]] virtual bool has_diff_var() const = 0;
     virtual expression diff(funcptr_map<expression> &, const std::string &) const = 0;
@@ -136,6 +151,9 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
 
     [[nodiscard]] virtual llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const = 0;
 
+    // NOTE: this is the last remaining trace of mutability
+    // related to decomposition. Note, however, that this is never
+    // exposed in the public API.
     virtual taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) && = 0;
     [[nodiscard]] virtual bool has_taylor_decompose() const = 0;
 
@@ -175,6 +193,12 @@ using func_is_time_dependent_t = decltype(std::declval<std::add_lvalue_reference
 
 template <typename T>
 inline constexpr bool func_has_is_time_dependent_v = std::is_same_v<detected_t<func_is_time_dependent_t, T>, bool>;
+
+template <typename T>
+using func_is_commutative_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().is_commutative());
+
+template <typename T>
+inline constexpr bool func_has_is_commutative_v = std::is_same_v<detected_t<func_is_commutative_t, T>, bool>;
 
 template <typename T>
 using func_extra_hash_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().extra_hash());
@@ -369,6 +393,15 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         }
     }
 
+    [[nodiscard]] bool is_commutative() const final
+    {
+        if constexpr (func_has_is_commutative_v<T>) {
+            return m_value.is_commutative();
+        } else {
+            return false;
+        }
+    }
+
     [[nodiscard]] std::size_t extra_hash() const final
     {
         if constexpr (func_has_extra_hash_v<T>) {
@@ -382,9 +415,9 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     {
         return static_cast<const func_base *>(&m_value)->args();
     }
-    std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it() final
+    std::pair<expression *, expression *> get_mutable_args_range() final
     {
-        return static_cast<func_base *>(&m_value)->get_mutable_args_it();
+        return static_cast<func_base *>(&m_value)->get_mutable_args_range();
     }
 
     // diff.
@@ -618,10 +651,10 @@ public:
     ~func();
 
     // NOTE: this creates a new func containing
-    // a copy of the inner object: this means that
-    // the function arguments are shallow-copied and
-    // NOT deep-copied.
-    [[nodiscard]] func copy() const;
+    // a copy of the inner object in which the original
+    // function arguments have been replaced by the
+    // provided vector of arguments.
+    [[nodiscard]] func copy(const std::vector<expression> &) const;
 
     // NOTE: like in pagmo, this may fail if invoked
     // from different DLLs in certain situations (e.g.,
@@ -637,18 +670,12 @@ public:
         auto p = dynamic_cast<const detail::func_inner<T> *>(ptr());
         return p == nullptr ? nullptr : &(p->m_value);
     }
-    template <typename T>
-    [[nodiscard]] T *extract() noexcept
-    {
-        auto p = dynamic_cast<detail::func_inner<T> *>(ptr());
-        return p == nullptr ? nullptr : &(p->m_value);
-    }
 
     [[nodiscard]] std::type_index get_type_index() const;
     [[nodiscard]] const void *get_ptr() const;
-    [[nodiscard]] void *get_ptr();
 
     [[nodiscard]] bool is_time_dependent() const;
+    [[nodiscard]] bool is_commutative() const;
 
     [[nodiscard]] const std::string &get_name() const;
 
@@ -657,7 +684,6 @@ public:
     [[nodiscard]] std::size_t hash(detail::funcptr_map<std::size_t> &) const;
 
     [[nodiscard]] const std::vector<expression> &args() const;
-    std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 
     expression diff(detail::funcptr_map<expression> &, const std::string &) const;
     expression diff(detail::funcptr_map<expression> &, const param &) const;

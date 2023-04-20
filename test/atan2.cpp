@@ -106,59 +106,6 @@ TEST_CASE("atan2 diff")
                    / ((par[1] / par[0]) * (par[1] / par[0]) + (par[0] * par[1]) * (par[0] * par[1])));
 }
 
-TEST_CASE("atan2 decompose")
-{
-    auto [u0, u1] = make_vars("u_0", "u_1");
-
-    {
-        taylor_dc_t dec;
-        dec.emplace_back("y"_var, std::vector<std::uint32_t>{});
-        dec.emplace_back("x"_var, std::vector<std::uint32_t>{});
-        taylor_decompose(atan2(u0, u1), dec);
-
-        REQUIRE(dec.size() == 6u);
-
-        REQUIRE(dec[2].first == u1 * u1);
-        REQUIRE(dec[2].second == std::vector<std::uint32_t>{});
-
-        REQUIRE(dec[3].first == u0 * u0);
-        REQUIRE(dec[3].second == std::vector<std::uint32_t>{});
-
-        REQUIRE(dec[4].first == "u_2"_var + "u_3"_var);
-        REQUIRE(dec[4].second == std::vector<std::uint32_t>{});
-
-        REQUIRE(dec[5].first == atan2(u0, u1));
-        REQUIRE(dec[5].second == std::vector<std::uint32_t>{4});
-    }
-
-    {
-        taylor_dc_t dec;
-        dec.emplace_back("y"_var, std::vector<std::uint32_t>{});
-        dec.emplace_back("x"_var, std::vector<std::uint32_t>{});
-        taylor_decompose(atan2(u0 + u1, u1 - u0), dec);
-
-        REQUIRE(dec.size() == 8u);
-
-        REQUIRE(dec[2].first == u0 + u1);
-        REQUIRE(dec[2].second.empty());
-
-        REQUIRE(dec[3].first == u1 - u0);
-        REQUIRE(dec[3].second.empty());
-
-        REQUIRE(dec[4].first == "u_3"_var * "u_3"_var);
-        REQUIRE(dec[4].second == std::vector<std::uint32_t>{});
-
-        REQUIRE(dec[5].first == "u_2"_var * "u_2"_var);
-        REQUIRE(dec[5].second == std::vector<std::uint32_t>{});
-
-        REQUIRE(dec[6].first == "u_4"_var + "u_5"_var);
-        REQUIRE(dec[6].second == std::vector<std::uint32_t>{});
-
-        REQUIRE(dec[7].first == atan2("u_2"_var, "u_3"_var));
-        REQUIRE(dec[7].second == std::vector<std::uint32_t>{6});
-    }
-}
-
 TEST_CASE("atan2 overloads")
 {
     auto k = atan2("x"_var, 1.1);
