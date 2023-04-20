@@ -111,14 +111,6 @@ public:
 HEYOKA_DLL_PUBLIC expression copy(const expression &);
 HEYOKA_DLL_PUBLIC std::vector<expression> copy(const std::vector<expression> &);
 
-namespace detail
-{
-
-// A couple of helpers for deep-copying containers of expressions.
-std::vector<std::pair<expression, expression>> copy(const std::vector<std::pair<expression, expression>> &);
-
-} // namespace detail
-
 inline namespace literals
 {
 
@@ -437,8 +429,6 @@ namespace detail
 taylor_dc_t::size_type taylor_decompose(funcptr_map<taylor_dc_t::size_type> &, const expression &, taylor_dc_t &);
 
 } // namespace detail
-
-HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose(const expression &, taylor_dc_t &);
 
 template <typename... Args>
 inline std::array<expression, sizeof...(Args)> make_vars(const Args &...strs)

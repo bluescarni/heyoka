@@ -1860,16 +1860,6 @@ taylor_dc_t::size_type taylor_decompose(funcptr_map<taylor_dc_t::size_type> &fun
 
 } // namespace detail
 
-// Decompose ex into dc. The return value is the index, in dc,
-// which corresponds to the decomposed version of ex.
-// If the return value is zero, ex was not decomposed.
-taylor_dc_t::size_type taylor_decompose(const expression &ex, taylor_dc_t &dc)
-{
-    detail::funcptr_map<taylor_dc_t::size_type> func_map;
-
-    return detail::taylor_decompose(func_map, ex, dc);
-}
-
 llvm::Value *taylor_diff(llvm_state &s, llvm::Type *fp_t, const expression &ex, const std::vector<std::uint32_t> &deps,
                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
                          std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
@@ -2168,18 +2158,6 @@ bool is_time_dependent(funcptr_map<bool> &func_map, const expression &ex)
 }
 
 } // namespace
-
-std::vector<std::pair<expression, expression>> copy(const std::vector<std::pair<expression, expression>> &v)
-{
-    std::vector<std::pair<expression, expression>> ret;
-    ret.reserve(v.size());
-
-    std::transform(v.begin(), v.end(), std::back_inserter(ret), [](const auto &p) {
-        return std::pair{copy(p.first), copy(p.second)};
-    });
-
-    return ret;
-}
 
 std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vector<expression>::size_type> &func_map,
                                                             const expression &ex, std::vector<expression> &dc)
