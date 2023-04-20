@@ -1517,7 +1517,7 @@ expression diff(const expression &e, const param &p)
 expression diff(const expression &e, const expression &x)
 {
     return std::visit(
-        [&](const auto &v) -> expression {
+        [&e](const auto &v) -> expression {
             if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
                 return diff(e, v.name());
             } else if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, param>) {
@@ -1615,21 +1615,6 @@ std::vector<expression> subs(const std::vector<expression> &v_ex,
     return ret;
 }
 
-std::vector<expression> subs(const std::vector<expression> &v_ex,
-                             const std::unordered_map<std::string, expression> &smap)
-{
-    detail::funcptr_map<expression> func_map;
-
-    std::vector<expression> ret;
-    ret.reserve(v_ex.size());
-
-    for (const auto &e : v_ex) {
-        ret.push_back(detail::subs(func_map, e, smap));
-    }
-
-    return ret;
-}
-
 namespace detail
 {
 
@@ -1712,21 +1697,6 @@ std::vector<expression> subs(const std::vector<expression> &v_ex,
 
     for (const auto &e : v_ex) {
         ret.push_back(detail::subs(func_map, e, smap, canonicalise));
-    }
-
-    return ret;
-}
-
-std::vector<expression> subs(const std::vector<expression> &v_ex,
-                             const std::unordered_map<expression, expression> &smap)
-{
-    detail::funcptr_map<expression> func_map;
-
-    std::vector<expression> ret;
-    ret.reserve(v_ex.size());
-
-    for (const auto &e : v_ex) {
-        ret.push_back(detail::subs(func_map, e, smap));
     }
 
     return ret;
@@ -2647,6 +2617,19 @@ function_decompose(const std::vector<expression> &v_ex_)
 
 #endif
 
+    // Simplify the decomposition.
+    // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
+    // This is fine, as the decomposition must contain at least nvars items.
+    ret = detail::function_decompose_cse(ret, nvars, nouts);
+
+#if !defined(NDEBUG)
+
+    // Verify the simplified decomposition.
+    detail::verify_function_dec(v_ex_, ret, nvars);
+
+#endif
+
+    // Run the breadth-first topological sort on the decomposition.
     // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
     // This is fine, as the decomposition must contain at least nvars items.
     ret = detail::function_sort_dc(ret, nvars, nouts);
