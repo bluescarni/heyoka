@@ -15,6 +15,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -2053,4 +2054,18 @@ TEST_CASE("get_params")
     // Test the vectorised version too.
     auto ex2 = 3_dbl + par[4];
     REQUIRE(get_params({ex, ex2}) == std::vector{par[3], par[4], par[56]});
+}
+
+TEST_CASE("swap")
+{
+    using std::swap;
+
+    REQUIRE(std::is_nothrow_swappable_v<expression>);
+
+    auto [x, y] = make_vars("x", "y");
+
+    swap(x, y);
+
+    REQUIRE(x == "y"_var);
+    REQUIRE(y == "x"_var);
 }

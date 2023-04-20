@@ -64,7 +64,7 @@ public:
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
 };
 
-const func *is_neg(expression &);
+const func *is_neg(const expression &);
 
 } // namespace detail
 
