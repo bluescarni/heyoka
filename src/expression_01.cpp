@@ -32,6 +32,7 @@
 #include <fmt/ranges.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -83,16 +84,8 @@ revdiff_decompose(const std::vector<expression> &v_ex_)
         }
     }
 
-#if !defined(NDEBUG)
-
-    // Store a copy of the original function for checking later.
-    auto orig_v_ex = copy(v_ex_);
-
-#endif
-
     // Rename variables and params.
-    // NOTE: this creates a new deep copy of v_ex_.
-    auto v_ex = subs(v_ex_, repl_map);
+    const auto v_ex = subs(v_ex_, repl_map);
 
     // Init the decomposition. It begins with a list
     // of the original variables and params of the function.
@@ -107,17 +100,41 @@ revdiff_decompose(const std::vector<expression> &v_ex_)
         ret.push_back(par);
     }
 
+    // Prepare the outputs vector.
+    std::vector<expression> outs;
+    outs.reserve(nouts);
+
     // Log the construction runtime in trace mode.
     spdlog::stopwatch sw;
 
     // Run the decomposition.
-    decompose(v_ex, ret);
+    detail::funcptr_map<std::vector<expression>::size_type> func_map;
+    for (const auto &ex : v_ex) {
+        // Decompose the current component.
+        if (const auto dres = detail::decompose(func_map, ex, ret)) {
+            // NOTE: if the component was decomposed
+            // (that is, it is not constant or a single variable),
+            // then the output is a u variable.
+            // NOTE: all functions are forced to return
+            // a non-empty dres
+            // in the func API, so the only entities that
+            // can return an empty dres are consts or
+            // variables.
+            outs.emplace_back(fmt::format("u_{}", *dres));
+        } else {
+            // NOTE: params have been turned into variables,
+            // thus here the only 2 possibilities are variable
+            // and number.
+            assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value()));
 
-    // Append the definitions of the outputs
-    // in terms of u variables or numbers.
-    for (auto &ex : v_ex) {
-        ret.emplace_back(std::move(ex));
+            outs.push_back(ex);
+        }
     }
+
+    assert(outs.size() == nouts);
+
+    // Append the definitions of the outputs.
+    ret.insert(ret.end(), outs.begin(), outs.end());
 
     get_logger()->trace("revdiff decomposition construction runtime: {}", sw);
 
@@ -126,7 +143,7 @@ revdiff_decompose(const std::vector<expression> &v_ex_)
     // Verify the decomposition.
     // NOTE: nvars + npars is implicitly converted to std::vector<expression>::size_type here.
     // This is fine, as the decomposition must contain at least nvars + npars items.
-    verify_function_dec(orig_v_ex, ret, nvars + npars, true);
+    verify_function_dec(v_ex_, ret, nvars + npars, true);
 
 #endif
 
@@ -138,7 +155,7 @@ revdiff_decompose(const std::vector<expression> &v_ex_)
 #if !defined(NDEBUG)
 
     // Verify the decomposition.
-    verify_function_dec(orig_v_ex, ret, nvars + npars, true);
+    verify_function_dec(v_ex_, ret, nvars + npars, true);
 
 #endif
 
@@ -150,7 +167,7 @@ revdiff_decompose(const std::vector<expression> &v_ex_)
 #if !defined(NDEBUG)
 
     // Verify the decomposition.
-    verify_function_dec(orig_v_ex, ret, nvars + npars, true);
+    verify_function_dec(v_ex_, ret, nvars + npars, true);
 
 #endif
 
