@@ -629,7 +629,7 @@ expression sum_sq(std::vector<expression> args, std::uint32_t split)
 #if !defined(NDEBUG)
         // NOTE: there cannot be zero numbers here because
         // we removed them.
-        if (auto *nptr = std::get_if<number>(&arg.value()); (nptr != nullptr) && is_zero(*nptr)) {
+        if (const auto *nptr = std::get_if<number>(&arg.value()); (nptr != nullptr) && is_zero(*nptr)) {
             assert(false);
         }
 #endif
