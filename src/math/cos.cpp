@@ -413,13 +413,13 @@ std::vector<expression> cos_impl::gradient() const
 
 expression cos(expression e)
 {
-    if (auto *fptr = detail::is_neg(e)) {
+    if (const auto *fptr = detail::is_neg(e)) {
         // Simplify cos(-x) to cos(x).
         assert(fptr->args().size() == 1u);
         return cos(fptr->args()[0]);
     } else {
         // Simplify cos(number) to its value.
-        if (auto *num_ptr = std::get_if<number>(&e.value())) {
+        if (const auto *num_ptr = std::get_if<number>(&e.value())) {
             return expression{std::visit(
                 [](const auto &x) {
                     using std::cos;

@@ -183,7 +183,7 @@ struct HEYOKA_DLL_PUBLIC prime_wrapper {
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC detail::prime_wrapper prime(expression);
+HEYOKA_DLL_PUBLIC detail::prime_wrapper prime(const expression &);
 
 inline namespace literals
 {
@@ -236,79 +236,79 @@ HEYOKA_DLL_PUBLIC std::vector<expression> rename_variables(const std::vector<exp
 HEYOKA_DLL_PUBLIC expression operator+(expression);
 HEYOKA_DLL_PUBLIC expression operator-(expression);
 
-HEYOKA_DLL_PUBLIC expression operator+(expression, expression);
-HEYOKA_DLL_PUBLIC expression operator+(expression, double);
-HEYOKA_DLL_PUBLIC expression operator+(expression, long double);
+HEYOKA_DLL_PUBLIC expression operator+(const expression &, const expression &);
+HEYOKA_DLL_PUBLIC expression operator+(const expression &, double);
+HEYOKA_DLL_PUBLIC expression operator+(const expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
-HEYOKA_DLL_PUBLIC expression operator+(expression, mppp::real128);
+HEYOKA_DLL_PUBLIC expression operator+(const expression &, mppp::real128);
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-HEYOKA_DLL_PUBLIC expression operator+(expression, mppp::real);
+HEYOKA_DLL_PUBLIC expression operator+(const expression &, mppp::real);
 #endif
-HEYOKA_DLL_PUBLIC expression operator+(double, expression);
-HEYOKA_DLL_PUBLIC expression operator+(long double, expression);
+HEYOKA_DLL_PUBLIC expression operator+(double, const expression &);
+HEYOKA_DLL_PUBLIC expression operator+(long double, const expression &);
 #if defined(HEYOKA_HAVE_REAL128)
-HEYOKA_DLL_PUBLIC expression operator+(mppp::real128, expression);
+HEYOKA_DLL_PUBLIC expression operator+(mppp::real128, const expression &);
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-HEYOKA_DLL_PUBLIC expression operator+(mppp::real, expression);
+HEYOKA_DLL_PUBLIC expression operator+(mppp::real, const expression &);
 #endif
 
-HEYOKA_DLL_PUBLIC expression operator-(expression, expression);
-HEYOKA_DLL_PUBLIC expression operator-(expression, double);
-HEYOKA_DLL_PUBLIC expression operator-(expression, long double);
+HEYOKA_DLL_PUBLIC expression operator-(const expression &, const expression &);
+HEYOKA_DLL_PUBLIC expression operator-(const expression &, double);
+HEYOKA_DLL_PUBLIC expression operator-(const expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
-HEYOKA_DLL_PUBLIC expression operator-(expression, mppp::real128);
+HEYOKA_DLL_PUBLIC expression operator-(const expression &, mppp::real128);
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-HEYOKA_DLL_PUBLIC expression operator-(expression, mppp::real);
+HEYOKA_DLL_PUBLIC expression operator-(const expression &, mppp::real);
 #endif
-HEYOKA_DLL_PUBLIC expression operator-(double, expression);
-HEYOKA_DLL_PUBLIC expression operator-(long double, expression);
+HEYOKA_DLL_PUBLIC expression operator-(double, const expression &);
+HEYOKA_DLL_PUBLIC expression operator-(long double, const expression &);
 #if defined(HEYOKA_HAVE_REAL128)
-HEYOKA_DLL_PUBLIC expression operator-(mppp::real128, expression);
+HEYOKA_DLL_PUBLIC expression operator-(mppp::real128, const expression &);
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-HEYOKA_DLL_PUBLIC expression operator-(mppp::real, expression);
+HEYOKA_DLL_PUBLIC expression operator-(mppp::real, const expression &);
 #endif
 
-HEYOKA_DLL_PUBLIC expression operator*(expression, expression);
-HEYOKA_DLL_PUBLIC expression operator*(expression, double);
-HEYOKA_DLL_PUBLIC expression operator*(expression, long double);
+HEYOKA_DLL_PUBLIC expression operator*(const expression &, const expression &);
+HEYOKA_DLL_PUBLIC expression operator*(const expression &, double);
+HEYOKA_DLL_PUBLIC expression operator*(const expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
-HEYOKA_DLL_PUBLIC expression operator*(expression, mppp::real128);
+HEYOKA_DLL_PUBLIC expression operator*(const expression &, mppp::real128);
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-HEYOKA_DLL_PUBLIC expression operator*(expression, mppp::real);
+HEYOKA_DLL_PUBLIC expression operator*(const expression &, mppp::real);
 #endif
-HEYOKA_DLL_PUBLIC expression operator*(double, expression);
-HEYOKA_DLL_PUBLIC expression operator*(long double, expression);
+HEYOKA_DLL_PUBLIC expression operator*(double, const expression &);
+HEYOKA_DLL_PUBLIC expression operator*(long double, const expression &);
 #if defined(HEYOKA_HAVE_REAL128)
-HEYOKA_DLL_PUBLIC expression operator*(mppp::real128, expression);
+HEYOKA_DLL_PUBLIC expression operator*(mppp::real128, const expression &);
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-HEYOKA_DLL_PUBLIC expression operator*(mppp::real, expression);
+HEYOKA_DLL_PUBLIC expression operator*(mppp::real, const expression &);
 #endif
 
-HEYOKA_DLL_PUBLIC expression operator/(expression, expression);
-HEYOKA_DLL_PUBLIC expression operator/(expression, double);
-HEYOKA_DLL_PUBLIC expression operator/(expression, long double);
+HEYOKA_DLL_PUBLIC expression operator/(const expression &, const expression &);
+HEYOKA_DLL_PUBLIC expression operator/(const expression &, double);
+HEYOKA_DLL_PUBLIC expression operator/(const expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
-HEYOKA_DLL_PUBLIC expression operator/(expression, mppp::real128);
+HEYOKA_DLL_PUBLIC expression operator/(const expression &, mppp::real128);
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-HEYOKA_DLL_PUBLIC expression operator/(expression, mppp::real);
+HEYOKA_DLL_PUBLIC expression operator/(const expression &, mppp::real);
 #endif
-HEYOKA_DLL_PUBLIC expression operator/(double, expression);
-HEYOKA_DLL_PUBLIC expression operator/(long double, expression);
+HEYOKA_DLL_PUBLIC expression operator/(double, const expression &);
+HEYOKA_DLL_PUBLIC expression operator/(long double, const expression &);
 #if defined(HEYOKA_HAVE_REAL128)
-HEYOKA_DLL_PUBLIC expression operator/(mppp::real128, expression);
+HEYOKA_DLL_PUBLIC expression operator/(mppp::real128, const expression &);
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-HEYOKA_DLL_PUBLIC expression operator/(mppp::real, expression);
+HEYOKA_DLL_PUBLIC expression operator/(mppp::real, const expression &);
 #endif
 
-HEYOKA_DLL_PUBLIC expression &operator+=(expression &, expression);
+HEYOKA_DLL_PUBLIC expression &operator+=(expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, double);
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -318,7 +318,7 @@ HEYOKA_DLL_PUBLIC expression &operator+=(expression &, mppp::real128);
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, mppp::real);
 #endif
 
-HEYOKA_DLL_PUBLIC expression &operator-=(expression &, expression);
+HEYOKA_DLL_PUBLIC expression &operator-=(expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, double);
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -328,7 +328,7 @@ HEYOKA_DLL_PUBLIC expression &operator-=(expression &, mppp::real128);
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, mppp::real);
 #endif
 
-HEYOKA_DLL_PUBLIC expression &operator*=(expression &, expression);
+HEYOKA_DLL_PUBLIC expression &operator*=(expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, double);
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -338,7 +338,7 @@ HEYOKA_DLL_PUBLIC expression &operator*=(expression &, mppp::real128);
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, mppp::real);
 #endif
 
-HEYOKA_DLL_PUBLIC expression &operator/=(expression &, expression);
+HEYOKA_DLL_PUBLIC expression &operator/=(expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, double);
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -458,7 +458,7 @@ dtens diff_tensors(const std::vector<expression> &v_ex, KwArgs &&...kw_args)
     return detail::diff_tensors(v_ex, d_args, order);
 }
 
-HEYOKA_DLL_PUBLIC expression pairwise_prod(std::vector<expression>);
+HEYOKA_DLL_PUBLIC expression pairwise_prod(const std::vector<expression> &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const expression &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> & = {});
