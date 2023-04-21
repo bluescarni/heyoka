@@ -224,7 +224,7 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, llvm::Type *fp_t, con
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto *f = module.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -239,15 +239,15 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, llvm::Type *fp_t, con
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
-        auto ord = f->args().begin();
-        auto diff_ptr = f->args().begin() + 2;
-        auto var_idx = f->args().begin() + 5;
+        auto *ord = f->args().begin();
+        auto *diff_ptr = f->args().begin() + 2;
+        auto *var_idx = f->args().begin() + 5;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = llvm_fneg(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, var_idx));
+        auto *retval = llvm_fneg(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, var_idx));
 
         // Return the result.
         builder.CreateRet(retval);

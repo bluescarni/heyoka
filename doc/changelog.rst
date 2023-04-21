@@ -7,6 +7,17 @@ Changelog
 New
 ~~~
 
+- Introduce several vectorised overloads in the expression
+  API. These vectorised overloads allow to perform the same
+  operation on a list of expressions more efficiently
+  than performing the same operation repeatedly on individual
+  expressions
+  (`#312 <https://github.com/bluescarni/heyoka/pull/312>`__).
+- Functions in the expression system can now be optionally
+  marked as commutative
+  (`#312 <https://github.com/bluescarni/heyoka/pull/312>`__).
+- The expression class is now immutable
+  (`#312 <https://github.com/bluescarni/heyoka/pull/312>`__).
 - The add/mul operators of the expression class now enforce
   a canonical ordering for their operands
   (`#311 <https://github.com/bluescarni/heyoka/pull/311>`__).
