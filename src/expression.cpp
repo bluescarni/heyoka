@@ -345,6 +345,48 @@ void get_variables(funcptr_set &func_set, std::unordered_set<std::string> &s_set
         e.value());
 }
 
+} // namespace
+
+} // namespace detail
+
+std::vector<std::string> get_variables(const expression &e)
+{
+    detail::funcptr_set func_set;
+
+    std::unordered_set<std::string> s_set;
+
+    detail::get_variables(func_set, s_set, e);
+
+    // Turn the set into an ordered vector.
+    std::vector retval(s_set.begin(), s_set.end());
+    std::sort(retval.begin(), retval.end());
+
+    return retval;
+}
+
+std::vector<std::string> get_variables(const std::vector<expression> &v_ex)
+{
+    detail::funcptr_set func_set;
+
+    std::unordered_set<std::string> s_set;
+
+    for (const auto &ex : v_ex) {
+        detail::get_variables(func_set, s_set, ex);
+    }
+
+    // Turn the set into an ordered vector.
+    std::vector retval(s_set.begin(), s_set.end());
+    std::sort(retval.begin(), retval.end());
+
+    return retval;
+}
+
+namespace detail
+{
+
+namespace
+{
+
 expression rename_variables(detail::funcptr_map<expression> &func_map, const expression &e,
                             const std::unordered_map<std::string, std::string> &repl_map)
 {
@@ -396,38 +438,6 @@ expression rename_variables(detail::funcptr_map<expression> &func_map, const exp
 } // namespace
 
 } // namespace detail
-
-std::vector<std::string> get_variables(const expression &e)
-{
-    detail::funcptr_set func_set;
-
-    std::unordered_set<std::string> s_set;
-
-    detail::get_variables(func_set, s_set, e);
-
-    // Turn the set into an ordered vector.
-    std::vector retval(s_set.begin(), s_set.end());
-    std::sort(retval.begin(), retval.end());
-
-    return retval;
-}
-
-std::vector<std::string> get_variables(const std::vector<expression> &v_ex)
-{
-    detail::funcptr_set func_set;
-
-    std::unordered_set<std::string> s_set;
-
-    for (const auto &ex : v_ex) {
-        detail::get_variables(func_set, s_set, ex);
-    }
-
-    // Turn the set into an ordered vector.
-    std::vector retval(s_set.begin(), s_set.end());
-    std::sort(retval.begin(), retval.end());
-
-    return retval;
-}
 
 expression rename_variables(const expression &e, const std::unordered_map<std::string, std::string> &repl_map)
 {
@@ -2154,6 +2164,19 @@ bool is_time_dependent(funcptr_map<bool> &func_map, const expression &ex)
 
 } // namespace
 
+} // namespace detail
+
+// Determine if an expression is time-dependent.
+bool is_time_dependent(const expression &ex)
+{
+    detail::funcptr_map<bool> func_map;
+
+    return detail::is_time_dependent(func_map, ex);
+}
+
+namespace detail
+{
+
 std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vector<expression>::size_type> &func_map,
                                                             const expression &ex, std::vector<expression> &dc)
 {
@@ -3788,14 +3811,6 @@ template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real>(llvm_st
 #endif
 
 } // namespace detail
-
-// Determine if an expression is time-dependent.
-bool is_time_dependent(const expression &ex)
-{
-    detail::funcptr_map<bool> func_map;
-
-    return detail::is_time_dependent(func_map, ex);
-}
 
 HEYOKA_END_NAMESPACE
 
