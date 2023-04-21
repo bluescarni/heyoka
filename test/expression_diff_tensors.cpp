@@ -258,3 +258,17 @@ TEST_CASE("speelpenning")
         // }
     }
 }
+
+// This test checks that reverse-mode differentiation produces
+// expressions in which the operands to commutative functions are kept
+// in a canonical order.
+TEST_CASE("comm canonical")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    auto dt = diff_tensors({par[0] * x * y}, kw::diff_args = diff_args::all);
+
+    REQUIRE(dt[{0, 0, 0, 1}] == x * y);
+    REQUIRE(dt[{0, 0, 1, 0}] == par[0] * x);
+    REQUIRE(dt[{0, 1, 0, 0}] == par[0] * y);
+}

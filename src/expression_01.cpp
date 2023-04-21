@@ -205,8 +205,13 @@ auto revdiff_make_adj_revdep(const std::vector<expression> &dc, std::vector<expr
     std::unordered_map<std::string, expression> subs_map;
 
     for (idx_t i = 0; i < nvars; ++i) {
-        // NOTE: no adjoints or direct/reverse dependencies needed for the initial definitions.
-        subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map));
+        assert(subs(dc[i], subs_map) == dc[i]);
+
+        // NOTE: no adjoints or direct/reverse dependencies needed for the initial definitions,
+        // we only need to fill in subs_map.
+        [[maybe_unused]] const auto flag = subs_map.emplace(fmt::format("u_{}", i), dc[i]).second;
+
+        assert(flag);
     }
 
     for (idx_t i = nvars; i < dc.size(); ++i) {
@@ -225,7 +230,10 @@ auto revdiff_make_adj_revdep(const std::vector<expression> &dc, std::vector<expr
             cur_dep.push_back(idx);
         }
 
-        subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map));
+        // NOTE: when building the substitution map, ensure that
+        // subs() canonicalises commutative operators, so that ultimately
+        // the result of reverse-mode differentiation will also be canonicalised.
+        subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map, true));
     }
 
     // Sort the vectors of reverse dependencies.
@@ -566,7 +574,10 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
                     cur_der = it->second;
                     already_computed = true;
                 } else if (auto it_dmap = dmap.find(args[j]); it_dmap != dmap.end()) {
-                    cur_der = subs(it_dmap->second, subs_map);
+                    // NOTE: when substituting the original variables in the derivative, ensure that
+                    // subs() canonicalises commutative operators, so that ultimately
+                    // the result of reverse-mode differentiation will also be canonicalised.
+                    cur_der = subs(it_dmap->second, subs_map, true);
                 }
 
                 // Add the derivative to the current tensor and diff_map, if needed.
