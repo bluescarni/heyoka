@@ -283,12 +283,12 @@ std::pair<expression, expression> prime_wrapper::operator=(expression e) &&
 
 } // namespace detail
 
-detail::prime_wrapper prime(expression e)
+detail::prime_wrapper prime(const expression &e)
 {
     return std::visit(
-        [&e](auto &v) -> detail::prime_wrapper {
+        [&e](const auto &v) -> detail::prime_wrapper {
             if constexpr (std::is_same_v<variable, detail::uncvref_t<decltype(v)>>) {
-                return detail::prime_wrapper{std::move(v.name())};
+                return detail::prime_wrapper{v.name()};
             } else {
                 throw std::invalid_argument(
                     fmt::format("Cannot apply the prime() operator to the non-variable expression '{}'", e));
@@ -618,12 +618,12 @@ bool comm_ops_lt(const expression &e1, const expression &e2)
 namespace
 {
 
-expression expression_plus(expression e1, expression e2)
+expression expression_plus(const expression &e1, const expression &e2)
 {
     // Simplify x + neg(y) to x - y.
     if (const auto *fptr = detail::is_neg(e2)) {
         assert(!fptr->args().empty()); // LCOV_EXCL_LINE
-        return std::move(e1) - fptr->args()[0];
+        return e1 - fptr->args()[0];
     }
 
     auto visitor = [](const auto &v1, const auto &v2) {
@@ -641,7 +641,7 @@ expression expression_plus(expression e1, expression e2)
             }
 
             if constexpr (std::is_same_v<func, type2>) {
-                if (auto *pbop = v2.template extract<detail::binary_op>()) {
+                if (const auto *pbop = v2.template extract<detail::binary_op>()) {
                     if (pbop->op() == detail::binary_op::type::add
                         && std::holds_alternative<number>(pbop->args()[0].value())) {
                         // e2 = a + x, where a is a number. Simplify e1 + (a + x) -> c + x, where c = e1 + a.
@@ -676,21 +676,21 @@ expression expression_plus(expression e1, expression e2)
 
 } // namespace detail
 
-expression operator+(expression e1, expression e2)
+expression operator+(const expression &e1, const expression &e2)
 {
     if (detail::comm_ops_lt(e1, e2)) {
-        return detail::expression_plus(std::move(e1), std::move(e2));
+        return detail::expression_plus(e1, e2);
     } else {
-        return detail::expression_plus(std::move(e2), std::move(e1));
+        return detail::expression_plus(e2, e1);
     }
 }
 
-expression operator-(expression e1, expression e2)
+expression operator-(const expression &e1, const expression &e2)
 {
     // Simplify x - (-y) to x + y.
     if (const auto *fptr = detail::is_neg(e2)) {
         assert(!fptr->args().empty()); // LCOV_EXCL_LINE
-        return std::move(e1) + fptr->args()[0];
+        return e1 + fptr->args()[0];
     }
 
     auto visitor = [](const auto &v1, const auto &v2) {
@@ -708,7 +708,7 @@ expression operator-(expression e1, expression e2)
             }
 
             if constexpr (std::is_same_v<func, type2>) {
-                if (auto *pbop = v2.template extract<detail::binary_op>()) {
+                if (const auto *pbop = v2.template extract<detail::binary_op>()) {
                     if (pbop->op() == detail::binary_op::type::add
                         && std::holds_alternative<number>(pbop->args()[0].value())) {
                         // e2 = a + x, where a is a number. Simplify e1 - (a + x) -> c - x, where c = e1 - a.
@@ -749,7 +749,7 @@ namespace detail
 namespace
 {
 
-expression expression_mul(expression e1, expression e2)
+expression expression_mul(const expression &e1, const expression &e2)
 {
     const auto *fptr1 = detail::is_neg(e1);
     const auto *fptr2 = detail::is_neg(e2);
@@ -764,7 +764,7 @@ expression expression_mul(expression e1, expression e2)
     // Simplify x*x -> square(x) if x is not a number (otherwise,
     // we will numerically compute the result below).
     if (e1 == e2 && !std::holds_alternative<number>(e1.value())) {
-        return square(std::move(e1));
+        return square(e1);
     }
 
     auto visitor = [fptr2](const auto &v1, const auto &v2) {
@@ -798,7 +798,7 @@ expression expression_mul(expression e1, expression e2)
             }
 
             if constexpr (std::is_same_v<func, type2>) {
-                if (auto *pbop = v2.template extract<detail::binary_op>()) {
+                if (const auto *pbop = v2.template extract<detail::binary_op>()) {
                     if (pbop->op() == detail::binary_op::type::mul
                         && std::holds_alternative<number>(pbop->args()[0].value())) {
                         // e2 = a * x, where a is a number. Simplify e1 * (a * x) -> c * x, where c = e1 * a.
@@ -836,16 +836,16 @@ expression expression_mul(expression e1, expression e2)
 
 } // namespace detail
 
-expression operator*(expression e1, expression e2)
+expression operator*(const expression &e1, const expression &e2)
 {
     if (detail::comm_ops_lt(e1, e2)) {
-        return detail::expression_mul(std::move(e1), std::move(e2));
+        return detail::expression_mul(e1, e2);
     } else {
-        return detail::expression_mul(std::move(e2), std::move(e1));
+        return detail::expression_mul(e2, e1);
     }
 }
 
-expression operator/(expression e1, expression e2)
+expression operator/(const expression &e1, const expression &e2)
 {
     const auto *fptr1 = detail::is_neg(e1);
     const auto *fptr2 = detail::is_neg(e2);
@@ -890,7 +890,7 @@ expression operator/(expression e1, expression e2)
             }
 
             if constexpr (std::is_same_v<func, type1>) {
-                if (auto *pbop = v1.template extract<detail::binary_op>()) {
+                if (const auto *pbop = v1.template extract<detail::binary_op>()) {
                     if (pbop->op() == detail::binary_op::type::div) {
                         if (std::holds_alternative<number>(pbop->args()[0].value())) {
                             // e1 = a / x, where a is a number. Simplify (a / x) / b -> (a / b) / x.
@@ -929,7 +929,7 @@ expression operator/(expression e1, expression e2)
             }
 
             if constexpr (std::is_same_v<func, type2>) {
-                if (auto *pbop = v2.template extract<detail::binary_op>()) {
+                if (const auto *pbop = v2.template extract<detail::binary_op>()) {
                     if (pbop->op() == detail::binary_op::type::div) {
                         if (std::holds_alternative<number>(pbop->args()[0].value())) {
                             // e2 = a / x, where a is a number. Simplify e1 / (a / x) -> c * x, where c = e1 / a.
@@ -963,257 +963,253 @@ expression operator/(expression e1, expression e2)
     return std::visit(visitor, e1.value(), e2.value());
 }
 
-expression operator+(expression ex, double x)
+expression operator+(const expression &ex, double x)
 {
-    return std::move(ex) + expression{x};
+    return ex + expression{x};
 }
 
-expression operator+(expression ex, long double x)
+expression operator+(const expression &ex, long double x)
 {
-    return std::move(ex) + expression{x};
+    return ex + expression{x};
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-expression operator+(expression ex, mppp::real128 x)
+expression operator+(const expression &ex, mppp::real128 x)
 {
-    return std::move(ex) + expression{x};
+    return ex + expression{x};
 }
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-expression operator+(expression ex, mppp::real x)
+expression operator+(const expression &ex, mppp::real x)
 {
-    return std::move(ex) + expression{std::move(x)};
+    return ex + expression{std::move(x)};
 }
 
 #endif
 
-expression operator+(double x, expression ex)
+expression operator+(double x, const expression &ex)
 {
-    return expression{x} + std::move(ex);
+    return expression{x} + ex;
 }
 
-expression operator+(long double x, expression ex)
+expression operator+(long double x, const expression &ex)
 {
-    return expression{x} + std::move(ex);
+    return expression{x} + ex;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-expression operator+(mppp::real128 x, expression ex)
+expression operator+(mppp::real128 x, const expression &ex)
 {
-    return expression{x} + std::move(ex);
+    return expression{x} + ex;
 }
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-expression operator+(mppp::real x, expression ex)
+expression operator+(mppp::real x, const expression &ex)
 {
-    return expression{std::move(x)} + std::move(ex);
+    return expression{std::move(x)} + ex;
 }
 
 #endif
 
-expression operator-(expression ex, double x)
+expression operator-(const expression &ex, double x)
 {
-    return std::move(ex) - expression{x};
+    return ex - expression{x};
 }
 
-expression operator-(expression ex, long double x)
+expression operator-(const expression &ex, long double x)
 {
-    return std::move(ex) - expression{x};
+    return ex - expression{x};
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-expression operator-(expression ex, mppp::real128 x)
+expression operator-(const expression &ex, mppp::real128 x)
 {
-    return std::move(ex) - expression{x};
+    return ex - expression{x};
 }
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-expression operator-(expression ex, mppp::real x)
+expression operator-(const expression &ex, mppp::real x)
 {
-    return std::move(ex) - expression{std::move(x)};
+    return ex - expression{std::move(x)};
 }
 
 #endif
 
-expression operator-(double x, expression ex)
+expression operator-(double x, const expression &ex)
 {
-    return expression{x} - std::move(ex);
+    return expression{x} - ex;
 }
 
-expression operator-(long double x, expression ex)
+expression operator-(long double x, const expression &ex)
 {
-    return expression{x} - std::move(ex);
+    return expression{x} - ex;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-expression operator-(mppp::real128 x, expression ex)
+expression operator-(mppp::real128 x, const expression &ex)
 {
-    return expression{x} - std::move(ex);
+    return expression{x} - ex;
 }
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-expression operator-(mppp::real x, expression ex)
+expression operator-(mppp::real x, const expression &ex)
 {
-    return expression{std::move(x)} - std::move(ex);
+    return expression{std::move(x)} - ex;
 }
 
 #endif
 
-expression operator*(expression ex, double x)
+expression operator*(const expression &ex, double x)
 {
-    return std::move(ex) * expression{x};
+    return ex *expression{x};
 }
 
-expression operator*(expression ex, long double x)
+expression operator*(const expression &ex, long double x)
 {
-    return std::move(ex) * expression{x};
+    return ex *expression{x};
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-expression operator*(expression ex, mppp::real128 x)
+expression operator*(const expression &ex, mppp::real128 x)
 {
-    return std::move(ex) * expression{x};
+    return ex *expression{x};
 }
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-expression operator*(expression ex, mppp::real x)
+expression operator*(const expression &ex, mppp::real x)
 {
-    return std::move(ex) * expression{std::move(x)};
+    return ex *expression{std::move(x)};
 }
 
 #endif
 
-expression operator*(double x, expression ex)
+expression operator*(double x, const expression &ex)
 {
-    return expression{x} * std::move(ex);
+    return expression{x} * ex;
 }
 
-expression operator*(long double x, expression ex)
+expression operator*(long double x, const expression &ex)
 {
-    return expression{x} * std::move(ex);
+    return expression{x} * ex;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-expression operator*(mppp::real128 x, expression ex)
+expression operator*(mppp::real128 x, const expression &ex)
 {
-    return expression{x} * std::move(ex);
+    return expression{x} * ex;
 }
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-expression operator*(mppp::real x, expression ex)
+expression operator*(mppp::real x, const expression &ex)
 {
-    return expression{std::move(x)} * std::move(ex);
+    return expression{std::move(x)} * ex;
 }
 
 #endif
 
-expression operator/(expression ex, double x)
+expression operator/(const expression &ex, double x)
 {
-    return std::move(ex) / expression{x};
+    return ex / expression{x};
 }
 
-expression operator/(expression ex, long double x)
+expression operator/(const expression &ex, long double x)
 {
-    return std::move(ex) / expression{x};
+    return ex / expression{x};
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-expression operator/(expression ex, mppp::real128 x)
+expression operator/(const expression &ex, mppp::real128 x)
 {
-    return std::move(ex) / expression{x};
+    return ex / expression{x};
 }
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-expression operator/(expression ex, mppp::real x)
+expression operator/(const expression &ex, mppp::real x)
 {
-    return std::move(ex) / expression{std::move(x)};
+    return ex / expression{std::move(x)};
 }
 
 #endif
 
-expression operator/(double x, expression ex)
+expression operator/(double x, const expression &ex)
 {
-    return expression{x} / std::move(ex);
+    return expression{x} / ex;
 }
 
-expression operator/(long double x, expression ex)
+expression operator/(long double x, const expression &ex)
 {
-    return expression{x} / std::move(ex);
+    return expression{x} / ex;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-expression operator/(mppp::real128 x, expression ex)
+expression operator/(mppp::real128 x, const expression &ex)
 {
-    return expression{x} / std::move(ex);
+    return expression{x} / ex;
 }
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-expression operator/(mppp::real x, expression ex)
+expression operator/(mppp::real x, const expression &ex)
 {
-    return expression{std::move(x)} / std::move(ex);
+    return expression{std::move(x)} / ex;
 }
 
 #endif
 
-expression &operator+=(expression &x, expression e)
+expression &operator+=(expression &x, const expression &e)
 {
     // NOTE: it is important that compound operators
     // are implemented as x = x op e, so that we properly
     // take into account arithmetic promotions for
     // numbers (and, in case of mppp::real numbers,
     // precision propagation).
-    // NOTE: using std::move() on both operands is fine:
-    // there cannot be aliasing as "e" is a copy
-    // of some expression that cannot possibly overlap
-    // with x.
-    return x = std::move(x) + std::move(e);
+    return x = x + e;
 }
 
-expression &operator-=(expression &x, expression e)
+expression &operator-=(expression &x, const expression &e)
 {
-    return x = std::move(x) - std::move(e);
+    return x = x - e;
 }
 
-expression &operator*=(expression &x, expression e)
+expression &operator*=(expression &x, const expression &e)
 {
-    return x = std::move(x) * std::move(e);
+    return x = x * e;
 }
 
-expression &operator/=(expression &x, expression e)
+expression &operator/=(expression &x, const expression &e)
 {
-    return x = std::move(x) / std::move(e);
+    return x = x / e;
 }
 
 expression &operator+=(expression &ex, double x)
@@ -1752,14 +1748,13 @@ expression pairwise_reduce_impl(const F &func, std::vector<expression> list)
 } // namespace detail
 
 // Pairwise product.
-expression pairwise_prod(std::vector<expression> prod)
+expression pairwise_prod(const std::vector<expression> &prod)
 {
     if (prod.empty()) {
         return 1_dbl;
     }
 
-    return detail::pairwise_reduce_impl([](expression &&a, expression &&b) { return std::move(a) * std::move(b); },
-                                        std::move(prod));
+    return detail::pairwise_reduce_impl(std::multiplies{}, prod);
 }
 
 double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map,
