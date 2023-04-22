@@ -94,15 +94,15 @@ TEST_CASE("basic test")
     }
 
     {
-        auto ss = sum({0_dbl, 0_dbl, 0_dbl});
+        auto ss = sum_sq({0_dbl, 0_dbl, 0_dbl});
 
         REQUIRE(ss == 0_dbl);
     }
 
     {
-        auto ss = sum({x, y, z, x + x, y + y, z + z, x + y, x + z, y + z});
+        auto ss = sum_sq({x, y, z, x + x, y + y, z + z, x + y, x + z, y + z});
 
-        REQUIRE(ss == sum({sum({x, y, z, x + x, y + y, z + z, x + y, x + z}), y + z}));
+        REQUIRE(ss == sum({sum_sq({x, y, z, x + x, y + y, z + z, x + y, x + z}), (y + z) * (y + z)}));
     }
 }
 
