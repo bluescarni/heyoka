@@ -94,9 +94,9 @@ TEST_CASE("basic test")
     }
 
     {
-        auto ss = sum_sq({0_dbl, 0_dbl, 0_dbl});
+        auto ss = sum_sq({0_dbl, 0_dbl, x, 0_dbl});
 
-        REQUIRE(ss == 0_dbl);
+        REQUIRE(ss == x * x);
     }
 
     {
