@@ -22,7 +22,6 @@
 #include <locale>
 #include <numeric>
 #include <ostream>
-#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
