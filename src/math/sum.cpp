@@ -350,7 +350,7 @@ expression sum(std::vector<expression> args, std::uint32_t split)
     // the accumulated value is not zero.
     if (n_end_it != args.end()) {
         for (auto it = n_end_it + 1; it != args.end(); ++it) {
-            *n_end_it += std::move(*it);
+            *n_end_it += *it;
         }
 
         // Remove all numbers but the first one.
@@ -384,7 +384,7 @@ expression sum(std::vector<expression> args, std::uint32_t split)
         // NOTE: there cannot be zero numbers here because
         // the numbers were compactified earlier and
         // compactification also removes the result if zero.
-        if (auto *nptr = std::get_if<number>(&arg.value()); (nptr != nullptr) && is_zero(*nptr)) {
+        if (const auto *nptr = std::get_if<number>(&arg.value()); (nptr != nullptr) && is_zero(*nptr)) {
             assert(false);
         }
 #endif
