@@ -133,30 +133,6 @@ TEST_CASE("stream test")
 
         REQUIRE(oss.str() == "(x**2 + y**2 + z**2)");
     }
-
-    {
-        std::ostringstream oss;
-
-        oss << sum_sq({x, y, z}, 2u);
-
-        REQUIRE(oss.str() == "((x**2 + y**2) + z**2)");
-    }
-
-    {
-        std::ostringstream oss;
-
-        oss << sum_sq({x, y, z, x - y}, 2u);
-
-        REQUIRE(oss.str() == "((x**2 + y**2) + (z**2 + (x - y)**2))");
-    }
-
-    {
-        std::ostringstream oss;
-
-        oss << sum_sq({x, par[42], z, 4_dbl}, 2u);
-
-        REQUIRE(boost::starts_with(oss.str(), "((x**2 + p42**2) + (z**2 + 4"));
-    }
 }
 
 TEST_CASE("diff test")
@@ -191,7 +167,7 @@ TEST_CASE("diff test")
     }
 
     {
-        REQUIRE(diff(sum_sq({par[0] - 1_dbl, par[1] + y, par[0] + x}), par[0])
+        REQUIRE(diff(sum_sq({par[0] - 1_dbl, par[1] + y, x + par[0]}), par[0])
                 == 2_dbl * sum({par[0] - 1_dbl, par[0] + x}));
     }
 }
@@ -204,17 +180,6 @@ TEST_CASE("sum_sq function")
 
     REQUIRE(sum_sq({}) == 0_dbl);
     REQUIRE(sum_sq({x}) == x * x);
-
-    REQUIRE_THROWS_MATCHES(sum_sq({x}, 0), std::invalid_argument,
-                           Message("The 'split' value for a sum of squares must be at least 2, but it is 0 instead"));
-    REQUIRE_THROWS_MATCHES(sum_sq({x}, 1), std::invalid_argument,
-                           Message("The 'split' value for a sum of squares must be at least 2, but it is 1 instead"));
-
-    REQUIRE(sum_sq({x, y, z, t}, 2) == sum({sum_sq({x, y}), sum_sq({z, t})}));
-    REQUIRE(sum_sq({x, y, z, t}, 3) == sum({sum_sq({x, y, z}), sum_sq({t})}));
-    REQUIRE(sum_sq({x, y, z, t}, 4) == sum_sq({x, y, z, t}));
-    REQUIRE(sum_sq({x, y, z, t, 2_dbl * x}, 3) == sum({sum_sq({x, y, z}), sum_sq({t, 2_dbl * x})}));
-    REQUIRE(sum_sq({0_dbl, y, 0_dbl, t, 2_dbl * x}, 3) == sum_sq({y, t, 2_dbl * x}));
 }
 
 TEST_CASE("sum_sq s11n")
@@ -264,7 +229,7 @@ TEST_CASE("sum_sq zero ignore")
     REQUIRE(sum_sq({0_dbl, 2_dbl, 0_dbl, "x"_var, 0_dbl}) == sum_sq({2_dbl, "x"_var}));
 
     REQUIRE(std::get<func>(sum_sq({"y"_var, 0_dbl, "x"_var, -21_dbl}).value()).args()
-            == std::vector{"y"_var, "x"_var, 21_dbl});
+            == std::vector{21_dbl, "x"_var, "y"_var});
 }
 
 TEST_CASE("cfunc")
