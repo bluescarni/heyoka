@@ -92,6 +92,18 @@ TEST_CASE("basic test")
 
         REQUIRE(ss.args() == std::vector{par[0], x, y, 2_dbl, z});
     }
+
+    {
+        auto ss = sum({0_dbl, 0_dbl, 0_dbl});
+
+        REQUIRE(ss == 0_dbl);
+    }
+
+    {
+        auto ss = sum({x, y, z, x + x, y + y, z + z, x + y, x + z, y + z});
+
+        REQUIRE(ss == sum({sum({x, y, z, x + x, y + y, z + z, x + y, x + z}), y + z}));
+    }
 }
 
 TEST_CASE("stream test")
