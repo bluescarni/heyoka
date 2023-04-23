@@ -131,30 +131,6 @@ TEST_CASE("stream test")
 
         REQUIRE(oss.str() == "(x + y + z)");
     }
-
-    {
-        std::ostringstream oss;
-
-        oss << sum({x, y, z}, 2u);
-
-        REQUIRE(oss.str() == "((x + y) + z)");
-    }
-
-    {
-        std::ostringstream oss;
-
-        oss << sum({x, y, z, x - y}, 2u);
-
-        REQUIRE(oss.str() == "((x + y) + (z + (x - y)))");
-    }
-
-    {
-        std::ostringstream oss;
-
-        oss << sum({x, par[42], z, 4_dbl}, 2u);
-
-        REQUIRE(boost::starts_with(oss.str(), "((x + p42) + (z + 4"));
-    }
 }
 
 TEST_CASE("diff test")
@@ -186,17 +162,6 @@ TEST_CASE("sum function")
 
     REQUIRE(sum({}) == 0_dbl);
     REQUIRE(sum({x}) == x);
-
-    REQUIRE_THROWS_MATCHES(sum({x}, 0), std::invalid_argument,
-                           Message("The 'split' value for a sum must be at least 2, but it is 0 instead"));
-    REQUIRE_THROWS_MATCHES(sum({x}, 1), std::invalid_argument,
-                           Message("The 'split' value for a sum must be at least 2, but it is 1 instead"));
-
-    REQUIRE(sum({x, y, z, t}, 2) == sum({sum({x, y}), sum({z, t})}));
-    REQUIRE(sum({x, y, z, t}, 3) == sum({sum({x, y, z}), sum({t})}));
-    REQUIRE(sum({x, y, z, t}, 4) == sum({x, y, z, t}));
-    REQUIRE(sum({x, y, z, t, 2_dbl * x}, 3) == sum({sum({x, y, z}), sum({t, 2_dbl * x})}));
-    REQUIRE(sum({0_dbl, y, 0_dbl, t, 2_dbl * x}, 3) == sum({y, t, 2_dbl * x}));
 }
 
 TEST_CASE("sum s11n")
@@ -245,7 +210,7 @@ TEST_CASE("sum number compress")
     REQUIRE(sum({1_dbl, "y"_var, -21_dbl, "x"_var, 20_dbl}) == sum({"y"_var, "x"_var}));
 
     REQUIRE(std::get<func>(sum({"y"_var, 1_dbl, "x"_var, -21_dbl}).value()).args()
-            == std::vector{"y"_var, "x"_var, -20_dbl});
+            == std::vector{-20_dbl, "x"_var, "y"_var});
 }
 
 TEST_CASE("cfunc")

@@ -14,13 +14,12 @@ New
   expressions
   (`#312 <https://github.com/bluescarni/heyoka/pull/312>`__).
 - Functions in the expression system can now be optionally
-  marked as commutative
-  (`#312 <https://github.com/bluescarni/heyoka/pull/312>`__).
+  marked as commutative. Commutative functions now enforce
+  a canonical ordering of their operands
+  (`#312 <https://github.com/bluescarni/heyoka/pull/312>`__,
+  `#311 <https://github.com/bluescarni/heyoka/pull/311>`__).
 - The expression class is now immutable
   (`#312 <https://github.com/bluescarni/heyoka/pull/312>`__).
-- The add/mul operators of the expression class now enforce
-  a canonical ordering for their operands
-  (`#311 <https://github.com/bluescarni/heyoka/pull/311>`__).
 - The arithmetic operators of the expression class
   can now fold constants through call chains
   (`#311 <https://github.com/bluescarni/heyoka/pull/311>`__).
