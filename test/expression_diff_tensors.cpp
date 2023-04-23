@@ -273,19 +273,26 @@ TEST_CASE("speelpenning check")
         auto *fr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
             s.jit_lookup("diff"));
 
+        // Randomly-generate inputs.
         std::vector<double> inputs(nvars);
         for (auto &ival : inputs) {
             ival = rdist(rng);
         }
-        std::vector<double> outputs(dt.get_tensors()[3].size());
 
+        // Prepare the outputs vector.
+        std::vector<double> outputs(dtensors.size());
+
+        // Evaluate.
         fr(outputs.data(), inputs.data(), nullptr, nullptr);
 
         for (decltype(indices.size()) i = 0; i < indices.size(); ++i) {
             const auto &v_idx = indices[i];
+
             REQUIRE(v_idx.size() == nvars + 1u);
             REQUIRE(v_idx[0] == 0u);
 
+            // Build the current derivative via repeated
+            // invocations of diff().
             auto ex = prod;
 
             for (auto j = 1u; j < v_idx.size(); ++j) {
@@ -296,6 +303,7 @@ TEST_CASE("speelpenning check")
                 }
             }
 
+            // Compile and fetch the expression of the derivative.
             llvm_state s2;
             add_cfunc<double>(s2, "diff", {ex}, kw::vars = vars);
             s2.optimise();
@@ -304,6 +312,7 @@ TEST_CASE("speelpenning check")
             auto *fr2 = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
                 s2.jit_lookup("diff"));
 
+            // Evaluate the derivative.
             double out = 0;
             fr2(&out, inputs.data(), nullptr, nullptr);
 
