@@ -153,6 +153,34 @@ TEST_CASE("diff_tensors basic")
     REQUIRE(dt.get_tensors()[1] == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
     REQUIRE(dt.get_tensors()[2] == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * y, 2. * x});
 
+    // Diff wrt all variables.
+    dt = diff_tensors({x + y, x * y * y}, kw::diff_order = 2, kw::diff_args = diff_args::vars);
+    REQUIRE(dt.get_tensors().size() == 3u);
+    REQUIRE(dt.get_tensors()[0] == std::vector{x + y, x * y * y});
+    REQUIRE(dt.get_tensors()[1] == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
+    REQUIRE(dt.get_tensors()[2] == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * y, 2. * x});
+
+    // Diff wrt some variables.
+    dt = diff_tensors({x + y, x * y * y}, kw::diff_order = 2, kw::diff_args = {x});
+    REQUIRE(dt.get_tensors().size() == 3u);
+    REQUIRE(dt.get_tensors()[0] == std::vector{x + y, x * y * y});
+    REQUIRE(dt.get_tensors()[1] == std::vector{1_dbl, y * y});
+    REQUIRE(dt.get_tensors()[2] == std::vector{0_dbl, 0_dbl});
+
+    // Diff wrt all params.
+    dt = diff_tensors({par[0] + y, x * y * par[1]}, kw::diff_order = 2, kw::diff_args = diff_args::params);
+    REQUIRE(dt.get_tensors().size() == 3u);
+    REQUIRE(dt.get_tensors()[0] == std::vector{par[0] + y, x * y * par[1]});
+    REQUIRE(dt.get_tensors()[1] == std::vector{1_dbl, 0_dbl, 0_dbl, x * y});
+    REQUIRE(dt.get_tensors()[2] == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl});
+
+    // Diff wrt some param.
+    dt = diff_tensors({par[0] + y, x * y * par[1]}, kw::diff_order = 2, kw::diff_args = {par[1]});
+    REQUIRE(dt.get_tensors().size() == 3u);
+    REQUIRE(dt.get_tensors()[0] == std::vector{par[0] + y, x * y * par[1]});
+    REQUIRE(dt.get_tensors()[1] == std::vector{0_dbl, x * y});
+    REQUIRE(dt.get_tensors()[2] == std::vector{0_dbl, 0_dbl});
+
     // Error modes.
     REQUIRE_THROWS_MATCHES(diff_tensors({1_dbl}, kw::diff_order = 1, kw::diff_args = {x + y}), std::invalid_argument,
                            Message("Derivatives can be computed only with respect to variables and/or parameters"));
@@ -165,6 +193,9 @@ TEST_CASE("diff_tensors basic")
                            Message("An invalid diff_args enumerator was passed to diff_tensors()"));
     REQUIRE_THROWS_MATCHES(diff_tensors({}), std::invalid_argument,
                            Message("Cannot compute the derivatives of a function with zero components"));
+    REQUIRE_THROWS_MATCHES(
+        diff_tensors({par[0] + y, x * y * par[1]}, kw::diff_order = 2, kw::diff_args = diff_args{-1}),
+        std::invalid_argument, Message("An invalid diff_args enumerator was passed to diff_tensors()"));
 }
 
 // A few tests for the dtens API.
