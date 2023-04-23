@@ -238,7 +238,81 @@ TEST_CASE("dtens basics")
     REQUIRE(dt3[{1, 0, 1}] == x);
 }
 
-TEST_CASE("speelpenning")
+TEST_CASE("speelpenning check")
+{
+    std::uniform_real_distribution<double> rdist(-10., 10.);
+
+    const auto nvars = 5u;
+
+    std::vector<expression> vars;
+    auto prod = 1_dbl;
+
+    for (auto i = 0u; i < nvars; ++i) {
+        auto cur_var = expression{fmt::format("x_{}", i)};
+
+        vars.push_back(cur_var);
+        prod *= cur_var;
+    }
+
+    const auto dt = diff_tensors({prod}, kw::diff_order = 3);
+
+    REQUIRE(dt.get_tensors().size() == 4u);
+    REQUIRE(dt.get_indices().size() == dt.get_tensors().size());
+
+    for (auto diff_order = 0u; diff_order <= 3u; ++diff_order) {
+        const auto &dtensors = dt.get_tensors()[diff_order];
+        const auto &indices = dt.get_indices()[diff_order];
+
+        REQUIRE(indices.size() == dtensors.size());
+
+        llvm_state s;
+        add_cfunc<double>(s, "diff", dtensors, kw::vars = vars);
+        s.optimise();
+        s.compile();
+
+        auto *fr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+            s.jit_lookup("diff"));
+
+        std::vector<double> inputs(nvars);
+        for (auto &ival : inputs) {
+            ival = rdist(rng);
+        }
+        std::vector<double> outputs(dt.get_tensors()[3].size());
+
+        fr(outputs.data(), inputs.data(), nullptr, nullptr);
+
+        for (decltype(indices.size()) i = 0; i < indices.size(); ++i) {
+            const auto &v_idx = indices[i];
+            REQUIRE(v_idx.size() == nvars + 1u);
+            REQUIRE(v_idx[0] == 0u);
+
+            auto ex = prod;
+
+            for (auto j = 1u; j < v_idx.size(); ++j) {
+                auto order = v_idx[j];
+
+                for (decltype(order) k = 0; k < order; ++k) {
+                    ex = diff(ex, vars[j - 1u]);
+                }
+            }
+
+            llvm_state s2;
+            add_cfunc<double>(s2, "diff", {ex}, kw::vars = vars);
+            s2.optimise();
+            s2.compile();
+
+            auto *fr2 = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+                s2.jit_lookup("diff"));
+
+            double out = 0;
+            fr2(&out, inputs.data(), nullptr, nullptr);
+
+            REQUIRE(out == approximately(outputs[i]));
+        }
+    }
+}
+
+TEST_CASE("speelpenning complexity")
 {
     fmt::print("Speelpenning's example\n");
     fmt::print("======================\n");

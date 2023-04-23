@@ -330,6 +330,8 @@ using dtens_diff_map_t = std::unordered_map<std::vector<std::uint32_t>, expressi
 
 using dtens_list_t = std::vector<std::vector<expression>>;
 
+using dtens_indices_t = std::vector<std::vector<std::vector<std::uint32_t>>>;
+
 } // namespace
 
 } // namespace detail
@@ -337,18 +339,21 @@ using dtens_list_t = std::vector<std::vector<expression>>;
 struct dtens::impl {
     detail::dtens_diff_map_t m_map;
     detail::dtens_list_t m_list;
+    detail::dtens_indices_t m_indices;
 
     // Serialisation.
     void save(boost::archive::binary_oarchive &ar, unsigned) const
     {
         ar << m_map;
         ar << m_list;
+        ar << m_indices;
     }
     void load(boost::archive::binary_iarchive &ar, unsigned)
     {
         try {
             ar >> m_map;
             ar >> m_list;
+            ar >> m_indices;
             // LCOV_EXCL_START
         } catch (...) {
             *this = impl{};
@@ -393,23 +398,28 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
     // List of tensors of derivatives.
     dtens_list_t tensor_list;
 
-    // List of indices vectors. This is used to facilitate the
-    // iterative construction of the indices vectors order
-    // by order.
-    std::vector<std::vector<std::uint32_t>> v_indices;
+    // Tensor of indices that will be stored within
+    // the output dtens. For each derivative order, this
+    // will contain the list of indices vectors corresponding
+    // to the derivatives in tensor_list.
+    dtens_indices_t out_indices;
 
     // An indices vector with preallocated storage,
     // used as temporary variable in several places below.
     std::vector<std::uint32_t> tmp_v_idx;
     tmp_v_idx.resize(1 + boost::safe_numerics::safe<decltype(tmp_v_idx.size())>(nargs));
 
-    // Init tensor_list and diff_map with the order 0 derivatives
+    // Init tensor_list, diff_map and out_indices
+    // with the order 0 derivatives
     // (i.e., the original function components).
     tensor_list.emplace_back();
 
+    out_indices.emplace_back();
+
     for (decltype(v_ex.size()) i = 0; i < orig_nouts; ++i) {
         tmp_v_idx[0] = boost::numeric_cast<std::uint32_t>(i);
-        v_indices.push_back(tmp_v_idx);
+
+        out_indices.back().push_back(tmp_v_idx);
 
         assert(diff_map.count(tmp_v_idx) == 0u);
         diff_map[tmp_v_idx] = v_ex[i];
@@ -417,16 +427,21 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
         tensor_list.back().push_back(v_ex[i]);
     }
 
-    // Fetch the range in v_indices corresponding to the
-    // current order (i.e., order-0) indices.
-    decltype(v_indices.size()) cur_idx_begin = 0, cur_idx_end = v_indices.size();
-
     // Iterate over the orders.
     for (std::uint32_t cur_order = 0; cur_order < order; ++cur_order) {
         // Prepare the new tensor.
         tensor_list.emplace_back();
         auto &new_tensor = tensor_list.back();
         const auto &prev_tensor = *(tensor_list.end() - 2);
+
+        // Prepare the new index tensor.
+        out_indices.emplace_back();
+        auto &new_index_tensor = out_indices.back();
+        const auto &prev_index_tensor = *(out_indices.end() - 2);
+
+        // We will be iterating over the previous index tensor
+        // to construct the new one.
+        auto prev_index_begin = prev_index_tensor.begin();
 
         // The current number of outputs is the number of components
         // in the previous order tensor.
@@ -560,7 +575,7 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
             // Add the derivatives to the new tensor and to diff_map.
             for (decltype(args.size()) j = 0; j < nargs; ++j) {
                 // Compute the indices vector for the current derivative.
-                tmp_v_idx = v_indices[cur_idx_begin];
+                tmp_v_idx = *prev_index_begin;
                 assert(j + 1u < tmp_v_idx.size());
                 tmp_v_idx[j + 1u] = boost::safe_numerics::safe<std::uint32_t>(tmp_v_idx[j + 1u]) + 1;
 
@@ -589,26 +604,22 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
                 }
 
                 // Add the new indices vector
-                v_indices.push_back(tmp_v_idx);
+                new_index_tensor.push_back(tmp_v_idx);
             }
 
-            // Update cur_idx_begin as we move to the next output.
-            ++cur_idx_begin;
+            // Update prev_index_begin as we move to the next output.
+            ++prev_index_begin;
         }
 
+        assert(prev_index_begin == prev_index_tensor.end());
+
         get_logger()->trace("dtens reverse passes runtime for order {}: {}", cur_order + 1u, sw_inner);
-
-        assert(cur_idx_begin == cur_idx_end);
-
-        // Update cur_idx_begin and cur_idx_end for the next order.
-        cur_idx_begin = cur_idx_end;
-        cur_idx_end = v_indices.size();
     }
 
     get_logger()->trace("dtens creation runtime: {}", sw);
 
     // Assemble and return the result.
-    return std::tuple{std::move(diff_map), std::move(tensor_list)};
+    return std::tuple{std::move(diff_map), std::move(tensor_list), std::move(out_indices)};
 }
 
 } // namespace
@@ -676,9 +687,9 @@ dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_
                         args));
     }
 
-    auto [diff_map, tensor_list] = diff_tensors_impl(v_ex, args, order);
+    auto [diff_map, tensor_list, indices] = diff_tensors_impl(v_ex, args, order);
 
-    return dtens{dtens::impl{std::move(diff_map), std::move(tensor_list)}};
+    return dtens{dtens::impl{std::move(diff_map), std::move(tensor_list), std::move(indices)}};
 }
 
 } // namespace detail
@@ -707,6 +718,11 @@ dtens::~dtens() = default;
 const std::vector<std::vector<expression>> &dtens::get_tensors() const
 {
     return p_impl->m_list;
+}
+
+const std::vector<std::vector<std::vector<std::uint32_t>>> &dtens::get_indices() const
+{
+    return p_impl->m_indices;
 }
 
 const expression &dtens::operator[](const std::vector<std::uint32_t> &vidx) const
