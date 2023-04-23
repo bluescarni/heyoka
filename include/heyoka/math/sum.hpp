@@ -56,13 +56,9 @@ public:
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
 };
 
-// NOTE: the default split value is a power of two so that the
-// internal pairwise sums are rounded up exactly.
-inline constexpr std::uint32_t default_sum_split = 8;
-
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression sum(std::vector<expression>, std::uint32_t = detail::default_sum_split);
+HEYOKA_DLL_PUBLIC expression sum(std::vector<expression>);
 
 HEYOKA_END_NAMESPACE
 

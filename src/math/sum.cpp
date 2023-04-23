@@ -334,12 +334,13 @@ llvm::Function *sum_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 
 } // namespace detail
 
-expression sum(std::vector<expression> args, std::uint32_t split)
+expression sum(std::vector<expression> args)
 {
-    if (split < 2u) {
-        throw std::invalid_argument(
-            fmt::format("The 'split' value for a sum must be at least 2, but it is {} instead", split));
-    }
+    // NOTE: the default split value is a power of two so that the
+    // internal pairwise sums are rounded up exactly.
+    constexpr std::uint32_t split = 8;
+
+    static_assert(split >= 2u);
 
     // Partition args so that all numbers are at the end.
     const auto n_end_it = std::stable_partition(
@@ -350,7 +351,7 @@ expression sum(std::vector<expression> args, std::uint32_t split)
     // the accumulated value is not zero.
     if (n_end_it != args.end()) {
         for (auto it = n_end_it + 1; it != args.end(); ++it) {
-            *n_end_it += std::move(*it);
+            *n_end_it += *it;
         }
 
         // Remove all numbers but the first one.
@@ -384,7 +385,7 @@ expression sum(std::vector<expression> args, std::uint32_t split)
         // NOTE: there cannot be zero numbers here because
         // the numbers were compactified earlier and
         // compactification also removes the result if zero.
-        if (auto *nptr = std::get_if<number>(&arg.value()); (nptr != nullptr) && is_zero(*nptr)) {
+        if (const auto *nptr = std::get_if<number>(&arg.value()); (nptr != nullptr) && is_zero(*nptr)) {
             assert(false);
         }
 #endif
@@ -392,9 +393,14 @@ expression sum(std::vector<expression> args, std::uint32_t split)
 
         tmp.push_back(std::move(arg));
         if (tmp.size() == split) {
-            // NOTE: after the move, tmp is guaranteed to be empty.
+            // Sort the operands in canonical order.
+            std::stable_sort(tmp.begin(), tmp.end(), detail::comm_ops_lt);
+
             ret_seq.emplace_back(func{detail::sum_impl{std::move(tmp)}});
-            assert(tmp.empty());
+
+            // NOTE: tmp is practically guaranteed to be empty, but let's
+            // be paranoid.
+            tmp.clear();
         }
     }
 
@@ -409,6 +415,9 @@ expression sum(std::vector<expression> args, std::uint32_t split)
         if (tmp.size() == 1u) {
             ret_seq.emplace_back(std::move(tmp[0]));
         } else {
+            // Sort the operands in canonical order.
+            std::stable_sort(tmp.begin(), tmp.end(), detail::comm_ops_lt);
+
             ret_seq.emplace_back(func{detail::sum_impl{std::move(tmp)}});
         }
     }
