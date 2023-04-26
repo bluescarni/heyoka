@@ -29,6 +29,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/container/flat_map.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/core.h>
@@ -393,8 +394,27 @@ IGOR_MAKE_NAMED_ARGUMENT(diff_order);
 
 } // namespace kw
 
+namespace detail
+{
+
+// Private aliases/utilities needed in the implementation of dtens.
+using dtens_v_idx_t = std::vector<std::uint32_t>;
+
+struct dtens_v_idx_cmp {
+    [[nodiscard]] bool operator()(const dtens_v_idx_t &, const dtens_v_idx_t &) const;
+};
+
+using dtens_map_t = boost::container::flat_map<dtens_v_idx_t, expression, dtens_v_idx_cmp>;
+
+} // namespace detail
+
 class HEYOKA_DLL_PUBLIC dtens
 {
+public:
+    using v_idx_t = detail::dtens_v_idx_t;
+    using size_type = detail::dtens_map_t::size_type;
+
+private:
     // NOTE: detail::diff_tensors() needs access to the private ctor.
     friend dtens detail::diff_tensors(const std::vector<expression> &,
                                       const std::variant<diff_args, std::vector<expression>> &, std::uint32_t);
@@ -419,10 +439,43 @@ public:
     dtens &operator=(dtens &&) noexcept;
     ~dtens();
 
-    [[nodiscard]] const std::vector<std::vector<expression>> &get_tensors() const;
-    [[nodiscard]] const std::vector<std::vector<std::vector<std::uint32_t>>> &get_indices() const;
-    [[nodiscard]] const expression &operator[](const std::vector<std::uint32_t> &) const;
-    [[nodiscard]] std::size_t n_diffs() const;
+    using iterator = detail::dtens_map_t::const_iterator;
+
+    // Subrange helper class to fetch
+    // ranges into dtens.
+    class subrange
+    {
+        friend class dtens;
+
+        iterator m_begin, m_end;
+
+        explicit subrange(const iterator &, const iterator &);
+
+    public:
+        subrange() = delete;
+        subrange(const subrange &);
+        subrange(subrange &&) noexcept;
+        subrange &operator=(const subrange &);
+        subrange &operator=(subrange &&) noexcept;
+        ~subrange() = default;
+
+        [[nodiscard]] iterator begin() const;
+        [[nodiscard]] iterator end() const;
+    };
+
+    [[nodiscard]] iterator begin() const;
+    [[nodiscard]] iterator end() const;
+
+    [[nodiscard]] std::uint32_t get_order() const;
+    [[nodiscard]] std::uint32_t get_nvars() const;
+    [[nodiscard]] std::uint32_t get_nouts() const;
+    [[nodiscard]] size_type size() const;
+
+    [[nodiscard]] iterator find(const v_idx_t &) const;
+    [[nodiscard]] const expression &operator[](const v_idx_t &) const;
+
+    [[nodiscard]] subrange get_derivatives(std::uint32_t, std::uint32_t) const;
+    [[nodiscard]] subrange get_derivatives(std::uint32_t) const;
 };
 
 template <typename... KwArgs>

@@ -6,8 +6,10 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <algorithm>
 #include <cstdint>
 #include <initializer_list>
+#include <limits>
 #include <random>
 #include <sstream>
 #include <stdexcept>
@@ -70,116 +72,149 @@ TEST_CASE("diff_tensors basic")
                            Message("Cannot compute derivatives with respect to an empty set of arguments"));
 
     auto dt = diff_tensors({1_dbl}, kw::diff_order = 0, kw::diff_args = {x});
-    REQUIRE(dt.get_tensors().size() == 1u);
-    REQUIRE(dt.get_tensors()[0].size() == 1u);
-    REQUIRE(dt.get_tensors()[0][0] == 1_dbl);
+
+    REQUIRE(dt.size() == 1u);
+    REQUIRE(dt.get_order() == 0u);
+    REQUIRE(dt.get_nvars() == 1u);
+    REQUIRE(dt.get_nouts() == 1u);
     REQUIRE(dt[{0, 0}] == 1_dbl);
-    REQUIRE(dt.n_diffs() == 1u);
 
     REQUIRE_THROWS_MATCHES(
         (dt[{1, 0}]), std::out_of_range,
-        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{1, 0})));
+        Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{1, 0})));
     REQUIRE_THROWS_MATCHES(
         (dt[{0, 1}]), std::out_of_range,
-        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{0, 1})));
+        Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{0, 1})));
     REQUIRE_THROWS_MATCHES(
         (dt[{0, 2}]), std::out_of_range,
-        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{0, 2})));
+        Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{0, 2})));
 
     dt = diff_tensors({1_dbl}, kw::diff_order = 1, kw::diff_args = {par[0]});
-    REQUIRE(dt.get_tensors().size() == 2u);
-    REQUIRE(dt.get_tensors()[0].size() == 1u);
-    REQUIRE(dt.get_tensors()[0][0] == 1_dbl);
-    REQUIRE(dt.get_tensors()[1].size() == 1u);
-    REQUIRE(dt.get_tensors()[1][0] == 0_dbl);
+
+    std::vector<expression> diff_vec;
+
+    auto assign_sr = [&diff_vec](const auto &sr) {
+        diff_vec.clear();
+        for (const auto &p : sr) {
+            diff_vec.push_back(p.second);
+        }
+    };
+
+    REQUIRE(dt.size() == 2u);
+
+    assign_sr(dt.get_derivatives(0, 0));
+    REQUIRE(diff_vec.size() == 1u);
+    REQUIRE(diff_vec[0] == 1_dbl);
+    assign_sr(dt.get_derivatives(0, 1));
+    REQUIRE(diff_vec.size() == 1u);
+    REQUIRE(diff_vec[0] == 0_dbl);
     REQUIRE(dt[{0, 0}] == 1_dbl);
     REQUIRE(dt[{0, 1}] == 0_dbl);
-    REQUIRE(dt.n_diffs() == 2u);
 
     REQUIRE_THROWS_MATCHES(
         (dt[{1, 0}]), std::out_of_range,
-        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{1, 0})));
+        Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{1, 0})));
     REQUIRE_THROWS_MATCHES(
         (dt[{0, 2}]), std::out_of_range,
-        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{0, 2})));
+        Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{0, 2})));
 
     dt = diff_tensors({1_dbl}, kw::diff_order = 2, kw::diff_args = {par[0]});
-    REQUIRE(dt.get_tensors().size() == 3u);
-    REQUIRE(dt.get_tensors()[0].size() == 1u);
-    REQUIRE(dt.get_tensors()[0][0] == 1_dbl);
-    REQUIRE(dt.get_tensors()[1].size() == 1u);
-    REQUIRE(dt.get_tensors()[1][0] == 0_dbl);
-    REQUIRE(dt.get_tensors()[2].size() == 1u);
-    REQUIRE(dt.get_tensors()[2][0] == 0_dbl);
+    REQUIRE(dt.size() == 3u);
+    assign_sr(dt.get_derivatives(0, 0));
+    REQUIRE(diff_vec.size() == 1u);
+    REQUIRE(diff_vec[0] == 1_dbl);
+    assign_sr(dt.get_derivatives(0, 1));
+    REQUIRE(diff_vec.size() == 1u);
+    REQUIRE(diff_vec[0] == 0_dbl);
+    assign_sr(dt.get_derivatives(0, 2));
+    REQUIRE(diff_vec.size() == 1u);
+    REQUIRE(diff_vec[0] == 0_dbl);
     REQUIRE(dt[{0, 0}] == 1_dbl);
     REQUIRE(dt[{0, 1}] == 0_dbl);
     REQUIRE(dt[{0, 2}] == 0_dbl);
-    REQUIRE(dt.n_diffs() == 3u);
 
     REQUIRE_THROWS_MATCHES(
         (dt[{1, 0}]), std::out_of_range,
-        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{1, 0})));
+        Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{1, 0})));
     REQUIRE_THROWS_MATCHES(
         (dt[{0, 3}]), std::out_of_range,
-        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{0, 3})));
+        Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{0, 3})));
 
     dt = diff_tensors({1_dbl}, kw::diff_order = 3, kw::diff_args = {par[0]});
-    REQUIRE(dt.get_tensors().size() == 4u);
-    REQUIRE(dt.get_tensors()[0].size() == 1u);
-    REQUIRE(dt.get_tensors()[0][0] == 1_dbl);
-    REQUIRE(dt.get_tensors()[1].size() == 1u);
-    REQUIRE(dt.get_tensors()[1][0] == 0_dbl);
-    REQUIRE(dt.get_tensors()[2].size() == 1u);
-    REQUIRE(dt.get_tensors()[2][0] == 0_dbl);
-    REQUIRE(dt.get_tensors()[3].size() == 1u);
-    REQUIRE(dt.get_tensors()[3][0] == 0_dbl);
+    REQUIRE(dt.size() == 4u);
+    assign_sr(dt.get_derivatives(0, 0));
+    REQUIRE(diff_vec.size() == 1u);
+    REQUIRE(diff_vec[0] == 1_dbl);
+    assign_sr(dt.get_derivatives(0, 1));
+    REQUIRE(diff_vec.size() == 1u);
+    REQUIRE(diff_vec[0] == 0_dbl);
+    assign_sr(dt.get_derivatives(0, 2));
+    REQUIRE(diff_vec.size() == 1u);
+    REQUIRE(diff_vec[0] == 0_dbl);
+    assign_sr(dt.get_derivatives(0, 3));
+    REQUIRE(diff_vec.size() == 1u);
+    REQUIRE(diff_vec[0] == 0_dbl);
     REQUIRE(dt[{0, 0}] == 1_dbl);
     REQUIRE(dt[{0, 1}] == 0_dbl);
     REQUIRE(dt[{0, 2}] == 0_dbl);
     REQUIRE(dt[{0, 3}] == 0_dbl);
-    REQUIRE(dt.n_diffs() == 4u);
 
     REQUIRE_THROWS_MATCHES(
         (dt[{1, 0}]), std::out_of_range,
-        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{1, 0})));
+        Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{1, 0})));
     REQUIRE_THROWS_MATCHES(
         (dt[{0, 4}]), std::out_of_range,
-        Message(fmt::format("Cannot locate the derivative corresponding to the index vector {}", std::vector{0, 4})));
+        Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{0, 4})));
 
     // Automatically deduced diff variables.
     dt = diff_tensors({x + y, x * y * y}, kw::diff_order = 2);
-    REQUIRE(dt.get_tensors().size() == 3u);
-    REQUIRE(dt.get_tensors()[0] == std::vector{x + y, x * y * y});
-    REQUIRE(dt.get_tensors()[1] == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
-    REQUIRE(dt.get_tensors()[2] == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * y, 2. * x});
+    REQUIRE(dt.size() == 12u);
+    assign_sr(dt.get_derivatives(0));
+    REQUIRE(diff_vec == std::vector{x + y, x * y * y});
+    assign_sr(dt.get_derivatives(1));
+    REQUIRE(diff_vec == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
+    assign_sr(dt.get_derivatives(2));
+    REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * x});
 
     // Diff wrt all variables.
     dt = diff_tensors({x + y, x * y * y}, kw::diff_order = 2, kw::diff_args = diff_args::vars);
-    REQUIRE(dt.get_tensors().size() == 3u);
-    REQUIRE(dt.get_tensors()[0] == std::vector{x + y, x * y * y});
-    REQUIRE(dt.get_tensors()[1] == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
-    REQUIRE(dt.get_tensors()[2] == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * y, 2. * x});
+    REQUIRE(dt.size() == 12u);
+    assign_sr(dt.get_derivatives(0));
+    REQUIRE(diff_vec == std::vector{x + y, x * y * y});
+    assign_sr(dt.get_derivatives(1));
+    REQUIRE(diff_vec == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
+    assign_sr(dt.get_derivatives(2));
+    REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * x});
 
     // Diff wrt some variables.
     dt = diff_tensors({x + y, x * y * y}, kw::diff_order = 2, kw::diff_args = {x});
-    REQUIRE(dt.get_tensors().size() == 3u);
-    REQUIRE(dt.get_tensors()[0] == std::vector{x + y, x * y * y});
-    REQUIRE(dt.get_tensors()[1] == std::vector{1_dbl, y * y});
-    REQUIRE(dt.get_tensors()[2] == std::vector{0_dbl, 0_dbl});
+    REQUIRE(dt.size() == 6u);
+    assign_sr(dt.get_derivatives(0));
+    REQUIRE(diff_vec == std::vector{x + y, x * y * y});
+    assign_sr(dt.get_derivatives(1));
+    REQUIRE(diff_vec == std::vector{1_dbl, y * y});
+    assign_sr(dt.get_derivatives(2));
+    REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl});
 
     // Diff wrt all params.
     dt = diff_tensors({par[0] + y, x * y * par[1]}, kw::diff_order = 2, kw::diff_args = diff_args::params);
-    REQUIRE(dt.get_tensors().size() == 3u);
-    REQUIRE(dt.get_tensors()[0] == std::vector{par[0] + y, x * y * par[1]});
-    REQUIRE(dt.get_tensors()[1] == std::vector{1_dbl, 0_dbl, 0_dbl, x * y});
-    REQUIRE(dt.get_tensors()[2] == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl});
+    REQUIRE(dt.size() == 12u);
+    assign_sr(dt.get_derivatives(0));
+    REQUIRE(diff_vec == std::vector{par[0] + y, x * y * par[1]});
+    assign_sr(dt.get_derivatives(1));
+    REQUIRE(diff_vec == std::vector{1_dbl, 0_dbl, 0_dbl, x * y});
+    assign_sr(dt.get_derivatives(2));
+    REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl});
 
     // Diff wrt some param.
     dt = diff_tensors({par[0] + y, x * y * par[1]}, kw::diff_order = 2, kw::diff_args = {par[1]});
-    REQUIRE(dt.get_tensors().size() == 3u);
-    REQUIRE(dt.get_tensors()[0] == std::vector{par[0] + y, x * y * par[1]});
-    REQUIRE(dt.get_tensors()[1] == std::vector{0_dbl, x * y});
-    REQUIRE(dt.get_tensors()[2] == std::vector{0_dbl, 0_dbl});
+    REQUIRE(dt.size() == 6u);
+    assign_sr(dt.get_derivatives(0));
+    REQUIRE(diff_vec == std::vector{par[0] + y, x * y * par[1]});
+    assign_sr(dt.get_derivatives(1));
+    REQUIRE(diff_vec == std::vector{0_dbl, x * y});
+    assign_sr(dt.get_derivatives(2));
+    REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl});
 
     // Error modes.
     REQUIRE_THROWS_MATCHES(diff_tensors({1_dbl}, kw::diff_order = 1, kw::diff_args = {x + y}), std::invalid_argument,
@@ -201,22 +236,87 @@ TEST_CASE("diff_tensors basic")
 // A few tests for the dtens API.
 TEST_CASE("dtens basics")
 {
+    using Catch::Matchers::Message;
+
     dtens dt;
 
-    REQUIRE(dt.get_tensors().empty());
-    REQUIRE(dt.n_diffs() == 0u);
+    REQUIRE(dt.get_order() == 0u);
+    REQUIRE(dt.get_nvars() == 0u);
+    REQUIRE(dt.get_nouts() == 0u);
+    REQUIRE(dt.size() == 0u);
+
+    REQUIRE(dt.begin() == dt.end());
+    REQUIRE(dt.find({}) == dt.end());
+    REQUIRE(dt.find({0, 1, 2}) == dt.end());
+
+    REQUIRE_THROWS_MATCHES((dt[{}]), std::out_of_range,
+                           Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}",
+                                               std::vector<int>{})));
+    REQUIRE_THROWS_MATCHES((dt[{0, 1, 2}]), std::out_of_range,
+                           Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}",
+                                               std::vector<int>{0, 1, 2})));
+
+    auto sr = dt.get_derivatives(5);
+    REQUIRE(sr.begin() == dt.end());
+    REQUIRE(sr.end() == dt.end());
+
+    sr = dt.get_derivatives(3, 5);
+    REQUIRE(sr.begin() == dt.end());
+    REQUIRE(sr.end() == dt.end());
 
     auto [x, y] = make_vars("x", "y");
 
     auto dt2 = diff_tensors({x + y, x * y}, kw::diff_order = 1);
+
+    REQUIRE(dt2.get_order() == 1u);
+    REQUIRE(dt2.get_nvars() == 2u);
+    REQUIRE(dt2.get_nouts() == 2u);
+    REQUIRE(dt2.find({0, 1, 0}) != dt2.end());
+    REQUIRE(dt2.find({0, 1}) == dt2.end());
+    REQUIRE(dt2.find({0, 3, 0}) == dt2.end());
+
+    REQUIRE(dt2[{0, 1, 0}] == 1_dbl);
+    REQUIRE_THROWS_MATCHES((dt2[{0, 1}]), std::out_of_range,
+                           Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}",
+                                               std::vector<int>{0, 1})));
+    REQUIRE_THROWS_MATCHES((dt2[{0, 3, 0}]), std::out_of_range,
+                           Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}",
+                                               std::vector<int>{0, 3, 0})));
+
+    sr = dt2.get_derivatives(1);
+    REQUIRE(sr.begin() != dt2.end());
+    REQUIRE(sr.end() == dt2.end());
+
+    sr = dt2.get_derivatives(3);
+    REQUIRE(sr.begin() == dt2.end());
+    REQUIRE(sr.end() == dt2.end());
+
+    sr = dt2.get_derivatives(0, 1);
+    REQUIRE(sr.begin() != dt2.end());
+    REQUIRE(sr.end() != dt2.end());
+
+    sr = dt2.get_derivatives(1, 1);
+    REQUIRE(sr.begin() != dt2.end());
+    REQUIRE(sr.end() == dt2.end());
+
+    sr = dt2.get_derivatives(2, 1);
+    REQUIRE(sr.begin() == dt2.end());
+    REQUIRE(sr.end() == dt2.end());
+
+    // Overflow throwing.
+    REQUIRE_THROWS(dt2[{0, std::numeric_limits<std::uint32_t>::max(), 1u}]);
+
+    // Copy/move semantics.
     auto dt3(dt2);
 
-    REQUIRE(dt3.get_tensors() == dt2.get_tensors());
+    REQUIRE(dt3.size() == dt2.size());
+    REQUIRE(std::equal(dt3.begin(), dt3.end(), dt2.begin()));
 
     auto dt4(std::move(dt3));
     dt3 = dt4;
 
-    REQUIRE(dt3.get_tensors() == dt2.get_tensors());
+    REQUIRE(dt3.size() == dt2.size());
+    REQUIRE(std::equal(dt3.begin(), dt3.end(), dt2.begin()));
 
     // s11n.
     std::stringstream ss;
@@ -234,8 +334,8 @@ TEST_CASE("dtens basics")
         ia >> dt3;
     }
 
-    REQUIRE(dt3.get_tensors() == dt2.get_tensors());
-    REQUIRE(dt3[{1, 0, 1}] == x);
+    REQUIRE(dt3.size() == dt2.size());
+    REQUIRE(std::equal(dt3.begin(), dt3.end(), dt2.begin()));
 }
 
 TEST_CASE("speelpenning check")
@@ -256,17 +356,21 @@ TEST_CASE("speelpenning check")
 
     const auto dt = diff_tensors({prod}, kw::diff_order = 3);
 
-    REQUIRE(dt.get_tensors().size() == 4u);
-    REQUIRE(dt.get_indices().size() == dt.get_tensors().size());
+    std::vector<expression> diff_vec;
+
+    auto assign_sr = [&diff_vec](const auto &sr) {
+        diff_vec.clear();
+        for (const auto &p : sr) {
+            diff_vec.push_back(p.second);
+        }
+    };
 
     for (auto diff_order = 0u; diff_order <= 3u; ++diff_order) {
-        const auto &dtensors = dt.get_tensors()[diff_order];
-        const auto &indices = dt.get_indices()[diff_order];
-
-        REQUIRE(indices.size() == dtensors.size());
+        auto sr = dt.get_derivatives(diff_order);
+        assign_sr(sr);
 
         llvm_state s;
-        add_cfunc<double>(s, "diff", dtensors, kw::vars = vars);
+        add_cfunc<double>(s, "diff", diff_vec, kw::vars = vars);
         s.optimise();
         s.compile();
 
@@ -280,13 +384,14 @@ TEST_CASE("speelpenning check")
         }
 
         // Prepare the outputs vector.
-        std::vector<double> outputs(dtensors.size());
+        std::vector<double> outputs(diff_vec.size());
 
         // Evaluate.
         fr(outputs.data(), inputs.data(), nullptr, nullptr);
 
-        for (decltype(indices.size()) i = 0; i < indices.size(); ++i) {
-            const auto &v_idx = indices[i];
+        auto sr_it = sr.begin();
+        for (decltype(diff_vec.size()) i = 0; i < diff_vec.size(); ++i, ++sr_it) {
+            const auto &v_idx = sr_it->first;
 
             REQUIRE(v_idx.size() == nvars + 1u);
             REQUIRE(v_idx[0] == 0u);
@@ -318,6 +423,8 @@ TEST_CASE("speelpenning check")
 
             REQUIRE(out == approximately(outputs[i]));
         }
+
+        REQUIRE(sr_it == sr.end());
     }
 }
 
@@ -327,6 +434,15 @@ TEST_CASE("speelpenning complexity")
     fmt::print("======================\n");
 
     std::uniform_real_distribution<double> rdist(-10., 10.);
+
+    std::vector<expression> diff_vec;
+
+    auto assign_sr = [&diff_vec](const auto &sr) {
+        diff_vec.clear();
+        for (const auto &p : sr) {
+            diff_vec.push_back(p.second);
+        }
+    };
 
     for (auto nvars : {3u, 10u, 20u, 50u, 100u, 200u}) {
         std::vector<double> inputs, outputs_f, outputs_r;
@@ -348,28 +464,16 @@ TEST_CASE("speelpenning complexity")
         prod = pairwise_prod(vars);
 
         llvm_state s;
-        // auto dc_forward = add_cfunc<double>(s, "f_forward", grad(prod, kw::diff_mode = diff_mode::forward));
-        // auto dc_reverse = add_cfunc<double>(s, "f_reverse", grad(prod, kw::diff_mode = diff_mode::reverse));
-        auto dc_reverse = add_cfunc<double>(s, "f_reverse", diff_tensors({prod}, kw::diff_order = 1).get_tensors()[1],
-                                            kw::compact_mode = true);
+        auto dt = diff_tensors({prod}, kw::diff_order = 1);
+        auto sr = dt.get_derivatives(1);
+        assign_sr(sr);
+
+        auto dc_reverse = add_cfunc<double>(s, "f_reverse", diff_vec, kw::compact_mode = true);
 
         fmt::print("nvars={:<5} decomposition size={:<6}\n", nvars, dc_reverse.size() - nvars - nvars);
 
         s.optimise();
         s.compile();
-
-        // auto *ff = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-        //     s.jit_lookup("f_forward"));
-
-        // auto *fr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
-        //     s.jit_lookup("f_reverse"));
-
-        // ff(outputs_f.data(), inputs.data(), nullptr, nullptr);
-        // fr(outputs_r.data(), inputs.data(), nullptr, nullptr);
-
-        // for (auto i = 0u; i < nvars; ++i) {
-        //     REQUIRE(outputs_f[i] == approximately(outputs_r[i]));
-        // }
     }
 }
 
