@@ -444,7 +444,7 @@ public:
 
     // Subrange helper class to fetch
     // ranges into dtens.
-    class subrange
+    class HEYOKA_DLL_PUBLIC subrange
     {
         friend class dtens;
 
