@@ -758,6 +758,9 @@ dtens::subrange &dtens::subrange::operator=(const subrange &) = default;
 
 dtens::subrange &dtens::subrange::operator=(subrange &&) noexcept = default;
 
+// NOLINTNEXTLINE(performance-trivially-destructible)
+dtens::subrange::~subrange() = default;
+
 dtens::iterator dtens::subrange::begin() const
 {
     return m_begin;

@@ -179,6 +179,7 @@ struct HEYOKA_DLL_PUBLIC prime_wrapper {
     prime_wrapper &operator=(prime_wrapper &&) noexcept;
     ~prime_wrapper();
 
+    // NOLINTNEXTLINE(misc-unconventional-assign-operator,cppcoreguidelines-c-copy-assignment-signature)
     std::pair<expression, expression> operator=(expression) &&;
 };
 
@@ -457,7 +458,7 @@ public:
         subrange(subrange &&) noexcept;
         subrange &operator=(const subrange &);
         subrange &operator=(subrange &&) noexcept;
-        ~subrange() = default;
+        ~subrange();
 
         [[nodiscard]] iterator begin() const;
         [[nodiscard]] iterator end() const;
