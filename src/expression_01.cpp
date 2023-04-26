@@ -386,7 +386,6 @@ struct dtens::impl {
             m_map.clear();
 
             // Read the size.
-            using size_type = decltype(m_map.size());
             size_type size = 0;
             ar >> size;
 
