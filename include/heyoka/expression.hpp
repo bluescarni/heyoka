@@ -376,7 +376,7 @@ expression diff(funcptr_map<expression> &, const expression &, const param &);
 
 // NOTE: public only for testing purposes.
 HEYOKA_DLL_PUBLIC std::pair<std::vector<expression>, std::vector<expression>::size_type>
-revdiff_decompose(const std::vector<expression> &);
+diff_decompose(const std::vector<expression> &);
 
 HEYOKA_DLL_PUBLIC dtens diff_tensors(const std::vector<expression> &,
                                      const std::variant<diff_args, std::vector<expression>> &, std::uint32_t);

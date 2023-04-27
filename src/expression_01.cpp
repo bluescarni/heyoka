@@ -49,8 +49,9 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+// Function decomposition for symbolic differentiation.
 std::pair<std::vector<expression>, std::vector<expression>::size_type>
-revdiff_decompose(const std::vector<expression> &v_ex_)
+diff_decompose(const std::vector<expression> &v_ex_)
 {
     // Determine the list of variables and params.
     const auto vars = get_variables(v_ex_);
@@ -136,7 +137,7 @@ revdiff_decompose(const std::vector<expression> &v_ex_)
     // Append the definitions of the outputs.
     ret.insert(ret.end(), outs.begin(), outs.end());
 
-    get_logger()->trace("revdiff decomposition construction runtime: {}", sw);
+    get_logger()->trace("diff decomposition construction runtime: {}", sw);
 
 #if !defined(NDEBUG)
 
@@ -178,8 +179,8 @@ namespace
 {
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-auto revdiff_make_adj_revdep(const std::vector<expression> &dc, std::vector<expression>::size_type nvars,
-                             [[maybe_unused]] std::vector<expression>::size_type nouts)
+auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression>::size_type nvars,
+                       [[maybe_unused]] std::vector<expression>::size_type nouts)
 {
     // NOTE: the shortest possible dc is for a scalar
     // function identically equal to a number. In this case,
@@ -490,10 +491,10 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
         const auto cur_nouts = prev_diffs.size();
 
         // Run the decomposition on the derivatives of the previous order.
-        const auto [dc, nvars] = revdiff_decompose(prev_diffs);
+        const auto [dc, nvars] = diff_decompose(prev_diffs);
 
         // Create the adjoints, the direct/reverse dependencies and the substitution map.
-        const auto [adj, dep, revdep, subs_map] = revdiff_make_adj_revdep(dc, nvars, cur_nouts);
+        const auto [adj, dep, revdep, subs_map] = diff_make_adj_dep(dc, nvars, cur_nouts);
 
         // These two containers will be used to store the list of subexpressions
         // on which an output depends. They are used in the reverse pass

@@ -32,34 +32,34 @@ std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-TEST_CASE("revdiff decompose")
+TEST_CASE("diff decompose")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(detail::revdiff_decompose({x}).first == std::vector{x, "u_0"_var});
-    REQUIRE(detail::revdiff_decompose({x}).second == 1u);
+    REQUIRE(detail::diff_decompose({x}).first == std::vector{x, "u_0"_var});
+    REQUIRE(detail::diff_decompose({x}).second == 1u);
 
-    REQUIRE(detail::revdiff_decompose({par[0]}).first == std::vector{par[0], "u_0"_var});
-    REQUIRE(detail::revdiff_decompose({par[0]}).second == 1u);
+    REQUIRE(detail::diff_decompose({par[0]}).first == std::vector{par[0], "u_0"_var});
+    REQUIRE(detail::diff_decompose({par[0]}).second == 1u);
 
-    REQUIRE(detail::revdiff_decompose({par[0] + x}).first
+    REQUIRE(detail::diff_decompose({par[0] + x}).first
             == std::vector{x, par[0], subs("u_1"_var + "u_0"_var, {{"u_1"_var, "u_0"_var}, {"u_0"_var, "u_1"_var}}),
                            "u_2"_var});
-    REQUIRE(detail::revdiff_decompose({par[0] + x}).second == 2u);
+    REQUIRE(detail::diff_decompose({par[0] + x}).second == 2u);
 
-    REQUIRE(detail::revdiff_decompose({(par[1] + y) * (par[0] + x)}).first
+    REQUIRE(detail::diff_decompose({(par[1] + y) * (par[0] + x)}).first
             == std::vector{x, y, par[0], par[1],
                            subs("u_2"_var + "u_0"_var, {{"u_2"_var, "u_0"_var}, {"u_0"_var, "u_2"_var}}),
                            subs("u_3"_var + "u_1"_var, {{"u_1"_var, "u_3"_var}, {"u_3"_var, "u_1"_var}}),
                            subs("u_5"_var * "u_4"_var, {{"u_5"_var, "u_4"_var}, {"u_4"_var, "u_5"_var}}), "u_6"_var});
-    REQUIRE(detail::revdiff_decompose({(par[1] + y) * (par[0] + x)}).second == 4u);
+    REQUIRE(detail::diff_decompose({(par[1] + y) * (par[0] + x)}).second == 4u);
 
-    REQUIRE(detail::revdiff_decompose({subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})}).first
+    REQUIRE(detail::diff_decompose({subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})}).first
             == std::vector{x, par[0], par[1],
                            subs("u_1"_var + "u_0"_var, {{"u_1"_var, "u_0"_var}, {"u_0"_var, "u_1"_var}}),
                            subs("u_2"_var + y, {{y, 1_dbl}}),
                            subs("u_4"_var * "u_3"_var, {{"u_3"_var, "u_4"_var}, {"u_4"_var, "u_3"_var}}), "u_5"_var});
-    REQUIRE(detail::revdiff_decompose({subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})}).second == 3u);
+    REQUIRE(detail::diff_decompose({subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})}).second == 3u);
 }
 
 TEST_CASE("diff_tensors basic")
