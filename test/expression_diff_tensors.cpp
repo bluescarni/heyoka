@@ -260,6 +260,18 @@ TEST_CASE("dtens basics")
     REQUIRE(sr.begin() == dt.end());
     REQUIRE(sr.end() == dt.end());
 
+    auto sr2(sr);
+    REQUIRE(sr2.begin() == sr.begin());
+    REQUIRE(sr2.end() == sr.end());
+
+    auto sr3(std::move(sr2));
+    REQUIRE(sr3.begin() == sr.begin());
+    REQUIRE(sr3.end() == sr.end());
+
+    sr2 = sr3;
+    REQUIRE(sr2.begin() == sr.begin());
+    REQUIRE(sr2.end() == sr.end());
+
     sr = dt.get_derivatives(3, 5);
     REQUIRE(sr.begin() == dt.end());
     REQUIRE(sr.end() == dt.end());
