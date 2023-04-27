@@ -177,6 +177,7 @@ revdiff_decompose(const std::vector<expression> &v_ex_)
 namespace
 {
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 auto revdiff_make_adj_revdep(const std::vector<expression> &dc, std::vector<expression>::size_type nvars,
                              [[maybe_unused]] std::vector<expression>::size_type nouts)
 {
