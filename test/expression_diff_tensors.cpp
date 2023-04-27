@@ -21,6 +21,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sum.hpp>
+#include <heyoka/model/fixed_centres.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -350,6 +351,109 @@ TEST_CASE("dtens basics")
     REQUIRE(std::equal(dt3.begin(), dt3.end(), dt2.begin()));
 }
 
+TEST_CASE("fixed centres check")
+{
+    std::uniform_real_distribution<double> rdist(-10., 10.);
+
+    const auto fc_energy = model::fixed_centres_energy(
+        kw::masses = {1., 1., 1.},
+        kw::positions = {par[0], par[1], par[2], par[3], par[4], par[5], par[6], par[7], par[8]});
+
+    const auto fc_pot = model::fixed_centres_potential(
+        kw::masses = {1., 1., 1.},
+        kw::positions = {par[0], par[1], par[2], par[3], par[4], par[5], par[6], par[7], par[8]});
+
+    const auto dt = diff_tensors({fc_energy, fc_pot}, kw::diff_order = 3, kw::diff_args = diff_args::all);
+
+    const auto vars = std::vector{"vx"_var, "vy"_var, "vz"_var, "x"_var, "y"_var, "z"_var};
+
+    const auto diff_vars = std::vector{"vx"_var, "vy"_var, "vz"_var, "x"_var, "y"_var, "z"_var, par[0], par[1],
+                                       par[2],   par[3],   par[4],   par[5],  par[6],  par[7],  par[8]};
+
+    const auto nvars = 6u;
+    const auto npars = 9u;
+
+    std::vector<expression> diff_vec;
+
+    auto assign_sr = [&diff_vec](const auto &sr) {
+        diff_vec.clear();
+        for (const auto &p : sr) {
+            diff_vec.push_back(p.second);
+        }
+    };
+
+    for (auto diff_order = 0u; diff_order <= 3u; ++diff_order) {
+        const auto sr = dt.get_derivatives(diff_order);
+        REQUIRE(sr.begin() != dt.end());
+        REQUIRE(sr.begin() != sr.end());
+        assign_sr(sr);
+
+        llvm_state s;
+        add_cfunc<double>(s, "diff", diff_vec, kw::vars = vars);
+        s.optimise();
+        s.compile();
+
+        auto *fr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+            s.jit_lookup("diff"));
+
+        // Randomly-generate inputs.
+        std::vector<double> inputs(nvars);
+        for (auto &ival : inputs) {
+            ival = rdist(rng);
+        }
+
+        // Randomly generate pars.
+        std::vector<double> pars(npars);
+        for (auto &pval : pars) {
+            pval = rdist(rng);
+        }
+
+        // Prepare the outputs vector.
+        std::vector<double> outputs(diff_vec.size());
+
+        // Evaluate.
+        fr(outputs.data(), inputs.data(), pars.data(), nullptr);
+
+        auto sr_it = sr.begin();
+        for (decltype(diff_vec.size()) i = 0; i < diff_vec.size(); ++i, ++sr_it) {
+            REQUIRE(sr_it != sr.end());
+
+            const auto &v_idx = sr_it->first;
+
+            REQUIRE(v_idx.size() == diff_vars.size() + 1u);
+
+            // Build the current derivative via repeated
+            // invocations of diff().
+            auto ex = v_idx[0] == 0u ? fc_energy : fc_pot;
+
+            for (auto j = 1u; j < v_idx.size(); ++j) {
+                auto order = v_idx[j];
+
+                for (decltype(order) k = 0; k < order; ++k) {
+                    ex = diff(ex, diff_vars[j - 1u]);
+                }
+            }
+
+            // Compile and fetch the expression of the derivative.
+            llvm_state s2;
+            add_cfunc<double>(s2, "diff", {ex}, kw::vars = vars);
+            s2.optimise();
+            s2.compile();
+
+            auto *fr2 = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+                s2.jit_lookup("diff"));
+
+            // Evaluate the derivative.
+            double out = 0;
+            fr2(&out, inputs.data(), pars.data(), nullptr);
+
+            REQUIRE(out == approximately(outputs[i]));
+        }
+
+        REQUIRE(sr_it == sr.end());
+    }
+}
+
 TEST_CASE("speelpenning check")
 {
     std::uniform_real_distribution<double> rdist(-10., 10.);
@@ -378,7 +482,9 @@ TEST_CASE("speelpenning check")
     };
 
     for (auto diff_order = 0u; diff_order <= 3u; ++diff_order) {
-        auto sr = dt.get_derivatives(diff_order);
+        const auto sr = dt.get_derivatives(diff_order);
+        REQUIRE(sr.begin() != dt.end());
+        REQUIRE(sr.begin() != sr.end());
         assign_sr(sr);
 
         llvm_state s;
@@ -403,6 +509,8 @@ TEST_CASE("speelpenning check")
 
         auto sr_it = sr.begin();
         for (decltype(diff_vec.size()) i = 0; i < diff_vec.size(); ++i, ++sr_it) {
+            REQUIRE(sr_it != sr.end());
+
             const auto &v_idx = sr_it->first;
 
             REQUIRE(v_idx.size() == nvars + 1u);
