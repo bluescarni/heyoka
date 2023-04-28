@@ -313,6 +313,204 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
     return std::tuple{std::move(adj), std::move(dep), std::move(revdep), std::move(subs_map)};
 }
 
+// Reverse-mode implementation of diff_tensors().
+template <typename DiffMap, typename Dep, typename Adj, typename SubsMap>
+void diff_tensors_reverse_impl(
+    // The map of derivatives. It wil be updated as new derivatives
+    // are computed
+    DiffMap &diff_map,
+    // The number of derivatives in the previous-order tensor.
+    std::vector<expression>::size_type cur_nouts,
+    // The decomposition of the previous-order tensor.
+    const std::vector<expression> &dc,
+    // The direct and reverse dependencies for the
+    // subexpressions in dc.
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    const Dep &dep, const Dep &revdep,
+    // The adjoints of the subexpressions in dc.
+    const Adj &adj,
+    // The total number of variables in dc (this accounts also
+    // for params, as they are turned into variables during the
+    // construciton of the decomposition).
+    std::vector<expression>::size_type nvars,
+    // The diff arguments.
+    const std::vector<expression> &args,
+    // Iterator in diff_map pointing to the first
+    // derivative for the previous order.
+    typename DiffMap::iterator prev_begin,
+    // The substitution map to recover the original
+    // variables when constructing the derivatives.
+    const SubsMap &subs_map)
+{
+    // Cache the number of diff arguments.
+    const auto nargs = args.size();
+
+    // An indices vector with preallocated storage,
+    // used as temporary variable in several places below.
+    std::vector<std::uint32_t> tmp_v_idx;
+    tmp_v_idx.resize(1 + boost::safe_numerics::safe<decltype(tmp_v_idx.size())>(nargs));
+
+    // These two containers will be used to store the list of subexpressions
+    // on which an output depends. They are used in the reverse pass
+    // to avoid iterating over those subexpressions on which the output
+    // does not depend (recall that the decomposition contains the subexpressions
+    // for ALL outputs). We need two containers (with identical content)
+    // because we need both ordered iteration AND fast lookup.
+    std::unordered_set<std::uint32_t> out_deps;
+    std::vector<std::uint32_t> sorted_out_deps;
+
+    // A stack to be used when filling up out_deps/sorted_out_deps.
+    std::deque<std::uint32_t> stack;
+
+    // Run the reverse pass for each output. The derivatives
+    // wrt the output will be stored into diffs.
+    std::vector<expression> diffs(dc.size());
+    for (std::vector<expression>::size_type i = 0; i < cur_nouts; ++i) {
+        // Compute the index of the current output in the decomposition.
+        const auto out_idx = boost::numeric_cast<std::uint32_t>(diffs.size() - cur_nouts + i);
+
+        // Seed the stack and out_deps/sorted_out_deps with the
+        // current output's dependency.
+        stack.assign(dep[out_idx].begin(), dep[out_idx].end());
+        sorted_out_deps.assign(dep[out_idx].begin(), dep[out_idx].end());
+        out_deps.clear();
+        out_deps.insert(dep[out_idx].begin(), dep[out_idx].end());
+
+#if !defined(NDEBUG)
+
+        // NOTE: an output can only have 0 or 1 dependencies.
+        if (stack.empty()) {
+            assert(std::holds_alternative<number>(dc[out_idx].value()));
+        } else {
+            assert(stack.size() == 1u);
+        }
+
+#endif
+
+        // Build out_deps/sorted_out_deps by traversing
+        // the decomposition backwards.
+        while (!stack.empty()) {
+            // Pop the first element from the stack.
+            const auto cur_idx = stack.front();
+            stack.pop_front();
+
+            // Push into the stack and out_deps/sorted_out_deps
+            // the dependencies of cur_idx.
+            for (const auto next_idx : dep[cur_idx]) {
+                // NOTE: if next_idx is already in out_deps,
+                // it means that it was visited already and thus
+                // it does not need to be put in the stack.
+                if (out_deps.count(next_idx) == 0u) {
+                    stack.push_back(next_idx);
+                    sorted_out_deps.push_back(next_idx);
+                    out_deps.insert(next_idx);
+                }
+            }
+        }
+
+        // Sort sorted_out_deps in decreasing order.
+        std::sort(sorted_out_deps.begin(), sorted_out_deps.end(), std::greater{});
+
+        // sorted_out_deps cannot have duplicate values.
+        assert(std::adjacent_find(sorted_out_deps.begin(), sorted_out_deps.end()) == sorted_out_deps.end());
+        // sorted_out_deps either must be empty, or its last index
+        // must refer to a variable/param (i.e., the current output
+        // must have a var/param as last element in the chain of dependencies).
+        assert(sorted_out_deps.empty() || *sorted_out_deps.rbegin() < nvars);
+        assert(sorted_out_deps.size() == out_deps.size());
+
+        // Set the seed value for the current output.
+        diffs[out_idx] = 1_dbl;
+
+        // Set the derivatives wrt all vars/params for the current output
+        // to zero, so that if the current output does not depend on a
+        // var/param then the derivative wrt that var/param is pre-emptively
+        // set to zero.
+        std::fill(diffs.data(), diffs.data() + nvars, 0_dbl);
+
+        // Run the reverse pass on all subexpressions which
+        // the current output depends on.
+        for (const auto cur_idx : sorted_out_deps) {
+            std::vector<expression> tmp_sum;
+
+            for (const auto rd_idx : revdep[cur_idx]) {
+                assert(rd_idx < diffs.size());
+                assert(rd_idx < adj.size());
+                // NOTE: the reverse dependency must point
+                // to a subexpression *after* the current one.
+                assert(rd_idx > cur_idx);
+                assert(adj[rd_idx].count(cur_idx) == 1u);
+
+                // NOTE: if the current subexpression is a dependency
+                // for another subexpression which is neither the current output
+                // nor one of its dependencies, then the derivative is zero.
+                if (rd_idx != out_idx && out_deps.count(rd_idx) == 0u) {
+                    tmp_sum.push_back(0_dbl);
+                } else {
+                    tmp_sum.push_back(diffs[rd_idx] * adj[rd_idx].find(cur_idx)->second);
+                }
+            }
+
+            assert(!tmp_sum.empty());
+
+            diffs[cur_idx] = sum(std::move(tmp_sum));
+        }
+
+        // Create a dict mapping the vars/params in the decomposition
+        // to the derivatives of the current output wrt them. This is used
+        // to fetch from diffs only the derivatives we are interested in
+        // (since there may be vars/params in the decomposition wrt which
+        // the derivatives are not requested).
+        std::unordered_map<expression, expression> dmap;
+        for (std::vector<expression>::size_type j = 0; j < nvars; ++j) {
+            [[maybe_unused]] const auto [_, flag] = dmap.try_emplace(dc[j], diffs[j]);
+            assert(flag);
+        }
+
+        // Add the derivatives to diff_map.
+        for (decltype(args.size()) j = 0; j < nargs; ++j) {
+            // Compute the indices vector for the current derivative.
+            tmp_v_idx = prev_begin->first;
+            assert(j + 1u < tmp_v_idx.size());
+            // NOTE: no need to overflow check here, because no derivative
+            // order can end up being larger than the total diff order which
+            // is representable by std::uint32_t.
+            tmp_v_idx[j + 1u] += 1u;
+
+            // Check if we already computed this derivative.
+            if (const auto it = diff_map.find(tmp_v_idx); it == diff_map.end()) {
+                // The derivative is new. If the diff arguent is present in the
+                // decomposition, then we will calculate the derivative and add it.
+                // Otherwise, we set the derivative to zero and add it.
+                expression cur_der = 0_dbl;
+
+                if (const auto it_dmap = dmap.find(args[j]); it_dmap != dmap.end()) {
+                    // NOTE: when substituting the original variables in the derivative, ensure that
+                    // subs() canonicalises commutative operators, so that ultimately
+                    // the result of reverse-mode differentiation will also be canonicalised.
+                    cur_der = subs(it_dmap->second, subs_map, true);
+                }
+
+                [[maybe_unused]] const auto [_, flag] = diff_map.try_emplace(tmp_v_idx, cur_der);
+                assert(flag);
+            }
+        }
+
+        // Update prev_begin as we move to the next output.
+        // NOTE; the iterator here stays valid even if we keep on modifying
+        // diff_map thanks to the iterator invalidation rules for associative
+        // containers (i.e., we never call erase, we just keep on inserting new
+        // elements).
+        // NOTE: prev_begin is iterating over the previous-order derivatives
+        // without interference from the new derivatives we are adding, since
+        // they are all higher-order derivatives (and thus appended past the end
+        // of the previous order derivative range).
+        ++prev_begin;
+
+        assert(prev_begin != diff_map.end());
+    }
+}
+
 } // namespace
 
 bool dtens_v_idx_cmp::operator()(const dtens_v_idx_t &v1, const dtens_v_idx_t &v2) const
@@ -477,7 +675,7 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
         tmp_v_idx[0] = 0;
         tmp_v_idx[1] = cur_order;
         std::fill(tmp_v_idx.begin() + 2, tmp_v_idx.end(), static_cast<std::uint32_t>(0));
-        auto prev_begin = diff_map.find(tmp_v_idx);
+        const auto prev_begin = diff_map.find(tmp_v_idx);
         assert(prev_begin != diff_map.end());
 
         // Store the previous-order derivatives into a separate
@@ -496,167 +694,11 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
         // Create the adjoints, the direct/reverse dependencies and the substitution map.
         const auto [adj, dep, revdep, subs_map] = diff_make_adj_dep(dc, nvars, cur_nouts);
 
-        // These two containers will be used to store the list of subexpressions
-        // on which an output depends. They are used in the reverse pass
-        // to avoid iterating over those subexpressions on which the output
-        // does not depend (recall that the decomposition contains the subexpressions
-        // for ALL outputs). We need two containers (with identical content)
-        // because we need both ordered iteration AND fast lookup.
-        std::unordered_set<std::uint32_t> out_deps;
-        std::vector<std::uint32_t> sorted_out_deps;
-
-        // A stack to be used when filling up out_deps/sorted_out_deps.
-        std::deque<std::uint32_t> stack;
-
         spdlog::stopwatch sw_inner;
 
-        // Run the reverse pass for each output. The derivatives
-        // wrt the output will be stored into diffs.
-        std::vector<expression> diffs(dc.size());
-        for (decltype(v_ex.size()) i = 0; i < cur_nouts; ++i) {
-            // Compute the index of the current output in the decomposition.
-            const auto out_idx = boost::numeric_cast<std::uint32_t>(diffs.size() - cur_nouts + i);
-
-            // Seed the stack and out_deps/sorted_out_deps with the
-            // current output's dependency.
-            stack.assign(dep[out_idx].begin(), dep[out_idx].end());
-            sorted_out_deps.assign(dep[out_idx].begin(), dep[out_idx].end());
-            out_deps.clear();
-            out_deps.insert(dep[out_idx].begin(), dep[out_idx].end());
-
-#if !defined(NDEBUG)
-
-            // NOTE: an output can only have 0 or 1 dependencies.
-            if (stack.empty()) {
-                assert(std::holds_alternative<number>(dc[out_idx].value()));
-            } else {
-                assert(stack.size() == 1u);
-            }
-
-#endif
-
-            // Build out_deps/sorted_out_deps by traversing
-            // the decomposition backwards.
-            while (!stack.empty()) {
-                // Pop the first element from the stack.
-                const auto cur_idx = stack.front();
-                stack.pop_front();
-
-                // Push into the stack and out_deps/sorted_out_deps
-                // the dependencies of cur_idx.
-                for (const auto next_idx : dep[cur_idx]) {
-                    // NOTE: if next_idx is already in out_deps,
-                    // it means that it was visited already and thus
-                    // it does not need to be put in the stack.
-                    if (out_deps.count(next_idx) == 0u) {
-                        stack.push_back(next_idx);
-                        sorted_out_deps.push_back(next_idx);
-                        out_deps.insert(next_idx);
-                    }
-                }
-            }
-
-            // Sort sorted_out_deps in decreasing order.
-            std::sort(sorted_out_deps.begin(), sorted_out_deps.end(), std::greater{});
-
-            // sorted_out_deps cannot have duplicate values.
-            assert(std::adjacent_find(sorted_out_deps.begin(), sorted_out_deps.end()) == sorted_out_deps.end());
-            // sorted_out_deps either must be empty, or its last index
-            // must refer to a variable/param (i.e., the current output
-            // must have a var/param as last element in the chain of dependencies).
-            assert(sorted_out_deps.empty() || *sorted_out_deps.rbegin() < nvars);
-            assert(sorted_out_deps.size() == out_deps.size());
-
-            // Set the seed value for the current output.
-            diffs[out_idx] = 1_dbl;
-
-            // Set the derivatives wrt all vars/params for the current output
-            // to zero, so that if the current output does not depend on a
-            // var/param then the derivative wrt that var/param is pre-emptively
-            // set to zero.
-            std::fill(diffs.data(), diffs.data() + nvars, 0_dbl);
-
-            // Run the reverse pass on all subexpressions which
-            // the current output depends on.
-            for (const auto cur_idx : sorted_out_deps) {
-                std::vector<expression> tmp_sum;
-
-                for (const auto rd_idx : revdep[cur_idx]) {
-                    assert(rd_idx < diffs.size());
-                    assert(rd_idx < adj.size());
-                    // NOTE: the reverse dependency must point
-                    // to a subexpression *after* the current one.
-                    assert(rd_idx > cur_idx);
-                    assert(adj[rd_idx].count(cur_idx) == 1u);
-
-                    // NOTE: if the current subexpression is a dependency
-                    // for another subexpression which is neither the current output
-                    // nor one of its dependencies, then the derivative is zero.
-                    if (rd_idx != out_idx && out_deps.count(rd_idx) == 0u) {
-                        tmp_sum.push_back(0_dbl);
-                    } else {
-                        tmp_sum.push_back(diffs[rd_idx] * adj[rd_idx].find(cur_idx)->second);
-                    }
-                }
-
-                assert(!tmp_sum.empty());
-
-                diffs[cur_idx] = sum(std::move(tmp_sum));
-            }
-
-            // Create a dict mapping the vars/params in the decomposition
-            // to the derivatives of the current output wrt them. This is used
-            // to fetch from diffs only the derivatives we are interested in
-            // (since there may be vars/params in the decomposition wrt which
-            // the derivatives are not requested).
-            std::unordered_map<expression, expression> dmap;
-            for (std::vector<expression>::size_type j = 0; j < nvars; ++j) {
-                [[maybe_unused]] const auto [_, flag] = dmap.try_emplace(dc[j], diffs[j]);
-                assert(flag);
-            }
-
-            // Add the derivatives to diff_map.
-            for (decltype(args.size()) j = 0; j < nargs; ++j) {
-                // Compute the indices vector for the current derivative.
-                tmp_v_idx = prev_begin->first;
-                assert(j + 1u < tmp_v_idx.size());
-                // NOTE: no need to overflow check here, because no derivative
-                // order can end up being larger than the total diff order which
-                // is representable by std::uint32_t.
-                tmp_v_idx[j + 1u] += 1u;
-
-                // Check if we already computed this derivative.
-                if (const auto it = diff_map.find(tmp_v_idx); it == diff_map.end()) {
-                    // The derivative is new. If the diff arguent is present in the
-                    // decomposition, then we will calculate the derivative and add it.
-                    // Otherwise, we set the derivative to zero and add it.
-                    expression cur_der = 0_dbl;
-
-                    if (const auto it_dmap = dmap.find(args[j]); it_dmap != dmap.end()) {
-                        // NOTE: when substituting the original variables in the derivative, ensure that
-                        // subs() canonicalises commutative operators, so that ultimately
-                        // the result of reverse-mode differentiation will also be canonicalised.
-                        cur_der = subs(it_dmap->second, subs_map, true);
-                    }
-
-                    [[maybe_unused]] const auto [_, flag] = diff_map.try_emplace(tmp_v_idx, cur_der);
-                    assert(flag);
-                }
-            }
-
-            // Update prev_begin as we move to the next output.
-            // NOTE; the iterator here stays valid even if we keep on modifying
-            // diff_map thanks to the iterator invalidation rules for associative
-            // containers (i.e., we never call erase, we just keep on inserting new
-            // elements).
-            // NOTE: prev_begin is iterating over the previous-order derivatives
-            // without interference from the new derivatives we are adding, since
-            // they are all higher-order derivatives (and thus appended past the end
-            // of the previous order derivative range).
-            ++prev_begin;
-
-            assert(prev_begin != diff_map.end());
-        }
+        // NOTE: current implementation always
+        // does reverse-mode differentiation.
+        diff_tensors_reverse_impl(diff_map, cur_nouts, dc, dep, revdep, adj, nvars, args, prev_begin, subs_map);
 
         get_logger()->trace("dtens reverse passes runtime for order {}: {}", cur_order + 1u, sw_inner);
     }
