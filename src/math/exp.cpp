@@ -94,6 +94,7 @@ void exp_impl::eval_batch_dbl(std::vector<double> &out, const std::unordered_map
     }
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 double exp_impl::eval_num_dbl(const std::vector<double> &a) const
 {
     if (a.size() != 1u) {
@@ -106,6 +107,7 @@ double exp_impl::eval_num_dbl(const std::vector<double> &a) const
     return std::exp(a[0]);
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 double exp_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>::size_type i) const
 {
     if (a.size() != 1u || i != 0u) {
@@ -162,6 +164,7 @@ llvm::Value *taylor_diff_exp_impl(llvm_state &s, llvm::Type *fp_t, const exp_imp
 // Derivative of exp(variable).
 llvm::Value *taylor_diff_exp_impl(llvm_state &s, llvm::Type *fp_t, const exp_impl &, const variable &var,
                                   const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
+                                  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                   std::uint32_t order, std::uint32_t a_idx, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
@@ -273,7 +276,7 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, llvm::Type *fp_t, con
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto *f = module.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -288,19 +291,19 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, llvm::Type *fp_t, con
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
-        auto ord = f->args().begin();
-        auto a_idx = f->args().begin() + 1;
-        auto diff_ptr = f->args().begin() + 2;
-        auto b_idx = f->args().begin() + 5;
+        auto *ord = f->args().begin();
+        auto *a_idx = f->args().begin() + 1;
+        auto *diff_ptr = f->args().begin() + 2;
+        auto *b_idx = f->args().begin() + 5;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
+        auto *acc = builder.CreateAlloca(val_t);
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
@@ -311,18 +314,18 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, llvm::Type *fp_t, con
             },
             [&]() {
                 // Create a vector version of ord.
-                auto ord_fp = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
+                auto *ord_fp = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-                    auto anj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), a_idx);
-                    auto bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, b_idx);
+                    auto *anj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), a_idx);
+                    auto *bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, b_idx);
 
                     // Compute the factor j.
-                    auto fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
+                    auto *fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     builder.CreateStore(
                         llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, anj, bj))), acc);

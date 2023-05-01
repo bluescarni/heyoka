@@ -977,17 +977,17 @@ private:
     // The LLVM machinery.
     llvm_state m_llvm;
     // Dimension of the system.
-    std::uint32_t m_dim;
+    std::uint32_t m_dim{};
     // Taylor decomposition.
     taylor_dc_t m_dc;
     // Taylor order.
-    std::uint32_t m_order;
+    std::uint32_t m_order{};
     // Tolerance.
     T m_tol;
     // High accuracy.
-    bool m_high_accuracy;
+    bool m_high_accuracy{};
     // Compact mode.
-    bool m_compact_mode;
+    bool m_compact_mode{};
     // The steppers.
     using step_f_t = void (*)(T *, const T *, const T *, T *, T *) noexcept;
     using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *, T *) noexcept;
@@ -1424,7 +1424,7 @@ private:
     };
 
     // The batch size.
-    std::uint32_t m_batch_size;
+    std::uint32_t m_batch_size{};
     // State vectors.
     std::vector<T> m_state;
     // Times.
@@ -1432,17 +1432,17 @@ private:
     // The LLVM machinery.
     llvm_state m_llvm;
     // Dimension of the system.
-    std::uint32_t m_dim;
+    std::uint32_t m_dim{};
     // Taylor decomposition.
     taylor_dc_t m_dc;
     // Taylor order.
-    std::uint32_t m_order;
+    std::uint32_t m_order{};
     // Tolerance.
     T m_tol;
     // High accuracy.
-    bool m_high_accuracy;
+    bool m_high_accuracy{};
     // Compact mode.
-    bool m_compact_mode;
+    bool m_compact_mode{};
     // The steppers.
     using step_f_t = void (*)(T *, const T *, const T *, T *, T *) noexcept;
     using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *, T *) noexcept;

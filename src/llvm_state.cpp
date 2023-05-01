@@ -422,11 +422,7 @@ struct llvm_state::jit {
     ~jit() = default;
 
     // Accessors.
-    llvm::LLVMContext &get_context()
-    {
-        return *m_ctx->getContext();
-    }
-    [[nodiscard]] const llvm::LLVMContext &get_context() const
+    [[nodiscard]] llvm::LLVMContext &get_context() const
     {
         return *m_ctx->getContext();
     }
@@ -583,6 +579,7 @@ llvm_state::llvm_state(const llvm_state &other)
         // IR snapshot and add the cached compiled module
         // to the jit.
         m_ir_snapshot = other.m_ir_snapshot;
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         detail::llvm_state_add_obj_to_jit(*m_jitter, *other.m_jitter->m_object_file);
     } else {
         // 'other' has not been compiled yet, or
@@ -686,6 +683,7 @@ void llvm_state::save_impl(Archive &ar, unsigned) const
 
     if (with_obj) {
         // Save the object file if available.
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         ar << *m_jitter->m_object_file;
     }
 }
@@ -706,24 +704,34 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
     // addresses.
 
     // Load the status flags from the archive.
+    // NOTE: not sure why clang-tidy wants cmp to be
+    // const here, as clearly ar >> cmp is going to
+    // write something into it. Perhaps some const_cast
+    // shenanigangs in Boost.Serialization?
+    // NOLINTNEXTLINE(misc-const-correctness)
     bool cmp{};
     ar >> cmp;
 
+    // NOLINTNEXTLINE(misc-const-correctness)
     bool with_obj{};
     ar >> with_obj;
 
     assert(!with_obj || cmp);
 
     // Load the config options.
+    // NOLINTNEXTLINE(misc-const-correctness)
     unsigned opt_level{};
     ar >> opt_level;
 
+    // NOLINTNEXTLINE(misc-const-correctness)
     bool fast_math{};
     ar >> fast_math;
 
+    // NOLINTNEXTLINE(misc-const-correctness)
     bool force_avx512{};
     ar >> force_avx512;
 
+    // NOLINTNEXTLINE(misc-const-correctness)
     std::string module_name;
     ar >> module_name;
 
@@ -757,6 +765,7 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
             m_ir_snapshot = std::move(ir);
 
             // Add the object code to the jit.
+            // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
             detail::llvm_state_add_obj_to_jit(*m_jitter, *obj_file);
         } else {
             // Clear the existing ir snapshot
@@ -1229,6 +1238,7 @@ const std::string &llvm_state::get_object_code() const
             "Cannot extract the object code from an llvm_state if the binary code has not been generated yet");
     }
 
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     return *m_jitter->m_object_file;
 }
 

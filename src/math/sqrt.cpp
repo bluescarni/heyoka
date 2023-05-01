@@ -93,6 +93,7 @@ void sqrt_impl::eval_batch_dbl(std::vector<double> &out,
     }
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 double sqrt_impl::eval_num_dbl(const std::vector<double> &a) const
 {
     if (a.size() != 1u) {
@@ -105,6 +106,7 @@ double sqrt_impl::eval_num_dbl(const std::vector<double> &a) const
     return std::sqrt(a[0]);
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 double sqrt_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>::size_type i) const
 {
     if (a.size() != 1u || i != 0u) {
@@ -444,8 +446,8 @@ expression sqrt_impl::diff(funcptr_map<expression> &func_map, const param &p) co
 expression sqrt(expression e)
 {
     // Simplify sqrt(number) to its value.
-    if (auto *num_ptr = std::get_if<number>(&e.value())) {
-        return expression{sqrt(std::move(*num_ptr))};
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return expression{sqrt(*num_ptr)};
     } else {
         return expression{func{detail::sqrt_impl(std::move(e))}};
     }

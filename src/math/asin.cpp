@@ -167,6 +167,7 @@ llvm::Value *taylor_diff_asin_impl(llvm_state &s, llvm::Type *fp_t, const asin_i
 llvm::Value *taylor_diff_asin_impl(llvm_state &s, llvm::Type *fp_t, const asin_impl &,
                                    const std::vector<std::uint32_t> &deps, const variable &var,
                                    const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
+                                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                    std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     assert(deps.size() == 1u);
@@ -364,6 +365,7 @@ llvm::Function *taylor_c_diff_func_asin_impl(llvm_state &s, llvm::Type *fp_t, co
                 ret = llvm_fdiv(s, ret, n_c0);
 
                 // Store into retval.
+                // NOLINTNEXTLINE(readability-suspicious-call-argument)
                 builder.CreateStore(ret, retval);
             });
 

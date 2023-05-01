@@ -791,13 +791,13 @@ class taylor_pwrap
 {
     auto get_poly_from_cache(std::uint32_t n, const T &poly_init)
     {
-        if (pc.empty()) {
+        if (pc->empty()) {
             // No polynomials are available, create a new one.
             return std::vector<T>(boost::numeric_cast<typename std::vector<T>::size_type>(n + 1u), poly_init);
         } else {
             // Extract an existing polynomial from the cache.
-            auto retval = std::move(pc.back());
-            pc.pop_back();
+            auto retval = std::move(pc->back());
+            pc->pop_back();
 
             return retval;
         }
@@ -807,16 +807,16 @@ class taylor_pwrap
     {
         // NOTE: the cache does not allow empty vectors.
         if (!v.empty()) {
-            assert(pc.empty() || pc[0].size() == v.size());
+            assert(pc->empty() || (*pc)[0].size() == v.size());
 
             // Move v into the cache.
-            pc.push_back(std::move(v));
+            pc->push_back(std::move(v));
         }
     }
 
 public:
     explicit taylor_pwrap(taylor_poly_cache<T> &cache, std::uint32_t n, const T &poly_init)
-        : pc(cache), v(get_poly_from_cache(n, poly_init))
+        : pc(&cache), v(get_poly_from_cache(n, poly_init))
     {
     }
 
@@ -831,7 +831,7 @@ public:
         assert(this != &other); // LCOV_EXCL_LINE
 
         // Make sure the polyomial caches match.
-        assert(&pc == &other.pc); // LCOV_EXCL_LINE
+        assert(pc == other.pc); // LCOV_EXCL_LINE
 
         // Make sure we are not moving from an
         // invalid taylor_pwrap.
@@ -856,7 +856,7 @@ public:
         back_to_cache();
     }
 
-    taylor_poly_cache<T> &pc;
+    taylor_poly_cache<T> *pc;
     std::vector<T> v;
 };
 
@@ -1123,7 +1123,7 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
                         detail::fp_to_string(root), detail::fp_to_string(h));
 
                     using std::nextafter;
-                    root = nextafter(h, T(0));
+                    root = nextafter(h, static_cast<T>(0));
                     // LCOV_EXCL_STOP
                 }
 
@@ -1266,6 +1266,7 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
             // Flag to signal that the do-while loop below failed.
             bool loop_failed = false;
 
+            // NOLINTNEXTLINE(cppcoreguidelines-avoid-do-while)
             do {
                 // Fetch the current interval and polynomial from the working list.
                 // NOTE: from now on, tmp contains the polynomial referred
@@ -1296,7 +1297,7 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
                     // NOTE: we will have to skip the event if we are dealing
                     // with a terminal event on cooldown and the lower bound
                     // falls within the cooldown time.
-                    bool skip_event = false;
+                    std::conditional_t<detail::is_terminal_event_v<ev_type>, bool, const bool> skip_event = false;
                     if constexpr (detail::is_terminal_event_v<ev_type>) {
                         if (lb < lb_offset) {
                             SPDLOG_LOGGER_DEBUG(detail::get_logger(),
@@ -1824,7 +1825,7 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
                             detail::fp_to_string(root), detail::fp_to_string(h));
 
                         using std::nextafter;
-                        root = nextafter(h, T(0));
+                        root = nextafter(h, static_cast<T>(0));
                         // LCOV_EXCL_STOP
                     }
 
@@ -1922,7 +1923,7 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
 
                     // NOTE: we end up here if the event is not terminal
                     // or not on cooldown.
-                    return T(0);
+                    return static_cast<T>(0);
                 }();
 
                 if (lb_offset >= 1) {
@@ -1960,6 +1961,7 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
                 // Flag to signal that the do-while loop below failed.
                 bool loop_failed = false;
 
+                // NOLINTNEXTLINE(cppcoreguidelines-avoid-do-while)
                 do {
                     // Fetch the current interval and polynomial from the working list.
                     // NOTE: from now on, tmp contains the polynomial referred
@@ -1981,13 +1983,13 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
                     // When we do proper root finding below, the
                     // algorithm should be able to detect non-finite
                     // polynomials.
-                    if (tmp.v[0] == T(0) // LCOV_EXCL_LINE
+                    if (tmp.v[0] == 0 // LCOV_EXCL_LINE
                         && std::all_of(tmp.v.data() + 1, tmp.v.data() + 1 + order,
                                        [](const auto &x) { return isfinite(x); })) {
                         // NOTE: we will have to skip the event if we are dealing
                         // with a terminal event on cooldown and the lower bound
                         // falls within the cooldown time.
-                        bool skip_event = false;
+                        std::conditional_t<detail::is_terminal_event_v<ev_type>, bool, const bool> skip_event = false;
                         if constexpr (detail::is_terminal_event_v<ev_type>) {
                             if (lb < lb_offset) {
                                 SPDLOG_LOGGER_DEBUG(detail::get_logger(),

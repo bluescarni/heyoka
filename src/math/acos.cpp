@@ -38,7 +38,6 @@
 
 #endif
 
-#include <heyoka/config.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -168,6 +167,7 @@ llvm::Value *taylor_diff_acos_impl(llvm_state &s, llvm::Type *fp_t, const acos_i
 llvm::Value *taylor_diff_acos_impl(llvm_state &s, llvm::Type *fp_t, const acos_impl &,
                                    const std::vector<std::uint32_t> &deps, const variable &var,
                                    const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
+                                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                    std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     assert(deps.size() == 1u);
@@ -351,10 +351,10 @@ llvm::Function *taylor_c_diff_func_acos_impl(llvm_state &s, llvm::Type *fp_t, co
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
-                    auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, a_idx);
+                    auto *c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
+                    auto *aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, a_idx);
 
-                    auto fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
+                    auto *fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     builder.CreateStore(
                         llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, c_nj, aj))), acc);
@@ -367,6 +367,7 @@ llvm::Function *taylor_c_diff_func_acos_impl(llvm_state &s, llvm::Type *fp_t, co
                 ret = llvm_fdiv(s, ret, n_c0);
 
                 // Store into retval.
+                // NOLINTNEXTLINE(readability-suspicious-call-argument)
                 builder.CreateStore(ret, retval);
             });
 

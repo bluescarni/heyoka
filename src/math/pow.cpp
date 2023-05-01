@@ -128,6 +128,7 @@ void pow_impl::eval_batch_dbl(std::vector<double> &out, const std::unordered_map
     }
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 double pow_impl::eval_num_dbl(const std::vector<double> &a) const
 {
     if (a.size() != 2u) {
@@ -140,6 +141,7 @@ double pow_impl::eval_num_dbl(const std::vector<double> &a) const
     return std::pow(a[0], a[1]);
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 double pow_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>::size_type i) const
 {
     if (a.size() != 2u || i != 0u) {
@@ -209,6 +211,7 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
 template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_impl &f, const variable &var, const U &num,
                                   const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                   std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
@@ -388,10 +391,10 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
+        auto *acc = builder.CreateAlloca(val_t);
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
@@ -416,7 +419,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
                     auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
 
                     // Compute the factor n*alpha-j*(alpha+1).
-                    auto j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
+                    auto *j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
                     auto fac = llvm_fsub(
                         s, llvm_fmul(s, ord_v, alpha_v),
                         llvm_fmul(s, j_v,
@@ -499,7 +502,7 @@ namespace
 // It will special-case for e == 0, 1, 2, 3, 4 and 0.5.
 expression pow_wrapper_impl(expression b, expression e)
 {
-    if (auto *num_ptr = std::get_if<number>(&e.value())) {
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
         if (is_zero(*num_ptr)) {
             return 1_dbl;
         }
@@ -575,6 +578,9 @@ expression powi(expression b, std::uint32_t e)
             return b;
         case 2u:
             return square(std::move(b));
+        default:
+            // NOTE: default continues.
+            ;
     }
 
     // https://en.wikipedia.org/wiki/Exponentiation_by_squaring
@@ -585,13 +591,13 @@ expression powi(expression b, std::uint32_t e)
             b = square(std::move(b));
             e /= 2u;
         } else {
-            y = b * std::move(y);
+            y = b * y;
             b = square(std::move(b));
             e = (e - 1u) / 2u;
         }
     }
 
-    return std::move(b) * std::move(y);
+    return b * y;
 }
 
 HEYOKA_END_NAMESPACE

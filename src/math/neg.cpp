@@ -64,6 +64,7 @@ void neg_impl::to_stream(std::ostringstream &oss) const
 }
 
 // Derivative.
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 std::vector<expression> neg_impl::gradient() const
 {
     assert(args().size() == 1u);

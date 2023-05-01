@@ -275,6 +275,7 @@ prime_wrapper &prime_wrapper::operator=(prime_wrapper &&) noexcept = default;
 
 prime_wrapper::~prime_wrapper() = default;
 
+// NOLINTNEXTLINE(cppcoreguidelines-c-copy-assignment-signature,misc-unconventional-assign-operator)
 std::pair<expression, expression> prime_wrapper::operator=(expression e) &&
 {
     return std::pair{expression{variable{std::move(m_str)}}, std::move(e)};
@@ -649,6 +650,7 @@ bool comm_ops_lt(const expression &e1, const expression &e2)
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression expression_plus(const expression &e1, const expression &e2)
 {
     // Simplify x + neg(y) to x - y.
@@ -707,6 +709,7 @@ expression expression_plus(const expression &e1, const expression &e2)
 
 } // namespace detail
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression operator+(const expression &e1, const expression &e2)
 {
     if (detail::comm_ops_lt(e2, e1)) {
@@ -716,6 +719,7 @@ expression operator+(const expression &e1, const expression &e2)
     }
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression operator-(const expression &e1, const expression &e2)
 {
     // Simplify x - (-y) to x + y.
@@ -780,6 +784,7 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression expression_mul(const expression &e1, const expression &e2)
 {
     const auto *fptr1 = detail::is_neg(e1);
@@ -867,6 +872,7 @@ expression expression_mul(const expression &e1, const expression &e2)
 
 } // namespace detail
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression operator*(const expression &e1, const expression &e2)
 {
     if (detail::comm_ops_lt(e2, e1)) {
@@ -876,6 +882,7 @@ expression operator*(const expression &e1, const expression &e2)
     }
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression operator/(const expression &e1, const expression &e2)
 {
     const auto *fptr1 = detail::is_neg(e1);
@@ -1541,6 +1548,7 @@ expression diff(const expression &e, const param &p)
     return detail::diff(func_map, e, p);
 }
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 expression diff(const expression &e, const expression &x)
 {
     return std::visit(
@@ -2298,7 +2306,9 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
 
 // Simplify a function decomposition by removing
 // common subexpressions.
-std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex, std::vector<expression>::size_type nvars,
+std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex,
+                                               // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                               std::vector<expression>::size_type nvars,
                                                std::vector<expression>::size_type nouts)
 {
     using idx_t = std::vector<expression>::size_type;
@@ -2410,7 +2420,9 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex, st
 // expressions which are dependent on each other. By doing another topological
 // sort, this time based on breadth-first search, we determine another valid
 // sorting in which independent operations tend to be clustered together.
-std::vector<expression> function_sort_dc(std::vector<expression> &dc, std::vector<expression>::size_type nvars,
+std::vector<expression> function_sort_dc(std::vector<expression> &dc,
+                                         // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                         std::vector<expression>::size_type nvars,
                                          std::vector<expression>::size_type nouts)
 {
     // A function decomposition is supposed
@@ -2849,8 +2861,10 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, llvm::Value *in_ptr, llvm::Value *par_ptr,
                        llvm::Value *time_ptr, llvm::Value *stride, const std::vector<expression> &dc,
+                       // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                        std::uint32_t nvars, std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
 {
     auto &builder = s.builder();
@@ -2915,8 +2929,9 @@ void add_cfunc_nc_mode(llvm_state &s, llvm::Type *fp_t, llvm::Value *out_ptr, ll
 // the definition of a u variable does not depend on any u variable defined within that segment.
 // NOTE: the segments in the return value will contain shallow copies of the
 // expressions in dc.
-std::vector<std::vector<expression>> function_segment_dc(const std::vector<expression> &dc, std::uint32_t nvars,
-                                                         std::uint32_t nuvars)
+std::vector<std::vector<expression>> function_segment_dc(const std::vector<expression> &dc,
+                                                         // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                                         std::uint32_t nvars, std::uint32_t nuvars)
 {
     // Log runtime in trace mode.
     spdlog::stopwatch sw;
@@ -3026,6 +3041,7 @@ std::vector<std::vector<expression>> function_segment_dc(const std::vector<expre
 }
 
 auto cfunc_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vector<std::vector<expression>> &s_dc,
+                               // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                std::uint32_t nvars, std::uint32_t batch_size, bool high_accuracy)
 {
     // Log runtime in trace mode.
@@ -3176,6 +3192,7 @@ auto cfunc_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vecto
     return retval;
 }
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void cfunc_c_store_eval(llvm_state &s, llvm::Type *fp_vec_t, llvm::Value *eval_arr, llvm::Value *idx, llvm::Value *val)
 {
     auto &builder = s.builder();
@@ -3309,8 +3326,9 @@ std::uint32_t cfunc_c_gl_arr_size(llvm::Value *v)
 // cout_gl is the return value of cfunc_c_make_output_globals(), which contains
 // the indices/constants necessary for the computation.
 void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *out_ptr,
-                           const std::pair<std::array<llvm::GlobalVariable *, 6>, bool> &cout_gl, llvm::Value *eval_arr,
-                           llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size)
+                           const std::pair<std::array<llvm::GlobalVariable *, 6>, bool> &cout_gl,
+                           // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                           llvm::Value *eval_arr, llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size)
 {
     assert(batch_size > 0u); // LCOV_EXCL_LINE
 
@@ -3405,10 +3423,12 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
     });
 }
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, llvm::Value *in_ptr,
                       llvm::Value *par_ptr, llvm::Value *time_ptr, llvm::Value *stride,
-                      const std::vector<expression> &dc, std::uint32_t nvars, std::uint32_t nuvars,
-                      std::uint32_t batch_size, bool high_accuracy)
+                      const std::vector<expression> &dc, std::uint32_t nvars,
+                      // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                      std::uint32_t nuvars, std::uint32_t batch_size, bool high_accuracy)
 {
     auto &builder = s.builder();
     auto &md = s.module();

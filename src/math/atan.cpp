@@ -167,6 +167,7 @@ llvm::Value *taylor_diff_atan_impl(llvm_state &s, llvm::Type *fp_t, const atan_i
 llvm::Value *taylor_diff_atan_impl(llvm_state &s, llvm::Type *fp_t, const atan_impl &,
                                    const std::vector<std::uint32_t> &deps, const variable &var,
                                    const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
+                                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                    std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     assert(deps.size() == 1u);
@@ -299,7 +300,7 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, llvm::Type *fp_t, co
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto *f = module.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -314,20 +315,20 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, llvm::Type *fp_t, co
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
-        auto ord = f->args().begin();
-        auto a_idx = f->args().begin() + 1;
-        auto diff_ptr = f->args().begin() + 2;
-        auto b_idx = f->args().begin() + 5;
-        auto c_idx = f->args().begin() + 6;
+        auto *ord = f->args().begin();
+        auto *a_idx = f->args().begin() + 1;
+        auto *diff_ptr = f->args().begin() + 2;
+        auto *b_idx = f->args().begin() + 5;
+        auto *c_idx = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
+        auto *acc = builder.CreateAlloca(val_t);
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
@@ -338,16 +339,16 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, llvm::Type *fp_t, co
             },
             [&]() {
                 // Create the constant 1 in fp format.
-                auto one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
+                auto *one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
 
                 // Compute the fp version of the order.
-                auto ord_fp = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
+                auto *ord_fp = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Compute n*b^[n].
-                auto ret = llvm_fmul(s, ord_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx));
+                auto *ret = llvm_fmul(s, ord_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, b_idx));
 
                 // Compute n*(c^[0] + 1).
-                auto n_c0_p1 = llvm_fmul(
+                auto *n_c0_p1 = llvm_fmul(
                     s, ord_fp,
                     llvm_fadd(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx), one_fp));
 
@@ -356,10 +357,10 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, llvm::Type *fp_t, co
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
-                    auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, a_idx);
+                    auto *c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
+                    auto *aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, a_idx);
 
-                    auto fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
+                    auto *fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     builder.CreateStore(
                         llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, c_nj, aj))), acc);
@@ -372,6 +373,7 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, llvm::Type *fp_t, co
                 ret = llvm_fdiv(s, ret, n_c0_p1);
 
                 // Store into retval.
+                // NOLINTNEXTLINE(readability-suspicious-call-argument)
                 builder.CreateStore(ret, retval);
             });
 

@@ -510,6 +510,7 @@ template <typename U,
           = 0>
 llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &nv, const variable &var1,
                                      const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                      std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     // Fetch the index of var1.
@@ -682,7 +683,7 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, llvm::Type *fp_t, c
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
@@ -786,7 +787,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(order, builder.getInt32(0)),
@@ -806,6 +807,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_
                 }
 
                 // Create the return value.
+                // NOLINTNEXTLINE(readability-suspicious-call-argument)
                 builder.CreateStore(ret, retval);
             });
 
@@ -876,7 +878,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(order, builder.getInt32(0)),
@@ -934,13 +936,13 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto *f = module.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -949,16 +951,16 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
-        auto order = f->args().begin();
-        auto diff_arr = f->args().begin() + 2;
-        auto var_idx0 = f->args().begin() + 5;
-        auto var_idx1 = f->args().begin() + 6;
+        auto *order = f->args().begin();
+        auto *diff_arr = f->args().begin() + 2;
+        auto *var_idx0 = f->args().begin() + 5;
+        auto *var_idx1 = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-        auto v0 = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, var_idx0);
-        auto v1 = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, var_idx1);
+        auto *v0 = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, var_idx0);
+        auto *v1 = taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, var_idx1);
 
         // Create the return value.
         if constexpr (AddOrSub) {
@@ -1050,7 +1052,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -1117,7 +1119,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
         // The function was not created before, do it now.
 
         // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
+        auto *orig_bb = builder.GetInsertBlock();
 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
@@ -1177,7 +1179,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto *f = module.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -1192,22 +1194,22 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
-        auto ord = f->args().begin();
-        auto diff_ptr = f->args().begin() + 2;
-        auto idx0 = f->args().begin() + 5;
-        auto idx1 = f->args().begin() + 6;
+        auto *ord = f->args().begin();
+        auto *diff_ptr = f->args().begin() + 2;
+        auto *idx0 = f->args().begin() + 5;
+        auto *idx1 = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
+        auto *acc = builder.CreateAlloca(val_t);
         builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
 
         // Run the loop.
         llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-            auto b_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), idx0);
-            auto cj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, idx1);
+            auto *b_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), idx0);
+            auto *cj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, idx1);
             builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, b_nj, cj)), acc);
         });
 
@@ -1376,10 +1378,10 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, 
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
+        auto *acc = builder.CreateAlloca(val_t);
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),

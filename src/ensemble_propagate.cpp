@@ -90,6 +90,7 @@ ensemble_propagate_until_impl(const taylor_adaptive<T> &ta, T t, std::size_t n_i
     // Move the results from opt_retval to retval.
     for (auto &opt : opt_retval) {
         assert(opt);
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         retval.push_back(std::move(*opt));
     }
 
@@ -135,6 +136,7 @@ ensemble_propagate_for_impl(const taylor_adaptive<T> &ta, T delta_t, std::size_t
     // Move the results from opt_retval to retval.
     for (auto &opt : opt_retval) {
         assert(opt); // LCOV_EXCL_LINE
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         retval.push_back(std::move(*opt));
     }
 
@@ -176,6 +178,7 @@ ensemble_propagate_grid_impl(const taylor_adaptive<T> &ta, std::vector<T> grid, 
     // Move the results from opt_retval to retval.
     for (auto &opt : opt_retval) {
         assert(opt);
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         retval.push_back(std::move(*opt));
     }
 
@@ -183,6 +186,7 @@ ensemble_propagate_grid_impl(const taylor_adaptive<T> &ta, std::vector<T> grid, 
 }
 
 // Explicit instantiations.
+// NOLINTBEGIN
 #define HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(T)                                                                       \
     template HEYOKA_DLL_PUBLIC std::vector<                                                                            \
         std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>        \
@@ -201,6 +205,7 @@ ensemble_propagate_grid_impl(const taylor_adaptive<T> &ta, std::vector<T> grid, 
         ensemble_propagate_grid_impl<T>(const taylor_adaptive<T> &, std::vector<T>, std::size_t,                       \
                                         const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,    \
                                         std::size_t, T, const std::function<bool(taylor_adaptive<T> &)> &);
+// NOLINTEND
 
 HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(double)
 HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(long double)
@@ -255,6 +260,7 @@ ensemble_propagate_until_batch_impl(
     // Move the results from opt_retval to retval.
     for (auto &opt : opt_retval) {
         assert(opt);
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         retval.push_back(std::move(*opt));
     }
 
@@ -299,6 +305,7 @@ ensemble_propagate_for_batch_impl(
     // Move the results from opt_retval to retval.
     for (auto &opt : opt_retval) {
         assert(opt);
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         retval.push_back(std::move(*opt));
     }
 
@@ -357,6 +364,7 @@ std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>> ensemble_propa
     // Move the results from opt_retval to retval.
     for (auto &opt : opt_retval) {
         assert(opt);
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         retval.push_back(std::move(*opt));
     }
 
@@ -364,6 +372,7 @@ std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>> ensemble_propa
 }
 
 // Explicit instantiations.
+// NOLINTBEGIN
 #define HEYOKA_ENSEMBLE_PROPAGATE_BATCH_INST(T)                                                                        \
     template HEYOKA_DLL_PUBLIC                                                                                         \
         std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>>>                   \
@@ -384,6 +393,7 @@ std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>> ensemble_propa
         const taylor_adaptive_batch<T> &, const std::vector<T> &, std::size_t,                                         \
         const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,           \
         const std::vector<T> &, const std::function<bool(taylor_adaptive_batch<T> &)> &);
+// NOLINTEND
 
 HEYOKA_ENSEMBLE_PROPAGATE_BATCH_INST(double)
 HEYOKA_ENSEMBLE_PROPAGATE_BATCH_INST(long double)
