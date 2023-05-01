@@ -26,7 +26,7 @@ cd build
 # GCC build.
 cmake ../ -G Ninja -DCMAKE_PREFIX_PATH=$deps_dir -DCMAKE_BUILD_TYPE=Debug -DHEYOKA_WITH_MPPP=yes -DHEYOKA_WITH_SLEEF=yes -DBoost_NO_BOOST_CMAKE=ON \
     -DCMAKE_CXX_CLANG_TIDY=`which clang-tidy` -DCMAKE_C_CLANG_TIDY=`which clang-tidy` -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-ninja -j4
+ninja -j2
 
 set +e
 set +x
