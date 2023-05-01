@@ -3333,7 +3333,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
                 const detail::dfloat<T> new_time(c_out_times_hi[c_out_times_hi.size() - m_batch_size + i],
                                                  c_out_times_lo[c_out_times_lo.size() - m_batch_size + i]);
                 assert(isfinite(new_time));
-                if (m_t_dir[i]) {
+                if (m_t_dir[i] != 0) {
                     assert(!(new_time < prev_times[i]));
                 } else {
                     assert(!(new_time > prev_times[i]));
