@@ -351,18 +351,18 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Type *tp, llvm::
     }
 
     // Create the vector type.
-    auto vector_t = make_vector_type(tp, vector_size);
+    auto *vector_t = make_vector_type(tp, vector_size);
     assert(vector_t != nullptr); // LCOV_EXCL_LINE
 
     // Create the mask (all 1s).
-    auto mask = llvm::ConstantInt::get(make_vector_type(builder.getInt1Ty(), vector_size), 1u);
+    auto *mask = llvm::ConstantInt::get(make_vector_type(builder.getInt1Ty(), vector_size), 1u);
 
     // Create the passthrough value. This can stay undefined as it is never used
     // due to the mask being all 1s.
-    auto passthru = llvm::UndefValue::get(vector_t);
+    auto *passthru = llvm::UndefValue::get(vector_t);
 
     // Invoke the intrinsic.
-    auto ret = llvm_invoke_intrinsic(builder, "llvm.masked.expandload", {vector_t}, {ptr, mask, passthru});
+    auto *ret = llvm_invoke_intrinsic(builder, "llvm.masked.expandload", {vector_t}, {ptr, mask, passthru});
 
     return ret;
 }
@@ -452,12 +452,12 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
     assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
     // LCOV_EXCL_STOP
 
-    if (auto vector_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
+    if (auto *vector_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
         // Determine the vector size.
         const auto vector_size = boost::numeric_cast<std::uint32_t>(vector_t->getNumElements());
 
         // Create the mask (all 1s).
-        auto mask = llvm::ConstantInt::get(make_vector_type(builder.getInt1Ty(), vector_size), 1u);
+        auto *mask = llvm::ConstantInt::get(make_vector_type(builder.getInt1Ty(), vector_size), 1u);
 
         // Invoke the intrinsic.
         llvm_invoke_intrinsic(builder, "llvm.masked.compressstore", {vector_t}, {vec, ptr, mask});
@@ -624,7 +624,7 @@ llvm::Type *make_vector_type(llvm::Type *t, std::uint32_t vector_size)
     if (vector_size == 1u) {
         return t;
     } else {
-        auto retval = llvm_vector_type::get(t, boost::numeric_cast<unsigned>(vector_size));
+        auto *retval = llvm_vector_type::get(t, boost::numeric_cast<unsigned>(vector_size));
 
         assert(retval != nullptr); // LCOV_EXCL_LINE
 
@@ -636,7 +636,7 @@ llvm::Type *make_vector_type(llvm::Type *t, std::uint32_t vector_size)
 // return {vec}.
 std::vector<llvm::Value *> vector_to_scalars(ir_builder &builder, llvm::Value *vec)
 {
-    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
+    if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
         // Fetch the vector width.
         auto vector_size = vec_t->getNumElements();
 
@@ -669,10 +669,10 @@ llvm::Value *scalars_to_vector(ir_builder &builder, const std::vector<llvm::Valu
     }
 
     // Fetch the scalar type.
-    auto scalar_t = scalars[0]->getType();
+    auto *scalar_t = scalars[0]->getType();
 
     // Create the corresponding vector type.
-    auto vector_t = make_vector_type(scalar_t, boost::numeric_cast<std::uint32_t>(vector_size));
+    auto *vector_t = make_vector_type(scalar_t, boost::numeric_cast<std::uint32_t>(vector_size));
     assert(vector_t != nullptr);
 
     // Create an empty vector.
@@ -780,6 +780,7 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
     if (callee_f == nullptr) {
         // The function does not exist yet, make the prototype.
         std::vector<llvm::Type *> arg_types;
+        arg_types.reserve(args.size());
         for (auto *a : args) {
             arg_types.push_back(a->getType());
         }
@@ -858,7 +859,7 @@ void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const st
 
     // Fetch the current function.
     assert(builder.GetInsertBlock() != nullptr);
-    auto f = builder.GetInsertBlock()->getParent();
+    auto *f = builder.GetInsertBlock()->getParent();
     assert(f != nullptr);
 
     // Pre-create loop and afterloop blocks. Note that these have just
@@ -870,23 +871,23 @@ void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const st
     // never to be executed (that is, begin >= end).
     // In such a case, we will jump directly to after_bb.
     // NOTE: unsigned integral comparison.
-    auto skip_cond = builder.CreateICmp(llvm::CmpInst::ICMP_UGE, begin, end);
+    auto *skip_cond = builder.CreateICmp(llvm::CmpInst::ICMP_UGE, begin, end);
     builder.CreateCondBr(skip_cond, after_bb, loop_bb);
 
     // Get a reference to the current block for
     // later usage in the phi node.
-    auto preheader_bb = builder.GetInsertBlock();
+    auto *preheader_bb = builder.GetInsertBlock();
 
     // Add the loop block and start insertion into it.
     llvm_append_block(f, loop_bb);
     builder.SetInsertPoint(loop_bb);
 
     // Create the phi node and add the first pair of arguments.
-    auto cur = builder.CreatePHI(builder.getInt32Ty(), 2);
+    auto *cur = builder.CreatePHI(builder.getInt32Ty(), 2);
     cur->addIncoming(begin, preheader_bb);
 
     // Execute the loop body and the post-body code.
-    llvm::Value *next;
+    llvm::Value *next{};
     try {
         body(cur);
 
@@ -905,11 +906,11 @@ void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const st
 
     // Compute the end condition.
     // NOTE: we use the unsigned less-than predicate.
-    auto end_cond = builder.CreateICmp(llvm::CmpInst::ICMP_ULT, next, end);
+    auto *end_cond = builder.CreateICmp(llvm::CmpInst::ICMP_ULT, next, end);
 
     // Get a reference to the current block for later use,
     // and insert the "after loop" block.
-    auto loop_end_bb = builder.GetInsertBlock();
+    auto *loop_end_bb = builder.GetInsertBlock();
     llvm_append_block(f, after_bb);
 
     // Insert the conditional branch into the end of loop_end_bb.
@@ -952,8 +953,8 @@ bool compare_function_signature(llvm::Function *f, llvm::Type *ret, const std::v
         return false;
     }
 
-    auto it = f->arg_begin();
-    for (auto arg_type : args) {
+    auto *it = f->arg_begin();
+    for (auto *arg_type : args) {
         if (it == f->arg_end() || it->getType() != arg_type) {
             // f has fewer arguments than args, or the current
             // arguments' types do not match.
@@ -974,8 +975,9 @@ bool compare_function_signature(llvm::Function *f, llvm::Type *ret, const std::v
 // } else {
 //   else_f();
 // }
-void llvm_if_then_else(llvm_state &s, llvm::Value *cond, const std::function<void()> &then_f,
-                       const std::function<void()> &else_f)
+void llvm_if_then_else(llvm_state &s, llvm::Value *cond,
+                       // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                       const std::function<void()> &then_f, const std::function<void()> &else_f)
 {
     auto &context = s.context();
     auto &builder = s.builder();
@@ -1156,6 +1158,7 @@ llvm::Value *call_extern_vec(llvm_state &s, const std::vector<llvm::Value *> &ar
 
     // Decompose each argument into a vector of scalars.
     std::vector<std::vector<llvm::Value *>> scalars;
+    scalars.reserve(args.size());
     for (const auto &arg : args) {
         scalars.push_back(vector_to_scalars(builder, arg));
     }
@@ -1164,7 +1167,7 @@ llvm::Value *call_extern_vec(llvm_state &s, const std::vector<llvm::Value *> &ar
     auto vec_size = scalars[0].size();
 
     // Fetch the type of the scalar arguments.
-    const auto scal_t = scalars[0][0]->getType();
+    auto *const scal_t = scalars[0][0]->getType();
 
     // LCOV_EXCL_START
     // Make sure the vector size is the same for all arguments.
@@ -1210,13 +1213,13 @@ void llvm_while_loop(llvm_state &s, const std::function<llvm::Value *()> &cond, 
 
     // Fetch the current function.
     assert(builder.GetInsertBlock() != nullptr);
-    auto f = builder.GetInsertBlock()->getParent();
+    auto *f = builder.GetInsertBlock()->getParent();
     assert(f != nullptr);
 
     // Do a first evaluation of cond.
     // NOTE: if this throws, we have not created any block
     // yet, no need for manual cleanup.
-    auto cmp = cond();
+    auto *cmp = cond();
     assert(cmp != nullptr);
     assert(cmp->getType() == builder.getInt1Ty());
 
@@ -1232,14 +1235,14 @@ void llvm_while_loop(llvm_state &s, const std::function<llvm::Value *()> &cond, 
 
     // Get a reference to the current block for
     // later usage in the phi node.
-    auto preheader_bb = builder.GetInsertBlock();
+    auto *preheader_bb = builder.GetInsertBlock();
 
     // Add the loop block and start insertion into it.
     llvm_append_block(f, loop_bb);
     builder.SetInsertPoint(loop_bb);
 
     // Create the phi node and add the first pair of arguments.
-    auto cur = builder.CreatePHI(builder.getInt1Ty(), 2);
+    auto *cur = builder.CreatePHI(builder.getInt1Ty(), 2);
     cur->addIncoming(cmp, preheader_bb);
 
     // Execute the loop body and the post-body code.
@@ -1261,7 +1264,7 @@ void llvm_while_loop(llvm_state &s, const std::function<llvm::Value *()> &cond, 
 
     // Get a reference to the current block for later use,
     // and insert the "after loop" block.
-    auto loop_end_bb = builder.GetInsertBlock();
+    auto *loop_end_bb = builder.GetInsertBlock();
     llvm_append_block(f, after_bb);
 
     // Insert the conditional branch into the end of loop_end_bb.
@@ -1589,7 +1592,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
     auto *x_t = x->getType()->getScalarType();
 
     if (x_t == to_llvm_type<double>(context, false) || x_t == to_llvm_type<long double>(context, false)) {
-        if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
             // NOTE: although there exists a SLEEF function for computing sin/cos
             // at the same time, we cannot use it directly because it returns a pair
             // of SIMD vectors rather than a single one and that does not play
@@ -1604,7 +1607,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
                                                      boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
 
             if (!sfn_sin.empty() && !sfn_cos.empty()) {
-                auto ret_sin = llvm_invoke_external(
+                auto *ret_sin = llvm_invoke_external(
                     s, sfn_sin, vec_t, {x},
                     // NOTE: in theory we may add ReadNone here as well,
                     // but for some reason, at least up to LLVM 10,
@@ -1612,7 +1615,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
                     // in the future.
                     {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
 
-                auto ret_cos = llvm_invoke_external(
+                auto *ret_cos = llvm_invoke_external(
                     s, sfn_cos, vec_t, {x},
                     // NOTE: in theory we may add ReadNone here as well,
                     // but for some reason, at least up to LLVM 10,
@@ -1641,11 +1644,11 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
         // the results in res_scalars.
         // NOTE: need temp storage because sincosq uses pointers
         // for output values.
-        auto s_all = builder.CreateAlloca(x_t);
-        auto c_all = builder.CreateAlloca(x_t);
+        auto *s_all = builder.CreateAlloca(x_t);
+        auto *c_all = builder.CreateAlloca(x_t);
         std::vector<llvm::Value *> res_sin, res_cos;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            llvm_invoke_external(s, "sincosq", builder.getVoidTy(), {x_scalars[i], s_all, c_all},
+        for (const auto &x_scal : x_scalars) {
+            llvm_invoke_external(s, "sincosq", builder.getVoidTy(), {x_scal, s_all, c_all},
                                  {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
 
             res_sin.emplace_back(builder.CreateLoad(x_t, s_all));
@@ -1786,7 +1789,7 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
         auto *cmp1 = llvm_fcmp_olt(s, val, zero);
 
         // Convert to int32.
-        llvm::Type *int_type;
+        llvm::Type *int_type{};
         if (auto *v_t = llvm::dyn_cast<llvm_vector_type>(cmp0->getType())) {
             int_type
                 = make_vector_type(builder.getInt32Ty(), boost::numeric_cast<std::uint32_t>(v_t->getNumElements()));
@@ -2556,7 +2559,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     const std::vector<llvm::Type *> fargs{tp, tp};
 
     // Try to see if we already created the function.
-    auto f = md.getFunction(fname);
+    auto *f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -2571,8 +2574,8 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
-        auto ecc_arg = f->args().begin();
-        auto M_arg = f->args().begin() + 1;
+        auto *ecc_arg = f->args().begin();
+        auto *M_arg = f->args().begin() + 1;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -2669,7 +2672,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         auto *fE = builder.CreateAlloca(tp);
         // Helper to compute f(E).
         auto fE_compute = [&]() {
-            auto ret = llvm_fmul(s, ecc, builder.CreateLoad(tp, sin_E));
+            auto *ret = llvm_fmul(s, ecc, builder.CreateLoad(tp, sin_E));
             ret = llvm_fsub(s, builder.CreateLoad(tp, retval), ret);
             return llvm_fsub(s, ret, M);
         };
@@ -2839,19 +2842,19 @@ namespace
 // math flags in a builder.
 class fmf_disabler
 {
-    ir_builder &m_builder;
+    ir_builder *m_builder;
     llvm::FastMathFlags m_orig_fmf;
 
 public:
-    explicit fmf_disabler(ir_builder &b) : m_builder(b), m_orig_fmf(m_builder.getFastMathFlags())
+    explicit fmf_disabler(ir_builder &b) : m_builder(&b), m_orig_fmf(m_builder->getFastMathFlags())
     {
         // Reset the fast math flags.
-        m_builder.setFastMathFlags(llvm::FastMathFlags{});
+        m_builder->setFastMathFlags(llvm::FastMathFlags{});
     }
     ~fmf_disabler()
     {
         // Restore the original fast math flags.
-        m_builder.setFastMathFlags(m_orig_fmf);
+        m_builder->setFastMathFlags(m_orig_fmf);
     }
 
     fmf_disabler(const fmf_disabler &) = delete;
@@ -2877,10 +2880,10 @@ std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &s, llvm::Va
     auto &builder = s.builder();
 
     // Temporarily disable the fast math flags.
-    fmf_disabler fd(builder);
+    const fmf_disabler fd(builder);
 
-    auto x = llvm_fmul(s, a, b);
-    auto y = llvm_fma(s, a, b, llvm_fneg(s, x));
+    auto *x = llvm_fmul(s, a, b);
+    auto *y = llvm_fma(s, a, b, llvm_fneg(s, x));
 
     return {x, y};
 }
@@ -2894,26 +2897,26 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &state, llvm::Val
     auto &builder = state.builder();
 
     // Temporarily disable the fast math flags.
-    fmf_disabler fd(builder);
+    const fmf_disabler fd(builder);
 
-    auto S = llvm_fadd(state, x_hi, y_hi);
-    auto T = llvm_fadd(state, x_lo, y_lo);
-    auto e = llvm_fsub(state, S, x_hi);
-    auto f = llvm_fsub(state, T, x_lo);
+    auto *S = llvm_fadd(state, x_hi, y_hi);
+    auto *T = llvm_fadd(state, x_lo, y_lo);
+    auto *e = llvm_fsub(state, S, x_hi);
+    auto *f = llvm_fsub(state, T, x_lo);
 
-    auto t1 = llvm_fsub(state, S, e);
+    auto *t1 = llvm_fsub(state, S, e);
     t1 = llvm_fsub(state, x_hi, t1);
-    auto s = llvm_fsub(state, y_hi, e);
+    auto *s = llvm_fsub(state, y_hi, e);
     s = llvm_fadd(state, s, t1);
 
     t1 = llvm_fsub(state, T, f);
     t1 = llvm_fsub(state, x_lo, t1);
-    auto t = llvm_fsub(state, y_lo, f);
+    auto *t = llvm_fsub(state, y_lo, f);
     t = llvm_fadd(state, t, t1);
 
     s = llvm_fadd(state, s, T);
-    auto H = llvm_fadd(state, S, s);
-    auto h = llvm_fsub(state, S, H);
+    auto *H = llvm_fadd(state, S, s);
+    auto *h = llvm_fsub(state, S, H);
     h = llvm_fadd(state, h, s);
 
     h = llvm_fadd(state, h, t);
@@ -2935,18 +2938,18 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &s, llvm::Value *
     auto &builder = s.builder();
 
     // Temporarily disable the fast math flags.
-    fmf_disabler fd(builder);
+    const fmf_disabler fd(builder);
 
     auto [c, cc] = llvm_eft_product(s, x_hi, y_hi);
 
     // cc = x*yy + xx*y + cc.
-    auto x_yy = llvm_fmul(s, x_hi, y_lo);
-    auto xx_y = llvm_fmul(s, x_lo, y_hi);
+    auto *x_yy = llvm_fmul(s, x_hi, y_lo);
+    auto *xx_y = llvm_fmul(s, x_lo, y_hi);
     cc = llvm_fadd(s, llvm_fadd(s, x_yy, xx_y), cc);
 
     // The normalisation step.
-    auto z = llvm_fadd(s, c, cc);
-    auto zz = llvm_fadd(s, llvm_fsub(s, c, z), cc);
+    auto *z = llvm_fadd(s, c, cc);
+    auto *zz = llvm_fadd(s, llvm_fsub(s, c, z), cc);
 
     return {z, zz};
 }
@@ -2956,13 +2959,15 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &s, llvm::Value *
 // https://link.springer.com/content/pdf/10.1007/BF01397083.pdf
 // The mul12() function is replaced with the FMA-based llvm_eft_product().
 // NOTE: the code in NTL looks identical to Dekker's.
-std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &s, llvm::Value *x_hi, llvm::Value *x_lo,
-                                                    llvm::Value *y_hi, llvm::Value *y_lo)
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &s,
+                                                    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                                    llvm::Value *x_hi, llvm::Value *x_lo, llvm::Value *y_hi,
+                                                    llvm::Value *y_lo)
 {
     auto &builder = s.builder();
 
     // Temporarily disable the fast math flags.
-    fmf_disabler fd(builder);
+    const fmf_disabler fd(builder);
 
     auto *c = llvm_fdiv(s, x_hi, y_hi);
 
@@ -2976,8 +2981,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &s, llvm::Value *
     cc = llvm_fdiv(s, cc, y_hi);
 
     // The normalisation step.
-    auto z = llvm_fadd(s, c, cc);
-    auto zz = llvm_fadd(s, llvm_fsub(s, c, z), cc);
+    auto *z = llvm_fadd(s, c, cc);
+    auto *zz = llvm_fadd(s, llvm_fsub(s, c, z), cc);
 
     return {z, zz};
 }
@@ -2995,10 +3000,10 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &s, llvm::Value
 
     auto &builder = s.builder();
 
-    auto fp_t = x_hi->getType();
+    auto *fp_t = x_hi->getType();
 
     // Temporarily disable the fast math flags.
-    fmf_disabler fd(builder);
+    const fmf_disabler fd(builder);
 
     // Floor x_hi.
     auto *fhi = llvm_floor(s, x_hi);
@@ -3021,8 +3026,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &s, llvm::Value
                 auto *flo = llvm_floor(s, x_lo);
 
                 // Normalise.
-                auto z = llvm_fadd(s, fhi, flo);
-                auto zz = llvm_fadd(s, llvm_fsub(s, fhi, z), flo);
+                auto *z = llvm_fadd(s, fhi, flo);
+                auto *zz = llvm_fadd(s, llvm_fsub(s, fhi, z), flo);
 
                 // Store.
                 builder.CreateStore(z, ret_hi_ptr);
@@ -3046,8 +3051,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &s, llvm::Value
         auto *ret_lo = builder.CreateSelect(llvm_fcmp_oeq(s, fhi, x_hi), flo, zero_vec);
 
         // Normalise.
-        auto z = llvm_fadd(s, fhi, ret_lo);
-        auto zz = llvm_fadd(s, llvm_fsub(s, fhi, z), ret_lo);
+        auto *z = llvm_fadd(s, fhi, ret_lo);
+        auto *zz = llvm_fadd(s, llvm_fsub(s, fhi, z), ret_lo);
 
         return {z, zz};
     }
@@ -3071,7 +3076,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_modulus(llvm_state &s, llvm::Val
     auto &builder = s.builder();
 
     // Temporarily disable the fast math flags.
-    fmf_disabler fd(builder);
+    const fmf_disabler fd(builder);
 
     auto [xoy_hi, xoy_lo] = llvm_dl_div(s, x_hi, x_lo, y_hi, y_lo);
     auto [fl_hi, fl_lo] = llvm_dl_floor(s, xoy_hi, xoy_lo);
@@ -3081,39 +3086,41 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_modulus(llvm_state &s, llvm::Val
 }
 
 // Less-than.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 llvm::Value *llvm_dl_lt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo, llvm::Value *y_hi, llvm::Value *y_lo)
 {
     auto &builder = state.builder();
 
     // Temporarily disable the fast math flags.
-    fmf_disabler fd(builder);
+    const fmf_disabler fd(builder);
 
-    auto cond1 = llvm_fcmp_olt(state, x_hi, y_hi);
-    auto cond2 = llvm_fcmp_oeq(state, x_hi, y_hi);
-    auto cond3 = llvm_fcmp_olt(state, x_lo, y_lo);
+    auto *cond1 = llvm_fcmp_olt(state, x_hi, y_hi);
+    auto *cond2 = llvm_fcmp_oeq(state, x_hi, y_hi);
+    auto *cond3 = llvm_fcmp_olt(state, x_lo, y_lo);
     // NOTE: this is a logical AND.
-    auto cond4 = builder.CreateSelect(cond2, cond3, llvm::ConstantInt::getNullValue(cond3->getType()));
+    auto *cond4 = builder.CreateSelect(cond2, cond3, llvm::ConstantInt::getNullValue(cond3->getType()));
     // NOTE: this is a logical OR.
-    auto cond = builder.CreateSelect(cond1, llvm::ConstantInt::getAllOnesValue(cond4->getType()), cond4);
+    auto *cond = builder.CreateSelect(cond1, llvm::ConstantInt::getAllOnesValue(cond4->getType()), cond4);
 
     return cond;
 }
 
 // Greater-than.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 llvm::Value *llvm_dl_gt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo, llvm::Value *y_hi, llvm::Value *y_lo)
 {
     auto &builder = state.builder();
 
     // Temporarily disable the fast math flags.
-    fmf_disabler fd(builder);
+    const fmf_disabler fd(builder);
 
-    auto cond1 = llvm_fcmp_ogt(state, x_hi, y_hi);
-    auto cond2 = llvm_fcmp_oeq(state, x_hi, y_hi);
-    auto cond3 = llvm_fcmp_ogt(state, x_lo, y_lo);
+    auto *cond1 = llvm_fcmp_ogt(state, x_hi, y_hi);
+    auto *cond2 = llvm_fcmp_oeq(state, x_hi, y_hi);
+    auto *cond3 = llvm_fcmp_ogt(state, x_lo, y_lo);
     // NOTE: this is a logical AND.
-    auto cond4 = builder.CreateSelect(cond2, cond3, llvm::ConstantInt::getNullValue(cond3->getType()));
+    auto *cond4 = builder.CreateSelect(cond2, cond3, llvm::ConstantInt::getNullValue(cond3->getType()));
     // NOTE: this is a logical OR.
-    auto cond = builder.CreateSelect(cond1, llvm::ConstantInt::getAllOnesValue(cond4->getType()), cond4);
+    auto *cond = builder.CreateSelect(cond1, llvm::ConstantInt::getAllOnesValue(cond4->getType()), cond4);
 
     return cond;
 }
@@ -3141,7 +3148,7 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t
     // - output pointer (write only),
     // - input ecc and mean anomaly pointers (read only).
     // No overlap allowed.
-    std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(ext_fp_t));
+    const std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(ext_fp_t));
     // The return type is void.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     // Create the function
@@ -3149,22 +3156,22 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t
     assert(f != nullptr); // LCOV_EXCL_LINE
 
     // Fetch the current insertion block.
-    auto orig_bb = builder.GetInsertBlock();
+    auto *orig_bb = builder.GetInsertBlock();
 
     // Setup the function arguments.
-    auto out_ptr = f->args().begin();
+    auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
     out_ptr->addAttr(llvm::Attribute::NoCapture);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
     out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
-    auto ecc_ptr = f->args().begin() + 1;
+    auto *ecc_ptr = f->args().begin() + 1;
     ecc_ptr->setName("ecc_ptr");
     ecc_ptr->addAttr(llvm::Attribute::NoCapture);
     ecc_ptr->addAttr(llvm::Attribute::NoAlias);
     ecc_ptr->addAttr(llvm::Attribute::ReadOnly);
 
-    auto M_ptr = f->args().begin() + 2;
+    auto *M_ptr = f->args().begin() + 2;
     M_ptr->setName("M_ptr");
     M_ptr->addAttr(llvm::Attribute::NoCapture);
     M_ptr->addAttr(llvm::Attribute::NoAlias);

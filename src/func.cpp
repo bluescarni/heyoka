@@ -293,7 +293,7 @@ expression func::diff(detail::funcptr_map<expression> &func_map, const std::stri
     std::vector<expression> prod;
     prod.reserve(arity);
     for (decltype(args().size()) i = 0; i < arity; ++i) {
-        prod.push_back(std::move(grad[i]) * detail::diff(func_map, args()[i], s));
+        prod.push_back(grad[i] * detail::diff(func_map, args()[i], s));
     }
 
     return sum(std::move(prod));
@@ -316,7 +316,7 @@ expression func::diff(detail::funcptr_map<expression> &func_map, const param &p)
     std::vector<expression> prod;
     prod.reserve(arity);
     for (decltype(args().size()) i = 0; i < arity; ++i) {
-        prod.push_back(std::move(grad[i]) * detail::diff(func_map, args()[i], p));
+        prod.push_back(grad[i] * detail::diff(func_map, args()[i], p));
     }
 
     return sum(std::move(prod));
@@ -692,8 +692,8 @@ void update_node_values_dbl(std::vector<double> &node_values, const func &f,
     const auto node_id = node_counter;
     node_counter++;
     // We have to recurse first as to make sure node_values is filled before being accessed later.
-    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
-        update_node_values_dbl(node_values, f.args()[i], map, node_connections, node_counter);
+    for (const auto &arg : f.args()) {
+        update_node_values_dbl(node_values, arg, map, node_connections, node_counter);
     }
     // Then we compute
     std::vector<double> in_values(f.args().size());
@@ -725,7 +725,7 @@ void update_connections(std::vector<std::vector<std::size_t>> &node_connections,
 {
     const auto node_id = node_counter;
     node_counter++;
-    node_connections.push_back(std::vector<std::size_t>(f.args().size()));
+    node_connections.emplace_back(f.args().size());
     for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
         node_connections[node_id][i] = node_counter;
         update_connections(node_connections, f.args()[i], node_counter);
@@ -738,6 +738,7 @@ namespace detail
 // Helper to perform the codegen for a parameter during the creation
 // of a compiled function in non-compact mode.
 llvm::Value *cfunc_nc_param_codegen(llvm_state &s, const param &p, std::uint32_t batch_size, llvm::Type *fp_t,
+                                    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                     llvm::Value *par_ptr, llvm::Value *stride)
 {
     auto &builder = s.builder();
