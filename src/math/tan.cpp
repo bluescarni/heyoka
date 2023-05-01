@@ -98,6 +98,7 @@ void tan_impl::eval_batch_dbl(std::vector<double> &out, const std::unordered_map
     }
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 double tan_impl::eval_num_dbl(const std::vector<double> &a) const
 {
     if (a.size() != 1u) {
@@ -110,6 +111,7 @@ double tan_impl::eval_num_dbl(const std::vector<double> &a) const
     return std::tan(a[0]);
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 double tan_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>::size_type i) const
 {
     if (a.size() != 1u || i != 0u) {
@@ -297,7 +299,7 @@ llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, llvm::Type *fp_t, con
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto *f = module.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -312,19 +314,19 @@ llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, llvm::Type *fp_t, con
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
-        auto ord = f->args().begin();
-        auto diff_ptr = f->args().begin() + 2;
-        auto var_idx = f->args().begin() + 5;
-        auto dep_idx = f->args().begin() + 6;
+        auto *ord = f->args().begin();
+        auto *diff_ptr = f->args().begin() + 2;
+        auto *var_idx = f->args().begin() + 5;
+        auto *dep_idx = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
+        auto *acc = builder.CreateAlloca(val_t);
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
@@ -339,17 +341,17 @@ llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, llvm::Type *fp_t, con
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-                    auto bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, var_idx);
-                    auto cnj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
+                    auto *bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, var_idx);
+                    auto *cnj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
 
-                    auto fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
+                    auto *fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     builder.CreateStore(
                         llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, fac, llvm_fmul(s, cnj, bj))), acc);
                 });
 
                 // Divide by the order and add to b^[n] to produce the return value.
-                auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
+                auto *ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 builder.CreateStore(llvm_fadd(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, var_idx),
                                               llvm_fdiv(s, builder.CreateLoad(val_t, acc), ord_v)),

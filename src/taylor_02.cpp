@@ -246,7 +246,10 @@ number taylor_determine_h_rhofac(llvm_state &s, llvm::Type *fp_t, std::uint32_t 
 llvm::Value *
 taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
                    const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &diff_variant,
-                   const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *h_ptr,
+                   const std::vector<std::uint32_t> &sv_funcs_dc,
+                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                   llvm::Value *svf_ptr, llvm::Value *h_ptr,
+                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                    std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
                    llvm::Value *max_abs_state_ptr)
 {
@@ -720,6 +723,7 @@ void taylor_c_compute_sv_diffs(llvm_state &s, llvm::Type *fp_t,
 // sets of arguments. The g_i functions are expected to be called with input argument j in [0, 1]
 // to yield the value of the i-th function argument for f at the j-th invocation.
 auto taylor_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vector<taylor_dc_t> &s_dc,
+                                // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                 std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t batch_size, bool high_accuracy)
 {
     // Log runtime in trace mode.
@@ -872,6 +876,7 @@ auto taylor_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vect
 // used in taylor_compute_jet().
 // NOTE: order0, par_ptr and time_ptr are external pointers.
 std::pair<llvm::Value *, llvm::Type *> taylor_compute_jet_compact_mode(
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     llvm_state &s, llvm::Type *fp_type, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
     const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq, std::uint32_t n_uvars,
     std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool parallel_mode)
@@ -1263,6 +1268,7 @@ std::pair<llvm::Value *, llvm::Type *> taylor_compute_jet_compact_mode(
 // Given an input pointer 'in', load the first n * batch_size values in it as n vectors
 // with size batch_size. If batch_size is 1, the values will be loaded as scalars.
 // 'in' is an external pointer.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 auto taylor_load_values(llvm_state &s, llvm::Type *fp_t, llvm::Value *in, std::uint32_t n, std::uint32_t batch_size)
 {
     assert(batch_size > 0u); // LCOV_EXCL_LINE
@@ -1441,8 +1447,9 @@ taylor_compute_jet(llvm_state &s, llvm::Type *fp_t, llvm::Value *order0, llvm::V
 void taylor_write_tc(
     llvm_state &s, llvm::Type *fp_t,
     const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &diff_variant,
-    const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *tc_ptr, std::uint32_t n_eq,
-    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
+    const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *tc_ptr,
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
     // LCOV_EXCL_START
     assert(batch_size != 0u);
@@ -1544,7 +1551,8 @@ void taylor_write_tc(
                 auto *const val = diff_arr[arr_idx];
 
                 // Index in tc_ptr.
-                const auto out_idx = (order + 1u) * batch_size * j + cur_order * batch_size;
+                const auto out_idx
+                    = static_cast<decltype(diff_arr.size())>(order + 1u) * batch_size * j + cur_order * batch_size;
 
                 // Write to tc_ptr.
                 auto *out_ptr = builder.CreateInBoundsGEP(ext_fp_t, tc_ptr,
@@ -1563,8 +1571,10 @@ void taylor_write_tc(
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_run_multihorner(llvm_state &s, llvm::Type *fp_t,
                        const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &diff_var,
-                       llvm::Value *h, std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
-                       std::uint32_t batch_size)
+                       // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                       llvm::Value *h, std::uint32_t n_eq, std::uint32_t n_uvars,
+                       // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                       std::uint32_t order, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
@@ -1633,8 +1643,9 @@ taylor_run_multihorner(llvm_state &s, llvm::Type *fp_t,
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
                  const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &diff_var,
-                 llvm::Value *h, std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, bool,
-                 std::uint32_t batch_size)
+                 llvm::Value *h,
+                 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                 std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, bool, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 

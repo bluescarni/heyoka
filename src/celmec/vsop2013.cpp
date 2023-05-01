@@ -21,19 +21,8 @@
 #include <variant>
 #include <vector>
 
-#include <boost/numeric/conversion/cast.hpp>
-#include <boost/version.hpp>
-
-// NOTE: the header for hash_combine changed in version 1.67.
-#if (BOOST_VERSION / 100000 > 1) || (BOOST_VERSION / 100000 == 1 && BOOST_VERSION / 100 % 1000 >= 67)
-
 #include <boost/container_hash/hash.hpp>
-
-#else
-
-#include <boost/functional/hash.hpp>
-
-#endif
+#include <boost/numeric/conversion/cast.hpp>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -226,14 +215,14 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
     // NOTE: avoid structured bindings due to the usual
     // issues with lambda capture.
     const auto n_alpha = std::get<0>(data_it->second);
-    const auto sizes_ptr = std::get<1>(data_it->second);
-    const auto val_ptr = std::get<2>(data_it->second);
+    const auto *const sizes_ptr = std::get<1>(data_it->second);
+    const auto *const val_ptr = std::get<2>(data_it->second);
 
     // This vector will contain the chunks of the series
     // for different values of alpha.
     std::vector<expression> parts(boost::numeric_cast<std::vector<expression>::size_type>(n_alpha));
 
-    tbb::parallel_for(tbb::blocked_range(std::size_t(0), n_alpha), [&](const auto &r) {
+    tbb::parallel_for(tbb::blocked_range(static_cast<std::size_t>(0), n_alpha), [&](const auto &r) {
         for (auto alpha = r.begin(); alpha != r.end(); ++alpha) {
             // Fetch the number of terms for this chunk.
             const auto cur_size = sizes_ptr[alpha];
@@ -279,7 +268,7 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
             // been skipped) are at the end. Use stable_partition so that the original ordering
             // is preserved.
             const auto new_end = std::stable_partition(cur.begin(), cur.end(), [](const expression &e) {
-                if (auto num_ptr = std::get_if<number>(&e.value()); num_ptr != nullptr && is_zero(*num_ptr)) {
+                if (const auto *num_ptr = std::get_if<number>(&e.value()); num_ptr != nullptr && is_zero(*num_ptr)) {
                     return false;
                 } else {
                     return true;
@@ -421,7 +410,7 @@ std::vector<expression> vsop2013_cartesian_icrf_impl(std::uint32_t pl_idx, expre
 
 std::array<double, 10> get_vsop2013_mus()
 {
-    std::array<double, 10> retval;
+    std::array<double, 10> retval{};
 
     retval[0] = heyoka::detail::vsop2013_gm_sun;
 

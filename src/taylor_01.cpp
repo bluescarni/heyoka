@@ -99,6 +99,7 @@ namespace detail
 // of uvars and the scalar or vector floating-point type in use (which depends on T and batch_size).
 std::pair<std::string, std::vector<llvm::Type *>>
 taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const std::string &name,
+                             // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                              std::uint32_t n_uvars, std::uint32_t batch_size,
                              const std::vector<std::variant<variable, number, param>> &args,
                              std::uint32_t n_hidden_deps)
@@ -282,6 +283,7 @@ llvm::Value *taylor_c_load_diff(llvm_state &s, llvm::Type *val_t, llvm::Value *d
 // Store the value val as the derivative of order 'order' of the u variable u_idx
 // into the array of Taylor derivatives diff_arr. n_uvars is the total number of u variables.
 void taylor_c_store_diff(llvm_state &s, llvm::Type *val_t, llvm::Value *diff_arr, std::uint32_t n_uvars,
+                         // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                          llvm::Value *order, llvm::Value *u_idx, llvm::Value *val)
 {
     auto &builder = s.builder();
@@ -2375,7 +2377,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     auto fp_t = detail::to_llvm_type<T>(context);
     auto fp_vec_t = detail::make_vector_type(fp_t, m_batch_size);
     auto ptr_t = llvm::PointerType::getUnqual(fp_t);
-    std::vector<llvm::Type *> fargs(5, ptr_t);
+    const std::vector<llvm::Type *> fargs(5, ptr_t);
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE

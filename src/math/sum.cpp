@@ -84,6 +84,7 @@ std::vector<expression> sum_impl::gradient() const
     return {args().size(), 1_dbl};
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool sum_impl::is_commutative() const
 {
     return true;
@@ -93,6 +94,7 @@ namespace
 {
 
 llvm::Value *sum_llvm_eval_impl(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
+                                // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                 const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr, llvm::Value *stride,
                                 std::uint32_t batch_size, bool high_accuracy)
 {
@@ -134,8 +136,9 @@ namespace
 
 llvm::Value *sum_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_impl &sf,
                                   const std::vector<std::uint32_t> &deps, const std::vector<llvm::Value *> &arr,
-                                  llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order,
-                                  std::uint32_t batch_size)
+                                  llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                  std::uint32_t order, std::uint32_t batch_size)
 {
     // NOTE: this is prevented in the implementation
     // of the sum() function.
@@ -236,7 +239,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, con
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = md.getFunction(fname);
+    auto *f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -253,10 +256,10 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, con
         f->addFnAttr(llvm::Attribute::AlwaysInline);
 
         // Fetch the necessary function arguments.
-        auto order = f->args().begin();
-        auto diff_arr = f->args().begin() + 2;
-        auto par_ptr = f->args().begin() + 3;
-        auto terms = f->args().begin() + 5;
+        auto *order = f->args().begin();
+        auto *diff_arr = f->args().begin() + 2;
+        auto *par_ptr = f->args().begin() + 3;
+        auto *terms = f->args().begin() + 5;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -274,7 +277,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, con
                         return taylor_c_load_diff(s, val_t, diff_arr, n_uvars, order, terms + i);
                     } else if constexpr (is_num_param_v<type>) {
                         // Create the return value.
-                        auto retval = builder.CreateAlloca(val_t);
+                        auto *retval = builder.CreateAlloca(val_t);
 
                         llvm_if_then_else(
                             s, builder.CreateICmpEQ(order, builder.getInt32(0)),
@@ -334,6 +337,7 @@ llvm::Function *sum_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 
 } // namespace detail
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression sum(std::vector<expression> args)
 {
     // NOTE: the default split value is a power of two so that the

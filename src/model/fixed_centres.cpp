@@ -118,7 +118,7 @@ expression fixed_centres_potential_impl(const expression &G, const std::vector<e
 
         auto dist = sqrt(sum_sq({diff_x, diff_y, diff_z}));
 
-        pot.push_back(masses[i] / std::move(dist));
+        pot.push_back(masses[i] / dist);
     }
 
     return -G * sum(std::move(pot));
@@ -133,7 +133,7 @@ expression fixed_centres_energy_impl(const expression &G, const std::vector<expr
     // Kinetic energy.
     auto kin = 0.5_dbl * sum_sq({vx, vy, vz});
 
-    return std::move(kin) + fixed_centres_potential_impl(G, masses, positions);
+    return kin + fixed_centres_potential_impl(G, masses, positions);
 }
 
 } // namespace model::detail

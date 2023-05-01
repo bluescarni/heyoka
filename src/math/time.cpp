@@ -51,17 +51,20 @@ namespace detail
 
 time_impl::time_impl() : func_base("time", {}) {}
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 void time_impl::to_stream(std::ostringstream &oss) const
 {
     oss << 't';
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 std::vector<expression> time_impl::gradient() const
 {
     assert(args().empty());
     return {};
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 llvm::Value *time_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &, llvm::Value *,
                                   llvm::Value *time_ptr, llvm::Value *, std::uint32_t batch_size, bool) const
 {
@@ -138,8 +141,9 @@ llvm::Function *time_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std
 namespace
 {
 
-llvm::Value *time_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, llvm::Value *time_ptr, std::uint32_t order,
-                                   std::uint32_t batch_size)
+llvm::Value *time_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, llvm::Value *time_ptr,
+                                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                   std::uint32_t order, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
@@ -159,6 +163,7 @@ llvm::Value *time_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, llvm::Value 
 
 } // namespace
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 llvm::Value *time_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &,
                                     const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *time_ptr,
                                     std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
@@ -264,12 +269,14 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, llvm::Type *fp_t, std::ui
 
 } // namespace
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 llvm::Function *time_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
                                               std::uint32_t batch_size, bool) const
 {
     return taylor_c_diff_time_impl(s, fp_t, n_uvars, batch_size);
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool time_impl::is_time_dependent() const
 {
     return true;
@@ -277,6 +284,7 @@ bool time_impl::is_time_dependent() const
 
 } // namespace detail
 
+// NOLINTNEXTLINE(cert-err58-cpp)
 const expression time{func{detail::time_impl{}}};
 
 HEYOKA_END_NAMESPACE

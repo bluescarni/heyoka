@@ -79,8 +79,10 @@ void tpoly_impl::to_stream(std::ostringstream &oss) const
 namespace
 {
 
-llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, llvm::Type *fp_t, const tpoly_impl &tp, llvm::Value *par_ptr,
-                                    llvm::Value *time_ptr, std::uint32_t order, std::uint32_t batch_size)
+llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, llvm::Type *fp_t, const tpoly_impl &tp,
+                                    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                    llvm::Value *par_ptr, llvm::Value *time_ptr, std::uint32_t order,
+                                    std::uint32_t batch_size)
 {
     assert(tp.m_e_idx > tp.m_b_idx);
     assert(std::holds_alternative<param>(tp.args()[0].value()));
@@ -293,6 +295,7 @@ llvm::Function *tpoly_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, 
     return taylor_c_diff_tpoly_impl(s, fp_t, *this, n_uvars, batch_size);
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool tpoly_impl::is_time_dependent() const
 {
     return true;

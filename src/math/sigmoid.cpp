@@ -92,6 +92,7 @@ long double sigmoid_impl::eval_ldbl(const std::unordered_map<std::string, long d
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
+
 mppp::real128 sigmoid_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map,
                                       const std::vector<mppp::real128> &pars) const
 {
@@ -99,6 +100,7 @@ mppp::real128 sigmoid_impl::eval_f128(const std::unordered_map<std::string, mppp
 
     return cpp_sigmoid(heyoka::eval_f128(args()[0], map, pars));
 }
+
 #endif
 
 void sigmoid_impl::eval_batch_dbl(std::vector<double> &out,
@@ -113,6 +115,7 @@ void sigmoid_impl::eval_batch_dbl(std::vector<double> &out,
     }
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 double sigmoid_impl::eval_num_dbl(const std::vector<double> &a) const
 {
     if (a.size() != 1u) {
@@ -125,6 +128,7 @@ double sigmoid_impl::eval_num_dbl(const std::vector<double> &a) const
     return cpp_sigmoid(a[0]);
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 double sigmoid_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>::size_type i) const
 {
     if (a.size() != 1u || i != 0u) {
@@ -200,6 +204,7 @@ llvm::Value *taylor_diff_sigmoid_impl(llvm_state &s, llvm::Type *fp_t, const sig
 llvm::Value *taylor_diff_sigmoid_impl(llvm_state &s, llvm::Type *fp_t, const sigmoid_impl &,
                                       const std::vector<std::uint32_t> &deps, const variable &var,
                                       const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
+                                      // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                       std::uint32_t order, std::uint32_t a_idx, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
@@ -317,7 +322,7 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, llvm::Type *fp_t,
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto *f = module.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -332,20 +337,20 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, llvm::Type *fp_t,
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
-        auto ord = f->args().begin();
-        auto a_idx = f->args().begin() + 1;
-        auto diff_ptr = f->args().begin() + 2;
-        auto b_idx = f->args().begin() + 5;
-        auto dep_idx = f->args().begin() + 6;
+        auto *ord = f->args().begin();
+        auto *a_idx = f->args().begin() + 1;
+        auto *diff_ptr = f->args().begin() + 2;
+        auto *b_idx = f->args().begin() + 5;
+        auto *dep_idx = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
+        auto *acc = builder.CreateAlloca(val_t);
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
@@ -361,23 +366,23 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, llvm::Type *fp_t,
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-                    auto anj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), a_idx);
-                    auto bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, b_idx);
-                    auto cnj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
+                    auto *anj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), a_idx);
+                    auto *bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, b_idx);
+                    auto *cnj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
 
                     // Compute the factor j.
-                    auto fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
+                    auto *fac = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     // Add  j*(anj-cnj)*bj into the sum.
-                    auto tmp1 = llvm_fsub(s, anj, cnj);
-                    auto tmp2 = llvm_fmul(s, tmp1, bj);
-                    auto tmp3 = llvm_fmul(s, tmp2, fac);
+                    auto *tmp1 = llvm_fsub(s, anj, cnj);
+                    auto *tmp2 = llvm_fmul(s, tmp1, bj);
+                    auto *tmp3 = llvm_fmul(s, tmp2, fac);
 
                     builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), tmp3), acc);
                 });
 
                 // Divide by the order to produce the return value.
-                auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
+                auto *ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 builder.CreateStore(llvm_fdiv(s, builder.CreateLoad(val_t, acc), ord_v), retval);
             });

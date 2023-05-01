@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <initializer_list>
+#include <limits>
 #include <type_traits>
 #include <vector>
 
@@ -56,7 +57,9 @@ struct nonesuch {
     nonesuch() = delete;
     ~nonesuch() = delete;
     nonesuch(nonesuch const &) = delete;
+    nonesuch(nonesuch &&) noexcept = delete;
     void operator=(nonesuch const &) = delete;
+    void operator=(nonesuch &&) noexcept = delete;
 };
 
 template <template <class...> class Op, class... Args>
@@ -123,6 +126,40 @@ struct is_any_ilist<std::initializer_list<T>> : std::true_type {
 
 template <typename T>
 inline constexpr bool is_any_ilist_v = is_any_ilist<T>::value;
+
+// Detection of IEEE-style floating-point types.
+template <typename T, int N>
+constexpr bool is_ieee754_binaryN()
+{
+    if constexpr (std::is_floating_point_v<T> && std::numeric_limits<T>::is_specialized) {
+        return std::numeric_limits<T>::radix == 2 && std::numeric_limits<T>::is_iec559
+               && std::numeric_limits<T>::digits == N;
+    } else {
+        return false;
+    }
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+constexpr bool is_ieee754_binaryN<mppp::real128, 113>()
+{
+    return true;
+}
+
+#endif
+
+template <typename T>
+inline constexpr bool is_ieee754_binary32 = is_ieee754_binaryN<T, 24>();
+
+template <typename T>
+inline constexpr bool is_ieee754_binary64 = is_ieee754_binaryN<T, 53>();
+
+template <typename T>
+inline constexpr bool is_x86_fp80 = is_ieee754_binaryN<T, 64>();
+
+template <typename T>
+inline constexpr bool is_ieee754_binary128 = is_ieee754_binaryN<T, 113>();
 
 } // namespace detail
 

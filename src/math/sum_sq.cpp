@@ -84,6 +84,7 @@ void sum_sq_impl::to_stream(std::ostringstream &oss) const
     }
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool sum_sq_impl::is_commutative() const
 {
     return true;
@@ -116,8 +117,10 @@ namespace
 {
 
 llvm::Value *sum_sq_llvm_eval_impl(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
-                                   const std::vector<llvm::Value *> &eval_arr, llvm::Value *par_ptr,
-                                   llvm::Value *stride, std::uint32_t batch_size, bool high_accuracy)
+                                   const std::vector<llvm::Value *> &eval_arr,
+                                   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                   llvm::Value *par_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                                   bool high_accuracy)
 {
     return llvm_eval_helper(
         [&s](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
@@ -176,8 +179,9 @@ namespace
 
 llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_sq_impl &sf,
                                      const std::vector<std::uint32_t> &deps, const std::vector<llvm::Value *> &arr,
-                                     llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order,
-                                     std::uint32_t batch_size)
+                                     llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                     std::uint32_t order, std::uint32_t batch_size)
 {
     // NOTE: this is prevented in the implementation
     // of the sum_sq() function.

@@ -30,6 +30,7 @@
 
 #include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/format.h>
 
@@ -105,13 +106,13 @@ namespace
 
 // RAII helper to temporarily set the opt level to 0 in an llvm_state.
 struct opt_disabler {
-    llvm_state &m_s;
+    llvm_state *m_s;
     unsigned m_orig_opt_level;
 
-    explicit opt_disabler(llvm_state &s) : m_s(s), m_orig_opt_level(s.opt_level())
+    explicit opt_disabler(llvm_state &s) : m_s(&s), m_orig_opt_level(s.opt_level())
     {
         // Disable optimisations.
-        m_s.opt_level() = 0;
+        m_s->opt_level() = 0;
     }
 
     opt_disabler(const opt_disabler &) = delete;
@@ -122,7 +123,7 @@ struct opt_disabler {
     ~opt_disabler()
     {
         // Restore the original optimisation level.
-        m_s.opt_level() = m_orig_opt_level;
+        m_s->opt_level() = m_orig_opt_level;
     }
 };
 
@@ -557,9 +558,10 @@ void taylor_adaptive_setup_sv_rhs(TA &ta, const U &sys)
 
 template <typename T>
 template <typename U>
-void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, std::optional<T> time,
-                                            std::optional<T> tol, bool high_accuracy, bool compact_mode,
-                                            std::vector<T> pars, std::vector<t_event_t> tes,
+void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state,
+                                            // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                            std::optional<T> time, std::optional<T> tol, bool high_accuracy,
+                                            bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
                                             std::vector<nt_event_t> ntes, bool parallel_mode,
                                             [[maybe_unused]] std::optional<long long> prec)
 {
@@ -719,8 +721,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, 
     // Add the stepper function.
     if (with_events) {
         std::vector<expression> ee;
-        // NOTE: no need for deep copies of the expressions: ee is never mutated
-        // and we will be deep-copying it anyway when we do the decomposition.
+        ee.reserve(boost::safe_numerics::safe<decltype(ee.size())>(tes.size()) + ntes.size());
         for (const auto &ev : tes) {
             ee.push_back(ev.get_expression());
         }
@@ -2364,8 +2365,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
     // Add the stepper function.
     if (with_events) {
         std::vector<expression> ee;
-        // NOTE: no need for deep copies of the expressions: ee is never mutated
-        // and we will be deep-copying it anyway when we do the decomposition.
+        ee.reserve(boost::safe_numerics::safe<decltype(ee.size())>(tes.size()) + ntes.size());
         for (const auto &ev : tes) {
             ee.push_back(ev.get_expression());
         }
@@ -2503,7 +2503,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
 
 template <typename T>
 taylor_adaptive_batch<T>::taylor_adaptive_batch()
-    : taylor_adaptive_batch({prime("x"_var) = 0_dbl}, {T(0)}, 1u, kw::tol = T(1e-1))
+    : taylor_adaptive_batch({prime("x"_var) = 0_dbl}, {static_cast<T>(0)}, 1u, kw::tol = static_cast<T>(1e-1))
 {
 }
 
@@ -2677,7 +2677,7 @@ void taylor_adaptive_batch<T>::set_time(const std::vector<T> &new_time)
         m_time_hi[i] = new_time[i];
     }
     // Reset the lo part.
-    std::fill(m_time_lo.begin(), m_time_lo.end(), T(0));
+    std::fill(m_time_lo.begin(), m_time_lo.end(), static_cast<T>(0));
 }
 
 template <typename T>
@@ -2686,7 +2686,7 @@ void taylor_adaptive_batch<T>::set_time(T new_time)
     // Set the hi part.
     std::fill(m_time_hi.begin(), m_time_hi.end(), new_time);
     // Reset the lo part.
-    std::fill(m_time_lo.begin(), m_time_lo.end(), T(0));
+    std::fill(m_time_lo.begin(), m_time_lo.end(), static_cast<T>(0));
 }
 
 template <typename T>
@@ -3294,9 +3294,9 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
             // Add padding to the times vectors to make the
             // vectorised upper_bound implementation well defined.
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                ret.m_times_hi.push_back(m_t_dir[i] ? std::numeric_limits<T>::infinity()
-                                                    : -std::numeric_limits<T>::infinity());
-                ret.m_times_lo.push_back(T(0));
+                ret.m_times_hi.push_back(m_t_dir[i] != 0 ? std::numeric_limits<T>::infinity()
+                                                         : -std::numeric_limits<T>::infinity());
+                ret.m_times_lo.push_back(static_cast<T>(0));
             }
 
             // Prepare the output vector.
@@ -3333,7 +3333,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
                 const detail::dfloat<T> new_time(c_out_times_hi[c_out_times_hi.size() - m_batch_size + i],
                                                  c_out_times_lo[c_out_times_lo.size() - m_batch_size + i]);
                 assert(isfinite(new_time));
-                if (m_t_dir[i]) {
+                if (m_t_dir[i] != 0) {
                     assert(!(new_time < prev_times[i]));
                 } else {
                     assert(!(new_time > prev_times[i]));

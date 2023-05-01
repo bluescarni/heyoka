@@ -80,14 +80,14 @@ std::string pi_constant_func::operator()(unsigned prec) const
 {
     assert(prec > 0u);
 
-    // NOTE: we assume double is always ieee style.
-    static_assert(std::numeric_limits<double>::is_iec559);
-    if (prec <= static_cast<unsigned>(std::numeric_limits<double>::digits)) {
+    // Let's try with double first.
+    if (std::numeric_limits<double>::is_iec559 && std::numeric_limits<double>::radix == 2
+        && prec <= static_cast<unsigned>(std::numeric_limits<double>::digits)) {
         return fmt::format("{:.{}}", boost::math::constants::pi<double>(), std::numeric_limits<double>::max_digits10);
     }
 
     // Try with long double.
-    if (std::numeric_limits<long double>::is_iec559
+    if (std::numeric_limits<long double>::is_iec559 && std::numeric_limits<long double>::radix == 2
         && prec <= static_cast<unsigned>(std::numeric_limits<long double>::digits)) {
         // NOTE: fmt support for long double is sketchy, let's go with iostreams.
         std::ostringstream oss;
@@ -160,6 +160,7 @@ void constant::to_stream(std::ostringstream &oss) const
     }
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 std::vector<expression> constant::gradient() const
 {
     assert(args().empty());
@@ -348,8 +349,10 @@ const expression pi{func{constant{"pi", detail::pi_constant_func{}, u8"π"}}};
 
 HEYOKA_END_NAMESPACE
 
+// NOLINTNEXTLINE(cert-err58-cpp)
 HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::null_constant_func, std::string, unsigned)
 
+// NOLINTNEXTLINE(cert-err58-cpp)
 HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::pi_constant_func, std::string, unsigned)
 
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::constant)

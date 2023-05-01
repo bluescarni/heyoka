@@ -98,6 +98,7 @@ void sin_impl::eval_batch_dbl(std::vector<double> &out, const std::unordered_map
     }
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 double sin_impl::eval_num_dbl(const std::vector<double> &a) const
 {
     if (a.size() != 1u) {
@@ -110,6 +111,7 @@ double sin_impl::eval_num_dbl(const std::vector<double> &a) const
     return std::sin(a[0]);
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 double sin_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>::size_type i) const
 {
     if (a.size() != 1u || i != 0u) {
@@ -299,7 +301,7 @@ llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, llvm::Type *fp_t, con
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto *f = module.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -314,19 +316,19 @@ llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, llvm::Type *fp_t, con
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
-        auto ord = f->args().begin();
-        auto diff_ptr = f->args().begin() + 2;
-        auto var_idx = f->args().begin() + 5;
-        auto dep_idx = f->args().begin() + 6;
+        auto *ord = f->args().begin();
+        auto *diff_ptr = f->args().begin() + 2;
+        auto *var_idx = f->args().begin() + 5;
+        auto *dep_idx = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
+        auto *acc = builder.CreateAlloca(val_t);
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
@@ -341,17 +343,17 @@ llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, llvm::Type *fp_t, con
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-                    auto a_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
-                    auto cj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, var_idx);
+                    auto *a_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
+                    auto *cj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, var_idx);
 
-                    auto j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
+                    auto *j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     builder.CreateStore(
                         llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, j_v, llvm_fmul(s, a_nj, cj))), acc);
                 });
 
                 // Divide by the order to produce the return value.
-                auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
+                auto *ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
                 builder.CreateStore(llvm_fdiv(s, builder.CreateLoad(val_t, acc), ord_v), retval);
             });
 
@@ -414,7 +416,7 @@ std::vector<expression> sin_impl::gradient() const
 expression sin(expression e)
 {
     // Simplify sin(number) to its value.
-    if (auto num_ptr = std::get_if<number>(&e.value())) {
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
         return expression{std::visit(
             [](const auto &x) {
                 using std::sin;
