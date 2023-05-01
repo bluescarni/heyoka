@@ -124,38 +124,37 @@ const auto type_map = []() {
     std::unordered_map<std::type_index, llvm::Type *(*)(llvm::LLVMContext &)> retval;
 
     // Try to associate C++ float to LLVM float.
-    if (std::numeric_limits<float>::is_iec559 && std::numeric_limits<float>::digits == 24) {
+    if (is_ieee754_binary32<float>) {
         retval[typeid(float)] = [](llvm::LLVMContext &c) { return llvm::Type::getFloatTy(c); };
     }
 
     // Try to associate C++ double to LLVM double.
-    if (std::numeric_limits<double>::is_iec559 && std::numeric_limits<double>::digits == 53) {
+    if (is_ieee754_binary64<double>) {
         retval[typeid(double)] = [](llvm::LLVMContext &c) { return llvm::Type::getDoubleTy(c); };
     }
 
     // Try to associate C++ long double to an LLVM fp type.
-    if (std::numeric_limits<long double>::is_iec559) {
-        if (std::numeric_limits<long double>::digits == 53) {
-            retval[typeid(long double)] = [](llvm::LLVMContext &c) {
-                // IEEE double-precision format (this is the case on MSVC for instance).
-                return llvm::Type::getDoubleTy(c);
-            };
-        } else if (std::numeric_limits<long double>::digits == 64) {
-            retval[typeid(long double)] = [](llvm::LLVMContext &c) {
-                // x86 extended precision format.
-                return llvm::Type::getX86_FP80Ty(c);
-            };
-        } else if (std::numeric_limits<long double>::digits == 113) {
-            retval[typeid(long double)] = [](llvm::LLVMContext &c) {
-                // IEEE quadruple-precision format (e.g., ARM 64).
-                return llvm::Type::getFP128Ty(c);
-            };
-        }
+    if (is_ieee754_binary64<long double>) {
+        retval[typeid(long double)] = [](llvm::LLVMContext &c) {
+            // IEEE double-precision format (this is the case on MSVC for instance).
+            return llvm::Type::getDoubleTy(c);
+        };
+    } else if (is_x86_fp80<long double>) {
+        retval[typeid(long double)] = [](llvm::LLVMContext &c) {
+            // x86 extended precision format.
+            return llvm::Type::getX86_FP80Ty(c);
+        };
+    } else if (is_ieee754_binary128<long double>) {
+        retval[typeid(long double)] = [](llvm::LLVMContext &c) {
+            // IEEE quadruple-precision format (e.g., ARM 64).
+            return llvm::Type::getFP128Ty(c);
+        };
     }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
     // Associate mppp::real128 to fp128.
+    static_assert(is_ieee754_binary128<mppp::real128>);
     retval[typeid(mppp::real128)] = [](llvm::LLVMContext &c) { return llvm::Type::getFP128Ty(c); };
 
 #endif
