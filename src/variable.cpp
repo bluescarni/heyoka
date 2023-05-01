@@ -132,7 +132,7 @@ void eval_batch_dbl(std::vector<double> &out_values, const variable &var,
 void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const variable &,
                         std::size_t &node_counter)
 {
-    node_connections.push_back(std::vector<std::size_t>());
+    node_connections.emplace_back();
     node_counter++;
 }
 

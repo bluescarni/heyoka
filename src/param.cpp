@@ -39,6 +39,7 @@ param &param::operator=(const param &) = default;
 
 param &param::operator=(param &&) noexcept = default;
 
+// NOLINTNEXTLINE(performance-trivially-destructible)
 param::~param() = default;
 
 const std::uint32_t &param::idx() const

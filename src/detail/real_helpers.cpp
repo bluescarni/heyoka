@@ -233,6 +233,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_undef_mpfr_view(llvm_state &s, llvm
 
 // Load the data from the input mpfr view (mpfr_struct_inst, limb_arr) into a heyoka.real.N
 // instance of type fp_t.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst, llvm::Value *limb_arr,
                                     llvm::Type *fp_t)
 {
@@ -280,6 +281,7 @@ llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst
 // Helper to construct an n-ary LLVM function corresponding to the MPFR primitive 'mpfr_name'.
 // The operands will be of type 'fp_t' (which must be a heyoka.real.N). The name of the function
 // will be built from pname. The return type of the MPFR primitive is assumed to be int.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string &pname, const std::string &mpfr_name,
                              unsigned nargs)
 {
@@ -417,6 +419,7 @@ namespace
 // The operands will be of type 'fp_t' (which must be a heyoka.real.N), the return type is bool. The name of the
 // function will be built from pname. The MPFR primitive must not require a rounding mode argument and it must
 // return an int.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 llvm::Function *real_nary_cmp(llvm_state &s, llvm::Type *fp_t, const std::string &pname, const std::string &mpfr_name,
                               unsigned nargs)
 {
