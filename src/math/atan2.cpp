@@ -76,7 +76,7 @@ expression atan2_impl::diff(funcptr_map<expression> &func_map, const std::string
 
     auto den = square(x) + square(y);
 
-    return (x * detail::diff(func_map, y, s) - y * detail::diff(func_map, x, s)) / std::move(den);
+    return (x * detail::diff(func_map, y, s) - y * detail::diff(func_map, x, s)) / den;
 }
 
 expression atan2_impl::diff(funcptr_map<expression> &func_map, const param &p) const
@@ -88,7 +88,7 @@ expression atan2_impl::diff(funcptr_map<expression> &func_map, const param &p) c
 
     auto den = square(x) + square(y);
 
-    return (x * detail::diff(func_map, y, p) - y * detail::diff(func_map, x, p)) / std::move(den);
+    return (x * detail::diff(func_map, y, p) - y * detail::diff(func_map, x, p)) / den;
 }
 
 llvm::Value *atan2_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
@@ -170,6 +170,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::
 template <typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
 llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
                                     const variable &var, const U &num, const std::vector<llvm::Value *> &arr,
+                                    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                     llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                     std::uint32_t batch_size)
 {
@@ -226,6 +227,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::
 template <typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
 llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
                                     const U &num, const variable &var, const std::vector<llvm::Value *> &arr,
+                                    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                     llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                     std::uint32_t batch_size)
 {
@@ -281,6 +283,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::
 // Derivative of atan2(var, var).
 llvm::Value *taylor_diff_atan2_impl(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
                                     const variable &var0, const variable &var1, const std::vector<llvm::Value *> &arr,
+                                    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                     llvm::Value *, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                     std::uint32_t batch_size)
 {
@@ -461,10 +464,10 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
+        auto *acc = builder.CreateAlloca(val_t);
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
@@ -473,6 +476,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
                 auto ret = llvm_atan2(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), y_idx),
                                       taylor_c_diff_numparam_codegen(s, fp_t, n, num_x, par_ptr, batch_size));
 
+                // NOLINTNEXTLINE(readability-suspicious-call-argument)
                 builder.CreateStore(ret, retval);
             },
             [&]() {
@@ -493,7 +497,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
+                    auto *j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     auto d_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
                     auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
@@ -578,10 +582,10 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
+        auto *acc = builder.CreateAlloca(val_t);
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
@@ -590,6 +594,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
                 auto ret = llvm_atan2(s, taylor_c_diff_numparam_codegen(s, fp_t, n, num_y, par_ptr, batch_size),
                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), x_idx));
 
+                // NOLINTNEXTLINE(readability-suspicious-call-argument)
                 builder.CreateStore(ret, retval);
             },
             [&]() {
@@ -610,7 +615,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
+                    auto *j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
                     auto d_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
                     auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
@@ -667,7 +672,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = md.getFunction(fname);
+    auto *f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -682,45 +687,46 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
         assert(f != nullptr); // LCOV_EXCL_LINE
 
         // Fetch the necessary function arguments.
-        auto ord = f->args().begin();
-        auto u_idx = f->args().begin() + 1;
-        auto diff_ptr = f->args().begin() + 2;
-        auto y_idx = f->args().begin() + 5;
-        auto x_idx = f->args().begin() + 6;
-        auto d_idx = f->args().begin() + 7;
+        auto *ord = f->args().begin();
+        auto *u_idx = f->args().begin() + 1;
+        auto *diff_ptr = f->args().begin() + 2;
+        auto *y_idx = f->args().begin() + 5;
+        auto *x_idx = f->args().begin() + 6;
+        auto *d_idx = f->args().begin() + 7;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateAlloca(val_t);
+        auto *retval = builder.CreateAlloca(val_t);
 
         // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
+        auto *acc = builder.CreateAlloca(val_t);
 
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, run the codegen.
-                auto ret = llvm_atan2(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), y_idx),
-                                      taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), x_idx));
+                auto *ret = llvm_atan2(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), y_idx),
+                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), x_idx));
 
+                // NOLINTNEXTLINE(readability-suspicious-call-argument)
                 builder.CreateStore(ret, retval);
             },
             [&]() {
                 // Create FP vector version of the order.
-                auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
+                auto *ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Compute the divisor: ord * d^[0].
-                auto divisor = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), d_idx);
+                auto *divisor = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), d_idx);
                 divisor = llvm_fmul(s, ord_v, divisor);
 
                 // Init the dividend: ord * (c^[0] * b^[n] - b^[0] * c^[n]).
-                auto div1 = llvm_fmul(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), x_idx),
-                                      taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, y_idx));
-                auto div2 = llvm_fmul(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), y_idx),
-                                      taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, x_idx));
-                auto dividend = llvm_fsub(s, div1, div2);
+                auto *div1 = llvm_fmul(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), x_idx),
+                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, y_idx));
+                auto *div2 = llvm_fmul(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), y_idx),
+                                       taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, x_idx));
+                auto *dividend = llvm_fsub(s, div1, div2);
                 dividend = llvm_fmul(s, ord_v, dividend);
 
                 // Init the accumulator.
@@ -728,21 +734,21 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, llvm::Type *fp_t, c
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-                    auto j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
+                    auto *j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
 
-                    auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), x_idx);
-                    auto bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, y_idx);
-                    auto tmp1 = llvm_fmul(s, c_nj, bj);
+                    auto *c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), x_idx);
+                    auto *bj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, y_idx);
+                    auto *tmp1 = llvm_fmul(s, c_nj, bj);
 
-                    auto b_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), y_idx);
-                    auto cj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, x_idx);
-                    auto tmp2 = llvm_fmul(s, b_nj, cj);
+                    auto *b_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), y_idx);
+                    auto *cj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, x_idx);
+                    auto *tmp2 = llvm_fmul(s, b_nj, cj);
 
-                    auto d_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
-                    auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
-                    auto tmp3 = llvm_fmul(s, d_nj, aj);
+                    auto *d_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
+                    auto *aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
+                    auto *tmp3 = llvm_fmul(s, d_nj, aj);
 
-                    auto tmp = llvm_fsub(s, llvm_fsub(s, tmp1, tmp2), tmp3);
+                    auto *tmp = llvm_fsub(s, llvm_fsub(s, tmp1, tmp2), tmp3);
                     tmp = llvm_fmul(s, j_v, tmp);
 
                     builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), tmp), acc);
