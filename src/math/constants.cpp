@@ -80,14 +80,14 @@ std::string pi_constant_func::operator()(unsigned prec) const
 {
     assert(prec > 0u);
 
-    // NOTE: we assume double is always ieee style.
-    static_assert(std::numeric_limits<double>::is_iec559);
-    if (prec <= static_cast<unsigned>(std::numeric_limits<double>::digits)) {
+    // Let's try with double first.
+    if (std::numeric_limits<double>::is_iec559 && std::numeric_limits<double>::radix == 2
+        && prec <= static_cast<unsigned>(std::numeric_limits<double>::digits)) {
         return fmt::format("{:.{}}", boost::math::constants::pi<double>(), std::numeric_limits<double>::max_digits10);
     }
 
     // Try with long double.
-    if (std::numeric_limits<long double>::is_iec559
+    if (std::numeric_limits<long double>::is_iec559 && std::numeric_limits<long double>::radix == 2
         && prec <= static_cast<unsigned>(std::numeric_limits<long double>::digits)) {
         // NOTE: fmt support for long double is sketchy, let's go with iostreams.
         std::ostringstream oss;

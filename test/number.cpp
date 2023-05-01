@@ -757,7 +757,7 @@ TEST_CASE("number_like")
     REQUIRE(num == number{42.});
     REQUIRE(std::holds_alternative<double>(num.value()));
 
-    if (std::numeric_limits<long double>::is_iec559) {
+    if (std::numeric_limits<long double>::is_iec559 && std::numeric_limits<long double>::radix == 2) {
         if (std::numeric_limits<long double>::digits == 53) {
             // NOTE: here we are on Windows + MSVC, where long double == double
             // and thus C++ long double associates to LLVM double.
