@@ -557,6 +557,7 @@ bool dtens_v_idx_cmp::operator()(const dtens_v_idx_t &v1, const dtens_v_idx_t &v
 
 } // namespace detail
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 struct dtens::impl {
     detail::dtens_map_t m_map;
 
@@ -603,6 +604,7 @@ struct dtens::impl {
                 assert(it == m_map.end() - 1);
 
                 // Reset the object address.
+                // NOLINTNEXTLINE(bugprone-use-after-move,hicpp-invalid-access-moved)
                 ar.reset_object_address(std::addressof(*it), &tmp_val);
             }
 
@@ -779,7 +781,7 @@ dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_
     }
 
     // Check if there are repeated entries in args.
-    std::unordered_set args_set(args.begin(), args.end());
+    const std::unordered_set args_set(args.begin(), args.end());
     if (args_set.size() != args.size()) {
         throw std::invalid_argument(
             fmt::format("Duplicate entries detected in the list of variables/parameters with respect to which the "
