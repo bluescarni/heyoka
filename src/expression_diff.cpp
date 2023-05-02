@@ -49,6 +49,122 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+expression diff(funcptr_map<expression> &func_map, const expression &e, const std::string &s)
+{
+    return std::visit(
+        [&func_map, &s](const auto &arg) {
+            using type = uncvref_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<type, number>) {
+                return std::visit(
+                    [](const auto &v) { return expression{number{static_cast<uncvref_t<decltype(v)>>(0)}}; },
+                    arg.value());
+            } else if constexpr (std::is_same_v<type, param>) {
+                return 0_dbl;
+            } else if constexpr (std::is_same_v<type, variable>) {
+                if (s == arg.name()) {
+                    return 1_dbl;
+                } else {
+                    return 0_dbl;
+                }
+            } else {
+                const auto f_id = arg.get_ptr();
+
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already performed diff on the current function,
+                    // fetch the result from the cache.
+                    return it->second;
+                }
+
+                auto ret = arg.diff(func_map, s);
+
+                // Put the return value in the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return ret;
+            }
+        },
+        e.value());
+}
+
+expression diff(funcptr_map<expression> &func_map, const expression &e, const param &p)
+{
+    return std::visit(
+        [&func_map, &p](const auto &arg) {
+            using type = uncvref_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<type, number>) {
+                return std::visit(
+                    [](const auto &v) { return expression{number{static_cast<uncvref_t<decltype(v)>>(0)}}; },
+                    arg.value());
+            } else if constexpr (std::is_same_v<type, param>) {
+                if (p.idx() == arg.idx()) {
+                    return 1_dbl;
+                } else {
+                    return 0_dbl;
+                }
+            } else if constexpr (std::is_same_v<type, variable>) {
+                return 0_dbl;
+            } else {
+                const auto f_id = arg.get_ptr();
+
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already performed diff on the current function,
+                    // fetch the result from the cache.
+                    return it->second;
+                }
+
+                auto ret = arg.diff(func_map, p);
+
+                // Put the return value in the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return ret;
+            }
+        },
+        e.value());
+}
+
+} // namespace detail
+
+expression diff(const expression &e, const std::string &s)
+{
+    detail::funcptr_map<expression> func_map;
+
+    return detail::diff(func_map, e, s);
+}
+
+expression diff(const expression &e, const param &p)
+{
+    detail::funcptr_map<expression> func_map;
+
+    return detail::diff(func_map, e, p);
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+expression diff(const expression &e, const expression &x)
+{
+    return std::visit(
+        [&e](const auto &v) -> expression {
+            if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
+                return diff(e, v.name());
+            } else if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, param>) {
+                return diff(e, v);
+            } else {
+                throw std::invalid_argument(
+                    "Derivatives are currently supported only with respect to variables and parameters");
+            }
+        },
+        x.value());
+}
+
+namespace detail
+{
+
 // Function decomposition for symbolic differentiation.
 std::pair<std::vector<expression>, std::vector<expression>::size_type>
 diff_decompose(const std::vector<expression> &v_ex_)
