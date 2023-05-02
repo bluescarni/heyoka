@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <ostream>
 #include <sstream>
@@ -27,6 +28,9 @@
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include <boost/container/flat_map.hpp>
+#include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/core.h>
 
@@ -175,6 +179,7 @@ struct HEYOKA_DLL_PUBLIC prime_wrapper {
     prime_wrapper &operator=(prime_wrapper &&) noexcept;
     ~prime_wrapper();
 
+    // NOLINTNEXTLINE(misc-unconventional-assign-operator,cppcoreguidelines-c-copy-assignment-signature)
     std::pair<expression, expression> operator=(expression) &&;
 };
 
@@ -358,17 +363,155 @@ HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
 HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
                                                const std::unordered_map<expression, expression> &, bool = false);
 
+enum class diff_args { vars, params, all };
+
+// Fwd declaration.
+class HEYOKA_DLL_PUBLIC dtens;
+
 namespace detail
 {
 
 expression diff(funcptr_map<expression> &, const expression &, const std::string &);
 expression diff(funcptr_map<expression> &, const expression &, const param &);
 
+// NOTE: public only for testing purposes.
+HEYOKA_DLL_PUBLIC std::pair<std::vector<expression>, std::vector<expression>::size_type>
+diff_decompose(const std::vector<expression> &);
+
+HEYOKA_DLL_PUBLIC dtens diff_tensors(const std::vector<expression> &,
+                                     const std::variant<diff_args, std::vector<expression>> &, std::uint32_t);
+
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const param &);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &);
+
+namespace kw
+{
+
+IGOR_MAKE_NAMED_ARGUMENT(diff_args);
+IGOR_MAKE_NAMED_ARGUMENT(diff_order);
+
+} // namespace kw
+
+namespace detail
+{
+
+// Private aliases/utilities needed in the implementation of dtens.
+using dtens_v_idx_t = std::vector<std::uint32_t>;
+
+struct dtens_v_idx_cmp {
+    [[nodiscard]] bool operator()(const dtens_v_idx_t &, const dtens_v_idx_t &) const;
+};
+
+using dtens_map_t = boost::container::flat_map<dtens_v_idx_t, expression, dtens_v_idx_cmp>;
+
+} // namespace detail
+
+class HEYOKA_DLL_PUBLIC dtens
+{
+public:
+    using v_idx_t = detail::dtens_v_idx_t;
+    using size_type = detail::dtens_map_t::size_type;
+
+private:
+    // NOTE: detail::diff_tensors() needs access to the private ctor.
+    friend dtens detail::diff_tensors(const std::vector<expression> &,
+                                      const std::variant<diff_args, std::vector<expression>> &, std::uint32_t);
+
+    struct impl;
+
+    std::unique_ptr<impl> p_impl;
+
+    explicit dtens(impl);
+
+    // Serialisation.
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+
+public:
+    dtens();
+    dtens(const dtens &);
+    dtens(dtens &&) noexcept;
+    dtens &operator=(const dtens &);
+    dtens &operator=(dtens &&) noexcept;
+    ~dtens();
+
+    using iterator = detail::dtens_map_t::const_iterator;
+
+    // Subrange helper class to fetch
+    // ranges into dtens.
+    class HEYOKA_DLL_PUBLIC subrange
+    {
+        friend class dtens;
+
+        iterator m_begin, m_end;
+
+        explicit subrange(const iterator &, const iterator &);
+
+    public:
+        subrange() = delete;
+        subrange(const subrange &);
+        subrange(subrange &&) noexcept;
+        subrange &operator=(const subrange &);
+        subrange &operator=(subrange &&) noexcept;
+        ~subrange();
+
+        [[nodiscard]] iterator begin() const;
+        [[nodiscard]] iterator end() const;
+    };
+
+    [[nodiscard]] iterator begin() const;
+    [[nodiscard]] iterator end() const;
+
+    [[nodiscard]] std::uint32_t get_order() const;
+    [[nodiscard]] std::uint32_t get_nvars() const;
+    [[nodiscard]] std::uint32_t get_nouts() const;
+    [[nodiscard]] size_type size() const;
+
+    [[nodiscard]] iterator find(const v_idx_t &) const;
+    [[nodiscard]] const expression &operator[](const v_idx_t &) const;
+
+    [[nodiscard]] subrange get_derivatives(std::uint32_t, std::uint32_t) const;
+    [[nodiscard]] subrange get_derivatives(std::uint32_t) const;
+};
+
+template <typename... KwArgs>
+dtens diff_tensors(const std::vector<expression> &v_ex, KwArgs &&...kw_args)
+{
+    igor::parser p{kw_args...};
+
+    static_assert(!p.has_unnamed_arguments(), "diff_tensors() accepts only named arguments in the variadic pack.");
+
+    // Variables and/or params wrt which the derivatives will be computed.
+    // Defaults to all variables.
+    std::variant<diff_args, std::vector<expression>> d_args = diff_args::vars;
+    if constexpr (p.has(kw::diff_args)) {
+        if constexpr (std::is_same_v<detail::uncvref_t<decltype(p(kw::diff_args))>, diff_args>) {
+            d_args = p(kw::diff_args);
+        } else if constexpr (std::is_constructible_v<std::vector<expression>, decltype(p(kw::diff_args))>) {
+            d_args = std::vector<expression>(std::forward<decltype(p(kw::diff_args))>(p(kw::diff_args)));
+        } else {
+            static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the diff_args keyword argument.");
+        }
+    }
+
+    // Order of derivatives. Defaults to 1.
+    std::uint32_t order = 1;
+    if constexpr (p.has(kw::diff_order)) {
+        if constexpr (std::is_integral_v<detail::uncvref_t<decltype(p(kw::diff_order))>>) {
+            order = boost::numeric_cast<std::uint32_t>(p(kw::diff_order));
+        } else {
+            static_assert(detail::always_false_v<KwArgs...>,
+                          "The diff_order keyword argument must be of integral type.");
+        }
+    }
+
+    return detail::diff_tensors(v_ex, d_args, order);
+}
 
 HEYOKA_DLL_PUBLIC expression pairwise_prod(const std::vector<expression> &);
 
@@ -469,6 +612,15 @@ namespace detail
 
 HEYOKA_DLL_PUBLIC bool is_integral(const expression &);
 HEYOKA_DLL_PUBLIC bool is_odd_integral_half(const expression &);
+
+void verify_function_dec(const std::vector<expression> &, const std::vector<expression> &,
+                         std::vector<expression>::size_type, bool = false);
+
+std::vector<expression> function_decompose_cse(std::vector<expression> &, std::vector<expression>::size_type,
+                                               std::vector<expression>::size_type);
+
+std::vector<expression> function_sort_dc(std::vector<expression> &, std::vector<expression>::size_type,
+                                         std::vector<expression>::size_type);
 
 std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vector<expression>::size_type> &,
                                                             const expression &, std::vector<expression> &);

@@ -2216,16 +2216,12 @@ std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vec
     }
 }
 
-namespace
-{
-
-// LCOV_EXCL_START
-
-#if !defined(NDEBUG)
-
 // Helper to verify a function decomposition.
 void verify_function_dec(const std::vector<expression> &orig, const std::vector<expression> &dc,
-                         std::vector<expression>::size_type nvars)
+                         std::vector<expression>::size_type nvars,
+                         // NOTE: this flags establishes if parameters are allowed
+                         // in the initial definitions of the u variables.
+                         bool allow_pars)
 {
     using idx_t = std::vector<expression>::size_type;
 
@@ -2235,9 +2231,10 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
     assert(dc.size() >= nouts);
 
     // The first nvars expressions of u variables
-    // must be just variables.
+    // must be just variables or possibly parameters.
     for (idx_t i = 0; i < nvars; ++i) {
-        assert(std::holds_alternative<variable>(dc[i].value()));
+        assert(std::holds_alternative<variable>(dc[i].value())
+               || (allow_pars && std::holds_alternative<param>(dc[i].value())));
     }
 
     // From nvars to dc.size() - nouts, the expressions
@@ -2251,34 +2248,34 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
 
                 if constexpr (std::is_same_v<type, func>) {
                     for (const auto &arg : v.args()) {
-                        if (auto p_var = std::get_if<variable>(&arg.value())) {
+                        if (auto *p_var = std::get_if<variable>(&arg.value())) {
                             assert(p_var->name().rfind("u_", 0) == 0);
                             assert(uname_to_index(p_var->name()) < i);
                         } else if (std::get_if<number>(&arg.value()) == nullptr
                                    && std::get_if<param>(&arg.value()) == nullptr) {
-                            assert(false);
+                            assert(false); // LCOV_EXCL_LINE
                         }
                     }
                 } else {
-                    assert(false);
+                    assert(false); // LCOV_EXCL_LINE
                 }
             },
             dc[i].value());
     }
 
     // From dc.size() - nouts to dc.size(), the expressions
-    // must be either variables in the u_n form, where n < i,
+    // must be either variables in the u_n form, where n < dc.size() - nouts,
     // or numbers/params.
     for (auto i = dc.size() - nouts; i < dc.size(); ++i) {
         std::visit(
-            [i](const auto &v) {
+            [&dc, nouts](const auto &v) {
                 using type = uncvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, variable>) {
                     assert(v.name().rfind("u_", 0) == 0);
-                    assert(uname_to_index(v.name()) < i);
+                    assert(uname_to_index(v.name()) < dc.size() - nouts);
                 } else if constexpr (!std::is_same_v<type, number> && !std::is_same_v<type, param>) {
-                    assert(false);
+                    assert(false); // LCOV_EXCL_LINE
                 }
             },
             dc[i].value());
@@ -2299,10 +2296,6 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
         assert(subs(dc[i], subs_map) == orig[i - (dc.size() - nouts)]);
     }
 }
-
-#endif
-
-// LCOV_EXCL_STOP
 
 // Simplify a function decomposition by removing
 // common subexpressions.
@@ -2341,7 +2334,6 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &v_ex,
     // The first nvars definitions are just renaming
     // of the original variables into u variables.
     for (idx_t i = 0; i < nvars; ++i) {
-        assert(std::holds_alternative<variable>(v_ex[i].value()));
         retval.push_back(std::move(v_ex[i]));
 
         // NOTE: the u vars that correspond to the original
@@ -2515,7 +2507,7 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
         // Fetch all the out edges of v and sort them according
         // to the target vertex.
         // NOTE: the sorting is important to ensure that all the original
-        // variables are insered into v_idx in the correct order.
+        // variables are inserted into v_idx in the correct order.
         const auto e_range = boost::out_edges(v, g);
         tmp_edges.assign(e_range.first, e_range.second);
         std::sort(tmp_edges.begin(), tmp_edges.end(),
@@ -2590,8 +2582,6 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
 
     return retval;
 }
-
-} // namespace
 
 } // namespace detail
 

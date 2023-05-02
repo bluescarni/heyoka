@@ -175,7 +175,8 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/number.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/variable.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/param.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/expression.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_00.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_01.cpp"
     # "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
     # VSOP2013.

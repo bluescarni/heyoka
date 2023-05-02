@@ -529,7 +529,7 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
         // Fetch all the out edges of v and sort them according
         // to the target vertex.
         // NOTE: the sorting is important to ensure that all the state
-        // variables are insered into v_idx in the correct order.
+        // variables are inserted into v_idx in the correct order.
         const auto e_range = boost::out_edges(v, g);
         tmp_edges.assign(e_range.first, e_range.second);
         std::sort(tmp_edges.begin(), tmp_edges.end(),
@@ -678,16 +678,16 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
     }
 
     // From dc.size() - n_eq to dc.size(), the expressions
-    // must be either variables in the u_n form, where n < i,
+    // must be either variables in the u_n form, where n < dc.size() - n_eq,
     // or numbers/params.
     for (auto i = dc.size() - n_eq; i < dc.size(); ++i) {
         std::visit(
-            [i](const auto &v) {
+            [&dc, n_eq](const auto &v) {
                 using type = detail::uncvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, variable>) {
                     assert(v.name().rfind("u_", 0) == 0);
-                    assert(uname_to_index(v.name()) < i);
+                    assert(uname_to_index(v.name()) < dc.size() - n_eq);
                 } else if constexpr (!std::is_same_v<type, number> && !std::is_same_v<type, param>) {
                     assert(false);
                 }

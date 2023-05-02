@@ -62,8 +62,8 @@ auto fixed_centres_common_opts(const KwArgs &...kw_args)
     // The vector of positions.
     std::vector<expression> positions_vec;
     if constexpr (p.has(kw::positions)) {
-        for (const auto &mass_value : p(kw::positions)) {
-            positions_vec.emplace_back(mass_value);
+        for (const auto &pos_value : p(kw::positions)) {
+            positions_vec.emplace_back(pos_value);
         }
     }
 
