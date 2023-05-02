@@ -317,7 +317,7 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
 template <typename DiffMap, typename Dep, typename Adj, typename SubsMap>
 void diff_tensors_reverse_impl(
     // The map of derivatives. It wil be updated as new derivatives
-    // are computed
+    // are computed.
     DiffMap &diff_map,
     // The number of derivatives in the previous-order tensor.
     std::vector<expression>::size_type cur_nouts,
@@ -491,7 +491,7 @@ void diff_tensors_reverse_impl(
                     cur_der = subs(it_dmap->second, subs_map, true);
                 }
 
-                [[maybe_unused]] const auto [_, flag] = diff_map.try_emplace(tmp_v_idx, cur_der);
+                [[maybe_unused]] const auto [_, flag] = diff_map.try_emplace(tmp_v_idx, std::move(cur_der));
                 assert(flag);
             }
         }
@@ -661,6 +661,10 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
     std::vector<std::uint32_t> tmp_v_idx;
     tmp_v_idx.resize(1 + boost::safe_numerics::safe<decltype(tmp_v_idx.size())>(nargs));
 
+    // Vector that will store the previous-order derivatives in the loop below.
+    // It will be used to construct the decomposition.
+    std::vector<expression> prev_diffs;
+
     // Init diff_map with the order 0 derivatives
     // (i.e., the original function components).
     for (decltype(v_ex.size()) i = 0; i < orig_nouts; ++i) {
@@ -682,7 +686,7 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
 
         // Store the previous-order derivatives into a separate
         // vector so that we can construct the decomposition.
-        std::vector<expression> prev_diffs;
+        prev_diffs.clear();
         std::transform(prev_begin, diff_map.end(), std::back_inserter(prev_diffs),
                        [](const auto &p) { return p.second; });
 
@@ -708,7 +712,7 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
     get_logger()->trace("dtens creation runtime: {}", sw);
 
     // Assemble and return the result.
-    auto retval = dtens_map_t(boost::container::ordered_unique_range_t{}, diff_map.begin(), diff_map.end());
+    dtens_map_t retval(boost::container::ordered_unique_range_t{}, diff_map.begin(), diff_map.end());
 
     // Check sorting.
     assert(std::is_sorted(retval.begin(), retval.end(),
