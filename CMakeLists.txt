@@ -175,7 +175,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/number.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/variable.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/param.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_00.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_basic.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_diff.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_ops.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_cfunc.cpp"
