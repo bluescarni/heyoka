@@ -471,6 +471,7 @@ public:
     [[nodiscard]] std::uint32_t get_nvars() const;
     [[nodiscard]] std::uint32_t get_nouts() const;
     [[nodiscard]] size_type size() const;
+    [[nodiscard]] const std::vector<expression> &get_args() const;
 
     [[nodiscard]] iterator find(const v_idx_t &) const;
     [[nodiscard]] const expression &operator[](const v_idx_t &) const;
@@ -478,6 +479,23 @@ public:
     [[nodiscard]] subrange get_derivatives(std::uint32_t, std::uint32_t) const;
     [[nodiscard]] subrange get_derivatives(std::uint32_t) const;
 };
+
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const dtens &);
+
+HEYOKA_END_NAMESPACE
+
+// fmt formatter for dtens, implemented
+// on top of the streaming operator.
+namespace fmt
+{
+
+template <>
+struct formatter<heyoka::dtens> : heyoka::detail::ostream_formatter {
+};
+
+} // namespace fmt
+
+HEYOKA_BEGIN_NAMESPACE
 
 template <typename... KwArgs>
 dtens diff_tensors(const std::vector<expression> &v_ex, KwArgs &&...kw_args)
