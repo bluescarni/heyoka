@@ -14,6 +14,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <ostream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -676,13 +677,15 @@ bool dtens_v_idx_cmp::operator()(const dtens_v_idx_t &v1, const dtens_v_idx_t &v
 // NOLINTNEXTLINE(bugprone-exception-escape)
 struct dtens::impl {
     detail::dtens_map_t m_map;
+    std::vector<expression> m_args;
 
     // Serialisation.
-    // NOTE: this is essentially a manual implementation of serialisation
-    // for flat_map, which is currently missing. See:
-    // https://stackoverflow.com/questions/69492511/boost-serialize-writing-a-general-map-serialization-function
     void save(boost::archive::binary_oarchive &ar, unsigned) const
     {
+        // NOTE: this is essentially a manual implementation of serialisation
+        // for flat_map, which is currently missing. See:
+        // https://stackoverflow.com/questions/69492511/boost-serialize-writing-a-general-map-serialization-function
+
         // Serialise the size.
         const auto size = m_map.size();
         ar << size;
@@ -691,6 +694,9 @@ struct dtens::impl {
         for (const auto &p : m_map) {
             ar << p;
         }
+
+        // Serialise m_args.
+        ar << m_args;
     }
 
     // NOTE: as usual, we assume here that the archive contains
@@ -725,6 +731,9 @@ struct dtens::impl {
             }
 
             assert(m_map.size() == size);
+
+            // Deserialise m_args.
+            ar >> m_args;
 
             // LCOV_EXCL_START
         } catch (...) {
@@ -909,7 +918,7 @@ dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_
                         args));
     }
 
-    return dtens{dtens::impl{diff_tensors_impl(v_ex, args, order)}};
+    return dtens{dtens::impl{diff_tensors_impl(v_ex, args, order), std::move(args)}};
 }
 
 } // namespace detail
@@ -1014,6 +1023,16 @@ const expression &dtens::operator[](const v_idx_t &vidx) const
     }
 
     return it->second;
+}
+
+dtens::size_type dtens::index_of(const v_idx_t &vidx) const
+{
+    return index_of(find(vidx));
+}
+
+dtens::size_type dtens::index_of(const iterator &it) const
+{
+    return p_impl->m_map.index_of(it);
 }
 
 // Get a range containing all derivatives of the given order for all components.
@@ -1178,6 +1197,11 @@ dtens::size_type dtens::size() const
     return p_impl->m_map.size();
 }
 
+const std::vector<expression> &dtens::get_args() const
+{
+    return p_impl->m_args;
+}
+
 void dtens::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
     ar << p_impl;
@@ -1193,6 +1217,15 @@ void dtens::load(boost::archive::binary_iarchive &ar, unsigned)
         throw;
     }
     // LCOV_EXCL_STOP
+}
+
+std::ostream &operator<<(std::ostream &os, const dtens &dt)
+{
+    os << "Highest diff order: " << dt.get_order() << '\n';
+    os << "Number of outputs : " << dt.get_nouts() << '\n';
+    os << "Diff arguments    : " << fmt::format("{}", dt.get_args()) << '\n';
+
+    return os;
 }
 
 HEYOKA_END_NAMESPACE

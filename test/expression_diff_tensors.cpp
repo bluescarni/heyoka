@@ -74,6 +74,10 @@ TEST_CASE("diff_tensors basic")
 
     auto dt = diff_tensors({1_dbl}, kw::diff_order = 0, kw::diff_args = {x});
 
+    std::ostringstream oss;
+    oss << dt;
+    REQUIRE(oss.str() == "Highest diff order: 0\nNumber of outputs : 1\nDiff arguments    : [x]\n");
+
     REQUIRE(dt.size() == 1u);
     REQUIRE(dt.get_order() == 0u);
     REQUIRE(dt.get_nvars() == 1u);
@@ -241,10 +245,18 @@ TEST_CASE("dtens basics")
 
     dtens dt;
 
+    std::ostringstream oss;
+    oss << dt;
+    REQUIRE(oss.str() == "Highest diff order: 0\nNumber of outputs : 0\nDiff arguments    : []\n");
+    REQUIRE(oss.str() == fmt::format("{}", dt));
+
     REQUIRE(dt.get_order() == 0u);
     REQUIRE(dt.get_nvars() == 0u);
     REQUIRE(dt.get_nouts() == 0u);
     REQUIRE(dt.size() == 0u);
+    REQUIRE(dt.index_of(dt.end()) == 0u);
+    REQUIRE(dt.index_of(dtens::v_idx_t{}) == 0u);
+    REQUIRE(dt.index_of(dtens::v_idx_t{1, 2, 3}) == 0u);
 
     REQUIRE(dt.begin() == dt.end());
     REQUIRE(dt.find({}) == dt.end());
@@ -284,9 +296,16 @@ TEST_CASE("dtens basics")
     REQUIRE(dt2.get_order() == 1u);
     REQUIRE(dt2.get_nvars() == 2u);
     REQUIRE(dt2.get_nouts() == 2u);
+    REQUIRE(dt2.get_args() == std::vector{x, y});
     REQUIRE(dt2.find({0, 1, 0}) != dt2.end());
     REQUIRE(dt2.find({0, 1}) == dt2.end());
     REQUIRE(dt2.find({0, 3, 0}) == dt2.end());
+    REQUIRE(dt2.index_of(dt2.begin()) == 0u);
+    REQUIRE(dt2.index_of(dt2.begin() + 1) == 1u);
+    REQUIRE(dt2.index_of(dt2.end()) == dt2.size());
+    REQUIRE(dt2.index_of(dtens::v_idx_t{}) == dt2.size());
+    REQUIRE(dt2.index_of(dtens::v_idx_t{0, 0, 0}) == 0u);
+    REQUIRE(dt2.index_of(dtens::v_idx_t{4, 0, 0}) == dt2.size());
 
     REQUIRE(dt2[{0, 1, 0}] == 1_dbl);
     REQUIRE_THROWS_MATCHES((dt2[{0, 1}]), std::out_of_range,
@@ -324,12 +343,14 @@ TEST_CASE("dtens basics")
 
     REQUIRE(dt3.size() == dt2.size());
     REQUIRE(std::equal(dt3.begin(), dt3.end(), dt2.begin()));
+    REQUIRE(dt3.get_args() == dt2.get_args());
 
     auto dt4(std::move(dt3));
     dt3 = dt4;
 
     REQUIRE(dt3.size() == dt2.size());
     REQUIRE(std::equal(dt3.begin(), dt3.end(), dt2.begin()));
+    REQUIRE(dt3.get_args() == dt2.get_args());
 
     // s11n.
     std::stringstream ss;
@@ -349,6 +370,7 @@ TEST_CASE("dtens basics")
 
     REQUIRE(dt3.size() == dt2.size());
     REQUIRE(std::equal(dt3.begin(), dt3.end(), dt2.begin()));
+    REQUIRE(dt3.get_args() == dt2.get_args());
 }
 
 TEST_CASE("fixed centres check")
