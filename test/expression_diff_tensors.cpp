@@ -254,6 +254,9 @@ TEST_CASE("dtens basics")
     REQUIRE(dt.get_nvars() == 0u);
     REQUIRE(dt.get_nouts() == 0u);
     REQUIRE(dt.size() == 0u);
+    REQUIRE(dt.index_of(dt.end()) == 0u);
+    REQUIRE(dt.index_of(dtens::v_idx_t{}) == 0u);
+    REQUIRE(dt.index_of(dtens::v_idx_t{1, 2, 3}) == 0u);
 
     REQUIRE(dt.begin() == dt.end());
     REQUIRE(dt.find({}) == dt.end());
@@ -297,6 +300,12 @@ TEST_CASE("dtens basics")
     REQUIRE(dt2.find({0, 1, 0}) != dt2.end());
     REQUIRE(dt2.find({0, 1}) == dt2.end());
     REQUIRE(dt2.find({0, 3, 0}) == dt2.end());
+    REQUIRE(dt2.index_of(dt2.begin()) == 0u);
+    REQUIRE(dt2.index_of(dt2.begin() + 1) == 1u);
+    REQUIRE(dt2.index_of(dt2.end()) == dt2.size());
+    REQUIRE(dt2.index_of(dtens::v_idx_t{}) == dt2.size());
+    REQUIRE(dt2.index_of(dtens::v_idx_t{0, 0, 0}) == 0u);
+    REQUIRE(dt2.index_of(dtens::v_idx_t{4, 0, 0}) == dt2.size());
 
     REQUIRE(dt2[{0, 1, 0}] == 1_dbl);
     REQUIRE_THROWS_MATCHES((dt2[{0, 1}]), std::out_of_range,

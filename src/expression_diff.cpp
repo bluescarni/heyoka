@@ -1025,6 +1025,16 @@ const expression &dtens::operator[](const v_idx_t &vidx) const
     return it->second;
 }
 
+dtens::size_type dtens::index_of(const v_idx_t &vidx) const
+{
+    return index_of(find(vidx));
+}
+
+dtens::size_type dtens::index_of(const iterator &it) const
+{
+    return p_impl->m_map.index_of(it);
+}
+
 // Get a range containing all derivatives of the given order for all components.
 dtens::subrange dtens::get_derivatives(std::uint32_t order) const
 {

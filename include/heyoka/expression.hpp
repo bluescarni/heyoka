@@ -475,6 +475,8 @@ public:
 
     [[nodiscard]] iterator find(const v_idx_t &) const;
     [[nodiscard]] const expression &operator[](const v_idx_t &) const;
+    [[nodiscard]] size_type index_of(const v_idx_t &) const;
+    [[nodiscard]] size_type index_of(const iterator &) const;
 
     [[nodiscard]] subrange get_derivatives(std::uint32_t, std::uint32_t) const;
     [[nodiscard]] subrange get_derivatives(std::uint32_t) const;
