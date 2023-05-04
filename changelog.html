@@ -497,6 +497,8 @@ document.write(`
 <section id="new">
 <h3>New<a class="headerlink" href="#new" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>The heyoka library now passes all <code class="docutils literal notranslate"><span class="pre">clang-tidy</span></code> checks
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/315">#315</a>).</p></li>
 <li><p>Introduce several vectorised overloads in the expression
 API. These vectorised overloads allow to perform the same
 operation on a list of expressions more efficiently
@@ -513,6 +515,8 @@ a canonical ordering of their operands
 <li><p>The arithmetic operators of the expression class
 can now fold constants through call chains
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/311">#311</a>).</p></li>
+<li><p>New API to compute high-order derivatives
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/309">#309</a>).</p></li>
 <li><p>The state variables and right-hand side of a system of ODEs
 are now available as read-only properties in the integrator
 classes
@@ -534,6 +538,11 @@ very large expressions
 <section id="changes">
 <h3>Changes<a class="headerlink" href="#changes" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>Moved-from expressions and numbers are now guaranteed to be in the
+default-constructed state
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/319">#319</a>).</p></li>
+<li><p>The expression code has been reorganised into multiple files
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/317">#317</a>).</p></li>
 <li><p>The <code class="docutils literal notranslate"><span class="pre">sum_sq()</span></code> function now performs constant folding
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/304">#304</a>).</p></li>
 <li><p>Performance improvements in compact mode for Taylor
