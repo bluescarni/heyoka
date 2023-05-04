@@ -62,8 +62,12 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
+HEYOKA_DLL_PUBLIC void swap(expression &, expression &) noexcept;
+
 class HEYOKA_DLL_PUBLIC expression
 {
+    friend HEYOKA_DLL_PUBLIC void swap(expression &, expression &) noexcept;
+
 public:
     using value_type = std::variant<number, variable, func, param>;
 
@@ -105,11 +109,6 @@ public:
     expression &operator=(expression &&) noexcept;
 
     [[nodiscard]] const value_type &value() const;
-
-    friend void swap(expression &ex0, expression &ex1) noexcept
-    {
-        std::swap(ex0.m_value, ex1.m_value);
-    }
 };
 
 HEYOKA_DLL_PUBLIC expression copy(const expression &);

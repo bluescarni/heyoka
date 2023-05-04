@@ -31,8 +31,12 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
+HEYOKA_DLL_PUBLIC void swap(param &, param &) noexcept;
+
 class HEYOKA_DLL_PUBLIC param
 {
+    friend HEYOKA_DLL_PUBLIC void swap(param &, param &) noexcept;
+
     std::uint32_t m_index;
 
     // Serialization.
@@ -57,11 +61,7 @@ public:
     ~param();
 
     [[nodiscard]] const std::uint32_t &idx() const;
-
-    std::uint32_t &idx();
 };
-
-HEYOKA_DLL_PUBLIC void swap(param &, param &) noexcept;
 
 HEYOKA_DLL_PUBLIC std::size_t hash(const param &);
 

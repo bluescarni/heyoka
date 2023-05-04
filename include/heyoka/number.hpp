@@ -39,8 +39,12 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
+HEYOKA_DLL_PUBLIC void swap(number &, number &) noexcept;
+
 class HEYOKA_DLL_PUBLIC number
 {
+    friend HEYOKA_DLL_PUBLIC void swap(number &, number &) noexcept;
+
 public:
     using value_type = std::variant<float, double, long double
 #if defined(HEYOKA_HAVE_REAL128)
@@ -82,11 +86,8 @@ public:
     number &operator=(const number &);
     number &operator=(number &&) noexcept;
 
-    value_type &value();
     [[nodiscard]] const value_type &value() const;
 };
-
-HEYOKA_DLL_PUBLIC void swap(number &, number &) noexcept;
 
 HEYOKA_DLL_PUBLIC std::size_t hash(const number &);
 
@@ -96,20 +97,20 @@ HEYOKA_DLL_PUBLIC bool is_zero(const number &);
 HEYOKA_DLL_PUBLIC bool is_one(const number &);
 HEYOKA_DLL_PUBLIC bool is_negative_one(const number &);
 
-HEYOKA_DLL_PUBLIC number operator-(number);
+HEYOKA_DLL_PUBLIC number operator-(const number &);
 
-HEYOKA_DLL_PUBLIC number operator+(number, number);
-HEYOKA_DLL_PUBLIC number operator-(number, number);
-HEYOKA_DLL_PUBLIC number operator*(number, number);
-HEYOKA_DLL_PUBLIC number operator/(number, number);
+HEYOKA_DLL_PUBLIC number operator+(const number &, const number &);
+HEYOKA_DLL_PUBLIC number operator-(const number &, const number &);
+HEYOKA_DLL_PUBLIC number operator*(const number &, const number &);
+HEYOKA_DLL_PUBLIC number operator/(const number &, const number &);
 
 HEYOKA_DLL_PUBLIC bool operator==(const number &, const number &);
 HEYOKA_DLL_PUBLIC bool operator!=(const number &, const number &);
 
-HEYOKA_DLL_PUBLIC number exp(number);
+HEYOKA_DLL_PUBLIC number exp(const number &);
 HEYOKA_DLL_PUBLIC number binomial(const number &, const number &);
 HEYOKA_DLL_PUBLIC number nextafter(const number &, const number &);
-HEYOKA_DLL_PUBLIC number sqrt(number);
+HEYOKA_DLL_PUBLIC number sqrt(const number &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const number &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);

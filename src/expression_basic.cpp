@@ -93,17 +93,46 @@ expression::expression(param p) : m_value(std::move(p)) {}
 
 expression::expression(const expression &) = default;
 
-expression::expression(expression &&) noexcept = default;
+// NOLINTNEXTLINE(bugprone-exception-escape)
+expression::expression(expression &&other) noexcept : m_value(std::move(other.m_value))
+{
+    // NOTE: ensure other is equivalent to a
+    // default-constructed expression.
+    other.m_value.emplace<number>(0.);
+}
 
 expression::~expression() = default;
 
-expression &expression::operator=(const expression &) = default;
+expression &expression::operator=(const expression &other)
+{
+    if (this != &other) {
+        *this = expression(other);
+    }
 
-expression &expression::operator=(expression &&) noexcept = default;
+    return *this;
+}
+
+// NOLINTNEXTLINE(bugprone-exception-escape)
+expression &expression::operator=(expression &&other) noexcept
+{
+    if (this != &other) {
+        m_value = std::move(other.m_value);
+        // NOTE: ensure other is equivalent to a
+        // default-constructed expression.
+        other.m_value.emplace<number>(0.);
+    }
+
+    return *this;
+}
 
 const expression::value_type &expression::value() const
 {
     return m_value;
+}
+
+void swap(expression &ex0, expression &ex1) noexcept
+{
+    std::swap(ex0.m_value, ex1.m_value);
 }
 
 namespace detail

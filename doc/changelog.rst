@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- The heyoka library now passes all ``clang-tidy`` checks
+  (`#315 <https://github.com/bluescarni/heyoka/pull/315>`__).
 - Introduce several vectorised overloads in the expression
   API. These vectorised overloads allow to perform the same
   operation on a list of expressions more efficiently
@@ -23,6 +25,8 @@ New
 - The arithmetic operators of the expression class
   can now fold constants through call chains
   (`#311 <https://github.com/bluescarni/heyoka/pull/311>`__).
+- New API to compute high-order derivatives
+  (`#309 <https://github.com/bluescarni/heyoka/pull/309>`__).
 - The state variables and right-hand side of a system of ODEs
   are now available as read-only properties in the integrator
   classes
@@ -43,6 +47,11 @@ New
 Changes
 ~~~~~~~
 
+- Moved-from expressions and numbers are now guaranteed to be in the
+  default-constructed state
+  (`#319 <https://github.com/bluescarni/heyoka/pull/319>`__).
+- The expression code has been reorganised into multiple files
+  (`#317 <https://github.com/bluescarni/heyoka/pull/317>`__).
 - The ``sum_sq()`` function now performs constant folding
   (`#304 <https://github.com/bluescarni/heyoka/pull/304>`__).
 - Performance improvements in compact mode for Taylor

@@ -17,6 +17,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <variant>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -916,4 +918,25 @@ TEST_CASE("is_negative_one")
     REQUIRE(is_negative_one(-number{mppp::real{1.}}));
 
 #endif
+}
+
+TEST_CASE("move semantics")
+{
+    REQUIRE(std::is_nothrow_move_assignable_v<number>);
+    REQUIRE(std::is_nothrow_move_constructible_v<number>);
+
+    auto x = number{3.};
+
+    // Check that move construction sets the moved-from
+    // object to zero.
+    auto x2(std::move(x));
+    REQUIRE(x2 == number{3.});
+    REQUIRE(x == number{0.});
+
+    // Check that move assignment sets the moved-from
+    // object to zero.
+    auto x3 = number{1.};
+    x3 = std::move(x2);
+    REQUIRE(x3 == number{3.});
+    REQUIRE(x2 == number{0.});
 }

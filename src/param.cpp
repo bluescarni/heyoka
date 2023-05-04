@@ -47,14 +47,9 @@ const std::uint32_t &param::idx() const
     return m_index;
 }
 
-std::uint32_t &param::idx()
-{
-    return m_index;
-}
-
 void swap(param &p0, param &p1) noexcept
 {
-    std::swap(p0.idx(), p1.idx());
+    std::swap(p0.m_index, p1.m_index);
 }
 
 std::size_t hash(const param &p)
