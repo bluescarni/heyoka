@@ -2069,3 +2069,25 @@ TEST_CASE("swap")
     REQUIRE(x == "y"_var);
     REQUIRE(y == "x"_var);
 }
+
+TEST_CASE("move semantics")
+{
+    REQUIRE(std::is_nothrow_move_assignable_v<expression>);
+    REQUIRE(std::is_nothrow_move_constructible_v<expression>);
+
+    auto [x, y] = make_vars("x", "y");
+
+    // Check that move construction sets the moved-from
+    // object to zero.
+    auto ex = x + y;
+    auto ex2(std::move(ex));
+    REQUIRE(ex2 == x + y);
+    REQUIRE(ex == 0_dbl);
+
+    // Check that move assignment sets the moved-from
+    // object to zero.
+    auto ex3 = 1_dbl;
+    ex3 = std::move(ex2);
+    REQUIRE(ex3 == x + y);
+    REQUIRE(ex2 == 0_dbl);
+}
