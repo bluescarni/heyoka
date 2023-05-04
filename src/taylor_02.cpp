@@ -228,11 +228,11 @@ number taylor_determine_h_rhofac(llvm_state &s, llvm::Type *fp_t, std::uint32_t 
     assert(fp_t != nullptr);
     assert(order > 0u);
 
-    auto const_m7_10 = number_like(s, fp_t, -7.) / number_like(s, fp_t, 10.);
-    auto const_e2 = exp(number_like(s, fp_t, 1.)) * exp(number_like(s, fp_t, 1.));
-    auto const_om1 = number_like(s, fp_t, static_cast<double>(order - 1u));
+    const auto const_m7_10 = number_like(s, fp_t, -7.) / number_like(s, fp_t, 10.);
+    const auto const_e2 = exp(number_like(s, fp_t, 1.)) * exp(number_like(s, fp_t, 1.));
+    const auto const_om1 = number_like(s, fp_t, static_cast<double>(order - 1u));
 
-    return exp(std::move(const_m7_10) / std::move(const_om1)) / std::move(const_e2);
+    return exp(const_m7_10 / const_om1) / const_e2;
 }
 
 } // namespace

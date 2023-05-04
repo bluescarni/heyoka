@@ -106,6 +106,11 @@ const expression::value_type &expression::value() const
     return m_value;
 }
 
+void swap(expression &ex0, expression &ex1) noexcept
+{
+    std::swap(ex0.m_value, ex1.m_value);
+}
+
 namespace detail
 {
 

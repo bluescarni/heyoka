@@ -47,11 +47,6 @@ variable &variable::operator=(const variable &) = default;
 
 variable &variable::operator=(variable &&) noexcept = default;
 
-std::string &variable::name()
-{
-    return m_name;
-}
-
 const std::string &variable::name() const
 {
     return m_name;
@@ -59,7 +54,7 @@ const std::string &variable::name() const
 
 void swap(variable &v0, variable &v1) noexcept
 {
-    std::swap(v0.name(), v1.name());
+    std::swap(v0.m_name, v1.m_name);
 }
 
 std::size_t hash(const variable &v)

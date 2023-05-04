@@ -100,11 +100,6 @@ number &number::operator=(const number &) = default;
 
 number &number::operator=(number &&) noexcept = default;
 
-number::value_type &number::value()
-{
-    return m_value;
-}
-
 const number::value_type &number::value() const
 {
     return m_value;
@@ -112,7 +107,7 @@ const number::value_type &number::value() const
 
 void swap(number &n0, number &n1) noexcept
 {
-    std::swap(n0.value(), n1.value());
+    std::swap(n0.m_value, n1.m_value);
 }
 
 std::size_t hash(const number &n)
@@ -197,9 +192,9 @@ bool is_negative_one(const number &n)
     return std::visit([](const auto &arg) { return arg == -1; }, n.value());
 }
 
-number operator-(number n)
+number operator-(const number &n)
 {
-    return std::visit([](auto &&arg) { return number{-std::forward<decltype(arg)>(arg)}; }, std::move(n.value()));
+    return std::visit([](const auto &arg) { return number{-arg}; }, n.value());
 }
 
 namespace detail
@@ -243,12 +238,12 @@ using is_divisible = std::conjunction<is_detected<div_t, T, U>, is_detected<div_
 
 } // namespace detail
 
-number operator+(number n1, number n2)
+number operator+(const number &n1, const number &n2)
 {
     return std::visit(
-        [](auto &&arg1, auto &&arg2) -> number {
+        [](const auto &arg1, const auto &arg2) -> number {
             if constexpr (detail::is_addable<decltype(arg1), decltype(arg2)>::value) {
-                return number{std::forward<decltype(arg1)>(arg1) + std::forward<decltype(arg2)>(arg2)};
+                return number{arg1 + arg2};
             } else {
                 // LCOV_EXCL_START
                 throw std::invalid_argument(fmt::format("Cannot add an object of type '{}' to an object of type '{}'",
@@ -257,15 +252,15 @@ number operator+(number n1, number n2)
                 // LCOV_EXCL_STOP
             }
         },
-        std::move(n1.value()), std::move(n2.value()));
+        n1.value(), n2.value());
 }
 
-number operator-(number n1, number n2)
+number operator-(const number &n1, const number &n2)
 {
     return std::visit(
-        [](auto &&arg1, auto &&arg2) -> number {
+        [](const auto &arg1, const auto &arg2) -> number {
             if constexpr (detail::is_subtractable<decltype(arg1), decltype(arg2)>::value) {
-                return number{std::forward<decltype(arg1)>(arg1) - std::forward<decltype(arg2)>(arg2)};
+                return number{arg1 - arg2};
             } else {
                 // LCOV_EXCL_START
                 throw std::invalid_argument(fmt::format(
@@ -274,15 +269,15 @@ number operator-(number n1, number n2)
                 // LCOV_EXCL_STOP
             }
         },
-        std::move(n1.value()), std::move(n2.value()));
+        n1.value(), n2.value());
 }
 
-number operator*(number n1, number n2)
+number operator*(const number &n1, const number &n2)
 {
     return std::visit(
-        [](auto &&arg1, auto &&arg2) -> number {
+        [](const auto &arg1, const auto &arg2) -> number {
             if constexpr (detail::is_multipliable<decltype(arg1), decltype(arg2)>::value) {
-                return number{std::forward<decltype(arg1)>(arg1) * std::forward<decltype(arg2)>(arg2)};
+                return number{arg1 * arg2};
             } else {
                 // LCOV_EXCL_START
                 throw std::invalid_argument(fmt::format(
@@ -291,15 +286,15 @@ number operator*(number n1, number n2)
                 // LCOV_EXCL_STOP
             }
         },
-        std::move(n1.value()), std::move(n2.value()));
+        n1.value(), n2.value());
 }
 
-number operator/(number n1, number n2)
+number operator/(const number &n1, const number &n2)
 {
     return std::visit(
-        [](auto &&arg1, auto &&arg2) -> number {
+        [](const auto &arg1, const auto &arg2) -> number {
             if constexpr (detail::is_divisible<decltype(arg1), decltype(arg2)>::value) {
-                return number{std::forward<decltype(arg1)>(arg1) / std::forward<decltype(arg2)>(arg2)};
+                return number{arg1 / arg2};
             } else {
                 // LCOV_EXCL_START
                 throw std::invalid_argument(fmt::format(
@@ -308,7 +303,7 @@ number operator/(number n1, number n2)
                 // LCOV_EXCL_STOP
             }
         },
-        std::move(n1.value()), std::move(n2.value()));
+        n1.value(), n2.value());
 }
 
 // NOTE: in order for equality to be consistent with hashing,
@@ -337,15 +332,15 @@ bool operator!=(const number &n1, const number &n2)
     return !(n1 == n2);
 }
 
-number exp(number n)
+number exp(const number &n)
 {
     return std::visit(
-        [](auto &&arg) {
+        [](const auto &arg) {
             using std::exp;
 
-            return number{exp(std::forward<decltype(arg)>(arg))};
+            return number{exp(arg)};
         },
-        std::move(n.value()));
+        n.value());
 }
 
 number binomial(const number &i, const number &j)
@@ -424,15 +419,15 @@ number nextafter(const number &from, const number &to)
         from.value(), to.value());
 }
 
-number sqrt(number n)
+number sqrt(const number &n)
 {
     return std::visit(
         [](auto &&arg) {
             using std::sqrt;
 
-            return number{sqrt(std::forward<decltype(arg)>(arg))};
+            return number{sqrt(arg)};
         },
-        std::move(n.value()));
+        n.value());
 }
 
 namespace detail

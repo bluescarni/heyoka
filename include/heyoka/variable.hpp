@@ -30,8 +30,12 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
+HEYOKA_DLL_PUBLIC void swap(variable &, variable &) noexcept;
+
 class HEYOKA_DLL_PUBLIC variable
 {
+    friend HEYOKA_DLL_PUBLIC void swap(variable &, variable &) noexcept;
+
     std::string m_name;
 
     // Serialization.
@@ -52,11 +56,8 @@ public:
     variable &operator=(const variable &);
     variable &operator=(variable &&) noexcept;
 
-    std::string &name();
     [[nodiscard]] const std::string &name() const;
 };
-
-HEYOKA_DLL_PUBLIC void swap(variable &, variable &) noexcept;
 
 HEYOKA_DLL_PUBLIC std::size_t hash(const variable &);
 
