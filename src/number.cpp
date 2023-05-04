@@ -92,13 +92,37 @@ number::number(mppp::real x) : m_value(std::move(x)) {}
 
 number::number(const number &) = default;
 
-number::number(number &&) noexcept = default;
+// NOLINTNEXTLINE(bugprone-exception-escape)
+number::number(number &&other) noexcept : m_value(std::move(other.m_value))
+{
+    // NOTE: ensure other is equivalent to a
+    // default-constructed number.
+    other.m_value.emplace<double>(0.);
+}
 
 number::~number() = default;
 
-number &number::operator=(const number &) = default;
+number &number::operator=(const number &other)
+{
+    if (this != &other) {
+        *this = number(other);
+    }
 
-number &number::operator=(number &&) noexcept = default;
+    return *this;
+}
+
+// NOLINTNEXTLINE(bugprone-exception-escape)
+number &number::operator=(number &&other) noexcept
+{
+    if (this != &other) {
+        m_value = std::move(other.m_value);
+        // NOTE: ensure other is equivalent to a
+        // default-constructed number.
+        other.m_value.emplace<double>(0.);
+    }
+
+    return *this;
+}
 
 const number::value_type &number::value() const
 {
