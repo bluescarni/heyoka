@@ -56,6 +56,8 @@ public:
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
 };
 
+HEYOKA_DLL_PUBLIC expression sum_split(const expression &, std::uint32_t);
+
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression sum(std::vector<expression>);

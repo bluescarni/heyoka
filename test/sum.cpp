@@ -336,3 +336,34 @@ TEST_CASE("commutativity")
 
     REQUIRE(std::get<func>(sum({x, y}).value()).is_commutative());
 }
+
+TEST_CASE("sum split")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    auto s = sum({x, x, x, x, y, y, y});
+
+    auto ss1 = detail::sum_split(s, 2u);
+
+    REQUIRE(ss1 == sum({sum({sum({x, x}), sum({x, x})}), expression(func(detail::sum_impl({sum({y, y}), y})))}));
+
+    ss1 = detail::sum_split(s, 3u);
+
+    REQUIRE(ss1 == expression(func(detail::sum_impl({sum({x, x, x}), sum({x, y, y}), y}))));
+
+    ss1 = detail::sum_split(s, 4u);
+
+    REQUIRE(ss1 == sum({sum({x, x, x, x}), sum({y, y, y})}));
+
+    ss1 = detail::sum_split(s, 8u);
+
+    REQUIRE(s == ss1);
+
+    ss1 = detail::sum_split(s, 9u);
+
+    REQUIRE(s == ss1);
+
+    ss1 = detail::sum_split(s, 10u);
+
+    REQUIRE(s == ss1);
+}

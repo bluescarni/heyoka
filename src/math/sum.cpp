@@ -335,6 +335,60 @@ llvm::Function *sum_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
     return sum_taylor_c_diff_func_impl(s, fp_t, *this, n_uvars, batch_size);
 }
 
+// Helper to split the input sum into nested sums, each
+// of which will have at most 'split' arguments.
+// NOLINTNEXTLINE(misc-no-recursion)
+expression sum_split(const expression &e, std::uint32_t split)
+{
+    assert(split >= 2u);
+    assert(std::holds_alternative<func>(e.value()));
+
+    const auto *sum_ptr = std::get<func>(e.value()).extract<sum_impl>();
+
+    assert(sum_ptr != nullptr);
+
+    // NOTE: this stops the recursion.
+    if (sum_ptr->args().size() <= split) {
+        return e;
+    }
+
+    // NOTE: ret_seq will be a list
+    // of sums each containing 'split' terms.
+    // tmp is a temporary vector
+    // used to accumulate the arguments for each
+    // sum in ret_seq.
+    std::vector<expression> ret_seq, tmp;
+    for (const auto &arg : sum_ptr->args()) {
+        tmp.push_back(arg);
+
+        if (tmp.size() == split) {
+            ret_seq.emplace_back(func{detail::sum_impl{std::move(tmp)}});
+
+            // NOTE: tmp is practically guaranteed to be empty, but let's
+            // be paranoid.
+            tmp.clear();
+        }
+    }
+
+    // NOTE: tmp is not empty if 'split' does not divide
+    // exactly sum_ptr->args().size(). In such a case, we need to do the
+    // last iteration manually.
+    if (!tmp.empty()) {
+        // NOTE: contrary to the previous loop, here we could
+        // in principle end up creating a sum_impl with only one
+        // term. In such a case, for consistency with the general
+        // behaviour of sum({arg}), return arg directly.
+        if (tmp.size() == 1u) {
+            ret_seq.push_back(std::move(tmp[0]));
+        } else {
+            ret_seq.emplace_back(func{detail::sum_impl{std::move(tmp)}});
+        }
+    }
+
+    // Recurse to split further, if needed.
+    return sum_split(expression{func{detail::sum_impl{std::move(ret_seq)}}}, split);
+}
+
 } // namespace detail
 
 // NOLINTNEXTLINE(misc-no-recursion)
