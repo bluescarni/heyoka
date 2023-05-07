@@ -345,10 +345,11 @@ expression sum_split(const expression &e, std::uint32_t split)
 
     const auto *sum_ptr = std::get<func>(e.value()).extract<sum_impl>();
 
-    assert(sum_ptr != nullptr);
-
-    // NOTE: this stops the recursion.
-    if (sum_ptr->args().size() <= split) {
+    // NOTE: return 'e' unchanged if it is not a sum,
+    // or if it is a sum that does not need to be split.
+    // The latter condition is also used to terminate the
+    // recursion.
+    if (sum_ptr == nullptr || sum_ptr->args().size() <= split) {
         return e;
     }
 
@@ -394,12 +395,6 @@ expression sum_split(const expression &e, std::uint32_t split)
 // NOLINTNEXTLINE(misc-no-recursion)
 expression sum(std::vector<expression> args)
 {
-    // NOTE: the default split value is a power of two so that the
-    // internal pairwise sums are rounded up exactly.
-    constexpr std::uint32_t split = 8;
-
-    static_assert(split >= 2u);
-
     // Partition args so that all numbers are at the end.
     const auto n_end_it = std::stable_partition(
         args.begin(), args.end(), [](const expression &ex) { return !std::holds_alternative<number>(ex.value()); });
@@ -421,67 +416,19 @@ expression sum(std::vector<expression> args)
         }
     }
 
-    // Special case.
+    // Special cases.
     if (args.empty()) {
         return 0_dbl;
     }
 
-    // NOTE: this terminates the recursion.
     if (args.size() == 1u) {
         return std::move(args[0]);
     }
 
-    // NOTE: ret_seq will contain a sequence
-    // of sums each containing 'split' terms.
-    // tmp is a temporary vector
-    // used to accumulate the arguments to each
-    // sum in ret_seq.
-    std::vector<expression> ret_seq, tmp;
-    for (auto &arg : args) {
-        // LCOV_EXCL_START
-#if !defined(NDEBUG)
-        // NOTE: there cannot be zero numbers here because
-        // the numbers were compactified earlier and
-        // compactification also removes the result if zero.
-        if (const auto *nptr = std::get_if<number>(&arg.value()); (nptr != nullptr) && is_zero(*nptr)) {
-            assert(false);
-        }
-#endif
-        // LCOV_EXCL_STOP
+    // Sort the operands in canonical order.
+    std::stable_sort(args.begin(), args.end(), detail::comm_ops_lt);
 
-        tmp.push_back(std::move(arg));
-        if (tmp.size() == split) {
-            // Sort the operands in canonical order.
-            std::stable_sort(tmp.begin(), tmp.end(), detail::comm_ops_lt);
-
-            ret_seq.emplace_back(func{detail::sum_impl{std::move(tmp)}});
-
-            // NOTE: tmp is practically guaranteed to be empty, but let's
-            // be paranoid.
-            tmp.clear();
-        }
-    }
-
-    // NOTE: tmp is not empty if 'split' does not divide
-    // exactly args.size(). In such a case, we need to do the
-    // last iteration manually.
-    if (!tmp.empty()) {
-        // NOTE: contrary to the previous loop, here we could
-        // in principle end up creating a sum_impl with only one
-        // term. In such a case, for consistency with the general
-        // behaviour of sum({arg}), return arg directly.
-        if (tmp.size() == 1u) {
-            ret_seq.emplace_back(std::move(tmp[0]));
-        } else {
-            // Sort the operands in canonical order.
-            std::stable_sort(tmp.begin(), tmp.end(), detail::comm_ops_lt);
-
-            ret_seq.emplace_back(func{detail::sum_impl{std::move(tmp)}});
-        }
-    }
-
-    // Perform a sum over the sums.
-    return sum(std::move(ret_seq));
+    return expression{func{detail::sum_impl{std::move(args)}}};
 }
 
 HEYOKA_END_NAMESPACE

@@ -57,6 +57,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
@@ -1239,5 +1240,95 @@ bool is_time_dependent(const expression &ex)
 
     return detail::is_time_dependent(func_map, ex);
 }
+
+namespace detail
+{
+
+namespace
+{
+
+// NOTE: the default split value is a power of two so that the
+// internal pairwise sums are rounded up exactly.
+constexpr std::uint32_t decompose_split = 8u;
+
+expression split_sums_for_decompose(funcptr_map<expression> &func_map, const expression &ex,
+                                    // NOTE: this flag indicates if ex was created
+                                    // by an invocation of sum_split() which generated
+                                    // a new sum. In other words, if ex_is_new is true then
+                                    // ex does not belong to the original expression
+                                    // on which the initial invocation of
+                                    // split_sums_for_decompose() took place.
+                                    bool ex_is_new = false)
+{
+    return std::visit(
+        [&func_map, &ex, ex_is_new](const auto &v) {
+            using type = uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, func>) {
+                const auto *f_id = v.get_ptr();
+
+                if (ex_is_new) {
+                    assert(func_map.find(f_id) == func_map.end());
+                } else {
+                    // Check if we already split sums on ex.
+                    if (const auto it = func_map.find(f_id); it != func_map.end()) {
+                        return it->second;
+                    }
+                }
+
+                // Attempt to split the current function.
+                const auto split_ex = sum_split(ex, decompose_split);
+                const auto &split_ex_func = std::get<func>(split_ex.value());
+
+                // Did we produce a new expression?
+                const auto split_ex_is_new = split_ex_func.get_ptr() != f_id;
+
+                // Split the function arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(split_ex_func.args().size());
+                for (const auto &orig_arg : split_ex_func.args()) {
+                    new_args.push_back(split_sums_for_decompose(func_map, orig_arg, ex_is_new || split_ex_is_new));
+                }
+
+                // Create a copy of split_ex_func with the new arguments.
+                auto f_copy = split_ex_func.copy(new_args);
+
+                // Construct the return value.
+                auto ret = expression{std::move(f_copy)};
+
+                // NOTE: the cache is to be updated only if ex is not a new expression.
+                // We don't want to add to the cache new expressions that were generated
+                // by splitting sums.
+                if (!ex_is_new) {
+                    [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
+                    // NOTE: an expression cannot contain itself.
+                    assert(flag); // LCOV_EXCL_LINE
+                }
+
+                return ret;
+            } else {
+                return ex;
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+std::vector<expression> split_sums_for_decompose(const std::vector<expression> &v_ex)
+{
+    funcptr_map<expression> func_map;
+
+    std::vector<expression> retval;
+    retval.reserve(v_ex.size());
+
+    for (const auto &e : v_ex) {
+        retval.push_back(split_sums_for_decompose(func_map, e));
+    }
+
+    return retval;
+}
+
+} // namespace detail
 
 HEYOKA_END_NAMESPACE

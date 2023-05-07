@@ -803,11 +803,22 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
 
     // Store in a single vector of expressions both the equations
     // and the sv_funcs.
-    auto all_ex_ = v_ex_;
-    all_ex_.insert(all_ex_.end(), sv_funcs_.begin(), sv_funcs_.end());
+    auto all_ex = v_ex_;
+    all_ex.insert(all_ex.end(), sv_funcs_.begin(), sv_funcs_.end());
+
+    // Split sums.
+    all_ex = detail::split_sums_for_decompose(all_ex);
+
+#if !defined(NDEBUG)
+
+    // Save copies for checking in debug mode.
+    const auto v_ex_split = std::vector(all_ex.data(), all_ex.data() + v_ex_.size());
+    const auto sv_funcs_split = std::vector(all_ex.data() + v_ex_.size(), all_ex.data() + all_ex.size());
+
+#endif
 
     // Rename the variables.
-    const auto all_ex = rename_variables(all_ex_, repl_map);
+    all_ex = rename_variables(all_ex, repl_map);
 
     // Init the decomposition. It begins with a list
     // of the original variables of the system.
@@ -878,8 +889,8 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
 
 #if !defined(NDEBUG)
     // Verify the decomposition.
-    detail::verify_taylor_dec(v_ex_, u_vars_defs);
-    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_, u_vars_defs, n_eq);
+    detail::verify_taylor_dec(v_ex_split, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_split, u_vars_defs, n_eq);
 #endif
 
     // Simplify the decomposition.
@@ -889,8 +900,8 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
 
 #if !defined(NDEBUG)
     // Verify the simplified decomposition.
-    detail::verify_taylor_dec(v_ex_, u_vars_defs);
-    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_, u_vars_defs, n_eq);
+    detail::verify_taylor_dec(v_ex_split, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_split, u_vars_defs, n_eq);
 #endif
 
     // Run the breadth-first topological sort on the decomposition.
@@ -900,8 +911,8 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
 
 #if !defined(NDEBUG)
     // Verify the reordered decomposition.
-    detail::verify_taylor_dec(v_ex_, u_vars_defs);
-    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_, u_vars_defs, n_eq);
+    detail::verify_taylor_dec(v_ex_split, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_split, u_vars_defs, n_eq);
 #endif
 
     return std::make_pair(std::move(u_vars_defs), std::move(sv_funcs_dc));
@@ -1005,11 +1016,22 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 
     // Store in a single vector of expressions both the rhs
     // and the sv_funcs.
-    auto all_ex_ = sys_rhs;
-    all_ex_.insert(all_ex_.end(), sv_funcs_.begin(), sv_funcs_.end());
+    auto all_ex = sys_rhs;
+    all_ex.insert(all_ex.end(), sv_funcs_.begin(), sv_funcs_.end());
+
+    // Split sums.
+    all_ex = detail::split_sums_for_decompose(all_ex);
+
+#if !defined(NDEBUG)
+
+    // Save copies for checking in debug mode.
+    const auto sys_rhs_split = std::vector(all_ex.data(), all_ex.data() + sys_rhs.size());
+    const auto sv_funcs_split = std::vector(all_ex.data() + sys_rhs.size(), all_ex.data() + all_ex.size());
+
+#endif
 
     // Rename the variables.
-    const auto all_ex = rename_variables(all_ex_, repl_map);
+    all_ex = rename_variables(all_ex, repl_map);
 
     // Init the decomposition. It begins with a list
     // of the original lhs variables of the system.
@@ -1079,8 +1101,8 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 
 #if !defined(NDEBUG)
     // Verify the decomposition.
-    detail::verify_taylor_dec(sys_rhs, u_vars_defs);
-    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_, u_vars_defs, n_eq);
+    detail::verify_taylor_dec(sys_rhs_split, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_split, u_vars_defs, n_eq);
 #endif
 
     // Simplify the decomposition.
@@ -1090,8 +1112,8 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 
 #if !defined(NDEBUG)
     // Verify the simplified decomposition.
-    detail::verify_taylor_dec(sys_rhs, u_vars_defs);
-    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_, u_vars_defs, n_eq);
+    detail::verify_taylor_dec(sys_rhs_split, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_split, u_vars_defs, n_eq);
 #endif
 
     // Run the breadth-first topological sort on the decomposition.
@@ -1101,8 +1123,8 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 
 #if !defined(NDEBUG)
     // Verify the reordered decomposition.
-    detail::verify_taylor_dec(sys_rhs, u_vars_defs);
-    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_, u_vars_defs, n_eq);
+    detail::verify_taylor_dec(sys_rhs_split, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_split, u_vars_defs, n_eq);
 #endif
 
     return std::make_pair(std::move(u_vars_defs), std::move(sv_funcs_dc));

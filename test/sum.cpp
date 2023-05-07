@@ -366,4 +366,9 @@ TEST_CASE("sum split")
     ss1 = detail::sum_split(s, 10u);
 
     REQUIRE(s == ss1);
+
+    // Check with a non-sum expression.
+    auto ns = x * y;
+    REQUIRE(detail::sum_split(ns, 8u) == ns);
+    REQUIRE(std::get<func>(detail::sum_split(ns, 8u).value()).get_ptr() == std::get<func>(ns.value()).get_ptr());
 }
