@@ -335,8 +335,10 @@ llvm::Function *sum_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
     return sum_taylor_c_diff_func_impl(s, fp_t, *this, n_uvars, batch_size);
 }
 
-// Helper to split the input sum into nested sums, each
+// Helper to split the input sum 'e' into nested sums, each
 // of which will have at most 'split' arguments.
+// If 'e' is not a sum, or if it is a sum with no more than
+// 'split' terms, 'e' will be returned unmodified.
 // NOLINTNEXTLINE(misc-no-recursion)
 expression sum_split(const expression &e, std::uint32_t split)
 {

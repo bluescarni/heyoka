@@ -21,7 +21,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
-#include <heyoka/math/sum_sq.hpp>
 #include <heyoka/taylor.hpp>
 
 #include <mp++/real.hpp>
