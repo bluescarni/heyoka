@@ -1281,7 +1281,7 @@ expression split_sums_for_decompose(funcptr_map<expression> &func_map, const exp
                 const auto &split_ex_func = std::get<func>(split_ex.value());
 
                 // Did we produce a new expression?
-                const auto split_ex_is_new = split_ex_func.get_ptr() != f_id;
+                const auto split_ex_is_new = (split_ex_func.get_ptr() != f_id);
 
                 // Split the function arguments.
                 std::vector<expression> new_args;
