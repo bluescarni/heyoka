@@ -98,12 +98,6 @@ TEST_CASE("basic test")
 
         REQUIRE(ss == x * x);
     }
-
-    {
-        auto ss = sum_sq({x, y, z, x + x, y + y, z + z, x + y, x + z, y + z});
-
-        REQUIRE(ss == sum({sum_sq({x, y, z, x + x, y + y, z + z, x + y, x + z}), (y + z) * (y + z)}));
-    }
 }
 
 TEST_CASE("stream test")

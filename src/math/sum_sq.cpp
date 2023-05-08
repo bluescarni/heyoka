@@ -570,12 +570,6 @@ llvm::Function *sum_sq_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t,
 
 expression sum_sq(std::vector<expression> args)
 {
-    // NOTE: the default split value is a power of two so that the
-    // internal pairwise sums are rounded up exactly.
-    constexpr std::uint32_t split = 8;
-
-    static_assert(split >= 2u);
-
     // Partition args so that all numbers are at the end.
     const auto n_end_it = std::stable_partition(
         args.begin(), args.end(), [](const expression &ex) { return !std::holds_alternative<number>(ex.value()); });
@@ -613,66 +607,19 @@ expression sum_sq(std::vector<expression> args)
         }
     }
 
-    // Special case.
+    // Special cases.
     if (args.empty()) {
         return 0_dbl;
     }
 
-    // NOTE: this terminates the recursion.
     if (args.size() == 1u) {
         return args[0] * args[0];
     }
 
-    // NOTE: ret_seq will contain a sequence
-    // of sum_sqs each containing 'split' terms.
-    // tmp is a temporary vector
-    // used to accumulate the arguments to each
-    // sum_sq in ret_seq.
-    std::vector<expression> ret_seq, tmp;
-    for (auto &arg : args) {
-        // LCOV_EXCL_START
-#if !defined(NDEBUG)
-        // NOTE: there cannot be zero numbers here because
-        // we removed them.
-        if (const auto *nptr = std::get_if<number>(&arg.value()); (nptr != nullptr) && is_zero(*nptr)) {
-            assert(false);
-        }
-#endif
-        // LCOV_EXCL_STOP
+    // Sort the operands in canonical order.
+    std::stable_sort(args.begin(), args.end(), detail::comm_ops_lt);
 
-        tmp.push_back(std::move(arg));
-        if (tmp.size() == split) {
-            // Sort the operands in canonical order.
-            std::stable_sort(tmp.begin(), tmp.end(), detail::comm_ops_lt);
-
-            ret_seq.emplace_back(func{detail::sum_sq_impl{std::move(tmp)}});
-
-            // NOTE: tmp is practically guaranteed to be empty, but let's
-            // be paranoid.
-            tmp.clear();
-        }
-    }
-
-    // NOTE: tmp is not empty if 'split' does not divide
-    // exactly args.size(). In such a case, we need to do the
-    // last iteration manually.
-    if (!tmp.empty()) {
-        // NOTE: contrary to the previous loop, here we could
-        // in principle end up creating a sum_sq_impl with only one
-        // term. In such a case, for consistency with the general
-        // behaviour of sum_sq({arg}), return arg*arg directly.
-        if (tmp.size() == 1u) {
-            ret_seq.emplace_back(tmp[0] * tmp[0]);
-        } else {
-            // Sort the operands in canonical order.
-            std::stable_sort(tmp.begin(), tmp.end(), detail::comm_ops_lt);
-
-            ret_seq.emplace_back(func{detail::sum_sq_impl{std::move(tmp)}});
-        }
-    }
-
-    // Perform a sum over the sum_sqs.
-    return sum(std::move(ret_seq));
+    return expression{func{detail::sum_sq_impl{std::move(args)}}};
 }
 
 HEYOKA_END_NAMESPACE

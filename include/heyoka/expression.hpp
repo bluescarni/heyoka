@@ -641,6 +641,8 @@ std::vector<expression> function_decompose_cse(std::vector<expression> &, std::v
 std::vector<expression> function_sort_dc(std::vector<expression> &, std::vector<expression>::size_type,
                                          std::vector<expression>::size_type);
 
+HEYOKA_DLL_PUBLIC std::vector<expression> split_sums_for_decompose(const std::vector<expression> &);
+
 std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vector<expression>::size_type> &,
                                                             const expression &, std::vector<expression> &);
 
