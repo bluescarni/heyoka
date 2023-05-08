@@ -7,11 +7,13 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <initializer_list>
+#include <sstream>
 #include <vector>
 
 #include <heyoka/detail/num_identity.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -82,4 +84,25 @@ TEST_CASE("taylor num_identity")
     // Def ctor.
     detail::num_identity_impl nu;
     REQUIRE(nu.args() == std::vector{0_dbl});
+
+    // s11n.
+    std::stringstream ss;
+
+    auto ex = hy::detail::num_identity(42_dbl) + x;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == hy::detail::num_identity(42_dbl) + x);
 }
