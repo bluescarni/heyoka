@@ -112,6 +112,11 @@ TEST_CASE("number hash eq")
     REQUIRE(number{std::numeric_limits<long double>::quiet_NaN()}
             == number{std::numeric_limits<long double>::quiet_NaN()});
 
+    REQUIRE(hash_number(number{std::numeric_limits<double>::quiet_NaN()})
+            == hash_number(number{std::numeric_limits<long double>::quiet_NaN()}));
+    REQUIRE(hash_number(number{std::numeric_limits<double>::quiet_NaN()})
+            == hash_number(number{std::numeric_limits<float>::quiet_NaN()}));
+
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{0.l});
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{0.f});
     REQUIRE(number{0.l} != number{std::numeric_limits<double>::quiet_NaN()});
@@ -149,6 +154,9 @@ TEST_CASE("number hash eq")
 
     REQUIRE(number{std::numeric_limits<mppp::real128>::quiet_NaN()}
             == number{std::numeric_limits<mppp::real128>::quiet_NaN()});
+
+    REQUIRE(hash_number(number{std::numeric_limits<double>::quiet_NaN()})
+            == hash_number(number{std::numeric_limits<mppp::real128>::quiet_NaN()}));
 
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{0._rq});
     REQUIRE(number{std::numeric_limits<float>::quiet_NaN()} != number{0._rq});
