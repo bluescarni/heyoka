@@ -73,6 +73,7 @@
 #include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/num_identity.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -642,9 +643,13 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
     }
 
     // From n_eq to dc.size() - n_eq, the expressions
-    // must be functions whose arguments
-    // are either variables in the u_n form,
-    // where n < i, or numbers/params.
+    // must be either:
+    // - functions whose arguments
+    //   are either variables in the u_n form,
+    //   where n < i, or numbers/params, or
+    // - numbers (this is a corner case arising
+    //   if constant folding happens when adding
+    //   hidden dependencies).
     // The hidden dependencies must contain indices
     // only in the [n_eq, dc.size() - n_eq) range.
     for (auto i = n_eq; i < dc.size() - n_eq; ++i) {
@@ -663,7 +668,7 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
                         }
                     }
                 } else {
-                    assert(false);
+                    assert((std::is_same_v<type, number>));
                 }
             },
             dc[i].first.value());
@@ -742,6 +747,25 @@ void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, c
 #endif
 
 // LCOV_EXCL_STOP
+
+// Replace subexpressions in dc consisting
+// of numbers with number identity functions.
+// Number subexpressions can occur in case of
+// constant folding when adding hidden dependencies.
+void taylor_decompose_replace_numbers(taylor_dc_t &dc, std::vector<expression>::size_type n_eq)
+{
+    assert(dc.size() >= n_eq * 2u);
+
+    for (auto i = n_eq; i < dc.size() - n_eq; ++i) {
+        auto &[ex, deps] = dc[i];
+
+        if (std::holds_alternative<number>(ex.value())) {
+            assert(deps.empty());
+
+            ex = num_identity(ex);
+        }
+    }
+}
 
 } // namespace
 
@@ -914,6 +938,9 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
     detail::verify_taylor_dec(v_ex_split, u_vars_defs);
     detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_split, u_vars_defs, n_eq);
 #endif
+
+    // Replace any number subexpression with an identity function.
+    detail::taylor_decompose_replace_numbers(u_vars_defs, n_eq);
 
     return std::make_pair(std::move(u_vars_defs), std::move(sv_funcs_dc));
 }
@@ -1126,6 +1153,9 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
     detail::verify_taylor_dec(sys_rhs_split, u_vars_defs);
     detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_split, u_vars_defs, n_eq);
 #endif
+
+    // Replace any number subexpression with an identity function.
+    detail::taylor_decompose_replace_numbers(u_vars_defs, n_eq);
 
     return std::make_pair(std::move(u_vars_defs), std::move(sv_funcs_dc));
 }

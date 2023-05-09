@@ -48,7 +48,6 @@
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 
@@ -316,9 +315,9 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
 
     // M, k**2 + h**2, q**2 + p**2, sqrt(q**2 + p**2).
     expression M, kh_2, qp_2, qp;
-    tbb::parallel_invoke([&]() { M = lam - atan2(h, k); }, [&]() { kh_2 = square(k) + square(h); },
+    tbb::parallel_invoke([&]() { M = lam - atan2(h, k); }, [&]() { kh_2 = k * k + h * h; },
                          [&]() {
-                             qp_2 = square(q) + square(p);
+                             qp_2 = q * q + p * p;
                              qp = sqrt(qp_2);
                          });
 
@@ -333,7 +332,7 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
         [&]() { sqrt_1me2 = sqrt(1_dbl - kh_2); },
         [&]() {
             ci = 1_dbl - 2_dbl * qp_2;
-            si = sqrt(1_dbl - square(ci));
+            si = sqrt(1_dbl - ci * ci);
         },
         [&]() { cOm = q / qp; }, [&]() { sOm = p / qp; });
 

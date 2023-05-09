@@ -52,7 +52,6 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/atan2.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -74,7 +73,7 @@ expression atan2_impl::diff(funcptr_map<expression> &func_map, const std::string
     const auto &y = args()[0];
     const auto &x = args()[1];
 
-    auto den = square(x) + square(y);
+    auto den = x * x + y * y;
 
     return (x * detail::diff(func_map, y, s) - y * detail::diff(func_map, x, s)) / den;
 }
@@ -86,7 +85,7 @@ expression atan2_impl::diff(funcptr_map<expression> &func_map, const param &p) c
     const auto &y = args()[0];
     const auto &x = args()[1];
 
-    auto den = square(x) + square(y);
+    auto den = x * x + y * y;
 
     return (x * detail::diff(func_map, y, p) - y * detail::diff(func_map, x, p)) / den;
 }
@@ -124,8 +123,8 @@ taylor_dc_t::size_type atan2_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 2u);
 
     // Append x * x and y * y.
-    u_vars_defs.emplace_back(square(args()[1]), std::vector<std::uint32_t>{});
-    u_vars_defs.emplace_back(square(args()[0]), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(args()[1] * args()[1], std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(args()[0] * args()[0], std::vector<std::uint32_t>{});
 
     // Append x*x + y*y.
     u_vars_defs.emplace_back(expression{fmt::format("u_{}", u_vars_defs.size() - 2u)}
