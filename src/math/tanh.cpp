@@ -45,7 +45,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/math/tanh.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
@@ -64,7 +63,8 @@ tanh_impl::tanh_impl() : tanh_impl(0_dbl) {}
 std::vector<expression> tanh_impl::gradient() const
 {
     assert(args().size() == 1u);
-    return {1_dbl - square(tanh(args()[0]))};
+    const auto tmp = tanh(args()[0]);
+    return {1_dbl - tmp * tmp};
 }
 
 llvm::Value *tanh_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
@@ -102,8 +102,8 @@ taylor_dc_t::size_type tanh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
 
     // Append the auxiliary function tanh(arg) * tanh(arg).
-    u_vars_defs.emplace_back(square(expression{fmt::format("u_{}", u_vars_defs.size() - 1u)}),
-                             std::vector<std::uint32_t>{});
+    const auto arg = expression{fmt::format("u_{}", u_vars_defs.size() - 1u)};
+    u_vars_defs.emplace_back(arg * arg, std::vector<std::uint32_t>{});
 
     // Add the hidden dep.
     (u_vars_defs.end() - 2)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));

@@ -59,7 +59,6 @@
 #include <heyoka/math/erf.hpp>
 #include <heyoka/math/exp.hpp>
 #include <heyoka/math/sqrt.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -131,7 +130,7 @@ taylor_dc_t::size_type erf_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 1u);
 
     // Append arg * arg.
-    u_vars_defs.emplace_back(square(args()[0]), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(args()[0] * args()[0], std::vector<std::uint32_t>{});
 
     // Append - arg * arg.
     u_vars_defs.emplace_back(-expression{fmt::format("u_{}", u_vars_defs.size() - 1u)}, std::vector<std::uint32_t>{});

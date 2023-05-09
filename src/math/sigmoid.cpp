@@ -47,7 +47,6 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sigmoid.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -174,8 +173,8 @@ taylor_dc_t::size_type sigmoid_impl::taylor_decompose(taylor_dc_t &u_vars_defs) 
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
 
     // Append the auxiliary function sigmoid(arg) * sigmoid(arg).
-    u_vars_defs.emplace_back(square(expression{fmt::format("u_{}", u_vars_defs.size() - 1u)}),
-                             std::vector<std::uint32_t>{});
+    const auto arg = expression{fmt::format("u_{}", u_vars_defs.size() - 1u)};
+    u_vars_defs.emplace_back(arg * arg, std::vector<std::uint32_t>{});
 
     // Add the hidden dep.
     (u_vars_defs.end() - 2)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));

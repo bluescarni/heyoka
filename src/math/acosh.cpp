@@ -48,7 +48,6 @@
 #include <heyoka/math/acosh.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sqrt.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -66,7 +65,7 @@ acosh_impl::acosh_impl() : acosh_impl(0_dbl) {}
 std::vector<expression> acosh_impl::gradient() const
 {
     assert(args().size() == 1u);
-    return {pow(square(args()[0]) - 1_dbl, -.5)};
+    return {pow(args()[0] * args()[0] - 1_dbl, -.5)};
 }
 
 double acosh_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
@@ -126,7 +125,7 @@ taylor_dc_t::size_type acosh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 1u);
 
     // Append arg * arg.
-    u_vars_defs.emplace_back(square(args()[0]), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(args()[0] * args()[0], std::vector<std::uint32_t>{});
 
     // Append arg * arg - 1.
     u_vars_defs.emplace_back(expression{fmt::format("u_{}", u_vars_defs.size() - 1u)} - 1_dbl,
