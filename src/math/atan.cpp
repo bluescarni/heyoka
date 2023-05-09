@@ -429,7 +429,17 @@ llvm::Function *atan_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, s
 
 expression atan(expression e)
 {
-    return expression{func{detail::atan_impl(std::move(e))}};
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return std::visit(
+            [](const auto &x) {
+                using std::atan;
+
+                return expression{atan(x)};
+            },
+            num_ptr->value());
+    } else {
+        return expression{func{detail::atan_impl(std::move(e))}};
+    }
 }
 
 HEYOKA_END_NAMESPACE
