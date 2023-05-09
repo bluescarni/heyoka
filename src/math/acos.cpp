@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
 #include <stdexcept>
@@ -423,7 +424,17 @@ llvm::Function *acos_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, s
 
 expression acos(expression e)
 {
-    return expression{func{detail::acos_impl(std::move(e))}};
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return std::visit(
+            [](const auto &x) {
+                using std::acos;
+
+                return expression{acos(x)};
+            },
+            num_ptr->value());
+    } else {
+        return expression{func{detail::acos_impl(std::move(e))}};
+    }
 }
 
 HEYOKA_END_NAMESPACE

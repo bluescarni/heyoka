@@ -136,7 +136,20 @@ void swap(number &n0, number &n1) noexcept
 
 std::size_t hash(const number &n)
 {
-    return std::visit([](const auto &v) { return std::hash<detail::uncvref_t<decltype(v)>>{}(v); }, n.value());
+    return std::visit(
+        [](const auto &v) -> std::size_t {
+            using std::isnan;
+
+            if (isnan(v)) {
+                // NOTE: enforce same hash for all NaN values,
+                // because NaNs are considered equal to each other
+                // by the comparison operator.
+                return std::hash<int>{}(42);
+            } else {
+                return std::hash<detail::uncvref_t<decltype(v)>>{}(v);
+            }
+        },
+        n.value());
 }
 
 std::ostream &operator<<(std::ostream &os, const number &n)
@@ -335,15 +348,23 @@ number operator/(const number &n1, const number &n2)
 // are always considered different (were they considered equal,
 // we would have then to ensure that they both hash to the same
 // value, which would be quite hard to do).
+// NOTE: it is convenient to consider NaNs equal to each other.
+// This allows to avoid ugly special-casing, e.g., when
+// verifying decompositions: when the original expression is
+// reconstructed from the subexpressions and we compare, the
+// check would fail due to NaN != NaN.
 bool operator==(const number &n1, const number &n2)
 {
     return std::visit(
         [](const auto &v1, const auto &v2) -> bool {
-            using type1 = detail::uncvref_t<decltype(v1)>;
-            using type2 = detail::uncvref_t<decltype(v2)>;
+            if constexpr (std::is_same_v<decltype(v1), decltype(v2)>) {
+                using std::isnan;
 
-            if constexpr (std::is_same_v<type1, type2>) {
-                return v1 == v2;
+                if (isnan(v1) && isnan(v2)) {
+                    return true;
+                } else {
+                    return v1 == v2;
+                }
             } else {
                 return false;
             }

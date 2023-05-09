@@ -107,10 +107,10 @@ TEST_CASE("number hash eq")
     REQUIRE(hash_number(number{1.1}) == std::hash<double>{}(1.1));
     REQUIRE(hash_number(number{1.1l}) == std::hash<long double>{}(1.1l));
 
-    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{std::numeric_limits<double>::quiet_NaN()});
-    REQUIRE(number{std::numeric_limits<float>::quiet_NaN()} != number{std::numeric_limits<float>::quiet_NaN()});
+    REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} == number{std::numeric_limits<double>::quiet_NaN()});
+    REQUIRE(number{std::numeric_limits<float>::quiet_NaN()} == number{std::numeric_limits<float>::quiet_NaN()});
     REQUIRE(number{std::numeric_limits<long double>::quiet_NaN()}
-            != number{std::numeric_limits<long double>::quiet_NaN()});
+            == number{std::numeric_limits<long double>::quiet_NaN()});
 
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{0.l});
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{0.f});
@@ -148,7 +148,7 @@ TEST_CASE("number hash eq")
     REQUIRE(hash_number(number{1.1_rq}) == std::hash<mppp::real128>{}(1.1_rq));
 
     REQUIRE(number{std::numeric_limits<mppp::real128>::quiet_NaN()}
-            != number{std::numeric_limits<mppp::real128>::quiet_NaN()});
+            == number{std::numeric_limits<mppp::real128>::quiet_NaN()});
 
     REQUIRE(number{std::numeric_limits<double>::quiet_NaN()} != number{0._rq});
     REQUIRE(number{std::numeric_limits<float>::quiet_NaN()} != number{0._rq});

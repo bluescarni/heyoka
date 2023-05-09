@@ -183,7 +183,7 @@ TEST_CASE("cfunc_mp")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<mppp::real>(s, "cfunc", {acosh(x), acosh(expression{1.5}), acosh(par[0])},
+            add_cfunc<mppp::real>(s, "cfunc", {acosh(x), acosh(expression{mppp::real{1.5, prec}}), acosh(par[0])},
                                   kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();
