@@ -440,7 +440,17 @@ std::vector<expression> erf_impl::gradient() const
 
 expression erf(expression e)
 {
-    return expression{func{detail::erf_impl(std::move(e))}};
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return std::visit(
+            [](const auto &x) {
+                using std::erf;
+
+                return expression{erf(x)};
+            },
+            num_ptr->value());
+    } else {
+        return expression{func{detail::erf_impl(std::move(e))}};
+    }
 }
 
 HEYOKA_END_NAMESPACE

@@ -419,7 +419,17 @@ expression log_impl::diff(funcptr_map<expression> &func_map, const param &p) con
 
 expression log(expression e)
 {
-    return expression{func{detail::log_impl(std::move(e))}};
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return std::visit(
+            [](const auto &x) {
+                using std::log;
+
+                return expression{log(x)};
+            },
+            num_ptr->value());
+    } else {
+        return expression{func{detail::log_impl(std::move(e))}};
+    }
 }
 
 HEYOKA_END_NAMESPACE

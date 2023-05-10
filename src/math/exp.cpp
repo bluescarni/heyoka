@@ -393,7 +393,17 @@ std::vector<expression> exp_impl::gradient() const
 
 expression exp(expression e)
 {
-    return expression{func{detail::exp_impl(std::move(e))}};
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return std::visit(
+            [](const auto &x) {
+                using std::exp;
+
+                return expression{exp(x)};
+            },
+            num_ptr->value());
+    } else {
+        return expression{func{detail::exp_impl(std::move(e))}};
+    }
 }
 
 HEYOKA_END_NAMESPACE

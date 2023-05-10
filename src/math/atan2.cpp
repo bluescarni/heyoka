@@ -820,7 +820,18 @@ llvm::Function *atan2_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, 
 
 expression atan2(expression y, expression x)
 {
-    return expression{func{detail::atan2_impl(std::move(y), std::move(x))}};
+    if (const auto *y_num_ptr = std::get_if<number>(&y.value()), *x_num_ptr = std::get_if<number>(&x.value());
+        (y_num_ptr != nullptr) && (x_num_ptr != nullptr)) {
+        return std::visit(
+            [](const auto &a, const auto &b) {
+                using std::atan2;
+
+                return expression{atan2(a, b)};
+            },
+            y_num_ptr->value(), x_num_ptr->value());
+    } else {
+        return expression{func{detail::atan2_impl(std::move(y), std::move(x))}};
+    }
 }
 
 expression atan2(expression y, double x)

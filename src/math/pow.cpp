@@ -536,24 +536,35 @@ expression pow_wrapper_impl(expression b, expression e)
 
 expression pow(expression b, expression e)
 {
-    return detail::pow_wrapper_impl(std::move(b), std::move(e));
+    if (const auto *b_num_ptr = std::get_if<number>(&b.value()), *e_num_ptr = std::get_if<number>(&e.value());
+        (b_num_ptr != nullptr) && (e_num_ptr != nullptr)) {
+        return std::visit(
+            [](const auto &x, const auto &y) {
+                using std::pow;
+
+                return expression{pow(x, y)};
+            },
+            b_num_ptr->value(), e_num_ptr->value());
+    } else {
+        return detail::pow_wrapper_impl(std::move(b), std::move(e));
+    }
 }
 
 expression pow(expression b, double e)
 {
-    return detail::pow_wrapper_impl(std::move(b), expression{e});
+    return pow(std::move(b), expression{e});
 }
 
 expression pow(expression b, long double e)
 {
-    return detail::pow_wrapper_impl(std::move(b), expression{e});
+    return pow(std::move(b), expression{e});
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 expression pow(expression b, mppp::real128 e)
 {
-    return detail::pow_wrapper_impl(std::move(b), expression{e});
+    return pow(std::move(b), expression{e});
 }
 
 #endif
@@ -562,7 +573,7 @@ expression pow(expression b, mppp::real128 e)
 
 expression pow(expression b, mppp::real e)
 {
-    return detail::pow_wrapper_impl(std::move(b), expression{std::move(e)});
+    return pow(std::move(b), expression{std::move(e)});
 }
 
 #endif

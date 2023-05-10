@@ -40,6 +40,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
@@ -62,12 +68,24 @@ namespace
 
 // C++ implementation.
 template <typename T>
-T cpp_sigmoid(T x)
+T cpp_sigmoid(const T &x)
 {
     using std::exp;
 
     return 1 / (1 + exp(-x));
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+mppp::real cpp_sigmoid<mppp::real>(const mppp::real &x)
+{
+    mppp::real one{1, x.get_prec()};
+
+    return one / (one + exp(-x));
+}
+
+#endif
 
 } // namespace
 
@@ -447,7 +465,11 @@ std::vector<expression> sigmoid_impl::gradient() const
 
 expression sigmoid(expression e)
 {
-    return expression{func{detail::sigmoid_impl(std::move(e))}};
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return std::visit([](const auto &x) { return expression{detail::cpp_sigmoid(x)}; }, num_ptr->value());
+    } else {
+        return expression{func{detail::sigmoid_impl(std::move(e))}};
+    }
 }
 
 HEYOKA_END_NAMESPACE

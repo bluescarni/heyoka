@@ -423,13 +423,13 @@ expression cos(expression e)
     } else {
         // Simplify cos(number) to its value.
         if (const auto *num_ptr = std::get_if<number>(&e.value())) {
-            return expression{std::visit(
+            return std::visit(
                 [](const auto &x) {
                     using std::cos;
 
-                    return number{cos(x)};
+                    return expression{cos(x)};
                 },
-                num_ptr->value())};
+                num_ptr->value());
         } else {
             return expression{func{detail::cos_impl(std::move(e))}};
         }

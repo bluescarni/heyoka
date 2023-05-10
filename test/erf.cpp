@@ -192,7 +192,7 @@ TEST_CASE("cfunc_mp")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<mppp::real>(s, "cfunc", {erf(x), erf(expression{1.5}), erf(par[0])},
+            add_cfunc<mppp::real>(s, "cfunc", {erf(x), erf(expression{mppp::real{1.5, prec}}), erf(par[0])},
                                   kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();

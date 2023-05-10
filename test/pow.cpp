@@ -387,3 +387,14 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
+
+TEST_CASE("pow const fold")
+{
+    REQUIRE(pow(1.1_dbl, 2.2_dbl) == expression{std::pow(1.1, 2.2)});
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(pow(2_dbl, mppp::real{"1.1", 123}) == expression{mppp::pow(2., mppp::real{"1.1", 123})});
+
+#endif
+}

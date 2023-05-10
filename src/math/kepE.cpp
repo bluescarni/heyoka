@@ -868,6 +868,9 @@ llvm::Function *kepE_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, s
 
 } // namespace detail
 
+// NOTE: constant folding here would need a JIT-compiled version of kepE().
+// Perhaps store the function pointer in a thread_local variable and keep around
+// a cache of llvm states to fetch the pointer from?
 expression kepE(expression e, expression M)
 {
     return expression{func{detail::kepE_impl{std::move(e), std::move(M)}}};
