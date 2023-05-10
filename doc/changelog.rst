@@ -47,6 +47,9 @@ New
 Changes
 ~~~~~~~
 
+- Constant folding is now implemented for all functions
+  in the expression system
+  (`#321 <https://github.com/bluescarni/heyoka/pull/321>`__).
 - Moved-from expressions and numbers are now guaranteed to be in the
   default-constructed state
   (`#319 <https://github.com/bluescarni/heyoka/pull/319>`__).
