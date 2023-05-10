@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
 #include <stdexcept>
@@ -48,7 +49,6 @@
 #include <heyoka/math/asin.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sqrt.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -66,7 +66,7 @@ asin_impl::asin_impl() : asin_impl(0_dbl) {}
 std::vector<expression> asin_impl::gradient() const
 {
     assert(args().size() == 1u);
-    return {pow(1_dbl - square(args()[0]), -.5)};
+    return {pow(1_dbl - args()[0] * args()[0], -.5)};
 }
 
 double asin_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
@@ -126,7 +126,7 @@ taylor_dc_t::size_type asin_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 1u);
 
     // Append arg * arg.
-    u_vars_defs.emplace_back(square(args()[0]), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(args()[0] * args()[0], std::vector<std::uint32_t>{});
 
     // Append 1 - arg * arg.
     u_vars_defs.emplace_back(1_dbl - expression{fmt::format("u_{}", u_vars_defs.size() - 1u)},
@@ -421,7 +421,17 @@ llvm::Function *asin_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, s
 
 expression asin(expression e)
 {
-    return expression{func{detail::asin_impl(std::move(e))}};
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return std::visit(
+            [](const auto &x) {
+                using std::asin;
+
+                return expression{asin(x)};
+            },
+            num_ptr->value());
+    } else {
+        return expression{func{detail::asin_impl(std::move(e))}};
+    }
 }
 
 HEYOKA_END_NAMESPACE

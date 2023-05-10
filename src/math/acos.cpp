@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
 #include <stdexcept>
@@ -48,7 +49,6 @@
 #include <heyoka/math/acos.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sqrt.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -66,7 +66,7 @@ acos_impl::acos_impl() : acos_impl(0_dbl) {}
 std::vector<expression> acos_impl::gradient() const
 {
     assert(args().size() == 1u);
-    return {-pow(1_dbl - square(args()[0]), -.5)};
+    return {-pow(1_dbl - args()[0] * args()[0], -.5)};
 }
 
 double acos_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
@@ -126,7 +126,7 @@ taylor_dc_t::size_type acos_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 1u);
 
     // Append arg * arg.
-    u_vars_defs.emplace_back(square(args()[0]), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(args()[0] * args()[0], std::vector<std::uint32_t>{});
 
     // Append 1 - arg * arg.
     u_vars_defs.emplace_back(1_dbl - expression{fmt::format("u_{}", u_vars_defs.size() - 1u)},
@@ -424,7 +424,17 @@ llvm::Function *acos_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, s
 
 expression acos(expression e)
 {
-    return expression{func{detail::acos_impl(std::move(e))}};
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return std::visit(
+            [](const auto &x) {
+                using std::acos;
+
+                return expression{acos(x)};
+            },
+            num_ptr->value());
+    } else {
+        return expression{func{detail::acos_impl(std::move(e))}};
+    }
 }
 
 HEYOKA_END_NAMESPACE

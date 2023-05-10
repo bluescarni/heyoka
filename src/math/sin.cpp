@@ -417,13 +417,13 @@ expression sin(expression e)
 {
     // Simplify sin(number) to its value.
     if (const auto *num_ptr = std::get_if<number>(&e.value())) {
-        return expression{std::visit(
+        return std::visit(
             [](const auto &x) {
                 using std::sin;
 
-                return number{sin(x)};
+                return expression{sin(x)};
             },
-            num_ptr->value())};
+            num_ptr->value());
     } else {
         return expression{func{detail::sin_impl(std::move(e))}};
     }

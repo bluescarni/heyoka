@@ -445,9 +445,14 @@ expression sqrt_impl::diff(funcptr_map<expression> &func_map, const param &p) co
 
 expression sqrt(expression e)
 {
-    // Simplify sqrt(number) to its value.
     if (const auto *num_ptr = std::get_if<number>(&e.value())) {
-        return expression{sqrt(*num_ptr)};
+        return std::visit(
+            [](const auto &x) {
+                using std::sqrt;
+
+                return expression{sqrt(x)};
+            },
+            num_ptr->value());
     } else {
         return expression{func{detail::sqrt_impl(std::move(e))}};
     }

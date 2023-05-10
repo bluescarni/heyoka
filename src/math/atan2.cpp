@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
 #include <stdexcept>
@@ -52,7 +53,6 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/atan2.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -74,7 +74,7 @@ expression atan2_impl::diff(funcptr_map<expression> &func_map, const std::string
     const auto &y = args()[0];
     const auto &x = args()[1];
 
-    auto den = square(x) + square(y);
+    auto den = x * x + y * y;
 
     return (x * detail::diff(func_map, y, s) - y * detail::diff(func_map, x, s)) / den;
 }
@@ -86,7 +86,7 @@ expression atan2_impl::diff(funcptr_map<expression> &func_map, const param &p) c
     const auto &y = args()[0];
     const auto &x = args()[1];
 
-    auto den = square(x) + square(y);
+    auto den = x * x + y * y;
 
     return (x * detail::diff(func_map, y, p) - y * detail::diff(func_map, x, p)) / den;
 }
@@ -124,8 +124,8 @@ taylor_dc_t::size_type atan2_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 2u);
 
     // Append x * x and y * y.
-    u_vars_defs.emplace_back(square(args()[1]), std::vector<std::uint32_t>{});
-    u_vars_defs.emplace_back(square(args()[0]), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(args()[1] * args()[1], std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(args()[0] * args()[0], std::vector<std::uint32_t>{});
 
     // Append x*x + y*y.
     u_vars_defs.emplace_back(expression{fmt::format("u_{}", u_vars_defs.size() - 2u)}
@@ -820,7 +820,18 @@ llvm::Function *atan2_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, 
 
 expression atan2(expression y, expression x)
 {
-    return expression{func{detail::atan2_impl(std::move(y), std::move(x))}};
+    if (const auto *y_num_ptr = std::get_if<number>(&y.value()), *x_num_ptr = std::get_if<number>(&x.value());
+        (y_num_ptr != nullptr) && (x_num_ptr != nullptr)) {
+        return std::visit(
+            [](const auto &a, const auto &b) {
+                using std::atan2;
+
+                return expression{atan2(a, b)};
+            },
+            y_num_ptr->value(), x_num_ptr->value());
+    } else {
+        return expression{func{detail::atan2_impl(std::move(y), std::move(x))}};
+    }
 }
 
 expression atan2(expression y, double x)

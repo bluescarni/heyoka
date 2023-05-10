@@ -59,7 +59,6 @@
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sqrt.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -512,7 +511,7 @@ expression pow_wrapper_impl(expression b, expression e)
         }
 
         if (std::visit([](const auto &v) { return v == 2; }, num_ptr->value())) {
-            return square(std::move(b));
+            return b * b;
         }
 
         if (std::visit([](const auto &v) { return v == 3; }, num_ptr->value())) {
@@ -537,24 +536,35 @@ expression pow_wrapper_impl(expression b, expression e)
 
 expression pow(expression b, expression e)
 {
-    return detail::pow_wrapper_impl(std::move(b), std::move(e));
+    if (const auto *b_num_ptr = std::get_if<number>(&b.value()), *e_num_ptr = std::get_if<number>(&e.value());
+        (b_num_ptr != nullptr) && (e_num_ptr != nullptr)) {
+        return std::visit(
+            [](const auto &x, const auto &y) {
+                using std::pow;
+
+                return expression{pow(x, y)};
+            },
+            b_num_ptr->value(), e_num_ptr->value());
+    } else {
+        return detail::pow_wrapper_impl(std::move(b), std::move(e));
+    }
 }
 
 expression pow(expression b, double e)
 {
-    return detail::pow_wrapper_impl(std::move(b), expression{e});
+    return pow(std::move(b), expression{e});
 }
 
 expression pow(expression b, long double e)
 {
-    return detail::pow_wrapper_impl(std::move(b), expression{e});
+    return pow(std::move(b), expression{e});
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 expression pow(expression b, mppp::real128 e)
 {
-    return detail::pow_wrapper_impl(std::move(b), expression{e});
+    return pow(std::move(b), expression{e});
 }
 
 #endif
@@ -563,7 +573,7 @@ expression pow(expression b, mppp::real128 e)
 
 expression pow(expression b, mppp::real e)
 {
-    return detail::pow_wrapper_impl(std::move(b), expression{std::move(e)});
+    return pow(std::move(b), expression{std::move(e)});
 }
 
 #endif
@@ -577,7 +587,7 @@ expression powi(expression b, std::uint32_t e)
         case 1u:
             return b;
         case 2u:
-            return square(std::move(b));
+            return b * b;
         default:
             // NOTE: default continues.
             ;
@@ -588,11 +598,11 @@ expression powi(expression b, std::uint32_t e)
 
     while (e > 1u) {
         if (e % 2u == 0u) {
-            b = square(std::move(b));
+            b = b * b;
             e /= 2u;
         } else {
             y = b * y;
-            b = square(std::move(b));
+            b = b * b;
             e = (e - 1u) / 2u;
         }
     }

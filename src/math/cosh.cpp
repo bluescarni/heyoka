@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
 #include <stdexcept>
@@ -354,7 +355,17 @@ llvm::Function *cosh_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, s
 
 expression cosh(expression e)
 {
-    return expression{func{detail::cosh_impl(std::move(e))}};
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return std::visit(
+            [](const auto &x) {
+                using std::cosh;
+
+                return expression{cosh(x)};
+            },
+            num_ptr->value());
+    } else {
+        return expression{func{detail::cosh_impl(std::move(e))}};
+    }
 }
 
 HEYOKA_END_NAMESPACE

@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
 #include <stdexcept>
@@ -48,7 +49,6 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/atanh.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -66,13 +66,13 @@ atanh_impl::atanh_impl() : atanh_impl(0_dbl) {}
 expression atanh_impl::diff(funcptr_map<expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 1u);
-    return detail::diff(func_map, args()[0], s) / (1_dbl - square(args()[0]));
+    return detail::diff(func_map, args()[0], s) / (1_dbl - args()[0] * args()[0]);
 }
 
 expression atanh_impl::diff(funcptr_map<expression> &func_map, const param &p) const
 {
     assert(args().size() == 1u);
-    return detail::diff(func_map, args()[0], p) / (1_dbl - square(args()[0]));
+    return detail::diff(func_map, args()[0], p) / (1_dbl - args()[0] * args()[0]);
 }
 
 double atanh_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
@@ -132,7 +132,7 @@ taylor_dc_t::size_type atanh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 1u);
 
     // Append arg * arg.
-    u_vars_defs.emplace_back(square(args()[0]), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(args()[0] * args()[0], std::vector<std::uint32_t>{});
 
     // Append the atanh decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
@@ -428,7 +428,17 @@ llvm::Function *atanh_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, 
 
 expression atanh(expression e)
 {
-    return expression{func{detail::atanh_impl(std::move(e))}};
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return std::visit(
+            [](const auto &x) {
+                using std::atanh;
+
+                return expression{atanh(x)};
+            },
+            num_ptr->value());
+    } else {
+        return expression{func{detail::atanh_impl(std::move(e))}};
+    }
 }
 
 HEYOKA_END_NAMESPACE

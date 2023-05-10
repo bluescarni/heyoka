@@ -15,7 +15,6 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/math/sum_sq.hpp>
 #include <heyoka/model/rotating.hpp>
@@ -112,7 +111,9 @@ expression rotating_potential_impl(const std::vector<expression> &omega)
         const auto &qe = omega[1];
         const auto &re = omega[2];
 
-        return 0.5_dbl * (square(sum({pe * x, qe * y, re * z})) - sum_sq({pe, qe, re}) * sum_sq({x, y, z}));
+        const auto tmp = sum({pe * x, qe * y, re * z});
+
+        return 0.5_dbl * (tmp * tmp - sum_sq({pe, qe, re}) * sum_sq({x, y, z}));
     }
 }
 

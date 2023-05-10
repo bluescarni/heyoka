@@ -46,7 +46,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/math/tan.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
@@ -157,8 +156,8 @@ taylor_dc_t::size_type tan_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
 
     // Append the auxiliary function tan(arg) * tan(arg).
-    u_vars_defs.emplace_back(square(expression{variable{fmt::format("u_{}", u_vars_defs.size() - 1u)}}),
-                             std::vector<std::uint32_t>{});
+    const auto arg = expression{variable{fmt::format("u_{}", u_vars_defs.size() - 1u)}};
+    u_vars_defs.emplace_back(arg * arg, std::vector<std::uint32_t>{});
 
     // Add the hidden dep.
     (u_vars_defs.end() - 2)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
@@ -411,14 +410,25 @@ std::vector<expression> tan_impl::gradient() const
     assert(args().size() == 1u);
     // NOTE: if single-precision floats are implemented,
     // should 1_dbl become 1_flt?
-    return {1_dbl + square(tan(args()[0]))};
+    const auto tmp = tan(args()[0]);
+    return {1_dbl + tmp * tmp};
 }
 
 } // namespace detail
 
 expression tan(expression e)
 {
-    return expression{func{detail::tan_impl(std::move(e))}};
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return std::visit(
+            [](const auto &x) {
+                using std::tan;
+
+                return expression{tan(x)};
+            },
+            num_ptr->value());
+    } else {
+        return expression{func{detail::tan_impl(std::move(e))}};
+    }
 }
 
 HEYOKA_END_NAMESPACE

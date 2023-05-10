@@ -160,6 +160,17 @@ TEST_CASE("atan2 cse")
     REQUIRE(dc.size() == 9u);
 }
 
+TEST_CASE("atan2 const fold")
+{
+    REQUIRE(atan2(1.1_dbl, 2.2_dbl) == expression{std::atan2(1.1, 2.2)});
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(atan2(mppp::real{"1.1", 123}, 2_dbl) == expression{mppp::atan2(mppp::real{"1.1", 123}, 2.)});
+
+#endif
+}
+
 TEST_CASE("atan2 integration")
 {
     auto x = "x"_var;

@@ -40,6 +40,12 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
@@ -47,7 +53,6 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sigmoid.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -63,12 +68,24 @@ namespace
 
 // C++ implementation.
 template <typename T>
-T cpp_sigmoid(T x)
+T cpp_sigmoid(const T &x)
 {
     using std::exp;
 
     return 1 / (1 + exp(-x));
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+mppp::real cpp_sigmoid<mppp::real>(const mppp::real &x)
+{
+    const mppp::real one{1, x.get_prec()};
+
+    return one / (one + exp(-x));
+}
+
+#endif
 
 } // namespace
 
@@ -174,8 +191,8 @@ taylor_dc_t::size_type sigmoid_impl::taylor_decompose(taylor_dc_t &u_vars_defs) 
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
 
     // Append the auxiliary function sigmoid(arg) * sigmoid(arg).
-    u_vars_defs.emplace_back(square(expression{fmt::format("u_{}", u_vars_defs.size() - 1u)}),
-                             std::vector<std::uint32_t>{});
+    const auto arg = expression{fmt::format("u_{}", u_vars_defs.size() - 1u)};
+    u_vars_defs.emplace_back(arg * arg, std::vector<std::uint32_t>{});
 
     // Add the hidden dep.
     (u_vars_defs.end() - 2)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
@@ -448,7 +465,11 @@ std::vector<expression> sigmoid_impl::gradient() const
 
 expression sigmoid(expression e)
 {
-    return expression{func{detail::sigmoid_impl(std::move(e))}};
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return std::visit([](const auto &x) { return expression{detail::cpp_sigmoid(x)}; }, num_ptr->value());
+    } else {
+        return expression{func{detail::sigmoid_impl(std::move(e))}};
+    }
 }
 
 HEYOKA_END_NAMESPACE
