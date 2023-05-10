@@ -418,7 +418,17 @@ std::vector<expression> tan_impl::gradient() const
 
 expression tan(expression e)
 {
-    return expression{func{detail::tan_impl(std::move(e))}};
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return std::visit(
+            [](const auto &x) {
+                using std::tan;
+
+                return expression{tan(x)};
+            },
+            num_ptr->value());
+    } else {
+        return expression{func{detail::tan_impl(std::move(e))}};
+    }
 }
 
 HEYOKA_END_NAMESPACE
