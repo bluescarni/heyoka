@@ -80,7 +80,7 @@ T cpp_sigmoid(const T &x)
 template <>
 mppp::real cpp_sigmoid<mppp::real>(const mppp::real &x)
 {
-    mppp::real one{1, x.get_prec()};
+    const mppp::real one{1, x.get_prec()};
 
     return one / (one + exp(-x));
 }
