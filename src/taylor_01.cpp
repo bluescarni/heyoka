@@ -762,11 +762,8 @@ void taylor_decompose_replace_numbers(taylor_dc_t &dc, std::vector<expression>::
         if (std::holds_alternative<number>(ex.value())) {
             ex = num_identity(ex);
 
-            // NOTE: the original subexpression might have hidden deps,
-            // we want to remove them as they are certainly not needed
-            // and keeping them would complicate the num_identity()
-            // implementation (e.g., the number of hidden deps matters
-            // in the compact mode function implementation).
+            // NOTE: num_identity() is a function without
+            // hidden dependencies.
             deps.clear();
         }
     }
