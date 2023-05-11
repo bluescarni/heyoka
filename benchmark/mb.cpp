@@ -27,7 +27,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/logging.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/taylor.hpp>
 
 int main(int argc, char *argv[])
@@ -170,7 +169,7 @@ int main(int argc, char *argv[])
         for (auto j = i + 1u; j < N; ++j) {
             auto [xj, yj] = make_vars(fmt::format("x_{}", j), fmt::format("y_{}", j));
 
-            t_events.emplace_back(square(xi - xj) + square(yi - yj) - 4 * p_radius * p_radius,
+            t_events.emplace_back((xi - xj) * (xi - xj) + (yi - yj) * (yi - yj) - 4 * p_radius * p_radius,
                                   kw::callback = cb_sph_sph{i, j}, kw::direction = event_direction::negative);
         }
     }
