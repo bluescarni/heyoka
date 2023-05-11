@@ -377,6 +377,36 @@ bool operator!=(const number &n1, const number &n2)
     return !(n1 == n2);
 }
 
+// NOTE: consistently with operator==(), n1 and n2 must be of the
+// same type in order to be considered equivalent. Also, NaNs are considered
+// greater than any other value, so that they will be placed at the
+// end of a sorted range.
+bool operator<(const number &n1, const number &n2)
+{
+    return std::visit(
+        [&](const auto &v1, const auto &v2) -> bool {
+            if constexpr (std::is_same_v<decltype(v1), decltype(v2)>) {
+                using std::isnan;
+
+                if (isnan(v1)) {
+                    // NaN cannot be less than anything,
+                    // including NaN.
+                    return false;
+                }
+
+                if (isnan(v2)) {
+                    // v1 < NaN, with v1 non-NaN.
+                    return true;
+                }
+
+                return v1 < v2;
+            } else {
+                return n1.value().index() < n2.value().index();
+            }
+        },
+        n1.value(), n2.value());
+}
+
 number exp(const number &n)
 {
     return std::visit(

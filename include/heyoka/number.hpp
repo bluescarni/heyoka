@@ -106,6 +106,7 @@ HEYOKA_DLL_PUBLIC number operator/(const number &, const number &);
 
 HEYOKA_DLL_PUBLIC bool operator==(const number &, const number &);
 HEYOKA_DLL_PUBLIC bool operator!=(const number &, const number &);
+HEYOKA_DLL_PUBLIC bool operator<(const number &, const number &);
 
 HEYOKA_DLL_PUBLIC number exp(const number &);
 HEYOKA_DLL_PUBLIC number binomial(const number &, const number &);
