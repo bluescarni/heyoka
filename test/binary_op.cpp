@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <functional>
 #include <initializer_list>
 #include <random>
 #include <sstream>
@@ -128,6 +129,19 @@ TEST_CASE("hashing")
     REQUIRE(hash(add(x, y)) != hash(sub(x, y)));
     REQUIRE(hash(add(x, y)) != hash(mul(x, y)));
     REQUIRE(hash(add(x, y)) != hash(div(x, y)));
+}
+
+TEST_CASE("less than")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(!std::less<expression>{}(add(x, y), add(x, y)));
+    REQUIRE(std::less<expression>{}(add(x, y), sub(x, y)));
+    REQUIRE(std::less<expression>{}(add(x, y), mul(x, y)));
+    REQUIRE(std::less<expression>{}(add(x, y), div(x, y)));
+    REQUIRE(!std::less<expression>{}(sub(x, y), sub(x, y)));
+    REQUIRE(std::less<expression>{}(sub(x, y), mul(x, y)));
+    REQUIRE(std::less<expression>{}(sub(x, y), div(x, y)));
 }
 
 TEST_CASE("diff var")

@@ -75,6 +75,15 @@ bool binary_op::extra_equal_to(const func &f) const
     return static_cast<const binary_op *>(f.get_ptr())->m_type == m_type;
 }
 
+bool binary_op::extra_less_than(const func &f) const
+{
+    // NOTE: this should be ensured by the
+    // implementation of func's operator<().
+    assert(f.extract<binary_op>() == f.get_ptr());
+
+    return m_type < static_cast<const binary_op *>(f.get_ptr())->m_type;
+}
+
 bool binary_op::is_commutative() const
 {
     return m_type == type::add || m_type == type::mul;

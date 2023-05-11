@@ -754,6 +754,13 @@ inline std::vector<expression> add_cfunc(llvm_state &s, const std::string &name,
     }
 }
 
+namespace detail
+{
+
+HEYOKA_DLL_PUBLIC bool ex_less_than(const expression &, const expression &);
+
+} // namespace detail
+
 HEYOKA_END_NAMESPACE
 
 namespace std
@@ -765,6 +772,15 @@ struct hash<heyoka::expression> {
     size_t operator()(const heyoka::expression &ex) const
     {
         return heyoka::hash(ex);
+    }
+};
+
+// Specialisation of std::less for expression.
+template <>
+struct less<heyoka::expression> {
+    bool operator()(const heyoka::expression &ex1, const heyoka::expression &ex2) const
+    {
+        return heyoka::detail::ex_less_than(ex1, ex2);
     }
 };
 

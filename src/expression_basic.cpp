@@ -1329,6 +1329,69 @@ std::vector<expression> split_sums_for_decompose(const std::vector<expression> &
     return retval;
 }
 
+// NOTE: this does not have any specific mathematical meaning, it
+// is just used to impose an ordering on expressions.
+bool ex_less_than(const expression &e1, const expression &e2)
+{
+    return std::visit(
+        [](const auto &v1, const auto &v2) {
+            using type1 = uncvref_t<decltype(v1)>;
+            using type2 = uncvref_t<decltype(v2)>;
+
+            // Phase 1: handle the cases where v1 and v2
+            // are the same type.
+
+            // Both arguments are variables: use lexicographic comparison.
+            if constexpr (std::is_same_v<variable, type1> && std::is_same_v<variable, type2>) {
+                return v1.name() < v2.name();
+            }
+
+            // Both arguments are params: compare the indices.
+            if constexpr (std::is_same_v<param, type1> && std::is_same_v<param, type2>) {
+                return v1.idx() < v2.idx();
+            }
+
+            // Both arguments are numbers: compare.
+            if constexpr (std::is_same_v<number, type1> && std::is_same_v<number, type2>) {
+                return v1 < v2;
+            }
+
+            // Both arguments are functions: compare.
+            if constexpr (std::is_same_v<func, type1> && std::is_same_v<func, type2>) {
+                return v1 < v2;
+            }
+
+            // Phase 2: handle mixed types.
+
+            // Number is always less than non-number.
+            if constexpr (std::is_same_v<number, type1>) {
+                return true;
+            }
+
+            // Function never less than non-function.
+            if constexpr (std::is_same_v<func, type1>) {
+                return false;
+            }
+
+            // Variable less than function, greater than anything elses.
+            if constexpr (std::is_same_v<variable, type1>) {
+                return std::is_same_v<type2, func>;
+            }
+
+            // Param greater than number, less than anything else.
+            if constexpr (std::is_same_v<param, type1>) {
+                return !std::is_same_v<type2, number>;
+            }
+
+            // LCOV_EXCL_START
+            assert(false);
+
+            return false;
+            // LCOV_EXCL_STOP
+        },
+        e1.value(), e2.value());
+}
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE

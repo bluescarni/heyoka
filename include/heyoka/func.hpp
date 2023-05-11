@@ -111,6 +111,7 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual void to_stream(std::ostringstream &) const = 0;
 
     [[nodiscard]] virtual bool extra_equal_to(const func &) const = 0;
+    [[nodiscard]] virtual bool extra_less_than(const func &) const = 0;
 
     [[nodiscard]] virtual bool is_time_dependent() const = 0;
     [[nodiscard]] virtual bool is_commutative() const = 0;
@@ -187,6 +188,13 @@ using func_extra_equal_to_t
 
 template <typename T>
 inline constexpr bool func_has_extra_equal_to_v = std::is_same_v<detected_t<func_extra_equal_to_t, T>, bool>;
+
+template <typename T>
+using func_extra_less_than_t
+    = decltype(std::declval<std::add_lvalue_reference_t<const T>>().extra_less_than(std::declval<const func &>()));
+
+template <typename T>
+inline constexpr bool func_has_extra_less_than_v = std::is_same_v<detected_t<func_extra_less_than_t, T>, bool>;
 
 template <typename T>
 using func_is_time_dependent_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().is_time_dependent());
@@ -381,6 +389,15 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
             return m_value.extra_equal_to(f);
         } else {
             return true;
+        }
+    }
+
+    [[nodiscard]] bool extra_less_than(const func &f) const final
+    {
+        if constexpr (func_has_extra_less_than_v<T>) {
+            return m_value.extra_less_than(f);
+        } else {
+            return false;
         }
     }
 
@@ -593,11 +610,13 @@ HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
 
 HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
 HEYOKA_DLL_PUBLIC bool operator!=(const func &, const func &);
+HEYOKA_DLL_PUBLIC bool operator<(const func &, const func &);
 
 class HEYOKA_DLL_PUBLIC func
 {
     friend HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
     friend HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
+    friend HEYOKA_DLL_PUBLIC bool operator<(const func &, const func &);
 
     // Pointer to the inner base.
     std::shared_ptr<detail::func_inner_base> m_ptr;
