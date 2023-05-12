@@ -31,7 +31,6 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/erf.hpp>
 #include <heyoka/math/exp.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -101,9 +100,6 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     }
 }
 
-// Potential issue in the decomposition when x = 0,
-// in the presence of square() automatic simplification (not
-// currently the case).
 TEST_CASE("taylor erf decompose bug 00")
 {
     llvm_state s;
@@ -157,7 +153,7 @@ TEST_CASE("taylor erf test simplifications")
 
     llvm_state s{kw::opt_level = 0u};
 
-    auto dc = taylor_add_jet<double>(s, "jet", {exp(-square(x + y)) + erf(x + y), x}, 2, 1, false, false);
+    auto dc = taylor_add_jet<double>(s, "jet", {exp(-((x + y) * (x + y))) + erf(x + y), x}, 2, 1, false, false);
 
     REQUIRE(dc.size() == 10u);
 

@@ -37,7 +37,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/atan.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -67,15 +66,24 @@ constexpr bool skip_batch_ld =
 #endif
     ;
 
+// NOTE: this wrapper is here only to ease the transition
+// of old test code to the new implementation of square
+// as a special case of multiplication.
+auto square_wrapper(const expression &x)
+{
+    return x * x;
+}
+
 TEST_CASE("atan diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(atan(x * x - y), x) == (2. * x) / (1. + square(square(x) - y)));
-    REQUIRE(diff(atan(x * x + y), y) == 1. / (1. + square(square(x) + y)));
+    REQUIRE(diff(atan(x * x - y), x) == (2. * x) / (1. + square_wrapper(square_wrapper(x) - y)));
+    REQUIRE(diff(atan(x * x + y), y) == 1. / (1. + square_wrapper(square_wrapper(x) + y)));
 
-    REQUIRE(diff(atan(par[0] * par[0] - y), par[0]) == (2. * par[0]) / (1. + square(square(par[0]) - y)));
-    REQUIRE(diff(atan(x * x + par[1]), par[1]) == 1. / (1. + square(square(x) + par[1])));
+    REQUIRE(diff(atan(par[0] * par[0] - y), par[0])
+            == (2. * par[0]) / (1. + square_wrapper(square_wrapper(par[0]) - y)));
+    REQUIRE(diff(atan(x * x + par[1]), par[1]) == 1. / (1. + square_wrapper(square_wrapper(x) + par[1])));
 }
 
 TEST_CASE("atan s11n")

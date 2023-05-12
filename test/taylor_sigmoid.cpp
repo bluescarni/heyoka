@@ -28,7 +28,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sigmoid.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -153,7 +152,7 @@ TEST_CASE("taylor sigmoid test simplifications")
 
     llvm_state s{kw::opt_level = 0u};
 
-    taylor_add_jet<double>(s, "jet", {square(sigmoid(x + y)) + sigmoid(x + y), x}, 2, 1, false, false);
+    taylor_add_jet<double>(s, "jet", {sigmoid(x + y) * sigmoid(x + y) + sigmoid(x + y), x}, 2, 1, false, false);
 
     s.compile();
 

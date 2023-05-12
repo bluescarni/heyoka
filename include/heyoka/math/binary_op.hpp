@@ -62,6 +62,7 @@ public:
     void to_stream(std::ostringstream &) const;
 
     [[nodiscard]] bool extra_equal_to(const func &) const;
+    [[nodiscard]] bool extra_less_than(const func &) const;
 
     [[nodiscard]] std::size_t extra_hash() const;
 

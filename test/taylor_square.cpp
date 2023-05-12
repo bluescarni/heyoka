@@ -15,6 +15,8 @@
 #include <tuple>
 #include <vector>
 
+#include <boost/algorithm/string/predicate.hpp>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -23,7 +25,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -45,6 +46,13 @@ const auto fp_types = std::tuple<double
                                  mppp::real128
 #endif
                                  >{};
+
+auto square_wrapper(expression e)
+{
+    auto ret = "x"_var * "y"_var;
+
+    return subs(ret, {{"x", e}, {"y", e}});
+}
 
 template <typename T, typename U>
 void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
@@ -98,8 +106,12 @@ TEST_CASE("taylor square")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {square(expression{number{fp_t(2)}}), x + y}, 1, 1, high_accuracy,
+            taylor_add_jet<fp_t>(s, "jet", {square_wrapper(expression{number{fp_t(2)}}), x + y}, 1, 1, high_accuracy,
                                  compact_mode);
+
+            if (compact_mode && opt_level == 0u) {
+                REQUIRE(boost::contains(s.get_ir(), "mul_square.num_num"));
+            }
 
             s.compile();
 
@@ -119,7 +131,11 @@ TEST_CASE("taylor square")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {square(par[0]), x + y}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {square_wrapper(par[0]), x + y}, 1, 1, high_accuracy, compact_mode);
+
+            if (compact_mode && opt_level == 0u) {
+                REQUIRE(boost::contains(s.get_ir(), "mul_square.par_par"));
+            }
 
             s.compile();
 
@@ -141,8 +157,12 @@ TEST_CASE("taylor square")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {square(expression{number{fp_t(2)}}), x + y}, 1, 2, high_accuracy,
+            taylor_add_jet<fp_t>(s, "jet", {square_wrapper(expression{number{fp_t(2)}}), x + y}, 1, 2, high_accuracy,
                                  compact_mode);
+
+            if (compact_mode && opt_level == 0u) {
+                REQUIRE(boost::contains(s.get_ir(), "mul_square.num_num"));
+            }
 
             s.compile();
 
@@ -169,7 +189,11 @@ TEST_CASE("taylor square")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {square(par[1]), x + y}, 1, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {square_wrapper(par[1]), x + y}, 1, 2, high_accuracy, compact_mode);
+
+            if (compact_mode && opt_level == 0u) {
+                REQUIRE(boost::contains(s.get_ir(), "mul_square.par_par"));
+            }
 
             s.compile();
 
@@ -198,8 +222,12 @@ TEST_CASE("taylor square")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {square(expression{number{fp_t(2)}}), x + y}, 2, 1, high_accuracy,
+            taylor_add_jet<fp_t>(s, "jet", {square_wrapper(expression{number{fp_t(2)}}), x + y}, 2, 1, high_accuracy,
                                  compact_mode);
+
+            if (compact_mode && opt_level == 0u) {
+                REQUIRE(boost::contains(s.get_ir(), "mul_square.num_num"));
+            }
 
             s.compile();
 
@@ -221,8 +249,12 @@ TEST_CASE("taylor square")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {square(expression{number{fp_t(2)}}), x + y}, 2, 2, high_accuracy,
+            taylor_add_jet<fp_t>(s, "jet", {square_wrapper(expression{number{fp_t(2)}}), x + y}, 2, 2, high_accuracy,
                                  compact_mode);
+
+            if (compact_mode && opt_level == 0u) {
+                REQUIRE(boost::contains(s.get_ir(), "mul_square.num_num"));
+            }
 
             s.compile();
 
@@ -255,8 +287,12 @@ TEST_CASE("taylor square")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {square(expression{number{fp_t(2)}}), x + y}, 3, 3, high_accuracy,
+            taylor_add_jet<fp_t>(s, "jet", {square_wrapper(expression{number{fp_t(2)}}), x + y}, 3, 3, high_accuracy,
                                  compact_mode);
+
+            if (compact_mode && opt_level == 0u) {
+                REQUIRE(boost::contains(s.get_ir(), "mul_square.num_num"));
+            }
 
             s.compile();
 
@@ -303,7 +339,11 @@ TEST_CASE("taylor square")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {square(par[0]), x + y}, 3, 3, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {square_wrapper(par[0]), x + y}, 3, 3, high_accuracy, compact_mode);
+
+            if (compact_mode && opt_level == 0u) {
+                REQUIRE(boost::contains(s.get_ir(), "mul_square.par_par"));
+            }
 
             s.compile();
 
@@ -350,14 +390,18 @@ TEST_CASE("taylor square")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({square(expression{number{fp_t(2)}}), x + y}, opt_level, high_accuracy,
+        compare_batch_scalar<fp_t>({square_wrapper(expression{number{fp_t(2)}}), x + y}, opt_level, high_accuracy,
                                    compact_mode);
 
         // Variable tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {square(y), square(x)}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {square_wrapper(y), square_wrapper(x)}, 1, 1, high_accuracy, compact_mode);
+
+            if (compact_mode && opt_level == 0u) {
+                REQUIRE(boost::contains(s.get_ir(), "mul_square.var_var"));
+            }
 
             s.compile();
 
@@ -377,7 +421,11 @@ TEST_CASE("taylor square")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {square(y), square(x)}, 1, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {square_wrapper(y), square_wrapper(x)}, 1, 2, high_accuracy, compact_mode);
+
+            if (compact_mode && opt_level == 0u) {
+                REQUIRE(boost::contains(s.get_ir(), "mul_square.var_var"));
+            }
 
             s.compile();
 
@@ -404,7 +452,11 @@ TEST_CASE("taylor square")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {square(y), square(x)}, 2, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {square_wrapper(y), square_wrapper(x)}, 2, 1, high_accuracy, compact_mode);
+
+            if (compact_mode && opt_level == 0u) {
+                REQUIRE(boost::contains(s.get_ir(), "mul_square.var_var"));
+            }
 
             s.compile();
 
@@ -426,7 +478,11 @@ TEST_CASE("taylor square")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {square(y), square(x)}, 2, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {square_wrapper(y), square_wrapper(x)}, 2, 2, high_accuracy, compact_mode);
+
+            if (compact_mode && opt_level == 0u) {
+                REQUIRE(boost::contains(s.get_ir(), "mul_square.var_var"));
+            }
 
             s.compile();
 
@@ -459,7 +515,11 @@ TEST_CASE("taylor square")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {square(y), square(x)}, 3, 3, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {square_wrapper(y), square_wrapper(x)}, 3, 3, high_accuracy, compact_mode);
+
+            if (compact_mode && opt_level == 0u) {
+                REQUIRE(boost::contains(s.get_ir(), "mul_square.var_var"));
+            }
 
             s.compile();
 
@@ -504,7 +564,7 @@ TEST_CASE("taylor square")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({square(y), square(x)}, opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({square_wrapper(y), square_wrapper(x)}, opt_level, high_accuracy, compact_mode);
     };
 
     for (auto cm : {false, true}) {

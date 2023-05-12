@@ -33,7 +33,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/math/sin.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -53,6 +52,14 @@ const auto fp_types = std::tuple<double
                                  mppp::real128
 #endif
                                  >{};
+
+// NOTE: this wrapper is here only to ease the transition
+// of old test code to the new implementation of square
+// as a special case of multiplication.
+auto square_wrapper(const expression &x)
+{
+    return x * x;
+}
 
 // Test for an event triggering exactly at the end of a timestep.
 TEST_CASE("linear box")
@@ -254,12 +261,12 @@ TEST_CASE("taylor glancing blow test")
             {prime(x0) = vx0, prime(y0) = vy0, prime(x1) = vx1, prime(y1) = vy1, prime(vx0) = 0_dbl, prime(vy0) = 0_dbl,
              prime(vx1) = 0_dbl, prime(vy1) = 0_dbl},
             {fp_t(0.), fp_t(0.), fp_t(-10.), fp_t(2), fp_t(0.), fp_t(0.), fp_t(1.), fp_t(0.)},
-            kw::nt_events
-            = {ev_t(square(x0 - x1) + square(y0 - y1) - 4., [&counter](taylor_adaptive<fp_t> &, fp_t t, int) {
-                  REQUIRE((t - 10.) * (t - 10.) <= std::numeric_limits<fp_t>::epsilon());
+            kw::nt_events = {ev_t(square_wrapper(x0 - x1) + square_wrapper(y0 - y1) - 4.,
+                                  [&counter](taylor_adaptive<fp_t> &, fp_t t, int) {
+                                      REQUIRE((t - 10.) * (t - 10.) <= std::numeric_limits<fp_t>::epsilon());
 
-                  ++counter;
-              })}};
+                                      ++counter;
+                                  })}};
 
         for (auto i = 0; i < 20; ++i) {
             REQUIRE(std::get<0>(ta.step(fp_t(1.3))) == taylor_outcome::time_limit);
@@ -276,7 +283,7 @@ TEST_CASE("taylor glancing blow test")
                                     prime(vx0) = 0_dbl, prime(vy0) = 0_dbl, prime(vx1) = .1_dbl, prime(vy1) = 0_dbl},
                                    {fp_t(0.), fp_t(0.), fp_t(-10.), fp_t(2), fp_t(0.), fp_t(0.), fp_t(1.), fp_t(0.)},
                                    kw::nt_events
-                                   = {ev_t(square(x0 - x1) + square(y0 - y1) - 4.,
+                                   = {ev_t(square_wrapper(x0 - x1) + square_wrapper(y0 - y1) - 4.,
                                            [&counter](taylor_adaptive<fp_t> &, fp_t, int) { ++counter; })}};
 
         for (auto i = 0; i < 20; ++i) {

@@ -63,6 +63,10 @@ public:
 // as the default equality/hashing primitives for func
 // take into account the constant name. Thus, under the assumption
 // that different constants have different names, this will be enough.
+// NOTE: we might need to revisit this - perhaps it's better/safer
+// to have an entirely different C++ type rather than relying on remembering
+// to give a unique name to each constant. Then again, still unsure whether
+// the func API can truly be considered as "public"...
 class HEYOKA_DLL_PUBLIC constant : public func_base
 {
 public:

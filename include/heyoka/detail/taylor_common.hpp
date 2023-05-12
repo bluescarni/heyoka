@@ -36,6 +36,8 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/number.hpp>
+#include <heyoka/param.hpp>
 #include <heyoka/taylor.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -66,6 +68,7 @@ inline llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, llvm::Type *fp_t
                                                  std::uint32_t n_hidden_deps, const F &cgen, const NumPars &...np)
 {
     static_assert(sizeof...(np) > 0u);
+    static_assert(std::conjunction_v<std::disjunction<std::is_same<NumPars, number>, std::is_same<NumPars, param>>...>);
 
     auto &md = s.module();
     auto &builder = s.builder();

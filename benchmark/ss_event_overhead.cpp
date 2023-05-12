@@ -41,7 +41,6 @@
 
 #endif
 
-#include <heyoka/math/square.hpp>
 #include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -114,7 +113,7 @@ void run_integration(const std::string &filename, T t_final, double perturb, boo
             auto diff_y = yj - yi;
             auto diff_z = zj - zi;
 
-            auto ev_eq = (square(diff_x) + square(diff_y) + square(diff_z) - 4 * jradius * jradius) * (1 / T(100));
+            auto ev_eq = (diff_x * diff_x + diff_y * diff_y + diff_z * diff_z - 4 * jradius * jradius) * (1 / T(100));
 
             evs.emplace_back(std::move(ev_eq), cb);
         }

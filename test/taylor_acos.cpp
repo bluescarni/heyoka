@@ -29,7 +29,6 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/acos.hpp>
 #include <heyoka/math/sqrt.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -99,10 +98,9 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     }
 }
 
-// Potential issue in the decomposition when x = 0,
-// in the presence of square() automatic simplification (not
-// currently the case).
-TEST_CASE("taylor acos decompose bug 00")
+// Issue in the verification of a Taylor decomposition
+// in presence of NaNs.
+TEST_CASE("taylor nan decompose verify bug")
 {
     llvm_state s;
 
@@ -121,7 +119,7 @@ TEST_CASE("taylor acos test simplifications")
 
     llvm_state s{kw::opt_level = 0u};
 
-    taylor_add_jet<double>(s, "jet", {acos(x + y) + sqrt(1. - square(x + y)), x}, 2, 1, false, false);
+    taylor_add_jet<double>(s, "jet", {acos(x + y) + sqrt(1. - (x + y) * (x + y)), x}, 2, 1, false, false);
 
     s.compile();
 

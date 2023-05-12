@@ -27,7 +27,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sin.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -37,6 +36,14 @@
 
 using namespace heyoka;
 using namespace heyoka_test;
+
+// NOTE: this wrapper is here only to ease the transition
+// of old test code to the new implementation of square
+// as a special case of multiplication.
+auto square_wrapper(const expression &x)
+{
+    return x * x;
+}
 
 TEST_CASE("poly translator 1")
 {
@@ -232,7 +239,7 @@ TEST_CASE("taylor nte glancing blow test")
                  prime(vy0) = 0_dbl, prime(vx1) = 0_dbl, prime(vy1) = 0_dbl},
                 {fp_t(0., prec), fp_t(0., prec), fp_t(-10., prec), fp_t(2, prec), fp_t(0., prec), fp_t(0., prec),
                  fp_t(1., prec), fp_t(0., prec)},
-                kw::nt_events = {ev_t(square(x0 - x1) + square(y0 - y1) - 4.,
+                kw::nt_events = {ev_t(square_wrapper(x0 - x1) + square_wrapper(y0 - y1) - 4.,
                                       [&counter, prec](taylor_adaptive<fp_t> &, fp_t t, int) {
                                           REQUIRE((t - 10.) * (t - 10.) <= detail::eps_from_prec(prec));
 
@@ -257,7 +264,7 @@ TEST_CASE("taylor nte glancing blow test")
                  prime(vy0) = 0_dbl, prime(vx1) = .1_dbl, prime(vy1) = 0_dbl},
                 {fp_t(0., prec), fp_t(0., prec), fp_t(-10., prec), fp_t(2, prec), fp_t(0., prec), fp_t(0., prec),
                  fp_t(1., prec), fp_t(0., prec)},
-                kw::nt_events = {ev_t(square(x0 - x1) + square(y0 - y1) - 4.,
+                kw::nt_events = {ev_t(square_wrapper(x0 - x1) + square_wrapper(y0 - y1) - 4.,
                                       [&counter](taylor_adaptive<fp_t> &, const fp_t &, int) { ++counter; })},
                 kw::opt_level = opt_level,
                 kw::compact_mode = true};

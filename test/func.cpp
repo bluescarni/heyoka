@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <typeindex>
 #include <typeinfo>
 #include <unordered_map>
 #include <utility>
@@ -813,6 +814,55 @@ TEST_CASE("is_time_dependent")
 
     f = func(func_22{});
     REQUIRE(!f.is_time_dependent());
+}
+
+struct func_23 : func_base {
+    func_23(std::string name = "pippo", std::vector<expression> args = {}, int n = 0)
+        : func_base(std::move(name), std::move(args)), m_n(n)
+    {
+    }
+    bool extra_less_than(const func &a) const
+    {
+        return m_n < a.extract<func_23>()->m_n;
+    }
+    bool extra_equal_to(const func &a) const
+    {
+        return m_n == a.extract<func_23>()->m_n;
+    }
+    int m_n;
+};
+
+TEST_CASE("func lt")
+{
+    func f(func_20{});
+    REQUIRE(!(f < f));
+
+    if (std::type_index(typeid(func_20)) < std::type_index(typeid(func_21))) {
+        REQUIRE(func{func_20{}} < func{func_21{}});
+        REQUIRE(!(func{func_21{}} < func{func_20{}}));
+    } else {
+        REQUIRE(func{func_21{}} < func{func_20{}});
+        REQUIRE(!(func{func_20{}} < func{func_21{}}));
+    }
+
+    REQUIRE(func{func_20{}} == func{func_20{}});
+    REQUIRE(func{func_21{}} != func{func_20{}});
+
+    REQUIRE(func{func_20{"aaa"}} < func{func_20{"bbb"}});
+    REQUIRE(!(func{func_20{"bbb"}} < func{func_20{"bbb"}}));
+    REQUIRE(func{func_20{"bbb"}} == func{func_20{"bbb"}});
+    REQUIRE(func{func_20{"aaa"}} != func{func_20{"bbb"}});
+    REQUIRE(!(func{func_20{"bbb"}} < func{func_20{"aaa"}}));
+    REQUIRE(func{func_20{"aaa", {1_dbl}}} < func{func_20{"aaa", {2_dbl}}});
+    REQUIRE(!(func{func_20{"aaa", {1_dbl}}} < func{func_20{"aaa", {1_dbl}}}));
+    REQUIRE(!(func{func_20{"aaa", {3_dbl}}} < func{func_20{"aaa", {2_dbl}}}));
+
+    REQUIRE(func{func_23{"aaa", {3_dbl}, 1}} < func{func_23{"aaa", {3_dbl}, 2}});
+    REQUIRE(!(func{func_23{"aaa", {3_dbl}, 2}} < func{func_23{"aaa", {3_dbl}, 1}}));
+    REQUIRE(!(func{func_23{"aaa", {3_dbl}, 1}} < func{func_23{"aaa", {3_dbl}, 1}}));
+    REQUIRE(!(func{func_23{"aaa", {3_dbl}, 1}} < func{func_23{"aaa", {3_dbl}, 1}}));
+    REQUIRE(func{func_23{"aaa", {3_dbl}, 1}} == func{func_23{"aaa", {3_dbl}, 1}});
+    REQUIRE(func{func_23{"aaa", {3_dbl}, 2}} != func{func_23{"aaa", {3_dbl}, 1}});
 }
 
 #if defined(__GNUC__)

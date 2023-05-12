@@ -13,7 +13,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/pow.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "benchmark_utils.hpp"
@@ -29,13 +28,13 @@ int main(int argc, char *argv[])
 
     auto [x, y, px, py] = make_vars("x", "y", "px", "py");
 
-    auto ta
-        = taylor_adaptive<double>({prime(x) = px + y, prime(y) = py - x,
-                                   prime(px) = py - (1. - mu) * (x - mu) * pow(square(x - mu) + square(y), -3 / 2.)
-                                               - mu * (x + (1. - mu)) * pow(square(x + (1. - mu)) + square(y), -3 / 2.),
-                                   prime(py) = -px - (1. - mu) * y * pow(square(x - mu) + square(y), -3 / 2.)
-                                               - mu * y * pow(square(x + (1. - mu)) + square(y), -3 / 2.)},
-                                  {-0.8, 0.0, 0.0, -0.6276410653920694}, kw::pars = {0.01}, kw::tol = 1e-15);
+    auto ta = taylor_adaptive<double>(
+        {prime(x) = px + y, prime(y) = py - x,
+         prime(px) = py - (1. - mu) * (x - mu) * pow((x - mu) * (x - mu) + y * y, -3 / 2.)
+                     - mu * (x + (1. - mu)) * pow((x + (1. - mu)) * (x + (1. - mu)) + y * y, -3 / 2.),
+         prime(py) = -px - (1. - mu) * y * pow((x - mu) * (x - mu) + y * y, -3 / 2.)
+                     - mu * y * pow((x + (1. - mu)) * (x + (1. - mu)) + y * y, -3 / 2.)},
+        {-0.8, 0.0, 0.0, -0.6276410653920694}, kw::pars = {0.01}, kw::tol = 1e-15);
 
     auto start = std::chrono::high_resolution_clock::now();
     auto oc = std::get<0>(ta.propagate_until(2000.));

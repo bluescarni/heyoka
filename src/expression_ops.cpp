@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cassert>
+#include <optional>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -18,7 +19,6 @@
 #include <heyoka/func.hpp>
 #include <heyoka/math/binary_op.hpp>
 #include <heyoka/math/neg.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
@@ -63,11 +63,12 @@ namespace detail
 
 // A comparison operator intended for sorting in a canonical
 // way the operands to a commutative operator/function.
-// NOTE: this cannot make a set of function arguments unique, as:
-// - two number arguments are considered equal to each other
-//   (this could be fixed by introducing an ordering on numbers),
-// - two func arguments are considered equal to each other
-//   (no idea how one would implement an ordering on functions).
+// NOTE: this is similar to std::less<expression>, except that
+// it does not sort functions. The reason for this is that
+// function comparison is platform-dependent as it relies on
+// std::type_index comparison. We want to avoid having a
+// platform-dependent canonical order for the way expressions
+// are constructed.
 bool comm_ops_lt(const expression &e1, const expression &e2)
 {
     return std::visit(
@@ -88,9 +89,9 @@ bool comm_ops_lt(const expression &e1, const expression &e2)
                 return v1.idx() < v2.idx();
             }
 
-            // Both arguments are numbers: equivalent.
+            // Both arguments are numbers: compare.
             if constexpr (std::is_same_v<number, type1> && std::is_same_v<number, type2>) {
-                return false;
+                return v1 < v2;
             }
 
             // Both arguments are functions: equivalent.
@@ -132,6 +133,52 @@ bool comm_ops_lt(const expression &e1, const expression &e2)
 namespace
 {
 
+// Helper to check if an expression is a multiplication whose first
+// operand is a number. If it is, then pointers to the number and the second
+// operand are returned. Otherwise, the first pointer is null and the second
+// pointer points to e.
+std::pair<const number *, const expression *> is_num_mul(const expression &e)
+{
+    if (!std::holds_alternative<func>(e.value())) {
+        return {nullptr, &e};
+    }
+
+    const auto *bop = std::get<func>(e.value()).extract<binary_op>();
+
+    if (bop == nullptr || bop->op() != binary_op::type::mul
+        || !std::holds_alternative<number>(bop->args()[0].value())) {
+        return {nullptr, &e};
+    }
+
+    return {&std::get<number>(bop->args()[0].value()), &bop->args()[1]};
+};
+
+// Detect if e1 + e2 can be compressed into num * x.
+std::optional<expression> plus_mul_compress(const expression &e1, const expression &e2)
+{
+    // Identical operands.
+    if (e1 == e2) {
+        return 2_dbl * e1;
+    }
+
+    const auto [n1, op1] = is_num_mul(e1);
+    const auto [n2, op2] = is_num_mul(e2);
+
+    if (n1 != nullptr && n2 != nullptr && *op1 == *op2) {
+        return expression{*n1 + *n2} * *op1;
+    }
+
+    if (n1 != nullptr && *op1 == *op2) {
+        return expression{*n1 + number{1.}} * *op1;
+    }
+
+    if (n2 != nullptr && *op2 == *op1) {
+        return expression{*n2 + number{1.}} * *op2;
+    }
+
+    return {};
+}
+
 // NOLINTNEXTLINE(misc-no-recursion)
 expression expression_plus(const expression &e1, const expression &e2)
 {
@@ -139,6 +186,10 @@ expression expression_plus(const expression &e1, const expression &e2)
     if (const auto *fptr = detail::is_neg(e2)) {
         assert(!fptr->args().empty()); // LCOV_EXCL_LINE
         return e1 - fptr->args()[0];
+    }
+
+    if (auto ret = plus_mul_compress(e1, e2)) {
+        return std::move(*ret);
     }
 
     auto visitor = [](const auto &v1, const auto &v2) {
@@ -201,6 +252,42 @@ expression operator+(const expression &e1, const expression &e2)
     }
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// Detect if e1 - e2 can be compressed into num * x.
+std::optional<expression> minus_mul_compress(const expression &e1, const expression &e2)
+{
+    // Identical operands.
+    if (e1 == e2) {
+        return 0_dbl;
+    }
+
+    const auto [n1, op1] = is_num_mul(e1);
+    const auto [n2, op2] = is_num_mul(e2);
+
+    if (n1 != nullptr && n2 != nullptr && *op1 == *op2) {
+        return expression{*n1 - *n2} * *op1;
+    }
+
+    if (n1 != nullptr && *op1 == *op2) {
+        return expression{*n1 - number{1.}} * *op1;
+    }
+
+    if (n2 != nullptr && *op2 == *op1) {
+        return expression{number{1.} - *n2} * *op2;
+    }
+
+    return {};
+}
+
+} // namespace
+
+} // namespace detail
+
 // NOLINTNEXTLINE(misc-no-recursion)
 expression operator-(const expression &e1, const expression &e2)
 {
@@ -208,6 +295,10 @@ expression operator-(const expression &e1, const expression &e2)
     if (const auto *fptr = detail::is_neg(e2)) {
         assert(!fptr->args().empty()); // LCOV_EXCL_LINE
         return e1 + fptr->args()[0];
+    }
+
+    if (auto ret = detail::minus_mul_compress(e1, e2)) {
+        return std::move(*ret);
     }
 
     auto visitor = [](const auto &v1, const auto &v2) {
@@ -277,12 +368,6 @@ expression expression_mul(const expression &e1, const expression &e2)
         assert(!fptr1->args().empty()); // LCOV_EXCL_LINE
         assert(!fptr2->args().empty()); // LCOV_EXCL_LINE
         return fptr1->args()[0] * fptr2->args()[0];
-    }
-
-    // Simplify x*x -> square(x) if x is not a number (otherwise,
-    // we will numerically compute the result below).
-    if (e1 == e2 && !std::holds_alternative<number>(e1.value())) {
-        return square(e1);
     }
 
     auto visitor = [fptr2](const auto &v1, const auto &v2) {

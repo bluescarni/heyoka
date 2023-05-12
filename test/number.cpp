@@ -83,6 +83,17 @@ TEST_CASE("number basic")
 #endif
 }
 
+TEST_CASE("number lt")
+{
+    REQUIRE(number{1.1} < number{2.});
+    REQUIRE(!(number{1.1} < number{1.1}));
+    REQUIRE(number{1.1} < number{std::numeric_limits<double>::quiet_NaN()});
+    REQUIRE(!(number{std::numeric_limits<double>::quiet_NaN()} < number{std::numeric_limits<double>::quiet_NaN()}));
+    REQUIRE(!(number{std::numeric_limits<double>::quiet_NaN()} < number{1.1}));
+    REQUIRE(number{3.1f} < number{2.});
+    REQUIRE(!(number{1.1l} < number{2.}));
+}
+
 TEST_CASE("number hash eq")
 {
     auto hash_number = [](const number &n) { return hash(n); };

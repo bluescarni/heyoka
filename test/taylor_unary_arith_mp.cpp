@@ -13,7 +13,6 @@
 
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/neg.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -98,7 +97,7 @@ TEST_CASE("square")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {square(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {par[0] * par[0], x + y}, 2, 1, ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -121,7 +120,8 @@ TEST_CASE("square")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {square(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {(y + 2_dbl) * (y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false,
+                                             prec);
 
                         s.compile();
 

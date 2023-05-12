@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <functional>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -126,7 +127,6 @@ void test_eval()
         REQUIRE(eval(sigmoid(x), in) == approximately(T(1.) / (T(1.) + exp(-T(0.125)))));
         REQUIRE(eval(erf(x), in) == approximately(erf(T(0.125))));
         REQUIRE(eval(neg(x), in) == approximately(-T(0.125)));
-        REQUIRE(eval(square(x), in) == approximately(T(0.125) * T(0.125)));
         REQUIRE(eval(acosh(x + heyoka::expression(T(1.))), in) == approximately(acosh(T(1.125))));
         REQUIRE(eval(asinh(x), in) == approximately(asinh(T(0.125))));
     }
@@ -220,14 +220,13 @@ TEST_CASE("operator == and !=")
         REQUIRE(ex1 != ex4);
         REQUIRE(ex1 != ex5);
     }
-    // Identities that will not hold
     {
         expression ex1 = 1_dbl + cos("x"_var);
         expression ex2 = cos("x"_var) + 1_dbl;
         expression ex3 = cos("x"_var) + 1_dbl + ex1 - ex1;
 
         REQUIRE(ex1 == ex2);
-        REQUIRE(ex3 != ex2);
+        REQUIRE(ex3 == ex2);
     }
 }
 
@@ -603,10 +602,7 @@ TEST_CASE("mul simpls")
 {
     auto [x, y] = make_vars("x", "y");
 
-    // Verify simplification to square(),
-    // for non-number arguments.
     REQUIRE(2_dbl * 2_dbl == 4_dbl);
-    REQUIRE(x * x == square(x));
 
     REQUIRE(1_dbl * 2_dbl == 2_dbl);
     REQUIRE(3_ldbl * 2_dbl == 6_ldbl);
@@ -1019,7 +1015,7 @@ TEST_CASE("copy")
                .get_ptr());
 
     // A test in which a function has the same argument twice.
-    bar = foo + foo;
+    bar = subs(x + y, {{"x", foo}, {"y", foo}});
     bar_copy = copy(bar);
 
     REQUIRE(std::get<func>(std::get<func>(bar.value()).args()[0].value()).get_ptr()
@@ -1032,7 +1028,7 @@ TEST_CASE("copy")
             != std::get<func>(std::get<func>(bar.value()).args()[1].value()).get_ptr());
 
     // Vectorised version.
-    auto vec_copy = copy({bar, foo + foo});
+    auto vec_copy = copy({bar, subs(x + y, {{"x", foo}, {"y", foo}})});
 
     REQUIRE(std::get<func>(std::get<func>(vec_copy[0].value()).args()[0].value()).get_ptr()
             == std::get<func>(std::get<func>(vec_copy[0].value()).args()[1].value()).get_ptr());
@@ -1113,23 +1109,23 @@ TEST_CASE("subs")
     auto tmp = x + y;
     auto tmp2 = x - y;
     auto *tmp2_id = std::get<func>(tmp2.value()).get_ptr();
-    auto ex = tmp - 2_dbl * tmp;
+    auto ex = tmp - par[0] * tmp;
     auto subs_res = subs(ex, {{tmp, tmp2}});
 
-    REQUIRE(subs_res == tmp2 - 2_dbl * tmp2);
+    REQUIRE(subs_res == tmp2 - par[0] * tmp2);
     REQUIRE(tmp2_id == std::get<func>(std::get<func>(subs_res.value()).args()[0].value()).get_ptr());
     REQUIRE(tmp2_id
             == std::get<func>(std::get<func>(std::get<func>(subs_res.value()).args()[1].value()).args()[1].value())
                    .get_ptr());
 
     subs_res = subs(ex, {{x, z}});
-    REQUIRE(subs_res == subs((z + y) - 2_dbl * (z + y), {{z, y}, {y, z}}));
+    REQUIRE(subs_res == subs((z + y) - par[0] * (z + y), {{z, y}, {y, z}}));
     REQUIRE(std::get<func>(std::get<func>(subs_res.value()).args()[0].value()).get_ptr()
             == std::get<func>(std::get<func>(std::get<func>(subs_res.value()).args()[1].value()).args()[1].value())
                    .get_ptr());
 
     // Check the vectorised version too.
-    auto vec_subs = subs({ex, tmp - 2_dbl * tmp}, {{x, z}});
+    auto vec_subs = subs({ex, tmp - par[0] * tmp}, {{x, z}});
     REQUIRE(vec_subs.size() == 2u);
     REQUIRE(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).get_ptr()
             == std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[1].value()).args()[1].value())
@@ -2091,4 +2087,47 @@ TEST_CASE("move semantics")
     ex3 = std::move(ex2);
     REQUIRE(ex3 == x + y);
     REQUIRE(ex2 == 0_dbl);
+}
+
+TEST_CASE("less than")
+{
+    REQUIRE(std::less<expression>{}("x"_var, "y"_var));
+    REQUIRE(!std::less<expression>{}("x"_var, "x"_var));
+    REQUIRE(!std::less<expression>{}("y"_var, "x"_var));
+
+    REQUIRE(std::less<expression>{}(par[0], par[1]));
+    REQUIRE(!std::less<expression>{}(par[0], par[0]));
+    REQUIRE(!std::less<expression>{}(par[1], par[0]));
+
+    REQUIRE(std::less<expression>{}(2_dbl, 3_dbl));
+    REQUIRE(!std::less<expression>{}(2_dbl, 2_dbl));
+    REQUIRE(!std::less<expression>{}(3_dbl, 2_dbl));
+
+    // TODO func compare once fixed.
+
+    REQUIRE(std::less<expression>{}(2_dbl, par[0]));
+    REQUIRE(std::less<expression>{}(2_dbl, "x"_var));
+    REQUIRE(std::less<expression>{}(2_dbl, "x"_var + "y"_var));
+
+    REQUIRE(!std::less<expression>{}("x"_var + "y"_var, 2_dbl));
+    REQUIRE(!std::less<expression>{}("x"_var + "y"_var, par[0]));
+    REQUIRE(!std::less<expression>{}("x"_var + "y"_var, "x"_var));
+
+    REQUIRE(std::less<expression>{}("x"_var, "x"_var + "y"_var));
+    REQUIRE(!std::less<expression>{}("x"_var, 2_dbl));
+    REQUIRE(!std::less<expression>{}("x"_var, par[0]));
+
+    REQUIRE(!std::less<expression>{}(par[0], 2_dbl));
+    REQUIRE(std::less<expression>{}(par[0], "x"_var));
+    REQUIRE(std::less<expression>{}(par[0], "x"_var + "y"_var));
+}
+
+TEST_CASE("mul compress")
+{
+    auto [x] = make_vars("x");
+
+    REQUIRE(2_dbl * x + 3_dbl * x == 5_dbl * x);
+    REQUIRE(2_dbl * x + x == 3_dbl * x);
+    REQUIRE(x + 2_dbl * x == 3_dbl * x);
+    REQUIRE(x - 2_dbl * x == -1_dbl * x);
 }

@@ -620,12 +620,12 @@ bool operator==(const func &a, const func &b)
     }
 
     // NOTE: the initial comparison considers:
-    // - the function name,
     // - the function inner type index,
+    // - the function name,
     // - the arguments.
     // If they are all equal, the extra equality comparison logic
     // is also run.
-    if (a.get_name() == b.get_name() && a.get_type_index() == b.get_type_index() && a.args() == b.args()) {
+    if (a.get_type_index() == b.get_type_index() && a.get_name() == b.get_name() && a.args() == b.args()) {
         return a.ptr()->extra_equal_to(b);
     } else {
         return false;
@@ -635,6 +635,76 @@ bool operator==(const func &a, const func &b)
 bool operator!=(const func &a, const func &b)
 {
     return !(a == b);
+}
+
+// NOTE: this comparison has no mathematical meaning, it is used
+// only to impose a strict ordering functions. Like operator==(),
+// this comparison considers, in order:
+//
+// - the function inner type index,
+// - the function name,
+// - the arguments,
+// - the extra_less_than() comparison logic.
+//
+// NOTE: **IMPORTANT** the ordering imposed by this comparison
+// operator is platform-dependent, due to the use of std::type_index
+// comparison.
+bool operator<(const func &a, const func &b)
+{
+    // Check if the underlying object is the same.
+    if (a.m_ptr == b.m_ptr) {
+        // Same object, a is NOT less than b.
+        return false;
+    }
+
+    // Check the type indices.
+    if (a.get_type_index() < b.get_type_index()) {
+        return true;
+    }
+
+    if (b.get_type_index() < a.get_type_index()) {
+        return false;
+    }
+
+    assert(a.get_type_index() == b.get_type_index());
+
+    // The type indices are equal, check the names next.
+    if (a.get_name() < b.get_name()) {
+        return true;
+    }
+
+    if (b.get_name() < a.get_name()) {
+        return false;
+    }
+
+    assert(a.get_name() == b.get_name());
+
+    // The names are equal, check the arguments next.
+    if (std::lexicographical_compare(a.args().begin(), a.args().end(), b.args().begin(), b.args().end(),
+                                     std::less<expression>{})) {
+        return true;
+    }
+
+    if (std::lexicographical_compare(b.args().begin(), b.args().end(), a.args().begin(), a.args().end(),
+                                     std::less<expression>{})) {
+        return false;
+    }
+
+    assert(a.args() == b.args());
+
+    // The arguments are equivalent, check the extra comparison operator.
+    if (a.ptr()->extra_less_than(b)) {
+        return true;
+    }
+
+    if (b.ptr()->extra_less_than(a)) {
+        return false;
+    }
+
+    // a and b are equivalent.
+    assert(a == b);
+
+    return false;
 }
 
 double eval_dbl(const func &f, const std::unordered_map<std::string, double> &map, const std::vector<double> &pars)

@@ -27,7 +27,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/math/tanh.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
@@ -137,7 +136,7 @@ TEST_CASE("taylor tanh test simplifications")
 
     llvm_state s{kw::opt_level = 0u};
 
-    taylor_add_jet<double>(s, "jet", {square(tanh(x + y)) + tanh(x + y), x}, 2, 1, false, false);
+    taylor_add_jet<double>(s, "jet", {tanh(x + y) * tanh(x + y) + tanh(x + y), x}, 2, 1, false, false);
 
     s.compile();
 

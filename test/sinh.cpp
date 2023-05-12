@@ -38,7 +38,6 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cosh.hpp>
 #include <heyoka/math/sinh.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -68,15 +67,23 @@ constexpr bool skip_batch_ld =
 #endif
     ;
 
+// NOTE: this wrapper is here only to ease the transition
+// of old test code to the new implementation of square
+// as a special case of multiplication.
+auto square_wrapper(const expression &x)
+{
+    return x * x;
+}
+
 TEST_CASE("sinh diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(sinh(x * x - y), x) == cosh(square(x) - y) * (2. * x));
-    REQUIRE(diff(sinh(x * x + y), y) == cosh(square(x) + y));
+    REQUIRE(diff(sinh(x * x - y), x) == cosh(square_wrapper(x) - y) * (2. * x));
+    REQUIRE(diff(sinh(x * x + y), y) == cosh(square_wrapper(x) + y));
 
-    REQUIRE(diff(sinh(par[0] * par[0] - y), par[0]) == cosh(square(par[0]) - y) * (2. * par[0]));
-    REQUIRE(diff(sinh(x * x + par[1]), par[1]) == cosh(square(x) + par[1]));
+    REQUIRE(diff(sinh(par[0] * par[0] - y), par[0]) == cosh(square_wrapper(par[0]) - y) * (2. * par[0]));
+    REQUIRE(diff(sinh(x * x + par[1]), par[1]) == cosh(square_wrapper(x) + par[1]));
 }
 
 TEST_CASE("sinh s11n")

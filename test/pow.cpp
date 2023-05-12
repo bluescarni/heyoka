@@ -39,7 +39,6 @@
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sqrt.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -49,6 +48,14 @@ static std::mt19937 rng;
 
 using namespace heyoka;
 using namespace heyoka_test;
+
+// NOTE: this wrapper is here only to ease the transition
+// of old test code to the new implementation of square
+// as a special case of multiplication.
+auto square_wrapper(const expression &x)
+{
+    return x * x;
+}
 
 #if defined(HEYOKA_HAVE_REAL128) || defined(HEYOKA_HAVE_REAL)
 
@@ -143,21 +150,21 @@ TEST_CASE("pow expo 2")
 {
     auto x = "x"_var;
 
-    REQUIRE(heyoka::pow(x, 2.) == square(x));
-    REQUIRE(heyoka::pow(x, 2.l) == square(x));
+    REQUIRE(heyoka::pow(x, 2.) == square_wrapper(x));
+    REQUIRE(heyoka::pow(x, 2.l) == square_wrapper(x));
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-    REQUIRE(heyoka::pow(x, 2._rq) == square(x));
+    REQUIRE(heyoka::pow(x, 2._rq) == square_wrapper(x));
 
 #endif
 
-    REQUIRE(heyoka::pow(x, 2.1) != square(x));
-    REQUIRE(heyoka::pow(x, 2.1l) != square(x));
+    REQUIRE(heyoka::pow(x, 2.1) != square_wrapper(x));
+    REQUIRE(heyoka::pow(x, 2.1l) != square_wrapper(x));
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-    REQUIRE(heyoka::pow(x, 21._rq) != square(x));
+    REQUIRE(heyoka::pow(x, 21._rq) != square_wrapper(x));
 
 #endif
 }
@@ -166,21 +173,21 @@ TEST_CASE("pow expo 3")
 {
     auto x = "x"_var;
 
-    REQUIRE(heyoka::pow(x, 3.) == square(x) * x);
-    REQUIRE(heyoka::pow(x, 3.l) == square(x) * x);
+    REQUIRE(heyoka::pow(x, 3.) == square_wrapper(x) * x);
+    REQUIRE(heyoka::pow(x, 3.l) == square_wrapper(x) * x);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-    REQUIRE(heyoka::pow(x, 3._rq) == square(x) * x);
+    REQUIRE(heyoka::pow(x, 3._rq) == square_wrapper(x) * x);
 
 #endif
 
-    REQUIRE(heyoka::pow(x, 3.1) != square(x) * x);
-    REQUIRE(heyoka::pow(x, 3.1l) != square(x) * x);
+    REQUIRE(heyoka::pow(x, 3.1) != square_wrapper(x) * x);
+    REQUIRE(heyoka::pow(x, 3.1l) != square_wrapper(x) * x);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-    REQUIRE(heyoka::pow(x, 31._rq) != square(x) * x);
+    REQUIRE(heyoka::pow(x, 31._rq) != square_wrapper(x) * x);
 
 #endif
 }
@@ -189,27 +196,27 @@ TEST_CASE("pow expo 4")
 {
     auto x = "x"_var;
 
-    REQUIRE(heyoka::pow(x, 4.) == square(x) * square(x));
-    REQUIRE(heyoka::pow(x, 4.l) == square(x) * square(x));
+    REQUIRE(heyoka::pow(x, 4.) == square_wrapper(x) * square_wrapper(x));
+    REQUIRE(heyoka::pow(x, 4.l) == square_wrapper(x) * square_wrapper(x));
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-    REQUIRE(heyoka::pow(x, 4._rq) == square(x) * square(x));
+    REQUIRE(heyoka::pow(x, 4._rq) == square_wrapper(x) * square_wrapper(x));
 
 #endif
 
-    REQUIRE(heyoka::pow(x, 4.1) != square(x) * square(x));
-    REQUIRE(heyoka::pow(x, 4.1l) != square(x) * square(x));
+    REQUIRE(heyoka::pow(x, 4.1) != square_wrapper(x) * square_wrapper(x));
+    REQUIRE(heyoka::pow(x, 4.1l) != square_wrapper(x) * square_wrapper(x));
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-    REQUIRE(heyoka::pow(x, 41._rq) != square(x) * square(x));
+    REQUIRE(heyoka::pow(x, 41._rq) != square_wrapper(x) * square_wrapper(x));
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-    REQUIRE(heyoka::pow(x, 1.1_r256) != square(x) * square(x));
+    REQUIRE(heyoka::pow(x, 1.1_r256) != square_wrapper(x) * square_wrapper(x));
     REQUIRE(heyoka::pow(x, 1.1_r256) == heyoka::pow(x, expression{1.1_r256}));
 
 #endif
@@ -244,12 +251,12 @@ TEST_CASE("powi")
 
     REQUIRE(powi(x, 0) == 1_dbl);
     REQUIRE(powi(x + 1., 1) == x + 1.);
-    REQUIRE(powi(x + 1., 2) == square(x + 1.));
-    REQUIRE(powi(x + 1., 3) == square(x + 1.) * (x + 1.));
-    REQUIRE(powi(x + 1., 4) == square(x + 1.) * square(x + 1.));
-    REQUIRE(powi(x + 1., 5) == square(x + 1.) * square(x + 1.) * (x + 1.));
-    REQUIRE(powi(x + 1., 6) == square(x + 1.) * square(x + 1.) * square(x + 1.));
-    REQUIRE(powi(x + 1., 7) == square(x + 1.) * square(x + 1.) * (square(x + 1.) * (x + 1.)));
+    REQUIRE(powi(x + 1., 2) == square_wrapper(x + 1.));
+    REQUIRE(powi(x + 1., 3) == square_wrapper(x + 1.) * (x + 1.));
+    REQUIRE(powi(x + 1., 4) == square_wrapper(x + 1.) * square_wrapper(x + 1.));
+    REQUIRE(powi(x + 1., 5) == square_wrapper(x + 1.) * square_wrapper(x + 1.) * (x + 1.));
+    REQUIRE(powi(x + 1., 6) == square_wrapper(x + 1.) * square_wrapper(x + 1.) * square_wrapper(x + 1.));
+    REQUIRE(powi(x + 1., 7) == square_wrapper(x + 1.) * square_wrapper(x + 1.) * (square_wrapper(x + 1.) * (x + 1.)));
 }
 
 TEST_CASE("pow diff")
