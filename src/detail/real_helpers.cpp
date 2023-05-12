@@ -122,9 +122,6 @@ namespace
 {
 
 // Small helper to codegen the MPFR_RNDN constant.
-// NOTE: MPFR_RNDN is part of the MPFR API, so technically this introduces
-// a direct dependency on MPFR. On the other hand, perhaps we can guarantee that
-// including real.hpp includes transitively mpfr.h and leave it at that?
 llvm::Constant *llvm_mpfr_rndn(llvm_state &s)
 {
     return llvm::ConstantInt::getSigned(to_llvm_type<real_rnd_t>(s.context()),
