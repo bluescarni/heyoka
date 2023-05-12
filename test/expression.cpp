@@ -219,14 +219,13 @@ TEST_CASE("operator == and !=")
         REQUIRE(ex1 != ex4);
         REQUIRE(ex1 != ex5);
     }
-    // Identities that will not hold
     {
         expression ex1 = 1_dbl + cos("x"_var);
         expression ex2 = cos("x"_var) + 1_dbl;
         expression ex3 = cos("x"_var) + 1_dbl + ex1 - ex1;
 
         REQUIRE(ex1 == ex2);
-        REQUIRE(ex3 != ex2);
+        REQUIRE(ex3 == ex2);
     }
 }
 
@@ -1109,23 +1108,23 @@ TEST_CASE("subs")
     auto tmp = x + y;
     auto tmp2 = x - y;
     auto *tmp2_id = std::get<func>(tmp2.value()).get_ptr();
-    auto ex = tmp - 2_dbl * tmp;
+    auto ex = tmp - par[0] * tmp;
     auto subs_res = subs(ex, {{tmp, tmp2}});
 
-    REQUIRE(subs_res == tmp2 - 2_dbl * tmp2);
+    REQUIRE(subs_res == tmp2 - par[0] * tmp2);
     REQUIRE(tmp2_id == std::get<func>(std::get<func>(subs_res.value()).args()[0].value()).get_ptr());
     REQUIRE(tmp2_id
             == std::get<func>(std::get<func>(std::get<func>(subs_res.value()).args()[1].value()).args()[1].value())
                    .get_ptr());
 
     subs_res = subs(ex, {{x, z}});
-    REQUIRE(subs_res == subs((z + y) - 2_dbl * (z + y), {{z, y}, {y, z}}));
+    REQUIRE(subs_res == subs((z + y) - par[0] * (z + y), {{z, y}, {y, z}}));
     REQUIRE(std::get<func>(std::get<func>(subs_res.value()).args()[0].value()).get_ptr()
             == std::get<func>(std::get<func>(std::get<func>(subs_res.value()).args()[1].value()).args()[1].value())
                    .get_ptr());
 
     // Check the vectorised version too.
-    auto vec_subs = subs({ex, tmp - 2_dbl * tmp}, {{x, z}});
+    auto vec_subs = subs({ex, tmp - par[0] * tmp}, {{x, z}});
     REQUIRE(vec_subs.size() == 2u);
     REQUIRE(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).get_ptr()
             == std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[1].value()).args()[1].value())

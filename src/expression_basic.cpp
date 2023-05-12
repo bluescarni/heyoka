@@ -1331,6 +1331,9 @@ std::vector<expression> split_sums_for_decompose(const std::vector<expression> &
 
 // NOTE: this does not have any specific mathematical meaning, it
 // is just used to impose an ordering on expressions.
+// NOTE: **IMPORTANT** the ordering imposed by this comparison
+// operator is platform-dependent, due to the use of std::type_index
+// comparison in operator<() for func.
 bool ex_less_than(const expression &e1, const expression &e2)
 {
     return std::visit(

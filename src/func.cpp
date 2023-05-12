@@ -645,6 +645,10 @@ bool operator!=(const func &a, const func &b)
 // - the function name,
 // - the arguments,
 // - the extra_less_than() comparison logic.
+//
+// NOTE: **IMPORTANT** the ordering imposed by this comparison
+// operator is platform-dependent, due to the use of std::type_index
+// comparison.
 bool operator<(const func &a, const func &b)
 {
     // Check if the underlying object is the same.
