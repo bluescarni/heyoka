@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <functional>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -2086,4 +2087,47 @@ TEST_CASE("move semantics")
     ex3 = std::move(ex2);
     REQUIRE(ex3 == x + y);
     REQUIRE(ex2 == 0_dbl);
+}
+
+TEST_CASE("less than")
+{
+    REQUIRE(std::less<expression>{}("x"_var, "y"_var));
+    REQUIRE(!std::less<expression>{}("x"_var, "x"_var));
+    REQUIRE(!std::less<expression>{}("y"_var, "x"_var));
+
+    REQUIRE(std::less<expression>{}(par[0], par[1]));
+    REQUIRE(!std::less<expression>{}(par[0], par[0]));
+    REQUIRE(!std::less<expression>{}(par[1], par[0]));
+
+    REQUIRE(std::less<expression>{}(2_dbl, 3_dbl));
+    REQUIRE(!std::less<expression>{}(2_dbl, 2_dbl));
+    REQUIRE(!std::less<expression>{}(3_dbl, 2_dbl));
+
+    // TODO func compare once fixed.
+
+    REQUIRE(std::less<expression>{}(2_dbl, par[0]));
+    REQUIRE(std::less<expression>{}(2_dbl, "x"_var));
+    REQUIRE(std::less<expression>{}(2_dbl, "x"_var + "y"_var));
+
+    REQUIRE(!std::less<expression>{}("x"_var + "y"_var, 2_dbl));
+    REQUIRE(!std::less<expression>{}("x"_var + "y"_var, par[0]));
+    REQUIRE(!std::less<expression>{}("x"_var + "y"_var, "x"_var));
+
+    REQUIRE(std::less<expression>{}("x"_var, "x"_var + "y"_var));
+    REQUIRE(!std::less<expression>{}("x"_var, 2_dbl));
+    REQUIRE(!std::less<expression>{}("x"_var, par[0]));
+
+    REQUIRE(!std::less<expression>{}(par[0], 2_dbl));
+    REQUIRE(std::less<expression>{}(par[0], "x"_var));
+    REQUIRE(std::less<expression>{}(par[0], "x"_var + "y"_var));
+}
+
+TEST_CASE("mul compress")
+{
+    auto [x] = make_vars("x");
+
+    REQUIRE(2_dbl * x + 3_dbl * x == 5_dbl * x);
+    REQUIRE(2_dbl * x + x == 3_dbl * x);
+    REQUIRE(x + 2_dbl * x == 3_dbl * x);
+    REQUIRE(x - 2_dbl * x == -1_dbl * x);
 }

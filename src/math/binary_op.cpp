@@ -526,7 +526,7 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *, const variable
                                      std::uint32_t order, std::uint32_t, std::uint32_t)
 {
     if (var0 == var1) {
-        // SUse square() if the two variables are the same.
+        // Use square() if the two variables are the same.
         return taylor_diff_square_impl(s, var0, arr, n_uvars, order);
     } else {
         // Fetch the indices of the u variables.
@@ -1380,6 +1380,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, 
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
+        // LCOV_EXCL_START
     } else {
         // The function was created before. Check if the signatures match.
         // NOTE: there could be a mismatch if the derivative function was created
@@ -1390,6 +1391,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, 
                                         "in compact mode detected");
         }
     }
+    // LCOV_EXCL_STOP
 
     return f;
 }

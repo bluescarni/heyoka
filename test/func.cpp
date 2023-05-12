@@ -858,6 +858,7 @@ TEST_CASE("func lt")
     REQUIRE(!(func{func_20{"aaa", {3_dbl}}} < func{func_20{"aaa", {2_dbl}}}));
 
     REQUIRE(func{func_23{"aaa", {3_dbl}, 1}} < func{func_23{"aaa", {3_dbl}, 2}});
+    REQUIRE(!(func{func_23{"aaa", {3_dbl}, 2}} < func{func_23{"aaa", {3_dbl}, 1}}));
     REQUIRE(!(func{func_23{"aaa", {3_dbl}, 1}} < func{func_23{"aaa", {3_dbl}, 1}}));
     REQUIRE(!(func{func_23{"aaa", {3_dbl}, 1}} < func{func_23{"aaa", {3_dbl}, 1}}));
     REQUIRE(func{func_23{"aaa", {3_dbl}, 1}} == func{func_23{"aaa", {3_dbl}, 1}});
