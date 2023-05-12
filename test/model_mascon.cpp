@@ -22,6 +22,14 @@
 #include "catch.hpp"
 #include "test_utils.hpp"
 
+// NOTE: this wrapper is here only to ease the transition
+// of old test code to the new implementation of square
+// as a special case of multiplication.
+auto square_wrapper(const heyoka::expression &x)
+{
+    return x * x;
+}
+
 // NOTE: original code implementing the mascon model.
 // We will be using it to check the new implementation.
 
@@ -59,7 +67,7 @@ make_mascon_system_impl(expression Gconst, std::vector<std::vector<expression>> 
         auto xdiff = (x - x_masc);
         auto ydiff = (y - y_masc);
         auto zdiff = (z - z_masc);
-        auto r2 = sum({square(xdiff), square(ydiff), square(zdiff)});
+        auto r2 = sum({square_wrapper(xdiff), square_wrapper(ydiff), square_wrapper(zdiff)});
         auto common_factor = -Gconst * m_masc * pow(r2, expression{-3. / 2.});
         x_acc.push_back(common_factor * xdiff);
         y_acc.push_back(common_factor * ydiff);

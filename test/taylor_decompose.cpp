@@ -23,6 +23,14 @@
 
 using namespace heyoka;
 
+// NOTE: this wrapper is here only to ease the transition
+// of old test code to the new implementation of square
+// as a special case of multiplication.
+auto square_wrapper(const expression &x)
+{
+    return x * x;
+}
+
 TEST_CASE("decompose auto")
 {
     using Catch::Matchers::Message;
@@ -173,7 +181,7 @@ TEST_CASE("decompose sys")
             auto diff_y = y_vars[j] - y_vars[i];
             auto diff_z = z_vars[j] - z_vars[i];
 
-            sv_funcs.push_back(sqrt(square(diff_x) + square(diff_y) + square(diff_z)));
+            sv_funcs.push_back(sqrt(square_wrapper(diff_x) + square_wrapper(diff_y) + square_wrapper(diff_z)));
         }
     }
 

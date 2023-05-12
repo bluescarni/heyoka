@@ -99,9 +99,6 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     }
 }
 
-// Potential issue in the decomposition when x = 0,
-// in the presence of square() automatic simplification (not
-// currently the case).
 TEST_CASE("taylor asin decompose bug 00")
 {
     llvm_state s;
@@ -121,7 +118,7 @@ TEST_CASE("taylor asin test simplifications")
 
     llvm_state s{kw::opt_level = 0u};
 
-    taylor_add_jet<double>(s, "jet", {asin(x + y) + sqrt(1. - square(x + y)), x}, 2, 1, false, false);
+    taylor_add_jet<double>(s, "jet", {asin(x + y) + sqrt(1. - (x + y) * (x + y)), x}, 2, 1, false, false);
 
     s.compile();
 

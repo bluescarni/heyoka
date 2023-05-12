@@ -126,7 +126,6 @@ void test_eval()
         REQUIRE(eval(sigmoid(x), in) == approximately(T(1.) / (T(1.) + exp(-T(0.125)))));
         REQUIRE(eval(erf(x), in) == approximately(erf(T(0.125))));
         REQUIRE(eval(neg(x), in) == approximately(-T(0.125)));
-        REQUIRE(eval(square(x), in) == approximately(T(0.125) * T(0.125)));
         REQUIRE(eval(acosh(x + heyoka::expression(T(1.))), in) == approximately(acosh(T(1.125))));
         REQUIRE(eval(asinh(x), in) == approximately(asinh(T(0.125))));
     }
@@ -603,10 +602,7 @@ TEST_CASE("mul simpls")
 {
     auto [x, y] = make_vars("x", "y");
 
-    // Verify simplification to square(),
-    // for non-number arguments.
     REQUIRE(2_dbl * 2_dbl == 4_dbl);
-    REQUIRE(x * x == square(x));
 
     REQUIRE(1_dbl * 2_dbl == 2_dbl);
     REQUIRE(3_ldbl * 2_dbl == 6_ldbl);
@@ -1019,7 +1015,7 @@ TEST_CASE("copy")
                .get_ptr());
 
     // A test in which a function has the same argument twice.
-    bar = foo + foo;
+    bar = subs(x + y, {{"x", foo}, {"y", foo}});
     bar_copy = copy(bar);
 
     REQUIRE(std::get<func>(std::get<func>(bar.value()).args()[0].value()).get_ptr()
@@ -1032,7 +1028,7 @@ TEST_CASE("copy")
             != std::get<func>(std::get<func>(bar.value()).args()[1].value()).get_ptr());
 
     // Vectorised version.
-    auto vec_copy = copy({bar, foo + foo});
+    auto vec_copy = copy({bar, subs(x + y, {{"x", foo}, {"y", foo}})});
 
     REQUIRE(std::get<func>(std::get<func>(vec_copy[0].value()).args()[0].value()).get_ptr()
             == std::get<func>(std::get<func>(vec_copy[0].value()).args()[1].value()).get_ptr());

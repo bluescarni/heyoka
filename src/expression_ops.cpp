@@ -279,12 +279,6 @@ expression expression_mul(const expression &e1, const expression &e2)
         return fptr1->args()[0] * fptr2->args()[0];
     }
 
-    // Simplify x*x -> square(x) if x is not a number (otherwise,
-    // we will numerically compute the result below).
-    if (e1 == e2 && !std::holds_alternative<number>(e1.value())) {
-        return square(e1);
-    }
-
     auto visitor = [fptr2](const auto &v1, const auto &v2) {
         using type1 = detail::uncvref_t<decltype(v1)>;
         using type2 = detail::uncvref_t<decltype(v2)>;

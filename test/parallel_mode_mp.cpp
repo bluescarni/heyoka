@@ -43,6 +43,14 @@ bool check_close(const V &v1, const V &v2, mpfr_prec_t prec)
     return true;
 }
 
+// NOTE: this wrapper is here only to ease the transition
+// of old test code to the new implementation of square
+// as a special case of multiplication.
+auto square_wrapper(const expression &x)
+{
+    return x * x;
+}
+
 // Check that the results of integration in parallel
 // mode are consistent with serial mode.
 TEST_CASE("parallel consistency")
@@ -100,7 +108,9 @@ TEST_CASE("parallel consistency")
                 auto diff_y = yj - yi;
                 auto diff_z = zj - zi;
 
-                auto ev_eq = (square(diff_x) + square(diff_y) + square(diff_z) - 4 * jradius * jradius) * (1 / 100.);
+                auto ev_eq
+                    = (square_wrapper(diff_x) + square_wrapper(diff_y) + square_wrapper(diff_z) - 4 * jradius * jradius)
+                      * (1 / 100.);
 
                 evs.emplace_back(std::move(ev_eq), cb);
             }

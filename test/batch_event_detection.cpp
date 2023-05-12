@@ -32,6 +32,14 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
+// NOTE: this wrapper is here only to ease the transition
+// of old test code to the new implementation of square
+// as a special case of multiplication.
+auto square_wrapper(const expression &x)
+{
+    return x * x;
+}
+
 TEST_CASE("nte copy semantics")
 {
     using ev_t = taylor_adaptive_batch<double>::nt_event_t;
@@ -348,13 +356,13 @@ TEST_CASE("nte glancing blow test")
          1.,   1.,   1.,   1.,   //
          0.,   0.,   0.,   0.},
         4,
-        kw::nt_events
-        = {ev_t(square(x0 - x1) + square(y0 - y1) - 4., [&counter](auto &, fp_t t, int, std::uint32_t batch_idx) {
-              REQUIRE((t - 10.) * (t - 10.) <= std::numeric_limits<fp_t>::epsilon());
-              REQUIRE(batch_idx == 1u);
+        kw::nt_events = {ev_t(square_wrapper(x0 - x1) + square_wrapper(y0 - y1) - 4.,
+                              [&counter](auto &, fp_t t, int, std::uint32_t batch_idx) {
+                                  REQUIRE((t - 10.) * (t - 10.) <= std::numeric_limits<fp_t>::epsilon());
+                                  REQUIRE(batch_idx == 1u);
 
-              ++counter;
-          })}};
+                                  ++counter;
+                              })}};
 
     for (auto i = 0; i < 20; ++i) {
         ta.step({1.3, 1.3, 1.3, 1.3});
@@ -381,7 +389,7 @@ TEST_CASE("nte glancing blow test")
                                       1.,   1.,   1.,   1.,   //
                                       0.,   0.,   0.,   0.},
                                      4,
-                                     kw::nt_events = {ev_t(square(x0 - x1) + square(y0 - y1) - 4.,
+                                     kw::nt_events = {ev_t(square_wrapper(x0 - x1) + square_wrapper(y0 - y1) - 4.,
                                                            [&counter](auto &, fp_t, int, std::uint32_t batch_idx) {
                                                                REQUIRE(batch_idx == 1u);
                                                                ++counter;

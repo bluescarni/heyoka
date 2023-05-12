@@ -44,6 +44,7 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -265,9 +266,16 @@ llvm::Value *binary_op::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::ve
                                   llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                   bool high_accuracy) const
 {
-    return llvm_eval_helper(
-        [&s, this](const std::vector<llvm::Value *> &args, bool) { return bo_llvm_eval(s, args, op()); }, *this, s,
-        fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    assert(args().size() == 2u);
+
+    if (op() == binary_op::type::mul && args()[0] == args()[1]) {
+        // Special case for squaring.
+        return llvm_eval_helper([&s](const auto &args, bool) { return llvm_square(s, args[0]); }, *this, s, fp_t,
+                                eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    } else {
+        return llvm_eval_helper([&s, this](const auto &args, bool) { return bo_llvm_eval(s, args, op()); }, *this, s,
+                                fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    }
 }
 
 namespace
@@ -276,7 +284,7 @@ namespace
 [[nodiscard]] llvm::Function *bo_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const func_base &fb,
                                              std::uint32_t batch_size, bool high_accuracy, binary_op::type op)
 {
-    auto impl = [&s, op](const std::vector<llvm::Value *> &args, bool) { return bo_llvm_eval(s, args, op); };
+    auto impl = [&s, op](const auto &args, bool) { return bo_llvm_eval(s, args, op); };
 
     switch (op) {
         case binary_op::type::add:
@@ -296,7 +304,16 @@ namespace
 llvm::Function *binary_op::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
                                             bool high_accuracy) const
 {
-    return bo_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy, op());
+    assert(args().size() == 2u);
+
+    if (op() == binary_op::type::mul && args()[0] == args()[1]) {
+        // Special case for squaring.
+        return llvm_c_eval_func_helper(
+            "square", [&s](const auto &args, bool) { return llvm_square(s, args[0]); }, *this, s, fp_t, batch_size,
+            high_accuracy);
+    } else {
+        return bo_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy, op());
+    }
 }
 
 namespace
@@ -417,6 +434,19 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *fp_t, const U &n
                                      const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
                                      std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
+    // NOTE: use square() if:
+    //
+    // - U and V are the same type (i.e., they are both number or param), and
+    // - num0 == num1, and
+    // - order is zero.
+    //
+    // Otherwise, fall through the default implementation.
+    if constexpr (std::is_same_v<U, V>) {
+        if (num0 == num1 && order == 0u) {
+            return llvm_square(s, taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size));
+        }
+    }
+
     if (order == 0u) {
         auto n0 = taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size);
         auto n1 = taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size);
@@ -449,27 +479,73 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *fp_t, const U &n
     return bo_taylor_diff_mul_impl(s, fp_t, var, num, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
+// Derivative of square(variable).
+llvm::Value *taylor_diff_square_impl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
+                                     std::uint32_t n_uvars, std::uint32_t order)
+{
+    // Fetch the index of the variable.
+    const auto u_idx = uname_to_index(var.name());
+
+    if (order == 0u) {
+        return llvm_square(s, taylor_fetch_diff(arr, u_idx, 0, n_uvars));
+    }
+
+    // Compute the sum.
+    std::vector<llvm::Value *> sum;
+    if (order % 2u == 1u) {
+        // Odd order.
+        for (std::uint32_t j = 0; j <= (order - 1u) / 2u; ++j) {
+            auto *v0 = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
+            auto *v1 = taylor_fetch_diff(arr, u_idx, j, n_uvars);
+
+            sum.push_back(llvm_fmul(s, v0, v1));
+        }
+
+        auto *ret = pairwise_sum(s, sum);
+        return llvm_fadd(s, ret, ret);
+    } else {
+        // Even order.
+        auto *ak2 = taylor_fetch_diff(arr, u_idx, order / 2u, n_uvars);
+        auto *sq_ak2 = llvm_fmul(s, ak2, ak2);
+
+        for (std::uint32_t j = 0; j <= (order - 2u) / 2u; ++j) {
+            auto *v0 = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
+            auto *v1 = taylor_fetch_diff(arr, u_idx, j, n_uvars);
+
+            sum.push_back(llvm_fmul(s, v0, v1));
+        }
+
+        auto *ret = pairwise_sum(s, sum);
+        return llvm_fadd(s, llvm_fadd(s, ret, ret), sq_ak2);
+    }
+}
+
 // Derivative of var * var.
 llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *, const variable &var0, const variable &var1,
                                      const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
                                      std::uint32_t order, std::uint32_t, std::uint32_t)
 {
-    // Fetch the indices of the u variables.
-    const auto u_idx0 = uname_to_index(var0.name());
-    const auto u_idx1 = uname_to_index(var1.name());
+    if (var0 == var1) {
+        // SUse square() if the two variables are the same.
+        return taylor_diff_square_impl(s, var0, arr, n_uvars, order);
+    } else {
+        // Fetch the indices of the u variables.
+        const auto u_idx0 = uname_to_index(var0.name());
+        const auto u_idx1 = uname_to_index(var1.name());
 
-    // NOTE: iteration in the [0, order] range
-    // (i.e., order inclusive).
-    std::vector<llvm::Value *> sum;
-    for (std::uint32_t j = 0; j <= order; ++j) {
-        auto *v0 = taylor_fetch_diff(arr, u_idx0, order - j, n_uvars);
-        auto *v1 = taylor_fetch_diff(arr, u_idx1, j, n_uvars);
+        // NOTE: iteration in the [0, order] range
+        // (i.e., order inclusive).
+        std::vector<llvm::Value *> sum;
+        for (std::uint32_t j = 0; j <= order; ++j) {
+            auto *v0 = taylor_fetch_diff(arr, u_idx0, order - j, n_uvars);
+            auto *v1 = taylor_fetch_diff(arr, u_idx1, j, n_uvars);
 
-        // Add v0*v1 to the sum.
-        sum.push_back(llvm_fmul(s, v0, v1));
+            // Add v0*v1 to the sum.
+            sum.push_back(llvm_fmul(s, v0, v1));
+        }
+
+        return pairwise_sum(s, sum);
     }
-
-    return pairwise_sum(s, sum);
 }
 
 // All the other cases.
@@ -1034,6 +1110,28 @@ template <typename U, typename V, std::enable_if_t<std::conjunction_v<is_num_par
 llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, const binary_op &bo, const U &num0,
                                                const V &num1, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
+    // NOTE: use square() if:
+    //
+    // - U and V are the same type (i.e., they are both number or param), and
+    // - num0 == num1.
+    //
+    // Otherwise, fall through the default implementation.
+    if constexpr (std::is_same_v<U, V>) {
+        if (num0 == num1) {
+            return taylor_c_diff_func_numpar(
+                s, fp_t, n_uvars, batch_size, "mul_square", 0,
+                [&s](const auto &args) {
+                    // LCOV_EXCL_START
+                    assert(args.size() == 2u);
+                    assert(args[0] != nullptr);
+                    // LCOV_EXCL_STOP
+
+                    return llvm_square(s, args[0]);
+                },
+                num0, num1);
+        }
+    }
+
     return bo_taylor_c_diff_func_num_num(s, fp_t, bo, num0, num1, n_uvars, batch_size, "mul");
 }
 
@@ -1171,10 +1269,140 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
     return f;
 }
 
+// Derivative of square(variable).
+llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, const variable &var,
+                                               std::uint32_t n_uvars, std::uint32_t batch_size)
+{
+    auto &module = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "mul_square", n_uvars, batch_size, {var, var});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
+
+    // Try to see if we already created the function.
+    auto *f = module.getFunction(fname);
+
+    if (f == nullptr) {
+        // The function was not created before, do it now.
+
+        // Fetch the current insertion block.
+        auto *orig_bb = builder.GetInsertBlock();
+
+        // The return type is val_t.
+        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+        // Create the function
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        assert(f != nullptr);
+
+        // Fetch the necessary function arguments.
+        auto *ord = f->args().begin();
+        auto *diff_ptr = f->args().begin() + 2;
+        auto *var_idx = f->args().begin() + 5;
+
+        // Create a new basic block to start insertion into.
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Create the return value.
+        auto *retval = builder.CreateAlloca(val_t);
+
+        // Create the accumulator.
+        auto *acc = builder.CreateAlloca(val_t);
+
+        llvm_if_then_else(
+            s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
+            [&]() {
+                // For order 0, invoke the function on the order 0 of var_idx.
+                builder.CreateStore(
+                    llvm_square(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx)),
+                    retval);
+            },
+            [&]() {
+                // Init the accumulator.
+                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
+
+                // Distinguish the odd/even cases for the order.
+                llvm_if_then_else(
+                    s, builder.CreateICmpEQ(builder.CreateURem(ord, builder.getInt32(2)), builder.getInt32(1)),
+                    [&]() {
+                        // Odd order.
+                        auto *loop_end = builder.CreateAdd(
+                            builder.CreateUDiv(builder.CreateSub(ord, builder.getInt32(1)), builder.getInt32(2)),
+                            builder.getInt32(1));
+                        llvm_loop_u32(s, builder.getInt32(0), loop_end, [&](llvm::Value *j) {
+                            auto *a_nj
+                                = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
+                            auto *aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, var_idx);
+
+                            builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, a_nj, aj)),
+                                                acc);
+                        });
+
+                        // Return 2 * acc.
+                        auto *acc_load = builder.CreateLoad(val_t, acc);
+                        builder.CreateStore(llvm_fadd(s, acc_load, acc_load), retval);
+                    },
+                    [&]() {
+                        // Even order.
+
+                        // Pre-compute the final term.
+                        auto *ak2 = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars,
+                                                       builder.CreateUDiv(ord, builder.getInt32(2)), var_idx);
+                        auto *sq_ak2 = llvm_fmul(s, ak2, ak2);
+
+                        auto *loop_end = builder.CreateAdd(
+                            builder.CreateUDiv(builder.CreateSub(ord, builder.getInt32(2)), builder.getInt32(2)),
+                            builder.getInt32(1));
+                        llvm_loop_u32(s, builder.getInt32(0), loop_end, [&](llvm::Value *j) {
+                            auto *a_nj
+                                = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
+                            auto *aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, var_idx);
+
+                            builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), llvm_fmul(s, a_nj, aj)),
+                                                acc);
+                        });
+
+                        // Return 2 * acc + ak2 * ak2.
+                        auto *acc_load = builder.CreateLoad(val_t, acc);
+                        builder.CreateStore(llvm_fadd(s, llvm_fadd(s, acc_load, acc_load), sq_ak2), retval);
+                    });
+            });
+
+        // Return the result.
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
+
+        // Verify.
+        s.verify_function(f);
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    } else {
+        // The function was created before. Check if the signatures match.
+        // NOTE: there could be a mismatch if the derivative function was created
+        // and then optimised - optimisation might remove arguments which are compile-time
+        // constants.
+        if (!compare_function_signature(f, val_t, fargs)) {
+            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of square() "
+                                        "in compact mode detected");
+        }
+    }
+
+    return f;
+}
+
 // Derivative of var * var.
 llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, const binary_op &, const variable &var0,
                                                const variable &var1, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
+    if (var0 == var1) {
+        // Special case for squaring.
+        return taylor_c_diff_func_square_impl(s, fp_t, var0, n_uvars, batch_size);
+    }
+
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();

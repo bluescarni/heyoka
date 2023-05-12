@@ -99,9 +99,6 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     }
 }
 
-// Potential issue in the decomposition when x = 0,
-// in the presence of square() automatic simplification (not
-// currently the case).
 TEST_CASE("taylor acosh decompose bug 00")
 {
     llvm_state s;
@@ -121,7 +118,7 @@ TEST_CASE("taylor acosh test simplifications")
 
     llvm_state s{kw::opt_level = 0u};
 
-    auto dc = taylor_add_jet<double>(s, "jet", {acosh(x + y) + sqrt(square(x + y) - 1.), x}, 2, 1, false, false);
+    auto dc = taylor_add_jet<double>(s, "jet", {acosh(x + y) + sqrt((x + y) * (x + y) - 1.), x}, 2, 1, false, false);
 
     REQUIRE(dc.size() == 10u);
 

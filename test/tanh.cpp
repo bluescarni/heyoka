@@ -67,15 +67,24 @@ constexpr bool skip_batch_ld =
 #endif
     ;
 
+// NOTE: this wrapper is here only to ease the transition
+// of old test code to the new implementation of square
+// as a special case of multiplication.
+auto square_wrapper(const expression &x)
+{
+    return x * x;
+}
+
 TEST_CASE("tanh diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(tanh(x * x - y), x) == (1. - square(tanh(square(x) - y))) * (2. * x));
-    REQUIRE(diff(tanh(x * x + y), y) == (1. - square(tanh(square(x) + y))));
+    REQUIRE(diff(tanh(x * x - y), x) == (1. - square_wrapper(tanh(square_wrapper(x) - y))) * (2. * x));
+    REQUIRE(diff(tanh(x * x + y), y) == (1. - square_wrapper(tanh(square_wrapper(x) + y))));
 
-    REQUIRE(diff(tanh(par[0] * par[0] - y), par[0]) == (1. - square(tanh(square(par[0]) - y))) * (2. * par[0]));
-    REQUIRE(diff(tanh(x * x + par[1]), par[1]) == (1. - square(tanh(square(x) + par[1]))));
+    REQUIRE(diff(tanh(par[0] * par[0] - y), par[0])
+            == (1. - square_wrapper(tanh(square_wrapper(par[0]) - y))) * (2. * par[0]));
+    REQUIRE(diff(tanh(x * x + par[1]), par[1]) == (1. - square_wrapper(tanh(square_wrapper(x) + par[1]))));
 }
 
 TEST_CASE("tanh s11n")
