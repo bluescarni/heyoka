@@ -38,7 +38,6 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/asin.hpp>
 #include <heyoka/math/pow.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"

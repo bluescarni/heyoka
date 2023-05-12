@@ -39,7 +39,6 @@
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sqrt.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"

@@ -29,7 +29,6 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/acosh.hpp>
 #include <heyoka/math/sqrt.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 

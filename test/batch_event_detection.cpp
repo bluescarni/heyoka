@@ -21,7 +21,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>

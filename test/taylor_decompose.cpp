@@ -15,7 +15,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/sqrt.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 

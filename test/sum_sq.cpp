@@ -38,7 +38,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/math/sum_sq.hpp>
 #include <heyoka/s11n.hpp>

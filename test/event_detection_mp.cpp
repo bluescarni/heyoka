@@ -27,7 +27,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sin.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/taylor.hpp>
 

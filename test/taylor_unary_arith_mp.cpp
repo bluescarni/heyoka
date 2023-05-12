@@ -13,7 +13,6 @@
 
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/neg.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"

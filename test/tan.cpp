@@ -36,7 +36,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/math/tan.hpp>
 #include <heyoka/s11n.hpp>
 
