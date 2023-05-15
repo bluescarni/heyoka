@@ -267,7 +267,6 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/acosh.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/atanh.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/erf.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/neg.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/tpoly.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sum.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sum_sq.cpp"
