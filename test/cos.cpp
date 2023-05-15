@@ -37,7 +37,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
-#include <heyoka/math/neg.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -67,6 +66,12 @@ constexpr bool skip_batch_ld =
     false
 #endif
     ;
+
+// Helper to ease the removal of neg() in the test code.
+auto neg(const expression &e)
+{
+    return -e;
+}
 
 TEST_CASE("cos neg simpl")
 {

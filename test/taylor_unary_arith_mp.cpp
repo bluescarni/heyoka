@@ -12,7 +12,6 @@
 #include <mp++/real.hpp>
 
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/neg.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -20,6 +19,12 @@
 
 using namespace heyoka;
 using namespace heyoka_test;
+
+// Helper to ease the removal of neg() in the test code.
+auto neg(const expression &e)
+{
+    return -e;
+}
 
 TEST_CASE("neg")
 {

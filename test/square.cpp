@@ -143,7 +143,7 @@ TEST_CASE("cfunc")
                 kw::batch_size = batch_size, kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.square."));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.mul_square."));
             }
 
             s.compile();

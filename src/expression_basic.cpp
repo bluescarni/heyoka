@@ -57,6 +57,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/binary_op.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
@@ -1393,6 +1394,24 @@ bool ex_less_than(const expression &e1, const expression &e2)
             // LCOV_EXCL_STOP
         },
         e1.value(), e2.value());
+}
+
+// Detect if ex is of the form -1 * whatever. If it is, then
+// a pointer to whatever is returned. Otherwise, nullptr is returned.
+const expression *is_negation(const expression &ex)
+{
+    if (!std::holds_alternative<func>(ex.value())) {
+        return nullptr;
+    }
+
+    const auto *bop = std::get<func>(ex.value()).extract<detail::binary_op>();
+
+    if (bop == nullptr || bop->op() != binary_op::type::mul
+        || !std::holds_alternative<number>(bop->args()[0].value())) {
+        return nullptr;
+    }
+
+    return is_negative_one(std::get<number>(bop->args()[0].value())) ? &bop->args()[1] : nullptr;
 }
 
 } // namespace detail

@@ -95,11 +95,40 @@ std::size_t binary_op::extra_hash() const
     return std::hash<type>{}(m_type);
 }
 
+namespace
+{
+
+// Detect if a binary op is a negation.
+bool bop_is_negation(const binary_op &bop)
+{
+    if (bop.op() != binary_op::type::mul) {
+        return false;
+    }
+
+    if (const auto *num_ptr = std::get_if<number>(&bop.args()[0].value());
+        num_ptr != nullptr && is_negative_one(*num_ptr)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+} // namespace
+
 void binary_op::to_stream(std::ostringstream &oss) const
 {
     assert(args().size() == 2u);
     assert(m_type >= type::add && m_type <= type::div);
 
+    // Special casing for negation.
+    if (bop_is_negation(*this)) {
+        oss << '-';
+        stream_expression(oss, args()[1]);
+
+        return;
+    }
+
+    // The general case.
     oss << '(';
     stream_expression(oss, lhs());
     oss << ' ';
@@ -270,8 +299,20 @@ llvm::Value *binary_op::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::ve
 
     if (op() == binary_op::type::mul && args()[0] == args()[1]) {
         // Special case for squaring.
-        return llvm_eval_helper([&s](const auto &args, bool) { return llvm_square(s, args[0]); }, *this, s, fp_t,
-                                eval_arr, par_ptr, stride, batch_size, high_accuracy);
+        return llvm_eval_helper(
+            [&s](const auto &args, bool) {
+                assert(args.size() == 2u);
+                return llvm_square(s, args[0]);
+            },
+            *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    } else if (bop_is_negation(*this)) {
+        // Special case for negation.
+        return llvm_eval_helper(
+            [&s](const auto &args, bool) {
+                assert(args.size() == 2u);
+                return llvm_fneg(s, args[1]);
+            },
+            *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
     } else {
         return llvm_eval_helper([&s, this](const auto &args, bool) { return bo_llvm_eval(s, args, op()); }, *this, s,
                                 fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
@@ -309,8 +350,21 @@ llvm::Function *binary_op::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std
     if (op() == binary_op::type::mul && args()[0] == args()[1]) {
         // Special case for squaring.
         return llvm_c_eval_func_helper(
-            "square", [&s](const auto &args, bool) { return llvm_square(s, args[0]); }, *this, s, fp_t, batch_size,
-            high_accuracy);
+            "mul_square",
+            [&s](const auto &args, bool) {
+                assert(args.size() == 2u);
+                return llvm_square(s, args[0]);
+            },
+            *this, s, fp_t, batch_size, high_accuracy);
+    } else if (bop_is_negation(*this)) {
+        // Special case for negation.
+        return llvm_c_eval_func_helper(
+            "mul_neg",
+            [&s](const auto &args, bool) {
+                assert(args.size() == 2u);
+                return llvm_fneg(s, args[1]);
+            },
+            *this, s, fp_t, batch_size, high_accuracy);
     } else {
         return bo_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy, op());
     }
@@ -447,6 +501,18 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *fp_t, const U &n
         }
     }
 
+    // NOTE: use neg() if:
+    //
+    // - U is a negative_one() number,
+    // - order is zero.
+    //
+    // Otherwise, fall through the default implementation.
+    if constexpr (std::is_same_v<U, number>) {
+        if (is_negative_one(num0) && order == 0u) {
+            return llvm_fneg(s, taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size));
+        }
+    }
+
     if (order == 0u) {
         auto n0 = taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size);
         auto n1 = taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size);
@@ -475,6 +541,13 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *fp_t, const U &n
                                      const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                                      std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
+    // Special casing for neg().
+    if constexpr (std::is_same_v<U, number>) {
+        if (is_negative_one(num)) {
+            return llvm_fneg(s, taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars));
+        }
+    }
+
     // Return the derivative of var * number.
     return bo_taylor_diff_mul_impl(s, fp_t, var, num, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
@@ -1132,6 +1205,23 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
         }
     }
 
+    // NOTE: use neg() if U is a negative_one() number.
+    if constexpr (std::is_same_v<U, number>) {
+        if (is_negative_one(num0)) {
+            return taylor_c_diff_func_numpar(
+                s, fp_t, n_uvars, batch_size, "mul_neg", 0,
+                [&s](const auto &args) {
+                    // LCOV_EXCL_START
+                    assert(args.size() == 2u);
+                    assert(args[1] != nullptr);
+                    // LCOV_EXCL_STOP
+
+                    return llvm_fneg(s, args[1]);
+                },
+                num0, num1);
+        }
+    }
+
     return bo_taylor_c_diff_func_num_num(s, fp_t, bo, num0, num1, n_uvars, batch_size, "mul");
 }
 
@@ -1202,11 +1292,85 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
     return f;
 }
 
+// Derivative of neg(variable).
+llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, llvm::Type *fp_t, const variable &var, std::uint32_t n_uvars,
+                                            std::uint32_t batch_size)
+{
+    auto &module = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+
+    const auto na_pair
+        = taylor_c_diff_func_name_args(context, fp_t, "mul_neg", n_uvars, batch_size, {number{-1.}, var});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
+
+    // Try to see if we already created the function.
+    auto *f = module.getFunction(fname);
+
+    if (f == nullptr) {
+        // The function was not created before, do it now.
+
+        // Fetch the current insertion block.
+        auto *orig_bb = builder.GetInsertBlock();
+
+        // The return type is val_t.
+        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+        // Create the function
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        assert(f != nullptr);
+
+        // Fetch the necessary function arguments.
+        auto *ord = f->args().begin();
+        auto *diff_ptr = f->args().begin() + 2;
+        auto *var_idx = f->args().begin() + 6;
+
+        // Create a new basic block to start insertion into.
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Create the return value.
+        auto *retval = llvm_fneg(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, var_idx));
+
+        // Return the result.
+        builder.CreateRet(retval);
+
+        // Verify.
+        s.verify_function(f);
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+
+        // LCOV_EXCL_START
+    } else {
+        // The function was created before. Check if the signatures match.
+        // NOTE: there could be a mismatch if the derivative function was created
+        // and then optimised - optimisation might remove arguments which are compile-time
+        // constants.
+        if (!compare_function_signature(f, val_t, fargs)) {
+            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of the negation "
+                                        "in compact mode detected");
+        }
+    }
+    // LCOV_EXCL_STOP
+
+    return f;
+}
+
 // Derivative of number * var.
 template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, const binary_op &, const U &n,
                                                const variable &var, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
+    if constexpr (std::is_same_v<U, number>) {
+        if (is_negative_one(n)) {
+            // Special case for negation.
+            return taylor_c_diff_func_neg_impl(s, fp_t, var, n_uvars, batch_size);
+        }
+    }
+
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();

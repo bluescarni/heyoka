@@ -73,7 +73,7 @@ TEST_CASE("basic")
         ta_fix.propagate_until(20.);
         ta_2bp.propagate_until(20.);
 
-        // NOTE: the tolerance here is relatively high beacuse fixed centres
+        // NOTE: the tolerance here is relatively high because fixed centres
         // dynamic has a slightly different formulation of the dynamics wrt nbody.
         REQUIRE(ta_fix.get_state()[0] == approximately(ta_2bp.get_state()[6], 1000.));
         REQUIRE(ta_fix.get_state()[1] == approximately(ta_2bp.get_state()[7], 1000.));
