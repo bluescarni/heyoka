@@ -494,7 +494,7 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *fp_t, const U &n
     // - num0 == num1, and
     // - order is zero.
     //
-    // Otherwise, fall through the default implementation.
+    // Otherwise, fall through.
     if constexpr (std::is_same_v<U, V>) {
         if (num0 == num1 && order == 0u) {
             return llvm_square(s, taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size));
@@ -506,13 +506,14 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, llvm::Type *fp_t, const U &n
     // - U is a negative_one() number,
     // - order is zero.
     //
-    // Otherwise, fall through the default implementation.
+    // Otherwise, fall through.
     if constexpr (std::is_same_v<U, number>) {
         if (is_negative_one(num0) && order == 0u) {
             return llvm_fneg(s, taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size));
         }
     }
 
+    // The general case.
     if (order == 0u) {
         auto n0 = taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size);
         auto n1 = taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size);
@@ -804,7 +805,7 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, llvm::Type *fp_t, c
                                               const V &n1, std::uint32_t n_uvars, std::uint32_t batch_size,
                                               const std::string &op_name)
 {
-    auto &module = s.module();
+    auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
@@ -817,7 +818,7 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, llvm::Type *fp_t, c
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -828,7 +829,7 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, llvm::Type *fp_t, c
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
@@ -906,7 +907,7 @@ template <bool AddOrSub, typename U, std::enable_if_t<is_num_param_v<U>, int> = 
 llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_t, const binary_op &, const U &n,
                                                   const variable &var, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    auto &module = s.module();
+    auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
@@ -920,7 +921,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -931,7 +932,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
@@ -997,7 +998,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_
                                                   const variable &var, const U &n, std::uint32_t n_uvars,
                                                   std::uint32_t batch_size)
 {
-    auto &module = s.module();
+    auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
@@ -1011,7 +1012,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -1022,7 +1023,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
         assert(f != nullptr);
 
         // Fetch the necessary arguments.
@@ -1080,7 +1081,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_
                                                   const variable &var0, const variable &var1, std::uint32_t n_uvars,
                                                   std::uint32_t batch_size)
 {
-    auto &module = s.module();
+    auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
@@ -1094,7 +1095,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto *f = module.getFunction(fname);
+    auto *f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -1105,7 +1106,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, llvm::Type *fp_
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
@@ -1188,7 +1189,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
     // - U and V are the same type (i.e., they are both number or param), and
     // - num0 == num1.
     //
-    // Otherwise, fall through the default implementation.
+    // Otherwise, fall through.
     if constexpr (std::is_same_v<U, V>) {
         if (num0 == num1) {
             return taylor_c_diff_func_numpar(
@@ -1222,6 +1223,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
         }
     }
 
+    // The general case.
     return bo_taylor_c_diff_func_num_num(s, fp_t, bo, num0, num1, n_uvars, batch_size, "mul");
 }
 
@@ -1230,7 +1232,7 @@ template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, const binary_op &, const variable &var,
                                                const U &n, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    auto &module = s.module();
+    auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
@@ -1243,7 +1245,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -1254,7 +1256,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
@@ -1296,7 +1298,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
 llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, llvm::Type *fp_t, const variable &var, std::uint32_t n_uvars,
                                             std::uint32_t batch_size)
 {
-    auto &module = s.module();
+    auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
@@ -1309,7 +1311,7 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, llvm::Type *fp_t, con
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto *f = module.getFunction(fname);
+    auto *f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -1320,7 +1322,7 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, llvm::Type *fp_t, con
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
@@ -1371,7 +1373,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
         }
     }
 
-    auto &module = s.module();
+    auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
@@ -1384,7 +1386,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -1395,7 +1397,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
@@ -1437,7 +1439,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
 llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, const variable &var,
                                                std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    auto &module = s.module();
+    auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
@@ -1449,7 +1451,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, 
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto *f = module.getFunction(fname);
+    auto *f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -1460,7 +1462,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
@@ -1569,7 +1571,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
         return taylor_c_diff_func_square_impl(s, fp_t, var0, n_uvars, batch_size);
     }
 
-    auto &module = s.module();
+    auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
@@ -1582,7 +1584,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto *f = module.getFunction(fname);
+    auto *f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -1593,7 +1595,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, llvm::Type *fp_t, 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
@@ -1672,7 +1674,7 @@ template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, const binary_op &, const variable &var,
                                                const U &n, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    auto &module = s.module();
+    auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
@@ -1685,7 +1687,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, 
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -1696,7 +1698,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
@@ -1739,7 +1741,7 @@ template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, const binary_op &, const U &n,
                                                const variable &var, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    auto &module = s.module();
+    auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
@@ -1752,7 +1754,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, 
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
+    auto f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -1763,7 +1765,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.
@@ -1841,7 +1843,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, 
 llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, const binary_op &, const variable &var0,
                                                const variable &var1, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    auto &module = s.module();
+    auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
@@ -1854,7 +1856,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, 
     const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
-    auto *f = module.getFunction(fname);
+    auto *f = md.getFunction(fname);
 
     if (f == nullptr) {
         // The function was not created before, do it now.
@@ -1865,7 +1867,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, 
         // The return type is val_t.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
         assert(f != nullptr);
 
         // Fetch the necessary function arguments.

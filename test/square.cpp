@@ -187,6 +187,8 @@ TEST_CASE("cfunc_mp")
                                   {square_wrapper(x), square_wrapper(expression{.5}), square_wrapper(par[0])},
                                   kw::compact_mode = compact_mode, kw::prec = prec);
 
+            REQUIRE(boost::contains(s.get_ir(), "mpfr_sqr"));
+
             s.compile();
 
             auto *cf_ptr
