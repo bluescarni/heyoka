@@ -60,6 +60,12 @@ using namespace heyoka;
 using namespace heyoka_test;
 using namespace Catch::literals;
 
+// Helper to ease the removal of neg() in the test code.
+auto neg(const expression &e)
+{
+    return -e;
+}
+
 template <class T>
 void test_eval()
 {
@@ -894,7 +900,7 @@ TEST_CASE("get_n_nodes")
 
     REQUIRE(get_n_nodes(x + y) == 3u);
     REQUIRE(get_n_nodes(x - y) == 3u);
-    REQUIRE(get_n_nodes(-z) == 2u);
+    REQUIRE(get_n_nodes(-z) == 3u);
     REQUIRE(get_n_nodes(heyoka::time) == 1u);
     REQUIRE(get_n_nodes(x + (y * z)) == 5u);
     REQUIRE(get_n_nodes((x - y - z) + (y * z)) == 9u);

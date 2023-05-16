@@ -23,7 +23,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/neg.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -45,6 +44,12 @@ const auto fp_types = std::tuple<double
                                  mppp::real128
 #endif
                                  >{};
+
+// Helper to ease the removal of neg() in the test code.
+auto neg(const expression &e)
+{
+    return -e;
+}
 
 template <typename T, typename U>
 void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)

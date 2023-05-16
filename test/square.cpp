@@ -143,7 +143,7 @@ TEST_CASE("cfunc")
                 kw::batch_size = batch_size, kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.square."));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.mul_square."));
             }
 
             s.compile();
@@ -186,6 +186,8 @@ TEST_CASE("cfunc_mp")
             add_cfunc<mppp::real>(s, "cfunc",
                                   {square_wrapper(x), square_wrapper(expression{.5}), square_wrapper(par[0])},
                                   kw::compact_mode = compact_mode, kw::prec = prec);
+
+            REQUIRE(boost::contains(s.get_ir(), "mpfr_sqr"));
 
             s.compile();
 

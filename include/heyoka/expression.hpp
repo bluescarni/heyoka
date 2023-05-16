@@ -235,7 +235,7 @@ HEYOKA_DLL_PUBLIC std::vector<expression> rename_variables(const std::vector<exp
                                                            const std::unordered_map<std::string, std::string> &);
 
 HEYOKA_DLL_PUBLIC expression operator+(expression);
-HEYOKA_DLL_PUBLIC expression operator-(expression);
+HEYOKA_DLL_PUBLIC expression operator-(const expression &);
 
 HEYOKA_DLL_PUBLIC expression operator+(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression operator+(const expression &, double);
@@ -758,6 +758,8 @@ namespace detail
 {
 
 HEYOKA_DLL_PUBLIC bool ex_less_than(const expression &, const expression &);
+
+const expression *is_negation(const expression &);
 
 } // namespace detail
 

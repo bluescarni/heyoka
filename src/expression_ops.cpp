@@ -18,7 +18,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/math/binary_op.hpp>
-#include <heyoka/math/neg.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
@@ -42,18 +41,19 @@ expression operator+(expression e)
     return e;
 }
 
-expression operator-(expression e)
+expression operator-(const expression &e)
 {
     if (const auto *num_ptr = std::get_if<number>(&e.value())) {
         // Simplify -number to its numerical value.
         return expression{-*num_ptr};
     } else {
-        if (const auto *fptr = detail::is_neg(e)) {
+        if (const auto *neg_exp = detail::is_negation(e)) {
             // Simplify -(-x) to x.
-            assert(!fptr->args().empty()); // LCOV_EXCL_LINE
-            return fptr->args()[0];
+            return *neg_exp;
         } else {
-            return neg(std::move(e));
+            // NOTE: need explicit construction of the -1 constant,
+            // because -1._dbl would end up calling back into operator-().
+            return expression{number{-1.}} * e;
         }
     }
 }
@@ -182,10 +182,9 @@ std::optional<expression> plus_mul_compress(const expression &e1, const expressi
 // NOLINTNEXTLINE(misc-no-recursion)
 expression expression_plus(const expression &e1, const expression &e2)
 {
-    // Simplify x + neg(y) to x - y.
-    if (const auto *fptr = detail::is_neg(e2)) {
-        assert(!fptr->args().empty()); // LCOV_EXCL_LINE
-        return e1 - fptr->args()[0];
+    // Simplify x + -y to x - y.
+    if (const auto *neg_exp = detail::is_negation(e2)) {
+        return e1 - *neg_exp;
     }
 
     if (auto ret = plus_mul_compress(e1, e2)) {
@@ -292,9 +291,8 @@ std::optional<expression> minus_mul_compress(const expression &e1, const express
 expression operator-(const expression &e1, const expression &e2)
 {
     // Simplify x - (-y) to x + y.
-    if (const auto *fptr = detail::is_neg(e2)) {
-        assert(!fptr->args().empty()); // LCOV_EXCL_LINE
-        return e1 + fptr->args()[0];
+    if (const auto *neg_exp = detail::is_negation(e2)) {
+        return e1 + *neg_exp;
     }
 
     if (auto ret = detail::minus_mul_compress(e1, e2)) {
@@ -360,17 +358,15 @@ namespace
 // NOLINTNEXTLINE(misc-no-recursion)
 expression expression_mul(const expression &e1, const expression &e2)
 {
-    const auto *fptr1 = detail::is_neg(e1);
-    const auto *fptr2 = detail::is_neg(e2);
+    const auto *ex_neg1 = detail::is_negation(e1);
+    const auto *ex_neg2 = detail::is_negation(e2);
 
-    if (fptr1 != nullptr && fptr2 != nullptr) {
+    if (ex_neg1 != nullptr && ex_neg2 != nullptr) {
         // Simplify (-x) * (-y) into x*y.
-        assert(!fptr1->args().empty()); // LCOV_EXCL_LINE
-        assert(!fptr2->args().empty()); // LCOV_EXCL_LINE
-        return fptr1->args()[0] * fptr2->args()[0];
+        return *ex_neg1 * *ex_neg2;
     }
 
-    auto visitor = [fptr2](const auto &v1, const auto &v2) {
+    auto visitor = [ex_neg2](const auto &v1, const auto &v2) {
         using type1 = detail::uncvref_t<decltype(v1)>;
         using type2 = detail::uncvref_t<decltype(v2)>;
 
@@ -389,15 +385,9 @@ expression expression_mul(const expression &e1, const expression &e2)
                 return expression{v2};
             }
 
-            if (is_negative_one(v1)) {
-                // -1 * e2 = -e2.
-                return -expression{v2};
-            }
-
-            if (fptr2 != nullptr) {
+            if (ex_neg2 != nullptr) {
                 // a * (-x) = (-a) * x.
-                assert(!fptr2->args().empty()); // LCOV_EXCL_LINE
-                return expression{-v1} * fptr2->args()[0];
+                return expression{-v1} * *ex_neg2;
             }
 
             if constexpr (std::is_same_v<func, type2>) {
@@ -452,17 +442,15 @@ expression operator*(const expression &e1, const expression &e2)
 // NOLINTNEXTLINE(misc-no-recursion)
 expression operator/(const expression &e1, const expression &e2)
 {
-    const auto *fptr1 = detail::is_neg(e1);
-    const auto *fptr2 = detail::is_neg(e2);
+    const auto *ex_neg1 = detail::is_negation(e1);
+    const auto *ex_neg2 = detail::is_negation(e2);
 
-    if (fptr1 != nullptr && fptr2 != nullptr) {
+    if (ex_neg1 != nullptr && ex_neg2 != nullptr) {
         // Simplify (-x) / (-y) into x/y.
-        assert(!fptr1->args().empty()); // LCOV_EXCL_LINE
-        assert(!fptr2->args().empty()); // LCOV_EXCL_LINE
-        return fptr1->args()[0] / fptr2->args()[0];
+        return *ex_neg1 / *ex_neg2;
     }
 
-    auto visitor = [fptr1, fptr2](const auto &v1, const auto &v2) {
+    auto visitor = [ex_neg1, ex_neg2](const auto &v1, const auto &v2) {
         using type1 = detail::uncvref_t<decltype(v1)>;
         using type2 = detail::uncvref_t<decltype(v2)>;
 
@@ -488,10 +476,9 @@ expression operator/(const expression &e1, const expression &e2)
                 return -expression{v1};
             }
 
-            if (fptr1 != nullptr) {
+            if (ex_neg1 != nullptr) {
                 // (-e1) / a = e1 / (-a).
-                assert(!fptr1->args().empty()); // LCOV_EXCL_LINE
-                return fptr1->args()[0] / expression{-v2};
+                return *ex_neg1 / expression{-v2};
             }
 
             if constexpr (std::is_same_v<func, type1>) {
@@ -527,10 +514,9 @@ expression operator/(const expression &e1, const expression &e2)
                 return expression{number{0.}};
             }
 
-            if (fptr2 != nullptr) {
+            if (ex_neg2 != nullptr) {
                 // a / (-e2) = (-a) / e2.
-                assert(!fptr2->args().empty()); // LCOV_EXCL_LINE
-                return expression{-v1} / fptr2->args()[0];
+                return expression{-v1} / *ex_neg2;
             }
 
             if constexpr (std::is_same_v<func, type2>) {
