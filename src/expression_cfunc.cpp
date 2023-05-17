@@ -504,6 +504,9 @@ function_decompose(const std::vector<expression> &v_ex_)
     // Split sums.
     auto v_ex = detail::split_sums_for_decompose(v_ex_);
 
+    // Transform sums into sum_sqs if possible.
+    v_ex = detail::sums_to_sum_sqs_for_decompose(v_ex);
+
 #if !defined(NDEBUG)
 
     // Save copy for checking in debug mode.
@@ -663,6 +666,9 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
 
     // Split sums.
     auto v_ex = detail::split_sums_for_decompose(v_ex_);
+
+    // Transform sums into sum_sqs if possible.
+    v_ex = detail::sums_to_sum_sqs_for_decompose(v_ex);
 
 #if !defined(NDEBUG)
 

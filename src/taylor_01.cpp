@@ -836,6 +836,9 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
     // Split sums.
     all_ex = detail::split_sums_for_decompose(all_ex);
 
+    // Transform sums into sum_sqs if possible.
+    all_ex = detail::sums_to_sum_sqs_for_decompose(all_ex);
+
 #if !defined(NDEBUG)
 
     // Save copies for checking in debug mode.
@@ -1051,6 +1054,9 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 
     // Split sums.
     all_ex = detail::split_sums_for_decompose(all_ex);
+
+    // Transform sums into sum_sqs if possible.
+    all_ex = detail::sums_to_sum_sqs_for_decompose(all_ex);
 
 #if !defined(NDEBUG)
 

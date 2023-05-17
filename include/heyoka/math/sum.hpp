@@ -58,6 +58,8 @@ public:
 
 HEYOKA_DLL_PUBLIC expression sum_split(const expression &, std::uint32_t);
 
+expression sum_to_sum_sq(const expression &);
+
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression sum(std::vector<expression>);

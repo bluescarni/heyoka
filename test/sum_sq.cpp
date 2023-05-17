@@ -189,9 +189,6 @@ TEST_CASE("sum_sq s11n")
     REQUIRE(ex == sum_sq({x, y, z}));
 }
 
-// TODO restore eventually.
-#if 0
-
 TEST_CASE("cfunc")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
@@ -254,8 +251,6 @@ TEST_CASE("cfunc")
         }
     }
 }
-
-#endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
