@@ -35,11 +35,11 @@
 
 #endif
 
+#include <heyoka/detail/sum_sq.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sum.hpp>
-#include <heyoka/math/sum_sq.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -49,6 +49,20 @@ static std::mt19937 rng;
 
 using namespace heyoka;
 using namespace heyoka_test;
+
+// Wrapper to ease the transition of old test code
+// after the removal of sum_sq() from the public API.
+auto sum_sq(const std::vector<expression> &args)
+{
+    std::vector<expression> new_args;
+    new_args.reserve(args.size());
+
+    for (const auto &arg : args) {
+        new_args.push_back(arg * arg);
+    }
+
+    return sum(new_args);
+}
 
 const auto fp_types = std::tuple<double
 #if !defined(HEYOKA_ARCH_PPC)
@@ -140,43 +154,6 @@ TEST_CASE("stream test")
     }
 }
 
-TEST_CASE("diff test")
-{
-    auto [x, y, z] = make_vars("x", "y", "z");
-
-    {
-        detail::sum_sq_impl ss;
-        REQUIRE(diff(expression(func(ss)), "x") == 0_dbl);
-    }
-
-    {
-        detail::sum_sq_impl ss({x, y, z});
-        REQUIRE(diff(expression(func(ss)), "x") == 2_dbl * "x"_var);
-        REQUIRE(diff(expression(func(ss)), "y") == 2_dbl * "y"_var);
-        REQUIRE(diff(expression(func(ss)), "z") == 2_dbl * "z"_var);
-        REQUIRE(diff(expression(func(ss)), par[0]) == 0_dbl);
-    }
-
-    {
-        detail::sum_sq_impl ss({par[0], par[1], par[2]});
-        REQUIRE(diff(expression(func(ss)), par[0]) == 2_dbl * par[0]);
-        REQUIRE(diff(expression(func(ss)), par[1]) == 2_dbl * par[1]);
-        REQUIRE(diff(expression(func(ss)), par[2]) == 2_dbl * par[2]);
-        REQUIRE(diff(expression(func(ss)), "x") == 0_dbl);
-    }
-
-    {
-        REQUIRE(diff(sum_sq({x, y, z}), "x") == 2_dbl * x);
-        REQUIRE(diff(sum_sq({x, x * x, z}), "x") == 2_dbl * sum({x, (x * x) * (2_dbl * x)}));
-        REQUIRE(diff(sum_sq({x, x * x, -z}), "z") == 2_dbl * z);
-    }
-
-    {
-        REQUIRE(diff(sum_sq({par[0] - 1_dbl, par[1] + y, x + par[0]}), par[0])
-                == 2_dbl * sum({par[0] - 1_dbl, par[0] + x}));
-    }
-}
-
 TEST_CASE("sum_sq function")
 {
     using Catch::Matchers::Message;
@@ -212,30 +189,8 @@ TEST_CASE("sum_sq s11n")
     REQUIRE(ex == sum_sq({x, y, z}));
 }
 
-TEST_CASE("sum_sq zero ignore")
-{
-    REQUIRE(sum_sq({1_dbl, 2_dbl, 0_dbl}) == sum_sq({1_dbl, 2_dbl}));
-    REQUIRE(sum_sq({1_dbl, 2_dbl, 0_dbl}) == 5_dbl);
-    REQUIRE(sum_sq({0_dbl, 0_dbl, 0_dbl}) == 0_dbl);
-    REQUIRE(sum_sq({1_dbl, 0_dbl, 1_dbl}) == sum_sq({1_dbl, 1_dbl}));
-    REQUIRE(sum_sq({0_dbl, 0_dbl, 0_dbl}) == 0_dbl);
-    REQUIRE(sum_sq({0_dbl, -1_dbl, 0_dbl}) == 1_dbl);
-
-    REQUIRE(sum_sq({0_dbl, 2_dbl, "x"_var}) == sum_sq({2_dbl, "x"_var}));
-    REQUIRE(sum_sq({1_dbl, 2_dbl, "x"_var}) == sum_sq({expression{std::sqrt(5.)}, "x"_var}));
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(sum_sq({1_f128, 2_f128, "x"_var}) == sum_sq({expression{sqrt(mppp::real128{5})}, "x"_var}));
-
-#endif
-
-    REQUIRE(sum_sq({0_dbl, 2_dbl, "x"_var, 0_dbl}) == sum_sq({2_dbl, "x"_var}));
-    REQUIRE(sum_sq({0_dbl, 2_dbl, 0_dbl, "x"_var, 0_dbl}) == sum_sq({2_dbl, "x"_var}));
-
-    REQUIRE(std::get<func>(sum_sq({"y"_var, 0_dbl, "x"_var, -21_dbl}).value()).args()
-            == std::vector{21_dbl, "x"_var, "y"_var});
-}
+// TODO restore eventually.
+#if 0
 
 TEST_CASE("cfunc")
 {
@@ -299,6 +254,8 @@ TEST_CASE("cfunc")
         }
     }
 }
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL)
 

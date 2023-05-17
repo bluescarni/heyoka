@@ -6,12 +6,11 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MATH_SUM_SQ_HPP
-#define HEYOKA_MATH_SUM_SQ_HPP
+#ifndef HEYOKA_DETAIL_SUM_SQ_HPP
+#define HEYOKA_DETAIL_SUM_SQ_HPP
 
 #include <cstdint>
 #include <sstream>
-#include <string>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -36,9 +35,6 @@ class HEYOKA_DLL_PUBLIC sum_sq_impl : public func_base
         ar &boost::serialization::base_object<func_base>(*this);
     }
 
-    template <typename T>
-    HEYOKA_DLL_LOCAL expression diff_impl(funcptr_map<expression> &, const T &) const;
-
 public:
     sum_sq_impl();
     explicit sum_sq_impl(std::vector<expression>);
@@ -46,9 +42,6 @@ public:
     void to_stream(std::ostringstream &) const;
 
     [[nodiscard]] bool is_commutative() const;
-
-    expression diff(funcptr_map<expression> &, const std::string &) const;
-    expression diff(funcptr_map<expression> &, const param &) const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
@@ -63,8 +56,6 @@ public:
 };
 
 } // namespace detail
-
-HEYOKA_DLL_PUBLIC expression sum_sq(std::vector<expression>);
 
 HEYOKA_END_NAMESPACE
 

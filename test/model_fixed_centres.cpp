@@ -14,7 +14,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/sum_sq.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/model/fixed_centres.hpp>
 #include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
@@ -24,6 +24,20 @@
 
 using namespace heyoka;
 using namespace heyoka_test;
+
+// Wrapper to ease the transition of old test code
+// after the removal of sum_sq() from the public API.
+auto sum_sq(const std::vector<expression> &args)
+{
+    std::vector<expression> new_args;
+    new_args.reserve(args.size());
+
+    for (const auto &arg : args) {
+        new_args.push_back(arg * arg);
+    }
+
+    return sum(new_args);
+}
 
 TEST_CASE("basic")
 {
