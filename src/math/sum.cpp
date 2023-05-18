@@ -339,6 +339,7 @@ llvm::Function *sum_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 // of which will have at most 'split' arguments.
 // If 'e' is not a sum, or if it is a sum with no more than
 // 'split' terms, 'e' will be returned unmodified.
+// NOTE: 'e' is assumed to be a function.
 // NOLINTNEXTLINE(misc-no-recursion)
 expression sum_split(const expression &e, std::uint32_t split)
 {
@@ -394,16 +395,12 @@ expression sum_split(const expression &e, std::uint32_t split)
 
 // Transform the input sum 'e' into a sum of squares, if possible. If not,
 // 'e' will be returned unchanged.
+// NOTE: 'e' is assumed to be a function.
 expression sum_to_sum_sq(const expression &e)
 {
-    const auto *func_ptr = std::get_if<func>(&e.value());
+    assert(std::holds_alternative<func>(e.value()));
 
-    if (func_ptr == nullptr) {
-        // 'e' is not a function.
-        return e;
-    }
-
-    const auto *sum_ptr = func_ptr->extract<sum_impl>();
+    const auto *sum_ptr = std::get<func>(e.value()).extract<sum_impl>();
 
     if (sum_ptr == nullptr) {
         // 'e' is not a sum.
