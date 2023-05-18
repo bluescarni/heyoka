@@ -212,7 +212,8 @@ TEST_CASE("taylor sum_sq")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {sum_sq({2_dbl, 3_dbl, 1_dbl}), x + y}, 2, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sum_sq({par[0], par[1], par[2]}), x + y}, 2, 1, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -221,7 +222,9 @@ TEST_CASE("taylor sum_sq")
             std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
             jet.resize(6);
 
-            jptr(jet.data(), nullptr, nullptr);
+            std::vector<fp_t> pars{fp_t{2}, fp_t{3}, fp_t{1}};
+
+            jptr(jet.data(), pars.data(), nullptr);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);

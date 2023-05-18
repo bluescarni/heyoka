@@ -83,12 +83,6 @@ void sum_sq_impl::to_stream(std::ostringstream &oss) const
     }
 }
 
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-bool sum_sq_impl::is_commutative() const
-{
-    return true;
-}
-
 namespace
 {
 
@@ -253,13 +247,13 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_
 
                     if constexpr (std::is_same_v<type, variable>) {
                         // Variable.
-                        auto val = taylor_fetch_diff(arr, uname_to_index(v.name()), order / 2u, n_uvars);
-                        return llvm_fmul(s, val, val);
+                        auto *val = taylor_fetch_diff(arr, uname_to_index(v.name()), order / 2u, n_uvars);
+                        return llvm_square(s, val);
                     } else if constexpr (is_num_param_v<type>) {
                         // Number/param.
                         if (order == 0u) {
-                            auto val = taylor_codegen_numparam(s, fp_t, v, par_ptr, batch_size);
-                            return llvm_fmul(s, val, val);
+                            auto *val = taylor_codegen_numparam(s, fp_t, v, par_ptr, batch_size);
+                            return llvm_square(s, val);
                         } else {
                             return vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
                         }

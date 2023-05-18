@@ -170,7 +170,7 @@ TEST_CASE("sum_sq s11n")
 
     auto [x, y, z] = make_vars("x", "y", "z");
 
-    auto ex = sum_sq({x, y, z});
+    auto ex = expression{func{detail::sum_sq_impl({x, y, z})}};
 
     {
         boost::archive::binary_oarchive oa(ss);
@@ -186,7 +186,7 @@ TEST_CASE("sum_sq s11n")
         ia >> ex;
     }
 
-    REQUIRE(ex == sum_sq({x, y, z}));
+    REQUIRE(ex == expression{func{detail::sum_sq_impl({x, y, z})}});
 }
 
 TEST_CASE("cfunc")
