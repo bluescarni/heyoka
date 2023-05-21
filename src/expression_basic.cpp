@@ -1385,6 +1385,7 @@ expression sums_to_sum_sqs_for_decompose(funcptr_map<expression> &func_map, cons
 
 } // namespace
 
+// Replace sum({square(x), square(y), ...}) with sum_sq({x, y, ...}).
 std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expression> &v_ex)
 {
     funcptr_map<expression> func_map;
