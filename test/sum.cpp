@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -20,6 +21,8 @@
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
+
+#include <fmt/core.h>
 
 #include <llvm/Config/llvm-config.h>
 
@@ -38,6 +41,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/cos.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -371,4 +375,39 @@ TEST_CASE("sum split")
     auto ns = x * y;
     REQUIRE(detail::sum_split(ns, 8u) == ns);
     REQUIRE(std::get<func>(detail::sum_split(ns, 8u).value()).get_ptr() == std::get<func>(ns.value()).get_ptr());
+
+    // A cfunc test with nested sums.
+    std::vector<expression> x_vars;
+    for (auto i = 0; i < 10; ++i) {
+        x_vars.emplace_back(fmt::format("x_{}", i));
+    }
+
+    s = sum({x_vars[0], x_vars[1], x_vars[2], x_vars[3], x_vars[4], x_vars[5], x_vars[6], x_vars[7], x_vars[8],
+             x_vars[9], cos(sum(x_vars))});
+
+    llvm_state ls;
+    const auto dc = add_cfunc<double>(ls, "cfunc", {s});
+
+    for (const auto &ex : dc) {
+        if (const auto *fptr = std::get_if<func>(&ex.value())) {
+            if (const auto *sptr = fptr->extract<detail::sum_impl>()) {
+                REQUIRE(sptr->args().size() <= 8u);
+            }
+        }
+    }
+
+    ls.optimise();
+    ls.compile();
+
+    auto *cf_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(ls.jit_lookup("cfunc"));
+
+    std::vector<double> inputs = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    double output = 0;
+
+    cf_ptr(&output, inputs.data(), nullptr, nullptr);
+
+    REQUIRE(output
+            == approximately((1. + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10)
+                             + std::cos(1. + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10)));
 }

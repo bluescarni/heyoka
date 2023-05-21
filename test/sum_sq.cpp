@@ -39,6 +39,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/cos.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -250,6 +251,26 @@ TEST_CASE("cfunc")
             tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
+
+    // Small test to check nested sum square replacements.
+    auto [x, y] = make_vars("x", "y");
+
+    llvm_state s;
+
+    const auto dc = add_cfunc<double>(s, "cfunc", {sum_sq({x, y, cos(sum_sq({x, y}))})});
+
+    s.optimise();
+    s.compile();
+
+    auto *cf_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+
+    std::vector<double> inputs = {1, 2};
+    double output = 0;
+
+    cf_ptr(&output, inputs.data(), nullptr, nullptr);
+
+    REQUIRE(output == approximately(1. + 4 + std::cos(1. + 4) * std::cos(1. + 4)));
 }
 
 #if defined(HEYOKA_HAVE_REAL)
