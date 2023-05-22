@@ -1285,6 +1285,8 @@ expression split_sums_for_decompose(funcptr_map<expression> &func_map, const exp
                 const auto split_ex_is_new = (split_ex_func.get_ptr() != f_id);
 
                 // Split the function arguments.
+                // NOTE: it is important here to recursively split the arguments. E.g., we could
+                // have that one of the arguments is cos(long sum), the long sum needs to be split.
                 std::vector<expression> new_args;
                 new_args.reserve(split_ex_func.args().size());
                 for (const auto &orig_arg : split_ex_func.args()) {
@@ -1325,6 +1327,74 @@ std::vector<expression> split_sums_for_decompose(const std::vector<expression> &
 
     for (const auto &e : v_ex) {
         retval.push_back(split_sums_for_decompose(func_map, e));
+    }
+
+    return retval;
+}
+
+namespace
+{
+
+expression sums_to_sum_sqs_for_decompose(funcptr_map<expression> &func_map, const expression &ex)
+{
+    return std::visit(
+        [&func_map, &ex](const auto &v) {
+            using type = uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, func>) {
+                const auto *f_id = v.get_ptr();
+
+                // Check if we already converted sums to sum_sqs on ex.
+                if (const auto it = func_map.find(f_id); it != func_map.end()) {
+                    return it->second;
+                }
+
+                // Attempt to convert the current function.
+                // NOTE: new_ex could be either ex itself, or a new
+                // function. In any case, the arguments of new_ex are **not**
+                // new, due to the way sum_to_sum_sq() is implemented. Thus, ultimately,
+                // we never end up calling sums_to_sum_sqs_for_decompose() on
+                // new subexpressions, and thus the additional machinery needed
+                // in split_sums_for_decompose() is not necessary here.
+                const auto new_ex = sum_to_sum_sq(ex);
+                const auto &new_ex_func = std::get<func>(new_ex.value());
+
+                // Convert the function arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(new_ex_func.args().size());
+                for (const auto &orig_arg : new_ex_func.args()) {
+                    new_args.push_back(sums_to_sum_sqs_for_decompose(func_map, orig_arg));
+                }
+
+                // Create a copy of new_ex with the new arguments.
+                auto f_copy = new_ex_func.copy(new_args);
+
+                // Construct the return value and put it into the cache.
+                auto ret = expression{std::move(f_copy)};
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
+                // NOTE: an expression cannot contain itself.
+                assert(flag); // LCOV_EXCL_LINE
+
+                return ret;
+            } else {
+                return ex;
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+// Replace sum({square(x), square(y), ...}) with sum_sq({x, y, ...}).
+std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expression> &v_ex)
+{
+    funcptr_map<expression> func_map;
+
+    std::vector<expression> retval;
+    retval.reserve(v_ex.size());
+
+    for (const auto &e : v_ex) {
+        retval.push_back(sums_to_sum_sqs_for_decompose(func_map, e));
     }
 
     return retval;
@@ -1412,6 +1482,23 @@ const expression *is_negation(const expression &ex)
     }
 
     return is_negative_one(std::get<number>(bop->args()[0].value())) ? &bop->args()[1] : nullptr;
+}
+
+// Detect if ex is of the form whatever * whatever. If it is, then
+// a pointer to whatever is returned. Otherwise, nullptr is returned.
+const expression *is_square(const expression &ex)
+{
+    if (!std::holds_alternative<func>(ex.value())) {
+        return nullptr;
+    }
+
+    const auto *bop = std::get<func>(ex.value()).extract<detail::binary_op>();
+
+    if (bop == nullptr || bop->op() != binary_op::type::mul || bop->args()[0] != bop->args()[1]) {
+        return nullptr;
+    } else {
+        return bop->args().data();
+    }
 }
 
 } // namespace detail

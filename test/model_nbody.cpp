@@ -7,13 +7,17 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <stdexcept>
+#include <variant>
 #include <vector>
 
 #include <xtensor/xadapt.hpp>
 #include <xtensor/xview.hpp>
 
+#include <heyoka/detail/sum_sq.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -61,6 +65,18 @@ TEST_CASE("nbody")
         for (const auto &p : dyn) {
             vars.push_back(p.first);
         }
+
+        // Check that all sums were replaced by sums of squares.
+        auto n_sums = 0, n_sum_sqs = 0;
+        for (const auto &[s_ex, _] : ta.get_decomposition()) {
+            if (const auto *fptr = std::get_if<func>(&s_ex.value())) {
+                n_sums += static_cast<int>(fptr->extract<detail::sum_impl>() != nullptr);
+                n_sum_sqs += static_cast<int>(fptr->extract<detail::sum_sq_impl>() != nullptr);
+            }
+        }
+
+        REQUIRE(n_sum_sqs == 15);
+        REQUIRE(n_sums == 18);
 
         add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
         s.optimise();

@@ -23,7 +23,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/sum_sq.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -34,6 +34,20 @@ static std::mt19937 rng;
 
 using namespace heyoka;
 using namespace heyoka_test;
+
+// Wrapper to ease the transition of old test code
+// after the removal of sum_sq() from the public API.
+auto sum_sq(const std::vector<expression> &args)
+{
+    std::vector<expression> new_args;
+    new_args.reserve(args.size());
+
+    for (const auto &arg : args) {
+        new_args.push_back(arg * arg);
+    }
+
+    return sum(new_args);
+}
 
 const auto fp_types = std::tuple<double
 #if !defined(HEYOKA_ARCH_PPC)
@@ -198,7 +212,8 @@ TEST_CASE("taylor sum_sq")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {sum_sq({2_dbl, 3_dbl, 1_dbl}), x + y}, 2, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sum_sq({par[0], par[1], par[2]}), x + y}, 2, 1, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -207,7 +222,9 @@ TEST_CASE("taylor sum_sq")
             std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
             jet.resize(6);
 
-            jptr(jet.data(), nullptr, nullptr);
+            std::vector<fp_t> pars{fp_t{2}, fp_t{3}, fp_t{1}};
+
+            jptr(jet.data(), pars.data(), nullptr);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -215,6 +232,33 @@ TEST_CASE("taylor sum_sq")
             REQUIRE(jet[3] == 5);
             REQUIRE(jet[4] == 0);
             REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (jet[3] + 14)));
+        }
+
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            taylor_add_jet<fp_t>(s, "jet", {sum_sq({par[0], par[1], par[2]}), x + y}, 3, 1, high_accuracy,
+                                 compact_mode);
+
+            s.compile();
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            jet.resize(8);
+
+            std::vector<fp_t> pars{fp_t{2}, fp_t{3}, fp_t{1}};
+
+            jptr(jet.data(), pars.data(), nullptr);
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == 14);
+            REQUIRE(jet[3] == 5);
+            REQUIRE(jet[4] == 0);
+            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (jet[3] + jet[2])));
+            REQUIRE(jet[6] == 0);
+            REQUIRE(jet[7] == approximately(fp_t{1} / 3 * (jet[5] + jet[4])));
         }
 
         {

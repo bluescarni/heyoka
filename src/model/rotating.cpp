@@ -16,7 +16,6 @@
 #include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/sum.hpp>
-#include <heyoka/math/sum_sq.hpp>
 #include <heyoka/model/rotating.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -113,7 +112,7 @@ expression rotating_potential_impl(const std::vector<expression> &omega)
 
         const auto tmp = sum({pe * x, qe * y, re * z});
 
-        return 0.5_dbl * (tmp * tmp - sum_sq({pe, qe, re}) * sum_sq({x, y, z}));
+        return 0.5_dbl * (tmp * tmp - sum({pe * pe, qe * qe, re * re}) * sum({x * x, y * y, z * z}));
     }
 }
 
@@ -122,7 +121,7 @@ expression rotating_energy_impl(const std::vector<expression> &omega)
     // Init the velocity variables.
     auto [vx, vy, vz] = make_vars("vx", "vy", "vz");
 
-    return 0.5_dbl * sum_sq({vx, vy, vz}) + rotating_potential_impl(omega);
+    return 0.5_dbl * sum({vx * vx, vy * vy, vz * vz}) + rotating_potential_impl(omega);
 }
 
 } // namespace model::detail

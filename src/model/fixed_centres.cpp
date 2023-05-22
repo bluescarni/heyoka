@@ -18,7 +18,6 @@
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/sum.hpp>
-#include <heyoka/math/sum_sq.hpp>
 #include <heyoka/model/fixed_centres.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -73,7 +72,7 @@ fixed_centres_impl(const expression &G, const std::vector<expression> &masses, c
         const auto diff_y = positions[3u * i + 1u] - y;
         const auto diff_z = positions[3u * i + 2u] - z;
 
-        const auto dist2 = sum_sq({diff_x, diff_y, diff_z});
+        const auto dist2 = sum({diff_x * diff_x, diff_y * diff_y, diff_z * diff_z});
         const auto Mrm3 = masses[i] * pow(dist2, expression{-3. / 2});
 
         acc_x.push_back(diff_x * Mrm3);
@@ -116,7 +115,7 @@ expression fixed_centres_potential_impl(const expression &G, const std::vector<e
         const auto diff_y = positions[3u * i + 1u] - y;
         const auto diff_z = positions[3u * i + 2u] - z;
 
-        auto dist = sqrt(sum_sq({diff_x, diff_y, diff_z}));
+        auto dist = sqrt(sum({diff_x * diff_x, diff_y * diff_y, diff_z * diff_z}));
 
         pot.push_back(masses[i] / dist);
     }
@@ -131,7 +130,7 @@ expression fixed_centres_energy_impl(const expression &G, const std::vector<expr
     auto [vx, vy, vz] = make_vars("vx", "vy", "vz");
 
     // Kinetic energy.
-    auto kin = 0.5_dbl * sum_sq({vx, vy, vz});
+    auto kin = 0.5_dbl * sum({vx * vx, vy * vy, vz * vz});
 
     return kin + fixed_centres_potential_impl(G, masses, positions);
 }

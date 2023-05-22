@@ -13,7 +13,6 @@
 #include <cstdint>
 #include <sstream>
 #include <stdexcept>
-#include <string>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -41,13 +40,13 @@
 #include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/sum_sq.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/sum.hpp>
-#include <heyoka/math/sum_sq.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
@@ -82,35 +81,6 @@ void sum_sq_impl::to_stream(std::ostringstream &oss) const
 
         oss << ')';
     }
-}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-bool sum_sq_impl::is_commutative() const
-{
-    return true;
-}
-
-template <typename T>
-expression sum_sq_impl::diff_impl(funcptr_map<expression> &func_map, const T &x) const
-{
-    std::vector<expression> terms;
-    terms.reserve(args().size());
-
-    for (const auto &arg : args()) {
-        terms.push_back(arg * detail::diff(func_map, arg, x));
-    }
-
-    return 2_dbl * sum(std::move(terms));
-}
-
-expression sum_sq_impl::diff(funcptr_map<expression> &func_map, const std::string &s) const
-{
-    return diff_impl(func_map, s);
-}
-
-expression sum_sq_impl::diff(funcptr_map<expression> &func_map, const param &p) const
-{
-    return diff_impl(func_map, p);
 }
 
 namespace
@@ -277,13 +247,13 @@ llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const sum_
 
                     if constexpr (std::is_same_v<type, variable>) {
                         // Variable.
-                        auto val = taylor_fetch_diff(arr, uname_to_index(v.name()), order / 2u, n_uvars);
-                        return llvm_fmul(s, val, val);
+                        auto *val = taylor_fetch_diff(arr, uname_to_index(v.name()), order / 2u, n_uvars);
+                        return llvm_square(s, val);
                     } else if constexpr (is_num_param_v<type>) {
                         // Number/param.
                         if (order == 0u) {
-                            auto val = taylor_codegen_numparam(s, fp_t, v, par_ptr, batch_size);
-                            return llvm_fmul(s, val, val);
+                            auto *val = taylor_codegen_numparam(s, fp_t, v, par_ptr, batch_size);
+                            return llvm_square(s, val);
                         } else {
                             return vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
                         }
@@ -567,60 +537,6 @@ llvm::Function *sum_sq_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t,
 }
 
 } // namespace detail
-
-expression sum_sq(std::vector<expression> args)
-{
-    // Partition args so that all numbers are at the end.
-    const auto n_end_it = std::stable_partition(
-        args.begin(), args.end(), [](const expression &ex) { return !std::holds_alternative<number>(ex.value()); });
-
-    // If we have numbers, make sure they are all
-    // accumulated in the last one, and ensure that
-    // the accumulated value is not zero.
-    if (n_end_it != args.end()) {
-        if (n_end_it + 1 != args.end()) {
-            // We have more than 1 number at the end.
-            // Accumulate the squares of the numbers in n_end_it.
-            *n_end_it *= *n_end_it;
-
-            for (auto it = n_end_it + 1; it != args.end(); ++it) {
-                *n_end_it += *it * *it;
-            }
-
-            // Check if the *entire* summation consists
-            // of numbers. In such a case, just return
-            // the accumulated value.
-            if (n_end_it == args.begin()) {
-                return std::move(*n_end_it);
-            }
-
-            // Restore the square root.
-            *n_end_it = sqrt(std::move(*n_end_it));
-        }
-
-        // Remove all numbers but the first one.
-        args.erase(n_end_it + 1, args.end());
-
-        // Remove the remaining number if it is zero.
-        if (is_zero(std::get<number>(n_end_it->value()))) {
-            args.pop_back();
-        }
-    }
-
-    // Special cases.
-    if (args.empty()) {
-        return 0_dbl;
-    }
-
-    if (args.size() == 1u) {
-        return args[0] * args[0];
-    }
-
-    // Sort the operands in canonical order.
-    std::stable_sort(args.begin(), args.end(), detail::comm_ops_lt);
-
-    return expression{func{detail::sum_sq_impl{std::move(args)}}};
-}
 
 HEYOKA_END_NAMESPACE
 

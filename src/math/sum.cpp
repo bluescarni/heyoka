@@ -38,6 +38,7 @@
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/sum_sq.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -59,7 +60,6 @@ sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v)) {
 
 // NOTE: a possible improvement here is to transform
 // "(x + y + -20)" into "(x + y - 20)".
-// Perhaps in sum_sq() as well?
 void sum_impl::to_stream(std::ostringstream &oss) const
 {
     if (args().size() == 1u) {
@@ -339,6 +339,7 @@ llvm::Function *sum_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 // of which will have at most 'split' arguments.
 // If 'e' is not a sum, or if it is a sum with no more than
 // 'split' terms, 'e' will be returned unmodified.
+// NOTE: 'e' is assumed to be a function.
 // NOLINTNEXTLINE(misc-no-recursion)
 expression sum_split(const expression &e, std::uint32_t split)
 {
@@ -390,6 +391,38 @@ expression sum_split(const expression &e, std::uint32_t split)
 
     // Recurse to split further, if needed.
     return sum_split(expression{func{detail::sum_impl{std::move(ret_seq)}}}, split);
+}
+
+// Transform the input sum 'e' into a sum of squares, if possible. If not,
+// 'e' will be returned unchanged.
+// NOTE: 'e' is assumed to be a function.
+expression sum_to_sum_sq(const expression &e)
+{
+    assert(std::holds_alternative<func>(e.value()));
+
+    const auto *sum_ptr = std::get<func>(e.value()).extract<sum_impl>();
+
+    if (sum_ptr == nullptr) {
+        // 'e' is not a sum.
+        return e;
+    }
+
+    // 'e' is a sum, check if all arguments are squares.
+    std::vector<expression> new_args;
+    new_args.reserve(sum_ptr->args().size());
+
+    for (const auto &arg : sum_ptr->args()) {
+        const auto *square_arg = is_square(arg);
+
+        if (square_arg == nullptr) {
+            // A non-square argument was encountered, return.
+            return e;
+        } else {
+            new_args.push_back(*square_arg);
+        }
+    }
+
+    return expression{func{sum_sq_impl{std::move(new_args)}}};
 }
 
 } // namespace detail

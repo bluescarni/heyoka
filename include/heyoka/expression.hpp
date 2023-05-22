@@ -643,6 +643,8 @@ std::vector<expression> function_sort_dc(std::vector<expression> &, std::vector<
 
 HEYOKA_DLL_PUBLIC std::vector<expression> split_sums_for_decompose(const std::vector<expression> &);
 
+std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expression> &);
+
 std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vector<expression>::size_type> &,
                                                             const expression &, std::vector<expression> &);
 
@@ -760,6 +762,8 @@ namespace detail
 HEYOKA_DLL_PUBLIC bool ex_less_than(const expression &, const expression &);
 
 const expression *is_negation(const expression &);
+
+const expression *is_square(const expression &);
 
 } // namespace detail
 
