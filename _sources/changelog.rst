@@ -55,8 +55,6 @@ Changes
   (`#319 <https://github.com/bluescarni/heyoka/pull/319>`__).
 - The expression code has been reorganised into multiple files
   (`#317 <https://github.com/bluescarni/heyoka/pull/317>`__).
-- The ``sum_sq()`` function now performs constant folding
-  (`#304 <https://github.com/bluescarni/heyoka/pull/304>`__).
 - Performance improvements in compact mode for Taylor
   integrators and compiled functions
   (`#303 <https://github.com/bluescarni/heyoka/pull/303>`__).
