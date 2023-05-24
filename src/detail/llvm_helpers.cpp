@@ -119,7 +119,7 @@ llvm::Type *int_to_llvm(llvm::LLVMContext &c)
 };
 
 // The global type map to associate a C++ type to an LLVM type.
-// NOLINTNEXTLINE(cert-err58-cpp,readability-function-cognitive-complexity)
+// NOLINTNEXTLINE(cert-err58-cpp)
 const auto type_map = []() {
     std::unordered_map<std::type_index, llvm::Type *(*)(llvm::LLVMContext &)> retval;
 
@@ -245,11 +245,11 @@ std::string llvm_mangle_type(llvm::Type *t)
     }
 }
 
-// Helper to determine the vector size of x. If x is a scalar,
-// 1 will be returned.
+// Helper to determine the vector size of x. If x is not
+// of type llvm_vector_type, 1 will be returned.
 std::uint32_t get_vector_size(llvm::Value *x)
 {
-    if (auto *vector_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+    if (const auto *vector_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
         return boost::numeric_cast<std::uint32_t>(vector_t->getNumElements());
     } else {
         return 1;
