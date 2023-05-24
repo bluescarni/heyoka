@@ -41,6 +41,7 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/Casting.h>
 
 #include <fmt/format.h>
 
@@ -62,6 +63,7 @@
 #include <heyoka/detail/binomial.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
@@ -590,10 +592,17 @@ void update_grad_dbl(std::unordered_map<std::string, double> &, const number &,
 }
 
 // Generate an LLVM constant of type tp representing the number n.
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+// NOLINTNEXTLINE(misc-no-recursion)
 llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
 {
     assert(tp != nullptr);
+
+    // If tp is an llvm_vector_type, codegen the scalar value and splat it.
+    if (const auto *vector_t = llvm::dyn_cast<detail::llvm_vector_type>(tp)) {
+        const auto vec_size = boost::numeric_cast<std::uint32_t>(vector_t->getNumElements());
+
+        return detail::vector_splat(s.builder(), llvm_codegen(s, vector_t->getScalarType(), n), vec_size);
+    }
 
     // NOTE: isIEEE() is only available since LLVM 13.
     // For earlier versions of LLVM, we check that
@@ -657,7 +666,7 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
         return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, str_rep));
 #if defined(HEYOKA_HAVE_REAL)
     } else if (const auto real_prec = detail::llvm_is_real(tp)) {
-        // From the number, generate a real with the desired precition.
+        // From the number, generate a real with the desired precision.
         const auto r = std::visit([real_prec](const auto &v) { return mppp::real{v, real_prec}; }, n.value());
 
         // Generate the limb array in LLVM.
