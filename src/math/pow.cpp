@@ -390,28 +390,18 @@ llvm::Value *pow_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vec
         *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
-namespace
+llvm::Function *pow_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                           bool high_accuracy) const
 {
 
-[[nodiscard]] llvm::Function *pow_llvm_c_eval(llvm_state &s, llvm::Type *fp_t, const pow_impl &pimpl,
-                                              std::uint32_t batch_size, bool high_accuracy)
-{
-    const auto allow_approx = pow_allow_approx(pimpl);
+    const auto allow_approx = pow_allow_approx(*this);
 
     return llvm_c_eval_func_helper(
         allow_approx ? "pow_approx" : "pow",
         [&s, allow_approx](const std::vector<llvm::Value *> &args, bool) {
             return llvm_pow(s, args[0], args[1], allow_approx);
         },
-        pimpl, s, fp_t, batch_size, high_accuracy);
-}
-
-} // namespace
-
-llvm::Function *pow_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                           bool high_accuracy) const
-{
-    return pow_llvm_c_eval(s, fp_t, *this, batch_size, high_accuracy);
+        *this, s, fp_t, batch_size, high_accuracy);
 }
 
 namespace
