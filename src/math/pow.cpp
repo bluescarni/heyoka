@@ -17,11 +17,13 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <typeinfo>
 #include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
 
+#include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
 
@@ -764,6 +766,21 @@ expression pow_wrapper_impl(expression b, expression e)
     return expression{func{pow_impl{std::move(b), std::move(e)}}};
 }
 
+// Type traits machinery to detect if two types can be used as base and exponent
+// in an exponentiation via the pow() function.
+namespace pow_detail
+{
+
+using std::pow;
+
+template <typename T, typename U>
+using pow_t = decltype(pow(std::declval<T>(), std::declval<U>()));
+
+} // namespace pow_detail
+
+template <typename T, typename U>
+using is_exponentiable = is_detected<pow_detail::pow_t, T, U>;
+
 } // namespace
 
 } // namespace detail
@@ -773,10 +790,18 @@ expression pow(expression b, expression e)
     if (const auto *b_num_ptr = std::get_if<number>(&b.value()), *e_num_ptr = std::get_if<number>(&e.value());
         (b_num_ptr != nullptr) && (e_num_ptr != nullptr)) {
         return std::visit(
-            [](const auto &x, const auto &y) {
-                using std::pow;
+            [](const auto &x, const auto &y) -> expression {
+                if constexpr (detail::is_exponentiable<decltype(x), decltype(y)>::value) {
+                    using std::pow;
 
-                return expression{pow(x, y)};
+                    return expression{pow(x, y)};
+                } else {
+                    // LCOV_EXCL_START
+                    throw std::invalid_argument(
+                        fmt::format("Cannot raise a base of type '{}' to an exponent of type '{}'",
+                                    boost::core::demangle(typeid(x).name()), boost::core::demangle(typeid(y).name())));
+                    // LCOV_EXCL_STOP
+                }
             },
             b_num_ptr->value(), e_num_ptr->value());
     } else {

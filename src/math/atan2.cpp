@@ -15,10 +15,12 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 #include <variant>
 #include <vector>
 
+#include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
@@ -49,6 +51,7 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -816,6 +819,26 @@ llvm::Function *atan2_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, 
     return taylor_c_diff_func_atan2(s, fp_t, *this, n_uvars, batch_size);
 }
 
+// Type traits machinery to detect if two types can be used as
+// arguments to the atan2() function.
+namespace
+{
+
+namespace atan2_detail
+{
+
+using std::atan2;
+
+template <typename T, typename U>
+using atan2_t = decltype(atan2(std::declval<T>(), std::declval<U>()));
+
+} // namespace atan2_detail
+
+template <typename T, typename U>
+using is_atan2able = is_detected<atan2_detail::atan2_t, T, U>;
+
+} // namespace
+
 } // namespace detail
 
 expression atan2(expression y, expression x)
@@ -823,10 +846,18 @@ expression atan2(expression y, expression x)
     if (const auto *y_num_ptr = std::get_if<number>(&y.value()), *x_num_ptr = std::get_if<number>(&x.value());
         (y_num_ptr != nullptr) && (x_num_ptr != nullptr)) {
         return std::visit(
-            [](const auto &a, const auto &b) {
-                using std::atan2;
+            [](const auto &a, const auto &b) -> expression {
+                if constexpr (detail::is_atan2able<decltype(a), decltype(b)>::value) {
+                    using std::atan2;
 
-                return expression{atan2(a, b)};
+                    return expression{atan2(a, b)};
+                } else {
+                    // LCOV_EXCL_START
+                    throw std::invalid_argument(
+                        fmt::format("Cannot invoke atan2() with arguments of type '{}' and '{}'",
+                                    boost::core::demangle(typeid(a).name()), boost::core::demangle(typeid(b).name())));
+                    // LCOV_EXCL_STOP
+                }
             },
             y_num_ptr->value(), x_num_ptr->value());
     } else {
