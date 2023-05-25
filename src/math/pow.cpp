@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstdint>
 #include <initializer_list>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -21,6 +22,7 @@
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/format.h>
 
@@ -35,6 +37,12 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
+
+#if defined(HEYOKA_HAVE_REAL128) || defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/integer.hpp>
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -53,6 +61,7 @@
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -75,6 +84,165 @@ pow_impl::pow_impl() : pow_impl(1_dbl, 1_dbl) {}
 
 namespace
 {
+
+// Maximum integral exponent magnitude for which
+// pow() is transformed into multiplications and divisions.
+constexpr std::uint32_t max_small_pow_n = 16;
+
+// Exponentiation by squaring.
+// NOLINTNEXTLINE(misc-no-recursion)
+llvm::Value *pow_ebs(llvm_state &s, llvm::Value *base, std::uint32_t exp)
+{
+    if (exp == 0u) {
+        return llvm_codegen(s, base->getType(), number{1.});
+    }
+
+    if (exp == 1u) {
+        return base;
+    }
+
+    if (exp % 2u == 0u) {
+        return pow_ebs(s, llvm_square(s, base), exp / 2u);
+    } else {
+        auto *tmp = pow_ebs(s, llvm_square(s, base), (exp - 1u) / 2u);
+        return llvm_fmul(s, base, tmp);
+    }
+}
+
+using safe_int64_t = boost::safe_numerics::safe<std::int64_t>;
+
+// Check if ex is an integral number. If it is, its
+// value will be returned.
+std::optional<safe_int64_t> ex_is_integral(const expression &ex)
+{
+    return std::visit(
+        [](const auto &v) -> std::optional<safe_int64_t> {
+            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, number>) {
+                return std::visit(
+                    [](const auto &x) -> std::optional<safe_int64_t> {
+                        using num_type = uncvref_t<decltype(x)>;
+
+                        using std::trunc;
+                        using std::isfinite;
+
+                        if (!isfinite(x) || x != trunc(x)) {
+                            // Non-finite or non-integral.
+                            return {};
+                        }
+
+                        // NOTE: in these conversions we are ok with throwing
+                        // if the integer is too large.
+                        if constexpr (std::is_floating_point_v<num_type>) {
+                            return boost::numeric_cast<std::int64_t>(x);
+                        }
+
+#if defined(HEYOKA_HAVE_REAL128)
+                        else if constexpr (std::is_same_v<num_type, mppp::real128>) {
+                            // NOTE: for mppp:: types, convert first into mppp::integer
+                            // and then do a (checked) cast to std::int64_t.
+                            return static_cast<std::int64_t>(static_cast<mppp::integer<1>>(x));
+                        }
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+                        else if constexpr (std::is_same_v<num_type, mppp::real>) {
+                            return static_cast<std::int64_t>(static_cast<mppp::integer<1>>(x));
+                        }
+#endif
+
+                        // LCOV_EXCL_START
+                        else {
+                            static_assert(always_false_v<num_type>);
+                            throw;
+                        }
+                        // LCOV_EXCL_STOP
+                    },
+                    v.value());
+            } else {
+                // Not a number.
+                return {};
+            }
+        },
+        ex.value());
+}
+
+// Check if ex is a number in the form n / 2,
+// where n is an odd integral value. If it is, n
+// will be returned.
+std::optional<safe_int64_t> ex_is_odd_integral_half(const expression &ex)
+{
+    return std::visit(
+        [](const auto &v) -> std::optional<safe_int64_t> {
+            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, number>) {
+                return std::visit(
+                    [](const auto &x) -> std::optional<safe_int64_t> {
+                        using num_type = uncvref_t<decltype(x)>;
+
+                        using std::trunc;
+                        using std::isfinite;
+
+                        if (!isfinite(x) || x == trunc(x)) {
+                            // x is not finite, or it is
+                            // an integral value.
+                            return {};
+                        }
+
+                        // NOTE: here we will be assuming that, for all supported
+                        // float types, multiplication by 2 is exact.
+                        // Since we are assuming IEEE binary floats anyway, we should be
+                        // safe here.
+                        const auto y = 2 * x;
+
+                        // NOTE: y should never become infinity here for builtin FP types,
+                        // because this would mean that x is integral (since large float
+                        // values are all integrals anyway).
+                        // The only potential exception is mppp::real, where I am not 100%
+                        // sure what happens wrt the minimum/maximum exponent API in MPFR.
+                        // Thus, in order to be sure, let's check the finiteness of y.
+                        if (!isfinite(y)) {
+                            // LCOV_EXCL_START
+                            throw std::overflow_error("Overflow detected in ex_is_odd_integral_half()");
+                            // LCOV_EXCL_STOP
+                        }
+
+                        if (y != trunc(y)) {
+                            // x is not n/2.
+                            return {};
+                        }
+
+                        // NOTE: in these conversions we are ok with throwing
+                        // if the integer is too large.
+                        if constexpr (std::is_floating_point_v<num_type>) {
+                            return boost::numeric_cast<std::int64_t>(y);
+                        }
+
+#if defined(HEYOKA_HAVE_REAL128)
+                        else if constexpr (std::is_same_v<num_type, mppp::real128>) {
+                            return static_cast<std::int64_t>(static_cast<mppp::integer<1>>(y));
+                        }
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+                        else if constexpr (std::is_same_v<num_type, mppp::real>) {
+                            return static_cast<std::int64_t>(static_cast<mppp::integer<1>>(y));
+                        }
+#endif
+
+                        // LCOV_EXCL_START
+                        else {
+                            static_assert(always_false_v<num_type>);
+                            throw;
+                        }
+                        // LCOV_EXCL_STOP
+                    },
+                    v.value());
+            } else {
+                // Not a number.
+                return {};
+            }
+        },
+        ex.value());
+}
 
 // NOTE: we want to allow approximate implementations of pow()
 // in the following cases:
@@ -105,6 +273,7 @@ long double pow_impl::eval_ldbl(const std::unordered_map<std::string, long doubl
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
+
 mppp::real128 pow_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map,
                                   const std::vector<mppp::real128> &pars) const
 {
@@ -112,6 +281,7 @@ mppp::real128 pow_impl::eval_f128(const std::unordered_map<std::string, mppp::re
 
     return mppp::pow(heyoka::eval_f128(args()[0], map, pars), heyoka::eval_f128(args()[1], map, pars));
 }
+
 #endif
 
 void pow_impl::eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std::string, std::vector<double>> &map,
@@ -155,9 +325,69 @@ llvm::Value *pow_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vec
                                  llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                  bool high_accuracy) const
 {
-    return llvm_eval_helper([&s, this](const std::vector<llvm::Value *> &args,
-                                       bool) { return llvm_pow(s, args[0], args[1], pow_allow_approx(*this)); },
-                            *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    assert(args().size() == 2u);
+
+    // NOTE: check the special cases first, otherwise fall through
+    // to the general case.
+
+    // Small integral powers.
+    if (const auto exp = ex_is_integral(args()[1])) {
+        if (*exp >= 0 && *exp <= max_small_pow_n) {
+            return llvm_eval_helper(
+                [&](const std::vector<llvm::Value *> &args, bool) {
+                    assert(args.size() == 2u);
+
+                    return pow_ebs(s, args[0], *exp);
+                },
+                *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+        }
+
+        if (*exp < 0 && -*exp <= max_small_pow_n) {
+            return llvm_eval_helper(
+                [&](const std::vector<llvm::Value *> &args, bool) {
+                    assert(args.size() == 2u);
+
+                    auto *tmp = pow_ebs(s, args[0], -*exp);
+                    return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
+                },
+                *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+        }
+    }
+
+    // Small half-integral powers.
+    if (const auto exp2 = ex_is_odd_integral_half(args()[1])) {
+        if (*exp2 >= 0 && *exp2 <= max_small_pow_n) {
+            return llvm_eval_helper(
+                [&](const std::vector<llvm::Value *> &args, bool) {
+                    assert(args.size() == 2u);
+
+                    auto *tmp = llvm_sqrt(s, args[0]);
+                    return pow_ebs(s, tmp, *exp2);
+                },
+                *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+        }
+
+        if (*exp2 < 0 && -*exp2 <= max_small_pow_n) {
+            return llvm_eval_helper(
+                [&](const std::vector<llvm::Value *> &args, bool) {
+                    assert(args.size() == 2u);
+
+                    auto *tmp = llvm_sqrt(s, args[0]);
+                    tmp = pow_ebs(s, tmp, -*exp2);
+                    return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
+                },
+                *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+        }
+    }
+
+    // The general case.
+    return llvm_eval_helper(
+        [&s](const std::vector<llvm::Value *> &args, bool) {
+            assert(args.size() == 2u);
+
+            return llvm_pow(s, args[0], args[1]);
+        },
+        *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 namespace
