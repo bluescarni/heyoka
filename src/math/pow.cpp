@@ -11,6 +11,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <initializer_list>
 #include <optional>
 #include <stdexcept>
@@ -321,73 +322,86 @@ double pow_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>
     return a[1] * std::pow(a[0], a[1] - 1.) + std::log(a[0]) * std::pow(a[0], a[1]);
 }
 
-llvm::Value *pow_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                                 llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
-                                 bool high_accuracy) const
+namespace
 {
-    assert(args().size() == 2u);
+
+// NOTE: this struct stores a std::function for the evaluation (in LLVM) of an exponentiation.
+// In the general case, the exponentiation is performed via a direct call to llvm_pow(). If the
+// exponent is a small integral or a small integral half, then the exponentiation is implemented
+// via multiplications, divisions and calls to llvm_sqrt(). The 'algo' enum signals the selected
+// implementation. The 'exp' member is empty in the general case. Otherwise, it contains either
+// the integral exponent (for the small integral optimisation), or twice the small integral half
+// exponent (for the small integral half optimisation).
+struct pow_eval_algo {
+    enum class type : int { general, pos_small_int, neg_small_int, pos_small_half, neg_small_half };
+
+    using eval_t = std::function<llvm::Value *(llvm_state &, const std::vector<llvm::Value *> &)>;
+
+    type algo{-1};
+    eval_t eval_f;
+    std::optional<safe_int64_t> exp;
+};
+
+pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
+{
+    assert(impl.args().size() == 2u);
 
     // NOTE: check the special cases first, otherwise fall through
     // to the general case.
 
     // Small integral powers.
-    if (const auto exp = ex_is_integral(args()[1])) {
+    if (const auto exp = ex_is_integral(impl.args()[1])) {
         if (*exp >= 0 && *exp <= max_small_pow_n) {
-            return llvm_eval_helper(
-                [&](const std::vector<llvm::Value *> &args, bool) {
-                    assert(args.size() == 2u);
-
-                    return pow_ebs(s, args[0], *exp);
-                },
-                *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+            return {pow_eval_algo::type::pos_small_int,
+                    [e = *exp](auto &s, const auto &args) { return pow_ebs(s, args[0], e); }, exp};
         }
 
         if (*exp < 0 && -*exp <= max_small_pow_n) {
-            return llvm_eval_helper(
-                [&](const std::vector<llvm::Value *> &args, bool) {
-                    assert(args.size() == 2u);
-
-                    auto *tmp = pow_ebs(s, args[0], -*exp);
-                    return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
-                },
-                *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+            return {pow_eval_algo::type::neg_small_int,
+                    [e = *exp](auto &s, const auto &args) {
+                        auto *tmp = pow_ebs(s, args[0], -e);
+                        return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
+                    },
+                    exp};
         }
     }
 
     // Small half-integral powers.
-    if (const auto exp2 = ex_is_odd_integral_half(args()[1])) {
+    if (const auto exp2 = ex_is_odd_integral_half(impl.args()[1])) {
         if (*exp2 >= 0 && *exp2 <= max_small_pow_n) {
-            return llvm_eval_helper(
-                [&](const std::vector<llvm::Value *> &args, bool) {
-                    assert(args.size() == 2u);
-
-                    auto *tmp = llvm_sqrt(s, args[0]);
-                    return pow_ebs(s, tmp, *exp2);
-                },
-                *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+            return {pow_eval_algo::type::pos_small_half,
+                    [e2 = *exp2](auto &s, const auto &args) {
+                        auto *tmp = llvm_sqrt(s, args[0]);
+                        return pow_ebs(s, tmp, e2);
+                    },
+                    exp2};
         }
 
         if (*exp2 < 0 && -*exp2 <= max_small_pow_n) {
-            return llvm_eval_helper(
-                [&](const std::vector<llvm::Value *> &args, bool) {
-                    assert(args.size() == 2u);
-
-                    auto *tmp = llvm_sqrt(s, args[0]);
-                    tmp = pow_ebs(s, tmp, -*exp2);
-                    return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
-                },
-                *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+            return {pow_eval_algo::type::neg_small_half,
+                    [e2 = *exp2](auto &s, const auto &args) {
+                        auto *tmp = llvm_sqrt(s, args[0]);
+                        tmp = pow_ebs(s, tmp, -e2);
+                        return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
+                    },
+                    exp2};
         }
     }
 
     // The general case.
-    return llvm_eval_helper(
-        [&s](const std::vector<llvm::Value *> &args, bool) {
-            assert(args.size() == 2u);
+    return {pow_eval_algo::type::general, [](auto &s, const auto &args) { return llvm_pow(s, args[0], args[1]); }, {}};
+}
 
-            return llvm_pow(s, args[0], args[1]);
-        },
-        *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+} // namespace
+
+llvm::Value *pow_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                                 llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
+                                 bool high_accuracy) const
+{
+    const auto pea = get_pow_eval_algo(*this);
+
+    return llvm_eval_helper([&](const std::vector<llvm::Value *> &args, bool) { return pea.eval_f(s, args); }, *this, s,
+                            fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
 llvm::Function *pow_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
