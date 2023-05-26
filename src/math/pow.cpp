@@ -333,7 +333,8 @@ namespace
 // via multiplications, divisions and calls to llvm_sqrt(). The 'algo' enum signals the selected
 // implementation. The 'exp' member is empty in the general case. Otherwise, it contains either
 // the integral exponent (for the small integral optimisation), or twice the small integral half
-// exponent (for the small integral half optimisation).
+// exponent (for the small integral half optimisation). The 'suffix' member contains a string
+// uniquely encoding the 'algo' and 'exp' data members.
 struct pow_eval_algo {
     enum class type : int { general, pos_small_int, neg_small_int, pos_small_half, neg_small_half };
 
@@ -342,6 +343,7 @@ struct pow_eval_algo {
     type algo{-1};
     eval_t eval_f;
     std::optional<safe_int64_t> exp;
+    std::string suffix;
 };
 
 // Construct a pow_eval_algo based on the exponentiation arguments of 'impl'.
@@ -356,7 +358,8 @@ pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
     if (const auto exp = ex_is_integral(impl.args()[1])) {
         if (*exp >= 0 && *exp <= max_small_pow_n) {
             return {pow_eval_algo::type::pos_small_int,
-                    [e = *exp](auto &s, const auto &args) { return pow_ebs(s, args[0], e); }, exp};
+                    [e = *exp](auto &s, const auto &args) { return pow_ebs(s, args[0], e); }, exp,
+                    fmt::format("_pos_small_int_{}", static_cast<std::int64_t>(*exp))};
         }
 
         if (*exp < 0 && -*exp <= max_small_pow_n) {
@@ -365,7 +368,7 @@ pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
                         auto *tmp = pow_ebs(s, args[0], -e);
                         return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
                     },
-                    exp};
+                    exp, fmt::format("_neg_small_int_{}", static_cast<std::int64_t>(-*exp))};
         }
     }
 
@@ -377,7 +380,7 @@ pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
                         auto *tmp = llvm_sqrt(s, args[0]);
                         return pow_ebs(s, tmp, e2);
                     },
-                    exp2};
+                    exp2, fmt::format("_pos_small_half_{}", static_cast<std::int64_t>(*exp2))};
         }
 
         if (*exp2 < 0 && -*exp2 <= max_small_pow_n) {
@@ -387,12 +390,13 @@ pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
                         tmp = pow_ebs(s, tmp, -e2);
                         return llvm_fdiv(s, llvm_codegen(s, tmp->getType(), number{1.}), tmp);
                     },
-                    exp2};
+                    exp2, fmt::format("_neg_small_half_{}", static_cast<std::int64_t>(-*exp2))};
         }
     }
 
     // The general case.
-    return {pow_eval_algo::type::general, [](auto &s, const auto &args) { return llvm_pow(s, args[0], args[1]); }, {}};
+    return {
+        pow_eval_algo::type::general, [](auto &s, const auto &args) { return llvm_pow(s, args[0], args[1]); }, {}, {}};
 }
 
 } // namespace
@@ -401,6 +405,7 @@ llvm::Value *pow_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vec
                                  llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                  bool high_accuracy) const
 {
+    // Fetch the pow eval algo.
     const auto pea = get_pow_eval_algo(*this);
 
     return llvm_eval_helper([&](const std::vector<llvm::Value *> &args, bool) { return pea.eval_f(s, args); }, *this, s,
@@ -410,15 +415,15 @@ llvm::Value *pow_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vec
 llvm::Function *pow_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
                                            bool high_accuracy) const
 {
+    // Fetch the pow eval algo.
+    const auto pea = get_pow_eval_algo(*this);
 
-    const auto allow_approx = pow_allow_approx(*this);
+    // Build the function name.
+    const std::string func_name = "pow" + pea.suffix;
 
     return llvm_c_eval_func_helper(
-        allow_approx ? "pow_approx" : "pow",
-        [&s, allow_approx](const std::vector<llvm::Value *> &args, bool) {
-            return llvm_pow(s, args[0], args[1], allow_approx);
-        },
-        *this, s, fp_t, batch_size, high_accuracy);
+        func_name, [&](const std::vector<llvm::Value *> &args, bool) { return pea.eval_f(s, args); }, *this, s, fp_t,
+        batch_size, high_accuracy);
 }
 
 namespace
@@ -432,12 +437,12 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
 {
     auto &builder = s.builder();
 
-    // Check if we can use the approximated version.
-    const auto allow_approx = pow_allow_approx(f);
-
     if (order == 0u) {
-        return llvm_pow(s, taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size),
-                        taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size), allow_approx);
+        // Fetch the pow eval algo.
+        const auto pea = get_pow_eval_algo(f);
+
+        return pea.eval_f(s, {taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size),
+                              taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size)});
     } else {
         return vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
     }
@@ -452,15 +457,15 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, llvm::Type *fp_t, const pow_imp
 {
     auto &builder = s.builder();
 
-    // Check if we can use the approximated version.
-    const auto allow_approx = pow_allow_approx(f);
-
     // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
 
     if (order == 0u) {
-        return llvm_pow(s, taylor_fetch_diff(arr, u_idx, 0, n_uvars),
-                        taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size), allow_approx);
+        // Fetch the pow eval algo.
+        const auto pea = get_pow_eval_algo(f);
+
+        return pea.eval_f(
+            s, {taylor_fetch_diff(arr, u_idx, 0, n_uvars), taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size)});
     }
 
     // NOTE: iteration in the [0, order) range

@@ -330,7 +330,7 @@ TEST_CASE("cfunc")
 
             if (opt_level == 0u && compact_mode) {
                 REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow."));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow_approx."));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow_pos_small_half_3."));
             }
 
             s.compile();
