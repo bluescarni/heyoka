@@ -344,6 +344,7 @@ struct pow_eval_algo {
     std::optional<safe_int64_t> exp;
 };
 
+// Construct a pow_eval_algo based on the exponentiation arguments of 'impl'.
 pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
 {
     assert(impl.args().size() == 2u);
