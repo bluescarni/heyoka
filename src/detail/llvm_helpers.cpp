@@ -4112,24 +4112,10 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_
         return ret;
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        // NOTE: in principle we can detect here if y is a (vector) constant,
-        // e.g., -3/2, and in such case we could do something like replacing
-        // powq with sqrtq + mul/div. However the accuracy implications of this
-        // are not clear: we know that allowapprox for double precision does not have
-        // catastrophic effects in the Brouwer's law test, but OTOH allow_approx perhaps
-        // transforms a * b**(-3/2) into a / (b * sqrt(b)), but all we can do here is to
-        // transform it into a * 1/(b * sqrt(b)) instead (as we don't have access to a from here),
-        // which looks perhaps worse accuracy wise? It seems like we need to run some extensive
-        // testing before taking these decisions, both from the point of view of performance
-        // *and* accuracy.
-        //
-        // The same applies to the real implementation.
         return call_extern_vec(s, {x, y}, "powq");
 #endif
 #if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(x->getType()) != 0) {
-        // NOTE: there is a convenient mpfr_rec_sqrt() function which looks very handy
-        // for possibly optimising the case of exponent == -3/2.
         auto *f = real_nary_op(s, x->getType(), "pow", "mpfr_pow", 2u);
         return s.builder().CreateCall(f, {x, y});
 #endif

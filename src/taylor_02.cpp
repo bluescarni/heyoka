@@ -382,17 +382,20 @@ taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
 
     // NOTE: it is fine here to static_cast<double>(order), as order is a 32-bit integer
     // and double is a IEEE double-precision type (i.e., 53 bits).
+    // NOTE: since these are estimates, it is ok to set allow_approx = true.
     auto *rho_o = llvm_pow(
         s, llvm_fdiv(s, num_rho, max_abs_diff_o),
         vector_splat(builder,
                      llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, static_cast<double>(order))),
-                     batch_size));
+                     batch_size),
+        true);
     auto *rho_om1 = llvm_pow(
         s, llvm_fdiv(s, num_rho, max_abs_diff_om1),
         vector_splat(
             builder,
             llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, static_cast<double>(order - 1u))),
-            batch_size));
+            batch_size),
+        true);
 
     // Take the minimum.
     auto *rho_m = llvm_min(s, rho_o, rho_om1);
