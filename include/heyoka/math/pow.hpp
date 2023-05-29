@@ -102,8 +102,6 @@ HEYOKA_DLL_PUBLIC expression pow(expression, mppp::real);
 
 #endif
 
-HEYOKA_DLL_PUBLIC expression powi(expression, std::uint32_t);
-
 HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::pow_impl)

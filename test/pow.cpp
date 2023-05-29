@@ -145,20 +145,6 @@ TEST_CASE("pow expo 1")
 #endif
 }
 
-TEST_CASE("powi")
-{
-    auto x = "x"_var;
-
-    REQUIRE(powi(x, 0) == 1_dbl);
-    REQUIRE(powi(x + 1., 1) == x + 1.);
-    REQUIRE(powi(x + 1., 2) == square_wrapper(x + 1.));
-    REQUIRE(powi(x + 1., 3) == square_wrapper(x + 1.) * (x + 1.));
-    REQUIRE(powi(x + 1., 4) == square_wrapper(x + 1.) * square_wrapper(x + 1.));
-    REQUIRE(powi(x + 1., 5) == square_wrapper(x + 1.) * square_wrapper(x + 1.) * (x + 1.));
-    REQUIRE(powi(x + 1., 6) == square_wrapper(x + 1.) * square_wrapper(x + 1.) * square_wrapper(x + 1.));
-    REQUIRE(powi(x + 1., 7) == square_wrapper(x + 1.) * square_wrapper(x + 1.) * (square_wrapper(x + 1.) * (x + 1.)));
-}
-
 TEST_CASE("pow diff")
 {
     auto [x, y] = make_vars("x", "y");

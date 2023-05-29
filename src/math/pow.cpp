@@ -1179,38 +1179,6 @@ expression pow(expression b, mppp::real e)
 
 #endif
 
-// Natural power.
-expression powi(expression b, std::uint32_t e)
-{
-    switch (e) {
-        case 0u:
-            return 1_dbl;
-        case 1u:
-            return b;
-        case 2u:
-            return b * b;
-        default:
-            // NOTE: default continues.
-            ;
-    }
-
-    // https://en.wikipedia.org/wiki/Exponentiation_by_squaring
-    auto y = 1_dbl;
-
-    while (e > 1u) {
-        if (e % 2u == 0u) {
-            b = b * b;
-            e /= 2u;
-        } else {
-            y = b * y;
-            b = b * b;
-            e = (e - 1u) / 2u;
-        }
-    }
-
-    return b * y;
-}
-
 HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::pow_impl)
