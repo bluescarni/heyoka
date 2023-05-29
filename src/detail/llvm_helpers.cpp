@@ -119,7 +119,7 @@ llvm::Type *int_to_llvm(llvm::LLVMContext &c)
 };
 
 // The global type map to associate a C++ type to an LLVM type.
-// NOLINTNEXTLINE(cert-err58-cpp,readability-function-cognitive-complexity)
+// NOLINTNEXTLINE(cert-err58-cpp)
 const auto type_map = []() {
     std::unordered_map<std::type_index, llvm::Type *(*)(llvm::LLVMContext &)> retval;
 
@@ -245,11 +245,11 @@ std::string llvm_mangle_type(llvm::Type *t)
     }
 }
 
-// Helper to determine the vector size of x. If x is a scalar,
-// 1 will be returned.
+// Helper to determine the vector size of x. If x is not
+// of type llvm_vector_type, 1 will be returned.
 std::uint32_t get_vector_size(llvm::Value *x)
 {
-    if (auto *vector_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+    if (const auto *vector_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
         return boost::numeric_cast<std::uint32_t>(vector_t->getNumElements());
     } else {
         return 1;
@@ -4112,24 +4112,10 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_
         return ret;
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        // NOTE: in principle we can detect here if y is a (vector) constant,
-        // e.g., -3/2, and in such case we could do something like replacing
-        // powq with sqrtq + mul/div. However the accuracy implications of this
-        // are not clear: we know that allowapprox for double precision does not have
-        // catastrophic effects in the Brouwer's law test, but OTOH allow_approx perhaps
-        // transforms a * b**(-3/2) into a / (b * sqrt(b)), but all we can do here is to
-        // transform it into a * 1/(b * sqrt(b)) instead (as we don't have access to a from here),
-        // which looks perhaps worse accuracy wise? It seems like we need to run some extensive
-        // testing before taking these decisions, both from the point of view of performance
-        // *and* accuracy.
-        //
-        // The same applies to the real implementation.
         return call_extern_vec(s, {x, y}, "powq");
 #endif
 #if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(x->getType()) != 0) {
-        // NOTE: there is a convenient mpfr_rec_sqrt() function which looks very handy
-        // for possibly optimising the case of exponent == -3/2.
         auto *f = real_nary_op(s, x->getType(), "pow", "mpfr_pow", 2u);
         return s.builder().CreateCall(f, {x, y});
 #endif

@@ -37,6 +37,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -48,11 +49,10 @@ using namespace heyoka;
 using namespace heyoka_test;
 
 // NOTE: this wrapper is here only to ease the transition
-// of old test code to the new implementation of square
-// as a special case of multiplication.
+// of old test code.
 auto square_wrapper(const heyoka::expression &x)
 {
-    return x * x;
+    return pow(x, 2.);
 }
 
 const auto fp_types = std::tuple<double
@@ -143,7 +143,7 @@ TEST_CASE("cfunc")
                 kw::batch_size = batch_size, kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.mul_square."));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow_pos_small_int_2"));
             }
 
             s.compile();

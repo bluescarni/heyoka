@@ -13,6 +13,7 @@
 #include <initializer_list>
 #include <random>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -25,6 +26,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -49,9 +51,7 @@ const auto fp_types = std::tuple<double
 
 auto square_wrapper(expression e)
 {
-    auto ret = "x"_var * "y"_var;
-
-    return subs(ret, {{"x", e}, {"y", e}});
+    return pow(std::move(e), 2.);
 }
 
 template <typename T, typename U>
@@ -109,10 +109,6 @@ TEST_CASE("taylor square")
             taylor_add_jet<fp_t>(s, "jet", {square_wrapper(expression{number{fp_t(2)}}), x + y}, 1, 1, high_accuracy,
                                  compact_mode);
 
-            if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(s.get_ir(), "mul_square.num_num"));
-            }
-
             s.compile();
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
@@ -134,7 +130,7 @@ TEST_CASE("taylor square")
             taylor_add_jet<fp_t>(s, "jet", {square_wrapper(par[0]), x + y}, 1, 1, high_accuracy, compact_mode);
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(s.get_ir(), "mul_square.par_par"));
+                REQUIRE(boost::contains(s.get_ir(), "pow_pos_small_int_2.par_num"));
             }
 
             s.compile();
@@ -159,10 +155,6 @@ TEST_CASE("taylor square")
 
             taylor_add_jet<fp_t>(s, "jet", {square_wrapper(expression{number{fp_t(2)}}), x + y}, 1, 2, high_accuracy,
                                  compact_mode);
-
-            if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(s.get_ir(), "mul_square.num_num"));
-            }
 
             s.compile();
 
@@ -192,7 +184,7 @@ TEST_CASE("taylor square")
             taylor_add_jet<fp_t>(s, "jet", {square_wrapper(par[1]), x + y}, 1, 2, high_accuracy, compact_mode);
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(s.get_ir(), "mul_square.par_par"));
+                REQUIRE(boost::contains(s.get_ir(), "pow_pos_small_int_2.par_num"));
             }
 
             s.compile();
@@ -225,10 +217,6 @@ TEST_CASE("taylor square")
             taylor_add_jet<fp_t>(s, "jet", {square_wrapper(expression{number{fp_t(2)}}), x + y}, 2, 1, high_accuracy,
                                  compact_mode);
 
-            if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(s.get_ir(), "mul_square.num_num"));
-            }
-
             s.compile();
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
@@ -251,10 +239,6 @@ TEST_CASE("taylor square")
 
             taylor_add_jet<fp_t>(s, "jet", {square_wrapper(expression{number{fp_t(2)}}), x + y}, 2, 2, high_accuracy,
                                  compact_mode);
-
-            if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(s.get_ir(), "mul_square.num_num"));
-            }
 
             s.compile();
 
@@ -289,10 +273,6 @@ TEST_CASE("taylor square")
 
             taylor_add_jet<fp_t>(s, "jet", {square_wrapper(expression{number{fp_t(2)}}), x + y}, 3, 3, high_accuracy,
                                  compact_mode);
-
-            if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(s.get_ir(), "mul_square.num_num"));
-            }
 
             s.compile();
 
@@ -342,7 +322,7 @@ TEST_CASE("taylor square")
             taylor_add_jet<fp_t>(s, "jet", {square_wrapper(par[0]), x + y}, 3, 3, high_accuracy, compact_mode);
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(s.get_ir(), "mul_square.par_par"));
+                REQUIRE(boost::contains(s.get_ir(), "pow_pos_small_int_2.par_num"));
             }
 
             s.compile();
@@ -400,7 +380,7 @@ TEST_CASE("taylor square")
             taylor_add_jet<fp_t>(s, "jet", {square_wrapper(y), square_wrapper(x)}, 1, 1, high_accuracy, compact_mode);
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(s.get_ir(), "mul_square.var_var"));
+                REQUIRE(boost::contains(s.get_ir(), "pow_square.var_num"));
             }
 
             s.compile();
@@ -424,7 +404,7 @@ TEST_CASE("taylor square")
             taylor_add_jet<fp_t>(s, "jet", {square_wrapper(y), square_wrapper(x)}, 1, 2, high_accuracy, compact_mode);
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(s.get_ir(), "mul_square.var_var"));
+                REQUIRE(boost::contains(s.get_ir(), "pow_square.var_num"));
             }
 
             s.compile();
@@ -455,7 +435,7 @@ TEST_CASE("taylor square")
             taylor_add_jet<fp_t>(s, "jet", {square_wrapper(y), square_wrapper(x)}, 2, 1, high_accuracy, compact_mode);
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(s.get_ir(), "mul_square.var_var"));
+                REQUIRE(boost::contains(s.get_ir(), "pow_square.var_num"));
             }
 
             s.compile();
@@ -481,7 +461,7 @@ TEST_CASE("taylor square")
             taylor_add_jet<fp_t>(s, "jet", {square_wrapper(y), square_wrapper(x)}, 2, 2, high_accuracy, compact_mode);
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(s.get_ir(), "mul_square.var_var"));
+                REQUIRE(boost::contains(s.get_ir(), "pow_square.var_num"));
             }
 
             s.compile();
@@ -518,7 +498,7 @@ TEST_CASE("taylor square")
             taylor_add_jet<fp_t>(s, "jet", {square_wrapper(y), square_wrapper(x)}, 3, 3, high_accuracy, compact_mode);
 
             if (compact_mode && opt_level == 0u) {
-                REQUIRE(boost::contains(s.get_ir(), "mul_square.var_var"));
+                REQUIRE(boost::contains(s.get_ir(), "pow_square.var_num"));
             }
 
             s.compile();

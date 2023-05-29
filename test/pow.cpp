@@ -35,10 +35,10 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
-#include <heyoka/math/sqrt.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -146,119 +146,6 @@ TEST_CASE("pow expo 1")
 #endif
 }
 
-TEST_CASE("pow expo 2")
-{
-    auto x = "x"_var;
-
-    REQUIRE(heyoka::pow(x, 2.) == square_wrapper(x));
-    REQUIRE(heyoka::pow(x, 2.l) == square_wrapper(x));
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, 2._rq) == square_wrapper(x));
-
-#endif
-
-    REQUIRE(heyoka::pow(x, 2.1) != square_wrapper(x));
-    REQUIRE(heyoka::pow(x, 2.1l) != square_wrapper(x));
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, 21._rq) != square_wrapper(x));
-
-#endif
-}
-
-TEST_CASE("pow expo 3")
-{
-    auto x = "x"_var;
-
-    REQUIRE(heyoka::pow(x, 3.) == square_wrapper(x) * x);
-    REQUIRE(heyoka::pow(x, 3.l) == square_wrapper(x) * x);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, 3._rq) == square_wrapper(x) * x);
-
-#endif
-
-    REQUIRE(heyoka::pow(x, 3.1) != square_wrapper(x) * x);
-    REQUIRE(heyoka::pow(x, 3.1l) != square_wrapper(x) * x);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, 31._rq) != square_wrapper(x) * x);
-
-#endif
-}
-
-TEST_CASE("pow expo 4")
-{
-    auto x = "x"_var;
-
-    REQUIRE(heyoka::pow(x, 4.) == square_wrapper(x) * square_wrapper(x));
-    REQUIRE(heyoka::pow(x, 4.l) == square_wrapper(x) * square_wrapper(x));
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, 4._rq) == square_wrapper(x) * square_wrapper(x));
-
-#endif
-
-    REQUIRE(heyoka::pow(x, 4.1) != square_wrapper(x) * square_wrapper(x));
-    REQUIRE(heyoka::pow(x, 4.1l) != square_wrapper(x) * square_wrapper(x));
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, 41._rq) != square_wrapper(x) * square_wrapper(x));
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-    REQUIRE(heyoka::pow(x, 1.1_r256) != square_wrapper(x) * square_wrapper(x));
-    REQUIRE(heyoka::pow(x, 1.1_r256) == heyoka::pow(x, expression{1.1_r256}));
-
-#endif
-}
-
-TEST_CASE("pow expo .5")
-{
-    auto x = "x"_var;
-
-    REQUIRE(heyoka::pow(x, .5) == sqrt(x));
-    REQUIRE(heyoka::pow(x, .5l) == sqrt(x));
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, .5_rq) == sqrt(x));
-
-#endif
-
-    REQUIRE(heyoka::pow(x, .51) != sqrt(x));
-    REQUIRE(heyoka::pow(x, .51l) != sqrt(x));
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, .51_rq) != sqrt(x));
-
-#endif
-}
-
-TEST_CASE("powi")
-{
-    auto x = "x"_var;
-
-    REQUIRE(powi(x, 0) == 1_dbl);
-    REQUIRE(powi(x + 1., 1) == x + 1.);
-    REQUIRE(powi(x + 1., 2) == square_wrapper(x + 1.));
-    REQUIRE(powi(x + 1., 3) == square_wrapper(x + 1.) * (x + 1.));
-    REQUIRE(powi(x + 1., 4) == square_wrapper(x + 1.) * square_wrapper(x + 1.));
-    REQUIRE(powi(x + 1., 5) == square_wrapper(x + 1.) * square_wrapper(x + 1.) * (x + 1.));
-    REQUIRE(powi(x + 1., 6) == square_wrapper(x + 1.) * square_wrapper(x + 1.) * square_wrapper(x + 1.));
-    REQUIRE(powi(x + 1., 7) == square_wrapper(x + 1.) * square_wrapper(x + 1.) * (square_wrapper(x + 1.) * (x + 1.)));
-}
-
 TEST_CASE("pow diff")
 {
     auto [x, y] = make_vars("x", "y");
@@ -300,6 +187,8 @@ TEST_CASE("cfunc")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using std::pow;
+        using std::isfinite;
+        using std::isnan;
 
         using fp_t = decltype(fp_x);
 
@@ -325,25 +214,61 @@ TEST_CASE("cfunc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {pow(x, y), pow(x, par[0]), pow(x, 3. / 2_dbl)}, kw::batch_size = batch_size,
+            add_cfunc<fp_t>(s, "cfunc1", {pow(x, y), pow(x, par[0]), pow(x, fp_t{3} / 2)}, kw::batch_size = batch_size,
                             kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
+
+            add_cfunc<fp_t>(s, "cfunc2",
+                            {expression{func{detail::pow_impl(x, 0_dbl)}}, pow(x, fp_t{-3}),
+                             pow(x, -std::numeric_limits<fp_t>::infinity())},
+                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                            kw::compact_mode = compact_mode);
+
+            add_cfunc<fp_t>(s, "cfunc3", {pow(x, fp_t(7)), pow(x, fp_t{-8}), pow(x, fp_t{11} / 2)},
+                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                            kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
                 REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow."));
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow_approx."));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow_pos_small_half_3."));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow_pos_small_int_0."));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow_neg_small_int_3."));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow_pos_small_half_11."));
             }
 
             s.compile();
 
-            auto *cf_ptr
-                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
+            auto *cf_ptr1
+                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc1"));
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+            auto *cf_ptr2
+                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc2"));
+
+            auto *cf_ptr3
+                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc3"));
+
+            cf_ptr1(outs.data(), ins.data(), pars.data(), nullptr);
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(pow(ins[i], ins[i + batch_size]), fp_t(100)));
                 REQUIRE(outs[i + batch_size] == approximately(pow(ins[i], pars[i]), fp_t(100)));
                 REQUIRE(outs[i + 2u * batch_size] == approximately(pow(ins[i], fp_t(3) / 2), fp_t(100)));
+            }
+
+            cf_ptr2(outs.data(), ins.data(), pars.data(), nullptr);
+
+            for (auto i = 0u; i < batch_size; ++i) {
+                REQUIRE(outs[i] == approximately(fp_t(1), fp_t(100)));
+                REQUIRE(outs[i + batch_size] == approximately(pow(ins[i], fp_t{-3}), fp_t(100)));
+                REQUIRE((outs[i + 2u * batch_size] == approximately(fp_t(0), fp_t(100))
+                         || (!isfinite(outs[i + 2u * batch_size]) && !isnan(outs[i + 2u * batch_size]))));
+            }
+
+            cf_ptr3(outs.data(), ins.data(), pars.data(), nullptr);
+
+            for (auto i = 0u; i < batch_size; ++i) {
+                REQUIRE(outs[i] == approximately(pow(ins[i], fp_t(7)), fp_t(100)));
+                REQUIRE(outs[i + batch_size] == approximately(pow(ins[i], fp_t(-8)), fp_t(100)));
+                REQUIRE(outs[i + 2u * batch_size] == approximately(pow(ins[i], fp_t{11} / 2), fp_t(100)));
             }
         }
     };
@@ -370,25 +295,27 @@ TEST_CASE("cfunc_mp")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<mppp::real>(s, "cfunc", {pow(x, y), pow(x, par[0]), pow(x, 3. / 2_dbl)},
-                                  kw::compact_mode = compact_mode, kw::prec = prec);
+            add_cfunc<mppp::real>(
+                s, "cfunc1", {pow(x, y), pow(x, par[0]), pow(x, mppp::real{3. / 2, prec}), pow(x, mppp::real{6, prec})},
+                kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();
 
-            auto *cf_ptr
+            auto *cf_ptr1
                 = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
-                    s.jit_lookup("cfunc"));
+                    s.jit_lookup("cfunc1"));
 
             const std::vector ins{mppp::real{"1.1", prec}, mppp::real{"2.1", prec}};
             const std::vector pars{mppp::real{"3.1", prec}};
-            std::vector<mppp::real> outs(3u, mppp::real{0, prec});
+            std::vector<mppp::real> outs(4u, mppp::real{0, prec});
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+            cf_ptr1(outs.data(), ins.data(), pars.data(), nullptr);
 
             auto i = 0u;
             REQUIRE(outs[i] == pow(ins[i], ins[i + 1u]));
             REQUIRE(outs[i + 1u] == pow(ins[i], pars[i]));
-            REQUIRE(outs[i + 2u * 1u] == pow(ins[i], 3. / 2));
+            REQUIRE(outs[i + 2u * 1u] == approximately(pow(ins[i], 3. / 2)));
+            REQUIRE(outs[i + 3u * 1u] == approximately(pow(ins[i], mppp::real{6, prec})));
         }
     }
 }

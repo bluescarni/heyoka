@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -961,68 +960,6 @@ llvm::Function *taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, const expres
 
 namespace detail
 {
-
-// Helper to detect if ex is an integral number.
-bool is_integral(const expression &ex)
-{
-    return std::visit(
-        [](const auto &v) {
-            using type = uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, number>) {
-                return std::visit(
-                    [](const auto &x) {
-                        using std::trunc;
-                        using std::isfinite;
-
-                        return isfinite(x) && x == trunc(x);
-                    },
-                    v.value());
-            } else {
-                // Not a number.
-                return false;
-            }
-        },
-        ex.value());
-}
-
-// Helper to detect if ex is a number in the form n / 2,
-// where n is an odd integral value.
-bool is_odd_integral_half(const expression &ex)
-{
-    return std::visit(
-        [](const auto &v) {
-            using type = uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, number>) {
-                return std::visit(
-                    [](const auto &x) {
-                        using std::trunc;
-                        using std::isfinite;
-
-                        if (!isfinite(x) || x == trunc(x)) {
-                            // x is not finite, or it is already
-                            // an integral value.
-                            return false;
-                        }
-
-                        // NOTE: here we will be assuming that, for all supported
-                        // float types, multiplication by 2 is exact.
-                        // Since we are assuming IEEE floats anyway, we should be
-                        // safe here.
-                        // NOTE: y should never become infinity here, because this would mean
-                        // that x is integral (since large float values are all integrals anyway).
-                        const auto y = 2 * x;
-                        return y == trunc(y);
-                    },
-                    v.value());
-            } else {
-                // Not a number.
-                return false;
-            }
-        },
-        ex.value());
-}
 
 expression par_impl::operator[](std::uint32_t idx) const
 {

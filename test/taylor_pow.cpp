@@ -101,8 +101,8 @@ TEST_CASE("taylor pow approx")
 
         taylor_add_jet<double>(s, "jet", {pow(x, -1.5) + pow(x, 1 / 3.)}, 3, 1, false, false);
 
-        REQUIRE(boost::contains(s.get_ir(), "call contract afn double @llvm.pow"));
-        REQUIRE(boost::contains(s.get_ir(), "call contract double @llvm.pow"));
+        REQUIRE(boost::contains(s.get_ir(), "@llvm.pow"));
+        REQUIRE(boost::contains(s.get_ir(), "@llvm.sqrt"));
     }
 
     {
@@ -110,7 +110,8 @@ TEST_CASE("taylor pow approx")
 
         taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(par[0], -1.5)}}, 3, 1, false, false);
 
-        REQUIRE(boost::contains(s.get_ir(), "call contract afn double @llvm.pow"));
+        REQUIRE(boost::contains(s.get_ir(), "@llvm.sqrt"));
+        REQUIRE(!boost::contains(s.get_ir(), "@llvm.pow"));
     }
 
     {
@@ -118,7 +119,7 @@ TEST_CASE("taylor pow approx")
 
         taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(-1.5_dbl, par[0])}}, 3, 1, false, false);
 
-        REQUIRE(!boost::contains(s.get_ir(), "call contract afn double @llvm.pow"));
+        REQUIRE(!boost::contains(s.get_ir(), "@llvm.sqrt"));
     }
 
     {
@@ -126,11 +127,8 @@ TEST_CASE("taylor pow approx")
 
         taylor_add_jet<double>(s, "jet", {pow(x, -1.5) + pow(x, 1 / 3.)}, 3, 1, false, true);
 
-        REQUIRE(boost::contains(s.get_ir(), "call contract afn double @llvm.pow"));
-        REQUIRE(boost::contains(s.get_ir(), "call contract double @llvm.pow"));
-
-        REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.pow_approx."));
-        REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.pow."));
+        REQUIRE(boost::contains(s.get_ir(), "@llvm.pow"));
+        REQUIRE(boost::contains(s.get_ir(), "@llvm.sqrt"));
     }
 
     {
@@ -138,8 +136,8 @@ TEST_CASE("taylor pow approx")
 
         taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(par[0], -1.5)}}, 3, 1, false, true);
 
-        REQUIRE(boost::contains(s.get_ir(), "call contract afn double @llvm.pow"));
-        REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.pow_approx."));
+        REQUIRE(!boost::contains(s.get_ir(), "@llvm.pow"));
+        REQUIRE(boost::contains(s.get_ir(), "@llvm.sqrt"));
     }
 
     {
@@ -147,8 +145,55 @@ TEST_CASE("taylor pow approx")
 
         taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(-1.5_dbl, par[0])}}, 3, 1, false, true);
 
-        REQUIRE(!boost::contains(s.get_ir(), "call contract afn double @llvm.pow"));
         REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.pow."));
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(x, 2_dbl)}}, 3, 1, false, true);
+
+        REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.pow_square."));
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(x, .5_dbl)}}, 3, 1, false, true);
+
+        REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.pow_sqrt."));
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(x, 1.5_dbl)}}, 3, 1, false, true);
+
+        REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.pow_pos_small_half_3."));
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(x, -1.5_dbl)}}, 3, 1, false, true);
+
+        REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.pow_neg_small_half_3."));
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(x, 4_dbl)}}, 3, 1, false, true);
+
+        REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.pow_pos_small_int_4."));
+    }
+
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        taylor_add_jet<double>(s, "jet", std::vector{std::pair{x, pow(x, -4_dbl)}}, 3, 1, false, true);
+
+        REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.pow_neg_small_int_4."));
     }
 }
 

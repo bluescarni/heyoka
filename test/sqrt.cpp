@@ -36,6 +36,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -70,6 +71,8 @@ TEST_CASE("sqrt basic")
 {
     REQUIRE(sqrt(3_dbl) == expression{std::sqrt(3.)});
 
+    REQUIRE(sqrt("x"_var) == pow("x"_var, .5));
+
 #if defined(HEYOKA_HAVE_REAL128)
 
     REQUIRE(sqrt(3_f128) == expression{sqrt(mppp::real128{3.})});
@@ -100,17 +103,6 @@ TEST_CASE("sqrt s11n")
     }
 
     REQUIRE(ex == sqrt(x));
-}
-
-TEST_CASE("sqrt diff")
-{
-    auto [x, y] = make_vars("x", "y");
-
-    REQUIRE(diff(sqrt(x * x - y), x) == (2. * x) / (2. * sqrt(x * x - y)));
-    REQUIRE(diff(sqrt(x * x - y), y) == -1. / (2. * sqrt(x * x - y)));
-
-    REQUIRE(diff(sqrt(par[0] * par[0] - y), par[0]) == (2. * par[0]) / (2. * sqrt(par[0] * par[0] - y)));
-    REQUIRE(diff(sqrt(x * x - par[1]), par[1]) == -1. / (2. * sqrt(x * x - par[1])));
 }
 
 TEST_CASE("cfunc")
@@ -147,7 +139,7 @@ TEST_CASE("cfunc")
                             kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.sqrt."));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pow_pos_small_half"));
             }
 
             s.compile();
