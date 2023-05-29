@@ -9,71 +9,14 @@
 #ifndef HEYOKA_MATH_SQRT_HPP
 #define HEYOKA_MATH_SQRT_HPP
 
-#include <cstdint>
-#include <string>
-#include <unordered_map>
-#include <vector>
-
 #include <heyoka/config.hpp>
-#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
-#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
-#include <heyoka/func.hpp>
-#include <heyoka/s11n.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
-
-namespace detail
-{
-
-class HEYOKA_DLL_PUBLIC sqrt_impl : public func_base
-{
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar &boost::serialization::base_object<func_base>(*this);
-    }
-
-public:
-    sqrt_impl();
-    explicit sqrt_impl(expression);
-
-    expression diff(funcptr_map<expression> &, const std::string &) const;
-    expression diff(funcptr_map<expression> &, const param &) const;
-
-    [[nodiscard]] double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
-    [[nodiscard]] long double eval_ldbl(const std::unordered_map<std::string, long double> &,
-                                        const std::vector<long double> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    [[nodiscard]] mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                                          const std::vector<mppp::real128> &) const;
-#endif
-
-    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
-                        const std::vector<double> &) const;
-    [[nodiscard]] double eval_num_dbl(const std::vector<double> &) const;
-    [[nodiscard]] double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
-
-    [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
-                                         llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
-
-    [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
-
-    llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
-                             const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
-                             std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
-
-    llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
-};
-
-} // namespace detail
 
 HEYOKA_DLL_PUBLIC expression sqrt(expression);
 
 HEYOKA_END_NAMESPACE
-
-HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::sqrt_impl)
 
 #endif

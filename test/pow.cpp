@@ -38,7 +38,6 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
-#include <heyoka/math/sqrt.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -142,105 +141,6 @@ TEST_CASE("pow expo 1")
 #if defined(HEYOKA_HAVE_REAL128)
 
     REQUIRE(heyoka::pow(x, 1.1_rq) != x);
-
-#endif
-}
-
-TEST_CASE("pow expo 2")
-{
-    auto x = "x"_var;
-
-    REQUIRE(heyoka::pow(x, 2.) == square_wrapper(x));
-    REQUIRE(heyoka::pow(x, 2.l) == square_wrapper(x));
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, 2._rq) == square_wrapper(x));
-
-#endif
-
-    REQUIRE(heyoka::pow(x, 2.1) != square_wrapper(x));
-    REQUIRE(heyoka::pow(x, 2.1l) != square_wrapper(x));
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, 21._rq) != square_wrapper(x));
-
-#endif
-}
-
-TEST_CASE("pow expo 3")
-{
-    auto x = "x"_var;
-
-    REQUIRE(heyoka::pow(x, 3.) == square_wrapper(x) * x);
-    REQUIRE(heyoka::pow(x, 3.l) == square_wrapper(x) * x);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, 3._rq) == square_wrapper(x) * x);
-
-#endif
-
-    REQUIRE(heyoka::pow(x, 3.1) != square_wrapper(x) * x);
-    REQUIRE(heyoka::pow(x, 3.1l) != square_wrapper(x) * x);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, 31._rq) != square_wrapper(x) * x);
-
-#endif
-}
-
-TEST_CASE("pow expo 4")
-{
-    auto x = "x"_var;
-
-    REQUIRE(heyoka::pow(x, 4.) == square_wrapper(x) * square_wrapper(x));
-    REQUIRE(heyoka::pow(x, 4.l) == square_wrapper(x) * square_wrapper(x));
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, 4._rq) == square_wrapper(x) * square_wrapper(x));
-
-#endif
-
-    REQUIRE(heyoka::pow(x, 4.1) != square_wrapper(x) * square_wrapper(x));
-    REQUIRE(heyoka::pow(x, 4.1l) != square_wrapper(x) * square_wrapper(x));
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, 41._rq) != square_wrapper(x) * square_wrapper(x));
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-    REQUIRE(heyoka::pow(x, 1.1_r256) != square_wrapper(x) * square_wrapper(x));
-    REQUIRE(heyoka::pow(x, 1.1_r256) == heyoka::pow(x, expression{1.1_r256}));
-
-#endif
-}
-
-TEST_CASE("pow expo .5")
-{
-    auto x = "x"_var;
-
-    REQUIRE(heyoka::pow(x, .5) == sqrt(x));
-    REQUIRE(heyoka::pow(x, .5l) == sqrt(x));
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, .5_rq) == sqrt(x));
-
-#endif
-
-    REQUIRE(heyoka::pow(x, .51) != sqrt(x));
-    REQUIRE(heyoka::pow(x, .51l) != sqrt(x));
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-    REQUIRE(heyoka::pow(x, .51_rq) != sqrt(x));
 
 #endif
 }

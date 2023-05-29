@@ -70,7 +70,6 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
-#include <heyoka/math/sqrt.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -679,7 +678,11 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, 
     // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
-    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "pow_square", n_uvars, batch_size, {var, var});
+    const auto na_pair
+        = taylor_c_diff_func_name_args(context, fp_t, "pow_square", n_uvars, batch_size,
+                                       {var,
+                                        // NOTE: as usual, here only the type is important, not the value.
+                                        number{0.}});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -806,7 +809,11 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
     // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
-    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "pow_sqrt", n_uvars, batch_size, {var, var});
+    const auto na_pair
+        = taylor_c_diff_func_name_args(context, fp_t, "pow_sqrt", n_uvars, batch_size,
+                                       {var,
+                                        // NOTE: as usual, here only the type is important, not the value.
+                                        number{.5}});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -1085,7 +1092,7 @@ namespace
 {
 
 // Wrapper for the implementation of the top-level pow() function.
-// It will special-case for e == 0, 1, 2, 3, 4 and 0.5.
+// It will special-case for e == 0 and 1.
 expression pow_wrapper_impl(expression b, expression e)
 {
     if (const auto *num_ptr = std::get_if<number>(&e.value())) {
@@ -1095,22 +1102,6 @@ expression pow_wrapper_impl(expression b, expression e)
 
         if (is_one(*num_ptr)) {
             return b;
-        }
-
-        if (std::visit([](const auto &v) { return v == 2; }, num_ptr->value())) {
-            return b * b;
-        }
-
-        if (std::visit([](const auto &v) { return v == 3; }, num_ptr->value())) {
-            return powi(std::move(b), 3);
-        }
-
-        if (std::visit([](const auto &v) { return v == 4; }, num_ptr->value())) {
-            return powi(std::move(b), 4);
-        }
-
-        if (std::visit([](const auto &v) { return v == .5; }, num_ptr->value())) {
-            return sqrt(std::move(b));
         }
     }
 
