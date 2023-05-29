@@ -295,8 +295,9 @@ TEST_CASE("cfunc_mp")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<mppp::real>(s, "cfunc1", {pow(x, y), pow(x, par[0]), pow(x, mppp::real{3. / 2, prec})},
-                                  kw::compact_mode = compact_mode, kw::prec = prec);
+            add_cfunc<mppp::real>(
+                s, "cfunc1", {pow(x, y), pow(x, par[0]), pow(x, mppp::real{3. / 2, prec}), pow(x, mppp::real{6, prec})},
+                kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();
 
@@ -306,14 +307,15 @@ TEST_CASE("cfunc_mp")
 
             const std::vector ins{mppp::real{"1.1", prec}, mppp::real{"2.1", prec}};
             const std::vector pars{mppp::real{"3.1", prec}};
-            std::vector<mppp::real> outs(3u, mppp::real{0, prec});
+            std::vector<mppp::real> outs(4u, mppp::real{0, prec});
 
             cf_ptr1(outs.data(), ins.data(), pars.data(), nullptr);
 
             auto i = 0u;
             REQUIRE(outs[i] == pow(ins[i], ins[i + 1u]));
             REQUIRE(outs[i + 1u] == pow(ins[i], pars[i]));
-            REQUIRE(outs[i + 2u * 1u] == pow(ins[i], 3. / 2));
+            REQUIRE(outs[i + 2u * 1u] == approximately(pow(ins[i], 3. / 2)));
+            REQUIRE(outs[i + 3u * 1u] == approximately(pow(ins[i], mppp::real{6, prec})));
         }
     }
 }
