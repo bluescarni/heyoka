@@ -115,7 +115,7 @@ TEST_CASE("stream test")
         detail::sum_impl ss({x});
         ss.to_stream(oss);
 
-        REQUIRE(oss.str() == "x");
+        REQUIRE(oss.str() == "(x)");
     }
 
     {

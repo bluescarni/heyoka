@@ -60,23 +60,20 @@ sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v)) {
 
 // NOTE: a possible improvement here is to transform
 // "(x + y + -20)" into "(x + y - 20)".
+// NOTE: sums which have 0 or 1 terms are not possible
+// when using the public API, thus do not bother special casing.
 void sum_impl::to_stream(std::ostringstream &oss) const
 {
-    if (args().size() == 1u) {
-        // NOTE: avoid brackets if there's only 1 argument.
-        stream_expression(oss, args()[0]);
-    } else {
-        oss << '(';
+    oss << '(';
 
-        for (decltype(args().size()) i = 0; i < args().size(); ++i) {
-            stream_expression(oss, args()[i]);
-            if (i != args().size() - 1u) {
-                oss << " + ";
-            }
+    for (decltype(args().size()) i = 0; i < args().size(); ++i) {
+        stream_expression(oss, args()[i]);
+        if (i != args().size() - 1u) {
+            oss << " + ";
         }
-
-        oss << ')';
     }
+
+    oss << ')';
 }
 
 std::vector<expression> sum_impl::gradient() const
