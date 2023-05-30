@@ -1096,7 +1096,9 @@ namespace
 {
 
 // Wrapper for the implementation of the top-level pow() function.
-// It will special-case for e == 0 and 1.
+// It will special-case for e == 0 and 1, and it will fold
+// (x**a)**b -> x**(a * b) if a and b are both numbers.
+// NOLINTNEXTLINE(misc-no-recursion)
 expression pow_wrapper_impl(expression b, expression e)
 {
     if (const auto *num_ptr = std::get_if<number>(&e.value())) {
@@ -1107,8 +1109,18 @@ expression pow_wrapper_impl(expression b, expression e)
         if (is_one(*num_ptr)) {
             return b;
         }
+
+        // If b is already a pow() with a numerical exponent, fold e into b's exponent.
+        if (const auto *fptr = std::get_if<func>(&b.value());
+            fptr != nullptr && fptr->extract<pow_impl>() != nullptr
+            && std::holds_alternative<number>(fptr->args()[1].value())) {
+            assert(fptr->args().size() == 2u);
+
+            return pow(fptr->args()[0], fptr->args()[1] * e);
+        }
     }
 
+    // The general case.
     return expression{func{pow_impl{std::move(b), std::move(e)}}};
 }
 
@@ -1131,6 +1143,7 @@ using is_exponentiable = is_detected<pow_detail::pow_t, T, U>;
 
 } // namespace detail
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression pow(expression b, expression e)
 {
     if (const auto *b_num_ptr = std::get_if<number>(&b.value()), *e_num_ptr = std::get_if<number>(&e.value());
