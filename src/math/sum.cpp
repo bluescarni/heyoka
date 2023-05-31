@@ -437,7 +437,6 @@ expression sum_to_sum_sq(const expression &e)
 
 } // namespace detail
 
-// NOLINTNEXTLINE(misc-no-recursion)
 expression sum(std::vector<expression> args)
 {
     // Partition args so that all numbers are at the end.
@@ -449,7 +448,9 @@ expression sum(std::vector<expression> args)
     // the accumulated value is not zero.
     if (n_end_it != args.end()) {
         for (auto it = n_end_it + 1; it != args.end(); ++it) {
-            *n_end_it += *it;
+            // NOTE: do not use directly operator+() on expressions in order
+            // to avoid recursion.
+            *n_end_it = expression{std::get<number>(n_end_it->value()) + std::get<number>(it->value())};
         }
 
         // Remove all numbers but the first one.
