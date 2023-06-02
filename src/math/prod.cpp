@@ -9,15 +9,23 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <map>
 #include <sstream>
 #include <utility>
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Type.h>
+#include <llvm/IR/Value.h>
+
 #include <heyoka/config.hpp>
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/number.hpp>
@@ -221,6 +229,67 @@ std::vector<expression> prod_impl::gradient() const
     }
 
     return retval;
+}
+
+llvm::Value *prod_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                                  llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
+                                  bool high_accuracy) const
+{
+    if (prod_is_negation_impl(*this)) {
+        // Special case for negation.
+        assert(args().size() >= 2u);
+
+        return llvm_eval_helper(
+            [&s](const auto &args, bool) {
+                auto args_copy = std::vector(args.begin() + 1, args.end());
+                auto *res = pairwise_prod(s, args_copy);
+
+                return llvm_fneg(s, res);
+            },
+            *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    } else {
+        return llvm_eval_helper(
+            [&s, fp_t, batch_size](const auto &args, bool) {
+                if (args.empty()) {
+                    return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{1.}), batch_size);
+                } else {
+                    auto args_copy = args;
+                    return pairwise_prod(s, args_copy);
+                }
+            },
+            *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
+    }
+}
+
+llvm::Function *prod_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                            bool high_accuracy) const
+{
+    if (prod_is_negation_impl(*this)) {
+        // Special case for negation.
+        assert(args().size() >= 2u);
+
+        return llvm_c_eval_func_helper(
+            "prod_neg",
+            [&s](const auto &args, bool) {
+                auto args_copy = std::vector(args.begin() + 1, args.end());
+                auto *res = pairwise_prod(s, args_copy);
+
+                return llvm_fneg(s, res);
+            },
+            *this, s, fp_t, batch_size, high_accuracy);
+    } else {
+        return llvm_c_eval_func_helper(
+            "prod",
+            [&s, fp_t, batch_size](const auto &args, bool) {
+                if (args.empty()) {
+                    return vector_splat(s.builder(), llvm_codegen(s, fp_t, number{1.}), batch_size);
+                } else {
+                    auto args_copy = args;
+                    return pairwise_prod(s, args_copy);
+                }
+            },
+            *this, s, fp_t, batch_size, high_accuracy);
+    }
 }
 
 // Simplify the arguments for a prod(). This function returns either the simplified vector of arguments,

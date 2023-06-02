@@ -728,6 +728,12 @@ llvm::Value *pairwise_sum(llvm_state &s, std::vector<llvm::Value *> &sum)
     return pairwise_reduce(sum, [&s](llvm::Value *a, llvm::Value *b) -> llvm::Value * { return llvm_fadd(s, a, b); });
 }
 
+// Pairwise product of a vector of LLVM values.
+llvm::Value *pairwise_prod(llvm_state &s, std::vector<llvm::Value *> &prod)
+{
+    return pairwise_reduce(prod, [&s](llvm::Value *a, llvm::Value *b) -> llvm::Value * { return llvm_fmul(s, a, b); });
+}
+
 // Helper to invoke an intrinsic function with arguments 'args'. 'types' are the argument type(s) for
 // overloaded intrinsics.
 llvm::CallInst *llvm_invoke_intrinsic(ir_builder &builder, const std::string &name,
