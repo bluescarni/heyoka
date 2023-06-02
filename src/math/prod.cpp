@@ -200,10 +200,28 @@ void prod_impl::to_stream(std::ostringstream &oss) const
     }
 }
 
-// std::vector<expression> prod_impl::gradient() const
-// {
+std::vector<expression> prod_impl::gradient() const
+{
+    const auto n_args = args().size();
 
-// }
+    std::vector<expression> retval, tmp;
+    retval.reserve(n_args);
+    tmp.reserve(n_args);
+
+    for (decltype(args().size()) i = 0; i < n_args; ++i) {
+        tmp.clear();
+
+        for (decltype(i) j = 0; j < n_args; ++j) {
+            if (i != j) {
+                tmp.push_back(args()[j]);
+            }
+        }
+
+        retval.push_back(prod(tmp));
+    }
+
+    return retval;
+}
 
 // Simplify the arguments for a prod(). This function returns either the simplified vector of arguments,
 // or a single expression directly representing the result of the product.

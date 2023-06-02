@@ -41,7 +41,7 @@ public:
 
     void to_stream(std::ostringstream &) const;
 
-    // [[nodiscard]] std::vector<expression> gradient() const;
+    [[nodiscard]] std::vector<expression> gradient() const;
 
     // [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value
     // *,

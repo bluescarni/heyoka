@@ -328,3 +328,18 @@ TEST_CASE("args simpl")
     // Sorting.
     REQUIRE(prod({y, z, x, 1_dbl}) == prod({1_dbl, x, y, z}));
 }
+
+TEST_CASE("diff")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    REQUIRE(diff(prod({}), x) == 0_dbl);
+
+    REQUIRE(diff(prod({3_dbl}), x) == 0_dbl);
+    REQUIRE(diff(prod({x}), x) == 1_dbl);
+    REQUIRE(diff(prod({x, 3_dbl}), x) == 3_dbl);
+    REQUIRE(diff(prod({x, y, 3_dbl}), x) == prod({3_dbl, y}));
+    REQUIRE(diff(prod({x, y, 3_dbl}), y) == prod({3_dbl, x}));
+    REQUIRE(diff(prod({x, y, 3_dbl}), z) == 0_dbl);
+    REQUIRE(diff(prod({x, y, 3_dbl}), par[0]) == 0_dbl);
+}
