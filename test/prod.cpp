@@ -157,6 +157,33 @@ TEST_CASE("stream test")
     {
         std::ostringstream oss;
 
+        detail::prod_impl ss({-1_dbl, x, y, x + y});
+        ss.to_stream(oss);
+
+        REQUIRE(oss.str() == "-(x * y * (x + y))");
+    }
+
+    {
+        std::ostringstream oss;
+
+        detail::prod_impl ss({-1_dbl, x, y, pow(x, y)});
+        ss.to_stream(oss);
+
+        REQUIRE(oss.str() == "-(x * y * x**y)");
+    }
+
+    {
+        std::ostringstream oss;
+
+        detail::prod_impl ss({-1_dbl, x, y, pow(x, 2_dbl)});
+        ss.to_stream(oss);
+
+        REQUIRE(boost::contains(oss.str(), "-(x * y * x**2.000"));
+    }
+
+    {
+        std::ostringstream oss;
+
         detail::prod_impl ss({x, y, z});
         ss.to_stream(oss);
 
