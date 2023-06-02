@@ -14,6 +14,7 @@
 #include <functional>
 #include <initializer_list>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -83,6 +84,13 @@ namespace detail
 pow_impl::pow_impl(expression b, expression e) : func_base("pow", std::vector{std::move(b), std::move(e)}) {}
 
 pow_impl::pow_impl() : pow_impl(1_dbl, 1_dbl) {}
+
+void pow_impl::to_stream(std::ostringstream &oss) const
+{
+    stream_expression(oss, args()[0]);
+    oss << "**";
+    stream_expression(oss, args()[1]);
+}
 
 namespace
 {
