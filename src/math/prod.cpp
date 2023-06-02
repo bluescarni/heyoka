@@ -205,9 +205,9 @@ void prod_impl::to_stream(std::ostringstream &oss) const
 
 // }
 
-} // namespace detail
-
-expression prod(const std::vector<expression> &args_)
+// Simplify the arguments for a prod(). This function returns either the simplified vector of arguments,
+// or a single expression directly representing the result of the product.
+std::variant<std::vector<expression>, expression> prod_simplify_args(const std::vector<expression> &args_)
 {
     // Step 1: flatten products in args.
     std::vector<expression> args;
@@ -298,7 +298,20 @@ expression prod(const std::vector<expression> &args_)
     // Sort the operands in canonical order.
     std::stable_sort(args.begin(), args.end(), detail::comm_ops_lt);
 
-    return expression{func{detail::prod_impl{std::move(args)}}};
+    return args;
+}
+
+} // namespace detail
+
+expression prod(const std::vector<expression> &args_)
+{
+    auto args = detail::prod_simplify_args(args_);
+
+    if (std::holds_alternative<expression>(args)) {
+        return std::move(std::get<expression>(args));
+    } else {
+        return expression{func{detail::prod_impl{std::move(std::get<std::vector<expression>>(args))}}};
+    }
 }
 
 HEYOKA_END_NAMESPACE
