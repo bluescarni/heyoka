@@ -686,7 +686,7 @@ public:
     template <typename T>
     [[nodiscard]] const T *extract() const noexcept
     {
-        auto p = dynamic_cast<const detail::func_inner<T> *>(ptr());
+        const auto *p = dynamic_cast<const detail::func_inner<T> *>(ptr());
         return p == nullptr ? nullptr : &(p->m_value);
     }
 

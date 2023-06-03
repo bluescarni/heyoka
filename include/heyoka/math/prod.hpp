@@ -65,4 +65,6 @@ HEYOKA_DLL_PUBLIC expression prod(const std::vector<expression> &);
 
 HEYOKA_END_NAMESPACE
 
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::prod_impl)
+
 #endif
