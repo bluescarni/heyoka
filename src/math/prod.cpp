@@ -586,8 +586,8 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, llvm::Type *fp_t, con
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
 
-        // LCOV_EXCL_START
     } else {
+        // LCOV_EXCL_START
         // The function was created before. Check if the signatures match.
         // NOTE: there could be a mismatch if the derivative function was created
         // and then optimised - optimisation might remove arguments which are compile-time
@@ -596,8 +596,8 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, llvm::Type *fp_t, con
             throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of the negation "
                                         "in compact mode detected");
         }
+        // LCOV_EXCL_STOP
     }
-    // LCOV_EXCL_STOP
 
     return f;
 }
