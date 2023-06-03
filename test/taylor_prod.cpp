@@ -1180,34 +1180,34 @@ TEST_CASE("taylor mul")
     llvm_state s;
 
     REQUIRE_THROWS_MATCHES(
-        taylor_add_jet<double>(s, "jet", {expression{func{detail::prod_impl()}}}, 3, 3, false, false),
+        taylor_add_jet<double>(s, "jet", {"x"_var + expression{func{detail::prod_impl()}}}, 3, 3, false, false),
         std::invalid_argument,
         Message("The Taylor derivative of a product can be computed only for products "
                 "of 2 terms, but the current product has 0 term(s) instead"));
     REQUIRE_THROWS_MATCHES(
-        taylor_add_jet<double>(s, "jet", {expression{func{detail::prod_impl()}}}, 3, 3, false, true),
+        taylor_add_jet<double>(s, "jet", {"x"_var + expression{func{detail::prod_impl()}}}, 3, 3, false, true),
         std::invalid_argument,
         Message("The Taylor derivative of a product in compact mode can be computed only for products "
                 "of 2 terms, but the current product has 0 term(s) instead"));
     REQUIRE_THROWS_MATCHES(
-        taylor_add_jet<double>(s, "jet", {expression{func{detail::prod_impl({par[0]})}}}, 3, 3, false, false),
+        taylor_add_jet<double>(s, "jet", {"x"_var + expression{func{detail::prod_impl({par[0]})}}}, 3, 3, false, false),
         std::invalid_argument,
         Message("The Taylor derivative of a product can be computed only for products "
                 "of 2 terms, but the current product has 1 term(s) instead"));
     REQUIRE_THROWS_MATCHES(
-        taylor_add_jet<double>(s, "jet", {expression{func{detail::prod_impl({par[0]})}}}, 3, 3, false, true),
+        taylor_add_jet<double>(s, "jet", {"x"_var + expression{func{detail::prod_impl({par[0]})}}}, 3, 3, false, true),
         std::invalid_argument,
         Message("The Taylor derivative of a product in compact mode can be computed only for products "
                 "of 2 terms, but the current product has 1 term(s) instead"));
-    REQUIRE_THROWS_MATCHES(taylor_add_jet<double>(s, "jet",
-                                                  {expression{func{detail::prod_impl({par[0], par[0], par[0]})}}}, 3, 3,
-                                                  false, false),
-                           std::invalid_argument,
-                           Message("The Taylor derivative of a product can be computed only for products "
-                                   "of 2 terms, but the current product has 3 term(s) instead"));
     REQUIRE_THROWS_MATCHES(
-        taylor_add_jet<double>(s, "jet", {expression{func{detail::prod_impl({par[0], par[0], par[0]})}}}, 3, 3, false,
-                               true),
+        taylor_add_jet<double>(s, "jet", {"x"_var + expression{func{detail::prod_impl({par[0], par[0], par[0]})}}}, 3,
+                               3, false, false),
+        std::invalid_argument,
+        Message("The Taylor derivative of a product can be computed only for products "
+                "of 2 terms, but the current product has 3 term(s) instead"));
+    REQUIRE_THROWS_MATCHES(
+        taylor_add_jet<double>(s, "jet", {"x"_var + expression{func{detail::prod_impl({par[0], par[0], par[0]})}}}, 3,
+                               3, false, true),
         std::invalid_argument,
         Message("The Taylor derivative of a product in compact mode can be computed only for products "
                 "of 2 terms, but the current product has 3 term(s) instead"));
