@@ -36,6 +36,7 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
@@ -410,7 +411,7 @@ TEST_CASE("cfunc")
                 continue;
             }
 
-            outs.resize(batch_size * 3u);
+            outs.resize(batch_size * 5u);
             ins.resize(batch_size * 2u);
             pars.resize(batch_size);
 
@@ -419,9 +420,12 @@ TEST_CASE("cfunc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(
-                s, "cfunc", {prod({expression{fp_t{-1}}, x}), prod({par[0], x, y}), prod({expression{fp_t{5}}, x, y})},
-                kw::batch_size = batch_size, kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
+            add_cfunc<fp_t>(s, "cfunc",
+                            {prod({expression{fp_t{-1}}, x}), prod({par[0], x, y}), prod({expression{fp_t{5}}, x, y}),
+                             // NOTE: test a couple of corner cases as well.
+                             expression{func{detail::prod_impl({x})}}, expression{func{detail::prod_impl{}}}},
+                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                            kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
                 REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.prod."));
@@ -439,6 +443,8 @@ TEST_CASE("cfunc")
                 REQUIRE(outs[i] == approximately(-ins[i], fp_t(100)));
                 REQUIRE(outs[i + batch_size] == approximately(pars[i] * ins[i] * ins[i + batch_size], fp_t(100)));
                 REQUIRE(outs[i + 2u * batch_size] == approximately(fp_t(5) * ins[i] * ins[i + batch_size], fp_t(100)));
+                REQUIRE(outs[i + 3u * batch_size] == ins[i]);
+                REQUIRE(outs[i + 4u * batch_size] == fp_t(1));
             }
         }
     };
