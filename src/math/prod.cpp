@@ -77,6 +77,7 @@ const number *ex_is_negative_pow(const expression &ex)
         return nullptr;
     }
 
+    // Helper to check if a number is NaN or negative.
     auto checker = [](const auto &v) {
         using std::isnan;
 
@@ -309,7 +310,7 @@ llvm::Function *prod_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std
 namespace
 {
 
-// Derivative of number * number.
+// Derivative of numpar * numpar.
 template <typename U, typename V, std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
 llvm::Value *prod_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const U &num0, const V &num1,
                                    const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
@@ -338,7 +339,7 @@ llvm::Value *prod_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const U &num
     }
 }
 
-// Derivative of var * number.
+// Derivative of var * numpar.
 // NOTE: no point in trying to optimise this with a negation,
 // as the public API won't allow the creation of a var * number product
 // (it will be immediately re-arranged into number * var).
@@ -353,7 +354,7 @@ llvm::Value *prod_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const variab
     return llvm_fmul(s, mul, ret);
 }
 
-// Derivative of number * var.
+// Derivative of numpar * var.
 template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Value *prod_taylor_diff_impl(llvm_state &s, llvm::Type *fp_t, const U &num, const variable &var,
                                    const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
@@ -436,7 +437,7 @@ llvm::Value *prod_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::
 namespace
 {
 
-// Derivative of number/param * number/param.
+// Derivative of numpar * numpar.
 template <typename U, typename V, std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
 llvm::Function *prod_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, const U &num0, const V &num1,
                                              std::uint32_t n_uvars, std::uint32_t batch_size)
@@ -472,7 +473,7 @@ llvm::Function *prod_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, co
         num0, num1);
 }
 
-// Derivative of var * number.
+// Derivative of var * numpar.
 template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *prod_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, const variable &var, const U &n,
                                              std::uint32_t n_uvars, std::uint32_t batch_size)
@@ -608,7 +609,7 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, llvm::Type *fp_t, con
     return f;
 }
 
-// Derivative of number * var.
+// Derivative of numpar * var.
 template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *prod_taylor_c_diff_func_impl(llvm_state &s, llvm::Type *fp_t, const U &n, const variable &var,
                                              std::uint32_t n_uvars, std::uint32_t batch_size)

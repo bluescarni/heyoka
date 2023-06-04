@@ -87,6 +87,9 @@ pow_impl::pow_impl() : pow_impl(1_dbl, 1_dbl) {}
 
 void pow_impl::to_stream(std::ostringstream &oss) const
 {
+    // NOTE: I don't think brackets are needed here,
+    // as '**' is the binary operator with highest
+    // precedence.
     stream_expression(oss, args()[0]);
     oss << "**";
     stream_expression(oss, args()[1]);
@@ -1124,7 +1127,7 @@ expression pow_wrapper_impl(expression b, expression e)
             && std::holds_alternative<number>(fptr->args()[1].value())) {
             assert(fptr->args().size() == 2u);
 
-            return pow(fptr->args()[0], fptr->args()[1] * e);
+            return pow(fptr->args()[0], expression{std::get<number>(fptr->args()[1].value()) * *num_ptr});
         }
     }
 
