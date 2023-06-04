@@ -202,7 +202,7 @@ TEST_CASE("stream test")
         detail::prod_impl ss({pow(x, -1_dbl), pow(y, -1_dbl)});
         ss.to_stream(oss);
 
-        REQUIRE(oss.str() == fmt::format("{} / (x * y)", 1_dbl));
+        REQUIRE(oss.str() == fmt::format("({} / (x * y))", 1_dbl));
     }
 
     {
@@ -211,7 +211,7 @@ TEST_CASE("stream test")
         detail::prod_impl ss({-1_dbl, pow(x, -1_dbl), pow(y, -1_dbl)});
         ss.to_stream(oss);
 
-        REQUIRE(oss.str() == fmt::format("-{} / (x * y)", 1_dbl));
+        REQUIRE(oss.str() == fmt::format("-({} / (x * y))", 1_dbl));
     }
 
     {
@@ -238,7 +238,7 @@ TEST_CASE("stream test")
         detail::prod_impl ss({pow(x, 1_dbl), pow(y, -1_dbl)});
         ss.to_stream(oss);
 
-        REQUIRE(oss.str() == "x / y");
+        REQUIRE(oss.str() == "(x / y)");
     }
 
     {
@@ -247,7 +247,7 @@ TEST_CASE("stream test")
         detail::prod_impl ss({-1_dbl, pow(x, 1_dbl), pow(y, -1_dbl)});
         ss.to_stream(oss);
 
-        REQUIRE(oss.str() == "-x / y");
+        REQUIRE(oss.str() == "-(x / y)");
     }
 
     {
@@ -256,7 +256,7 @@ TEST_CASE("stream test")
         detail::prod_impl ss({pow(x, 1_dbl), pow(y, -2_dbl)});
         ss.to_stream(oss);
 
-        REQUIRE(boost::contains(oss.str(), "x / y**2.000"));
+        REQUIRE(boost::contains(oss.str(), "(x / y**2.000"));
     }
 
     {
@@ -265,7 +265,7 @@ TEST_CASE("stream test")
         detail::prod_impl ss({-1_dbl, pow(x, 1_dbl), pow(y, -2_dbl)});
         ss.to_stream(oss);
 
-        REQUIRE(boost::contains(oss.str(), "-x / y**2.000"));
+        REQUIRE(boost::contains(oss.str(), "-(x / y**2.000"));
     }
 
     {
@@ -274,7 +274,7 @@ TEST_CASE("stream test")
         detail::prod_impl ss({pow(x, 1_dbl), pow(y, 1_dbl), pow(z, -1_dbl)});
         ss.to_stream(oss);
 
-        REQUIRE(oss.str() == "(x * y) / z");
+        REQUIRE(oss.str() == "((x * y) / z)");
     }
 
     {
@@ -283,7 +283,7 @@ TEST_CASE("stream test")
         detail::prod_impl ss({-1_dbl, pow(x, 1_dbl), pow(y, 1_dbl), pow(z, -1_dbl)});
         ss.to_stream(oss);
 
-        REQUIRE(oss.str() == "-(x * y) / z");
+        REQUIRE(oss.str() == "-((x * y) / z)");
     }
 
     {
@@ -292,7 +292,7 @@ TEST_CASE("stream test")
         detail::prod_impl ss({pow(x, 1_dbl), pow(y, 1_dbl), pow(z, -3_dbl)});
         ss.to_stream(oss);
 
-        REQUIRE(boost::contains(oss.str(), "(x * y) / z**3.000"));
+        REQUIRE(boost::contains(oss.str(), "((x * y) / z**3.000"));
     }
 
     {
@@ -301,7 +301,7 @@ TEST_CASE("stream test")
         detail::prod_impl ss({-1_dbl, pow(x, 1_dbl), pow(y, 1_dbl), pow(z, -3_dbl)});
         ss.to_stream(oss);
 
-        REQUIRE(boost::contains(oss.str(), "-(x * y) / z**3.000"));
+        REQUIRE(boost::contains(oss.str(), "-((x * y) / z**3.000"));
     }
 
     {
@@ -310,9 +310,9 @@ TEST_CASE("stream test")
         detail::prod_impl ss({pow(x, 1_dbl), pow(y, -2_dbl), pow(z, -3_dbl)});
         ss.to_stream(oss);
 
-        REQUIRE(boost::contains(oss.str(), "x / (y**2.0000"));
+        REQUIRE(boost::contains(oss.str(), "(x / (y**2.0000"));
         REQUIRE(boost::contains(oss.str(), "z**3.0000"));
-        REQUIRE(boost::contains(oss.str(), "0000)"));
+        REQUIRE(boost::contains(oss.str(), "0000))"));
     }
 
     {
@@ -321,9 +321,9 @@ TEST_CASE("stream test")
         detail::prod_impl ss({-1_dbl, pow(x, 1_dbl), pow(y, -2_dbl), pow(z, -3_dbl)});
         ss.to_stream(oss);
 
-        REQUIRE(boost::contains(oss.str(), "-x / (y**2.0000"));
+        REQUIRE(boost::contains(oss.str(), "-(x / (y**2.0000"));
         REQUIRE(boost::contains(oss.str(), "z**3.0000"));
-        REQUIRE(boost::contains(oss.str(), "0000)"));
+        REQUIRE(boost::contains(oss.str(), "0000))"));
     }
 }
 

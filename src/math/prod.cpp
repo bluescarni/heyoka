@@ -202,17 +202,23 @@ void prod_impl::to_stream(std::ostringstream &oss) const
 
     if (den_it == tmp_args.begin()) {
         // Product consists only of negative pow()s.
+        oss << '(';
         stream_expression(oss, 1_dbl);
         oss << " / ";
         stream_den();
+        oss << ')';
     } else if (den_it == tmp_args.end()) {
         // There are no negative pow()s in the prod.
+        // NOTE: no need to wrap in '()' brackets here as the numerator's
+        // output already contains them.
         stream_num();
     } else {
         // There are some negative pow()s in the prod.
+        oss << '(';
         stream_num();
         oss << " / ";
         stream_den();
+        oss << ')';
     }
 }
 
