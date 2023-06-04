@@ -57,7 +57,7 @@ public:
 
 std::variant<std::vector<expression>, expression> prod_simplify_args(const std::vector<expression> &);
 
-// HEYOKA_DLL_PUBLIC expression prod_split(const expression &, std::uint32_t);
+HEYOKA_DLL_PUBLIC expression prod_split(const expression &, std::uint32_t);
 
 } // namespace detail
 
