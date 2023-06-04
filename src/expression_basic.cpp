@@ -1263,28 +1263,21 @@ expression sums_to_sum_sqs_for_decompose(funcptr_map<expression> &func_map, cons
                     return it->second;
                 }
 
-                // Attempt to convert the current function.
-                // NOTE: new_ex could be either ex itself, or a new
-                // function. In any case, the arguments of new_ex are **not**
-                // new, due to the way sum_to_sum_sq() is implemented. Thus, ultimately,
-                // we never end up calling sums_to_sum_sqs_for_decompose() on
-                // new subexpressions, and thus the additional machinery needed
-                // in split_sums_for_decompose() is not necessary here.
-                const auto new_ex = sum_to_sum_sq(ex);
-                const auto &new_ex_func = std::get<func>(new_ex.value());
-
-                // Convert the function arguments.
+                // Convert sums to sum_sqs on the function arguments.
                 std::vector<expression> new_args;
-                new_args.reserve(new_ex_func.args().size());
-                for (const auto &orig_arg : new_ex_func.args()) {
+                new_args.reserve(v.args().size());
+                for (const auto &orig_arg : v.args()) {
                     new_args.push_back(sums_to_sum_sqs_for_decompose(func_map, orig_arg));
                 }
 
-                // Create a copy of new_ex with the new arguments.
-                auto f_copy = new_ex_func.copy(new_args);
+                // Create a copy of v with the split arguments.
+                auto f_copy = v.copy(new_args);
 
-                // Construct the return value and put it into the cache.
-                auto ret = expression{std::move(f_copy)};
+                // After having taken care of the arguments, convert
+                // v itself.
+                auto ret = sum_to_sum_sq(expression{std::move(f_copy)});
+
+                // Put the return value into the cache.
                 [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
                 // NOTE: an expression cannot contain itself.
                 assert(flag); // LCOV_EXCL_LINE
