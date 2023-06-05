@@ -57,6 +57,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/binary_op.hpp>
+#include <heyoka/math/prod.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
@@ -1241,6 +1242,66 @@ std::vector<expression> split_sums_for_decompose(const std::vector<expression> &
 
     for (const auto &e : v_ex) {
         retval.push_back(split_sums_for_decompose(func_map, e));
+    }
+
+    return retval;
+}
+
+namespace
+{
+
+expression split_prods_for_decompose(funcptr_map<expression> &func_map, const expression &ex, std::uint32_t split)
+{
+    return std::visit(
+        [&func_map, &ex, split](const auto &v) {
+            using type = uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, func>) {
+                const auto *f_id = v.get_ptr();
+
+                // Check if we already split prods on ex.
+                if (const auto it = func_map.find(f_id); it != func_map.end()) {
+                    return it->second;
+                }
+
+                // Split prods on the function arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(v.args().size());
+                for (const auto &orig_arg : v.args()) {
+                    new_args.push_back(split_prods_for_decompose(func_map, orig_arg, split));
+                }
+
+                // Create a copy of v with the split arguments.
+                auto f_copy = v.copy(new_args);
+
+                // After having taken care of the arguments, split
+                // v itself.
+                auto ret = prod_split(expression{std::move(f_copy)}, split);
+
+                // Put the return value into the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
+                // NOTE: an expression cannot contain itself.
+                assert(flag); // LCOV_EXCL_LINE
+
+                return ret;
+            } else {
+                return ex;
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+std::vector<expression> split_prods_for_decompose(const std::vector<expression> &v_ex, std::uint32_t split)
+{
+    funcptr_map<expression> func_map;
+
+    std::vector<expression> retval;
+    retval.reserve(v_ex.size());
+
+    for (const auto &e : v_ex) {
+        retval.push_back(split_prods_for_decompose(func_map, e, split));
     }
 
     return retval;

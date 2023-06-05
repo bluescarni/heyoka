@@ -538,7 +538,6 @@ TEST_CASE("prod split")
     REQUIRE(detail::prod_split(ns, 8u) == ns);
     REQUIRE(std::get<func>(detail::prod_split(ns, 8u).value()).get_ptr() == std::get<func>(ns.value()).get_ptr());
 
-#if 0
     // A cfunc test with nested prods.
     std::vector<expression> x_vars;
     for (auto i = 0; i < 10; ++i) {
@@ -571,8 +570,6 @@ TEST_CASE("prod split")
     cf_ptr(&output, inputs.data(), nullptr, nullptr);
 
     REQUIRE(output
-            == approximately((1. + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10)
-                             + std::cos(1. + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10)));
-
-#endif
+            == approximately((1. * 2 * 3 * 4 * 5 * 6 * 7 * 8 * 9 * 10)
+                             * std::cos(1. * 2 * 3 * 4 * 5 * 6 * 7 * 8 * 9 * 10)));
 }
