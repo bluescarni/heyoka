@@ -281,6 +281,17 @@ TEST_CASE("cfunc")
             tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
+
+    // Small test to check that pow() is never invoked for small powers.
+    {
+        auto [x] = make_vars("x");
+
+        llvm_state s{kw::opt_level = 0u};
+
+        add_cfunc<double>(s, "cfunc1", {pow(x, 2_dbl), pow(x, -3_dbl), pow(x, -3_dbl / 2.), pow(x, 5_dbl / 2.)});
+
+        REQUIRE(!boost::contains(s.get_ir(), "pow"));
+    }
 }
 
 #if defined(HEYOKA_HAVE_REAL)
