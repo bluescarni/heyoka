@@ -168,6 +168,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/num_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/num_identity.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sum_sq.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/div.cpp"
     # NOTE: this will be an empty file in case we are not
     # building with support for real.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"

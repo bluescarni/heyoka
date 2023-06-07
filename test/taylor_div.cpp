@@ -12,6 +12,7 @@
 #include <initializer_list>
 #include <random>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -20,9 +21,9 @@
 
 #endif
 
+#include <heyoka/detail/div.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/binary_op.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -33,6 +34,11 @@ static std::mt19937 rng;
 
 using namespace heyoka;
 using namespace heyoka_test;
+
+auto div_wrapper(expression a, expression b)
+{
+    return detail::div(std::move(a), std::move(b));
+}
 
 const auto fp_types = std::tuple<double
 #if !defined(HEYOKA_ARCH_PPC)
@@ -97,8 +103,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {div(expression{number{fp_t(1)}}, 3_dbl), x + y}, 1, 1, high_accuracy,
-                                 compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(expression{number{fp_t(1)}}, 3_dbl), x + y}, 1, 1,
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -118,7 +124,7 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {div(par[0], 3_dbl), x + y}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(par[0], 3_dbl), x + y}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -140,8 +146,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {div(expression{number{fp_t(1)}}, 3_dbl), x + y}, 2, 1, high_accuracy,
-                                 compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(expression{number{fp_t(1)}}, 3_dbl), x + y}, 2, 1,
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -163,8 +169,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {div(expression{number{fp_t(1)}}, 3_dbl), x + y}, 1, 2, high_accuracy,
-                                 compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(expression{number{fp_t(1)}}, 3_dbl), x + y}, 1, 2,
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -191,8 +197,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {div(expression{number{fp_t(1)}}, par[1]), x + y}, 1, 2, high_accuracy,
-                                 compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(expression{number{fp_t(1)}}, par[1]), x + y}, 1, 2,
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -221,8 +227,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {div(expression{number{fp_t(1)}}, 3_dbl), x + y}, 2, 2, high_accuracy,
-                                 compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(expression{number{fp_t(1)}}, 3_dbl), x + y}, 2, 2,
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -255,8 +261,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {div(expression{number{fp_t(1)}}, 3_dbl), x + y}, 3, 3, high_accuracy,
-                                 compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(expression{number{fp_t(1)}}, 3_dbl), x + y}, 3, 3,
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -303,7 +309,7 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {div(par[0], par[1]), x + y}, 3, 3, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(par[0], par[1]), x + y}, 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -350,14 +356,15 @@ TEST_CASE("taylor div")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({div(expression{number{fp_t(1)}}, 3_dbl), x + y}, opt_level, high_accuracy,
+        compare_batch_scalar<fp_t>({div_wrapper(expression{number{fp_t(1)}}, 3_dbl), x + y}, opt_level, high_accuracy,
                                    compact_mode);
 
         // Variable-number tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {y / 2_dbl, x / -4_dbl}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(y, 2_dbl), div_wrapper(x, -4_dbl)}, 1, 1, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -377,7 +384,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {y / par[0], x / -4_dbl}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(y, par[0]), div_wrapper(x, -4_dbl)}, 1, 1, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -399,7 +407,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {y / 2_dbl, x / -4_dbl}, 2, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(y, 2_dbl), div_wrapper(x, -4_dbl)}, 2, 1, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -421,7 +430,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {y / 2_dbl, x / -4_dbl}, 1, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(y, 2_dbl), div_wrapper(x, -4_dbl)}, 1, 2, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -448,7 +458,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {y / 2_dbl, x / par[1]}, 1, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(y, 2_dbl), div_wrapper(x, par[1])}, 1, 2, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -477,7 +488,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {y / 2_dbl, x / -4_dbl}, 2, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(y, 2_dbl), div_wrapper(x, -4_dbl)}, 2, 2, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -504,7 +516,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {y / 2_dbl, x / -4_dbl}, 3, 3, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(y, 2_dbl), div_wrapper(x, -4_dbl)}, 3, 3, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -551,7 +564,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {y / par[0], x / par[1]}, 3, 3, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(y, par[0]), div_wrapper(x, par[1])}, 3, 3, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -597,13 +611,15 @@ TEST_CASE("taylor div")
             REQUIRE(jet[23] == approximately(fp_t{1} / 6 * (jet[14] * fp_t{2} / fp_t{-4})));
         }
 
-        compare_batch_scalar<fp_t>({y / 2_dbl, x / -4_dbl}, opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({div_wrapper(y, 2_dbl), div_wrapper(x, -4_dbl)}, opt_level, high_accuracy,
+                                   compact_mode);
 
         // Number/variable tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {2_dbl / y, -4_dbl / x}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(2_dbl, y), div_wrapper(-4_dbl, x)}, 1, 1, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -623,7 +639,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {par[0] / y, -4_dbl / x}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(par[0], y), div_wrapper(-4_dbl, x)}, 1, 1, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -645,7 +662,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {2_dbl / y, -4_dbl / x}, 2, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(2_dbl, y), div_wrapper(-4_dbl, x)}, 2, 1, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -667,7 +685,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {2_dbl / y, -4_dbl / x}, 1, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(2_dbl, y), div_wrapper(-4_dbl, x)}, 1, 2, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -694,7 +713,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {2_dbl / y, par[1] / x}, 1, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(2_dbl, y), div_wrapper(par[1], x)}, 1, 2, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -723,7 +743,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {2_dbl / y, -4_dbl / x}, 2, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(2_dbl, y), div_wrapper(-4_dbl, x)}, 2, 2, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -756,7 +777,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {2_dbl / y, -4_dbl / x}, 3, 3, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(2_dbl, y), div_wrapper(-4_dbl, x)}, 3, 3, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -811,7 +833,8 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {par[0] / y, par[1] / x}, 3, 3, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(par[0], y), div_wrapper(par[1], x)}, 3, 3, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -871,7 +894,7 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x / y, y / x}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(x, y), div_wrapper(y, x)}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -891,7 +914,7 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x / y, y / x}, 2, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(x, y), div_wrapper(y, x)}, 2, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -913,7 +936,7 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x / y, y / x}, 1, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(x, y), div_wrapper(y, x)}, 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -940,7 +963,7 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x / y, y / x}, 2, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(x, y), div_wrapper(y, x)}, 2, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -973,7 +996,7 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x / y, y / x}, 3, 3, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {div_wrapper(x, y), div_wrapper(y, x)}, 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -1041,7 +1064,7 @@ TEST_CASE("taylor div")
                         / (1 * 1 * 1 * 1)));
         }
 
-        compare_batch_scalar<fp_t>({x / y, y / x}, opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({div_wrapper(x, y), div_wrapper(y, x)}, opt_level, high_accuracy, compact_mode);
     };
 
     for (auto cm : {false, true}) {
