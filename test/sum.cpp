@@ -106,7 +106,7 @@ TEST_CASE("stream test")
         detail::sum_impl ss;
         ss.to_stream(oss);
 
-        REQUIRE(oss.str() == "()");
+        REQUIRE(oss.str() == fmt::format("{}", 0_dbl));
     }
 
     {

@@ -62,21 +62,31 @@ sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v)) {
 // "(x + y + -20)" into "(x + y - 20)".
 void sum_impl::to_stream(std::ostringstream &oss) const
 {
-    if (args().size() == 1u) {
-        // NOTE: avoid brackets if there's only 1 argument.
-        stream_expression(oss, args()[0]);
-    } else {
-        oss << '(';
+    // NOTE: sums which have 0 or 1 terms are not possible
+    // when using the public API, but let's handle these special
+    // cases anyway.
+    if (args().empty()) {
+        stream_expression(oss, 0_dbl);
 
-        for (decltype(args().size()) i = 0; i < args().size(); ++i) {
-            stream_expression(oss, args()[i]);
-            if (i != args().size() - 1u) {
-                oss << " + ";
-            }
-        }
-
-        oss << ')';
+        return;
     }
+
+    if (args().size() == 1u) {
+        stream_expression(oss, args()[0]);
+
+        return;
+    }
+
+    oss << '(';
+
+    for (decltype(args().size()) i = 0; i < args().size(); ++i) {
+        stream_expression(oss, args()[i]);
+        if (i != args().size() - 1u) {
+            oss << " + ";
+        }
+    }
+
+    oss << ')';
 }
 
 std::vector<expression> sum_impl::gradient() const
@@ -427,7 +437,6 @@ expression sum_to_sum_sq(const expression &e)
 
 } // namespace detail
 
-// NOLINTNEXTLINE(misc-no-recursion)
 expression sum(std::vector<expression> args)
 {
     // Partition args so that all numbers are at the end.
@@ -439,7 +448,9 @@ expression sum(std::vector<expression> args)
     // the accumulated value is not zero.
     if (n_end_it != args.end()) {
         for (auto it = n_end_it + 1; it != args.end(); ++it) {
-            *n_end_it += *it;
+            // NOTE: do not use directly operator+() on expressions in order
+            // to avoid recursion.
+            *n_end_it = expression{std::get<number>(n_end_it->value()) + std::get<number>(it->value())};
         }
 
         // Remove all numbers but the first one.

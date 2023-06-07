@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <cstdint>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -54,6 +55,8 @@ class HEYOKA_DLL_PUBLIC pow_impl : public func_base
 public:
     pow_impl();
     explicit pow_impl(expression, expression);
+
+    void to_stream(std::ostringstream &) const;
 
     [[nodiscard]] std::vector<expression> gradient() const;
 

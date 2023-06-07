@@ -11,8 +11,11 @@
 
 #include <mp++/real.hpp>
 
+#include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/binary_op.hpp>
+#include <heyoka/math/prod.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -20,6 +23,11 @@
 
 using namespace heyoka;
 using namespace heyoka_test;
+
+auto mul_prod_wrapper(const expression &a, const expression &b)
+{
+    return expression{func{detail::prod_impl{{a, b}}}};
+}
 
 TEST_CASE("taylor add")
 {
@@ -207,7 +215,8 @@ TEST_CASE("taylor mul")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {mul(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {mul_prod_wrapper(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {},
+                                             false, prec);
 
                         s.compile();
 
@@ -231,7 +240,8 @@ TEST_CASE("taylor mul")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {y * 2_dbl, par[0] * x}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {mul_prod_wrapper(y, 2_dbl), mul_prod_wrapper(par[0], x)}, 2, 1,
+                                             ha, cm, {}, false, prec);
 
                         s.compile();
 
@@ -255,7 +265,8 @@ TEST_CASE("taylor mul")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {x * y, y * x}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {mul_prod_wrapper(x, y), mul_prod_wrapper(y, x)}, 2, 1, ha, cm,
+                                             {}, false, prec);
 
                         s.compile();
 

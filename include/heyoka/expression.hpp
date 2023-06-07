@@ -640,6 +640,8 @@ std::vector<expression> function_sort_dc(std::vector<expression> &, std::vector<
 
 HEYOKA_DLL_PUBLIC std::vector<expression> split_sums_for_decompose(const std::vector<expression> &);
 
+HEYOKA_DLL_PUBLIC std::vector<expression> split_prods_for_decompose(const std::vector<expression> &, std::uint32_t);
+
 std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expression> &);
 
 std::optional<std::vector<expression>::size_type> decompose(funcptr_map<std::vector<expression>::size_type> &,

@@ -78,12 +78,11 @@ TEST_CASE("square diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    // TODO restore eventually.
-    // REQUIRE(diff(square_wrapper(x * x - y), "x") == 2_dbl * (x * x - y) * (2_dbl * x));
-    // REQUIRE(diff(square_wrapper(x * x - y), "y") == -(2_dbl * (x * x - y)));
+    REQUIRE(diff(square_wrapper(x * x - y), "x") == 2_dbl * (x * x - y) * (2_dbl * x));
+    REQUIRE(diff(square_wrapper(x * x - y), "y") == -(2_dbl * (x * x - y)));
 
-    // REQUIRE(diff(square_wrapper(par[0] * par[0] - y), par[0]) == 2_dbl * (par[0] * par[0] - y) * (2_dbl * par[0]));
-    // REQUIRE(diff(square_wrapper(x * x - par[1]), par[1]) == -(2_dbl * (x * x - par[1])));
+    REQUIRE(diff(square_wrapper(par[0] * par[0] - y), par[0]) == 2_dbl * (par[0] * par[0] - y) * (2_dbl * par[0]));
+    REQUIRE(diff(square_wrapper(x * x - par[1]), par[1]) == -(2_dbl * (x * x - par[1])));
 }
 
 TEST_CASE("square s11n")
