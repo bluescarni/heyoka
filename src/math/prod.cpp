@@ -77,14 +77,14 @@ const number *ex_is_negative_pow(const expression &ex)
         return nullptr;
     }
 
-    // Helper to check if a number is NaN or negative.
-    auto checker = [](const auto &v) {
+    // Helper to check if a number is negative.
+    auto negative_checker = [](const auto &v) {
         using std::isnan;
 
         return !isnan(v) && v < 0;
     };
 
-    if (std::visit(checker, n_exp_ptr->value())) {
+    if (std::visit(negative_checker, n_exp_ptr->value())) {
         return n_exp_ptr;
     } else {
         // pow() number exponent is either NaN or not negative.
