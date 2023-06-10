@@ -206,7 +206,7 @@ llvm::Value *div_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::v
 namespace
 {
 
-// Derivative of number/param / number/param.
+// Derivative of numpar / numpar.
 template <typename U, typename V, std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
 llvm::Function *taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, const U &num0, const V &num1,
                                             std::uint32_t n_uvars, std::uint32_t batch_size)
@@ -225,7 +225,7 @@ llvm::Function *taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, con
         num0, num1);
 }
 
-// Derivative of var / number.
+// Derivative of var / numpar.
 template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, const variable &var, const U &n,
                                             std::uint32_t n_uvars, std::uint32_t batch_size)
@@ -294,7 +294,7 @@ llvm::Function *taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, con
     return f;
 }
 
-// Derivative of number / var.
+// Derivative of numpar / var.
 template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, const U &n, const variable &var,
                                             std::uint32_t n_uvars, std::uint32_t batch_size)
