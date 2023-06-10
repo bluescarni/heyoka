@@ -19,8 +19,6 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
-// #include <fmt/core.h>
-
 #include <llvm/Config/llvm-config.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -35,13 +33,9 @@
 
 #endif
 
-#include <heyoka/expression.hpp>
-// #include <heyoka/func.hpp>
-#include <heyoka/llvm_state.hpp>
-// #include <heyoka/math/cos.hpp>
-// #include <heyoka/math/pow.hpp>
-// #include <heyoka/math/prod.hpp>
 #include <heyoka/detail/div.hpp>
+#include <heyoka/expression.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
