@@ -39,6 +39,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
+#include <heyoka/math/prod.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -81,6 +82,51 @@ constexpr bool skip_batch_ld =
     false
 #endif
     ;
+
+TEST_CASE("pow stream")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    {
+        std::ostringstream oss;
+
+        oss << pow(x, y);
+
+        REQUIRE(oss.str() == "x**y");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << pow(prod({-1_dbl, x}), y);
+
+        REQUIRE(oss.str() == "(-x)**y");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << pow(pow(x, y), z);
+
+        REQUIRE(oss.str() == "(x**y)**z");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << pow(x, pow(y, z));
+
+        REQUIRE(oss.str() == "x**y**z");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << pow(log(x), y);
+
+        REQUIRE(oss.str() == "log(x)**y");
+    }
+}
 
 TEST_CASE("pow expo 0")
 {

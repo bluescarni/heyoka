@@ -71,6 +71,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
+#include <heyoka/math/prod.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -87,12 +88,47 @@ pow_impl::pow_impl() : pow_impl(1_dbl, 1_dbl) {}
 
 void pow_impl::to_stream(std::ostringstream &oss) const
 {
-    // NOTE: I don't think brackets are needed here,
-    // as '**' is the binary operator with highest
-    // precedence.
-    stream_expression(oss, args()[0]);
+    assert(args().size() == 2u);
+
+    const auto &base = args()[0];
+    const auto &expo = args()[1];
+
+    // NOTE: following Python's parsing rules, there are 2
+    // situations in which we need to put brackets around the base:
+    //
+    // - the base is a negation: this is because the power operator **
+    //   binds more tightly than unary operators on its left.
+    //   Thus, if the base begins with a '-' sign, we cannot
+    //   print here -x**y, but we must print instead (-x)**y;
+    // - the base itself is a pow(): this is because in Python
+    //   the power operator associates from right to left. Thus,
+    //   pow(pow(x, y), z) cannot be written as x**y**z as that
+    //   would be parsed as x**(y**z), and we need to write
+    //   (x**y)**z instead.
+
+    const auto base_is_negation = is_negation_prod(base);
+    const auto base_is_pow = [&]() {
+        const auto *fptr = std::get_if<func>(&base.value());
+
+        if (fptr == nullptr) {
+            return false;
+        }
+
+        return fptr->extract<pow_impl>() != nullptr;
+    }();
+
+    if (base_is_negation || base_is_pow) {
+        oss << '(';
+    }
+
+    stream_expression(oss, base);
+
+    if (base_is_negation || base_is_pow) {
+        oss << ')';
+    }
+
     oss << "**";
-    stream_expression(oss, args()[1]);
+    stream_expression(oss, expo);
 }
 
 namespace

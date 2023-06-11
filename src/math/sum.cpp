@@ -62,9 +62,6 @@ sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v)) {
 // "(x + y + -20)" into "(x + y - 20)".
 void sum_impl::to_stream(std::ostringstream &oss) const
 {
-    // NOTE: sums which have 0 or 1 terms are not possible
-    // when using the public API, but let's handle these special
-    // cases anyway.
     if (args().empty()) {
         stream_expression(oss, 0_dbl);
 

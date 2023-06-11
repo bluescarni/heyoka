@@ -117,12 +117,31 @@ bool prod_is_negation_impl(const prod_impl &p)
 
 } // namespace
 
+// Return true if ex is a product with at least
+// 2 terms and whose only numerical coefficient is at the beginning with
+// value -1.
+bool is_negation_prod(const expression &ex)
+{
+    const auto *fptr = std::get_if<func>(&ex.value());
+
+    if (fptr == nullptr) {
+        // Not a function.
+        return false;
+    }
+
+    const auto *prod_ptr = fptr->extract<prod_impl>();
+
+    if (prod_ptr == nullptr) {
+        // Not a product.
+        return false;
+    }
+
+    return prod_is_negation_impl(*prod_ptr);
+}
+
 // NOLINTNEXTLINE(misc-no-recursion)
 void prod_impl::to_stream(std::ostringstream &oss) const
 {
-    // NOTE: prods which have 0 or 1 terms are not possible
-    // when using the public API, but let's handle these special
-    // cases anyway.
     if (args().empty()) {
         stream_expression(oss, 1_dbl);
         return;
@@ -136,6 +155,9 @@ void prod_impl::to_stream(std::ostringstream &oss) const
     // Special case for negation.
     if (prod_is_negation_impl(*this)) {
         oss << '-';
+        // NOTE: if this has 2 arguments, then the recursive call will
+        // involve a product with a single argument, which will be caught
+        // by the special case above.
         prod_impl(std::vector(args().begin() + 1, args().end())).to_stream(oss);
 
         return;
