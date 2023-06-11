@@ -1166,7 +1166,7 @@ expression pow_wrapper_impl(expression b, expression e)
                 return pow(b_base, expression{std::get<number>(b_exp.value()) * *num_ptr});
             } else {
                 // b's exponent is not a number, multiply it by e.
-                return pow(b_base, b_exp * e);
+                return pow(b_base, prod({b_exp, e}));
             }
         }
     }

@@ -394,5 +394,5 @@ TEST_CASE("pow special cases")
 
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(pow(pow(x, y), -5.) == pow(x, -5. * y));
+    REQUIRE(pow(pow(x, y), -5.) == pow(x, prod({-5._dbl, y})));
 }
