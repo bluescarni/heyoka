@@ -6,7 +6,6 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -138,12 +137,7 @@ bool is_negation_prod(const expression &ex)
 
     const auto *prod_ptr = fptr->extract<prod_impl>();
 
-    if (prod_ptr == nullptr) {
-        // Not a product.
-        return false;
-    }
-
-    return prod_is_negation_impl(*prod_ptr);
+    return prod_ptr != nullptr && prod_is_negation_impl(*prod_ptr);
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)

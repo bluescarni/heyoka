@@ -1161,9 +1161,9 @@ expression pow_wrapper_impl(expression b, expression e)
             const auto &b_base = fptr->args()[0];
             const auto &b_exp = fptr->args()[1];
 
-            if (std::holds_alternative<number>(b_exp.value())) {
+            if (const auto *b_exp_num_ptr = std::get_if<number>(&b_exp.value())) {
                 // b's exponent is a number, fold it together with e.
-                return pow(b_base, expression{std::get<number>(b_exp.value()) * *num_ptr});
+                return pow(b_base, expression{*b_exp_num_ptr * *num_ptr});
             } else {
                 // b's exponent is not a number, multiply it by e.
                 return pow(b_base, prod({b_exp, e}));
