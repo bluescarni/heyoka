@@ -379,7 +379,7 @@ TEST_CASE("cfunc_mp")
 
 #endif
 
-TEST_CASE("pow const fold")
+TEST_CASE("pow special cases")
 {
     REQUIRE(pow(1.1_dbl, 2.2_dbl) == expression{std::pow(1.1, 2.2)});
 
@@ -391,4 +391,8 @@ TEST_CASE("pow const fold")
 
     REQUIRE(pow(pow("x"_var, 3_dbl), 2_dbl) == pow("x"_var, 6_dbl));
     REQUIRE(pow(pow("x"_var, .5_dbl), 2_dbl) == "x"_var);
+
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(pow(pow(x, y), -5.) == pow(x, -5. * y));
 }

@@ -1148,6 +1148,7 @@ namespace
 // NOLINTNEXTLINE(misc-no-recursion)
 expression pow_wrapper_impl(expression b, expression e)
 {
+    // Handle special cases for a numerical exponent.
     if (const auto *num_ptr = std::get_if<number>(&e.value())) {
         if (is_zero(*num_ptr)) {
             return 1_dbl;
@@ -1157,13 +1158,17 @@ expression pow_wrapper_impl(expression b, expression e)
             return b;
         }
 
-        // If b is already a pow() with a numerical exponent, fold e into b's exponent.
-        if (const auto *fptr = std::get_if<func>(&b.value());
-            fptr != nullptr && fptr->extract<pow_impl>() != nullptr
-            && std::holds_alternative<number>(fptr->args()[1].value())) {
+        // Handle special cases when the base is a pow().
+        if (const auto *fptr = std::get_if<func>(&b.value()); fptr != nullptr && fptr->extract<pow_impl>() != nullptr) {
             assert(fptr->args().size() == 2u);
 
-            return pow(fptr->args()[0], expression{std::get<number>(fptr->args()[1].value()) * *num_ptr});
+            if (std::holds_alternative<number>(fptr->args()[1].value())) {
+                // b's exponent is a number, fold it together with e.
+                return pow(fptr->args()[0], expression{std::get<number>(fptr->args()[1].value()) * *num_ptr});
+            } else {
+                // b's exponent is not a number, multiply it by e.
+                return pow(fptr->args()[0], fptr->args()[1] * e);
+            }
         }
     }
 
