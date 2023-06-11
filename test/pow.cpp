@@ -39,6 +39,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
+#include <heyoka/math/prod.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -81,6 +82,51 @@ constexpr bool skip_batch_ld =
     false
 #endif
     ;
+
+TEST_CASE("pow stream")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    {
+        std::ostringstream oss;
+
+        oss << pow(x, y);
+
+        REQUIRE(oss.str() == "x**y");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << pow(prod({-1_dbl, x}), y);
+
+        REQUIRE(oss.str() == "(-x)**y");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << pow(pow(x, y), z);
+
+        REQUIRE(oss.str() == "(x**y)**z");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << pow(x, pow(y, z));
+
+        REQUIRE(oss.str() == "x**y**z");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << pow(log(x), y);
+
+        REQUIRE(oss.str() == "log(x)**y");
+    }
+}
 
 TEST_CASE("pow expo 0")
 {
@@ -333,7 +379,7 @@ TEST_CASE("cfunc_mp")
 
 #endif
 
-TEST_CASE("pow const fold")
+TEST_CASE("pow special cases")
 {
     REQUIRE(pow(1.1_dbl, 2.2_dbl) == expression{std::pow(1.1, 2.2)});
 
@@ -345,4 +391,8 @@ TEST_CASE("pow const fold")
 
     REQUIRE(pow(pow("x"_var, 3_dbl), 2_dbl) == pow("x"_var, 6_dbl));
     REQUIRE(pow(pow("x"_var, .5_dbl), 2_dbl) == "x"_var);
+
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(pow(pow(x, y), -5.) == pow(x, prod({-5._dbl, y})));
 }

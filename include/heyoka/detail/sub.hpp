@@ -6,15 +6,14 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MATH_PROD_HPP
-#define HEYOKA_MATH_PROD_HPP
+#ifndef HEYOKA_DETAIL_SUB_HPP
+#define HEYOKA_DETAIL_SUB_HPP
 
 #include <cstdint>
-#include <sstream>
-#include <variant>
 #include <vector>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -26,7 +25,7 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC prod_impl : public func_base
+class HEYOKA_DLL_PUBLIC sub_impl : public func_base
 {
     friend class boost::serialization::access;
     template <typename Archive>
@@ -36,12 +35,8 @@ class HEYOKA_DLL_PUBLIC prod_impl : public func_base
     }
 
 public:
-    prod_impl();
-    explicit prod_impl(std::vector<expression>);
-
-    void to_stream(std::ostringstream &) const;
-
-    [[nodiscard]] std::vector<expression> gradient() const;
+    sub_impl();
+    explicit sub_impl(expression, expression);
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
@@ -55,18 +50,12 @@ public:
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
 };
 
-std::variant<std::vector<expression>, expression> prod_simplify_args(const std::vector<expression> &);
-
-bool is_negation_prod(const expression &);
-
-HEYOKA_DLL_PUBLIC expression prod_split(const expression &, std::uint32_t);
+HEYOKA_DLL_PUBLIC expression sub(expression, expression);
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression prod(const std::vector<expression> &);
-
 HEYOKA_END_NAMESPACE
 
-HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::prod_impl)
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::sub_impl)
 
 #endif

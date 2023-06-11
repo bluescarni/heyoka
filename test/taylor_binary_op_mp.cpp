@@ -7,10 +7,13 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <initializer_list>
+#include <utility>
 #include <vector>
 
 #include <mp++/real.hpp>
 
+#include <heyoka/detail/div.hpp>
+#include <heyoka/detail/sub.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -27,6 +30,16 @@ using namespace heyoka_test;
 auto mul_prod_wrapper(const expression &a, const expression &b)
 {
     return expression{func{detail::prod_impl{{a, b}}}};
+}
+
+auto div_wrapper(expression a, expression b)
+{
+    return detail::div(std::move(a), std::move(b));
+}
+
+auto sub_wrapper(expression a, expression b)
+{
+    return detail::sub(std::move(a), std::move(b));
 }
 
 TEST_CASE("taylor add")
@@ -129,7 +142,8 @@ TEST_CASE("taylor sub")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {sub(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {sub_wrapper(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false,
+                                             prec);
 
                         s.compile();
 
@@ -153,7 +167,8 @@ TEST_CASE("taylor sub")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {y - 2_dbl, par[0] - x}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {sub_wrapper(y, 2_dbl), sub_wrapper(par[0], x)}, 2, 1, ha, cm,
+                                             {}, false, prec);
 
                         s.compile();
 
@@ -177,7 +192,8 @@ TEST_CASE("taylor sub")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {x - y, y - x}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {sub_wrapper(x, y), sub_wrapper(y, x)}, 2, 1, ha, cm, {}, false,
+                                             prec);
 
                         s.compile();
 
@@ -308,7 +324,8 @@ TEST_CASE("taylor div")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {div(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {div_wrapper(2_dbl, par[0]), x + y}, 2, 1, ha, cm, {}, false,
+                                             prec);
 
                         s.compile();
 
@@ -332,7 +349,8 @@ TEST_CASE("taylor div")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {y / 2_dbl, par[0] / x}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {div_wrapper(y, 2_dbl), div_wrapper(par[0], x)}, 2, 1, ha, cm,
+                                             {}, false, prec);
 
                         s.compile();
 
@@ -356,7 +374,8 @@ TEST_CASE("taylor div")
                     {
                         llvm_state s{kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {x / y, y / x}, 2, 1, ha, cm, {}, false, prec);
+                        taylor_add_jet<fp_t>(s, "jet", {div_wrapper(x, y), div_wrapper(y, x)}, 2, 1, ha, cm, {}, false,
+                                             prec);
 
                         s.compile();
 

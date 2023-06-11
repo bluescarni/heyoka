@@ -6,7 +6,6 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -20,8 +19,12 @@
 
 #include <fmt/core.h>
 
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
@@ -51,50 +54,61 @@ prod_impl::prod_impl(std::vector<expression> v) : func_base("prod", std::move(v)
 namespace
 {
 
-// If ex is a pow() function whose exponent is a negative
-// number, then a pointer to the exponent will be returned. Otherwise,
-// nullptr will be returned.
-const number *ex_is_negative_pow(const expression &ex)
+// Return true if ex is a pow() function whose exponent is either:
+//
+// - a negative number, or
+// - a product with at least 2 arguments whose first
+//   term is a negative number.
+//
+// Otherwise, false will be returned.
+bool ex_is_negative_pow(const expression &ex)
 {
     const auto *fptr = std::get_if<func>(&ex.value());
 
     if (fptr == nullptr) {
         // Not a function.
-        return nullptr;
+        return false;
     }
 
     const auto *pow_ptr = fptr->extract<pow_impl>();
 
     if (pow_ptr == nullptr) {
         // Not a pow().
-        return nullptr;
+        return false;
     }
 
-    const auto *n_exp_ptr = std::get_if<number>(&(pow_ptr->args()[1].value()));
+    assert(pow_ptr->args().size() == 2u);
 
-    if (n_exp_ptr == nullptr) {
-        // pow() exponent is not a number.
-        return nullptr;
-    }
+    const auto &expo = pow_ptr->args()[1];
 
-    // Helper to check if a number is NaN or negative.
-    auto checker = [](const auto &v) {
+    // Helper to check if a value is non-NaN and negative.
+    auto negative_checker = [](const auto &v) {
         using std::isnan;
 
         return !isnan(v) && v < 0;
     };
 
-    if (std::visit(checker, n_exp_ptr->value())) {
-        return n_exp_ptr;
+    if (const auto *n_exp_ptr = std::get_if<number>(&expo.value())) {
+        // Exponent is a number.
+        return std::visit(negative_checker, n_exp_ptr->value());
+    } else if (const auto *exp_f_ptr = std::get_if<func>(&expo.value());
+               exp_f_ptr != nullptr && exp_f_ptr->extract<prod_impl>() != nullptr) {
+        // Exponent is a product.
+        if (exp_f_ptr->args().size() < 2u) {
+            // Less than 2 arguments in the product.
+            return false;
+        }
+
+        // Check if the first argument of the product is a negative number.
+        const auto *num_ptr = std::get_if<number>(&exp_f_ptr->args()[0].value());
+        return num_ptr != nullptr && std::visit(negative_checker, num_ptr->value());
     } else {
-        // pow() number exponent is either NaN or not negative.
-        return nullptr;
+        return false;
     }
 }
 
 // Check if a product is a negation - that is, a product with at least
-// 2 terms and whose only numerical coefficient is at the beginning with
-// value -1.
+// 2 terms and whose first term is a number with value -1.
 bool prod_is_negation_impl(const prod_impl &p)
 {
     const auto &args = p.args();
@@ -103,22 +117,31 @@ bool prod_is_negation_impl(const prod_impl &p)
         return false;
     }
 
-    if (const auto *num_ptr = std::get_if<number>(&args[0].value()); num_ptr != nullptr && is_negative_one(*num_ptr)) {
-        return std::none_of(args.begin() + 1, args.end(),
-                            [](const auto &ex) { return std::holds_alternative<number>(ex.value()); });
-    } else {
-        return false;
-    }
+    const auto *num_ptr = std::get_if<number>(&args[0].value());
+    return num_ptr != nullptr && is_negative_one(*num_ptr);
 }
 
 } // namespace
 
+// Return true if ex is a negation product - that is, a product with at least
+// 2 terms and whose first term is a number with value -1.
+bool is_negation_prod(const expression &ex)
+{
+    const auto *fptr = std::get_if<func>(&ex.value());
+
+    if (fptr == nullptr) {
+        // Not a function.
+        return false;
+    }
+
+    const auto *prod_ptr = fptr->extract<prod_impl>();
+
+    return prod_ptr != nullptr && prod_is_negation_impl(*prod_ptr);
+}
+
 // NOLINTNEXTLINE(misc-no-recursion)
 void prod_impl::to_stream(std::ostringstream &oss) const
 {
-    // NOTE: prods which have 0 or 1 terms are not possible
-    // when using the public API, but let's handle these special
-    // cases anyway.
     if (args().empty()) {
         stream_expression(oss, 1_dbl);
         return;
@@ -132,6 +155,9 @@ void prod_impl::to_stream(std::ostringstream &oss) const
     // Special case for negation.
     if (prod_is_negation_impl(*this)) {
         oss << '-';
+        // NOTE: if this has 2 arguments, then the recursive call will
+        // involve a product with a single argument, which will be caught
+        // by the special case above.
         prod_impl(std::vector(args().begin() + 1, args().end())).to_stream(oss);
 
         return;
@@ -142,10 +168,11 @@ void prod_impl::to_stream(std::ostringstream &oss) const
     // of the product.
     auto tmp_args = args();
     const auto den_it = std::stable_partition(tmp_args.begin(), tmp_args.end(),
-                                              [](const auto &ex) { return ex_is_negative_pow(ex) == nullptr; });
+                                              [](const auto &ex) { return !ex_is_negative_pow(ex); });
 
     // Helper to stream the numerator of the product.
     auto stream_num = [&]() {
+        // We must have some terms in the numerator.
         assert(den_it != tmp_args.begin());
 
         // Is the numerator consisting of a single term?
@@ -170,6 +197,7 @@ void prod_impl::to_stream(std::ostringstream &oss) const
 
     // Helper to stream the denominator of the product.
     auto stream_den = [&]() {
+        // We must have some terms in the denominator.
         assert(den_it != tmp_args.end());
 
         // Is the denominator consisting of a single term?
@@ -185,11 +213,11 @@ void prod_impl::to_stream(std::ostringstream &oss) const
             assert(std::get<func>(it->value()).args().size() == 2u);
 
             // Fetch the pow()'s base and exponent.
-            auto base = std::get<func>(it->value()).args()[0];
-            auto exp = std::get<number>(std::get<func>(it->value()).args()[1].value());
+            const auto &base = std::get<func>(it->value()).args()[0];
+            const auto &exp = std::get<func>(it->value()).args()[1];
 
             // Stream the pow() with negated exponent.
-            stream_expression(oss, pow(std::move(base), expression{-exp}));
+            stream_expression(oss, pow(base, prod({-1_dbl, exp})));
 
             if (it + 1 != tmp_args.end()) {
                 oss << " * ";

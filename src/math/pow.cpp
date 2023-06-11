@@ -71,6 +71,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
+#include <heyoka/math/prod.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -87,12 +88,43 @@ pow_impl::pow_impl() : pow_impl(1_dbl, 1_dbl) {}
 
 void pow_impl::to_stream(std::ostringstream &oss) const
 {
-    // NOTE: I don't think brackets are needed here,
-    // as '**' is the binary operator with highest
-    // precedence.
-    stream_expression(oss, args()[0]);
+    assert(args().size() == 2u);
+
+    const auto &base = args()[0];
+    const auto &expo = args()[1];
+
+    // NOTE: following Python's parsing rules, there are 2
+    // situations in which we need to put brackets around the base:
+    //
+    // - the base is a negation: this is because the power operator **
+    //   binds more tightly than unary operators on its left.
+    //   Thus, if the base begins with a '-' sign, we cannot
+    //   print here -x**y, but we must print instead (-x)**y;
+    // - the base itself is a pow(): this is because in Python
+    //   the power operator associates from right to left. Thus,
+    //   pow(pow(x, y), z) cannot be written as x**y**z as that
+    //   would be parsed as x**(y**z), and we need to write
+    //   (x**y)**z instead.
+
+    const auto base_is_negation = is_negation_prod(base);
+    const auto base_is_pow = [&]() {
+        const auto *fptr = std::get_if<func>(&base.value());
+
+        return fptr != nullptr && fptr->extract<pow_impl>() != nullptr;
+    }();
+
+    if (base_is_negation || base_is_pow) {
+        oss << '(';
+    }
+
+    stream_expression(oss, base);
+
+    if (base_is_negation || base_is_pow) {
+        oss << ')';
+    }
+
     oss << "**";
-    stream_expression(oss, args()[1]);
+    stream_expression(oss, expo);
 }
 
 namespace
@@ -1107,11 +1139,10 @@ namespace
 {
 
 // Wrapper for the implementation of the top-level pow() function.
-// It will special-case for e == 0 and 1, and it will fold
-// (x**a)**b -> x**(a * b) if a and b are both numbers.
 // NOLINTNEXTLINE(misc-no-recursion)
 expression pow_wrapper_impl(expression b, expression e)
 {
+    // Handle special cases for a numerical exponent.
     if (const auto *num_ptr = std::get_if<number>(&e.value())) {
         if (is_zero(*num_ptr)) {
             return 1_dbl;
@@ -1121,13 +1152,20 @@ expression pow_wrapper_impl(expression b, expression e)
             return b;
         }
 
-        // If b is already a pow() with a numerical exponent, fold e into b's exponent.
-        if (const auto *fptr = std::get_if<func>(&b.value());
-            fptr != nullptr && fptr->extract<pow_impl>() != nullptr
-            && std::holds_alternative<number>(fptr->args()[1].value())) {
+        // Handle special cases when the base is a pow().
+        if (const auto *fptr = std::get_if<func>(&b.value()); fptr != nullptr && fptr->extract<pow_impl>() != nullptr) {
             assert(fptr->args().size() == 2u);
 
-            return pow(fptr->args()[0], expression{std::get<number>(fptr->args()[1].value()) * *num_ptr});
+            const auto &b_base = fptr->args()[0];
+            const auto &b_exp = fptr->args()[1];
+
+            if (const auto *b_exp_num_ptr = std::get_if<number>(&b_exp.value())) {
+                // b's exponent is a number, fold it together with e.
+                return pow(b_base, expression{*b_exp_num_ptr * *num_ptr});
+            } else {
+                // b's exponent is not a number, multiply it by e.
+                return pow(b_base, prod({b_exp, e}));
+            }
         }
     }
 
