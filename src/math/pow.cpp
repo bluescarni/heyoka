@@ -110,11 +110,7 @@ void pow_impl::to_stream(std::ostringstream &oss) const
     const auto base_is_pow = [&]() {
         const auto *fptr = std::get_if<func>(&base.value());
 
-        if (fptr == nullptr) {
-            return false;
-        }
-
-        return fptr->extract<pow_impl>() != nullptr;
+        return fptr != nullptr && fptr->extract<pow_impl>() != nullptr;
     }();
 
     if (base_is_negation || base_is_pow) {
@@ -1162,12 +1158,15 @@ expression pow_wrapper_impl(expression b, expression e)
         if (const auto *fptr = std::get_if<func>(&b.value()); fptr != nullptr && fptr->extract<pow_impl>() != nullptr) {
             assert(fptr->args().size() == 2u);
 
-            if (std::holds_alternative<number>(fptr->args()[1].value())) {
+            const auto &b_base = fptr->args()[0];
+            const auto &b_exp = fptr->args()[1];
+
+            if (std::holds_alternative<number>(b_exp.value())) {
                 // b's exponent is a number, fold it together with e.
-                return pow(fptr->args()[0], expression{std::get<number>(fptr->args()[1].value()) * *num_ptr});
+                return pow(b_base, expression{std::get<number>(b_exp.value()) * *num_ptr});
             } else {
                 // b's exponent is not a number, multiply it by e.
-                return pow(fptr->args()[0], fptr->args()[1] * e);
+                return pow(b_base, b_exp * e);
             }
         }
     }
