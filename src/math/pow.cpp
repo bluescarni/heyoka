@@ -1139,8 +1139,6 @@ namespace
 {
 
 // Wrapper for the implementation of the top-level pow() function.
-// It will special-case for e == 0 and 1, and it will fold
-// (x**a)**b -> x**(a * b) if a and b are both numbers.
 // NOLINTNEXTLINE(misc-no-recursion)
 expression pow_wrapper_impl(expression b, expression e)
 {

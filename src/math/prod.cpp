@@ -57,7 +57,8 @@ namespace
 // Return true if ex is a pow() function whose exponent is either:
 //
 // - a negative number, or
-// - a product whose first term is a negative number.
+// - a product with at least 2 arguments whose first
+//   term is a negative number.
 //
 // Otherwise, false will be returned.
 bool ex_is_negative_pow(const expression &ex)
@@ -93,7 +94,6 @@ bool ex_is_negative_pow(const expression &ex)
     } else if (const auto *exp_f_ptr = std::get_if<func>(&expo.value());
                exp_f_ptr != nullptr && exp_f_ptr->extract<prod_impl>() != nullptr) {
         // Exponent is a product.
-
         if (exp_f_ptr->args().size() < 2u) {
             // Less than 2 arguments in the product.
             return false;
@@ -123,9 +123,8 @@ bool prod_is_negation_impl(const prod_impl &p)
 
 } // namespace
 
-// Return true if ex is a product with at least
-// 2 terms and whose only numerical coefficient is at the beginning with
-// value -1.
+// Return true if ex is a negation product - that is, a product with at least
+// 2 terms and whose first term is a number with value -1.
 bool is_negation_prod(const expression &ex)
 {
     const auto *fptr = std::get_if<func>(&ex.value());
@@ -173,6 +172,7 @@ void prod_impl::to_stream(std::ostringstream &oss) const
 
     // Helper to stream the numerator of the product.
     auto stream_num = [&]() {
+        // We must have some terms in the numerator.
         assert(den_it != tmp_args.begin());
 
         // Is the numerator consisting of a single term?
@@ -197,6 +197,7 @@ void prod_impl::to_stream(std::ostringstream &oss) const
 
     // Helper to stream the denominator of the product.
     auto stream_den = [&]() {
+        // We must have some terms in the denominator.
         assert(den_it != tmp_args.end());
 
         // Is the denominator consisting of a single term?
@@ -212,11 +213,11 @@ void prod_impl::to_stream(std::ostringstream &oss) const
             assert(std::get<func>(it->value()).args().size() == 2u);
 
             // Fetch the pow()'s base and exponent.
-            auto base = std::get<func>(it->value()).args()[0];
-            auto exp = std::get<func>(it->value()).args()[1];
+            const auto &base = std::get<func>(it->value()).args()[0];
+            const auto &exp = std::get<func>(it->value()).args()[1];
 
             // Stream the pow() with negated exponent.
-            stream_expression(oss, pow(std::move(base), prod({-1_dbl, std::move(exp)})));
+            stream_expression(oss, pow(base, prod({-1_dbl, exp})));
 
             if (it + 1 != tmp_args.end()) {
                 oss << " * ";

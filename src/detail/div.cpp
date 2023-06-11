@@ -80,7 +80,7 @@ llvm::Function *div_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std:
 namespace
 {
 
-// Derivative of number / number.
+// Derivative of numpar / numpar.
 template <typename U, typename V, std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
 llvm::Value *taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &num0, const V &num1,
                                   const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
@@ -96,7 +96,7 @@ llvm::Value *taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &num0
     }
 }
 
-// Derivative of variable / variable or number / variable. These two cases
+// Derivative of variable / variable or numpar / variable. These two cases
 // are quite similar, so we handle them together.
 template <typename U,
           std::enable_if_t<
@@ -155,7 +155,7 @@ llvm::Value *taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const U &nv, 
     }
 }
 
-// Derivative of variable / number.
+// Derivative of variable / numpar.
 template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Value *taylor_diff_div_impl(llvm_state &s, llvm::Type *fp_t, const variable &var, const U &num,
                                   const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
