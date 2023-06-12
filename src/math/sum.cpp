@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
@@ -43,6 +44,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/prod.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
@@ -432,17 +434,74 @@ expression sum_to_sum_sq(const expression &e)
     return expression{func{sum_sq_impl{std::move(new_args)}}};
 }
 
-} // namespace detail
-
-expression sum(std::vector<expression> args)
+// Simplify the arguments for a sum(). This function returns either the simplified vector of arguments,
+// or a single expression directly representing the result of the sum.
+std::variant<std::vector<expression>, expression> sum_simplify_args(const std::vector<expression> &args_)
 {
-    // Partition args so that all numbers are at the end.
+    // Step 1: flatten sums in args.
+    // NOTE: here SymPy flattens not only nested sum()s, but also
+    // terms of type cf * sum(a, ...), with cf a numerical coefficient,
+    // which are transformed into sum(cf * a, ...). This does not always
+    // looks like an automatic win for eval/Taylor diff purposes, needs
+    // to be investigated.
+    std::vector<expression> args;
+    args.reserve(args_.size());
+    for (const auto &arg : args_) {
+        if (const auto *fptr = std::get_if<func>(&arg.value());
+            fptr != nullptr && fptr->extract<detail::sum_impl>() != nullptr) {
+            // Nested sum.
+            for (const auto &sum_arg : fptr->args()) {
+                args.push_back(sum_arg);
+            }
+        } else {
+            args.push_back(arg);
+        }
+    }
+
+    // Step 2: gather common products with numerical coefficients.
+    // NOTE: we use map instead of unordered_map because expression hashing always
+    // requires traversing the whole expression, while std::less<expression> can
+    // exit early.
+    std::map<expression, number> coeff_mul_map;
+
+    for (const auto &arg : args) {
+        if (const auto *fptr = std::get_if<func>(&arg.value());
+            fptr != nullptr && fptr->extract<detail::prod_impl>() != nullptr && fptr->args().size() >= 2u
+            && std::holds_alternative<number>(fptr->args()[0].value())) {
+            // The current argument is of the form cf*a*..., where cf is a number.
+            const auto &cf = std::get<number>(fptr->args()[0].value());
+
+            // Try to insert cf and the rest of the product into coeff_mul_map.
+            const auto [it, new_item]
+                = coeff_mul_map.try_emplace(prod(std::vector(fptr->args().begin() + 1, fptr->args().end())), cf);
+
+            if (!new_item) {
+                // The product already existed in coeff_mul_map, update the coefficient.
+                it->second = it->second + cf;
+            }
+        } else {
+            // The current argument is *NOT* a product with a numerical coefficient. Let's try to insert
+            // it into coeff_mul_map with a coefficient of 1.
+            const auto [it, new_item] = coeff_mul_map.try_emplace(arg, 1.);
+
+            if (!new_item) {
+                // The current argument was already in the map, update its coefficient.
+                it->second = it->second + number{1.};
+            }
+        }
+    }
+
+    // Reconstruct args from coeff_mul_map.
+    args.clear();
+    for (const auto &[pr, cf] : coeff_mul_map) {
+        args.push_back(prod({expression{cf}, pr}));
+    }
+
+    // Step 3: partition args so that all numbers are at the end.
     const auto n_end_it = std::stable_partition(
         args.begin(), args.end(), [](const expression &ex) { return !std::holds_alternative<number>(ex.value()); });
 
-    // If we have numbers, make sure they are all
-    // accumulated in the last one, and ensure that
-    // the accumulated value is not zero.
+    // Constant fold the numbers.
     if (n_end_it != args.end()) {
         for (auto it = n_end_it + 1; it != args.end(); ++it) {
             // NOTE: do not use directly operator+() on expressions in order
@@ -471,7 +530,20 @@ expression sum(std::vector<expression> args)
     // Sort the operands in canonical order.
     std::stable_sort(args.begin(), args.end(), detail::comm_ops_lt);
 
-    return expression{func{detail::sum_impl{std::move(args)}}};
+    return args;
+}
+
+} // namespace detail
+
+expression sum(const std::vector<expression> &args_)
+{
+    auto args = detail::sum_simplify_args(args_);
+
+    if (std::holds_alternative<expression>(args)) {
+        return std::move(std::get<expression>(args));
+    } else {
+        return expression{func{detail::sum_impl{std::move(std::get<std::vector<expression>>(args))}}};
+    }
 }
 
 HEYOKA_END_NAMESPACE

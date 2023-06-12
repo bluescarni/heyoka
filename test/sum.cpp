@@ -42,6 +42,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/prod.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -343,21 +344,25 @@ TEST_CASE("commutativity")
 
 TEST_CASE("sum split")
 {
+    auto sum_wrapper = [](const std::vector<expression> &args) { return expression{func{detail::sum_impl(args)}}; };
+
     auto [x, y] = make_vars("x", "y");
 
-    auto s = sum({x, x, x, x, y, y, y});
+    auto s = sum_wrapper({x, x, x, x, y, y, y});
 
     auto ss1 = detail::sum_split(s, 2u);
 
-    REQUIRE(ss1 == sum({sum({sum({x, x}), sum({x, x})}), expression(func(detail::sum_impl({sum({y, y}), y})))}));
+    REQUIRE(ss1
+            == sum_wrapper({sum_wrapper({sum_wrapper({x, x}), sum_wrapper({x, x})}),
+                            expression(func(detail::sum_impl({sum_wrapper({y, y}), y})))}));
 
     ss1 = detail::sum_split(s, 3u);
 
-    REQUIRE(ss1 == expression(func(detail::sum_impl({sum({x, x, x}), sum({x, y, y}), y}))));
+    REQUIRE(ss1 == expression(func(detail::sum_impl({sum_wrapper({x, x, x}), sum_wrapper({x, y, y}), y}))));
 
     ss1 = detail::sum_split(s, 4u);
 
-    REQUIRE(ss1 == sum({sum({x, x, x, x}), sum({y, y, y})}));
+    REQUIRE(ss1 == sum_wrapper({sum_wrapper({x, x, x, x}), sum_wrapper({y, y, y})}));
 
     ss1 = detail::sum_split(s, 8u);
 
@@ -382,8 +387,8 @@ TEST_CASE("sum split")
         x_vars.emplace_back(fmt::format("x_{}", i));
     }
 
-    s = sum({x_vars[0], x_vars[1], x_vars[2], x_vars[3], x_vars[4], x_vars[5], x_vars[6], x_vars[7], x_vars[8],
-             x_vars[9], cos(sum(x_vars))});
+    s = sum_wrapper({x_vars[0], x_vars[1], x_vars[2], x_vars[3], x_vars[4], x_vars[5], x_vars[6], x_vars[7], x_vars[8],
+                     x_vars[9], cos(sum_wrapper(x_vars))});
 
     llvm_state ls;
     const auto dc = add_cfunc<double>(ls, "cfunc", {s});
@@ -410,4 +415,15 @@ TEST_CASE("sum split")
     REQUIRE(output
             == approximately((1. + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10)
                              + std::cos(1. + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10)));
+}
+
+TEST_CASE("sum simpls")
+{
+    auto [x, y, z, t] = make_vars("x", "y", "z", "t");
+
+    REQUIRE(sum({sum({x, y}), sum({z, t})}) == sum({x, y, z, t}));
+    REQUIRE(sum({x, x}) == prod({2_dbl, x}));
+
+    REQUIRE(sum({sum({x, y}), y, z, t, prod({2_dbl, x}), y, z, t})
+            == sum({prod({2_dbl, t}), prod({3_dbl, x}), prod({3_dbl, y}), prod({2_dbl, z})}));
 }

@@ -87,9 +87,9 @@ std::vector<std::pair<expression, expression>> rotating_impl(const std::vector<e
     ret.push_back(prime(x) = vx);
     ret.push_back(prime(y) = vy);
     ret.push_back(prime(z) = vz);
-    ret.push_back(prime(vx) = sum(std::move(acc_x)));
-    ret.push_back(prime(vy) = sum(std::move(acc_y)));
-    ret.push_back(prime(vz) = sum(std::move(acc_z)));
+    ret.push_back(prime(vx) = sum(acc_x));
+    ret.push_back(prime(vy) = sum(acc_y));
+    ret.push_back(prime(vz) = sum(acc_z));
 
     return ret;
 }

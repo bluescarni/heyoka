@@ -205,7 +205,7 @@ expression nbody_potential_impl([[maybe_unused]] std::uint32_t n, const expressi
         }
     }
 
-    return -Gconst * sum(std::move(pot));
+    return -Gconst * sum(pot);
 }
 
 expression nbody_energy_impl([[maybe_unused]] std::uint32_t n, const expression &Gconst,
@@ -232,7 +232,7 @@ expression nbody_energy_impl([[maybe_unused]] std::uint32_t n, const expression 
         kin.push_back(masses_vec[i] * sum({vx_vars[i] * vx_vars[i], vy_vars[i] * vy_vars[i], vz_vars[i] * vz_vars[i]}));
     }
 
-    return .5_dbl * sum(std::move(kin)) + nbody_potential_impl(n, Gconst, masses_vec);
+    return .5_dbl * sum(kin) + nbody_potential_impl(n, Gconst, masses_vec);
 }
 
 std::vector<std::pair<expression, expression>> np1body_impl(std::uint32_t n, const expression &Gconst,
@@ -321,9 +321,9 @@ std::vector<std::pair<expression, expression>> np1body_impl(std::uint32_t n, con
         }
 
         // Add the expressions of the accelerations to the system.
-        retval.push_back(prime(vx_vars[i]) = sum(std::move(x_acc)));
-        retval.push_back(prime(vy_vars[i]) = sum(std::move(y_acc)));
-        retval.push_back(prime(vz_vars[i]) = sum(std::move(z_acc)));
+        retval.push_back(prime(vx_vars[i]) = sum(x_acc));
+        retval.push_back(prime(vy_vars[i]) = sum(y_acc));
+        retval.push_back(prime(vz_vars[i]) = sum(z_acc));
     }
 
     return retval;
@@ -371,7 +371,7 @@ expression np1body_potential_impl([[maybe_unused]] std::uint32_t n, const expres
         }
     }
 
-    return -Gconst * sum(std::move(pot));
+    return -Gconst * sum(pot);
 }
 
 expression np1body_energy_impl([[maybe_unused]] std::uint32_t n, const expression &Gconst,
@@ -409,11 +409,11 @@ expression np1body_energy_impl([[maybe_unused]] std::uint32_t n, const expressio
         tot_mass_terms.push_back(masses_vec[i + 1u]);
     }
 
-    const auto tot_mass = sum(std::move(tot_mass_terms));
+    const auto tot_mass = sum(tot_mass_terms);
 
-    const auto ud0_x = -sum(std::move(ud0_x_terms)) / tot_mass;
-    const auto ud0_y = -sum(std::move(ud0_y_terms)) / tot_mass;
-    const auto ud0_z = -sum(std::move(ud0_z_terms)) / tot_mass;
+    const auto ud0_x = -sum(ud0_x_terms) / tot_mass;
+    const auto ud0_y = -sum(ud0_y_terms) / tot_mass;
+    const auto ud0_z = -sum(ud0_z_terms) / tot_mass;
 
     // The kinetic terms.
     std::vector<expression> kin{masses_vec[0] * sum({ud0_x * ud0_x, ud0_y * ud0_y, ud0_z * ud0_z})};
@@ -423,7 +423,7 @@ expression np1body_energy_impl([[maybe_unused]] std::uint32_t n, const expressio
                              (vz_vars[i] + ud0_z) * (vz_vars[i] + ud0_z)}));
     }
 
-    return .5_dbl * sum(std::move(kin)) + np1body_potential_impl(n, Gconst, masses_vec);
+    return .5_dbl * sum(kin) + np1body_potential_impl(n, Gconst, masses_vec);
 }
 
 } // namespace model::detail

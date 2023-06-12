@@ -278,13 +278,12 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
             cur.erase(new_end, cur.end());
 
             // Sum the terms in the chunk and multiply them by t**alpha.
-            parts[alpha]
-                = pow(t_expr, static_cast<double>(boost::numeric_cast<std::uint32_t>(alpha))) * sum(std::move(cur));
+            parts[alpha] = pow(t_expr, static_cast<double>(boost::numeric_cast<std::uint32_t>(alpha))) * sum(cur);
         }
     });
 
     // Sum the chunks and return them.
-    return sum(std::move(parts));
+    return sum(parts);
 }
 
 namespace

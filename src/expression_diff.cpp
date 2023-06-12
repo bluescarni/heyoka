@@ -570,7 +570,7 @@ void diff_tensors_reverse_impl(
 
             assert(!tmp_sum.empty());
 
-            diffs[cur_idx] = sum(std::move(tmp_sum));
+            diffs[cur_idx] = sum(tmp_sum);
         }
 
         // Create a dict mapping the vars/params in the decomposition

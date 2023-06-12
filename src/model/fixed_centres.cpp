@@ -87,9 +87,9 @@ fixed_centres_impl(const expression &G, const std::vector<expression> &masses, c
     ret.push_back(prime(x) = vx);
     ret.push_back(prime(y) = vy);
     ret.push_back(prime(z) = vz);
-    ret.push_back(prime(vx) = G * sum(std::move(acc_x)));
-    ret.push_back(prime(vy) = G * sum(std::move(acc_y)));
-    ret.push_back(prime(vz) = G * sum(std::move(acc_z)));
+    ret.push_back(prime(vx) = G * sum(acc_x));
+    ret.push_back(prime(vy) = G * sum(acc_y));
+    ret.push_back(prime(vz) = G * sum(acc_z));
 
     return ret;
 }
@@ -120,7 +120,7 @@ expression fixed_centres_potential_impl(const expression &G, const std::vector<e
         pot.push_back(masses[i] / dist);
     }
 
-    return -G * sum(std::move(pot));
+    return -G * sum(pot);
 }
 
 expression fixed_centres_energy_impl(const expression &G, const std::vector<expression> &masses,
