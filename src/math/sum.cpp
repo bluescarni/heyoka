@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstddef>
 #include <map>
 #include <sstream>
@@ -60,29 +61,111 @@ sum_impl::sum_impl() : sum_impl(std::vector<expression>{}) {}
 
 sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v)) {}
 
-// NOTE: a possible improvement here is to transform
-// "(x + y + -20)" into "(x + y - 20)".
 void sum_impl::to_stream(std::ostringstream &oss) const
 {
     if (args().empty()) {
         stream_expression(oss, 0_dbl);
-
         return;
     }
 
     if (args().size() == 1u) {
         stream_expression(oss, args()[0]);
-
         return;
     }
 
+    // Helper to check if a value is non-NaN and negative.
+    auto negative_checker = [](const auto &v) {
+        using std::isnan;
+
+        return !isnan(v) && v < 0;
+    };
+
+    // Partition the arguments so that all terms which are either a negative
+    // number or a product in the form cf * a * ..., with cf a negative number,
+    // are at the end.
+    auto terms = args();
+    const auto neg_it = std::stable_partition(terms.begin(), terms.end(), [&](const expression &arg) {
+        if (const auto *num_ptr = std::get_if<number>(&arg.value())) {
+            return !std::visit(negative_checker, num_ptr->value());
+        }
+
+        if (const auto &fptr = std::get_if<func>(&arg.value());
+            fptr != nullptr && fptr->extract<prod_impl>() != nullptr && fptr->args().size() >= 2u
+            && std::holds_alternative<number>(fptr->args()[0].value())) {
+            return !std::visit(negative_checker, std::get<number>(fptr->args()[0].value()).value());
+        }
+
+        return true;
+    });
+
+    // Helper to stream the positive terms.
+    auto stream_pos_terms = [&]() {
+        // Must have some positive terms.
+        assert(neg_it != terms.begin());
+
+        for (auto it = terms.begin(); it != neg_it; ++it) {
+            stream_expression(oss, *it);
+
+            if (it + 1 != neg_it) {
+                oss << " + ";
+            }
+        }
+    };
+
+    // Helper to stream the negative terms.
+    auto stream_neg_terms = [&]() {
+        // Must have some negative terms.
+        assert(neg_it != terms.end());
+
+        auto it = neg_it;
+
+        if (it == terms.begin()) {
+            // If all terms are negative, handle
+            // specially the first one: print *it with its
+            // own leading '-' sign, and add a trailing
+            // " - " for the next term.
+            stream_expression(oss, *it);
+            // NOTE: 'it' points at the beginning of terms,
+            // and we know that there are at least 2 terms. Thus,
+            // we are certain there is always at least one more term
+            // and that we always need another " - ".
+            oss << " - ";
+            ++it;
+        }
+
+        for (; it != terms.end(); ++it) {
+            if (const auto *num_ptr = std::get_if<number>(&it->value())) {
+                stream_expression(oss, expression{-*num_ptr});
+            } else {
+                const auto &pfunc = std::get<func>(it->value());
+                assert(pfunc.extract<prod_impl>() != nullptr);
+
+                auto new_prod_args = pfunc.args();
+                assert(new_prod_args.size() >= 2u);
+                new_prod_args[0] = expression{-std::get<number>(new_prod_args[0].value())};
+
+                stream_expression(oss, prod(new_prod_args));
+            }
+
+            if (it + 1 != terms.end()) {
+                oss << " - ";
+            }
+        }
+    };
+
     oss << '(';
 
-    for (decltype(args().size()) i = 0; i < args().size(); ++i) {
-        stream_expression(oss, args()[i]);
-        if (i != args().size() - 1u) {
-            oss << " + ";
-        }
+    if (neg_it == terms.begin()) {
+        // The sum consists only of negative terms.
+        stream_neg_terms();
+    } else if (neg_it == terms.end()) {
+        // The sum consists only of positive terms.
+        stream_pos_terms();
+    } else {
+        // There are both positive and negative terms.
+        stream_pos_terms();
+        oss << " - ";
+        stream_neg_terms();
     }
 
     oss << ')';

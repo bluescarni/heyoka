@@ -136,6 +136,69 @@ TEST_CASE("stream test")
 
         REQUIRE(oss.str() == "(x + y + z)");
     }
+
+    {
+        std::ostringstream oss;
+
+        detail::sum_impl ss({prod({x, -1_dbl}), y, z});
+        ss.to_stream(oss);
+
+        REQUIRE(oss.str() == "(y + z - x)");
+    }
+
+    {
+        std::ostringstream oss;
+
+        detail::sum_impl ss({prod({x, -2_dbl}), y, z});
+        ss.to_stream(oss);
+
+        REQUIRE(oss.str() == fmt::format("(y + z - ({} * x))", 2_dbl));
+    }
+
+    {
+        std::ostringstream oss;
+
+        detail::sum_impl ss({prod({x, -2_dbl}), -3_dbl, z});
+        ss.to_stream(oss);
+
+        REQUIRE(oss.str() == fmt::format("(z - ({} * x) - {})", 2_dbl, 3_dbl));
+    }
+
+    {
+        std::ostringstream oss;
+
+        detail::sum_impl ss({prod({x, -2_dbl}), -3_dbl});
+        ss.to_stream(oss);
+
+        REQUIRE(oss.str() == fmt::format("((-{} * x) - {})", 2_dbl, 3_dbl));
+    }
+
+    {
+        std::ostringstream oss;
+
+        detail::sum_impl ss({-3_dbl, prod({x, -2_dbl})});
+        ss.to_stream(oss);
+
+        REQUIRE(oss.str() == fmt::format("(-{} - ({} * x))", 3_dbl, 2_dbl));
+    }
+
+    {
+        std::ostringstream oss;
+
+        detail::sum_impl ss({-3_dbl, -2_dbl});
+        ss.to_stream(oss);
+
+        REQUIRE(oss.str() == fmt::format("(-{} - {})", 3_dbl, 2_dbl));
+    }
+
+    {
+        std::ostringstream oss;
+
+        detail::sum_impl ss({prod({-3_dbl, x}), prod({x, -2_dbl})});
+        ss.to_stream(oss);
+
+        REQUIRE(oss.str() == fmt::format("((-{} * x) - ({} * x))", 3_dbl, 2_dbl));
+    }
 }
 
 TEST_CASE("diff test")
