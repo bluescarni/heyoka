@@ -140,6 +140,7 @@ void sum_impl::to_stream(std::ostringstream &oss) const
                 const auto &pfunc = std::get<func>(it->value());
                 assert(pfunc.extract<prod_impl>() != nullptr);
 
+                // Negate the first (constant negative) term of the product.
                 auto new_prod_args = pfunc.args();
                 assert(new_prod_args.size() >= 2u);
                 new_prod_args[0] = expression{-std::get<number>(new_prod_args[0].value())};
