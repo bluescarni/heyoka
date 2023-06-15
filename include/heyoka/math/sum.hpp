@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <sstream>
+#include <variant>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -58,11 +59,13 @@ public:
 
 HEYOKA_DLL_PUBLIC expression sum_split(const expression &, std::uint32_t);
 
+std::variant<std::vector<expression>, expression> sum_simplify_args(const std::vector<expression> &);
+
 expression sum_to_sum_sq(const expression &);
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression sum(std::vector<expression>);
+HEYOKA_DLL_PUBLIC expression sum(const std::vector<expression> &);
 
 HEYOKA_END_NAMESPACE
 

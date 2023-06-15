@@ -285,7 +285,7 @@ expression func::diff(detail::funcptr_map<expression> &func_map, const std::stri
         prod.push_back(grad[i] * detail::diff(func_map, args()[i], s));
     }
 
-    return sum(std::move(prod));
+    return sum(prod);
 }
 
 expression func::diff(detail::funcptr_map<expression> &func_map, const param &p) const
@@ -308,7 +308,7 @@ expression func::diff(detail::funcptr_map<expression> &func_map, const param &p)
         prod.push_back(grad[i] * detail::diff(func_map, args()[i], p));
     }
 
-    return sum(std::move(prod));
+    return sum(prod);
 }
 
 double func::eval_dbl(const std::unordered_map<std::string, double> &m, const std::vector<double> &pars) const
