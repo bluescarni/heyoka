@@ -130,10 +130,6 @@ void pow_impl::to_stream(std::ostringstream &oss) const
 namespace
 {
 
-// Maximum integral exponent magnitude for which
-// pow() is transformed into multiplications and divisions.
-constexpr std::uint32_t max_small_pow_n = 16;
-
 // Exponentiation by squaring.
 // NOLINTNEXTLINE(misc-no-recursion)
 llvm::Value *pow_ebs(llvm_state &s, llvm::Value *base, std::uint32_t exp)
@@ -358,24 +354,11 @@ double pow_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>
 namespace
 {
 
-// NOTE: this struct stores a std::function for the evaluation (in LLVM) of an exponentiation.
-// In the general case, the exponentiation is performed via a direct call to llvm_pow(). If the
-// exponent is a small integral or a small integral half, then the exponentiation is implemented
-// via multiplications, divisions and calls to llvm_sqrt(). The 'algo' enum signals the selected
-// implementation. The 'exp' member is empty in the general case. Otherwise, it contains either
-// the integral exponent (for the small integral optimisation), or twice the small integral half
-// exponent (for the small integral half optimisation). The 'suffix' member contains a string
-// uniquely encoding the 'algo' and 'exp' data members.
-struct pow_eval_algo {
-    enum class type : int { general, pos_small_int, neg_small_int, pos_small_half, neg_small_half };
+// Maximum integral exponent magnitude for which
+// pow() is transformed into multiplications and divisions.
+constexpr std::uint32_t pow_max_small_pow_n = 16;
 
-    using eval_t = std::function<llvm::Value *(llvm_state &, const std::vector<llvm::Value *> &)>;
-
-    type algo{-1};
-    eval_t eval_f;
-    std::optional<safe_int64_t> exp;
-    std::string suffix;
-};
+} // namespace
 
 // Construct a pow_eval_algo based on the exponentiation arguments of 'impl'.
 pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
@@ -387,13 +370,13 @@ pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
 
     // Small integral powers.
     if (const auto exp = ex_is_integral(impl.args()[1])) {
-        if (*exp >= 0 && *exp <= max_small_pow_n) {
+        if (*exp >= 0 && *exp <= pow_max_small_pow_n) {
             return {pow_eval_algo::type::pos_small_int,
                     [e = *exp](auto &s, const auto &args) { return pow_ebs(s, args[0], e); }, exp,
                     fmt::format("_pos_small_int_{}", static_cast<std::int64_t>(*exp))};
         }
 
-        if (*exp < 0 && -*exp <= max_small_pow_n) {
+        if (*exp < 0 && -*exp <= pow_max_small_pow_n) {
             return {pow_eval_algo::type::neg_small_int,
                     [e = *exp](auto &s, const auto &args) {
                         auto *tmp = pow_ebs(s, args[0], -e);
@@ -405,7 +388,7 @@ pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
 
     // Small half-integral powers.
     if (const auto exp2 = ex_is_odd_integral_half(impl.args()[1])) {
-        if (*exp2 >= 0 && *exp2 <= max_small_pow_n) {
+        if (*exp2 >= 0 && *exp2 <= pow_max_small_pow_n) {
             return {pow_eval_algo::type::pos_small_half,
                     [e2 = *exp2](auto &s, const auto &args) {
                         auto *tmp = llvm_sqrt(s, args[0]);
@@ -414,7 +397,7 @@ pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
                     exp2, fmt::format("_pos_small_half_{}", static_cast<std::int64_t>(*exp2))};
         }
 
-        if (*exp2 < 0 && -*exp2 <= max_small_pow_n) {
+        if (*exp2 < 0 && -*exp2 <= pow_max_small_pow_n) {
             return {pow_eval_algo::type::neg_small_half,
                     [e2 = *exp2](auto &s, const auto &args) {
                         auto *tmp = llvm_sqrt(s, args[0]);
@@ -429,8 +412,6 @@ pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
     return {
         pow_eval_algo::type::general, [](auto &s, const auto &args) { return llvm_pow(s, args[0], args[1]); }, {}, {}};
 }
-
-} // namespace
 
 llvm::Value *pow_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
                                  llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,

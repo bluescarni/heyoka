@@ -12,10 +12,14 @@
 #include <heyoka/config.hpp>
 
 #include <cstdint>
+#include <functional>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -40,9 +44,6 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// NOTE: when we implement serialization, we will
-// want to make sure that the deserialized exponent
-// is never 0.
 class HEYOKA_DLL_PUBLIC pow_impl : public func_base
 {
     friend class boost::serialization::access;
@@ -86,6 +87,27 @@ public:
 
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
 };
+
+// NOTE: this struct stores a std::function for the evaluation (in LLVM) of an exponentiation.
+// In the general case, the exponentiation is performed via a direct call to llvm_pow(). If the
+// exponent is a small integral or a small integral half, then the exponentiation is implemented
+// via multiplications, divisions and calls to llvm_sqrt(). The 'algo' enum signals the selected
+// implementation. The 'exp' member is empty in the general case. Otherwise, it contains either
+// the integral exponent (for the small integral optimisation), or twice the small integral half
+// exponent (for the small integral half optimisation). The 'suffix' member contains a string
+// uniquely encoding the 'algo' and 'exp' data members.
+struct pow_eval_algo {
+    enum class type : int { general, pos_small_int, neg_small_int, pos_small_half, neg_small_half };
+
+    using eval_t = std::function<llvm::Value *(llvm_state &, const std::vector<llvm::Value *> &)>;
+
+    type algo{-1};
+    eval_t eval_f;
+    std::optional<boost::safe_numerics::safe<std::int64_t>> exp;
+    std::string suffix;
+};
+
+pow_eval_algo get_pow_eval_algo(const pow_impl &);
 
 } // namespace detail
 
