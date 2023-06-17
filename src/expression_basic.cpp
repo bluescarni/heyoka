@@ -1193,7 +1193,7 @@ constexpr std::uint32_t decompose_split = 8u;
 expression split_sums_for_decompose(funcptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
-        [&func_map, &ex](const auto &v) {
+        [&](const auto &v) {
             using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, func>) {
@@ -1313,7 +1313,7 @@ namespace
 expression sums_to_sum_sqs_for_decompose(funcptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
-        [&func_map, &ex](const auto &v) {
+        [&](const auto &v) {
             using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, func>) {
