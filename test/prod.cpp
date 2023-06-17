@@ -35,6 +35,7 @@
 
 #endif
 
+#include <heyoka/detail/div.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -589,4 +590,35 @@ TEST_CASE("prod split")
     REQUIRE(output
             == approximately((1. * 2 * 3 * 4 * 5 * 6 * 7 * 8 * 9 * 10)
                              * std::cos(1. * 2 * 3 * 4 * 5 * 6 * 7 * 8 * 9 * 10)));
+}
+
+TEST_CASE("prod_to_div")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    auto ret = detail::prod_to_div_llvm_eval({prod({x, pow(y, -1_dbl)})});
+
+    REQUIRE(ret.size() == 1u);
+    REQUIRE(ret[0] == detail::div(x, y));
+
+    ret = detail::prod_to_div_llvm_eval({prod({2_dbl, pow(y, -1_dbl)})});
+    REQUIRE(ret[0] == detail::div(2_dbl, y));
+
+    ret = detail::prod_to_div_llvm_eval({prod({2_dbl, cos(x), pow(y, -1_dbl)})});
+    REQUIRE(ret[0] == detail::div(prod({2_dbl, cos(x)}), y));
+
+    ret = detail::prod_to_div_llvm_eval({prod({2_dbl, cos(x), pow(y, -1_dbl), pow(x, -1.5_dbl)})});
+    REQUIRE(ret[0] == detail::div(prod({2_dbl, cos(x)}), prod({y, pow(x, 1.5_dbl)})));
+
+    ret = detail::prod_to_div_llvm_eval({cos(prod({2_dbl, cos(x), pow(y, -1_dbl), pow(x, -1.5_dbl)}))});
+    REQUIRE(ret[0] == cos(detail::div(prod({2_dbl, cos(x)}), prod({y, pow(x, 1.5_dbl)}))));
+
+    ret = detail::prod_to_div_llvm_eval({prod({pow(x, -.5_dbl), pow(y, -1_dbl)})});
+    REQUIRE(ret[0] == detail::div(1_dbl, prod({pow(x, .5_dbl), y})));
+
+    ret = detail::prod_to_div_llvm_eval({prod({pow(x, -.5_dbl), pow(y, 1.5_dbl)})});
+    REQUIRE(ret[0] == detail::div(pow(y, 1.5_dbl), pow(x, .5_dbl)));
+
+    ret = detail::prod_to_div_llvm_eval({prod({pow(x, -.5_dbl), pow(y, 2_dbl)})});
+    REQUIRE(ret[0] == detail::div(pow(y, 2_dbl), pow(x, .5_dbl)));
 }

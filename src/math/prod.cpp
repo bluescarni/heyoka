@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -29,9 +30,12 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/div.hpp>
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -972,6 +976,131 @@ expression prod_split(const expression &e, std::uint32_t split)
 
     // Recurse to split further, if needed.
     return prod_split(expression{func{detail::prod_impl{std::move(ret_seq)}}}, split);
+}
+
+namespace
+{
+
+// Transform a product into a division by collecting
+// negative powers among the operands.
+expression prod_to_div_llvm_eval(funcptr_map<expression> &func_map, const expression &ex)
+{
+    return std::visit(
+        [&](const auto &v) {
+            using type = uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, func>) {
+                const auto *f_id = v.get_ptr();
+
+                // Check if we already handled ex.
+                if (const auto it = func_map.find(f_id); it != func_map.end()) {
+                    return it->second;
+                }
+
+                // Recursively transform product into divisions
+                // in the arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(v.args().size());
+                for (const auto &orig_arg : v.args()) {
+                    new_args.push_back(prod_to_div_llvm_eval(func_map, orig_arg));
+                }
+
+                // Prepare the return value.
+                std::optional<expression> retval;
+
+                if (v.template extract<prod_impl>() == nullptr) {
+                    // The current function is not a prod(). Just create
+                    // a copy of it with the new args.
+                    retval.emplace(v.copy(new_args));
+                } else {
+                    // The current function is a prod(). Partition its
+                    // arguments so that powers which are negative and small
+                    // are at the end.
+                    const auto it = std::stable_partition(new_args.begin(), new_args.end(), [](const auto &e) {
+                        const auto *fptr = std::get_if<func>(&e.value());
+
+                        if (fptr == nullptr) {
+                            // Not a function.
+                            return true;
+                        }
+
+                        const auto *pptr = fptr->template extract<pow_impl>();
+
+                        if (pptr == nullptr) {
+                            // Not a pow().
+                            return true;
+                        }
+
+                        // Use get_pow_eval_algo() to understand
+                        // if we are in a special case with small
+                        // negative exponent.
+                        const auto pea = get_pow_eval_algo(*pptr);
+                        return pea.algo != pow_eval_algo::type::neg_small_int
+                               && pea.algo != pow_eval_algo::type::neg_small_half;
+                    });
+
+                    if (it == new_args.end()) {
+                        // There are no small negative powers in the prod, just make a copy.
+                        retval.emplace(v.copy(new_args));
+                    } else {
+                        // There are some small negative powers in the prod. Transform those
+                        // into divisions.
+
+                        // Construct the terms of the divisor.
+                        std::vector<expression> div_args;
+                        for (auto d_it = it; d_it != new_args.end(); ++d_it) {
+                            const auto &f = std::get<func>(d_it->value());
+
+                            assert(f.args().size() == 2u);
+                            assert(f.template extract<pow_impl>() != nullptr);
+
+                            const auto &base = f.args()[0];
+                            const auto &expo = f.args()[1];
+
+                            div_args.push_back(pow(base, expression{-std::get<number>(expo.value())}));
+                        }
+
+                        // Construct the divisor.
+                        auto divisor = prod(div_args);
+
+                        // Construct the numerator.
+                        new_args.erase(it, new_args.end());
+                        // NOTE: if there are *only* small negative powers, then
+                        // new_args will be empty and num will end up being 1.
+                        auto num = prod(new_args);
+
+                        // Construct the return value.
+                        retval.emplace(div(std::move(num), std::move(divisor)));
+                    }
+                }
+
+                // Put the return value into the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, *retval);
+                // NOTE: an expression cannot contain itself.
+                assert(flag); // LCOV_EXCL_LINE
+
+                return std::move(*retval);
+            } else {
+                return ex;
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+std::vector<expression> prod_to_div_llvm_eval(const std::vector<expression> &v_ex)
+{
+    funcptr_map<expression> func_map;
+
+    std::vector<expression> retval;
+    retval.reserve(v_ex.size());
+
+    for (const auto &e : v_ex) {
+        retval.push_back(prod_to_div_llvm_eval(func_map, e));
+    }
+
+    return retval;
 }
 
 } // namespace detail
