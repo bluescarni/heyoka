@@ -978,8 +978,8 @@ namespace
 // negative powers among the operands. Exactly which
 // negative powers are collected is established by the
 // input partitioning function fpart.
-expression prod_to_div_llvm_eval(funcptr_map<expression> &func_map, const expression &ex,
-                                 const std::function<bool(const expression &)> &fpart)
+expression prod_to_div_impl(funcptr_map<expression> &func_map, const expression &ex,
+                            const std::function<bool(const expression &)> &fpart)
 {
     return std::visit(
         [&](const auto &v) {
@@ -998,7 +998,7 @@ expression prod_to_div_llvm_eval(funcptr_map<expression> &func_map, const expres
                 std::vector<expression> new_args;
                 new_args.reserve(v.args().size());
                 for (const auto &orig_arg : v.args()) {
-                    new_args.push_back(prod_to_div_llvm_eval(func_map, orig_arg, fpart));
+                    new_args.push_back(prod_to_div_impl(func_map, orig_arg, fpart));
                 }
 
                 // Prepare the return value.
@@ -1099,7 +1099,56 @@ std::vector<expression> prod_to_div_llvm_eval(const std::vector<expression> &v_e
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(prod_to_div_llvm_eval(func_map, e, fpart));
+        retval.push_back(prod_to_div_impl(func_map, e, fpart));
+    }
+
+    return retval;
+}
+
+// Transform products to divisions. Version for Taylor integrators.
+std::vector<expression> prod_to_div_taylor_diff(const std::vector<expression> &v_ex)
+{
+    funcptr_map<expression> func_map;
+
+    // NOTE: for Taylor integrators, it is generally not worth it to transform
+    // negative powers into divisions because this results in having to compute
+    // the Taylor derivative for an additional operation (the new division).
+    // Thus, in general we take the performance/accuracy hit during the evaluation
+    // of the expression (i.e., the order-0 derivative) with the goal of not
+    // slowing down the computation of the higher order Taylor derivatives.
+    // The only exception is pow(..., -1), which can be transformed into a division
+    // while eliminating the pow().
+    const auto fpart = [](const auto &e) {
+        const auto *fptr = std::get_if<func>(&e.value());
+
+        if (fptr == nullptr) {
+            // Not a function.
+            return true;
+        }
+
+        const auto *pptr = fptr->template extract<pow_impl>();
+
+        if (pptr == nullptr) {
+            // Not a pow().
+            return true;
+        }
+
+        assert(fptr->args().size() == 2u);
+
+        if (const auto *num_expo_ptr = std::get_if<number>(&fptr->args()[1].value())) {
+            // The exponent is a number.
+            return !is_negative_one(*num_expo_ptr);
+        } else {
+            // The exponent is not a number.
+            return true;
+        }
+    };
+
+    std::vector<expression> retval;
+    retval.reserve(v_ex.size());
+
+    for (const auto &e : v_ex) {
+        retval.push_back(prod_to_div_impl(func_map, e, fpart));
     }
 
     return retval;

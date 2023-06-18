@@ -63,7 +63,7 @@ HEYOKA_DLL_PUBLIC expression prod_split(const expression &, std::uint32_t);
 
 HEYOKA_DLL_PUBLIC std::vector<expression> prod_to_div_llvm_eval(const std::vector<expression> &);
 
-// HEYOKA_DLL_PUBLIC std::vector<expression> prod_to_div_taylor_diff(const std::vector<expression> &);
+HEYOKA_DLL_PUBLIC std::vector<expression> prod_to_div_taylor_diff(const std::vector<expression> &);
 
 } // namespace detail
 
