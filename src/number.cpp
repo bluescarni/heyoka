@@ -231,6 +231,11 @@ bool is_negative_one(const number &n)
     return std::visit([](const auto &arg) { return arg == -1; }, n.value());
 }
 
+bool is_negative(const number &n)
+{
+    return std::visit([](const auto &arg) { return arg < 0; }, n.value());
+}
+
 number operator-(const number &n)
 {
     return std::visit([](const auto &arg) { return number{-arg}; }, n.value());

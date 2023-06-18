@@ -8,8 +8,8 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cmath>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <sstream>
 #include <stdexcept>
@@ -85,16 +85,9 @@ bool ex_is_negative_pow(const expression &ex)
 
     const auto &expo = pow_ptr->args()[1];
 
-    // Helper to check if a value is non-NaN and negative.
-    auto negative_checker = [](const auto &v) {
-        using std::isnan;
-
-        return !isnan(v) && v < 0;
-    };
-
     if (const auto *n_exp_ptr = std::get_if<number>(&expo.value())) {
         // Exponent is a number.
-        return std::visit(negative_checker, n_exp_ptr->value());
+        return is_negative(*n_exp_ptr);
     } else if (const auto *exp_f_ptr = std::get_if<func>(&expo.value());
                exp_f_ptr != nullptr && exp_f_ptr->extract<prod_impl>() != nullptr) {
         // Exponent is a product.
@@ -105,7 +98,7 @@ bool ex_is_negative_pow(const expression &ex)
 
         // Check if the first argument of the product is a negative number.
         const auto *num_ptr = std::get_if<number>(&exp_f_ptr->args()[0].value());
-        return num_ptr != nullptr && std::visit(negative_checker, num_ptr->value());
+        return num_ptr != nullptr && is_negative(*num_ptr);
     } else {
         return false;
     }
@@ -982,8 +975,11 @@ namespace
 {
 
 // Transform a product into a division by collecting
-// negative powers among the operands.
-expression prod_to_div_llvm_eval(funcptr_map<expression> &func_map, const expression &ex)
+// negative powers among the operands. Exactly which
+// negative powers are collected is established by the
+// input partitioning function fpart.
+expression prod_to_div_llvm_eval(funcptr_map<expression> &func_map, const expression &ex,
+                                 const std::function<bool(const expression &)> &fpart)
 {
     return std::visit(
         [&](const auto &v) {
@@ -1002,7 +998,7 @@ expression prod_to_div_llvm_eval(funcptr_map<expression> &func_map, const expres
                 std::vector<expression> new_args;
                 new_args.reserve(v.args().size());
                 for (const auto &orig_arg : v.args()) {
-                    new_args.push_back(prod_to_div_llvm_eval(func_map, orig_arg));
+                    new_args.push_back(prod_to_div_llvm_eval(func_map, orig_arg, fpart));
                 }
 
                 // Prepare the return value.
@@ -1014,30 +1010,8 @@ expression prod_to_div_llvm_eval(funcptr_map<expression> &func_map, const expres
                     retval.emplace(v.copy(new_args));
                 } else {
                     // The current function is a prod(). Partition its
-                    // arguments so that powers which are negative and small
-                    // are at the end.
-                    const auto it = std::stable_partition(new_args.begin(), new_args.end(), [](const auto &e) {
-                        const auto *fptr = std::get_if<func>(&e.value());
-
-                        if (fptr == nullptr) {
-                            // Not a function.
-                            return true;
-                        }
-
-                        const auto *pptr = fptr->template extract<pow_impl>();
-
-                        if (pptr == nullptr) {
-                            // Not a pow().
-                            return true;
-                        }
-
-                        // Use get_pow_eval_algo() to understand
-                        // if we are in a special case with small
-                        // negative exponent.
-                        const auto pea = get_pow_eval_algo(*pptr);
-                        return pea.algo != pow_eval_algo::type::neg_small_int
-                               && pea.algo != pow_eval_algo::type::neg_small_half;
-                    });
+                    // arguments according to fpart.
+                    const auto it = std::stable_partition(new_args.begin(), new_args.end(), fpart);
 
                     if (it == new_args.end()) {
                         // There are no small negative powers in the prod, just make a copy.
@@ -1089,15 +1063,43 @@ expression prod_to_div_llvm_eval(funcptr_map<expression> &func_map, const expres
 
 } // namespace
 
+// Transform products to divisions. Version for compiled functions.
 std::vector<expression> prod_to_div_llvm_eval(const std::vector<expression> &v_ex)
 {
     funcptr_map<expression> func_map;
+
+    // NOTE: for compiled functions, we want to transform into divisions
+    // all small negative powers which would be evaluated via multiplications,
+    // divisions and square roots in pow(). In addition to being more efficient
+    // (a single division is used for multiple negative powers), it is also more
+    // accurate as it reduces the number of roundings.
+    const auto fpart = [](const auto &e) {
+        const auto *fptr = std::get_if<func>(&e.value());
+
+        if (fptr == nullptr) {
+            // Not a function.
+            return true;
+        }
+
+        const auto *pptr = fptr->template extract<pow_impl>();
+
+        if (pptr == nullptr) {
+            // Not a pow().
+            return true;
+        }
+
+        // Use get_pow_eval_algo() to understand
+        // if we are in a special case with small
+        // negative exponent.
+        const auto pea = get_pow_eval_algo(*pptr);
+        return pea.algo != pow_eval_algo::type::neg_small_int && pea.algo != pow_eval_algo::type::neg_small_half;
+    };
 
     std::vector<expression> retval;
     retval.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        retval.push_back(prod_to_div_llvm_eval(func_map, e));
+        retval.push_back(prod_to_div_llvm_eval(func_map, e, fpart));
     }
 
     return retval;

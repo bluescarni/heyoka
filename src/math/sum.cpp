@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cmath>
 #include <cstddef>
 #include <map>
 #include <sstream>
@@ -73,26 +72,19 @@ void sum_impl::to_stream(std::ostringstream &oss) const
         return;
     }
 
-    // Helper to check if a value is non-NaN and negative.
-    auto negative_checker = [](const auto &v) {
-        using std::isnan;
-
-        return !isnan(v) && v < 0;
-    };
-
     // Partition the arguments so that all terms which are either a negative
     // number or a product in the form cf * a * ..., with cf a negative number,
     // are at the end.
     auto terms = args();
     const auto neg_it = std::stable_partition(terms.begin(), terms.end(), [&](const expression &arg) {
         if (const auto *num_ptr = std::get_if<number>(&arg.value())) {
-            return !std::visit(negative_checker, num_ptr->value());
+            return !is_negative(*num_ptr);
         }
 
         if (const auto &fptr = std::get_if<func>(&arg.value());
             fptr != nullptr && fptr->extract<prod_impl>() != nullptr && fptr->args().size() >= 2u
             && std::holds_alternative<number>(fptr->args()[0].value())) {
-            return !std::visit(negative_checker, std::get<number>(fptr->args()[0].value()).value());
+            return !is_negative(std::get<number>(fptr->args()[0].value()));
         }
 
         return true;
