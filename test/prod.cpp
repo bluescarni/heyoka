@@ -42,6 +42,7 @@
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
+#include <heyoka/math/sin.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -621,4 +622,13 @@ TEST_CASE("prod_to_div")
 
     ret = detail::prod_to_div_llvm_eval({prod({pow(x, -.5_dbl), pow(y, 2_dbl)})});
     REQUIRE(ret[0] == detail::div(pow(y, 2_dbl), pow(x, .5_dbl)));
+
+    ret = detail::prod_to_div_llvm_eval({prod({x, y})});
+    REQUIRE(ret[0] == prod({x, y}));
+
+    ret = detail::prod_to_div_llvm_eval(
+        {prod({2_dbl, cos(prod({pow(x, -.5_dbl), pow(y, -1_dbl)})), sin(prod({pow(x, -.5_dbl), pow(y, -1_dbl)}))})});
+    REQUIRE(ret[0]
+            == prod({2_dbl, cos(detail::div(1_dbl, prod({pow(x, .5_dbl), pow(y, 1_dbl)}))),
+                     sin(detail::div(1_dbl, prod({pow(x, .5_dbl), pow(y, 1_dbl)})))}));
 }
