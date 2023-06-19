@@ -1017,8 +1017,9 @@ expression prod_to_div_impl(funcptr_map<expression> &func_map, const expression 
                         // There are no small negative powers in the prod, just make a copy.
                         retval.emplace(v.copy(new_args));
                     } else {
-                        // There are some small negative powers in the prod. Transform those
-                        // into divisions.
+                        // There are some small negative powers in the prod.
+                        // Group them into a divisor, negate the exponents, and transform
+                        // into a division.
 
                         // Construct the terms of the divisor.
                         std::vector<expression> div_args;
@@ -1135,7 +1136,9 @@ std::vector<expression> prod_to_div_taylor_diff(const std::vector<expression> &v
 
         assert(fptr->args().size() == 2u);
 
-        if (const auto *num_expo_ptr = std::get_if<number>(&fptr->args()[1].value())) {
+        const auto &expo = fptr->args()[1];
+
+        if (const auto *num_expo_ptr = std::get_if<number>(&expo.value())) {
             // The exponent is a number.
             return !is_negative_one(*num_expo_ptr);
         } else {

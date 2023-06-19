@@ -351,18 +351,13 @@ double pow_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>
     return a[1] * std::pow(a[0], a[1] - 1.) + std::log(a[0]) * std::pow(a[0], a[1]);
 }
 
-namespace
-{
-
-// Maximum integral exponent magnitude for which
-// pow() is transformed into multiplications and divisions.
-constexpr std::uint32_t pow_max_small_pow_n = 16;
-
-} // namespace
-
 // Construct a pow_eval_algo based on the exponentiation arguments of 'impl'.
 pow_eval_algo get_pow_eval_algo(const pow_impl &impl)
 {
+    // Maximum integral exponent magnitude for which
+    // pow() is transformed into multiplications and divisions.
+    constexpr std::uint32_t pow_max_small_pow_n = 16;
+
     assert(impl.args().size() == 2u);
 
     // NOTE: check the special cases first, otherwise fall through
