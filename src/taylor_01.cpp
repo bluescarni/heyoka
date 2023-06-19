@@ -80,6 +80,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/prod.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
@@ -834,6 +835,9 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
     auto all_ex = v_ex_;
     all_ex.insert(all_ex.end(), sv_funcs_.begin(), sv_funcs_.end());
 
+    // Transform sums into subs.
+    all_ex = detail::sum_to_sub(all_ex);
+
     // Split sums.
     all_ex = detail::split_sums_for_decompose(all_ex);
 
@@ -1060,6 +1064,9 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
     // and the sv_funcs.
     auto all_ex = sys_rhs;
     all_ex.insert(all_ex.end(), sv_funcs_.begin(), sv_funcs_.end());
+
+    // Transform sums into subs.
+    all_ex = detail::sum_to_sub(all_ex);
 
     // Split sums.
     all_ex = detail::split_sums_for_decompose(all_ex);
