@@ -627,8 +627,9 @@ TEST_CASE("prod_to_div")
     ret = detail::prod_to_div_llvm_eval({prod({x, y})});
     REQUIRE(ret[0] == prod({x, y}));
 
-    ret = detail::prod_to_div_llvm_eval(
-        {prod({2_dbl, cos(prod({pow(x, -.5_dbl), pow(y, -1_dbl)})), sin(prod({pow(x, -.5_dbl), pow(y, -1_dbl)}))})});
+    const auto tmp_ex = prod({pow(x, -.5_dbl), pow(y, -1_dbl)});
+
+    ret = detail::prod_to_div_llvm_eval({prod({2_dbl, cos(tmp_ex), sin(tmp_ex)})});
     REQUIRE(ret[0]
             == prod({2_dbl, cos(detail::div(1_dbl, prod({pow(x, .5_dbl), pow(y, 1_dbl)}))),
                      sin(detail::div(1_dbl, prod({pow(x, .5_dbl), pow(y, 1_dbl)})))}));
@@ -663,9 +664,11 @@ TEST_CASE("prod_to_div")
     ret = detail::prod_to_div_taylor_diff({prod({x, y})});
     REQUIRE(ret[0] == prod({x, y}));
 
-    ret = detail::prod_to_div_taylor_diff(
-        {prod({2_dbl, cos(prod({pow(x, -.5_dbl), pow(y, -1_dbl)})), sin(prod({pow(x, -.5_dbl), pow(y, -1_dbl)}))})});
+    ret = detail::prod_to_div_taylor_diff({prod({2_dbl, cos(tmp_ex), sin(tmp_ex)})});
     REQUIRE(ret[0]
             == prod({2_dbl, cos(detail::div(pow(x, -.5_dbl), prod({pow(y, 1_dbl)}))),
                      sin(detail::div(pow(x, -.5_dbl), prod({pow(y, 1_dbl)})))}));
+
+    ret = detail::prod_to_div_taylor_diff({prod({x, pow(x, y)})});
+    REQUIRE(ret[0] == prod({x, pow(x, y)}));
 }
