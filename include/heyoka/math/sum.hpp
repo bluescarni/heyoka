@@ -59,6 +59,8 @@ public:
 
 HEYOKA_DLL_PUBLIC expression sum_split(const expression &, std::uint32_t);
 
+HEYOKA_DLL_PUBLIC std::vector<expression> sum_to_sub(const std::vector<expression> &);
+
 std::variant<std::vector<expression>, expression> sum_simplify_args(const std::vector<expression> &);
 
 expression sum_to_sum_sq(const expression &);
