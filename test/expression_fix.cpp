@@ -74,11 +74,11 @@ TEST_CASE("fix diff par")
 {
     auto [x, y] = make_vars("x", "y");
 
-    auto df = diff(fix(sin(sum({pow(par[0], 2_dbl), y}))), x);
+    auto df = diff(fix(sin(sum({pow(par[0], 2_dbl), y}))), par[0]);
 
     REQUIRE(detail::is_fixed(df));
     REQUIRE(std::get<func>(df.value()).args().size() == 1u);
-    REQUIRE(std::get<func>(df.value()).args()[0] == diff(sin(sum({pow(par[0], 2_dbl), y})), x));
+    REQUIRE(std::get<func>(df.value()).args()[0] == diff(sin(sum({pow(par[0], 2_dbl), y})), par[0]));
 }
 
 TEST_CASE("fix")
