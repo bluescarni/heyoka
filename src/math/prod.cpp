@@ -983,9 +983,7 @@ expression prod_to_div_impl(funcptr_map<expression> &func_map, const expression 
 {
     return std::visit(
         [&](const auto &v) {
-            using type = uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, func>) {
+            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto *f_id = v.get_ptr();
 
                 // Check if we already handled ex.
