@@ -525,7 +525,7 @@ function_decompose(const std::vector<expression> &v_ex_)
 #if !defined(NDEBUG)
 
     // Save copy for checking in debug mode.
-    auto v_ex_split = v_ex;
+    const auto v_ex_verify = v_ex;
 
 #endif
 
@@ -581,7 +581,7 @@ function_decompose(const std::vector<expression> &v_ex_)
     // Verify the decomposition.
     // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
     // This is fine, as the decomposition must contain at least nvars items.
-    detail::verify_function_dec(v_ex_split, ret, nvars);
+    detail::verify_function_dec(v_ex_verify, ret, nvars);
 
 #endif
 
@@ -593,7 +593,7 @@ function_decompose(const std::vector<expression> &v_ex_)
 #if !defined(NDEBUG)
 
     // Verify the simplified decomposition.
-    detail::verify_function_dec(v_ex_split, ret, nvars);
+    detail::verify_function_dec(v_ex_verify, ret, nvars);
 
 #endif
 
@@ -605,7 +605,7 @@ function_decompose(const std::vector<expression> &v_ex_)
 #if !defined(NDEBUG)
 
     // Verify the reordered decomposition.
-    detail::verify_function_dec(v_ex_split, ret, nvars);
+    detail::verify_function_dec(v_ex_verify, ret, nvars);
 
 #endif
 
@@ -701,7 +701,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
 #if !defined(NDEBUG)
 
     // Save copy for checking in debug mode.
-    auto v_ex_split = v_ex;
+    const auto v_ex_verify = v_ex;
 
 #endif
 
@@ -757,7 +757,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
     // Verify the decomposition.
     // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
     // This is fine, as the decomposition must contain at least nvars items.
-    detail::verify_function_dec(v_ex_split, ret, nvars);
+    detail::verify_function_dec(v_ex_verify, ret, nvars);
 
 #endif
 
@@ -769,7 +769,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
 #if !defined(NDEBUG)
 
     // Verify the simplified decomposition.
-    detail::verify_function_dec(v_ex_split, ret, nvars);
+    detail::verify_function_dec(v_ex_verify, ret, nvars);
 
 #endif
 
@@ -781,7 +781,7 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
 #if !defined(NDEBUG)
 
     // Verify the reordered decomposition.
-    detail::verify_function_dec(v_ex_split, ret, nvars);
+    detail::verify_function_dec(v_ex_verify, ret, nvars);
 
 #endif
 

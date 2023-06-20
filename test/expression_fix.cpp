@@ -121,4 +121,11 @@ TEST_CASE("unfix")
 
     REQUIRE(ret[0] == cos(x + y));
     REQUIRE(ret[1] == sin(x + y));
+
+    tmp = fix(fix(fix(x + y)));
+
+    ret = unfix({cos(tmp), sin(tmp)});
+
+    REQUIRE(ret[0] == cos(x + y));
+    REQUIRE(ret[1] == sin(x + y));
 }
