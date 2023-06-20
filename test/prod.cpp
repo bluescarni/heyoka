@@ -35,12 +35,14 @@
 
 #endif
 
+#include <heyoka/detail/div.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
+#include <heyoka/math/sin.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -589,4 +591,84 @@ TEST_CASE("prod split")
     REQUIRE(output
             == approximately((1. * 2 * 3 * 4 * 5 * 6 * 7 * 8 * 9 * 10)
                              * std::cos(1. * 2 * 3 * 4 * 5 * 6 * 7 * 8 * 9 * 10)));
+}
+
+TEST_CASE("prod_to_div")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    // cfunc.
+    auto ret = detail::prod_to_div_llvm_eval({prod({x, pow(y, -1_dbl)})});
+
+    REQUIRE(ret.size() == 1u);
+    REQUIRE(ret[0] == detail::div(x, y));
+
+    ret = detail::prod_to_div_llvm_eval({prod({2_dbl, pow(y, -1_dbl)})});
+    REQUIRE(ret[0] == detail::div(2_dbl, y));
+
+    ret = detail::prod_to_div_llvm_eval({prod({2_dbl, cos(x), pow(y, -1_dbl)})});
+    REQUIRE(ret[0] == detail::div(prod({2_dbl, cos(x)}), y));
+
+    ret = detail::prod_to_div_llvm_eval({prod({2_dbl, cos(x), pow(y, -1_dbl), pow(x, -1.5_dbl)})});
+    REQUIRE(ret[0] == detail::div(prod({2_dbl, cos(x)}), prod({y, pow(x, 1.5_dbl)})));
+
+    ret = detail::prod_to_div_llvm_eval({cos(prod({2_dbl, cos(x), pow(y, -1_dbl), pow(x, -1.5_dbl)}))});
+    REQUIRE(ret[0] == cos(detail::div(prod({2_dbl, cos(x)}), prod({y, pow(x, 1.5_dbl)}))));
+
+    ret = detail::prod_to_div_llvm_eval({prod({pow(x, -.5_dbl), pow(y, -1_dbl)})});
+    REQUIRE(ret[0] == detail::div(1_dbl, prod({pow(x, .5_dbl), y})));
+
+    ret = detail::prod_to_div_llvm_eval({prod({pow(x, -.5_dbl), pow(y, 1.5_dbl)})});
+    REQUIRE(ret[0] == detail::div(pow(y, 1.5_dbl), pow(x, .5_dbl)));
+
+    ret = detail::prod_to_div_llvm_eval({prod({pow(x, -.5_dbl), pow(y, 2_dbl)})});
+    REQUIRE(ret[0] == detail::div(pow(y, 2_dbl), pow(x, .5_dbl)));
+
+    ret = detail::prod_to_div_llvm_eval({prod({x, y})});
+    REQUIRE(ret[0] == prod({x, y}));
+
+    const auto tmp_ex = prod({pow(x, -.5_dbl), pow(y, -1_dbl)});
+
+    ret = detail::prod_to_div_llvm_eval({prod({2_dbl, cos(tmp_ex), sin(tmp_ex)})});
+    REQUIRE(ret[0]
+            == prod({2_dbl, cos(detail::div(1_dbl, prod({pow(x, .5_dbl), pow(y, 1_dbl)}))),
+                     sin(detail::div(1_dbl, prod({pow(x, .5_dbl), pow(y, 1_dbl)})))}));
+
+    // Taylor diff.
+    ret = detail::prod_to_div_taylor_diff({prod({x, pow(y, -1_dbl)})});
+
+    REQUIRE(ret.size() == 1u);
+    REQUIRE(ret[0] == detail::div(x, y));
+
+    ret = detail::prod_to_div_taylor_diff({prod({2_dbl, pow(y, -1_dbl)})});
+    REQUIRE(ret[0] == detail::div(2_dbl, y));
+
+    ret = detail::prod_to_div_taylor_diff({prod({2_dbl, cos(x), pow(y, -1_dbl)})});
+    REQUIRE(ret[0] == detail::div(prod({2_dbl, cos(x)}), y));
+
+    ret = detail::prod_to_div_taylor_diff({prod({2_dbl, cos(x), pow(y, -1_dbl), pow(x, -1.5_dbl)})});
+    REQUIRE(ret[0] == detail::div(prod({2_dbl, cos(x), pow(x, -1.5_dbl)}), prod({y})));
+
+    ret = detail::prod_to_div_taylor_diff({cos(prod({2_dbl, cos(x), pow(y, -1_dbl), pow(x, -1.5_dbl)}))});
+    REQUIRE(ret[0] == cos(detail::div(prod({2_dbl, cos(x), pow(x, -1.5_dbl)}), prod({y}))));
+
+    ret = detail::prod_to_div_taylor_diff({prod({pow(x, -.5_dbl), pow(y, -1_dbl)})});
+    REQUIRE(ret[0] == detail::div(pow(x, -.5_dbl), prod({y})));
+
+    ret = detail::prod_to_div_taylor_diff({prod({pow(x, -.5_dbl), pow(y, 1.5_dbl)})});
+    REQUIRE(ret[0] == prod({pow(x, -.5_dbl), pow(y, 1.5_dbl)}));
+
+    ret = detail::prod_to_div_taylor_diff({prod({pow(x, -.5_dbl), pow(y, 2_dbl)})});
+    REQUIRE(ret[0] == prod({pow(x, -.5_dbl), pow(y, 2_dbl)}));
+
+    ret = detail::prod_to_div_taylor_diff({prod({x, y})});
+    REQUIRE(ret[0] == prod({x, y}));
+
+    ret = detail::prod_to_div_taylor_diff({prod({2_dbl, cos(tmp_ex), sin(tmp_ex)})});
+    REQUIRE(ret[0]
+            == prod({2_dbl, cos(detail::div(pow(x, -.5_dbl), prod({pow(y, 1_dbl)}))),
+                     sin(detail::div(pow(x, -.5_dbl), prod({pow(y, 1_dbl)})))}));
+
+    ret = detail::prod_to_div_taylor_diff({prod({x, pow(x, y)})});
+    REQUIRE(ret[0] == prod({x, pow(x, y)}));
 }

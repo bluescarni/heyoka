@@ -10,9 +10,9 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cmath>
 #include <cstddef>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
@@ -38,8 +38,10 @@
 
 #endif
 
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/sub.hpp>
 #include <heyoka/detail/sum_sq.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
@@ -61,6 +63,31 @@ sum_impl::sum_impl() : sum_impl(std::vector<expression>{}) {}
 
 sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v)) {}
 
+namespace
+{
+
+// Partitioning function to identify negative
+// terms in a sum. It will return false if
+// arg is either a negative number or a product
+// in the form cf * a * ..., with cf a negative number,
+// true otherwise.
+bool sum_neg_term_part(const expression &arg)
+{
+    if (const auto *num_ptr = std::get_if<number>(&arg.value())) {
+        return !is_negative(*num_ptr);
+    }
+
+    if (const auto &fptr = std::get_if<func>(&arg.value());
+        fptr != nullptr && fptr->extract<prod_impl>() != nullptr && fptr->args().size() >= 2u
+        && std::holds_alternative<number>(fptr->args()[0].value())) {
+        return !is_negative(std::get<number>(fptr->args()[0].value()));
+    }
+
+    return true;
+}
+
+} // namespace
+
 void sum_impl::to_stream(std::ostringstream &oss) const
 {
     if (args().empty()) {
@@ -73,30 +100,11 @@ void sum_impl::to_stream(std::ostringstream &oss) const
         return;
     }
 
-    // Helper to check if a value is non-NaN and negative.
-    auto negative_checker = [](const auto &v) {
-        using std::isnan;
-
-        return !isnan(v) && v < 0;
-    };
-
     // Partition the arguments so that all terms which are either a negative
     // number or a product in the form cf * a * ..., with cf a negative number,
     // are at the end.
     auto terms = args();
-    const auto neg_it = std::stable_partition(terms.begin(), terms.end(), [&](const expression &arg) {
-        if (const auto *num_ptr = std::get_if<number>(&arg.value())) {
-            return !std::visit(negative_checker, num_ptr->value());
-        }
-
-        if (const auto &fptr = std::get_if<func>(&arg.value());
-            fptr != nullptr && fptr->extract<prod_impl>() != nullptr && fptr->args().size() >= 2u
-            && std::holds_alternative<number>(fptr->args()[0].value())) {
-            return !std::visit(negative_checker, std::get<number>(fptr->args()[0].value()).value());
-        }
-
-        return true;
-    });
+    const auto neg_it = std::stable_partition(terms.begin(), terms.end(), sum_neg_term_part);
 
     // Helper to stream the positive terms.
     auto stream_pos_terms = [&]() {
@@ -615,6 +623,129 @@ std::variant<std::vector<expression>, expression> sum_simplify_args(const std::v
     std::stable_sort(args.begin(), args.end(), detail::comm_ops_lt);
 
     return args;
+}
+
+namespace
+{
+
+expression sum_to_sub_impl(funcptr_map<expression> &func_map, const expression &ex)
+{
+    return std::visit(
+        [&](const auto &v) {
+            using type = uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, func>) {
+                const auto *f_id = v.get_ptr();
+
+                // Check if we already handled ex.
+                if (const auto it = func_map.find(f_id); it != func_map.end()) {
+                    return it->second;
+                }
+
+                // Recursively transform sums into subs
+                // in the arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(v.args().size());
+                for (const auto &orig_arg : v.args()) {
+                    new_args.push_back(sum_to_sub_impl(func_map, orig_arg));
+                }
+
+                // Prepare the return value.
+                std::optional<expression> retval;
+
+                if (v.template extract<sum_impl>() == nullptr) {
+                    // The current function is not a sum(). Just create
+                    // a copy of it with the new args.
+                    retval.emplace(v.copy(new_args));
+                } else {
+                    // The current function is a sum(). Partition its
+                    // negative arguments.
+                    const auto it = std::stable_partition(new_args.begin(), new_args.end(), sum_neg_term_part);
+
+                    if (it == new_args.end()) {
+                        // There are no negative terms in the sum, just make a copy.
+                        retval.emplace(v.copy(new_args));
+                    } else {
+                        // There are some negative terms in the sum.
+                        // Group them into a subtrahend, negate, and transform
+                        // into a subtraction.
+
+                        // Construct the terms of the subtrahend.
+                        std::vector<expression> sub_args, tmp_args;
+                        for (auto s_it = it; s_it != new_args.end(); ++s_it) {
+                            if (const auto *num_ptr = std::get_if<number>(&s_it->value())) {
+                                // The subtrahend term is a number, negate it.
+                                sub_args.emplace_back(-*num_ptr);
+                            } else {
+                                // The subtrahend term is a product with leading
+                                // negative coefficient.
+                                const auto &fn = std::get<func>(s_it->value());
+
+                                assert(fn.template extract<prod_impl>() != nullptr);
+                                assert(fn.args().size() >= 2u);
+
+                                // Get the original leading coefficient.
+                                const auto &cf = std::get<number>(fn.args()[0].value());
+
+                                assert(is_negative(cf));
+
+                                // Negate it and insert it in tmp_args.
+                                tmp_args.clear();
+                                tmp_args.reserve(fn.args().size());
+                                tmp_args.emplace_back(-cf);
+
+                                // Insert the rest of the terms from the product.
+                                tmp_args.insert(tmp_args.end(), fn.args().begin() + 1, fn.args().end());
+
+                                // Reconstruct the negated product.
+                                sub_args.push_back(prod(tmp_args));
+                            }
+                        }
+
+                        // Construct the subtrahend.
+                        auto st = sum(sub_args);
+
+                        if (it == new_args.begin()) {
+                            // There are *only* negative terms, return the negation of st.
+                            retval.emplace(prod({-1_dbl, std::move(st)}));
+                        } else {
+                            // Construct the minuend.
+                            new_args.erase(it, new_args.end());
+                            auto mend = sum(new_args);
+
+                            // Construct the return value.
+                            retval.emplace(sub(std::move(mend), std::move(st)));
+                        }
+                    }
+                }
+
+                // Put the return value into the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, *retval);
+                // NOTE: an expression cannot contain itself.
+                assert(flag); // LCOV_EXCL_LINE
+
+                return std::move(*retval);
+            } else {
+                return ex;
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+std::vector<expression> sum_to_sub(const std::vector<expression> &v_ex)
+{
+    funcptr_map<expression> func_map;
+
+    std::vector<expression> retval;
+    retval.reserve(v_ex.size());
+
+    for (const auto &e : v_ex) {
+        retval.push_back(sum_to_sub_impl(func_map, e));
+    }
+
+    return retval;
 }
 
 } // namespace detail

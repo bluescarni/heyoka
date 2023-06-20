@@ -28,6 +28,8 @@
 
 #include <heyoka/celmec/vsop2013.hpp>
 #include <heyoka/config.hpp>
+#include <heyoka/detail/div.hpp>
+#include <heyoka/detail/sub.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -2095,4 +2097,110 @@ TEST_CASE("mul compress")
     REQUIRE(2_dbl * x + x == 3_dbl * x);
     REQUIRE(x + 2_dbl * x == 3_dbl * x);
     REQUIRE(x - 2_dbl * x == -1_dbl * x);
+}
+
+TEST_CASE("cfunc prod_to_div")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    {
+        llvm_state s;
+
+        const auto dc = add_cfunc<double>(s, "cfunc", {prod({3_dbl, pow(y, -1_dbl), pow(x, -1.5_dbl)})});
+
+        REQUIRE(dc.size() == 6u);
+        REQUIRE(std::count_if(dc.begin(), dc.end(),
+                              [](const auto &ex) {
+                                  return std::holds_alternative<func>(ex.value())
+                                         && std::get<func>(ex.value()).template extract<detail::div_impl>() != nullptr;
+                              })
+                == 1);
+        REQUIRE(std::count_if(dc.begin(), dc.end(),
+                              [](const auto &ex) {
+                                  return std::holds_alternative<func>(ex.value())
+                                         && std::get<func>(ex.value()).template extract<detail::pow_impl>() != nullptr;
+                              })
+                == 1);
+
+        for (const auto &ex : dc) {
+            if (std::holds_alternative<func>(ex.value())
+                && std::get<func>(ex.value()).extract<detail::pow_impl>() != nullptr) {
+                REQUIRE(!is_negative(std::get<number>(std::get<func>(ex.value()).args()[1].value())));
+            }
+        }
+    }
+
+    {
+        llvm_state s;
+
+        const auto dc
+            = add_cfunc<double>(s, "cfunc", {prod({3_dbl, pow(y, -1_dbl), pow(x, -1.5_dbl)})}, kw::vars = {x, y});
+
+        REQUIRE(dc.size() == 6u);
+        REQUIRE(std::count_if(dc.begin(), dc.end(),
+                              [](const auto &ex) {
+                                  return std::holds_alternative<func>(ex.value())
+                                         && std::get<func>(ex.value()).template extract<detail::div_impl>() != nullptr;
+                              })
+                == 1);
+        REQUIRE(std::count_if(dc.begin(), dc.end(),
+                              [](const auto &ex) {
+                                  return std::holds_alternative<func>(ex.value())
+                                         && std::get<func>(ex.value()).template extract<detail::pow_impl>() != nullptr;
+                              })
+                == 1);
+
+        for (const auto &ex : dc) {
+            if (std::holds_alternative<func>(ex.value())
+                && std::get<func>(ex.value()).extract<detail::pow_impl>() != nullptr) {
+                REQUIRE(!is_negative(std::get<number>(std::get<func>(ex.value()).args()[1].value())));
+            }
+        }
+    }
+}
+
+TEST_CASE("cfunc sum_to_sub")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    {
+        llvm_state s;
+
+        const auto dc = add_cfunc<double>(s, "cfunc", {sum({1_dbl, prod({-1_dbl, x}), prod({-1_dbl, y})})});
+
+        REQUIRE(dc.size() == 5u);
+        REQUIRE(std::count_if(dc.begin(), dc.end(),
+                              [](const auto &ex) {
+                                  return std::holds_alternative<func>(ex.value())
+                                         && std::get<func>(ex.value()).template extract<detail::sub_impl>() != nullptr;
+                              })
+                == 1);
+        REQUIRE(std::count_if(dc.begin(), dc.end(),
+                              [](const auto &ex) {
+                                  return std::holds_alternative<func>(ex.value())
+                                         && std::get<func>(ex.value()).template extract<detail::sum_impl>() != nullptr;
+                              })
+                == 1);
+    }
+
+    {
+        llvm_state s;
+
+        const auto dc
+            = add_cfunc<double>(s, "cfunc", {sum({1_dbl, prod({-1_dbl, x}), prod({-1_dbl, y})})}, kw::vars = {x, y});
+
+        REQUIRE(dc.size() == 5u);
+        REQUIRE(std::count_if(dc.begin(), dc.end(),
+                              [](const auto &ex) {
+                                  return std::holds_alternative<func>(ex.value())
+                                         && std::get<func>(ex.value()).template extract<detail::sub_impl>() != nullptr;
+                              })
+                == 1);
+        REQUIRE(std::count_if(dc.begin(), dc.end(),
+                              [](const auto &ex) {
+                                  return std::holds_alternative<func>(ex.value())
+                                         && std::get<func>(ex.value()).template extract<detail::sum_impl>() != nullptr;
+                              })
+                == 1);
+    }
 }

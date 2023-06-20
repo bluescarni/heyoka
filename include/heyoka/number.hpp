@@ -96,6 +96,7 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const number &);
 HEYOKA_DLL_PUBLIC bool is_zero(const number &);
 HEYOKA_DLL_PUBLIC bool is_one(const number &);
 HEYOKA_DLL_PUBLIC bool is_negative_one(const number &);
+HEYOKA_DLL_PUBLIC bool is_negative(const number &);
 
 HEYOKA_DLL_PUBLIC number operator-(const number &);
 

@@ -79,6 +79,8 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/prod.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
@@ -833,11 +835,17 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
     auto all_ex = v_ex_;
     all_ex.insert(all_ex.end(), sv_funcs_.begin(), sv_funcs_.end());
 
+    // Transform sums into subs.
+    all_ex = detail::sum_to_sub(all_ex);
+
     // Split sums.
     all_ex = detail::split_sums_for_decompose(all_ex);
 
     // Transform sums into sum_sqs if possible.
     all_ex = detail::sums_to_sum_sqs_for_decompose(all_ex);
+
+    // Transform prods into divs.
+    all_ex = detail::prod_to_div_taylor_diff(all_ex);
 
     // Split prods.
     // NOTE: split must be 2 here as the Taylor diff formulae require
@@ -1057,11 +1065,17 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
     auto all_ex = sys_rhs;
     all_ex.insert(all_ex.end(), sv_funcs_.begin(), sv_funcs_.end());
 
+    // Transform sums into subs.
+    all_ex = detail::sum_to_sub(all_ex);
+
     // Split sums.
     all_ex = detail::split_sums_for_decompose(all_ex);
 
     // Transform sums into sum_sqs if possible.
     all_ex = detail::sums_to_sum_sqs_for_decompose(all_ex);
+
+    // Transform prods into divs.
+    all_ex = detail::prod_to_div_taylor_diff(all_ex);
 
     // Split prods.
     // NOTE: split must be 2 here as the Taylor diff formulae require

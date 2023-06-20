@@ -72,6 +72,8 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/prod.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
@@ -501,11 +503,17 @@ function_decompose(const std::vector<expression> &v_ex_)
         }
     }
 
+    // Transform sums into subs.
+    auto v_ex = detail::sum_to_sub(v_ex_);
+
     // Split sums.
-    auto v_ex = detail::split_sums_for_decompose(v_ex_);
+    v_ex = detail::split_sums_for_decompose(v_ex);
 
     // Transform sums into sum_sqs if possible.
     v_ex = detail::sums_to_sum_sqs_for_decompose(v_ex);
+
+    // Transform prods into divs.
+    v_ex = detail::prod_to_div_llvm_eval(v_ex);
 
     // Split prods.
     // NOTE: 8 is the same value as for split_sums_for_decompose().
@@ -668,11 +676,17 @@ std::vector<expression> function_decompose(const std::vector<expression> &v_ex_,
         assert(eres.second);
     }
 
+    // Transform sums into subs.
+    auto v_ex = detail::sum_to_sub(v_ex_);
+
     // Split sums.
-    auto v_ex = detail::split_sums_for_decompose(v_ex_);
+    v_ex = detail::split_sums_for_decompose(v_ex);
 
     // Transform sums into sum_sqs if possible.
     v_ex = detail::sums_to_sum_sqs_for_decompose(v_ex);
+
+    // Transform prods into divs.
+    v_ex = detail::prod_to_div_llvm_eval(v_ex);
 
     // Split prods.
     // NOTE: 8 is the same value as for split_sums_for_decompose().

@@ -38,11 +38,13 @@
 
 #endif
 
+#include <heyoka/detail/sub.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/prod.hpp>
+#include <heyoka/math/sin.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -489,4 +491,29 @@ TEST_CASE("sum simpls")
 
     REQUIRE(sum({sum({x, y}), y, z, t, prod({2_dbl, x}), y, z, t})
             == sum({prod({2_dbl, t}), prod({3_dbl, x}), prod({3_dbl, y}), prod({2_dbl, z})}));
+}
+
+TEST_CASE("sum_to_sub")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    auto ret = detail::sum_to_sub({sum({x, prod({-1_dbl, y})})});
+    REQUIRE(ret[0] == detail::sub(x, y));
+
+    ret = detail::sum_to_sub({sum({-5_dbl, x, prod({-1_dbl, y})})});
+    REQUIRE(ret[0] == detail::sub(x, sum({y, 5_dbl})));
+
+    ret = detail::sum_to_sub({sum({5_dbl, x, cos(y)})});
+    REQUIRE(ret[0] == sum({5_dbl, x, cos(y)}));
+
+    ret = detail::sum_to_sub({sum({-5_dbl, prod({-2_dbl, x}), prod({-1_dbl, cos(y)})})});
+    REQUIRE(ret[0] == prod({-1_dbl, sum({5_dbl, prod({2_dbl, x}), prod({1_dbl, cos(y)})})}));
+
+    ret = detail::sum_to_sub({cos(sum({-5_dbl, prod({-2_dbl, x}), prod({-1_dbl, cos(y)})}))});
+    REQUIRE(ret[0] == cos(prod({-1_dbl, sum({5_dbl, prod({2_dbl, x}), prod({1_dbl, cos(y)})})})));
+
+    auto tmp = sum({x, prod({-1_dbl, cos(x)})});
+
+    ret = detail::sum_to_sub({sum({prod({-1_dbl, y}), sin(tmp), cos(tmp)})});
+    REQUIRE(ret[0] == detail::sub(sum({sin(detail::sub(x, cos(x))), cos(detail::sub(x, cos(x)))}), y));
 }
