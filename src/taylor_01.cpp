@@ -852,11 +852,14 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
     // binary multiplications.
     all_ex = detail::split_prods_for_decompose(all_ex, 2);
 
+    // Unfix.
+    all_ex = unfix(all_ex);
+
 #if !defined(NDEBUG)
 
     // Save copies for checking in debug mode.
-    const auto v_ex_split = std::vector(all_ex.data(), all_ex.data() + v_ex_.size());
-    const auto sv_funcs_split = std::vector(all_ex.data() + v_ex_.size(), all_ex.data() + all_ex.size());
+    const auto v_ex_verify = std::vector(all_ex.data(), all_ex.data() + v_ex_.size());
+    const auto sv_funcs_verify = std::vector(all_ex.data() + v_ex_.size(), all_ex.data() + all_ex.size());
 
 #endif
 
@@ -932,8 +935,8 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
 
 #if !defined(NDEBUG)
     // Verify the decomposition.
-    detail::verify_taylor_dec(v_ex_split, u_vars_defs);
-    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_split, u_vars_defs, n_eq);
+    detail::verify_taylor_dec(v_ex_verify, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_verify, u_vars_defs, n_eq);
 #endif
 
     // Simplify the decomposition.
@@ -943,8 +946,8 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
 
 #if !defined(NDEBUG)
     // Verify the simplified decomposition.
-    detail::verify_taylor_dec(v_ex_split, u_vars_defs);
-    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_split, u_vars_defs, n_eq);
+    detail::verify_taylor_dec(v_ex_verify, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_verify, u_vars_defs, n_eq);
 #endif
 
     // Run the breadth-first topological sort on the decomposition.
@@ -954,8 +957,8 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
 
 #if !defined(NDEBUG)
     // Verify the reordered decomposition.
-    detail::verify_taylor_dec(v_ex_split, u_vars_defs);
-    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_split, u_vars_defs, n_eq);
+    detail::verify_taylor_dec(v_ex_verify, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_verify, u_vars_defs, n_eq);
 #endif
 
     // Replace any number subexpression with an identity function.
@@ -1082,11 +1085,14 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
     // binary multiplications.
     all_ex = detail::split_prods_for_decompose(all_ex, 2);
 
+    // Unfix.
+    all_ex = unfix(all_ex);
+
 #if !defined(NDEBUG)
 
     // Save copies for checking in debug mode.
-    const auto sys_rhs_split = std::vector(all_ex.data(), all_ex.data() + sys_rhs.size());
-    const auto sv_funcs_split = std::vector(all_ex.data() + sys_rhs.size(), all_ex.data() + all_ex.size());
+    const auto sys_rhs_verify = std::vector(all_ex.data(), all_ex.data() + sys_rhs.size());
+    const auto sv_funcs_verify = std::vector(all_ex.data() + sys_rhs.size(), all_ex.data() + all_ex.size());
 
 #endif
 
@@ -1161,8 +1167,8 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 
 #if !defined(NDEBUG)
     // Verify the decomposition.
-    detail::verify_taylor_dec(sys_rhs_split, u_vars_defs);
-    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_split, u_vars_defs, n_eq);
+    detail::verify_taylor_dec(sys_rhs_verify, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_verify, u_vars_defs, n_eq);
 #endif
 
     // Simplify the decomposition.
@@ -1172,8 +1178,8 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 
 #if !defined(NDEBUG)
     // Verify the simplified decomposition.
-    detail::verify_taylor_dec(sys_rhs_split, u_vars_defs);
-    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_split, u_vars_defs, n_eq);
+    detail::verify_taylor_dec(sys_rhs_verify, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_verify, u_vars_defs, n_eq);
 #endif
 
     // Run the breadth-first topological sort on the decomposition.
@@ -1183,8 +1189,8 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 
 #if !defined(NDEBUG)
     // Verify the reordered decomposition.
-    detail::verify_taylor_dec(sys_rhs_split, u_vars_defs);
-    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_split, u_vars_defs, n_eq);
+    detail::verify_taylor_dec(sys_rhs_verify, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, sv_funcs_verify, u_vars_defs, n_eq);
 #endif
 
     // Replace any number subexpression with an identity function.

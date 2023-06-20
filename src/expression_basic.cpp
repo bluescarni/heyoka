@@ -1194,9 +1194,7 @@ expression split_sums_for_decompose(funcptr_map<expression> &func_map, const exp
 {
     return std::visit(
         [&](const auto &v) {
-            using type = uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, func>) {
+            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto *f_id = v.get_ptr();
 
                 // Check if we already split sums on ex.
@@ -1254,9 +1252,7 @@ expression split_prods_for_decompose(funcptr_map<expression> &func_map, const ex
 {
     return std::visit(
         [&func_map, &ex, split](const auto &v) {
-            using type = uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, func>) {
+            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto *f_id = v.get_ptr();
 
                 // Check if we already split prods on ex.
@@ -1314,9 +1310,7 @@ expression sums_to_sum_sqs_for_decompose(funcptr_map<expression> &func_map, cons
 {
     return std::visit(
         [&](const auto &v) {
-            using type = uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, func>) {
+            if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto *f_id = v.get_ptr();
 
                 // Check if we already converted sums to sum_sqs on ex.
