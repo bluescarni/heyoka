@@ -41,6 +41,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -825,7 +826,7 @@ std::variant<std::vector<expression>, expression> prod_simplify_args(const std::
     for (const auto &arg : args_) {
         if (const auto *fptr = std::get_if<func>(&arg.value());
             fptr != nullptr && fptr->extract<detail::prod_impl>() != nullptr) {
-
+            // Nested product.
             for (const auto &prod_arg : fptr->args()) {
                 args.push_back(prod_arg);
             }
@@ -887,12 +888,29 @@ std::variant<std::vector<expression>, expression> prod_simplify_args(const std::
         // Remove all numbers but the first one.
         args.erase(n_end_it + 1, args.end());
 
-        // Remove the remaining number if it is one, or
-        // return zero if constant folding results in zero.
+        // Handle the special cases in which the remaining number
+        // is zero or one.
         if (is_one(std::get<number>(n_end_it->value()))) {
-            args.pop_back();
+            // The only remaining number is equal to one.
+            if (args.size() == 1u) {
+                assert(n_end_it == args.begin());
+
+                // This is also the only remaining term in the product,
+                // return it.
+                // NOTE: it is important to special-case this, because otherwise
+                // we will fall into the args().empty() special case below, which will
+                // forcibly convert the folded 1 constant into double precision.
+                return *n_end_it;
+            } else {
+                // Besides the number 1, there are other
+                // non-number terms in the product. Remove
+                // the number 1.
+                args.pop_back();
+            }
         } else if (is_zero(std::get<number>(n_end_it->value()))) {
-            return 0_dbl;
+            // The only remaining number is zero, the result
+            // of the multiplication will be zero too.
+            return *n_end_it;
         }
     }
 
@@ -1157,6 +1175,7 @@ std::vector<expression> prod_to_div_taylor_diff(const std::vector<expression> &v
 
 } // namespace detail
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression prod(const std::vector<expression> &args_)
 {
     auto args = detail::prod_simplify_args(args_);
@@ -1164,7 +1183,27 @@ expression prod(const std::vector<expression> &args_)
     if (std::holds_alternative<expression>(args)) {
         return std::move(std::get<expression>(args));
     } else {
-        return expression{func{detail::prod_impl{std::move(std::get<std::vector<expression>>(args))}}};
+        auto &v_args = std::get<std::vector<expression>>(args);
+
+        assert(v_args.size() >= 2u);
+
+        if (const auto *fptr = std::get_if<func>(&v_args[1].value());
+            fptr != nullptr && v_args.size() == 2u && std::holds_alternative<number>(v_args[0].value())
+            && fptr->extract<detail::sum_impl>() != nullptr) {
+            // Binary product of the form cf * sum(a, ...), with cf a numerical coefficient.
+            // Transform into sum(cf * a, ...).
+            const auto &cf = v_args[0];
+
+            std::vector<expression> new_sum_args;
+            new_sum_args.reserve(fptr->args().size());
+            for (const auto &orig_sum_arg : fptr->args()) {
+                new_sum_args.push_back(prod({cf, orig_sum_arg}));
+            }
+
+            return sum(new_sum_args);
+        }
+
+        return expression{func{detail::prod_impl{std::move(v_args)}}};
     }
 }
 
