@@ -395,4 +395,10 @@ TEST_CASE("pow special cases")
     auto [x, y] = make_vars("x", "y");
 
     REQUIRE(pow(pow(x, y), -5.) == pow(x, prod({-5._dbl, y})));
+
+    REQUIRE(pow(prod({x, y}), 2_dbl) == prod({pow(x, 2_dbl), pow(y, 2_dbl)}));
+    REQUIRE(pow(prod({x, y}), -2_dbl) == prod({pow(x, -2_dbl), pow(y, -2_dbl)}));
+
+    REQUIRE(pow(prod({x, y}), 2.1_dbl) != prod({pow(x, 2.1_dbl), pow(y, 2.1_dbl)}));
+    REQUIRE(pow(prod({x, y}), -2.1_dbl) != prod({pow(x, -2.1_dbl), pow(y, -2.1_dbl)}));
 }

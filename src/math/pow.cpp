@@ -1143,6 +1143,19 @@ expression pow_wrapper_impl(expression b, expression e)
                 return pow(b_base, prod({b_exp, e}));
             }
         }
+
+        // Handle special case when the base is a prod() and the exponent is an integral value:
+        // (x*y)**n -> x**n * y**n.
+        if (const auto *fptr = std::get_if<func>(&b.value());
+            fptr != nullptr && fptr->extract<prod_impl>() != nullptr && is_integer(*num_ptr)) {
+            std::vector<expression> new_prod_args;
+            new_prod_args.reserve(fptr->args().size());
+            for (const auto &arg : fptr->args()) {
+                new_prod_args.push_back(pow(arg, expression{*num_ptr}));
+            }
+
+            return prod(new_prod_args);
+        }
     }
 
     // The general case.
