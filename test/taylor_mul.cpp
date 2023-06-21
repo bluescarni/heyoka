@@ -21,8 +21,9 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/binary_op.hpp>
+#include <heyoka/math/prod.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -43,6 +44,12 @@ const auto fp_types = std::tuple<double
                                  mppp::real128
 #endif
                                  >{};
+
+// Helper to ease the removal of mul() in the test code.
+auto mul(const expression &a, const expression &b)
+{
+    return expression{func{detail::prod_impl({a, b})}};
+}
 
 template <typename T, typename U>
 void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)

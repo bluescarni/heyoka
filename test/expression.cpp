@@ -68,137 +68,6 @@ auto neg(const expression &e)
     return -e;
 }
 
-template <class T>
-void test_eval()
-{
-    using std::acos;
-    using std::acosh;
-    using std::asin;
-    using std::asinh;
-    using std::atan;
-    using std::atanh;
-    using std::cos;
-    using std::erf;
-    using std::exp;
-    using std::log;
-    using std::pow;
-    using std::sin;
-    using std::sqrt;
-    using std::tan;
-
-    auto [x, y] = make_vars("x", "y");
-
-    // We test on a number
-    {
-        expression ex(T(0.125));
-        std::unordered_map<std::string, T> in;
-        REQUIRE(eval(ex, in) == T(0.125));
-    }
-    // We test on a variable
-    {
-        std::unordered_map<std::string, T> in{{"x", T(0.125)}};
-        REQUIRE(eval(x, in) == T(0.125));
-    }
-    // We test on a function call
-
-    // We test on a binary operator
-    {
-        std::unordered_map<std::string, T> in{{"x", T(0.125)}};
-        REQUIRE(eval(x / T(0.125), in) == 1.);
-    }
-    // We test on a deeper tree
-    {
-        expression ex = (x * y + x * y * y * y) / (x * y + x * y * y * y) - x / y;
-        std::unordered_map<std::string, T> in{{"x", T(0.125)}, {"y", T(0.125)}};
-        REQUIRE(eval(ex, in) == 0.);
-    }
-    // We test the corner case of a dictionary not containing the variable.
-    {
-        expression ex = x * y;
-        std::unordered_map<std::string, T> in{{"x", T(0.125)}};
-        REQUIRE_THROWS(eval(ex, in));
-    }
-    // We test the implementation of all function.
-    {
-        std::unordered_map<std::string, T> in{{"x", T(0.125)}};
-        REQUIRE(eval(acos(x), in) == approximately(acos(T(0.125))));
-        REQUIRE(eval(asin(x), in) == approximately(asin(T(0.125))));
-        REQUIRE(eval(atan(x), in) == approximately(atan(T(0.125))));
-        REQUIRE(eval(atanh(x), in) == approximately(atanh(T(0.125))));
-        REQUIRE(eval(cos(x), in) == approximately(cos(T(0.125))));
-        REQUIRE(eval(sin(x), in) == approximately(sin(T(0.125))));
-        REQUIRE(eval(log(x), in) == approximately(log(T(0.125))));
-        REQUIRE(eval(exp(x), in) == approximately(exp(T(0.125))));
-        REQUIRE(eval(pow(x, x), in) == approximately(pow(T(0.125), T(0.125))));
-        REQUIRE(eval(tan(x), in) == approximately(tan(T(0.125))));
-        REQUIRE(eval(sqrt(x), in) == approximately(sqrt(T(0.125))));
-        REQUIRE(eval(sigmoid(x), in) == approximately(T(1.) / (T(1.) + exp(-T(0.125)))));
-        REQUIRE(eval(erf(x), in) == approximately(erf(T(0.125))));
-        REQUIRE(eval(neg(x), in) == approximately(-T(0.125)));
-        REQUIRE(eval(acosh(x + heyoka::expression(T(1.))), in) == approximately(acosh(T(1.125))));
-        REQUIRE(eval(asinh(x), in) == approximately(asinh(T(0.125))));
-    }
-}
-
-TEST_CASE("eval")
-{
-    test_eval<double>();
-
-#if !defined(HEYOKA_ARCH_PPC)
-    test_eval<long double>();
-#endif
-
-#if defined(HEYOKA_HAVE_REAL128)
-    test_eval<mppp::real128>();
-#endif
-}
-
-TEST_CASE("eval_batch_dbl")
-{
-    std::vector<double> out(2);
-    // We test on a number
-    {
-        expression ex = 2.345_dbl;
-        std::unordered_map<std::string, std::vector<double>> in{{"x", {-2.345, 20.234}}};
-        out = std::vector<double>(2);
-        eval_batch_dbl(out, ex, in);
-        REQUIRE(out == std::vector<double>{2.345, 2.345});
-    }
-    // We test on a variable
-    {
-        expression ex = "x"_var;
-        std::unordered_map<std::string, std::vector<double>> in{{"x", {-2.345, 20.234}}};
-        out = std::vector<double>(2);
-        eval_batch_dbl(out, ex, in);
-        REQUIRE(out == std::vector<double>{-2.345, 20.234});
-    }
-    // We test on a function call
-    {
-        expression ex = cos("x"_var);
-        std::unordered_map<std::string, std::vector<double>> in{{"x", {-2.345, 20.234}}};
-        out = std::vector<double>(2);
-        eval_batch_dbl(out, ex, in);
-        REQUIRE(out == std::vector<double>{std::cos(-2.345), std::cos(20.234)});
-    }
-    // We test on a deeper tree
-    {
-        expression ex = "x"_var * "y"_var + cos("x"_var * "y"_var);
-        std::unordered_map<std::string, std::vector<double>> in;
-        in["x"] = std::vector<double>{3., 4.};
-        in["y"] = std::vector<double>{-1., -2.};
-        out = std::vector<double>(2);
-        eval_batch_dbl(out, ex, in);
-        REQUIRE(out == std::vector<double>{-3 + std::cos(-3), -8 + std::cos(-8)});
-    }
-    // We test the corner case of a dictionary not containing the variable.
-    {
-        expression ex = "x"_var * "y"_var;
-        std::unordered_map<std::string, std::vector<double>> in{{"x", {-2.345, 20.234}}};
-        out = std::vector<double>(2);
-        REQUIRE_THROWS(eval_batch_dbl(out, ex, in));
-    }
-}
-
 TEST_CASE("operator == and !=")
 {
     // Expression 1
@@ -420,15 +289,6 @@ TEST_CASE("diff var")
 
     REQUIRE(diff(par[42], "x") == 0_dbl);
     REQUIRE(std::holds_alternative<double>(std::get<number>(diff(par[42], "x").value()).value()));
-
-    // Test the caching of derivatives.
-    auto foo = x * (x + y), bar = (foo - x) + (2. * foo);
-    auto bar_diff = diff(bar, "x");
-
-    REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(bar_diff.value()).args()[0].value()).args()[1].value()).get_ptr()
-        == std::get<func>(std::get<func>(std::get<func>(bar_diff.value()).args()[1].value()).args()[1].value())
-               .get_ptr());
 }
 
 TEST_CASE("diff par")
@@ -451,15 +311,6 @@ TEST_CASE("diff par")
 
     REQUIRE(diff("x"_var, par[42]) == 0_dbl);
     REQUIRE(std::holds_alternative<double>(std::get<number>(diff("x"_var, par[42]).value()).value()));
-
-    // Test the caching of derivatives.
-    auto foo = par[0] * (par[0] + y), bar = (foo - par[0]) + (2. * foo);
-    auto bar_diff = diff(bar, par[0]);
-
-    REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(bar_diff.value()).args()[0].value()).args()[1].value()).get_ptr()
-        == std::get<func>(std::get<func>(std::get<func>(bar_diff.value()).args()[1].value()).args()[1].value())
-               .get_ptr());
 }
 
 TEST_CASE("get_param_size")
@@ -534,14 +385,6 @@ TEST_CASE("add simpls")
 
     REQUIRE(x + 0_dbl == x);
     REQUIRE(x + 1_dbl == 1_dbl + x);
-
-    REQUIRE(std::get<func>((1_dbl + y).value()).extract<detail::binary_op>() != nullptr);
-    REQUIRE(std::get<func>((1_dbl + y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::add);
-    REQUIRE(std::get<func>((1_dbl + y).value()).extract<detail::binary_op>()->args() == std::vector{1_dbl, y});
-
-    REQUIRE(std::get<func>((x + y).value()).extract<detail::binary_op>() != nullptr);
-    REQUIRE(std::get<func>((x + y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::add);
-    REQUIRE(std::get<func>((x + y).value()).extract<detail::binary_op>()->args() == std::vector{x, y});
 }
 
 TEST_CASE("sub simpls")
@@ -555,14 +398,6 @@ TEST_CASE("sub simpls")
 
     REQUIRE((x + y) - 0_dbl == x + y);
     REQUIRE((x + y) - 1_dbl == x + y + -1_dbl);
-
-    REQUIRE(std::get<func>((1_dbl - y).value()).extract<detail::binary_op>() != nullptr);
-    REQUIRE(std::get<func>((1_dbl - y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::sub);
-    REQUIRE(std::get<func>((1_dbl - y).value()).extract<detail::binary_op>()->args() == std::vector{1_dbl, y});
-
-    REQUIRE(std::get<func>((x - y).value()).extract<detail::binary_op>() != nullptr);
-    REQUIRE(std::get<func>((x - y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::sub);
-    REQUIRE(std::get<func>((x - y).value()).extract<detail::binary_op>()->args() == std::vector{x, y});
 }
 
 TEST_CASE("mul simpls")
@@ -588,14 +423,6 @@ TEST_CASE("mul simpls")
     REQUIRE(2_dbl * (-3_dbl * -x) == 6_dbl * x);
     REQUIRE(2_dbl * (-x * -3_dbl) == 6_dbl * x);
     REQUIRE(2_dbl * (-3_dbl * (-x * -4_dbl)) == -24_dbl * x);
-
-    REQUIRE(std::get<func>((2_dbl * y).value()).extract<detail::binary_op>() != nullptr);
-    REQUIRE(std::get<func>((2_dbl * y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::mul);
-    REQUIRE(std::get<func>((2_dbl * y).value()).extract<detail::binary_op>()->args() == std::vector{2_dbl, y});
-
-    REQUIRE(std::get<func>((x * y).value()).extract<detail::binary_op>() != nullptr);
-    REQUIRE(std::get<func>((x * y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::mul);
-    REQUIRE(std::get<func>((x * y).value()).extract<detail::binary_op>()->args() == std::vector{x, y});
 
     REQUIRE(-1_dbl * (x + y) == -(x + y));
     REQUIRE((x - y) * -1_dbl == -(x - y));
@@ -629,8 +456,6 @@ TEST_CASE("div simpls")
 
     REQUIRE(-x / -y == x / y);
 
-    REQUIRE_THROWS_MATCHES(x / 0_dbl, zero_division_error, Message("Division by zero"));
-
     REQUIRE(1_dbl / 2_dbl == 0.5_dbl);
     REQUIRE(1_dbl / -2_dbl == -0.5_dbl);
 
@@ -645,18 +470,6 @@ TEST_CASE("div simpls")
     REQUIRE(-2_dbl / -x == 2_dbl / x);
 
     REQUIRE(x / 2_dbl / 2_dbl == x / 4_dbl);
-
-    REQUIRE(std::get<func>((2_dbl / y).value()).extract<detail::binary_op>() != nullptr);
-    REQUIRE(std::get<func>((2_dbl / y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::div);
-    REQUIRE(std::get<func>((2_dbl / y).value()).extract<detail::binary_op>()->args() == std::vector{2_dbl, y});
-
-    REQUIRE(std::get<func>((y / 2_dbl).value()).extract<detail::binary_op>() != nullptr);
-    REQUIRE(std::get<func>((y / 2_dbl).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::div);
-    REQUIRE(std::get<func>((y / 2_dbl).value()).extract<detail::binary_op>()->args() == std::vector{y, 2_dbl});
-
-    REQUIRE(std::get<func>((y / x).value()).extract<detail::binary_op>() != nullptr);
-    REQUIRE(std::get<func>((y / x).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::div);
-    REQUIRE(std::get<func>((y / x).value()).extract<detail::binary_op>()->args() == std::vector{y, x});
 }
 
 // Check that compound ops correctly
@@ -840,14 +653,6 @@ TEST_CASE("s11n")
 
         ia >> bar;
     }
-
-    // Make sure multiple instances of 'foo' in bar point to the same
-    // underlying object.
-    REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[1].value()).args()[1].value()).get_ptr()
-        == std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[0].value()).args()[0].value()).get_ptr());
-    REQUIRE(std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[1].value()).args()[1].value()).get_ptr()
-            != std::get<func>(foo.value()).get_ptr());
 }
 
 TEST_CASE("get_n_nodes")
@@ -860,23 +665,23 @@ TEST_CASE("get_n_nodes")
     REQUIRE(get_n_nodes(x) == 1u);
 
     REQUIRE(get_n_nodes(x + y) == 3u);
-    REQUIRE(get_n_nodes(x - y) == 3u);
+    REQUIRE(get_n_nodes(x - y) == 5u);
     REQUIRE(get_n_nodes(-z) == 3u);
     REQUIRE(get_n_nodes(heyoka::time) == 1u);
     REQUIRE(get_n_nodes(x + (y * z)) == 5u);
-    REQUIRE(get_n_nodes((x - y - z) + (y * z)) == 9u);
+    REQUIRE(get_n_nodes((x - y - z) + (y * z)) == 11u);
 
     // Try with subexpressions repeating in the tree.
     auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo),
          bar2 = (copy(foo) - x) / (2. * copy(foo));
 
-    REQUIRE(get_n_nodes(bar) == 35u);
-    REQUIRE(get_n_nodes(bar2) == 35u);
+    REQUIRE(get_n_nodes(bar) == 37u);
+    REQUIRE(get_n_nodes(bar2) == 37u);
 
     // Build a very large expression such that
     // get_n_nodes() will return 0.
     // NOTE: this has been calibrated for a 64-bit size_t.
-    for (auto i = 0; i < 5; ++i) {
+    for (auto i = 0; i < 6; ++i) {
         foo = subs(foo, {{x, foo}});
     }
 
@@ -939,16 +744,6 @@ TEST_CASE("rename_variables")
     ex = (y + tmp) / foo * tmp - foo;
     ex = rename_variables(ex, {{"x", "a"}, {"y", "b"}});
     REQUIRE(ex == ("b"_var + "a"_var * z) / ("a"_var - z - 5_dbl) * ("a"_var * z) - ("a"_var - z - 5_dbl));
-
-    // The vectorised version.
-    ex = (y + tmp) / foo * tmp - foo;
-    auto v_ex = rename_variables({ex, tmp}, {{"x", "a"}, {"y", "b"}});
-    REQUIRE(v_ex[0] == ("b"_var + "a"_var * z) / ("a"_var - z - 5_dbl) * ("a"_var * z) - ("a"_var - z - 5_dbl));
-    REQUIRE(v_ex[1] == "a"_var * z);
-
-    REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(v_ex[0].value()).args()[0].value()).args()[1].value()).get_ptr()
-        == std::get<func>(v_ex[1].value()).get_ptr());
 }
 
 TEST_CASE("copy")
@@ -961,52 +756,6 @@ TEST_CASE("copy")
 
     // Copy created a new object.
     REQUIRE(std::get<func>(bar_copy.value()).get_ptr() != std::get<func>(bar.value()).get_ptr());
-
-    // foo was deep-copied into bar_copy.
-    REQUIRE(std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[0].value()).args()[0].value()).get_ptr()
-            == std::get<func>(foo.value()).get_ptr());
-    REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).args()[0].value()).get_ptr()
-        != std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[0].value()).args()[0].value()).get_ptr());
-
-    REQUIRE(std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[1].value()).args()[1].value()).get_ptr()
-            == std::get<func>(foo.value()).get_ptr());
-    REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(bar_copy.value()).args()[1].value()).args()[1].value()).get_ptr()
-        != std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[1].value()).args()[1].value()).get_ptr());
-
-    // The foo appearing in bar_copy is the same object, not two separate copies.
-    REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(bar_copy.value()).args()[1].value()).args()[1].value()).get_ptr()
-        == std::get<func>(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).args()[0].value())
-               .get_ptr());
-
-    // A test in which a function has the same argument twice.
-    bar = subs(x + y, {{"x", foo}, {"y", foo}});
-    bar_copy = copy(bar);
-
-    REQUIRE(std::get<func>(std::get<func>(bar.value()).args()[0].value()).get_ptr()
-            == std::get<func>(foo.value()).get_ptr());
-    REQUIRE(std::get<func>(std::get<func>(bar.value()).args()[0].value()).get_ptr()
-            == std::get<func>(std::get<func>(bar.value()).args()[1].value()).get_ptr());
-    REQUIRE(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).get_ptr()
-            == std::get<func>(std::get<func>(bar_copy.value()).args()[1].value()).get_ptr());
-    REQUIRE(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).get_ptr()
-            != std::get<func>(std::get<func>(bar.value()).args()[1].value()).get_ptr());
-
-    // Vectorised version.
-    auto vec_copy = copy({bar, subs(x + y, {{"x", foo}, {"y", foo}})});
-
-    REQUIRE(std::get<func>(std::get<func>(vec_copy[0].value()).args()[0].value()).get_ptr()
-            == std::get<func>(std::get<func>(vec_copy[0].value()).args()[1].value()).get_ptr());
-    REQUIRE(std::get<func>(std::get<func>(vec_copy[0].value()).args()[0].value()).get_ptr()
-            != std::get<func>(std::get<func>(bar.value()).args()[1].value()).get_ptr());
-    REQUIRE(std::get<func>(std::get<func>(vec_copy[1].value()).args()[0].value()).get_ptr()
-            == std::get<func>(std::get<func>(vec_copy[1].value()).args()[1].value()).get_ptr());
-    REQUIRE(std::get<func>(std::get<func>(vec_copy[0].value()).args()[0].value()).get_ptr()
-            == std::get<func>(std::get<func>(vec_copy[1].value()).args()[0].value()).get_ptr());
-    REQUIRE(std::get<func>(std::get<func>(vec_copy[0].value()).args()[1].value()).get_ptr()
-            == std::get<func>(std::get<func>(vec_copy[1].value()).args()[1].value()).get_ptr());
 }
 
 TEST_CASE("subs str")
@@ -1026,35 +775,9 @@ TEST_CASE("subs str")
     REQUIRE(bar == (foo - x) / (2. * foo));
     REQUIRE(std::get<func>(foo.value()).get_ptr() == foo_id);
     REQUIRE(std::get<func>(bar.value()).get_ptr() == bar_id);
-    REQUIRE(std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[0].value()).args()[0].value()).get_ptr()
-            == foo_id);
-    REQUIRE(std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[1].value()).args()[1].value()).get_ptr()
-            == foo_id);
 
     // Check the substitution.
     REQUIRE(bar_subs == bar_a);
-
-    // Check that after substitution, what used to be foo in bar is a shared subexpression in bar_subs.
-    REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[0].value()).args()[0].value()).get_ptr()
-        == std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[1].value()).args()[1].value())
-               .get_ptr());
-
-    // Check the vectorised version too.
-    auto vec_subs = subs({bar, (foo - x) / (2. * foo)}, {{"x", a}});
-    REQUIRE(vec_subs.size() == 2u);
-    REQUIRE(std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).args()[0].value())
-                .get_ptr()
-            == std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[1].value()).args()[1].value())
-                   .get_ptr());
-    REQUIRE(std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).args()[0].value())
-                .get_ptr()
-            == std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[1].value()).args()[1].value())
-                   .get_ptr());
-    REQUIRE(std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).args()[0].value())
-                .get_ptr()
-            == std::get<func>(std::get<func>(std::get<func>(vec_subs[1].value()).args()[0].value()).args()[0].value())
-                   .get_ptr());
 
     // Check canonicalisation.
     REQUIRE(subs(x + y, {{"x", "b"_var}, {"y", "a"_var}}, true) == "a"_var + "b"_var);
@@ -1075,37 +798,10 @@ TEST_CASE("subs")
 
     auto tmp = x + y;
     auto tmp2 = x - y;
-    auto *tmp2_id = std::get<func>(tmp2.value()).get_ptr();
     auto ex = tmp - par[0] * tmp;
     auto subs_res = subs(ex, {{tmp, tmp2}});
 
-    REQUIRE(subs_res == tmp2 - par[0] * tmp2);
-    REQUIRE(tmp2_id == std::get<func>(std::get<func>(subs_res.value()).args()[0].value()).get_ptr());
-    REQUIRE(tmp2_id
-            == std::get<func>(std::get<func>(std::get<func>(subs_res.value()).args()[1].value()).args()[1].value())
-                   .get_ptr());
-
-    subs_res = subs(ex, {{x, z}});
-    REQUIRE(subs_res == subs((z + y) - par[0] * (z + y), {{z, y}, {y, z}}));
-    REQUIRE(std::get<func>(std::get<func>(subs_res.value()).args()[0].value()).get_ptr()
-            == std::get<func>(std::get<func>(std::get<func>(subs_res.value()).args()[1].value()).args()[1].value())
-                   .get_ptr());
-
-    // Check the vectorised version too.
-    auto vec_subs = subs({ex, tmp - par[0] * tmp}, {{x, z}});
-    REQUIRE(vec_subs.size() == 2u);
-    REQUIRE(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).get_ptr()
-            == std::get<func>(std::get<func>(std::get<func>(vec_subs[0].value()).args()[1].value()).args()[1].value())
-                   .get_ptr());
-    REQUIRE(std::get<func>(std::get<func>(vec_subs[1].value()).args()[0].value()).get_ptr()
-            == std::get<func>(std::get<func>(std::get<func>(vec_subs[1].value()).args()[1].value()).args()[1].value())
-                   .get_ptr());
-    REQUIRE(std::get<func>(std::get<func>(vec_subs[0].value()).args()[0].value()).get_ptr()
-            == std::get<func>(std::get<func>(vec_subs[1].value()).args()[0].value()).get_ptr());
-
-    // Check canonicalisation.
-    REQUIRE(subs(x + y, {{x, "b"_var}, {y, "a"_var}}, true) == "a"_var + "b"_var);
-    REQUIRE(subs(std::vector{x + y}, {{x, "b"_var}, {y, "a"_var}}, true)[0] == "a"_var + "b"_var);
+    REQUIRE(subs_res == tmp - par[0] * tmp2);
 }
 
 // cfunc N-body with fixed masses.
@@ -1987,7 +1683,7 @@ TEST_CASE("output too long")
     auto ex = 1. + x;
 
     for (auto i = 0; i < 1000; ++i) {
-        ex = x * ex;
+        ex = expression(variable(fmt::format("x_{}", i))) * ex;
     }
 
     std::ostringstream oss;

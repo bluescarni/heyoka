@@ -114,8 +114,8 @@ std::vector<std::pair<expression, expression>> nbody_impl(std::uint32_t n, const
                 // will be constant folded into the numerical result, if masses
                 // and Gconst are all numbers. This allows to reduce the number
                 // of operations wrt the other branch.
-                const auto fac_j = Gconst * masses_vec[j] * r_m3;
-                const auto c_ij = -masses_vec[i] / masses_vec[j];
+                const auto fac_j = fix(Gconst * masses_vec[j] * r_m3);
+                const auto c_ij = fix(-masses_vec[i] / masses_vec[j]);
 
                 // Acceleration exerted by j on i.
                 x_acc[i].push_back(diff_x * fac_j);

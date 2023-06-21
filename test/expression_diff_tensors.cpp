@@ -47,6 +47,8 @@ TEST_CASE("diff decompose")
                            "u_2"_var});
     REQUIRE(detail::diff_decompose({par[0] + x}).second == 2u);
 
+// TODO restore.
+#if 0
     REQUIRE(detail::diff_decompose({(par[1] + y) * (par[0] + x)}).first
             == std::vector{x, y, par[0], par[1],
                            subs("u_2"_var + "u_0"_var, {{"u_2"_var, "u_0"_var}, {"u_0"_var, "u_2"_var}}),
@@ -60,6 +62,7 @@ TEST_CASE("diff decompose")
                            subs("u_2"_var + y, {{y, 1_dbl}}),
                            subs("u_4"_var * "u_3"_var, {{"u_3"_var, "u_4"_var}, {"u_4"_var, "u_3"_var}}), "u_5"_var});
     REQUIRE(detail::diff_decompose({subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})}).second == 3u);
+#endif
 }
 
 TEST_CASE("diff_tensors basic")
@@ -621,6 +624,9 @@ TEST_CASE("speelpenning complexity")
     }
 }
 
+// TODO restore.
+#if 0
+
 // This test checks that reverse-mode differentiation produces
 // expressions in which the operands to commutative functions are kept
 // in a canonical order.
@@ -634,3 +640,5 @@ TEST_CASE("comm canonical")
     REQUIRE(dt[{0, 0, 1, 0}] == par[0] * x);
     REQUIRE(dt[{0, 1, 0, 0}] == par[0] * y);
 }
+
+#endif

@@ -771,10 +771,6 @@ namespace detail
 
 HEYOKA_DLL_PUBLIC bool ex_less_than(const expression &, const expression &);
 
-const expression *is_negation(const expression &);
-
-const expression *is_square(const expression &);
-
 } // namespace detail
 
 HEYOKA_END_NAMESPACE

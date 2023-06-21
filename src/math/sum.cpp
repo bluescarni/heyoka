@@ -47,6 +47,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
@@ -494,6 +495,50 @@ expression sum_split(const expression &e, std::uint32_t split)
     return sum_split(expression{func{detail::sum_impl{std::move(ret_seq)}}}, split);
 }
 
+namespace
+{
+
+// Check if ex is pow(something, 2). If it is, return
+// a pointer to something, otherwise return nullptr.
+const expression *is_square(const expression &ex)
+{
+    const auto *fptr = std::get_if<func>(&ex.value());
+
+    if (fptr == nullptr) {
+        // Not a function.
+        return nullptr;
+    }
+
+    const auto *pow_ptr = fptr->extract<pow_impl>();
+
+    if (pow_ptr == nullptr) {
+        // Not a pow().
+        return nullptr;
+    }
+
+    assert(pow_ptr->args().size() == 2u);
+
+    const auto &base = pow_ptr->args()[0];
+    const auto &expo = pow_ptr->args()[1];
+
+    if (const auto *expo_num_ptr = std::get_if<number>(&expo.value())) {
+        // The exponent is a number.
+
+        if (std::visit([](const auto &v) { return v == 2; }, expo_num_ptr->value())) {
+            // Exponent is 2, return the base.
+            return &base;
+        } else {
+            // Exponent is not 2.
+            return nullptr;
+        }
+    } else {
+        // Exponent is not a number.
+        return nullptr;
+    }
+}
+
+} // namespace
+
 // Transform the input sum 'e' into a sum of squares, if possible. If not,
 // 'e' will be returned unchanged.
 // NOTE: 'e' is assumed to be a function.
@@ -531,11 +576,6 @@ expression sum_to_sum_sq(const expression &e)
 std::variant<std::vector<expression>, expression> sum_simplify_args(const std::vector<expression> &args_)
 {
     // Step 1: flatten sums in args.
-    // NOTE: here SymPy flattens not only nested sum()s, but also
-    // terms of type cf * sum(a, ...), with cf a numerical coefficient,
-    // which are transformed into sum(cf * a, ...). This does not always
-    // looks like an automatic win for eval/Taylor diff purposes, needs
-    // to be investigated.
     std::vector<expression> args;
     args.reserve(args_.size());
     for (const auto &arg : args_) {
@@ -604,9 +644,23 @@ std::variant<std::vector<expression>, expression> sum_simplify_args(const std::v
         // Remove all numbers but the first one.
         args.erase(n_end_it + 1, args.end());
 
-        // Remove the remaining number if it is zero.
+        // Handle the special case in which the remaining number is zero.
         if (is_zero(std::get<number>(n_end_it->value()))) {
-            args.pop_back();
+            if (args.size() == 1u) {
+                assert(n_end_it == args.begin());
+
+                // This is also the only remaining term in the sum,
+                // return it.
+                // NOTE: it is important to special-case this, because otherwise
+                // we will fall into the args().empty() special case below, which will
+                // forcibly convert the folded 0 constant into double precision.
+                return *n_end_it;
+            } else {
+                // Besides the number 0, there are other
+                // non-number terms in the sum. Remove
+                // the number 0.
+                args.pop_back();
+            }
         }
     }
 

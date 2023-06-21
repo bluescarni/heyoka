@@ -730,17 +730,17 @@ TEST_CASE("copy")
 
     // Error mode.
     REQUIRE_THROWS_MATCHES(
-        expression{std::get<func>(foo.value()).copy({x, y, z})}, std::invalid_argument,
-        Message("The set of new arguments passed to func::copy() has a size of 3, but the number of arguments "
-                "of the original function is 2 (the two sizes must be equal)"));
+        expression{std::get<func>(foo.value()).copy({x, y})}, std::invalid_argument,
+        Message("The set of new arguments passed to func::copy() has a size of 2, but the number of arguments "
+                "of the original function is 3 (the two sizes must be equal)"));
 
-    auto foo_copy = expression{std::get<func>(foo.value()).copy({x, y})};
+    auto foo_copy = expression{std::get<func>(foo.value()).copy({x, y, z})};
 
     // Check that copy creates a new obejct.
     REQUIRE(std::get<func>(foo_copy.value()).get_ptr() != std::get<func>(foo.value()).get_ptr());
 
     // Check the new arguments.
-    REQUIRE(std::get<func>(foo_copy.value()).args() == std::vector{x, y});
+    REQUIRE(std::get<func>(foo_copy.value()).args() == std::vector{x, y, z});
 }
 
 // Bug: a default-constructed function is not serialisable.

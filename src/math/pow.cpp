@@ -66,6 +66,7 @@
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -1144,7 +1145,7 @@ expression pow_wrapper_impl(expression b, expression e)
             }
         }
 
-        // Handle special case when the base is a prod() and the exponent is an integral value:
+        // Handle special cases when the base is a prod() and the exponent is an integral value:
         // (x*y)**n -> x**n * y**n.
         if (const auto *fptr = std::get_if<func>(&b.value());
             fptr != nullptr && fptr->extract<prod_impl>() != nullptr && is_integer(*num_ptr)) {

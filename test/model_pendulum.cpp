@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cmath>
+
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
@@ -42,7 +44,7 @@ TEST_CASE("basic")
         REQUIRE(dyn[0].second == "v"_var);
 
         REQUIRE(dyn[1].first == "v"_var);
-        REQUIRE(dyn[1].second == -(.1l / .3) * sin("x"_var));
+        REQUIRE(dyn[1].second == -(.1l * std::pow(.3, -1.)) * sin("x"_var));
 
         auto E = model::pendulum_energy(kw::gconst = .1l, kw::l = .3);
 
