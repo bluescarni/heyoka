@@ -68,6 +68,12 @@ std::vector<expression> tanh_impl::gradient() const
     return {1_dbl - tmp * tmp};
 }
 
+[[nodiscard]] expression tanh_impl::normalise() const
+{
+    assert(args().size() == 1u);
+    return tanh(args()[0]);
+}
+
 llvm::Value *tanh_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
                                   llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                   bool high_accuracy) const

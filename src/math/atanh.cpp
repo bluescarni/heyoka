@@ -75,6 +75,12 @@ expression atanh_impl::diff(funcptr_map<expression> &func_map, const param &p) c
     return detail::diff(func_map, args()[0], p) / (1_dbl - args()[0] * args()[0]);
 }
 
+[[nodiscard]] expression atanh_impl::normalise() const
+{
+    assert(args().size() == 1u);
+    return atanh(args()[0]);
+}
+
 double atanh_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
 {
     assert(args().size() == 1u);

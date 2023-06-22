@@ -677,3 +677,11 @@ TEST_CASE("prod_to_div")
     ret = detail::prod_to_div_taylor_diff({prod({x, pow(x, y)})});
     REQUIRE(ret[0] == prod({x, pow(x, y)}));
 }
+
+TEST_CASE("normalise")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(normalise(x * y) == x * y);
+    REQUIRE(normalise(subs(x * y, {{y, 3. * x}})) == 3. * pow(x, 2.));
+}

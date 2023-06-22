@@ -517,3 +517,11 @@ TEST_CASE("sum_to_sub")
     ret = detail::sum_to_sub({sum({prod({-1_dbl, y}), sin(tmp), cos(tmp)})});
     REQUIRE(ret[0] == detail::sub(sum({sin(detail::sub(x, cos(x))), cos(detail::sub(x, cos(x)))}), y));
 }
+
+TEST_CASE("normalise")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(normalise(x + y) == x + y);
+    REQUIRE(normalise(subs(x + y, {{x, 2_dbl * y}})) == 3. * y);
+}

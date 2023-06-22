@@ -1112,6 +1112,12 @@ std::vector<expression> pow_impl::gradient() const
     return {args()[1] * pow(args()[0], args()[1] - 1_dbl), pow(args()[0], args()[1]) * log(args()[0])};
 }
 
+[[nodiscard]] expression pow_impl::normalise() const
+{
+    assert(args().size() == 2u);
+    return pow(args()[0], args()[1]);
+}
+
 namespace
 {
 

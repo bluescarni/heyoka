@@ -186,6 +186,11 @@ std::vector<expression> sum_impl::gradient() const
     return {args().size(), 1_dbl};
 }
 
+[[nodiscard]] expression sum_impl::normalise() const
+{
+    return sum(args());
+}
+
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool sum_impl::is_commutative() const
 {

@@ -70,6 +70,12 @@ std::vector<expression> acos_impl::gradient() const
     return {-pow(1_dbl - args()[0] * args()[0], -.5)};
 }
 
+[[nodiscard]] expression acos_impl::normalise() const
+{
+    assert(args().size() == 1u);
+    return acos(args()[0]);
+}
+
 double acos_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
 {
     assert(args().size() == 1u);

@@ -415,6 +415,12 @@ expression log_impl::diff(funcptr_map<expression> &func_map, const param &p) con
     return detail::diff(func_map, args()[0], p) / args()[0];
 }
 
+[[nodiscard]] expression log_impl::normalise() const
+{
+    assert(args().size() == 1u);
+    return log(args()[0]);
+}
+
 } // namespace detail
 
 expression log(expression e)

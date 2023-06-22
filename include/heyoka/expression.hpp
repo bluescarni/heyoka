@@ -179,6 +179,19 @@ inline expression func_inner<T>::diff(funcptr_map<expression> &func_map, const p
     // LCOV_EXCL_STOP
 }
 
+template <typename T>
+inline expression func_inner<T>::normalise() const
+{
+    if constexpr (func_has_normalise_v<T>) {
+        return m_value.normalise();
+    }
+
+    // LCOV_EXCL_START
+    assert(false);
+    throw;
+    // LCOV_EXCL_STOP
+}
+
 struct HEYOKA_DLL_PUBLIC prime_wrapper {
     std::string m_str;
 
@@ -370,6 +383,9 @@ HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
                                                const std::unordered_map<std::string, expression> &, bool = false);
 HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
                                                const std::unordered_map<expression, expression> &, bool = false);
+
+HEYOKA_DLL_PUBLIC expression normalise(const expression &);
+HEYOKA_DLL_PUBLIC std::vector<expression> normalise(const std::vector<expression> &);
 
 enum class diff_args { vars, params, all };
 

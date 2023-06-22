@@ -225,6 +225,15 @@ bool func::is_commutative() const
     return ptr()->is_commutative();
 }
 
+expression func::normalise() const
+{
+    if (ptr()->has_normalise()) {
+        return ptr()->normalise();
+    } else {
+        return expression{*this};
+    }
+}
+
 const std::string &func::get_name() const
 {
     return ptr()->get_name();

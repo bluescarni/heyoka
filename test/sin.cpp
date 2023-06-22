@@ -217,3 +217,11 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
+
+TEST_CASE("normalise")
+{
+    auto [x] = make_vars("x");
+
+    REQUIRE(normalise(sin(x)) == sin(x));
+    REQUIRE(normalise(subs(sin(x), {{x, .1_dbl}})) == sin(.1_dbl));
+}

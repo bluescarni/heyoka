@@ -55,6 +55,8 @@ public:
     expression diff(funcptr_map<expression> &, const std::string &) const;
     expression diff(funcptr_map<expression> &, const param &) const;
 
+    [[nodiscard]] expression normalise() const;
+
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 

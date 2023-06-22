@@ -70,6 +70,12 @@ std::vector<expression> asin_impl::gradient() const
     return {pow(1_dbl - args()[0] * args()[0], -.5)};
 }
 
+[[nodiscard]] expression asin_impl::normalise() const
+{
+    assert(args().size() == 1u);
+    return asin(args()[0]);
+}
+
 double asin_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
 {
     assert(args().size() == 1u);

@@ -402,3 +402,16 @@ TEST_CASE("pow special cases")
     REQUIRE(pow(prod({x, y}), 2.1_dbl) != prod({pow(x, 2.1_dbl), pow(y, 2.1_dbl)}));
     REQUIRE(pow(prod({x, y}), -2.1_dbl) != prod({pow(x, -2.1_dbl), pow(y, -2.1_dbl)}));
 }
+
+TEST_CASE("normalise")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    REQUIRE(normalise(pow(x, y)) == pow(x, y));
+    REQUIRE(normalise(subs(pow(x, y), {{x, .1_dbl}, {y, .2_dbl}})) == pow(.1_dbl, .2_dbl));
+    REQUIRE(normalise(subs(pow(x, y), {{y, .0_dbl}})) == 1_dbl);
+    REQUIRE(normalise(subs(pow(x, y), {{y, 1_dbl}})) == x);
+    REQUIRE(normalise(subs(pow(x, y), {{x, pow(x, .3)}, {y, .1_dbl}})) == pow(x, .3 * .1));
+    REQUIRE(normalise(subs(pow(x, y), {{x, pow(x, y)}, {y, .1_dbl}})) == pow(x, y * .1));
+    REQUIRE(normalise(subs(pow(x, y), {{x, x * y}, {y, -2_dbl}})) == pow(x, -2.) * pow(y, -2.));
+}

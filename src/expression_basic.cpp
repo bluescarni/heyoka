@@ -782,6 +782,78 @@ namespace detail
 namespace
 {
 
+expression normalise_impl(detail::funcptr_map<expression> &func_map, const expression &ex)
+{
+    return std::visit(
+        [&](const auto &arg) {
+            using type = uncvref_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<type, func>) {
+                const auto f_id = arg.get_ptr();
+
+                // Check if we already normalised ex.
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    return it->second;
+                }
+
+                // Create the new args vector by running the
+                // normalisation on all arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(arg.args().size());
+                for (const auto &orig_arg : arg.args()) {
+                    new_args.push_back(normalise_impl(func_map, orig_arg));
+                }
+
+                // Create a copy of arg with the new arguments.
+                auto tmp = arg.copy(new_args);
+
+                // Create the return value by normalising tmp.
+                auto ret = tmp.normalise();
+
+                // Put the return value in the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return ret;
+            } else {
+                return expression{arg};
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+} // namespace detail
+
+expression normalise(const expression &ex)
+{
+    detail::funcptr_map<expression> func_map;
+
+    return detail::normalise_impl(func_map, ex);
+}
+
+std::vector<expression> normalise(const std::vector<expression> &v_ex)
+{
+    detail::funcptr_map<expression> func_map;
+
+    std::vector<expression> retval;
+    retval.reserve(v_ex.size());
+
+    for (const auto &ex : v_ex) {
+        retval.push_back(detail::normalise_impl(func_map, ex));
+    }
+
+    return retval;
+}
+
+namespace detail
+{
+
+namespace
+{
+
 // Pairwise reduction of a vector of expressions.
 template <typename F>
 expression pairwise_reduce_impl(const F &func, std::vector<expression> list)

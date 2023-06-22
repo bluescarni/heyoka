@@ -223,3 +223,11 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
+
+TEST_CASE("normalise")
+{
+    auto [x] = make_vars("x");
+
+    REQUIRE(normalise(exp(x)) == exp(x));
+    REQUIRE(normalise(subs(exp(x), {{x, .1_dbl}})) == exp(.1_dbl));
+}

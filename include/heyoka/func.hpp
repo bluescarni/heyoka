@@ -113,6 +113,9 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     [[nodiscard]] virtual bool is_time_dependent() const = 0;
     [[nodiscard]] virtual bool is_commutative() const = 0;
 
+    [[nodiscard]] virtual bool has_normalise() const = 0;
+    [[nodiscard]] virtual expression normalise() const = 0;
+
     [[nodiscard]] virtual const std::vector<expression> &args() const = 0;
     virtual std::pair<expression *, expression *> get_mutable_args_range() = 0;
 
@@ -188,6 +191,12 @@ using func_is_commutative_t = decltype(std::declval<std::add_lvalue_reference_t<
 
 template <typename T>
 inline constexpr bool func_has_is_commutative_v = std::is_same_v<detected_t<func_is_commutative_t, T>, bool>;
+
+template <typename T>
+using func_normalise_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().normalise());
+
+template <typename T>
+inline constexpr bool func_has_normalise_v = std::is_same_v<detected_t<func_normalise_t, T>, expression>;
 
 template <typename T>
 using func_diff_var_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(
@@ -375,6 +384,12 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
             return false;
         }
     }
+
+    [[nodiscard]] bool has_normalise() const final
+    {
+        return func_has_normalise_v<T>;
+    }
+    [[nodiscard]] expression normalise() const final;
 
     [[nodiscard]] const std::vector<expression> &args() const final
     {
@@ -643,6 +658,8 @@ public:
 
     [[nodiscard]] bool is_time_dependent() const;
     [[nodiscard]] bool is_commutative() const;
+
+    [[nodiscard]] expression normalise() const;
 
     [[nodiscard]] const std::string &get_name() const;
 

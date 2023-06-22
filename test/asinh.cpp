@@ -215,3 +215,11 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
+
+TEST_CASE("normalise")
+{
+    auto [x] = make_vars("x");
+
+    REQUIRE(normalise(asinh(x)) == asinh(x));
+    REQUIRE(normalise(subs(asinh(x), {{x, -.5_dbl}})) == asinh(-.5_dbl));
+}

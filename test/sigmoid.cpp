@@ -207,3 +207,11 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
+
+TEST_CASE("normalise")
+{
+    auto [x] = make_vars("x");
+
+    REQUIRE(normalise(sigmoid(x)) == sigmoid(x));
+    REQUIRE(normalise(subs(sigmoid(x), {{x, 1.5_dbl}})) == sigmoid(1.5_dbl));
+}

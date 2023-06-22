@@ -408,10 +408,14 @@ llvm::Function *tan_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 std::vector<expression> tan_impl::gradient() const
 {
     assert(args().size() == 1u);
-    // NOTE: if single-precision floats are implemented,
-    // should 1_dbl become 1_flt?
     const auto tmp = tan(args()[0]);
     return {1_dbl + tmp * tmp};
+}
+
+[[nodiscard]] expression tan_impl::normalise() const
+{
+    assert(args().size() == 1u);
+    return tan(args()[0]);
 }
 
 } // namespace detail
