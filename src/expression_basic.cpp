@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <functional>
 #include <iterator>
 #include <limits>
 #include <ostream>
@@ -644,7 +645,7 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
                 // Canonicalise the new arguments vector,
                 // if requested and if the function is commutative.
                 if (canonicalise && arg.is_commutative()) {
-                    std::stable_sort(new_args.begin(), new_args.end(), comm_ops_lt);
+                    std::stable_sort(new_args.begin(), new_args.end(), std::less<expression>{});
                 }
 
                 // Create a copy of arg with the new arguments.
@@ -726,7 +727,7 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
                 // Canonicalise the new arguments vector,
                 // if requested and if the function is commutative.
                 if (canonicalise && arg.is_commutative()) {
-                    std::stable_sort(new_args.begin(), new_args.end(), comm_ops_lt);
+                    std::stable_sort(new_args.begin(), new_args.end(), std::less<expression>{});
                 }
 
                 // Create a copy of arg with the new arguments.

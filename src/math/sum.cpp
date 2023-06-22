@@ -674,7 +674,7 @@ std::variant<std::vector<expression>, expression> sum_simplify_args(const std::v
     }
 
     // Sort the operands in canonical order.
-    std::stable_sort(args.begin(), args.end(), detail::comm_ops_lt);
+    std::stable_sort(args.begin(), args.end(), std::less<expression>{});
 
     return args;
 }
