@@ -20,6 +20,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/prod.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/model/fixed_centres.hpp>
 #include <heyoka/s11n.hpp>
@@ -595,20 +596,18 @@ TEST_CASE("speelpenning complexity")
         std::vector<double> inputs, outputs_f, outputs_r;
 
         std::vector<expression> vars;
-        auto prod = 1_dbl;
 
         for (auto i = 0u; i < nvars; ++i) {
             auto cur_var = expression{fmt::format("x_{}", i)};
 
             vars.push_back(cur_var);
-            prod *= cur_var;
 
             inputs.push_back(rdist(rng));
             outputs_f.push_back(0.);
             outputs_r.push_back(0.);
         }
 
-        prod = pairwise_prod(vars);
+        auto prod = heyoka::prod(vars);
 
         llvm_state s;
         auto dt = diff_tensors({prod}, kw::diff_order = 1);
