@@ -350,8 +350,8 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
         }
 
         // NOTE: when building the substitution map, ensure that
-        // subs() canonicalises commutative operators, so that ultimately
-        // the result of reverse-mode differentiation will also be canonicalised.
+        // subs() normalises, so that ultimately the result of
+        // reverse-mode differentiation will also be normalised.
         subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map, true));
     }
 
@@ -603,8 +603,8 @@ void diff_tensors_reverse_impl(
 
                 if (const auto it_dmap = dmap.find(args[j]); it_dmap != dmap.end()) {
                     // NOTE: when substituting the original variables in the derivative, ensure that
-                    // subs() canonicalises commutative operators, so that ultimately
-                    // the result of reverse-mode differentiation will also be canonicalised.
+                    // subs() normalises, so that ultimately the result of reverse-mode
+                    // differentiation will also be normalised.
                     cur_der = subs(it_dmap->second, subs_map, true);
                 }
 

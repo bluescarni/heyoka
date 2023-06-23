@@ -309,10 +309,3 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
-
-TEST_CASE("commutativity")
-{
-    auto [x, y] = make_vars("x", "y");
-
-    REQUIRE(std::get<func>(sum_sq({x, y}).value()).is_commutative());
-}

@@ -611,10 +611,10 @@ namespace
 {
 
 expression subs(funcptr_map<expression> &func_map, const expression &ex,
-                const std::unordered_map<std::string, expression> &smap, bool canonicalise)
+                const std::unordered_map<std::string, expression> &smap)
 {
     return std::visit(
-        [&func_map, &smap, canonicalise](const auto &arg) {
+        [&func_map, &smap](const auto &arg) {
             using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, number> || std::is_same_v<type, param>) {
@@ -639,13 +639,7 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
                 std::vector<expression> new_args;
                 new_args.reserve(arg.args().size());
                 for (const auto &orig_arg : arg.args()) {
-                    new_args.push_back(subs(func_map, orig_arg, smap, canonicalise));
-                }
-
-                // Canonicalise the new arguments vector,
-                // if requested and if the function is commutative.
-                if (canonicalise && arg.is_commutative()) {
-                    std::stable_sort(new_args.begin(), new_args.end(), std::less<expression>{});
+                    new_args.push_back(subs(func_map, orig_arg, smap));
                 }
 
                 // Create a copy of arg with the new arguments.
@@ -667,15 +661,21 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
 
 } // namespace detail
 
-expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap, bool canonicalise)
+expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap, bool normalise)
 {
     detail::funcptr_map<expression> func_map;
 
-    return detail::subs(func_map, e, smap, canonicalise);
+    auto ret = detail::subs(func_map, e, smap);
+
+    if (normalise) {
+        return heyoka::normalise(ret);
+    } else {
+        return ret;
+    }
 }
 
 std::vector<expression> subs(const std::vector<expression> &v_ex,
-                             const std::unordered_map<std::string, expression> &smap, bool canonicalise)
+                             const std::unordered_map<std::string, expression> &smap, bool normalise)
 {
     detail::funcptr_map<expression> func_map;
 
@@ -683,10 +683,14 @@ std::vector<expression> subs(const std::vector<expression> &v_ex,
     ret.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        ret.push_back(detail::subs(func_map, e, smap, canonicalise));
+        ret.push_back(detail::subs(func_map, e, smap));
     }
 
-    return ret;
+    if (normalise) {
+        return heyoka::normalise(ret);
+    } else {
+        return ret;
+    }
 }
 
 namespace detail
@@ -696,7 +700,7 @@ namespace
 {
 
 expression subs(funcptr_map<expression> &func_map, const expression &ex,
-                const std::unordered_map<expression, expression> &smap, bool canonicalise)
+                const std::unordered_map<expression, expression> &smap)
 {
     if (auto it = smap.find(ex); it != smap.end()) {
         // ex is in the substitution map, return the value it maps to.
@@ -704,7 +708,7 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
     }
 
     return std::visit(
-        [&](const auto &arg) {
+        [&func_map, &smap](const auto &arg) {
             using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, func>) {
@@ -721,13 +725,7 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
                 std::vector<expression> new_args;
                 new_args.reserve(arg.args().size());
                 for (const auto &orig_arg : arg.args()) {
-                    new_args.push_back(subs(func_map, orig_arg, smap, canonicalise));
-                }
-
-                // Canonicalise the new arguments vector,
-                // if requested and if the function is commutative.
-                if (canonicalise && arg.is_commutative()) {
-                    std::stable_sort(new_args.begin(), new_args.end(), std::less<expression>{});
+                    new_args.push_back(subs(func_map, orig_arg, smap));
                 }
 
                 // Create a copy of arg with the new arguments.
@@ -754,15 +752,21 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
 
 } // namespace detail
 
-expression subs(const expression &e, const std::unordered_map<expression, expression> &smap, bool canonicalise)
+expression subs(const expression &e, const std::unordered_map<expression, expression> &smap, bool normalise)
 {
     detail::funcptr_map<expression> func_map;
 
-    return detail::subs(func_map, e, smap, canonicalise);
+    auto ret = detail::subs(func_map, e, smap);
+
+    if (normalise) {
+        return heyoka::normalise(ret);
+    } else {
+        return ret;
+    }
 }
 
 std::vector<expression> subs(const std::vector<expression> &v_ex,
-                             const std::unordered_map<expression, expression> &smap, bool canonicalise)
+                             const std::unordered_map<expression, expression> &smap, bool normalise)
 {
     detail::funcptr_map<expression> func_map;
 
@@ -770,10 +774,14 @@ std::vector<expression> subs(const std::vector<expression> &v_ex,
     ret.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        ret.push_back(detail::subs(func_map, e, smap, canonicalise));
+        ret.push_back(detail::subs(func_map, e, smap));
     }
 
-    return ret;
+    if (normalise) {
+        return heyoka::normalise(ret);
+    } else {
+        return ret;
+    }
 }
 
 namespace detail

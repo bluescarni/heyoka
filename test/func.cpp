@@ -60,7 +60,6 @@ TEST_CASE("func minimal")
     REQUIRE(f.get_type_index() == typeid(func_00));
     REQUIRE(f.get_name() == "f");
     REQUIRE(f.args() == std::vector{"x"_var, "y"_var});
-    REQUIRE(!f.is_commutative());
 
     REQUIRE_THROWS_MATCHES(func{func_00{""}}, std::invalid_argument, Message("Cannot create a function with no name"));
 

@@ -191,12 +191,6 @@ std::vector<expression> sum_impl::gradient() const
     return sum(args());
 }
 
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-bool sum_impl::is_commutative() const
-{
-    return true;
-}
-
 namespace
 {
 

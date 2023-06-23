@@ -400,13 +400,6 @@ TEST_CASE("cfunc mp")
 
 #endif
 
-TEST_CASE("commutativity")
-{
-    auto [x, y] = make_vars("x", "y");
-
-    REQUIRE(std::get<func>(sum({x, y}).value()).is_commutative());
-}
-
 TEST_CASE("sum split")
 {
     auto sum_wrapper = [](const std::vector<expression> &args) { return expression{func{detail::sum_impl(args)}}; };

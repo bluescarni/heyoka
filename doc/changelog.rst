@@ -15,11 +15,6 @@ New
   than performing the same operation repeatedly on individual
   expressions
   (`#312 <https://github.com/bluescarni/heyoka/pull/312>`__).
-- Functions in the expression system can now be optionally
-  marked as commutative. Commutative functions now enforce
-  a canonical ordering of their operands
-  (`#312 <https://github.com/bluescarni/heyoka/pull/312>`__,
-  `#311 <https://github.com/bluescarni/heyoka/pull/311>`__).
 - The expression class is now immutable
   (`#312 <https://github.com/bluescarni/heyoka/pull/312>`__).
 - The arithmetic operators of the expression class

@@ -220,11 +220,6 @@ bool func::is_time_dependent() const
     return ptr()->is_time_dependent();
 }
 
-bool func::is_commutative() const
-{
-    return ptr()->is_commutative();
-}
-
 expression func::normalise() const
 {
     if (ptr()->has_normalise()) {
