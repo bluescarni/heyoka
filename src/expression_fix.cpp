@@ -83,7 +83,11 @@ bool is_fixed(const expression &ex)
 
 expression fix(expression x)
 {
-    return expression{func{detail::fix_impl(std::move(x))}};
+    if (detail::is_fixed(x)) {
+        return x;
+    } else {
+        return expression{func{detail::fix_impl(std::move(x))}};
+    }
 }
 
 namespace detail
