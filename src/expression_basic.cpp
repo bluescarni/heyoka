@@ -29,9 +29,6 @@
 
 #include <boost/safe_numerics/safe_integer.hpp>
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
-
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
@@ -854,65 +851,6 @@ std::vector<expression> normalise(const std::vector<expression> &v_ex)
     }
 
     return retval;
-}
-
-namespace detail
-{
-
-namespace
-{
-
-// Pairwise reduction of a vector of expressions.
-template <typename F>
-expression pairwise_reduce_impl(const F &func, std::vector<expression> list)
-{
-    assert(!list.empty());
-
-    // LCOV_EXCL_START
-    if (list.size() == std::numeric_limits<decltype(list.size())>::max()) {
-        throw std::overflow_error("Overflow detected in pairwise_reduce()");
-    }
-    // LCOV_EXCL_STOP
-
-    while (list.size() != 1u) {
-        const auto cur_size = list.size();
-
-        // Init the new list. The size will be halved, +1 if the
-        // current size is odd.
-        const auto next_size = cur_size / 2u + cur_size % 2u;
-        std::vector<expression> new_list(next_size);
-
-        tbb::parallel_for(tbb::blocked_range<decltype(new_list.size())>(0, new_list.size()),
-                          [&list, &new_list, cur_size, &func](const auto &r) {
-                              for (auto i = r.begin(); i != r.end(); ++i) {
-                                  if (i * 2u == cur_size - 1u) {
-                                      // list has an odd size, and we are at the last element of list.
-                                      // Just move it to new_list.
-                                      new_list[i] = std::move(list.back());
-                                  } else {
-                                      new_list[i] = func(std::move(list[i * 2u]), std::move(list[i * 2u + 1u]));
-                                  }
-                              }
-                          });
-
-        new_list.swap(list);
-    }
-
-    return std::move(list[0]);
-}
-
-} // namespace
-
-} // namespace detail
-
-// Pairwise product.
-expression pairwise_prod(const std::vector<expression> &prod)
-{
-    if (prod.empty()) {
-        return 1_dbl;
-    }
-
-    return detail::pairwise_reduce_impl(std::multiplies{}, prod);
 }
 
 double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map,

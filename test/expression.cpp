@@ -558,19 +558,6 @@ TEST_CASE("is_time_dependent")
     REQUIRE(is_time_dependent(bar));
 }
 
-TEST_CASE("pairwise_prod")
-{
-    auto [x0, x1, x2, x3, x4, x5] = make_vars("x0", "x1", "x2", "x3", "x4", "x5");
-
-    REQUIRE(pairwise_prod({}) == 1_dbl);
-    REQUIRE(pairwise_prod({x0}) == x0);
-    REQUIRE(pairwise_prod({x0, x1}) == x0 * x1);
-    REQUIRE(pairwise_prod({x0, x1, x2}) == x0 * x1 * x2);
-    REQUIRE(pairwise_prod({x0, x1, x2, x3}) == (x0 * x1) * (x2 * x3));
-    REQUIRE(pairwise_prod({x0, x1, x2, x3, x4}) == (x0 * x1) * (x2 * x3) * x4);
-    REQUIRE(pairwise_prod({x0, x1, x2, x3, x4, x5}) == ((x0 * x1) * (x2 * x3)) * (x4 * x5));
-}
-
 TEST_CASE("s11n")
 {
     std::stringstream ss;

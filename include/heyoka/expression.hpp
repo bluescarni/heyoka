@@ -557,8 +557,6 @@ dtens diff_tensors(const std::vector<expression> &v_ex, KwArgs &&...kw_args)
     return detail::diff_tensors(v_ex, d_args, order);
 }
 
-HEYOKA_DLL_PUBLIC expression pairwise_prod(const std::vector<expression> &);
-
 HEYOKA_DLL_PUBLIC double eval_dbl(const expression &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> & = {});
 HEYOKA_DLL_PUBLIC long double eval_ldbl(const expression &, const std::unordered_map<std::string, long double> &,
