@@ -30,7 +30,6 @@
 // This benchmark builds a Taylor integrator for the motion around asteroid Bennu.
 // The mascon model for Bennu was generated using a thetraedral mesh built upon
 // the polyhedral surface model available. Model units are L = asteroid diameter, M = asteroid mass.
-// TODO: check the exact values
 
 using namespace heyoka;
 using namespace std::chrono;
@@ -93,7 +92,6 @@ struct mascon_dynamics {
         y_acc.resize(std::size(m_mascon_masses));
         z_acc.resize(std::size(m_mascon_masses));
         // FIRST: Assemble the acceleration due to mascons
-        // TODO: switch to pairwise/compensated summation here?
         double x_a = 0, y_a = 0, z_a = 0;
         for (decltype(dim) i = 0; i < dim; ++i) {
             auto r2 = (x[0] - m_mascon_points[i][0]) * (x[0] - m_mascon_points[i][0])

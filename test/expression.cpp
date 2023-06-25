@@ -1753,7 +1753,11 @@ TEST_CASE("less than")
     REQUIRE(!std::less<expression>{}(2_dbl, 2_dbl));
     REQUIRE(!std::less<expression>{}(3_dbl, 2_dbl));
 
-    // TODO func compare once fixed.
+    REQUIRE(std::less<expression>{}(par[0], "x"_var + 1_dbl));
+    REQUIRE(std::less<expression>{}(1_dbl, "x"_var + 1_dbl));
+    REQUIRE(std::less<expression>{}("y"_var, "x"_var + 1_dbl));
+    REQUIRE(!std::less<expression>{}("x"_var + 1_dbl, "x"_var + 1_dbl));
+    REQUIRE(!std::less<expression>{}("x"_var + 2_dbl, "x"_var + 1_dbl));
 
     REQUIRE(std::less<expression>{}(2_dbl, par[0]));
     REQUIRE(std::less<expression>{}(2_dbl, "x"_var));

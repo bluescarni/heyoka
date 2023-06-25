@@ -48,22 +48,18 @@ TEST_CASE("diff decompose")
                            "u_2"_var});
     REQUIRE(detail::diff_decompose({par[0] + x}).second == 2u);
 
-// TODO restore.
-#if 0
     REQUIRE(detail::diff_decompose({(par[1] + y) * (par[0] + x)}).first
             == std::vector{x, y, par[0], par[1],
                            subs("u_2"_var + "u_0"_var, {{"u_2"_var, "u_0"_var}, {"u_0"_var, "u_2"_var}}),
                            subs("u_3"_var + "u_1"_var, {{"u_1"_var, "u_3"_var}, {"u_3"_var, "u_1"_var}}),
-                           subs("u_5"_var * "u_4"_var, {{"u_5"_var, "u_4"_var}, {"u_4"_var, "u_5"_var}}), "u_6"_var});
+                           "u_5"_var * "u_4"_var, "u_6"_var});
     REQUIRE(detail::diff_decompose({(par[1] + y) * (par[0] + x)}).second == 4u);
 
     REQUIRE(detail::diff_decompose({subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})}).first
             == std::vector{x, par[0], par[1],
                            subs("u_1"_var + "u_0"_var, {{"u_1"_var, "u_0"_var}, {"u_0"_var, "u_1"_var}}),
-                           subs("u_2"_var + y, {{y, 1_dbl}}),
-                           subs("u_4"_var * "u_3"_var, {{"u_3"_var, "u_4"_var}, {"u_4"_var, "u_3"_var}}), "u_5"_var});
+                           subs("u_2"_var + y, {{y, 1_dbl}}), "u_4"_var * "u_3"_var, "u_5"_var});
     REQUIRE(detail::diff_decompose({subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})}).second == 3u);
-#endif
 }
 
 TEST_CASE("diff_tensors basic")

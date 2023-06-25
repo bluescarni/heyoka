@@ -125,7 +125,7 @@ expression energy_mascon_system_impl(expression Gconst, std::vector<expression> 
 template <typename... KwArgs>
 inline std::vector<std::pair<expression, expression>> make_mascon_system(KwArgs &&...kw_args)
 {
-    // 1 - Check input consistency (TODO)
+    // 1 - Check input consistency
     // 2 - We parse the unnamed arguments
     igor::parser p{kw_args...};
     if constexpr (p.has_unnamed_arguments()) {

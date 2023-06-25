@@ -6,25 +6,17 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <cassert>
-#include <optional>
 #include <type_traits>
 #include <utility>
 #include <variant>
 
-// TODO review headers.
-
 #include <heyoka/config.hpp>
 #include <heyoka/detail/type_traits.hpp>
-#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/func.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/param.hpp>
-#include <heyoka/variable.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -45,42 +37,35 @@ expression operator+(expression e)
     return e;
 }
 
-// TODO: pass by copy + move?
 expression operator-(const expression &e)
 {
     return prod({expression{number{-1.}}, e});
 }
 
-// TODO pass by copy + move?
 // NOLINTNEXTLINE(misc-no-recursion)
 expression operator+(const expression &e1, const expression &e2)
 {
     return sum({e1, e2});
 }
 
-// TODO pass by copy + move?
 // NOLINTNEXTLINE(misc-no-recursion)
 expression operator-(const expression &e1, const expression &e2)
 {
     return e1 + -e2;
 }
 
-// TODO pass by copy + move?
 // NOLINTNEXTLINE(misc-no-recursion)
 expression operator*(const expression &e1, const expression &e2)
 {
     return prod({e1, e2});
 }
 
-// TODO pass by copy + move?
 // NOLINTNEXTLINE(misc-no-recursion)
 expression operator/(const expression &e1, const expression &e2)
 {
     return prod({e1, pow(e2, -1_dbl)});
 }
 
-// TODO pass by copy + move?
-// TODO everywhere below.
 expression operator+(const expression &ex, double x)
 {
     return ex + expression{x};
