@@ -202,8 +202,28 @@ diff_decompose(const std::vector<expression> &v_ex_)
         }
     }
 
+    // NOTE: split prods into binary mults. In reverse-mode AD,
+    // n-ary products slow down performance because the complexity
+    // of each adjoint increases linearly with the number of arguments,
+    // leading to quadratic complexity in the reverse pass. By contrast,
+    // the adjoints of binary products have fixed complexity and the number
+    // of binary multiplications necessary to reconstruct an n-ary product
+    // increases only linearly with the number of arguments.
+    auto v_ex = detail::split_prods_for_decompose(v_ex_, 2u);
+
+    // Unfix: fix() calls are not necessary any more, they will just increase
+    // the decomposition's size and mess up the derivatives.
+    v_ex = unfix(v_ex);
+
+#if !defined(NDEBUG)
+
+    // Save copy for checking in debug mode.
+    const auto v_ex_verify = v_ex;
+
+#endif
+
     // Rename variables and params.
-    const auto v_ex = subs(v_ex_, repl_map);
+    v_ex = subs(v_ex, repl_map);
 
     // Init the decomposition. It begins with a list
     // of the original variables and params of the function.
@@ -261,7 +281,7 @@ diff_decompose(const std::vector<expression> &v_ex_)
     // Verify the decomposition.
     // NOTE: nvars + npars is implicitly converted to std::vector<expression>::size_type here.
     // This is fine, as the decomposition must contain at least nvars + npars items.
-    verify_function_dec(v_ex_, ret, nvars + npars, true);
+    verify_function_dec(v_ex_verify, ret, nvars + npars, true);
 
 #endif
 
@@ -273,7 +293,7 @@ diff_decompose(const std::vector<expression> &v_ex_)
 #if !defined(NDEBUG)
 
     // Verify the decomposition.
-    verify_function_dec(v_ex_, ret, nvars + npars, true);
+    verify_function_dec(v_ex_verify, ret, nvars + npars, true);
 
 #endif
 
@@ -285,7 +305,7 @@ diff_decompose(const std::vector<expression> &v_ex_)
 #if !defined(NDEBUG)
 
     // Verify the decomposition.
-    verify_function_dec(v_ex_, ret, nvars + npars, true);
+    verify_function_dec(v_ex_verify, ret, nvars + npars, true);
 
 #endif
 
@@ -349,10 +369,7 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
             cur_dep.push_back(idx);
         }
 
-        // NOTE: when building the substitution map, ensure that
-        // subs() normalises, so that ultimately the result of
-        // reverse-mode differentiation will also be normalised.
-        subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map, true));
+        subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map));
     }
 
     // Sort the vectors of reverse dependencies.
@@ -547,6 +564,30 @@ void diff_tensors_reverse_impl(
 
         // Run the reverse pass on all subexpressions which
         // the current output depends on.
+        //
+        // NOTE: we need to tread lightly here. The reverse pass consists
+        // of iteratively building up an expression from a seed value via
+        // multiplications and summations involving the adjoints. In order
+        // for the resulting expression to be able to be evaluated with
+        // optimal performance by heyoka, several automated simplifications in sums
+        // and products need to be disabled. One such example is the flattening
+        // of nested products, which destroys heyoka's ability to identify and
+        // eliminate redundant subexpressions via CSE. In order to disable automatic
+        // simplifications, we use fix(), with the caveat that fix() is *not*
+        // applied to number expressions (so that constant
+        // folding can still take place). Perhaps in the future it will be possible
+        // to enable further simplifications involving pars/vars, but, for now, let
+        // us play it conservatively.
+
+        // Helper to fix() an expression only if it is not a number.
+        auto fix_nn = [](expression e) {
+            if (std::holds_alternative<number>(e.value())) {
+                return e;
+            } else {
+                return fix(std::move(e));
+            }
+        };
+
         for (const auto cur_idx : sorted_out_deps) {
             std::vector<expression> tmp_sum;
 
@@ -564,13 +605,14 @@ void diff_tensors_reverse_impl(
                 if (rd_idx != out_idx && out_deps.count(rd_idx) == 0u) {
                     tmp_sum.push_back(0_dbl);
                 } else {
-                    tmp_sum.push_back(diffs[rd_idx] * adj[rd_idx].find(cur_idx)->second);
+                    auto new_term = fix_nn(fix_nn(diffs[rd_idx]) * fix_nn(adj[rd_idx].find(cur_idx)->second));
+                    tmp_sum.push_back(std::move(new_term));
                 }
             }
 
             assert(!tmp_sum.empty());
 
-            diffs[cur_idx] = sum(tmp_sum);
+            diffs[cur_idx] = fix_nn(sum(tmp_sum));
         }
 
         // Create a dict mapping the vars/params in the decomposition
@@ -602,10 +644,7 @@ void diff_tensors_reverse_impl(
                 expression cur_der = 0_dbl;
 
                 if (const auto it_dmap = dmap.find(args[j]); it_dmap != dmap.end()) {
-                    // NOTE: when substituting the original variables in the derivative, ensure that
-                    // subs() normalises, so that ultimately the result of reverse-mode
-                    // differentiation will also be normalised.
-                    cur_der = subs(it_dmap->second, subs_map, true);
+                    cur_der = subs(it_dmap->second, subs_map);
                 }
 
                 [[maybe_unused]] const auto [_, flag] = diff_map.try_emplace(tmp_v_idx, std::move(cur_der));

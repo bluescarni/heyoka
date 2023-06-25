@@ -181,10 +181,9 @@ TEST_CASE("diff_tensors basic")
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{x + y, x * y * y});
     assign_sr(dt.get_derivatives(1));
-    // TODO restore.
-    // REQUIRE(diff_vec == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
     assign_sr(dt.get_derivatives(2));
-    REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * x});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * x});
 
     // Diff wrt all variables.
     dt = diff_tensors({x + y, x * y * y}, kw::diff_order = 2, kw::diff_args = diff_args::vars);
@@ -192,10 +191,9 @@ TEST_CASE("diff_tensors basic")
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{x + y, x * y * y});
     assign_sr(dt.get_derivatives(1));
-    // TODO restore.
-    // REQUIRE(diff_vec == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
     assign_sr(dt.get_derivatives(2));
-    REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * x});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * x});
 
     // Diff wrt some variables.
     dt = diff_tensors({x + y, x * y * y}, kw::diff_order = 2, kw::diff_args = {x});
@@ -203,9 +201,9 @@ TEST_CASE("diff_tensors basic")
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{x + y, x * y * y});
     assign_sr(dt.get_derivatives(1));
-    REQUIRE(diff_vec == std::vector{1_dbl, y * y});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{1_dbl, y * y});
     assign_sr(dt.get_derivatives(2));
-    REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, 0_dbl});
 
     // Diff wrt all params.
     dt = diff_tensors({par[0] + y, x * y * par[1]}, kw::diff_order = 2, kw::diff_args = diff_args::params);
@@ -213,7 +211,7 @@ TEST_CASE("diff_tensors basic")
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{par[0] + y, x * y * par[1]});
     assign_sr(dt.get_derivatives(1));
-    REQUIRE(diff_vec == std::vector{1_dbl, 0_dbl, 0_dbl, x * y});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{1_dbl, 0_dbl, 0_dbl, x * y});
     assign_sr(dt.get_derivatives(2));
     REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl});
 
@@ -223,7 +221,7 @@ TEST_CASE("diff_tensors basic")
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{par[0] + y, x * y * par[1]});
     assign_sr(dt.get_derivatives(1));
-    REQUIRE(diff_vec == std::vector{0_dbl, x * y});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, x * y});
     assign_sr(dt.get_derivatives(2));
     REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl});
 
@@ -622,22 +620,3 @@ TEST_CASE("speelpenning complexity")
         s.compile();
     }
 }
-
-// TODO restore.
-#if 0
-
-// This test checks that reverse-mode differentiation produces
-// expressions in which the operands to commutative functions are kept
-// in a canonical order.
-TEST_CASE("comm canonical")
-{
-    auto [x, y] = make_vars("x", "y");
-
-    auto dt = diff_tensors({par[0] * x * y}, kw::diff_args = diff_args::all);
-
-    REQUIRE(dt[{0, 0, 0, 1}] == x * y);
-    REQUIRE(dt[{0, 0, 1, 0}] == par[0] * x);
-    REQUIRE(dt[{0, 1, 0, 0}] == par[0] * y);
-}
-
-#endif
