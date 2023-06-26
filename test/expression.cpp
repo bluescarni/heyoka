@@ -766,9 +766,10 @@ TEST_CASE("subs str")
     // Check the substitution.
     REQUIRE(bar_subs == bar_a);
 
-    // Check canonicalisation.
+    // Check normalisation.
     REQUIRE(subs(x + y, {{"x", "b"_var}, {"y", "a"_var}}, true) == "a"_var + "b"_var);
     REQUIRE(subs(std::vector{x + y}, {{"x", "b"_var}, {"y", "a"_var}}, true)[0] == "a"_var + "b"_var);
+    REQUIRE(subs(std::vector{x + y}, {{"x", "b"_var}, {"y", "a"_var}})[0] != "a"_var + "b"_var);
 }
 
 TEST_CASE("subs")
@@ -789,6 +790,11 @@ TEST_CASE("subs")
     auto subs_res = subs(ex, {{tmp, tmp2}});
 
     REQUIRE(subs_res == tmp - par[0] * tmp2);
+
+    // Check normalisation.
+    REQUIRE(subs(x + y, {{x, "b"_var}, {y, "a"_var}}, true) == "a"_var + "b"_var);
+    REQUIRE(subs(std::vector{x + y}, {{x, "b"_var}, {y, "a"_var}}, true)[0] == "a"_var + "b"_var);
+    REQUIRE(subs(std::vector{x + y}, {{x, "b"_var}, {y, "a"_var}})[0] != "a"_var + "b"_var);
 }
 
 // cfunc N-body with fixed masses.

@@ -523,6 +523,9 @@ struct formatter<heyoka::dtens> : heyoka::detail::ostream_formatter {
 
 HEYOKA_BEGIN_NAMESPACE
 
+// NOTE: when documenting, we need to point out that the expressions
+// returned by this function are optimised for evaluation. The users
+// can always unfix() and normalise() these expressions if needed.
 template <typename... KwArgs>
 dtens diff_tensors(const std::vector<expression> &v_ex, KwArgs &&...kw_args)
 {
