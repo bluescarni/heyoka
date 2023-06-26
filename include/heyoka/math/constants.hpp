@@ -59,14 +59,12 @@ public:
 
 } // namespace detail
 
-// NOTE: no need to define custom equality and hashing here,
-// as the default equality/hashing primitives for func
-// take into account the constant name. Thus, under the assumption
-// that different constants have different names, this will be enough.
-// NOTE: we might need to revisit this - perhaps it's better/safer
-// to have an entirely different C++ type rather than relying on remembering
-// to give a unique name to each constant. Then again, still unsure whether
-// the func API can truly be considered as "public"...
+// NOTE: like for user-defined functions, here we are relying
+// on the user to remember to give different names to different
+// constants in order for the comparison/hashing/etc. primitives
+// to make sense. If/when we implement a mechanism for automatic
+// function name registration to prevent naming collisions, we should
+// do the same for constants.
 class HEYOKA_DLL_PUBLIC constant : public func_base
 {
 public:
