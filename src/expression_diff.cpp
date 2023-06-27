@@ -213,6 +213,8 @@ diff_decompose(const std::vector<expression> &v_ex_)
 
     // Unfix: fix() calls are not necessary any more, they will just increase
     // the decomposition's size and mess up the derivatives.
+    // NOTE: unfix is the last step, as we want to keep expressions
+    // fixed in the previous preprocessing steps.
     v_ex = unfix(v_ex);
 
 #if !defined(NDEBUG)
