@@ -99,51 +99,52 @@ std::vector<std::pair<expression, expression>> nbody_impl(std::uint32_t n, const
             const auto diff_y = y_vars[j] - y_vars[i];
             const auto diff_z = z_vars[j] - z_vars[i];
 
+            // Compute r_ij**-3.
             const auto r_m3 = pow(sum({diff_x * diff_x, diff_y * diff_y, diff_z * diff_z}), expression{-3. / 2});
 
-            // If j is massive and masses_vec[j] is a non-zero number,
-            // we compute the accelerations using a grouping
-            // of the operations optimised for the common case
-            // in which masses and G are numbers.
+            // If:
+            //
+            // - j is massive and masses_vec[j] is a non-zero number, and
+            // - G is a number,
+            //
+            // then we group the operations in a way that minimises
+            // the computational complexity thanks to constant folding.
             const auto j_massive = j < n_massive;
             const auto opt_grouping = j_massive && std::holds_alternative<number>(masses_vec[j].value())
-                                      && !is_zero(std::get<number>(masses_vec[j].value()));
+                                      && !is_zero(std::get<number>(masses_vec[j].value()))
+                                      && std::holds_alternative<number>(Gconst.value());
 
             if (opt_grouping) {
-                // NOTE: Gconst * masses_vec[j] and -masses_vec[i] / masses_vec[j]
-                // will be constant folded into the numerical result, if masses
-                // and Gconst are all numbers. This allows to reduce the number
-                // of operations wrt the other branch.
-                const auto fac_j = fix(Gconst * masses_vec[j] * r_m3);
-                const auto c_ij = fix(-masses_vec[i] / masses_vec[j]);
+                const auto fac_j = fix_nn(Gconst * masses_vec[j] * r_m3);
+                const auto c_ij = -masses_vec[i] / masses_vec[j];
 
                 // Acceleration exerted by j on i.
-                x_acc[i].push_back(diff_x * fac_j);
-                y_acc[i].push_back(diff_y * fac_j);
-                z_acc[i].push_back(diff_z * fac_j);
+                x_acc[i].push_back(fix_nn(diff_x * fac_j));
+                y_acc[i].push_back(fix_nn(diff_y * fac_j));
+                z_acc[i].push_back(fix_nn(diff_z * fac_j));
 
                 // Acceleration exerted by i on j.
-                x_acc[j].push_back(x_acc[i].back() * c_ij);
-                y_acc[j].push_back(y_acc[i].back() * c_ij);
-                z_acc[j].push_back(z_acc[i].back() * c_ij);
+                x_acc[j].push_back((fix_nn(x_acc[i].back() * c_ij)));
+                y_acc[j].push_back((fix_nn(y_acc[i].back() * c_ij)));
+                z_acc[j].push_back((fix_nn(z_acc[i].back() * c_ij)));
             } else {
-                const auto G_r_m3 = Gconst * r_m3;
+                const auto G_r_m3 = fix_nn(Gconst * r_m3);
 
                 // Acceleration due to i on j.
-                const auto fac_i = -masses_vec[i] * G_r_m3;
-                x_acc[j].push_back(diff_x * fac_i);
-                y_acc[j].push_back(diff_y * fac_i);
-                z_acc[j].push_back(diff_z * fac_i);
+                const auto fac_i = fix_nn(-masses_vec[i] * G_r_m3);
+                x_acc[j].push_back(fix_nn(diff_x * fac_i));
+                y_acc[j].push_back(fix_nn(diff_y * fac_i));
+                z_acc[j].push_back(fix_nn(diff_z * fac_i));
 
                 if (j_massive) {
                     // Body j is massive and it interacts mutually with body i
                     // (which is also massive).
-                    const auto fac_j = masses_vec[j] * G_r_m3;
+                    const auto fac_j = fix_nn(masses_vec[j] * G_r_m3);
 
                     // Acceleration due to j on i.
-                    x_acc[i].push_back(diff_x * fac_j);
-                    y_acc[i].push_back(diff_y * fac_j);
-                    z_acc[i].push_back(diff_z * fac_j);
+                    x_acc[i].push_back(fix_nn(diff_x * fac_j));
+                    y_acc[i].push_back(fix_nn(diff_y * fac_j));
+                    z_acc[i].push_back(fix_nn(diff_z * fac_j));
                 }
             }
         }
