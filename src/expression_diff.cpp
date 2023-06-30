@@ -580,16 +580,6 @@ void diff_tensors_reverse_impl(
         // folding can still take place). Perhaps in the future it will be possible
         // to enable further simplifications involving pars/vars, but, for now, let
         // us play it conservatively.
-
-        // Helper to fix() an expression only if it is not a number.
-        auto fix_nn = [](expression e) {
-            if (std::holds_alternative<number>(e.value())) {
-                return e;
-            } else {
-                return fix(std::move(e));
-            }
-        };
-
         for (const auto cur_idx : sorted_out_deps) {
             std::vector<expression> tmp_sum;
 

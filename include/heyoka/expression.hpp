@@ -115,6 +115,7 @@ HEYOKA_DLL_PUBLIC expression copy(const expression &);
 HEYOKA_DLL_PUBLIC std::vector<expression> copy(const std::vector<expression> &);
 
 HEYOKA_DLL_PUBLIC expression fix(expression);
+HEYOKA_DLL_PUBLIC expression fix_nn(expression);
 HEYOKA_DLL_PUBLIC expression unfix(const expression &);
 HEYOKA_DLL_PUBLIC std::vector<expression> unfix(const std::vector<expression> &);
 

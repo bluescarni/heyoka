@@ -21,6 +21,7 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -87,6 +88,15 @@ expression fix(expression x)
         return x;
     } else {
         return expression{func{detail::fix_impl(std::move(x))}};
+    }
+}
+
+expression fix_nn(expression x)
+{
+    if (std::holds_alternative<number>(x.value())) {
+        return x;
+    } else {
+        return fix(std::move(x));
     }
 }
 
