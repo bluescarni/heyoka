@@ -79,7 +79,10 @@ TEST_CASE("nbody")
         REQUIRE(n_sums == 18);
         REQUIRE(ta.get_decomposition().size() == 270u);
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 146u);
+
         s.optimise();
         s.compile();
 
@@ -112,7 +115,10 @@ TEST_CASE("nbody")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 114u);
+
         s.optimise();
         s.compile();
 
@@ -156,7 +162,10 @@ TEST_CASE("nbody")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 146u);
+
         s.optimise();
         s.compile();
 
@@ -202,7 +211,10 @@ TEST_CASE("nbody")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 114u);
+
         s.optimise();
         s.compile();
 
@@ -250,7 +262,10 @@ TEST_CASE("nbody")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 146u);
+
         s.optimise();
         s.compile();
 
@@ -299,7 +314,10 @@ TEST_CASE("nbody")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 114u);
+
         s.optimise();
         s.compile();
 
@@ -343,7 +361,10 @@ TEST_CASE("nbody")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 124u);
+
         s.optimise();
         s.compile();
 
@@ -385,7 +406,10 @@ TEST_CASE("nbody")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 37u);
+
         s.optimise();
         s.compile();
 
@@ -461,6 +485,8 @@ TEST_CASE("np1body")
         auto en_ex = model::np1body_energy(6, kw::masses = masses, kw::Gconst = Gconst);
 
         auto ta = heyoka::taylor_adaptive{dyn, std::vector(n_ic.begin() + 6, n_ic.end()), kw::compact_mode = true};
+
+        REQUIRE(ta.get_decomposition().size() == 285u);
 
         llvm_state s;
         std::vector<expression> vars;
