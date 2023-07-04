@@ -378,12 +378,15 @@ expression np1body_potential_impl([[maybe_unused]] std::uint32_t n, const expres
         z_vars.emplace_back(fmt::format("z_{}", i + 1u));
     }
 
+    // Prepare the accumulator for the terms of the potential.
     std::vector<expression> pot;
+
     // Add the potential between the zeroth body and the rest.
     for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
         pot.push_back(masses_vec[0] * masses_vec[i + 1u]
                       / sqrt(sum({x_vars[i] * x_vars[i], y_vars[i] * y_vars[i], z_vars[i] * z_vars[i]})));
     }
+
     // Add the mutual potentials.
     for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
         for (std::uint32_t j = i + 1u; j < n_massive - 1u; ++j) {
@@ -396,7 +399,13 @@ expression np1body_potential_impl([[maybe_unused]] std::uint32_t n, const expres
         }
     }
 
-    return -Gconst * sum(pot);
+    // NOTE: the fix() here is to prevent distribution if Gconst is a number
+    // and the masses are parametric. It is however suboptimal if all masses and G are
+    // numbers, as it prevents constant folding. However, there
+    // is only a single extra multiplication to be performed wrt
+    // the optimal grouping, if necessary in the future we can always
+    // add special casing if G and all masses are numbers.
+    return -Gconst * fix_nn(sum(pot));
 }
 
 expression np1body_energy_impl([[maybe_unused]] std::uint32_t n, const expression &Gconst,
@@ -441,14 +450,16 @@ expression np1body_energy_impl([[maybe_unused]] std::uint32_t n, const expressio
     const auto ud0_z = -sum(ud0_z_terms) / tot_mass;
 
     // The kinetic terms.
-    std::vector<expression> kin{masses_vec[0] * sum({ud0_x * ud0_x, ud0_y * ud0_y, ud0_z * ud0_z})};
+    std::vector<expression> kin{masses_vec[0] * fix_nn(sum({ud0_x * ud0_x, ud0_y * ud0_y, ud0_z * ud0_z}))};
     for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
-        kin.push_back(masses_vec[i + 1u]
-                      * sum({(vx_vars[i] + ud0_x) * (vx_vars[i] + ud0_x), (vy_vars[i] + ud0_y) * (vy_vars[i] + ud0_y),
-                             (vz_vars[i] + ud0_z) * (vz_vars[i] + ud0_z)}));
+        const auto tmp_vx = vx_vars[i] + fix_nn(ud0_x);
+        const auto tmp_vy = vy_vars[i] + fix_nn(ud0_y);
+        const auto tmp_vz = vz_vars[i] + fix_nn(ud0_z);
+
+        kin.push_back(masses_vec[i + 1u] * fix_nn(sum({tmp_vx * tmp_vx, tmp_vy * tmp_vy, tmp_vz * tmp_vz})));
     }
 
-    return .5_dbl * sum(kin) + np1body_potential_impl(n, Gconst, masses_vec);
+    return .5_dbl * fix_nn(sum(kin)) + np1body_potential_impl(n, Gconst, masses_vec);
 }
 
 } // namespace model::detail
