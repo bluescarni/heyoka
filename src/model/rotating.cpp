@@ -59,6 +59,7 @@ std::vector<std::pair<expression, expression>> rotating_impl(const std::vector<e
         const auto re_x = re * x;
         const auto qe_y = qe * y;
         const auto re_z = re * z;
+
         acc_x.push_back(qe * qe_x);
         acc_x.push_back(re * re_x);
         acc_x.push_back(-(pe * qe_y));
