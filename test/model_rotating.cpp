@@ -70,7 +70,7 @@ TEST_CASE("basic")
 
         auto ta = taylor_adaptive{dyn, init_state, kw::compact_mode = true};
 
-        REQUIRE(ta.get_decomposition().size() == 36u);
+        REQUIRE(ta.get_decomposition().size() == 30u);
 
         ta.propagate_until(20.);
 
@@ -112,7 +112,7 @@ TEST_CASE("basic")
 
         auto ta = taylor_adaptive{dyn, init_state, kw::compact_mode = true, kw::pars = omega_vals};
 
-        REQUIRE(ta.get_decomposition().size() == 48u);
+        REQUIRE(ta.get_decomposition().size() == 51u);
 
         ta.propagate_until(20.);
 

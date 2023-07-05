@@ -64,31 +64,6 @@ sum_impl::sum_impl() : sum_impl(std::vector<expression>{}) {}
 
 sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v)) {}
 
-namespace
-{
-
-// Partitioning function to identify negative
-// terms in a sum. It will return false if
-// arg is either a negative number or a product
-// in the form cf * a * ..., with cf a negative number,
-// true otherwise.
-bool sum_neg_term_part(const expression &arg)
-{
-    if (const auto *num_ptr = std::get_if<number>(&arg.value())) {
-        return !is_negative(*num_ptr);
-    }
-
-    if (const auto &fptr = std::get_if<func>(&arg.value());
-        fptr != nullptr && fptr->extract<prod_impl>() != nullptr && fptr->args().size() >= 2u
-        && std::holds_alternative<number>(fptr->args()[0].value())) {
-        return !is_negative(std::get<number>(fptr->args()[0].value()));
-    }
-
-    return true;
-}
-
-} // namespace
-
 void sum_impl::to_stream(std::ostringstream &oss) const
 {
     if (args().empty()) {
@@ -104,8 +79,22 @@ void sum_impl::to_stream(std::ostringstream &oss) const
     // Partition the arguments so that all terms which are either a negative
     // number or a product in the form cf * a * ..., with cf a negative number,
     // are at the end.
+    const auto fpart = [](const expression &arg) {
+        if (const auto *num_ptr = std::get_if<number>(&arg.value())) {
+            return !is_negative(*num_ptr);
+        }
+
+        if (const auto &fptr = std::get_if<func>(&arg.value());
+            fptr != nullptr && fptr->extract<prod_impl>() != nullptr && fptr->args().size() >= 2u
+            && std::holds_alternative<number>(fptr->args()[0].value())) {
+            return !is_negative(std::get<number>(fptr->args()[0].value()));
+        }
+
+        return true;
+    };
+
     auto terms = args();
-    const auto neg_it = std::stable_partition(terms.begin(), terms.end(), sum_neg_term_part);
+    const auto neg_it = std::stable_partition(terms.begin(), terms.end(), fpart);
 
     // Helper to stream the positive terms.
     auto stream_pos_terms = [&]() {
@@ -710,54 +699,51 @@ expression sum_to_sub_impl(funcptr_map<expression> &func_map, const expression &
                     retval.emplace(v.copy(new_args));
                 } else {
                     // The current function is a sum(). Partition its
-                    // negative arguments.
-                    const auto it = std::stable_partition(new_args.begin(), new_args.end(), sum_neg_term_part);
+                    // arguments so that those in the form -1 * a * ...
+                    // are at the end.
+                    const auto fpart = [](const expression &arg) {
+                        if (const auto &fptr = std::get_if<func>(&arg.value());
+                            fptr != nullptr && fptr->extract<prod_impl>() != nullptr && fptr->args().size() >= 2u
+                            && std::holds_alternative<number>(fptr->args()[0].value())) {
+                            return !is_negative_one(std::get<number>(fptr->args()[0].value()));
+                        }
+
+                        return true;
+                    };
+
+                    const auto it = std::stable_partition(new_args.begin(), new_args.end(), fpart);
 
                     if (it == new_args.end()) {
-                        // There are no negative terms in the sum, just make a copy.
+                        // There are no negations in the sum, just make a copy.
                         retval.emplace(v.copy(new_args));
                     } else {
-                        // There are some negative terms in the sum.
+                        // There are some negations in the sum.
                         // Group them into a subtrahend, negate, and transform
                         // into a subtraction.
 
                         // Construct the terms of the subtrahend.
                         std::vector<expression> sub_args, tmp_args;
                         for (auto s_it = it; s_it != new_args.end(); ++s_it) {
-                            if (const auto *num_ptr = std::get_if<number>(&s_it->value())) {
-                                // The subtrahend term is a number, negate it.
-                                sub_args.emplace_back(-*num_ptr);
-                            } else {
-                                // The subtrahend term is a product with leading
-                                // negative coefficient.
-                                const auto &fn = std::get<func>(s_it->value());
+                            const auto &fn = std::get<func>(s_it->value());
 
-                                assert(fn.template extract<prod_impl>() != nullptr);
-                                assert(fn.args().size() >= 2u);
+                            assert(fn.template extract<prod_impl>() != nullptr);
+                            assert(fn.args().size() >= 2u);
+                            assert(is_negative_one(std::get<number>(fn.args()[0].value())));
 
-                                // Get the original leading coefficient.
-                                const auto &cf = std::get<number>(fn.args()[0].value());
+                            // Build tmp_args from fn.args(), skipping the first term (-1).
+                            tmp_args.clear();
+                            tmp_args.reserve(fn.args().size() - 1u);
+                            tmp_args.insert(tmp_args.end(), fn.args().begin() + 1, fn.args().end());
 
-                                assert(is_negative(cf));
-
-                                // Negate it and insert it in tmp_args.
-                                tmp_args.clear();
-                                tmp_args.reserve(fn.args().size());
-                                tmp_args.emplace_back(-cf);
-
-                                // Insert the rest of the terms from the product.
-                                tmp_args.insert(tmp_args.end(), fn.args().begin() + 1, fn.args().end());
-
-                                // Reconstruct the negated product.
-                                sub_args.push_back(prod(tmp_args));
-                            }
+                            // Reconstruct the negated product.
+                            sub_args.push_back(prod(tmp_args));
                         }
 
                         // Construct the subtrahend.
                         auto st = sum(sub_args);
 
                         if (it == new_args.begin()) {
-                            // There are *only* negative terms, return the negation of st.
+                            // There are *only* negations, return the negation of st.
                             retval.emplace(prod({-1_dbl, std::move(st)}));
                         } else {
                             // Construct the minuend.
@@ -785,6 +771,10 @@ expression sum_to_sub_impl(funcptr_map<expression> &func_map, const expression &
 
 } // namespace
 
+// This function will transform sums containing negated terms
+// (i.e., terms of the form -1 * a * ...) into subtractions. E.g.,
+// (x + -1 * y) will be transformed into (x - y), thereby shaving
+// away the cost of a multiplication.
 std::vector<expression> sum_to_sub(const std::vector<expression> &v_ex)
 {
     funcptr_map<expression> func_map;

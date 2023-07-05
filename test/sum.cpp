@@ -494,16 +494,16 @@ TEST_CASE("sum_to_sub")
     REQUIRE(ret[0] == detail::sub(x, y));
 
     ret = detail::sum_to_sub({sum({-5_dbl, x, prod({-1_dbl, y})})});
-    REQUIRE(ret[0] == detail::sub(x, sum({y, 5_dbl})));
+    REQUIRE(ret[0] == detail::sub(x - 5_dbl, y));
 
     ret = detail::sum_to_sub({sum({5_dbl, x, cos(y)})});
     REQUIRE(ret[0] == sum({5_dbl, x, cos(y)}));
 
     ret = detail::sum_to_sub({sum({-5_dbl, prod({-2_dbl, x}), prod({-1_dbl, cos(y)})})});
-    REQUIRE(ret[0] == prod({-1_dbl, sum({5_dbl, prod({2_dbl, x}), prod({1_dbl, cos(y)})})}));
+    REQUIRE(ret[0] == detail::sub((-5. - (2. * x)), cos(y)));
 
     ret = detail::sum_to_sub({cos(sum({-5_dbl, prod({-2_dbl, x}), prod({-1_dbl, cos(y)})}))});
-    REQUIRE(ret[0] == cos(prod({-1_dbl, sum({5_dbl, prod({2_dbl, x}), prod({1_dbl, cos(y)})})})));
+    REQUIRE(ret[0] == cos(detail::sub((-5. - (2. * x)), cos(y))));
 
     auto tmp = sum({x, prod({-1_dbl, cos(x)})});
 

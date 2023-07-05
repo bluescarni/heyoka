@@ -32,8 +32,6 @@
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
-#include <fmt/ranges.h>
-
 #include "catch.hpp"
 #include "test_utils.hpp"
 
@@ -120,8 +118,6 @@ TEST_CASE("taylor acosh test simplifications")
     llvm_state s{kw::opt_level = 0u};
 
     auto dc = taylor_add_jet<double>(s, "jet", {acosh(x + y) + sqrt((x + y) * (x + y) - 1.), x}, 2, 1, false, false);
-
-    fmt::print("{}\n", dc);
 
     REQUIRE(dc.size() == 10u);
 

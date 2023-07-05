@@ -42,7 +42,6 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/string_conv.hpp>
-#include <heyoka/detail/sub.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -136,13 +135,7 @@ taylor_dc_t::size_type acosh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     u_vars_defs.emplace_back(args()[0] * args()[0], std::vector<std::uint32_t>{});
 
     // Append arg * arg - 1.
-    // NOTE: need to manually use sub() here because:
-    // - otherwise arg * arg - 1 is not any more an elementary
-    //   subexpression,
-    // - if arg * arg - 1 appears elsewhere in the expression, then
-    //   it is automatically transformed into a sub() by the decomposition
-    //   preprocessing.
-    u_vars_defs.emplace_back(sub(expression{fmt::format("u_{}", u_vars_defs.size() - 1u)}, 1_dbl),
+    u_vars_defs.emplace_back(expression{fmt::format("u_{}", u_vars_defs.size() - 1u)} - 1_dbl,
                              std::vector<std::uint32_t>{});
 
     // Append sqrt(arg * arg - 1).
