@@ -70,15 +70,22 @@ TEST_CASE("basic")
 
         auto ta = taylor_adaptive{dyn, init_state, kw::compact_mode = true};
 
+        REQUIRE(ta.get_decomposition().size() == 36u);
+
         ta.propagate_until(20.);
 
         auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
 
         llvm_state s;
-        add_cfunc<double>(s, "en",
-                          // NOTE: need to add the kinetic energy per unit of mass.
-                          {0.5 * (vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {.1, .2, .3})},
-                          kw::vars = {x, y, z, vx, vy, vz});
+
+        const auto dc = add_cfunc<double>(
+            s, "en",
+            // NOTE: need to add the kinetic energy per unit of mass.
+            {0.5 * fix(vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {.1, .2, .3})},
+            kw::vars = {x, y, z, vx, vy, vz});
+
+        REQUIRE(dc.size() == 19u);
+
         s.optimise();
         s.compile();
 
@@ -92,8 +99,50 @@ TEST_CASE("basic")
 
         REQUIRE(E == approximately(E0));
 
-        REQUIRE(0.5 * sum_sq({vx, vy, vz}) + model::rotating_potential(kw::omega = {.1, .2, .3})
+        REQUIRE(0.5 * fix_nn(sum_sq({vx, vy, vz})) + model::rotating_potential(kw::omega = {.1, .2, .3})
                 == model::rotating_energy(kw::omega = {.1, .2, .3}));
+    }
+
+    {
+        const std::vector omega_vals = {.1, .2, .3};
+
+        auto dyn = model::rotating(kw::omega = {par[0], par[1], par[2]});
+
+        const std::vector<double> init_state = {.4, .5, .6, .7, .8, .9};
+
+        auto ta = taylor_adaptive{dyn, init_state, kw::compact_mode = true, kw::pars = omega_vals};
+
+        REQUIRE(ta.get_decomposition().size() == 48u);
+
+        ta.propagate_until(20.);
+
+        auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
+
+        llvm_state s;
+
+        const auto dc = add_cfunc<double>(
+            s, "en",
+            // NOTE: need to add the kinetic energy per unit of mass.
+            {0.5 * fix(vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {par[0], par[1], par[2]})},
+            kw::vars = {x, y, z, vx, vy, vz});
+
+        REQUIRE(dc.size() == 20u);
+
+        s.optimise();
+        s.compile();
+
+        auto *cf
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("en"));
+        double E0 = 0;
+        cf(&E0, init_state.data(), omega_vals.data(), nullptr);
+
+        double E = 0;
+        cf(&E, ta.get_state().data(), omega_vals.data(), nullptr);
+
+        REQUIRE(E == approximately(E0));
+
+        REQUIRE(0.5 * fix_nn(sum_sq({vx, vy, vz})) + model::rotating_potential(kw::omega = {par[0], par[1], par[2]})
+                == model::rotating_energy(kw::omega = {par[0], par[1], par[2]}));
     }
 
     // Error modes.
