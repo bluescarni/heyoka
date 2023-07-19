@@ -144,6 +144,7 @@ namespace
 expression copy_impl(funcptr_map<expression> &func_map, const expression &e)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_map](const auto &v) {
             if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto f_id = v.get_ptr();
@@ -298,6 +299,7 @@ namespace
 void get_variables(funcptr_set &func_set, std::unordered_set<std::string> &s_set, const expression &e)
 {
     std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_set, &s_set](const auto &arg) {
             using type = uncvref_t<decltype(arg)>;
 
@@ -374,6 +376,7 @@ expression rename_variables(detail::funcptr_map<expression> &func_map, const exp
                             const std::unordered_map<std::string, std::string> &repl_map)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_map, &repl_map](const auto &arg) {
             using type = uncvref_t<decltype(arg)>;
 
@@ -553,6 +556,7 @@ struct too_many_nodes : std::exception {
 std::size_t get_n_nodes(funcptr_map<std::size_t> &func_map, const expression &e)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_map](const auto &arg) -> std::size_t {
             if constexpr (std::is_same_v<func, uncvref_t<decltype(arg)>>) {
                 const auto f_id = arg.get_ptr();
@@ -616,6 +620,7 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
                 const std::unordered_map<std::string, expression> &smap)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_map, &smap](const auto &arg) {
             using type = uncvref_t<decltype(arg)>;
 
@@ -711,6 +716,7 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
     }
 
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_map, &smap](const auto &arg) {
             using type = uncvref_t<decltype(arg)>;
 
@@ -797,6 +803,7 @@ namespace
 expression normalise_impl(detail::funcptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&](const auto &arg) {
             using type = uncvref_t<decltype(arg)>;
 
@@ -1006,6 +1013,7 @@ std::uint32_t get_param_size(detail::funcptr_set &func_set, const expression &ex
     std::uint32_t retval = 0;
 
     std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&retval, &func_set](const auto &v) {
             using type = uncvref_t<decltype(v)>;
 
@@ -1063,6 +1071,7 @@ namespace
 void get_params(std::unordered_set<std::uint32_t> &idx_set, detail::funcptr_set &func_set, const expression &ex)
 {
     std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&](const auto &v) {
             using type = uncvref_t<decltype(v)>;
 
@@ -1155,6 +1164,7 @@ bool is_time_dependent(funcptr_map<bool> &func_map, const expression &ex)
     //   if any of its arguments is time-dependent,
     // - otherwise, return false.
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_map](const auto &v) {
             using type = uncvref_t<decltype(v)>;
 
@@ -1222,6 +1232,7 @@ constexpr std::uint32_t decompose_split = 8u;
 expression split_sums_for_decompose(funcptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&](const auto &v) {
             if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto *f_id = v.get_ptr();
@@ -1281,6 +1292,7 @@ namespace
 expression split_prods_for_decompose(funcptr_map<expression> &func_map, const expression &ex, std::uint32_t split)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_map, &ex, split](const auto &v) {
             if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto *f_id = v.get_ptr();
@@ -1340,6 +1352,7 @@ namespace
 expression sums_to_sum_sqs_for_decompose(funcptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&](const auto &v) {
             if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto *f_id = v.get_ptr();
