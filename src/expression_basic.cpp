@@ -140,6 +140,7 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression copy_impl(funcptr_map<expression> &func_map, const expression &e)
 {
     return std::visit(
@@ -293,6 +294,7 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 void get_variables(funcptr_set &func_set, std::unordered_set<std::string> &s_set, const expression &e)
 {
     std::visit(
@@ -367,6 +369,7 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression rename_variables(detail::funcptr_map<expression> &func_map, const expression &e,
                             const std::unordered_map<std::string, std::string> &repl_map)
 {
@@ -546,6 +549,7 @@ namespace
 struct too_many_nodes : std::exception {
 };
 
+// NOLINTNEXTLINE(misc-no-recursion)
 std::size_t get_n_nodes(funcptr_map<std::size_t> &func_map, const expression &e)
 {
     return std::visit(
@@ -607,6 +611,7 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression subs(funcptr_map<expression> &func_map, const expression &ex,
                 const std::unordered_map<std::string, expression> &smap)
 {
@@ -696,6 +701,7 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression subs(funcptr_map<expression> &func_map, const expression &ex,
                 const std::unordered_map<expression, expression> &smap)
 {
@@ -787,6 +793,7 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression normalise_impl(detail::funcptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
@@ -993,6 +1000,7 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 std::uint32_t get_param_size(detail::funcptr_set &func_set, const expression &ex)
 {
     std::uint32_t retval = 0;
@@ -1051,6 +1059,7 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 void get_params(std::unordered_set<std::uint32_t> &idx_set, detail::funcptr_set &func_set, const expression &ex)
 {
     std::visit(
@@ -1139,6 +1148,7 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 bool is_time_dependent(funcptr_map<bool> &func_map, const expression &ex)
 {
     // - If ex is a function, check if it is time-dependent, or
@@ -1208,6 +1218,7 @@ namespace
 // internal pairwise sums are rounded up exactly.
 constexpr std::uint32_t decompose_split = 8u;
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression split_sums_for_decompose(funcptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
@@ -1266,6 +1277,7 @@ std::vector<expression> split_sums_for_decompose(const std::vector<expression> &
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression split_prods_for_decompose(funcptr_map<expression> &func_map, const expression &ex, std::uint32_t split)
 {
     return std::visit(
@@ -1324,6 +1336,7 @@ std::vector<expression> split_prods_for_decompose(const std::vector<expression> 
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression sums_to_sum_sqs_for_decompose(funcptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
