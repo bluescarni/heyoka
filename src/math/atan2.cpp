@@ -50,6 +50,7 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/sum_sq.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
@@ -132,14 +133,8 @@ taylor_dc_t::size_type atan2_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 2u);
 
-    // Append x * x and y * y.
-    u_vars_defs.emplace_back(args()[1] * args()[1], std::vector<std::uint32_t>{});
-    u_vars_defs.emplace_back(args()[0] * args()[0], std::vector<std::uint32_t>{});
-
-    // Append x*x + y*y.
-    u_vars_defs.emplace_back(expression{fmt::format("u_{}", u_vars_defs.size() - 2u)}
-                                 + expression{fmt::format("u_{}", u_vars_defs.size() - 1u)},
-                             std::vector<std::uint32_t>{});
+    // Append x**2 + y**2.
+    u_vars_defs.emplace_back(expression{func{sum_sq_impl({args()[0], args()[1]})}}, std::vector<std::uint32_t>{});
 
     // Append the atan2 decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
