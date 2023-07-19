@@ -2069,3 +2069,31 @@ TEST_CASE("state_vars rhs")
 
     REQUIRE(std::get<func>(rhs_v.value()).get_ptr() == std::get<func>(ta3.get_rhs()[0].value()).get_ptr());
 }
+
+#if defined(HEYOKA_WITH_SLEEF)
+
+// This test checks that, when SLEEF is available,
+// its pow() function is being used (instead of the pow
+// LLVM intrinsic) in the computation of the integration timestep.
+TEST_CASE("pow rho sleef")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto rhs_x = v;
+    auto rhs_v = -9.8 * sin(x);
+
+    auto ta = taylor_adaptive_batch<double>{
+        {prime(x) = rhs_x, prime(v) = rhs_v}, std::vector<double>(8u, 0.), 4u, kw::tol = 1e-6};
+
+    const auto ir = ta.get_llvm_state().get_ir();
+
+    // NOTE: run the check only if avx2 is available.
+    if (!boost::algorithm::contains(ir, "+avx2")) {
+        return;
+    }
+
+    REQUIRE(boost::algorithm::contains(ir, "Sleef_powd4_u10avx2"));
+    REQUIRE(!boost::algorithm::contains(ir, "@llvm.pow.v4f64"));
+}
+
+#endif

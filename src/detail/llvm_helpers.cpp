@@ -4079,7 +4079,7 @@ llvm::Value *llvm_tanh(llvm_state &s, llvm::Value *x)
 }
 
 // Exponentiation.
-llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_approx)
+llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y)
 {
     // LCOV_EXCL_START
     assert(x != nullptr);
@@ -4093,9 +4093,7 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_
     auto *x_t = x->getType()->getScalarType();
 
     if (x_t == to_llvm_type<double>(context, false) || x_t == to_llvm_type<long double>(context, false)) {
-        // NOTE: we want to try the SLEEF route only if we are *not* allowing
-        // an approximated implementation.
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType()); !allow_approx && vec_t != nullptr) {
+        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
             if (const auto sfn
                 = sleef_function_name(context, "pow", x_t, boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
                 !sfn.empty()) {
@@ -4110,10 +4108,6 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y, bool allow_
         }
 
         auto *ret = llvm_invoke_intrinsic(s.builder(), "llvm.pow", {x->getType()}, {x, y});
-
-        if (allow_approx) {
-            ret->setHasApproxFunc(true);
-        }
 
         return ret;
 #if defined(HEYOKA_HAVE_REAL128)
