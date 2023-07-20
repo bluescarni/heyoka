@@ -106,9 +106,11 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression unfix_impl(funcptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_map](const auto &v) {
             if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto *f_id = v.get_ptr();
