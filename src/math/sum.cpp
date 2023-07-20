@@ -670,9 +670,11 @@ std::variant<std::vector<expression>, expression> sum_simplify_args(const std::v
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression sum_to_sub_impl(funcptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&](const auto &v) {
             if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto *f_id = v.get_ptr();

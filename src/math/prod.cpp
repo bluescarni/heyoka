@@ -1001,10 +1001,12 @@ namespace
 // negative powers among the operands. Exactly which
 // negative powers are collected is established by the
 // input partitioning function fpart.
+// NOLINTNEXTLINE(misc-no-recursion)
 expression prod_to_div_impl(funcptr_map<expression> &func_map, const expression &ex,
                             const std::function<bool(const expression &)> &fpart)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&](const auto &v) {
             if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto *f_id = v.get_ptr();
