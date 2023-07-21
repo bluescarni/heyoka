@@ -17,7 +17,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/binary_op.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/taylor.hpp>
 

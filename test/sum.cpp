@@ -400,13 +400,6 @@ TEST_CASE("cfunc mp")
 
 #endif
 
-TEST_CASE("commutativity")
-{
-    auto [x, y] = make_vars("x", "y");
-
-    REQUIRE(std::get<func>(sum({x, y}).value()).is_commutative());
-}
-
 TEST_CASE("sum split")
 {
     auto sum_wrapper = [](const std::vector<expression> &args) { return expression{func{detail::sum_impl(args)}}; };
@@ -501,19 +494,27 @@ TEST_CASE("sum_to_sub")
     REQUIRE(ret[0] == detail::sub(x, y));
 
     ret = detail::sum_to_sub({sum({-5_dbl, x, prod({-1_dbl, y})})});
-    REQUIRE(ret[0] == detail::sub(x, sum({y, 5_dbl})));
+    REQUIRE(ret[0] == detail::sub(x - 5_dbl, y));
 
     ret = detail::sum_to_sub({sum({5_dbl, x, cos(y)})});
     REQUIRE(ret[0] == sum({5_dbl, x, cos(y)}));
 
     ret = detail::sum_to_sub({sum({-5_dbl, prod({-2_dbl, x}), prod({-1_dbl, cos(y)})})});
-    REQUIRE(ret[0] == prod({-1_dbl, sum({5_dbl, prod({2_dbl, x}), prod({1_dbl, cos(y)})})}));
+    REQUIRE(ret[0] == detail::sub((-5. - (2. * x)), cos(y)));
 
     ret = detail::sum_to_sub({cos(sum({-5_dbl, prod({-2_dbl, x}), prod({-1_dbl, cos(y)})}))});
-    REQUIRE(ret[0] == cos(prod({-1_dbl, sum({5_dbl, prod({2_dbl, x}), prod({1_dbl, cos(y)})})})));
+    REQUIRE(ret[0] == cos(detail::sub((-5. - (2. * x)), cos(y))));
 
     auto tmp = sum({x, prod({-1_dbl, cos(x)})});
 
     ret = detail::sum_to_sub({sum({prod({-1_dbl, y}), sin(tmp), cos(tmp)})});
     REQUIRE(ret[0] == detail::sub(sum({sin(detail::sub(x, cos(x))), cos(detail::sub(x, cos(x)))}), y));
+}
+
+TEST_CASE("normalise")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(normalise(x + y) == x + y);
+    REQUIRE(normalise(subs(x + y, {{x, 2_dbl * y}})) == 3. * y);
 }

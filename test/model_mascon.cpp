@@ -125,7 +125,7 @@ expression energy_mascon_system_impl(expression Gconst, std::vector<expression> 
 template <typename... KwArgs>
 inline std::vector<std::pair<expression, expression>> make_mascon_system(KwArgs &&...kw_args)
 {
-    // 1 - Check input consistency (TODO)
+    // 1 - Check input consistency
     // 2 - We parse the unnamed arguments
     igor::parser p{kw_args...};
     if constexpr (p.has_unnamed_arguments()) {
@@ -295,6 +295,9 @@ TEST_CASE("basic cmp")
         const std::vector init_state = {1., 0., 0., 0., 1., 0.};
 
         auto ta = taylor_adaptive{dyn, init_state, kw::compact_mode = true};
+
+        REQUIRE(ta.get_decomposition().size() == 45u);
+
         auto ta_old = taylor_adaptive{dyn_old, init_state, kw::compact_mode = true};
 
         ta.propagate_until(10.);
@@ -313,15 +316,20 @@ TEST_CASE("basic cmp")
         auto ta = taylor_adaptive{dyn, init_state, kw::compact_mode = true};
 
         llvm_state s;
-        add_cfunc<double>(
+        const auto dc1 = add_cfunc<double>(
             s, "en",
             {model::mascon_energy(kw::masses = masses, kw::positions = pos, kw::Gconst = 1.01, kw::omega = omega)},
             kw::vars = {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
-        add_cfunc<double>(
+
+        const auto dc2 = add_cfunc<double>(
             s, "en2",
             {0.5 * ("vx"_var * "vx"_var + "vy"_var * "vy"_var + "vz"_var * "vz"_var)
              + model::mascon_potential(kw::masses = masses, kw::positions = pos, kw::Gconst = 1.01, kw::omega = omega)},
             kw::vars = {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
+
+        REQUIRE(dc1.size() == 27u);
+        REQUIRE(dc2.size() == 30u);
+
         s.optimise();
         s.compile();
 

@@ -99,51 +99,52 @@ std::vector<std::pair<expression, expression>> nbody_impl(std::uint32_t n, const
             const auto diff_y = y_vars[j] - y_vars[i];
             const auto diff_z = z_vars[j] - z_vars[i];
 
+            // Compute r_ij**-3.
             const auto r_m3 = pow(sum({diff_x * diff_x, diff_y * diff_y, diff_z * diff_z}), expression{-3. / 2});
 
-            // If j is massive and masses_vec[j] is a non-zero number,
-            // we compute the accelerations using a grouping
-            // of the operations optimised for the common case
-            // in which masses and G are numbers.
+            // If:
+            //
+            // - j is massive and masses_vec[j] is a non-zero number, and
+            // - G is a number,
+            //
+            // then we group the operations in a way that minimises
+            // the computational complexity thanks to constant folding.
             const auto j_massive = j < n_massive;
             const auto opt_grouping = j_massive && std::holds_alternative<number>(masses_vec[j].value())
-                                      && !is_zero(std::get<number>(masses_vec[j].value()));
+                                      && !is_zero(std::get<number>(masses_vec[j].value()))
+                                      && std::holds_alternative<number>(Gconst.value());
 
             if (opt_grouping) {
-                // NOTE: Gconst * masses_vec[j] and -masses_vec[i] / masses_vec[j]
-                // will be constant folded into the numerical result, if masses
-                // and Gconst are all numbers. This allows to reduce the number
-                // of operations wrt the other branch.
-                const auto fac_j = Gconst * masses_vec[j] * r_m3;
+                const auto fac_j = fix_nn(Gconst * masses_vec[j] * r_m3);
                 const auto c_ij = -masses_vec[i] / masses_vec[j];
 
                 // Acceleration exerted by j on i.
-                x_acc[i].push_back(diff_x * fac_j);
-                y_acc[i].push_back(diff_y * fac_j);
-                z_acc[i].push_back(diff_z * fac_j);
+                x_acc[i].push_back(fix_nn(diff_x * fac_j));
+                y_acc[i].push_back(fix_nn(diff_y * fac_j));
+                z_acc[i].push_back(fix_nn(diff_z * fac_j));
 
                 // Acceleration exerted by i on j.
-                x_acc[j].push_back(x_acc[i].back() * c_ij);
-                y_acc[j].push_back(y_acc[i].back() * c_ij);
-                z_acc[j].push_back(z_acc[i].back() * c_ij);
+                x_acc[j].push_back((fix_nn(x_acc[i].back() * c_ij)));
+                y_acc[j].push_back((fix_nn(y_acc[i].back() * c_ij)));
+                z_acc[j].push_back((fix_nn(z_acc[i].back() * c_ij)));
             } else {
-                const auto G_r_m3 = Gconst * r_m3;
+                const auto G_r_m3 = fix_nn(Gconst * r_m3);
 
                 // Acceleration due to i on j.
-                const auto fac_i = -masses_vec[i] * G_r_m3;
-                x_acc[j].push_back(diff_x * fac_i);
-                y_acc[j].push_back(diff_y * fac_i);
-                z_acc[j].push_back(diff_z * fac_i);
+                const auto fac_i = fix_nn(-masses_vec[i] * G_r_m3);
+                x_acc[j].push_back(fix_nn(diff_x * fac_i));
+                y_acc[j].push_back(fix_nn(diff_y * fac_i));
+                z_acc[j].push_back(fix_nn(diff_z * fac_i));
 
                 if (j_massive) {
                     // Body j is massive and it interacts mutually with body i
                     // (which is also massive).
-                    const auto fac_j = masses_vec[j] * G_r_m3;
+                    const auto fac_j = fix_nn(masses_vec[j] * G_r_m3);
 
                     // Acceleration due to j on i.
-                    x_acc[i].push_back(diff_x * fac_j);
-                    y_acc[i].push_back(diff_y * fac_j);
-                    z_acc[i].push_back(diff_z * fac_j);
+                    x_acc[i].push_back(fix_nn(diff_x * fac_j));
+                    y_acc[i].push_back(fix_nn(diff_y * fac_j));
+                    z_acc[i].push_back(fix_nn(diff_z * fac_j));
                 }
             }
         }
@@ -196,16 +197,18 @@ expression nbody_potential_impl([[maybe_unused]] std::uint32_t n, const expressi
             const auto diff_y = y_vars[j] - y_vars[i];
             const auto diff_z = z_vars[j] - z_vars[i];
 
-            // NOTE: this is not the most optimal grouping of terms,
-            // since if both masses and G are constants, it would be
-            // better to do the multiplication by G directly here.
-            // However, the difference is just a single multiplication.
             pot.push_back(masses_vec[i] * masses_vec[j]
                           / sqrt(sum({diff_x * diff_x, diff_y * diff_y, diff_z * diff_z})));
         }
     }
 
-    return -Gconst * sum(pot);
+    // NOTE: the fix() here is to prevent distribution if Gconst is a number
+    // and the masses are parametric. It is however suboptimal if all masses and G are
+    // numbers, as it prevents constant folding. However, there
+    // is only a single extra multiplication to be performed wrt
+    // the optimal grouping, if necessary in the future we can always
+    // add special casing if G and all masses are numbers.
+    return -Gconst * fix_nn(sum(pot));
 }
 
 expression nbody_energy_impl([[maybe_unused]] std::uint32_t n, const expression &Gconst,
@@ -229,10 +232,13 @@ expression nbody_energy_impl([[maybe_unused]] std::uint32_t n, const expression 
     // The kinetic terms.
     std::vector<expression> kin;
     for (std::uint32_t i = 0; i < n_massive; ++i) {
-        kin.push_back(masses_vec[i] * sum({vx_vars[i] * vx_vars[i], vy_vars[i] * vy_vars[i], vz_vars[i] * vz_vars[i]}));
+        kin.push_back(masses_vec[i]
+                      // NOTE: need the fix() here to prevent distribution
+                      // in case masses_vec[i] is a number.
+                      * fix_nn(sum({vx_vars[i] * vx_vars[i], vy_vars[i] * vy_vars[i], vz_vars[i] * vz_vars[i]})));
     }
 
-    return .5_dbl * sum(kin) + nbody_potential_impl(n, Gconst, masses_vec);
+    return .5_dbl * fix_nn(sum(kin)) + nbody_potential_impl(n, Gconst, masses_vec);
 }
 
 std::vector<std::pair<expression, expression>> np1body_impl(std::uint32_t n, const expression &Gconst,
@@ -289,10 +295,12 @@ std::vector<std::pair<expression, expression>> np1body_impl(std::uint32_t n, con
         // Add the acceleration due to the zero-th body.
         const auto m_0 = (n_massive > 0u) ? masses_vec[0] : 0_dbl;
         const auto m_i = (i + 1u < n_massive) ? masses_vec[i + 1u] : 0_dbl;
-        const auto mu_0i = -Gconst * (m_0 + m_i);
-        x_acc.push_back(mu_0i * x_r3[i]);
-        y_acc.push_back(mu_0i * y_r3[i]);
-        z_acc.push_back(mu_0i * z_r3[i]);
+        // NOTE: the fix() here is to prevent distribution if Gconst
+        // is a number and the masses are parametric.
+        const auto mu_0i = -Gconst * fix_nn(m_0 + m_i);
+        x_acc.push_back(fix_nn(fix_nn(mu_0i) * fix_nn(x_r3[i])));
+        y_acc.push_back(fix_nn(fix_nn(mu_0i) * fix_nn(y_r3[i])));
+        z_acc.push_back(fix_nn(fix_nn(mu_0i) * fix_nn(z_r3[i])));
 
         // Add the accelerations due to the other bodies and the non-intertial
         // reference frame.
@@ -307,17 +315,34 @@ std::vector<std::pair<expression, expression>> np1body_impl(std::uint32_t n, con
             const auto diff_y = j_gt_i ? y_vars[j] - y_vars[i] : y_vars[i] - y_vars[j];
             const auto diff_z = j_gt_i ? z_vars[j] - z_vars[i] : z_vars[i] - z_vars[j];
 
-            const auto diff_rm3 = pow(sum({diff_x * diff_x, diff_y * diff_y, diff_z * diff_z}), expression{-3. / 2});
+            // This is r_ij**-3 if j > i, -(r_ij**-3) otherwise.
+            const auto diff_rm3 = pow(sum({diff_x * diff_x, diff_y * diff_y, diff_z * diff_z}), -1.5);
 
-            const auto tmp_acc_x = j_gt_i ? x_r3[j] - diff_x * diff_rm3 : x_r3[j] + diff_x * diff_rm3;
-            const auto tmp_acc_y = j_gt_i ? y_r3[j] - diff_y * diff_rm3 : y_r3[j] + diff_y * diff_rm3;
-            const auto tmp_acc_z = j_gt_i ? z_r3[j] - diff_z * diff_rm3 : z_r3[j] + diff_z * diff_rm3;
+            // mu_j.
+            const auto cur_mu = Gconst * masses_vec[j + 1u];
 
-            const auto cur_mu = -Gconst * masses_vec[j + 1u];
+            // Is mu_j a number?
+            const auto cur_mu_num = std::holds_alternative<number>(cur_mu.value());
 
-            x_acc.push_back(cur_mu * tmp_acc_x);
-            y_acc.push_back(cur_mu * tmp_acc_y);
-            z_acc.push_back(cur_mu * tmp_acc_z);
+            // Body-body acceleration.
+            const auto acc_ij_x = fix_nn(cur_mu) * fix_nn(diff_x * diff_rm3);
+            const auto acc_ij_y = fix_nn(cur_mu) * fix_nn(diff_y * diff_rm3);
+            const auto acc_ij_z = fix_nn(cur_mu) * fix_nn(diff_z * diff_rm3);
+
+            // NOTE: if cur_mu is a number, then we avoid fixing in order to take advantage
+            // of constant folding with -1. Otherwise, we keep acc_ij_* isolated in order
+            // to promote CSE.
+            x_acc.push_back(fix_nn(j_gt_i ? acc_ij_x : (cur_mu_num ? -acc_ij_x : -fix_nn(acc_ij_x))));
+            y_acc.push_back(fix_nn(j_gt_i ? acc_ij_y : (cur_mu_num ? -acc_ij_y : -fix_nn(acc_ij_y))));
+            z_acc.push_back(fix_nn(j_gt_i ? acc_ij_z : (cur_mu_num ? -acc_ij_z : -fix_nn(acc_ij_z))));
+
+            const auto acc_app_x = fix_nn(-cur_mu) * fix_nn(x_r3[j]);
+            const auto acc_app_y = fix_nn(-cur_mu) * fix_nn(y_r3[j]);
+            const auto acc_app_z = fix_nn(-cur_mu) * fix_nn(z_r3[j]);
+
+            x_acc.push_back(fix_nn(acc_app_x));
+            y_acc.push_back(fix_nn(acc_app_y));
+            z_acc.push_back(fix_nn(acc_app_z));
         }
 
         // Add the expressions of the accelerations to the system.
@@ -353,12 +378,15 @@ expression np1body_potential_impl([[maybe_unused]] std::uint32_t n, const expres
         z_vars.emplace_back(fmt::format("z_{}", i + 1u));
     }
 
+    // Prepare the accumulator for the terms of the potential.
     std::vector<expression> pot;
+
     // Add the potential between the zeroth body and the rest.
     for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
         pot.push_back(masses_vec[0] * masses_vec[i + 1u]
                       / sqrt(sum({x_vars[i] * x_vars[i], y_vars[i] * y_vars[i], z_vars[i] * z_vars[i]})));
     }
+
     // Add the mutual potentials.
     for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
         for (std::uint32_t j = i + 1u; j < n_massive - 1u; ++j) {
@@ -371,7 +399,13 @@ expression np1body_potential_impl([[maybe_unused]] std::uint32_t n, const expres
         }
     }
 
-    return -Gconst * sum(pot);
+    // NOTE: the fix() here is to prevent distribution if Gconst is a number
+    // and the masses are parametric. It is however suboptimal if all masses and G are
+    // numbers, as it prevents constant folding. However, there
+    // is only a single extra multiplication to be performed wrt
+    // the optimal grouping, if necessary in the future we can always
+    // add special casing if G and all masses are numbers.
+    return -Gconst * fix_nn(sum(pot));
 }
 
 expression np1body_energy_impl([[maybe_unused]] std::uint32_t n, const expression &Gconst,
@@ -416,14 +450,16 @@ expression np1body_energy_impl([[maybe_unused]] std::uint32_t n, const expressio
     const auto ud0_z = -sum(ud0_z_terms) / tot_mass;
 
     // The kinetic terms.
-    std::vector<expression> kin{masses_vec[0] * sum({ud0_x * ud0_x, ud0_y * ud0_y, ud0_z * ud0_z})};
+    std::vector<expression> kin{masses_vec[0] * fix_nn(sum({ud0_x * ud0_x, ud0_y * ud0_y, ud0_z * ud0_z}))};
     for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
-        kin.push_back(masses_vec[i + 1u]
-                      * sum({(vx_vars[i] + ud0_x) * (vx_vars[i] + ud0_x), (vy_vars[i] + ud0_y) * (vy_vars[i] + ud0_y),
-                             (vz_vars[i] + ud0_z) * (vz_vars[i] + ud0_z)}));
+        const auto tmp_vx = vx_vars[i] + fix_nn(ud0_x);
+        const auto tmp_vy = vy_vars[i] + fix_nn(ud0_y);
+        const auto tmp_vz = vz_vars[i] + fix_nn(ud0_z);
+
+        kin.push_back(masses_vec[i + 1u] * fix_nn(sum({tmp_vx * tmp_vx, tmp_vy * tmp_vy, tmp_vz * tmp_vz})));
     }
 
-    return .5_dbl * sum(kin) + np1body_potential_impl(n, Gconst, masses_vec);
+    return .5_dbl * fix_nn(sum(kin)) + np1body_potential_impl(n, Gconst, masses_vec);
 }
 
 } // namespace model::detail

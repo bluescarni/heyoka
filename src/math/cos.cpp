@@ -47,6 +47,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/prod.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
@@ -410,14 +411,24 @@ std::vector<expression> cos_impl::gradient() const
     return {-sin(args()[0])};
 }
 
+[[nodiscard]] expression cos_impl::normalise() const
+{
+    assert(args().size() == 1u);
+    return cos(args()[0]);
+}
+
 } // namespace detail
 
 // NOLINTNEXTLINE(misc-no-recursion)
 expression cos(expression e)
 {
-    if (const auto *ex_neg = detail::is_negation(e)) {
+    if (detail::is_negation_prod(e)) {
         // Simplify cos(-x) to cos(x).
-        return cos(*ex_neg);
+        const auto &fn = std::get<func>(e.value());
+
+        assert(fn.args().size() >= 2u);
+
+        return cos(prod(std::vector(fn.args().begin() + 1, fn.args().end())));
     } else {
         // Simplify cos(number) to its value.
         if (const auto *num_ptr = std::get_if<number>(&e.value())) {

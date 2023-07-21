@@ -220,9 +220,13 @@ bool func::is_time_dependent() const
     return ptr()->is_time_dependent();
 }
 
-bool func::is_commutative() const
+expression func::normalise() const
 {
-    return ptr()->is_commutative();
+    if (ptr()->has_normalise()) {
+        return ptr()->normalise();
+    } else {
+        return expression{*this};
+    }
 }
 
 const std::string &func::get_name() const
@@ -594,20 +598,14 @@ void swap(func &a, func &b) noexcept
 
 std::size_t func::hash(detail::funcptr_map<std::size_t> &func_map) const
 {
-    // NOTE: the initial hash value is computed by combining the hash values of:
+    // NOTE: the hash value is computed by combining the hash values of:
     // - the function name,
-    // - the function inner type index,
     // - the arguments' hashes.
     std::size_t seed = std::hash<std::string>{}(get_name());
-
-    boost::hash_combine(seed, get_type_index());
 
     for (const auto &arg : args()) {
         boost::hash_combine(seed, detail::hash(func_map, arg));
     }
-
-    // Combine with the extra hash value too.
-    boost::hash_combine(seed, ptr()->extra_hash());
 
     return seed;
 }
@@ -619,17 +617,8 @@ bool operator==(const func &a, const func &b)
         return true;
     }
 
-    // NOTE: the initial comparison considers:
-    // - the function inner type index,
-    // - the function name,
-    // - the arguments.
-    // If they are all equal, the extra equality comparison logic
-    // is also run.
-    if (a.get_type_index() == b.get_type_index() && a.get_name() == b.get_name() && a.args() == b.args()) {
-        return a.ptr()->extra_equal_to(b);
-    } else {
-        return false;
-    }
+    // NOTE: the comparison considers the function name and the arguments.
+    return a.get_name() == b.get_name() && a.args() == b.args();
 }
 
 bool operator!=(const func &a, const func &b)
@@ -641,14 +630,8 @@ bool operator!=(const func &a, const func &b)
 // only to impose a strict ordering functions. Like operator==(),
 // this comparison considers, in order:
 //
-// - the function inner type index,
 // - the function name,
-// - the arguments,
-// - the extra_less_than() comparison logic.
-//
-// NOTE: **IMPORTANT** the ordering imposed by this comparison
-// operator is platform-dependent, due to the use of std::type_index
-// comparison.
+// - the arguments.
 bool operator<(const func &a, const func &b)
 {
     // Check if the underlying object is the same.
@@ -656,17 +639,6 @@ bool operator<(const func &a, const func &b)
         // Same object, a is NOT less than b.
         return false;
     }
-
-    // Check the type indices.
-    if (a.get_type_index() < b.get_type_index()) {
-        return true;
-    }
-
-    if (b.get_type_index() < a.get_type_index()) {
-        return false;
-    }
-
-    assert(a.get_type_index() == b.get_type_index());
 
     // The type indices are equal, check the names next.
     if (a.get_name() < b.get_name()) {
@@ -691,15 +663,6 @@ bool operator<(const func &a, const func &b)
     }
 
     assert(a.args() == b.args());
-
-    // The arguments are equivalent, check the extra comparison operator.
-    if (a.ptr()->extra_less_than(b)) {
-        return true;
-    }
-
-    if (b.ptr()->extra_less_than(a)) {
-        return false;
-    }
 
     // a and b are equivalent.
     assert(a == b);

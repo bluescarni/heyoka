@@ -77,8 +77,7 @@ TEST_CASE("cos neg simpl")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(cos(-(x + y)) == cos(x + y));
-    REQUIRE(cos(neg(x + y)) == cos(x + y));
+    REQUIRE(cos(-x) == cos(x));
     REQUIRE(cos(neg(neg(x + y))) == cos(x + y));
     REQUIRE(cos(neg(neg(par[0]))) == cos(par[0]));
 }
@@ -233,3 +232,11 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
+
+TEST_CASE("normalise")
+{
+    auto [x] = make_vars("x");
+
+    REQUIRE(normalise(cos(x)) == cos(x));
+    REQUIRE(normalise(subs(cos(x), {{x, .1_dbl}})) == cos(.1_dbl));
+}

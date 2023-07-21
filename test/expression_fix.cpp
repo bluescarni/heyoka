@@ -98,6 +98,8 @@ TEST_CASE("fix")
     REQUIRE(std::get<func>(prod({fix(pow(x, 2_dbl)), x}).value()).extract<detail::prod_impl>() != nullptr);
 
     REQUIRE(cos(fix(1_dbl)) != cos(1_dbl));
+
+    REQUIRE(fix(fix(fix(fix(x)))) == fix(x));
 }
 
 TEST_CASE("unfix")

@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <functional>
 #include <iterator>
 #include <limits>
 #include <ostream>
@@ -27,9 +28,6 @@
 #include <vector>
 
 #include <boost/safe_numerics/safe_integer.hpp>
-
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Type.h>
@@ -56,7 +54,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/binary_op.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
@@ -143,9 +140,11 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression copy_impl(funcptr_map<expression> &func_map, const expression &e)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_map](const auto &v) {
             if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto f_id = v.get_ptr();
@@ -296,9 +295,11 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 void get_variables(funcptr_set &func_set, std::unordered_set<std::string> &s_set, const expression &e)
 {
     std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_set, &s_set](const auto &arg) {
             using type = uncvref_t<decltype(arg)>;
 
@@ -370,10 +371,12 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression rename_variables(detail::funcptr_map<expression> &func_map, const expression &e,
                             const std::unordered_map<std::string, std::string> &repl_map)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_map, &repl_map](const auto &arg) {
             using type = uncvref_t<decltype(arg)>;
 
@@ -549,9 +552,11 @@ namespace
 struct too_many_nodes : std::exception {
 };
 
+// NOLINTNEXTLINE(misc-no-recursion)
 std::size_t get_n_nodes(funcptr_map<std::size_t> &func_map, const expression &e)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_map](const auto &arg) -> std::size_t {
             if constexpr (std::is_same_v<func, uncvref_t<decltype(arg)>>) {
                 const auto f_id = arg.get_ptr();
@@ -610,11 +615,13 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression subs(funcptr_map<expression> &func_map, const expression &ex,
-                const std::unordered_map<std::string, expression> &smap, bool canonicalise)
+                const std::unordered_map<std::string, expression> &smap)
 {
     return std::visit(
-        [&func_map, &smap, canonicalise](const auto &arg) {
+        // NOLINTNEXTLINE(misc-no-recursion)
+        [&func_map, &smap](const auto &arg) {
             using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, number> || std::is_same_v<type, param>) {
@@ -639,13 +646,7 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
                 std::vector<expression> new_args;
                 new_args.reserve(arg.args().size());
                 for (const auto &orig_arg : arg.args()) {
-                    new_args.push_back(subs(func_map, orig_arg, smap, canonicalise));
-                }
-
-                // Canonicalise the new arguments vector,
-                // if requested and if the function is commutative.
-                if (canonicalise && arg.is_commutative()) {
-                    std::stable_sort(new_args.begin(), new_args.end(), comm_ops_lt);
+                    new_args.push_back(subs(func_map, orig_arg, smap));
                 }
 
                 // Create a copy of arg with the new arguments.
@@ -667,15 +668,21 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
 
 } // namespace detail
 
-expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap, bool canonicalise)
+expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap, bool normalise)
 {
     detail::funcptr_map<expression> func_map;
 
-    return detail::subs(func_map, e, smap, canonicalise);
+    auto ret = detail::subs(func_map, e, smap);
+
+    if (normalise) {
+        return heyoka::normalise(ret);
+    } else {
+        return ret;
+    }
 }
 
 std::vector<expression> subs(const std::vector<expression> &v_ex,
-                             const std::unordered_map<std::string, expression> &smap, bool canonicalise)
+                             const std::unordered_map<std::string, expression> &smap, bool normalise)
 {
     detail::funcptr_map<expression> func_map;
 
@@ -683,10 +690,14 @@ std::vector<expression> subs(const std::vector<expression> &v_ex,
     ret.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        ret.push_back(detail::subs(func_map, e, smap, canonicalise));
+        ret.push_back(detail::subs(func_map, e, smap));
     }
 
-    return ret;
+    if (normalise) {
+        return heyoka::normalise(ret);
+    } else {
+        return ret;
+    }
 }
 
 namespace detail
@@ -695,8 +706,9 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression subs(funcptr_map<expression> &func_map, const expression &ex,
-                const std::unordered_map<expression, expression> &smap, bool canonicalise)
+                const std::unordered_map<expression, expression> &smap)
 {
     if (auto it = smap.find(ex); it != smap.end()) {
         // ex is in the substitution map, return the value it maps to.
@@ -704,7 +716,8 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
     }
 
     return std::visit(
-        [&](const auto &arg) {
+        // NOLINTNEXTLINE(misc-no-recursion)
+        [&func_map, &smap](const auto &arg) {
             using type = uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, func>) {
@@ -721,13 +734,7 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
                 std::vector<expression> new_args;
                 new_args.reserve(arg.args().size());
                 for (const auto &orig_arg : arg.args()) {
-                    new_args.push_back(subs(func_map, orig_arg, smap, canonicalise));
-                }
-
-                // Canonicalise the new arguments vector,
-                // if requested and if the function is commutative.
-                if (canonicalise && arg.is_commutative()) {
-                    std::stable_sort(new_args.begin(), new_args.end(), comm_ops_lt);
+                    new_args.push_back(subs(func_map, orig_arg, smap));
                 }
 
                 // Create a copy of arg with the new arguments.
@@ -754,15 +761,21 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
 
 } // namespace detail
 
-expression subs(const expression &e, const std::unordered_map<expression, expression> &smap, bool canonicalise)
+expression subs(const expression &e, const std::unordered_map<expression, expression> &smap, bool normalise)
 {
     detail::funcptr_map<expression> func_map;
 
-    return detail::subs(func_map, e, smap, canonicalise);
+    auto ret = detail::subs(func_map, e, smap);
+
+    if (normalise) {
+        return heyoka::normalise(ret);
+    } else {
+        return ret;
+    }
 }
 
 std::vector<expression> subs(const std::vector<expression> &v_ex,
-                             const std::unordered_map<expression, expression> &smap, bool canonicalise)
+                             const std::unordered_map<expression, expression> &smap, bool normalise)
 {
     detail::funcptr_map<expression> func_map;
 
@@ -770,10 +783,14 @@ std::vector<expression> subs(const std::vector<expression> &v_ex,
     ret.reserve(v_ex.size());
 
     for (const auto &e : v_ex) {
-        ret.push_back(detail::subs(func_map, e, smap, canonicalise));
+        ret.push_back(detail::subs(func_map, e, smap));
     }
 
-    return ret;
+    if (normalise) {
+        return heyoka::normalise(ret);
+    } else {
+        return ret;
+    }
 }
 
 namespace detail
@@ -782,57 +799,72 @@ namespace detail
 namespace
 {
 
-// Pairwise reduction of a vector of expressions.
-template <typename F>
-expression pairwise_reduce_impl(const F &func, std::vector<expression> list)
+// NOLINTNEXTLINE(misc-no-recursion)
+expression normalise_impl(detail::funcptr_map<expression> &func_map, const expression &ex)
 {
-    assert(!list.empty());
+    return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
+        [&](const auto &arg) {
+            using type = uncvref_t<decltype(arg)>;
 
-    // LCOV_EXCL_START
-    if (list.size() == std::numeric_limits<decltype(list.size())>::max()) {
-        throw std::overflow_error("Overflow detected in pairwise_reduce()");
-    }
-    // LCOV_EXCL_STOP
+            if constexpr (std::is_same_v<type, func>) {
+                const auto f_id = arg.get_ptr();
 
-    while (list.size() != 1u) {
-        const auto cur_size = list.size();
+                // Check if we already normalised ex.
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    return it->second;
+                }
 
-        // Init the new list. The size will be halved, +1 if the
-        // current size is odd.
-        const auto next_size = cur_size / 2u + cur_size % 2u;
-        std::vector<expression> new_list(next_size);
+                // Create the new args vector by running the
+                // normalisation on all arguments.
+                std::vector<expression> new_args;
+                new_args.reserve(arg.args().size());
+                for (const auto &orig_arg : arg.args()) {
+                    new_args.push_back(normalise_impl(func_map, orig_arg));
+                }
 
-        tbb::parallel_for(tbb::blocked_range<decltype(new_list.size())>(0, new_list.size()),
-                          [&list, &new_list, cur_size, &func](const auto &r) {
-                              for (auto i = r.begin(); i != r.end(); ++i) {
-                                  if (i * 2u == cur_size - 1u) {
-                                      // list has an odd size, and we are at the last element of list.
-                                      // Just move it to new_list.
-                                      new_list[i] = std::move(list.back());
-                                  } else {
-                                      new_list[i] = func(std::move(list[i * 2u]), std::move(list[i * 2u + 1u]));
-                                  }
-                              }
-                          });
+                // Create a copy of arg with the new arguments.
+                auto tmp = arg.copy(new_args);
 
-        new_list.swap(list);
-    }
+                // Create the return value by normalising tmp.
+                auto ret = tmp.normalise();
 
-    return std::move(list[0]);
+                // Put the return value in the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return ret;
+            } else {
+                return expression{arg};
+            }
+        },
+        ex.value());
 }
 
 } // namespace
 
 } // namespace detail
 
-// Pairwise product.
-expression pairwise_prod(const std::vector<expression> &prod)
+expression normalise(const expression &ex)
 {
-    if (prod.empty()) {
-        return 1_dbl;
+    detail::funcptr_map<expression> func_map;
+
+    return detail::normalise_impl(func_map, ex);
+}
+
+std::vector<expression> normalise(const std::vector<expression> &v_ex)
+{
+    detail::funcptr_map<expression> func_map;
+
+    std::vector<expression> retval;
+    retval.reserve(v_ex.size());
+
+    for (const auto &ex : v_ex) {
+        retval.push_back(detail::normalise_impl(func_map, ex));
     }
 
-    return detail::pairwise_reduce_impl(std::multiplies{}, prod);
+    return retval;
 }
 
 double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map,
@@ -975,11 +1007,13 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 std::uint32_t get_param_size(detail::funcptr_set &func_set, const expression &ex)
 {
     std::uint32_t retval = 0;
 
     std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&retval, &func_set](const auto &v) {
             using type = uncvref_t<decltype(v)>;
 
@@ -1033,9 +1067,11 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 void get_params(std::unordered_set<std::uint32_t> &idx_set, detail::funcptr_set &func_set, const expression &ex)
 {
     std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&](const auto &v) {
             using type = uncvref_t<decltype(v)>;
 
@@ -1121,12 +1157,14 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 bool is_time_dependent(funcptr_map<bool> &func_map, const expression &ex)
 {
     // - If ex is a function, check if it is time-dependent, or
     //   if any of its arguments is time-dependent,
     // - otherwise, return false.
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_map](const auto &v) {
             using type = uncvref_t<decltype(v)>;
 
@@ -1190,9 +1228,11 @@ namespace
 // internal pairwise sums are rounded up exactly.
 constexpr std::uint32_t decompose_split = 8u;
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression split_sums_for_decompose(funcptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&](const auto &v) {
             if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto *f_id = v.get_ptr();
@@ -1248,9 +1288,11 @@ std::vector<expression> split_sums_for_decompose(const std::vector<expression> &
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression split_prods_for_decompose(funcptr_map<expression> &func_map, const expression &ex, std::uint32_t split)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_map, &ex, split](const auto &v) {
             if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto *f_id = v.get_ptr();
@@ -1306,9 +1348,11 @@ std::vector<expression> split_prods_for_decompose(const std::vector<expression> 
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression sums_to_sum_sqs_for_decompose(funcptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&](const auto &v) {
             if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto *f_id = v.get_ptr();
@@ -1364,9 +1408,6 @@ std::vector<expression> sums_to_sum_sqs_for_decompose(const std::vector<expressi
 
 // NOTE: this does not have any specific mathematical meaning, it
 // is just used to impose an ordering on expressions.
-// NOTE: **IMPORTANT** the ordering imposed by this comparison
-// operator is platform-dependent, due to the use of std::type_index
-// comparison in operator<() for func.
 bool ex_less_than(const expression &e1, const expression &e2)
 {
     return std::visit(
@@ -1412,41 +1453,6 @@ bool ex_less_than(const expression &e1, const expression &e2)
             }
         },
         e1.value(), e2.value());
-}
-
-// Detect if ex is of the form -1 * whatever. If it is, then
-// a pointer to whatever is returned. Otherwise, nullptr is returned.
-const expression *is_negation(const expression &ex)
-{
-    if (!std::holds_alternative<func>(ex.value())) {
-        return nullptr;
-    }
-
-    const auto *bop = std::get<func>(ex.value()).extract<detail::binary_op>();
-
-    if (bop == nullptr || bop->op() != binary_op::type::mul
-        || !std::holds_alternative<number>(bop->args()[0].value())) {
-        return nullptr;
-    }
-
-    return is_negative_one(std::get<number>(bop->args()[0].value())) ? &bop->args()[1] : nullptr;
-}
-
-// Detect if ex is of the form whatever * whatever. If it is, then
-// a pointer to whatever is returned. Otherwise, nullptr is returned.
-const expression *is_square(const expression &ex)
-{
-    if (!std::holds_alternative<func>(ex.value())) {
-        return nullptr;
-    }
-
-    const auto *bop = std::get<func>(ex.value()).extract<detail::binary_op>();
-
-    if (bop == nullptr || bop->op() != binary_op::type::mul || bop->args()[0] != bop->args()[1]) {
-        return nullptr;
-    } else {
-        return bop->args().data();
-    }
 }
 
 } // namespace detail

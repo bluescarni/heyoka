@@ -106,6 +106,34 @@ TEST_CASE("taylor atan2 decompose bug 00")
     taylor_add_jet<double>(s, "jet", {atan2(0_dbl, x) + atan2(x, 0_dbl) + atan2(0_dbl, 0_dbl) - x}, 1, 1, false, false);
 }
 
+// Test CSE involving hidden dependencies.
+TEST_CASE("taylor atan2 test simplifications")
+{
+    using std::atan2;
+
+    auto x = "x"_var, y = "y"_var;
+
+    llvm_state s{kw::opt_level = 0u};
+
+    const auto dc = taylor_add_jet<double>(s, "jet", {atan2(x, y), x * x + y * y}, 2, 1, false, false);
+
+    REQUIRE(dc.size() == 6u);
+
+    s.compile();
+
+    auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("jet"));
+
+    std::vector<double> jet{double{.2}, double{-.3}};
+    jet.resize(6);
+
+    jptr(jet.data(), nullptr, nullptr);
+
+    REQUIRE(jet[0] == .2);
+    REQUIRE(jet[1] == -.3);
+    REQUIRE(jet[2] == approximately(atan2(jet[0], jet[1])));
+    REQUIRE(jet[3] == jet[0] * jet[0] + jet[1] * jet[1]);
+}
+
 TEST_CASE("taylor atan2")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {

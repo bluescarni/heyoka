@@ -43,7 +43,7 @@ public:
 
     [[nodiscard]] std::vector<expression> gradient() const;
 
-    [[nodiscard]] bool is_commutative() const;
+    [[nodiscard]] expression normalise() const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;

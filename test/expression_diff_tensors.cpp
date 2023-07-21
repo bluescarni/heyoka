@@ -20,6 +20,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/prod.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/model/fixed_centres.hpp>
 #include <heyoka/s11n.hpp>
@@ -51,14 +52,13 @@ TEST_CASE("diff decompose")
             == std::vector{x, y, par[0], par[1],
                            subs("u_2"_var + "u_0"_var, {{"u_2"_var, "u_0"_var}, {"u_0"_var, "u_2"_var}}),
                            subs("u_3"_var + "u_1"_var, {{"u_1"_var, "u_3"_var}, {"u_3"_var, "u_1"_var}}),
-                           subs("u_5"_var * "u_4"_var, {{"u_5"_var, "u_4"_var}, {"u_4"_var, "u_5"_var}}), "u_6"_var});
+                           "u_5"_var * "u_4"_var, "u_6"_var});
     REQUIRE(detail::diff_decompose({(par[1] + y) * (par[0] + x)}).second == 4u);
 
     REQUIRE(detail::diff_decompose({subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})}).first
             == std::vector{x, par[0], par[1],
                            subs("u_1"_var + "u_0"_var, {{"u_1"_var, "u_0"_var}, {"u_0"_var, "u_1"_var}}),
-                           subs("u_2"_var + y, {{y, 1_dbl}}),
-                           subs("u_4"_var * "u_3"_var, {{"u_3"_var, "u_4"_var}, {"u_4"_var, "u_3"_var}}), "u_5"_var});
+                           subs("u_2"_var + y, {{y, 1_dbl}}), "u_4"_var * "u_3"_var, "u_5"_var});
     REQUIRE(detail::diff_decompose({subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})}).second == 3u);
 }
 
@@ -177,10 +177,9 @@ TEST_CASE("diff_tensors basic")
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{x + y, x * y * y});
     assign_sr(dt.get_derivatives(1));
-    // TODO restore.
-    // REQUIRE(diff_vec == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
     assign_sr(dt.get_derivatives(2));
-    REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * x});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * x});
 
     // Diff wrt all variables.
     dt = diff_tensors({x + y, x * y * y}, kw::diff_order = 2, kw::diff_args = diff_args::vars);
@@ -188,10 +187,9 @@ TEST_CASE("diff_tensors basic")
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{x + y, x * y * y});
     assign_sr(dt.get_derivatives(1));
-    // TODO restore.
-    // REQUIRE(diff_vec == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
     assign_sr(dt.get_derivatives(2));
-    REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * x});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * x});
 
     // Diff wrt some variables.
     dt = diff_tensors({x + y, x * y * y}, kw::diff_order = 2, kw::diff_args = {x});
@@ -199,9 +197,9 @@ TEST_CASE("diff_tensors basic")
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{x + y, x * y * y});
     assign_sr(dt.get_derivatives(1));
-    REQUIRE(diff_vec == std::vector{1_dbl, y * y});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{1_dbl, y * y});
     assign_sr(dt.get_derivatives(2));
-    REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, 0_dbl});
 
     // Diff wrt all params.
     dt = diff_tensors({par[0] + y, x * y * par[1]}, kw::diff_order = 2, kw::diff_args = diff_args::params);
@@ -209,7 +207,7 @@ TEST_CASE("diff_tensors basic")
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{par[0] + y, x * y * par[1]});
     assign_sr(dt.get_derivatives(1));
-    REQUIRE(diff_vec == std::vector{1_dbl, 0_dbl, 0_dbl, x * y});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{1_dbl, 0_dbl, 0_dbl, x * y});
     assign_sr(dt.get_derivatives(2));
     REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl});
 
@@ -219,7 +217,7 @@ TEST_CASE("diff_tensors basic")
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{par[0] + y, x * y * par[1]});
     assign_sr(dt.get_derivatives(1));
-    REQUIRE(diff_vec == std::vector{0_dbl, x * y});
+    REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, x * y});
     assign_sr(dt.get_derivatives(2));
     REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl});
 
@@ -592,20 +590,18 @@ TEST_CASE("speelpenning complexity")
         std::vector<double> inputs, outputs_f, outputs_r;
 
         std::vector<expression> vars;
-        auto prod = 1_dbl;
 
         for (auto i = 0u; i < nvars; ++i) {
             auto cur_var = expression{fmt::format("x_{}", i)};
 
             vars.push_back(cur_var);
-            prod *= cur_var;
 
             inputs.push_back(rdist(rng));
             outputs_f.push_back(0.);
             outputs_r.push_back(0.);
         }
 
-        prod = pairwise_prod(vars);
+        auto prod = heyoka::prod(vars);
 
         llvm_state s;
         auto dt = diff_tensors({prod}, kw::diff_order = 1);
@@ -619,18 +615,4 @@ TEST_CASE("speelpenning complexity")
         s.optimise();
         s.compile();
     }
-}
-
-// This test checks that reverse-mode differentiation produces
-// expressions in which the operands to commutative functions are kept
-// in a canonical order.
-TEST_CASE("comm canonical")
-{
-    auto [x, y] = make_vars("x", "y");
-
-    auto dt = diff_tensors({par[0] * x * y}, kw::diff_args = diff_args::all);
-
-    REQUIRE(dt[{0, 0, 0, 1}] == x * y);
-    REQUIRE(dt[{0, 0, 1, 0}] == par[0] * x);
-    REQUIRE(dt[{0, 1, 0, 0}] == par[0] * y);
 }

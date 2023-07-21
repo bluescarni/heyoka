@@ -78,7 +78,7 @@ TEST_CASE("neg ostream")
     std::ostringstream oss;
     oss << neg(x + y);
 
-    REQUIRE(oss.str() == "-(x + y)");
+    REQUIRE(oss.str() == "(-x - y)");
 
     oss.str("");
     oss << -x;
@@ -174,7 +174,7 @@ TEST_CASE("cfunc")
                             kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.mul_neg."));
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.prod_neg."));
             }
 
             s.compile();

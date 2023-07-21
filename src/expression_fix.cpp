@@ -21,6 +21,7 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -83,7 +84,20 @@ bool is_fixed(const expression &ex)
 
 expression fix(expression x)
 {
-    return expression{func{detail::fix_impl(std::move(x))}};
+    if (detail::is_fixed(x)) {
+        return x;
+    } else {
+        return expression{func{detail::fix_impl(std::move(x))}};
+    }
+}
+
+expression fix_nn(expression x)
+{
+    if (std::holds_alternative<number>(x.value())) {
+        return x;
+    } else {
+        return fix(std::move(x));
+    }
 }
 
 namespace detail
@@ -92,9 +106,11 @@ namespace detail
 namespace
 {
 
+// NOLINTNEXTLINE(misc-no-recursion)
 expression unfix_impl(funcptr_map<expression> &func_map, const expression &ex)
 {
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&func_map](const auto &v) {
             if constexpr (std::is_same_v<uncvref_t<decltype(v)>, func>) {
                 const auto *f_id = v.get_ptr();

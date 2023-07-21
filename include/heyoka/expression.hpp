@@ -115,6 +115,7 @@ HEYOKA_DLL_PUBLIC expression copy(const expression &);
 HEYOKA_DLL_PUBLIC std::vector<expression> copy(const std::vector<expression> &);
 
 HEYOKA_DLL_PUBLIC expression fix(expression);
+HEYOKA_DLL_PUBLIC expression fix_nn(expression);
 HEYOKA_DLL_PUBLIC expression unfix(const expression &);
 HEYOKA_DLL_PUBLIC std::vector<expression> unfix(const std::vector<expression> &);
 
@@ -179,6 +180,19 @@ inline expression func_inner<T>::diff(funcptr_map<expression> &func_map, const p
     // LCOV_EXCL_STOP
 }
 
+template <typename T>
+inline expression func_inner<T>::normalise() const
+{
+    if constexpr (func_has_normalise_v<T>) {
+        return m_value.normalise();
+    }
+
+    // LCOV_EXCL_START
+    assert(false);
+    throw;
+    // LCOV_EXCL_STOP
+}
+
 struct HEYOKA_DLL_PUBLIC prime_wrapper {
     std::string m_str;
 
@@ -217,8 +231,6 @@ namespace detail
 {
 
 void stream_expression(std::ostringstream &, const expression &);
-
-bool comm_ops_lt(const expression &, const expression &);
 
 } // namespace detail
 
@@ -373,6 +385,9 @@ HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
 HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
                                                const std::unordered_map<expression, expression> &, bool = false);
 
+HEYOKA_DLL_PUBLIC expression normalise(const expression &);
+HEYOKA_DLL_PUBLIC std::vector<expression> normalise(const std::vector<expression> &);
+
 enum class diff_args { vars, params, all };
 
 // Fwd declaration.
@@ -509,6 +524,9 @@ struct formatter<heyoka::dtens> : heyoka::detail::ostream_formatter {
 
 HEYOKA_BEGIN_NAMESPACE
 
+// NOTE: when documenting, we need to point out that the expressions
+// returned by this function are optimised for evaluation. The users
+// can always unfix() and normalise() these expressions if needed.
 template <typename... KwArgs>
 dtens diff_tensors(const std::vector<expression> &v_ex, KwArgs &&...kw_args)
 {
@@ -542,8 +560,6 @@ dtens diff_tensors(const std::vector<expression> &v_ex, KwArgs &&...kw_args)
 
     return detail::diff_tensors(v_ex, d_args, order);
 }
-
-HEYOKA_DLL_PUBLIC expression pairwise_prod(const std::vector<expression> &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const expression &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> & = {});
@@ -770,10 +786,6 @@ namespace detail
 {
 
 HEYOKA_DLL_PUBLIC bool ex_less_than(const expression &, const expression &);
-
-const expression *is_negation(const expression &);
-
-const expression *is_square(const expression &);
 
 } // namespace detail
 

@@ -209,3 +209,11 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
+
+TEST_CASE("normalise")
+{
+    auto [x] = make_vars("x");
+
+    REQUIRE(normalise(atanh(x)) == atanh(x));
+    REQUIRE(normalise(subs(atanh(x), {{x, .5_dbl}})) == atanh(.5_dbl));
+}

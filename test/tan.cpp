@@ -208,3 +208,11 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
+
+TEST_CASE("normalise")
+{
+    auto [x] = make_vars("x");
+
+    REQUIRE(normalise(tan(x)) == tan(x));
+    REQUIRE(normalise(subs(tan(x), {{x, .1_dbl}})) == tan(.1_dbl));
+}

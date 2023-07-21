@@ -110,13 +110,10 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
 
     virtual void to_stream(std::ostringstream &) const = 0;
 
-    [[nodiscard]] virtual bool extra_equal_to(const func &) const = 0;
-    [[nodiscard]] virtual bool extra_less_than(const func &) const = 0;
-
     [[nodiscard]] virtual bool is_time_dependent() const = 0;
-    [[nodiscard]] virtual bool is_commutative() const = 0;
 
-    [[nodiscard]] virtual std::size_t extra_hash() const = 0;
+    [[nodiscard]] virtual bool has_normalise() const = 0;
+    [[nodiscard]] virtual expression normalise() const = 0;
 
     [[nodiscard]] virtual const std::vector<expression> &args() const = 0;
     virtual std::pair<expression *, expression *> get_mutable_args_range() = 0;
@@ -183,36 +180,16 @@ template <typename T>
 inline constexpr bool func_has_to_stream_v = std::is_same_v<detected_t<func_to_stream_t, T>, void>;
 
 template <typename T>
-using func_extra_equal_to_t
-    = decltype(std::declval<std::add_lvalue_reference_t<const T>>().extra_equal_to(std::declval<const func &>()));
-
-template <typename T>
-inline constexpr bool func_has_extra_equal_to_v = std::is_same_v<detected_t<func_extra_equal_to_t, T>, bool>;
-
-template <typename T>
-using func_extra_less_than_t
-    = decltype(std::declval<std::add_lvalue_reference_t<const T>>().extra_less_than(std::declval<const func &>()));
-
-template <typename T>
-inline constexpr bool func_has_extra_less_than_v = std::is_same_v<detected_t<func_extra_less_than_t, T>, bool>;
-
-template <typename T>
 using func_is_time_dependent_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().is_time_dependent());
 
 template <typename T>
 inline constexpr bool func_has_is_time_dependent_v = std::is_same_v<detected_t<func_is_time_dependent_t, T>, bool>;
 
 template <typename T>
-using func_is_commutative_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().is_commutative());
+using func_normalise_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().normalise());
 
 template <typename T>
-inline constexpr bool func_has_is_commutative_v = std::is_same_v<detected_t<func_is_commutative_t, T>, bool>;
-
-template <typename T>
-using func_extra_hash_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().extra_hash());
-
-template <typename T>
-inline constexpr bool func_has_extra_hash_v = std::is_same_v<detected_t<func_extra_hash_t, T>, std::size_t>;
+inline constexpr bool func_has_normalise_v = std::is_same_v<detected_t<func_normalise_t, T>, expression>;
 
 template <typename T>
 using func_diff_var_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(
@@ -383,24 +360,6 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         }
     }
 
-    [[nodiscard]] bool extra_equal_to(const func &f) const final
-    {
-        if constexpr (func_has_extra_equal_to_v<T>) {
-            return m_value.extra_equal_to(f);
-        } else {
-            return true;
-        }
-    }
-
-    [[nodiscard]] bool extra_less_than(const func &f) const final
-    {
-        if constexpr (func_has_extra_less_than_v<T>) {
-            return m_value.extra_less_than(f);
-        } else {
-            return false;
-        }
-    }
-
     [[nodiscard]] bool is_time_dependent() const final
     {
         if constexpr (func_has_is_time_dependent_v<T>) {
@@ -410,23 +369,11 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         }
     }
 
-    [[nodiscard]] bool is_commutative() const final
+    [[nodiscard]] bool has_normalise() const final
     {
-        if constexpr (func_has_is_commutative_v<T>) {
-            return m_value.is_commutative();
-        } else {
-            return false;
-        }
+        return func_has_normalise_v<T>;
     }
-
-    [[nodiscard]] std::size_t extra_hash() const final
-    {
-        if constexpr (func_has_extra_hash_v<T>) {
-            return m_value.extra_hash();
-        } else {
-            return 0;
-        }
-    }
+    [[nodiscard]] expression normalise() const final;
 
     [[nodiscard]] const std::vector<expression> &args() const final
     {
@@ -694,7 +641,8 @@ public:
     [[nodiscard]] const void *get_ptr() const;
 
     [[nodiscard]] bool is_time_dependent() const;
-    [[nodiscard]] bool is_commutative() const;
+
+    [[nodiscard]] expression normalise() const;
 
     [[nodiscard]] const std::string &get_name() const;
 

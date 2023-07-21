@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include "heyoka/kw.hpp"
 #include <heyoka/config.hpp>
 
 #include <algorithm>
@@ -40,6 +41,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -255,22 +257,33 @@ TEST_CASE("cfunc")
     // Small test to check nested sum square replacements.
     auto [x, y] = make_vars("x", "y");
 
-    llvm_state s;
+    {
+        llvm_state s;
 
-    const auto dc = add_cfunc<double>(s, "cfunc", {sum_sq({x, y, cos(sum_sq({x, y}))})});
+        const auto dc = add_cfunc<double>(s, "cfunc", {sum_sq({x, y, cos(sum_sq({x, y}))})});
 
-    s.optimise();
-    s.compile();
+        s.optimise();
+        s.compile();
 
-    auto *cf_ptr
-        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+        auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
+            s.jit_lookup("cfunc"));
 
-    std::vector<double> inputs = {1, 2};
-    double output = 0;
+        std::vector<double> inputs = {1, 2};
+        double output = 0;
 
-    cf_ptr(&output, inputs.data(), nullptr, nullptr);
+        cf_ptr(&output, inputs.data(), nullptr, nullptr);
 
-    REQUIRE(output == approximately(1. + 4 + std::cos(1. + 4) * std::cos(1. + 4)));
+        REQUIRE(output == approximately(1. + 4 + std::cos(1. + 4) * std::cos(1. + 4)));
+    }
+
+    // Check sum_to_sum_sq() failure due to non-numeric exponent.
+    {
+        llvm_state s{kw::opt_level = 0u};
+
+        add_cfunc<double>(s, "cfunc", {sum({pow(x, 2_dbl), pow(x, y)})}, kw::compact_mode = true);
+
+        REQUIRE(!boost::contains(s.get_ir(), "sum_sq"));
+    }
 }
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -309,10 +322,3 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
-
-TEST_CASE("commutativity")
-{
-    auto [x, y] = make_vars("x", "y");
-
-    REQUIRE(std::get<func>(sum_sq({x, y}).value()).is_commutative());
-}

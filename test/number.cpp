@@ -184,9 +184,6 @@ TEST_CASE("number hash eq")
 
 #endif
 
-    // Verify that subexpressions which differ only
-    // by the type of the constants (but not their values)
-    // are not simplified.
     auto [x, y] = make_vars("x", "y");
 
     {
@@ -194,7 +191,7 @@ TEST_CASE("number hash eq")
 
         auto dc = taylor_add_jet<double>(s, "jet", {prime(x) = (y + 1.) + (y + 1.l), prime(y) = x}, 1, 1, false, true);
 
-        REQUIRE(dc.size() == 7u);
+        REQUIRE(dc.size() == 6u);
     }
 
     {
@@ -203,7 +200,7 @@ TEST_CASE("number hash eq")
         auto dc = taylor_add_jet<double>(s, "jet", {prime(x) = (y + 1.) + (y + expression{number{1.f}}), prime(y) = x},
                                          1, 1, false, true);
 
-        REQUIRE(dc.size() == 7u);
+        REQUIRE(dc.size() == 6u);
     }
 }
 

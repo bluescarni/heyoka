@@ -30,7 +30,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/binary_op.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -267,7 +266,7 @@ TEST_CASE("s11n")
 
         llvm_state s;
 
-        taylor_add_jet<double>(s, "jet", {sub(2_dbl, 3_dbl), x + y}, 1, 1, true, false);
+        taylor_add_jet<double>(s, "jet", {-1_dbl, x + y}, 1, 1, true, false);
 
         const auto orig_ir = s.get_ir();
 
@@ -314,7 +313,7 @@ TEST_CASE("make_similar")
     auto [x, y] = make_vars("x", "y");
 
     llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::force_avx512 = true};
-    taylor_add_jet<double>(s, "jet", {sub(2_dbl, 3_dbl), x + y}, 1, 1, true, false);
+    taylor_add_jet<double>(s, "jet", {-1_dbl, x + y}, 1, 1, true, false);
 
     s.compile();
 

@@ -60,7 +60,6 @@ TEST_CASE("func minimal")
     REQUIRE(f.get_type_index() == typeid(func_00));
     REQUIRE(f.get_name() == "f");
     REQUIRE(f.args() == std::vector{"x"_var, "y"_var});
-    REQUIRE(!f.is_commutative());
 
     REQUIRE_THROWS_MATCHES(func{func_00{""}}, std::invalid_argument, Message("Cannot create a function with no name"));
 
@@ -468,13 +467,6 @@ TEST_CASE("func eq ineq")
     // Differing names.
     REQUIRE(f3 != f4);
     REQUIRE(!(f3 == f4));
-
-    // Differing underlying types.
-    f3 = func(func_10{{"x"_var, "y"_var}});
-    f4 = func(func_14{{"x"_var, "y"_var}});
-
-    REQUIRE(f3 != f4);
-    REQUIRE(!(f3 == f4));
 }
 
 TEST_CASE("func get_variables")
@@ -604,56 +596,6 @@ TEST_CASE("func extract")
 #endif
 }
 
-struct func_17 : func_base {
-    func_17(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
-    {
-    }
-    explicit func_17(int n, std::vector<expression> args) : func_base("f", std::move(args)), value(n) {}
-
-    bool extra_equal_to(const func &f) const
-    {
-        return f.extract<func_17>()->value == value;
-    }
-
-    int value = 0;
-};
-
-TEST_CASE("func extra_equal_to")
-{
-    auto f1 = func(func_17{0, {"x"_var, "y"_var}});
-    auto f2 = func(func_17{0, {"x"_var, "y"_var}});
-    auto f3 = func(func_17{1, {"x"_var, "y"_var}});
-
-    REQUIRE(f1 == f2);
-    REQUIRE(f1 != f3);
-}
-
-struct func_18 : func_base {
-    func_18(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
-    {
-    }
-    explicit func_18(int n, std::vector<expression> args) : func_base("f", std::move(args)), value(n) {}
-
-    std::size_t extra_hash() const
-    {
-        return static_cast<std::size_t>(value);
-    }
-
-    int value = 0;
-};
-
-TEST_CASE("func extra_hash")
-{
-    detail::funcptr_map<std::size_t> tmp;
-
-    auto f1 = func(func_18{0, {"x"_var, "y"_var}});
-    auto f2 = func(func_18{0, {"x"_var, "y"_var}});
-    auto f3 = func(func_18{-1, {"x"_var, "y"_var}});
-
-    REQUIRE(f1.hash(tmp) == f2.hash(tmp));
-    REQUIRE(f1.hash(tmp) != f3.hash(tmp));
-}
-
 TEST_CASE("func hash eq consistency")
 {
     auto [x, y, z] = make_vars("x", "y", "z");
@@ -730,17 +672,17 @@ TEST_CASE("copy")
 
     // Error mode.
     REQUIRE_THROWS_MATCHES(
-        expression{std::get<func>(foo.value()).copy({x, y, z})}, std::invalid_argument,
-        Message("The set of new arguments passed to func::copy() has a size of 3, but the number of arguments "
-                "of the original function is 2 (the two sizes must be equal)"));
+        expression{std::get<func>(foo.value()).copy({x, y})}, std::invalid_argument,
+        Message("The set of new arguments passed to func::copy() has a size of 2, but the number of arguments "
+                "of the original function is 3 (the two sizes must be equal)"));
 
-    auto foo_copy = expression{std::get<func>(foo.value()).copy({x, y})};
+    auto foo_copy = expression{std::get<func>(foo.value()).copy({x, y, z})};
 
     // Check that copy creates a new obejct.
     REQUIRE(std::get<func>(foo_copy.value()).get_ptr() != std::get<func>(foo.value()).get_ptr());
 
     // Check the new arguments.
-    REQUIRE(std::get<func>(foo_copy.value()).args() == std::vector{x, y});
+    REQUIRE(std::get<func>(foo_copy.value()).args() == std::vector{x, y, z});
 }
 
 // Bug: a default-constructed function is not serialisable.
@@ -816,37 +758,10 @@ TEST_CASE("is_time_dependent")
     REQUIRE(!f.is_time_dependent());
 }
 
-struct func_23 : func_base {
-    func_23(std::string name = "pippo", std::vector<expression> args = {}, int n = 0)
-        : func_base(std::move(name), std::move(args)), m_n(n)
-    {
-    }
-    bool extra_less_than(const func &a) const
-    {
-        return m_n < a.extract<func_23>()->m_n;
-    }
-    bool extra_equal_to(const func &a) const
-    {
-        return m_n == a.extract<func_23>()->m_n;
-    }
-    int m_n;
-};
-
 TEST_CASE("func lt")
 {
     func f(func_20{});
     REQUIRE(!(f < f));
-
-    if (std::type_index(typeid(func_20)) < std::type_index(typeid(func_21))) {
-        REQUIRE(func{func_20{}} < func{func_21{}});
-        REQUIRE(!(func{func_21{}} < func{func_20{}}));
-    } else {
-        REQUIRE(func{func_21{}} < func{func_20{}});
-        REQUIRE(!(func{func_20{}} < func{func_21{}}));
-    }
-
-    REQUIRE(func{func_20{}} == func{func_20{}});
-    REQUIRE(func{func_21{}} != func{func_20{}});
 
     REQUIRE(func{func_20{"aaa"}} < func{func_20{"bbb"}});
     REQUIRE(!(func{func_20{"bbb"}} < func{func_20{"bbb"}}));
@@ -856,13 +771,6 @@ TEST_CASE("func lt")
     REQUIRE(func{func_20{"aaa", {1_dbl}}} < func{func_20{"aaa", {2_dbl}}});
     REQUIRE(!(func{func_20{"aaa", {1_dbl}}} < func{func_20{"aaa", {1_dbl}}}));
     REQUIRE(!(func{func_20{"aaa", {3_dbl}}} < func{func_20{"aaa", {2_dbl}}}));
-
-    REQUIRE(func{func_23{"aaa", {3_dbl}, 1}} < func{func_23{"aaa", {3_dbl}, 2}});
-    REQUIRE(!(func{func_23{"aaa", {3_dbl}, 2}} < func{func_23{"aaa", {3_dbl}, 1}}));
-    REQUIRE(!(func{func_23{"aaa", {3_dbl}, 1}} < func{func_23{"aaa", {3_dbl}, 1}}));
-    REQUIRE(!(func{func_23{"aaa", {3_dbl}, 1}} < func{func_23{"aaa", {3_dbl}, 1}}));
-    REQUIRE(func{func_23{"aaa", {3_dbl}, 1}} == func{func_23{"aaa", {3_dbl}, 1}});
-    REQUIRE(func{func_23{"aaa", {3_dbl}, 2}} != func{func_23{"aaa", {3_dbl}, 1}});
 }
 
 #if defined(__GNUC__)

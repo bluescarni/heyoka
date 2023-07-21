@@ -51,7 +51,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/binary_op.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepE.hpp>
 #include <heyoka/math/sin.hpp>
@@ -163,10 +162,7 @@ taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
                              std::vector<std::uint32_t>{});
 
     // Append the e*cos(a) decomposition.
-    // NOTE: use mul() instead of * in order to avoid the automatic simplification
-    // of 0 * cos(a) -> 0, which would result in an invalid entry in the Taylor decomposition
-    // (i.e., a number entry).
-    u_vars_defs.emplace_back(mul(std::move(e_copy), expression{variable{fmt::format("u_{}", u_vars_defs.size() - 1u)}}),
+    u_vars_defs.emplace_back(e_copy * expression{variable{fmt::format("u_{}", u_vars_defs.size() - 1u)}},
                              std::vector<std::uint32_t>{});
 
     // Add the hidden deps.

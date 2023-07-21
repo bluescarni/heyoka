@@ -43,6 +43,7 @@
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -371,6 +372,10 @@ TEST_CASE("args simpl")
 
     // Sorting.
     REQUIRE(prod({y, z, x, 1_dbl}) == prod({1_dbl, x, y, z}));
+
+    // cf * sum(a, ...) to sum(cf * a, ...), where cf is a number.
+    REQUIRE(prod({2_dbl, sum({x, y})}) == sum({prod({2_dbl, x}), prod({2_dbl, y})}));
+    REQUIRE(prod({sum({x, y}), 6_dbl, 2_dbl}) == sum({prod({12_dbl, x}), prod({12_dbl, y})}));
 }
 
 TEST_CASE("diff")
@@ -671,4 +676,12 @@ TEST_CASE("prod_to_div")
 
     ret = detail::prod_to_div_taylor_diff({prod({x, pow(x, y)})});
     REQUIRE(ret[0] == prod({x, pow(x, y)}));
+}
+
+TEST_CASE("normalise")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(normalise(x * y) == x * y);
+    REQUIRE(normalise(subs(x * y, {{y, 3. * x}})) == 3. * pow(x, 2.));
 }

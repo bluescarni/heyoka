@@ -187,7 +187,7 @@ TEST_CASE("kepE cse")
 
     auto dc = taylor_add_jet<double>(s, "jet", {cos(kepE(x, y)) + sin(kepE(x, y)) + kepE(x, y), x}, 1, 1, false, false);
 
-    REQUIRE(dc.size() == 10u);
+    REQUIRE(dc.size() == 9u);
 }
 
 // NOTE: this test checks a numerical integration of the Stark problem using kepE vs

@@ -42,6 +42,7 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/sub.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -67,6 +68,12 @@ std::vector<expression> acos_impl::gradient() const
 {
     assert(args().size() == 1u);
     return {-pow(1_dbl - args()[0] * args()[0], -.5)};
+}
+
+[[nodiscard]] expression acos_impl::normalise() const
+{
+    assert(args().size() == 1u);
+    return acos(args()[0]);
 }
 
 double acos_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
@@ -129,7 +136,13 @@ taylor_dc_t::size_type acos_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     u_vars_defs.emplace_back(args()[0] * args()[0], std::vector<std::uint32_t>{});
 
     // Append 1 - arg * arg.
-    u_vars_defs.emplace_back(1_dbl - expression{fmt::format("u_{}", u_vars_defs.size() - 1u)},
+    // NOTE: need to manually use sub() here because:
+    // - otherwise 1 - arg * arg is not any more an elementary
+    //   subexpression,
+    // - if 1 - arg * arg appears elsewhere in the expression, then
+    //   it is automatically transformed into a sub() by the decomposition
+    //   preprocessing.
+    u_vars_defs.emplace_back(sub(1_dbl, expression{fmt::format("u_{}", u_vars_defs.size() - 1u)}),
                              std::vector<std::uint32_t>{});
 
     // Append sqrt(1 - arg * arg).

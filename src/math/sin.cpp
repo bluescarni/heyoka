@@ -411,6 +411,12 @@ std::vector<expression> sin_impl::gradient() const
     return {cos(args()[0])};
 }
 
+[[nodiscard]] expression sin_impl::normalise() const
+{
+    assert(args().size() == 1u);
+    return sin(args()[0]);
+}
+
 } // namespace detail
 
 expression sin(expression e)

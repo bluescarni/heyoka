@@ -77,8 +77,12 @@ TEST_CASE("nbody")
 
         REQUIRE(n_sum_sqs == 15);
         REQUIRE(n_sums == 18);
+        REQUIRE(ta.get_decomposition().size() == 270u);
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 146u);
+
         s.optimise();
         s.compile();
 
@@ -111,7 +115,10 @@ TEST_CASE("nbody")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 114u);
+
         s.optimise();
         s.compile();
 
@@ -136,13 +143,29 @@ TEST_CASE("nbody")
 
         auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true, kw::pars = masses};
 
+        // Check that all sums were replaced by sums of squares.
+        auto n_sums = 0, n_sum_sqs = 0;
+        for (const auto &[s_ex, _] : ta.get_decomposition()) {
+            if (const auto *fptr = std::get_if<func>(&s_ex.value())) {
+                n_sums += static_cast<int>(fptr->extract<detail::sum_impl>() != nullptr);
+                n_sum_sqs += static_cast<int>(fptr->extract<detail::sum_sq_impl>() != nullptr);
+            }
+        }
+
+        REQUIRE(n_sum_sqs == 15);
+        REQUIRE(n_sums == 18);
+        REQUIRE(ta.get_decomposition().size() == 305u);
+
         llvm_state s;
         std::vector<expression> vars;
         for (const auto &p : dyn) {
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 146u);
+
         s.optimise();
         s.compile();
 
@@ -169,13 +192,29 @@ TEST_CASE("nbody")
         auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true,
                                           kw::pars = std::vector(masses.begin(), masses.begin() + 5)};
 
+        // Check that all sums were replaced by sums of squares.
+        auto n_sums = 0, n_sum_sqs = 0;
+        for (const auto &[s_ex, _] : ta.get_decomposition()) {
+            if (const auto *fptr = std::get_if<func>(&s_ex.value())) {
+                n_sums += static_cast<int>(fptr->extract<detail::sum_impl>() != nullptr);
+                n_sum_sqs += static_cast<int>(fptr->extract<detail::sum_sq_impl>() != nullptr);
+            }
+        }
+
+        REQUIRE(n_sum_sqs == 15);
+        REQUIRE(n_sums == 18);
+        REQUIRE(ta.get_decomposition().size() == 285u);
+
         llvm_state s;
         std::vector<expression> vars;
         for (const auto &p : dyn) {
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 114u);
+
         s.optimise();
         s.compile();
 
@@ -204,13 +243,29 @@ TEST_CASE("nbody")
         auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true,
                                           kw::pars = std::vector(masses.begin(), masses.begin() + 3)};
 
+        // Check that all sums were replaced by sums of squares.
+        auto n_sums = 0, n_sum_sqs = 0;
+        for (const auto &[s_ex, _] : ta.get_decomposition()) {
+            if (const auto *fptr = std::get_if<func>(&s_ex.value())) {
+                n_sums += static_cast<int>(fptr->extract<detail::sum_impl>() != nullptr);
+                n_sum_sqs += static_cast<int>(fptr->extract<detail::sum_sq_impl>() != nullptr);
+            }
+        }
+
+        REQUIRE(n_sum_sqs == 15);
+        REQUIRE(n_sums == 18);
+        REQUIRE(ta.get_decomposition().size() == 287u);
+
         llvm_state s;
         std::vector<expression> vars;
         for (const auto &p : dyn) {
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 146u);
+
         s.optimise();
         s.compile();
 
@@ -240,13 +295,29 @@ TEST_CASE("nbody")
         auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true,
                                           kw::pars = std::vector(masses.begin(), masses.begin() + 3)};
 
+        // Check that all sums were replaced by sums of squares.
+        auto n_sums = 0, n_sum_sqs = 0;
+        for (const auto &[s_ex, _] : ta.get_decomposition()) {
+            if (const auto *fptr = std::get_if<func>(&s_ex.value())) {
+                n_sums += static_cast<int>(fptr->extract<detail::sum_impl>() != nullptr);
+                n_sum_sqs += static_cast<int>(fptr->extract<detail::sum_sq_impl>() != nullptr);
+            }
+        }
+
+        REQUIRE(n_sum_sqs == 15);
+        REQUIRE(n_sums == 18);
+        REQUIRE(ta.get_decomposition().size() == 273u);
+
         llvm_state s;
         std::vector<expression> vars;
         for (const auto &p : dyn) {
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 114u);
+
         s.optimise();
         s.compile();
 
@@ -271,13 +342,29 @@ TEST_CASE("nbody")
 
         auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true};
 
+        // Check that all sums were replaced by sums of squares.
+        auto n_sums = 0, n_sum_sqs = 0;
+        for (const auto &[s_ex, _] : ta.get_decomposition()) {
+            if (const auto *fptr = std::get_if<func>(&s_ex.value())) {
+                n_sums += static_cast<int>(fptr->extract<detail::sum_impl>() != nullptr);
+                n_sum_sqs += static_cast<int>(fptr->extract<detail::sum_sq_impl>() != nullptr);
+            }
+        }
+
+        REQUIRE(n_sum_sqs == 15);
+        REQUIRE(n_sums == 18);
+        REQUIRE(ta.get_decomposition().size() == 255u);
+
         llvm_state s;
         std::vector<expression> vars;
         for (const auto &p : dyn) {
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 124u);
+
         s.optimise();
         s.compile();
 
@@ -311,13 +398,18 @@ TEST_CASE("nbody")
 
         auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true};
 
+        REQUIRE(ta.get_decomposition().size() == 72u);
+
         llvm_state s;
         std::vector<expression> vars;
         for (const auto &p : dyn) {
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 37u);
+
         s.optimise();
         s.compile();
 
@@ -394,13 +486,18 @@ TEST_CASE("np1body")
 
         auto ta = heyoka::taylor_adaptive{dyn, std::vector(n_ic.begin() + 6, n_ic.end()), kw::compact_mode = true};
 
+        REQUIRE(ta.get_decomposition().size() == 285u);
+
         llvm_state s;
         std::vector<expression> vars;
         for (const auto &p : dyn) {
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 158u);
+
         s.optimise();
         s.compile();
 
@@ -433,7 +530,10 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 123u);
+
         s.optimise();
         s.compile();
 
@@ -466,7 +566,10 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 158u);
+
         s.optimise();
         s.compile();
 
@@ -499,7 +602,10 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 123u);
+
         s.optimise();
         s.compile();
 
@@ -534,7 +640,10 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 158u);
+
         s.optimise();
         s.compile();
 
@@ -570,7 +679,10 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 123u);
+
         s.optimise();
         s.compile();
 
@@ -601,7 +713,10 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 136u);
+
         s.optimise();
         s.compile();
 
@@ -636,7 +751,10 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 141u);
+
         s.optimise();
         s.compile();
 
@@ -668,7 +786,10 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+
+        REQUIRE(dc.size() == 31u);
+
         s.optimise();
         s.compile();
 

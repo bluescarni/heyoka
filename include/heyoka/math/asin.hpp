@@ -40,6 +40,8 @@ public:
 
     [[nodiscard]] std::vector<expression> gradient() const;
 
+    [[nodiscard]] expression normalise() const;
+
     [[nodiscard]] double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     [[nodiscard]] long double eval_ldbl(const std::unordered_map<std::string, long double> &,
                                         const std::vector<long double> &) const;

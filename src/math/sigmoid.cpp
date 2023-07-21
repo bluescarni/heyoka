@@ -456,9 +456,13 @@ llvm::Function *sigmoid_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t
 std::vector<expression> sigmoid_impl::gradient() const
 {
     assert(args().size() == 1u);
-    // NOTE: if single-precision floats are implemented,
-    // should 1_dbl become 1_flt?
     return {(1_dbl - sigmoid(args()[0])) * sigmoid(args()[0])};
+}
+
+[[nodiscard]] expression sigmoid_impl::normalise() const
+{
+    assert(args().size() == 1u);
+    return sigmoid(args()[0]);
 }
 
 } // namespace detail

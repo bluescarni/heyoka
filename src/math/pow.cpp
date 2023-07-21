@@ -66,6 +66,7 @@
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -1111,13 +1112,54 @@ std::vector<expression> pow_impl::gradient() const
     return {args()[1] * pow(args()[0], args()[1] - 1_dbl), pow(args()[0], args()[1]) * log(args()[0])};
 }
 
+[[nodiscard]] expression pow_impl::normalise() const
+{
+    assert(args().size() == 2u);
+    return pow(args()[0], args()[1]);
+}
+
 namespace
 {
+
+// Type traits machinery to detect if two types can be used as base and exponent
+// in an exponentiation via the pow() function.
+namespace pow_detail
+{
+
+using std::pow;
+
+template <typename T, typename U>
+using pow_t = decltype(pow(std::declval<T>(), std::declval<U>()));
+
+} // namespace pow_detail
+
+template <typename T, typename U>
+using is_exponentiable = is_detected<pow_detail::pow_t, T, U>;
 
 // Wrapper for the implementation of the top-level pow() function.
 // NOLINTNEXTLINE(misc-no-recursion)
 expression pow_wrapper_impl(expression b, expression e)
 {
+    // Attempt constant folding first.
+    if (const auto *b_num_ptr = std::get_if<number>(&b.value()), *e_num_ptr = std::get_if<number>(&e.value());
+        (b_num_ptr != nullptr) && (e_num_ptr != nullptr)) {
+        return std::visit(
+            [](const auto &x, const auto &y) -> expression {
+                if constexpr (detail::is_exponentiable<decltype(x), decltype(y)>::value) {
+                    using std::pow;
+
+                    return expression{pow(x, y)};
+                } else {
+                    // LCOV_EXCL_START
+                    throw std::invalid_argument(
+                        fmt::format("Cannot raise a base of type '{}' to an exponent of type '{}'",
+                                    boost::core::demangle(typeid(x).name()), boost::core::demangle(typeid(y).name())));
+                    // LCOV_EXCL_STOP
+                }
+            },
+            b_num_ptr->value(), e_num_ptr->value());
+    }
+
     // Handle special cases for a numerical exponent.
     if (const auto *num_ptr = std::get_if<number>(&e.value())) {
         if (is_zero(*num_ptr)) {
@@ -1143,26 +1185,24 @@ expression pow_wrapper_impl(expression b, expression e)
                 return pow(b_base, prod({b_exp, e}));
             }
         }
+
+        // Handle special cases when the base is a prod() and the exponent is an integral value:
+        // (x*y)**n -> x**n * y**n.
+        if (const auto *fptr = std::get_if<func>(&b.value());
+            fptr != nullptr && fptr->extract<prod_impl>() != nullptr && is_integer(*num_ptr)) {
+            std::vector<expression> new_prod_args;
+            new_prod_args.reserve(fptr->args().size());
+            for (const auto &arg : fptr->args()) {
+                new_prod_args.push_back(pow(arg, expression{*num_ptr}));
+            }
+
+            return prod(new_prod_args);
+        }
     }
 
     // The general case.
     return expression{func{pow_impl{std::move(b), std::move(e)}}};
 }
-
-// Type traits machinery to detect if two types can be used as base and exponent
-// in an exponentiation via the pow() function.
-namespace pow_detail
-{
-
-using std::pow;
-
-template <typename T, typename U>
-using pow_t = decltype(pow(std::declval<T>(), std::declval<U>()));
-
-} // namespace pow_detail
-
-template <typename T, typename U>
-using is_exponentiable = is_detected<pow_detail::pow_t, T, U>;
 
 } // namespace
 
@@ -1171,26 +1211,7 @@ using is_exponentiable = is_detected<pow_detail::pow_t, T, U>;
 // NOLINTNEXTLINE(misc-no-recursion)
 expression pow(expression b, expression e)
 {
-    if (const auto *b_num_ptr = std::get_if<number>(&b.value()), *e_num_ptr = std::get_if<number>(&e.value());
-        (b_num_ptr != nullptr) && (e_num_ptr != nullptr)) {
-        return std::visit(
-            [](const auto &x, const auto &y) -> expression {
-                if constexpr (detail::is_exponentiable<decltype(x), decltype(y)>::value) {
-                    using std::pow;
-
-                    return expression{pow(x, y)};
-                } else {
-                    // LCOV_EXCL_START
-                    throw std::invalid_argument(
-                        fmt::format("Cannot raise a base of type '{}' to an exponent of type '{}'",
-                                    boost::core::demangle(typeid(x).name()), boost::core::demangle(typeid(y).name())));
-                    // LCOV_EXCL_STOP
-                }
-            },
-            b_num_ptr->value(), e_num_ptr->value());
-    } else {
-        return detail::pow_wrapper_impl(std::move(b), std::move(e));
-    }
+    return detail::pow_wrapper_impl(std::move(b), std::move(e));
 }
 
 expression pow(expression b, double e)
