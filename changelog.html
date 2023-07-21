@@ -9,7 +9,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
-    <title>Changelog &#8212; heyoka 0.22.0 documentation</title>
+    <title>Changelog &#8212; heyoka 1.0.0 documentation</title>
   
   
   
@@ -349,7 +349,7 @@ document.write(`
             </div>
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">0.22.0 (unreleased)</a><ul class="nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">1.0.0 (unreleased)</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#new">New</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#changes">Changes</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fix">Fix</a></li>
@@ -493,7 +493,7 @@ document.write(`
   <section id="changelog">
 <h1>Changelog<a class="headerlink" href="#changelog" title="Permalink to this heading">#</a></h1>
 <section id="unreleased">
-<h2>0.22.0 (unreleased)<a class="headerlink" href="#unreleased" title="Permalink to this heading">#</a></h2>
+<h2>1.0.0 (unreleased)<a class="headerlink" href="#unreleased" title="Permalink to this heading">#</a></h2>
 <section id="new">
 <h3>New<a class="headerlink" href="#new" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
@@ -505,16 +505,8 @@ operation on a list of expressions more efficiently
 than performing the same operation repeatedly on individual
 expressions
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/312">#312</a>).</p></li>
-<li><p>Functions in the expression system can now be optionally
-marked as commutative. Commutative functions now enforce
-a canonical ordering of their operands
-(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/312">#312</a>,
-<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/311">#311</a>).</p></li>
 <li><p>The expression class is now immutable
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/312">#312</a>).</p></li>
-<li><p>The arithmetic operators of the expression class
-can now fold constants through call chains
-(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/311">#311</a>).</p></li>
 <li><p>New API to compute high-order derivatives
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/309">#309</a>).</p></li>
 <li><p>The state variables and right-hand side of a system of ODEs
@@ -538,6 +530,23 @@ very large expressions
 <section id="changes">
 <h3>Changes<a class="headerlink" href="#changes" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>Comprehensive overhaul of the expression system, including:
+enhanced automatic simplification capabilities for sums,
+products and powers, removal of several specialised primitives
+(such as <code class="docutils literal notranslate"><span class="pre">square()</span></code>, <code class="docutils literal notranslate"><span class="pre">neg()</span></code>, <code class="docutils literal notranslate"><span class="pre">sum_sq()</span></code>, etc.),
+re-implementation of division and subtraction as special
+cases of product and sum, and more
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/332">#332</a>,
+<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/331">#331</a>,
+<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/330">#330</a>,
+<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/329">#329</a>,
+<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/328">#328</a>,
+<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/327">#327</a>,
+<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/326">#326</a>,
+<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/325">#325</a>,
+<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/324">#324</a>,
+<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/323">#323</a>,
+<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/322">#322</a>).</p></li>
 <li><p>Constant folding is now implemented for all functions
 in the expression system
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/321">#321</a>).</p></li>
@@ -568,7 +577,7 @@ inlined, which leads to improved codegen and better performance
 <li><p><strong>BREAKING</strong>: the <code class="docutils literal notranslate"><span class="pre">make_nbody_sys()</span></code> helper has been replaced by an equivalent
 function in the new <code class="docutils literal notranslate"><span class="pre">model</span></code> module
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/295">#295</a>).
-This is a <a class="reference internal" href="breaking_changes.html#bchanges-0-22-0"><span class="std std-ref">breaking change</span></a>.</p></li>
+This is a <a class="reference internal" href="breaking_changes.html#bchanges-1-0-0"><span class="std std-ref">breaking change</span></a>.</p></li>
 </ul>
 </section>
 <section id="fix">
@@ -1371,7 +1380,7 @@ on more general classes of functions, and add
   </div>
   <nav class="bd-toc-nav page-toc">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">0.22.0 (unreleased)</a><ul class="nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">1.0.0 (unreleased)</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#new">New</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#changes">Changes</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fix">Fix</a></li>

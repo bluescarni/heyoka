@@ -1,8 +1,8 @@
 Changelog
 =========
 
-0.22.0 (unreleased)
--------------------
+1.0.0 (unreleased)
+------------------
 
 New
 ~~~
@@ -15,16 +15,8 @@ New
   than performing the same operation repeatedly on individual
   expressions
   (`#312 <https://github.com/bluescarni/heyoka/pull/312>`__).
-- Functions in the expression system can now be optionally
-  marked as commutative. Commutative functions now enforce
-  a canonical ordering of their operands
-  (`#312 <https://github.com/bluescarni/heyoka/pull/312>`__,
-  `#311 <https://github.com/bluescarni/heyoka/pull/311>`__).
 - The expression class is now immutable
   (`#312 <https://github.com/bluescarni/heyoka/pull/312>`__).
-- The arithmetic operators of the expression class
-  can now fold constants through call chains
-  (`#311 <https://github.com/bluescarni/heyoka/pull/311>`__).
 - New API to compute high-order derivatives
   (`#309 <https://github.com/bluescarni/heyoka/pull/309>`__).
 - The state variables and right-hand side of a system of ODEs
@@ -47,6 +39,23 @@ New
 Changes
 ~~~~~~~
 
+- Comprehensive overhaul of the expression system, including:
+  enhanced automatic simplification capabilities for sums,
+  products and powers, removal of several specialised primitives
+  (such as ``square()``, ``neg()``, ``sum_sq()``, etc.),
+  re-implementation of division and subtraction as special
+  cases of product and sum, and more
+  (`#332 <https://github.com/bluescarni/heyoka/pull/332>`__,
+  `#331 <https://github.com/bluescarni/heyoka/pull/331>`__,
+  `#330 <https://github.com/bluescarni/heyoka/pull/330>`__,
+  `#329 <https://github.com/bluescarni/heyoka/pull/329>`__,
+  `#328 <https://github.com/bluescarni/heyoka/pull/328>`__,
+  `#327 <https://github.com/bluescarni/heyoka/pull/327>`__,
+  `#326 <https://github.com/bluescarni/heyoka/pull/326>`__,
+  `#325 <https://github.com/bluescarni/heyoka/pull/325>`__,
+  `#324 <https://github.com/bluescarni/heyoka/pull/324>`__,
+  `#323 <https://github.com/bluescarni/heyoka/pull/323>`__,
+  `#322 <https://github.com/bluescarni/heyoka/pull/322>`__).
 - Constant folding is now implemented for all functions
   in the expression system
   (`#321 <https://github.com/bluescarni/heyoka/pull/321>`__).
@@ -77,7 +86,7 @@ Changes
 - **BREAKING**: the ``make_nbody_sys()`` helper has been replaced by an equivalent
   function in the new ``model`` module
   (`#295 <https://github.com/bluescarni/heyoka/pull/295>`__).
-  This is a :ref:`breaking change <bchanges_0_22_0>`.
+  This is a :ref:`breaking change <bchanges_1_0_0>`.
 
 Fix
 ~~~
