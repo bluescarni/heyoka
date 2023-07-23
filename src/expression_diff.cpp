@@ -484,7 +484,6 @@ void diff_tensors_reverse_impl(
     // An indices vector with preallocated storage,
     // used as temporary variable in several places below.
     std::vector<std::uint32_t> tmp_v_idx;
-    tmp_v_idx.resize(1 + boost::safe_numerics::safe<decltype(tmp_v_idx.size())>(nargs));
 
     // These two containers will be used to store the list of subexpressions
     // on which an output depends. They are used in the reverse pass
