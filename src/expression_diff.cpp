@@ -630,7 +630,7 @@ void diff_tensors_reverse_impl(
 
             // Check if we already computed this derivative.
             if (const auto it = diff_map.find(tmp_v_idx); it == diff_map.end()) {
-                // The derivative is new. If the diff arguent is present in the
+                // The derivative is new. If the diff argument is present in the
                 // decomposition, then we will calculate the derivative and add it.
                 // Otherwise, we set the derivative to zero and add it.
                 expression cur_der = 0_dbl;
