@@ -478,11 +478,12 @@ void diff_tensors_reverse_impl(
     // variables when constructing the derivatives.
     const SubsMap &subs_map)
 {
+    assert(dc.size() > nvars);
+
     // Cache the number of diff arguments.
     const auto nargs = args.size();
 
-    // An indices vector with preallocated storage,
-    // used as temporary variable in several places below.
+    // An indices vector used as temporary variable in several places below.
     std::vector<std::uint32_t> tmp_v_idx;
 
     // These two containers will be used to store the list of subexpressions
