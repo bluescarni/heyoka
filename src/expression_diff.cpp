@@ -449,6 +449,206 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
     return std::tuple{std::move(adj), std::move(dep), std::move(revdep), std::move(subs_map)};
 }
 
+// Forward-mode implementation of diff_tensors().
+template <typename DiffMap, typename Dep, typename Adj, typename SubsMap>
+void diff_tensors_forward_impl(
+    // The map of derivatives. It wil be updated as new derivatives
+    // are computed.
+    DiffMap &diff_map,
+    // The number of derivatives in the previous-order tensor.
+    std::vector<expression>::size_type cur_nouts,
+    // The decomposition of the previous-order tensor.
+    const std::vector<expression> &dc,
+    // The direct and reverse dependencies for the
+    // subexpressions in dc.
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    const Dep &dep, const Dep &revdep,
+    // The adjoints of the subexpressions in dc.
+    const Adj &adj,
+    // The total number of variables in dc (this accounts also
+    // for params, as they are turned into variables during the
+    // construciton of the decomposition).
+    std::vector<expression>::size_type nvars,
+    // The diff arguments.
+    const std::vector<expression> &args,
+    // Iterator in diff_map pointing to the first
+    // derivative for the previous order.
+    typename DiffMap::iterator prev_begin,
+    // The substitution map to recover the original
+    // variables when constructing the derivatives.
+    const SubsMap &subs_map)
+{
+    assert(dc.size() > nvars);
+
+    // An indices vector used as temporary variable in several places below.
+    std::vector<std::uint32_t> tmp_v_idx;
+
+    // These two containers will be used to store the list of subexpressions
+    // which depend on an input. They are used in the forward pass
+    // to avoid iterating over those subexpressions which do not depend on
+    // an input. We need two containers (with identical content)
+    // because we need both ordered iteration AND fast lookup.
+    std::unordered_set<std::uint32_t> in_deps;
+    std::vector<std::uint32_t> sorted_in_deps;
+
+    // A stack to be used when filling up in_deps/sorted_in_deps.
+    std::deque<std::uint32_t> stack;
+
+    // Create a dictionary mapping an input to its position
+    // in the decomposition. This is used to locate diff arguments
+    // in the decomposition.
+    std::unordered_map<expression, std::vector<expression>::size_type> input_idx_map;
+    for (std::vector<expression>::size_type i = 0; i < nvars; ++i) {
+        const auto &cur_in = dc[i];
+        assert(input_idx_map.count(cur_in) == 0u);
+        input_idx_map[cur_in] = i;
+    }
+
+    // Run the forward pass for each diff argument. The derivatives
+    // wrt the diff argument will be stored into diffs.
+    std::vector<expression> diffs(dc.size());
+    for (decltype(args.size()) diff_arg_idx = 0; diff_arg_idx < args.size(); ++diff_arg_idx) {
+        const auto &cur_diff_arg = args[diff_arg_idx];
+
+        if (input_idx_map.count(cur_diff_arg) == 0u) {
+            // The diff argument is not one of the inputs:
+            // set the derivatives of all outputs wrt to the
+            // diff argument to zero.
+            auto out_it = prev_begin;
+
+            for (std::vector<expression>::size_type out_idx = 0; out_idx < cur_nouts; ++out_idx, ++out_it) {
+                assert(out_it != diff_map.end());
+
+                tmp_v_idx = out_it->first;
+                assert(diff_arg_idx + 1u < tmp_v_idx.size());
+                tmp_v_idx[diff_arg_idx + 1u] += 1u;
+
+                // Use try_emplace() so that if the derivative
+                // has already been computed, nothing happens.
+                diff_map.try_emplace(tmp_v_idx, 0_dbl);
+            }
+
+            // Move to the next diff argument.
+            continue;
+        }
+
+        // The diff argument is one of the inputs. Fetch its index.
+        const auto input_idx = input_idx_map.find(cur_diff_arg)->second;
+
+        // Seed the stack and in_deps/sorted_in_deps with the
+        // dependees of the current input.
+        stack.assign(revdep[input_idx].begin(), revdep[input_idx].end());
+        sorted_in_deps.assign(revdep[input_idx].begin(), revdep[input_idx].end());
+        in_deps.clear();
+        in_deps.insert(revdep[input_idx].begin(), revdep[input_idx].end());
+
+        // Build in_deps/sorted_in_deps by traversing
+        // the decomposition forward.
+        while (!stack.empty()) {
+            // Pop the first element from the stack.
+            const auto cur_idx = stack.front();
+            stack.pop_front();
+
+            // Push into the stack and in_deps/sorted_in_deps
+            // the dependees of cur_idx.
+            for (const auto next_idx : revdep[cur_idx]) {
+                // NOTE: if next_idx is already in in_deps,
+                // it means that it was visited already and thus
+                // it does not need to be put in the stack.
+                if (in_deps.count(next_idx) == 0u) {
+                    stack.push_back(next_idx);
+                    sorted_in_deps.push_back(next_idx);
+                    in_deps.insert(next_idx);
+                }
+            }
+        }
+
+        // Sort sorted_in_deps in ascending order.
+        std::sort(sorted_in_deps.begin(), sorted_in_deps.end());
+
+        // sorted_in_deps cannot have duplicate values.
+        assert(std::adjacent_find(sorted_in_deps.begin(), sorted_in_deps.end()) == sorted_in_deps.end());
+        // sorted_in_deps either must be empty, or its last index
+        // must refer to an output (i.e., the current input must be
+        // a dependency for some output).
+        assert(sorted_in_deps.empty() || *sorted_in_deps.rbegin() >= diffs.size() - cur_nouts);
+        assert(sorted_in_deps.size() == in_deps.size());
+
+        // Set the seed value for the current input.
+        diffs[input_idx] = 1_dbl;
+
+        // Set the derivatives of all outputs to zero, so that if
+        // an output does not depend on the current input then the
+        // derivative of that output wrt the current input is pre-emptively
+        // set to zero.
+        std::fill(diffs.data() + diffs.size() - cur_nouts, diffs.data() + diffs.size(), 0_dbl);
+
+        // Run the forward pass.
+        //
+        // NOTE: we need to tread lightly here. The forward pass consists
+        // of iteratively building up an expression from a seed value via
+        // multiplications and summations involving the adjoints. In order
+        // for the resulting expression to be able to be evaluated with
+        // optimal performance by heyoka, several automated simplifications in sums
+        // and products need to be disabled. One such example is the flattening
+        // of nested products, which destroys heyoka's ability to identify and
+        // eliminate redundant subexpressions via CSE. In order to disable automatic
+        // simplifications, we use fix(), with the caveat that fix() is *not*
+        // applied to number expressions (so that constant
+        // folding can still take place). Perhaps in the future it will be possible
+        // to enable further simplifications involving pars/vars, but, for now, let
+        // us play it conservatively.
+        for (const auto cur_idx : sorted_in_deps) {
+            std::vector<expression> tmp_sum;
+
+            for (const auto d_idx : dep[cur_idx]) {
+                assert(d_idx < diffs.size());
+                assert(cur_idx < adj.size());
+                // NOTE: the dependency must point
+                // to a subexpression *before* the current one.
+                assert(d_idx < cur_idx);
+                assert(adj[cur_idx].count(d_idx) == 1u);
+
+                // NOTE: if the current subexpression depends
+                // on another subexpression which neither is
+                // the current input nor depends on the current input,
+                // then the derivative is zero.
+                if (d_idx != input_idx && in_deps.count(d_idx) == 0u) {
+                    tmp_sum.push_back(0_dbl);
+                } else {
+                    auto new_term = fix_nn(fix_nn(diffs[d_idx]) * fix_nn(adj[cur_idx].find(d_idx)->second));
+                    tmp_sum.push_back(std::move(new_term));
+                }
+            }
+
+            assert(!tmp_sum.empty());
+
+            diffs[cur_idx] = fix_nn(sum(tmp_sum));
+        }
+
+        // Add the derivatives of all outputs wrt the current input
+        // to diff_map.
+        auto out_it = prev_begin;
+
+        for (std::vector<expression>::size_type out_idx = 0; out_idx < cur_nouts; ++out_idx, ++out_it) {
+            assert(out_it != diff_map.end());
+
+            tmp_v_idx = out_it->first;
+            assert(diff_arg_idx + 1u < tmp_v_idx.size());
+            tmp_v_idx[diff_arg_idx + 1u] += 1u;
+
+            // Check if we already computed this derivative.
+            if (const auto it = diff_map.find(tmp_v_idx); it == diff_map.end()) {
+                // The derivative is new.
+                auto cur_der = subs(diffs[diffs.size() - cur_nouts + out_idx], subs_map);
+
+                [[maybe_unused]] const auto [_, flag] = diff_map.try_emplace(tmp_v_idx, std::move(cur_der));
+                assert(flag);
+            }
+        }
+    }
+}
+
 // Reverse-mode implementation of diff_tensors().
 template <typename DiffMap, typename Dep, typename Adj, typename SubsMap>
 void diff_tensors_reverse_impl(
@@ -858,9 +1058,15 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
 
         spdlog::stopwatch sw_inner;
 
-        // NOTE: current implementation always
-        // does reverse-mode differentiation.
-        diff_tensors_reverse_impl(diff_map, cur_nouts, dc, dep, revdep, adj, nvars, args, prev_begin, subs_map);
+        // NOTE: in order to choose between forward and reverse mode, we adopt the standard approach
+        // of comparing the number of inputs and outputs. A more accurate (yet more exepensive) approach
+        // would be to do the computation in both modes (e.g., in parallel) and pick the mode which
+        // results in the shortest decomposition. Perhaps we can consider this for a future extension.
+        if (cur_nouts >= args.size()) {
+            diff_tensors_forward_impl(diff_map, cur_nouts, dc, dep, revdep, adj, nvars, args, prev_begin, subs_map);
+        } else {
+            diff_tensors_reverse_impl(diff_map, cur_nouts, dc, dep, revdep, adj, nvars, args, prev_begin, subs_map);
+        }
 
         get_logger()->trace("dtens reverse passes runtime for order {}: {}", cur_order + 1u, sw_inner);
     }
