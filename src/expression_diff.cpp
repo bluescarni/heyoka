@@ -1068,13 +1068,33 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
             diff_tensors_reverse_impl(diff_map, cur_nouts, dc, dep, revdep, adj, nvars, args, prev_begin, subs_map);
         }
 
-        get_logger()->trace("dtens reverse passes runtime for order {}: {}", cur_order + 1u, sw_inner);
+        get_logger()->trace("dtens diff runtime for order {}: {}", cur_order + 1u, sw_inner);
     }
 
     get_logger()->trace("dtens creation runtime: {}", sw);
 
-    // Assemble and return the result.
-    dtens_map_t retval(boost::container::ordered_unique_range_t{}, diff_map.begin(), diff_map.end());
+    sw.reset();
+
+    // Normalise the derivatives.
+    std::vector<expression> norm_diffs;
+    norm_diffs.reserve(diff_map.size());
+    for (auto &p : diff_map) {
+        norm_diffs.push_back(std::move(p.second));
+    }
+    norm_diffs = normalise(norm_diffs);
+
+    // Construct the return value.
+    dtens_map_t::sequence_type retval_seq;
+    retval_seq.reserve(norm_diffs.size());
+    auto diff_map_it = diff_map.begin();
+    for (decltype(norm_diffs.size()) i = 0; i < norm_diffs.size(); ++i, ++diff_map_it) {
+        retval_seq.emplace_back(diff_map_it->first, std::move(norm_diffs[i]));
+    }
+    assert(diff_map_it == diff_map.end());
+    dtens_map_t retval;
+    retval.adopt_sequence(boost::container::ordered_unique_range_t{}, std::move(retval_seq));
+
+    get_logger()->trace("dtens normalisation runtime: {}", sw);
 
     // Check sorting.
     assert(std::is_sorted(retval.begin(), retval.end(),
