@@ -63,7 +63,14 @@ expression operator*(const expression &e1, const expression &e2)
 // NOLINTNEXTLINE(misc-no-recursion)
 expression operator/(const expression &e1, const expression &e2)
 {
-    return prod({e1, pow(e2, -1_dbl)});
+    if (std::holds_alternative<number>(e1.value()) && std::holds_alternative<number>(e2.value())) {
+        // NOTE: if e1 and e2 are numbers, do immediately constant folding. Otherwise, constant folding
+        // is first done on pow(e2, -1_dbl) and then on the product, which leads to wrong precision
+        // propagation in case e1 and e2 have different precisions.
+        return expression{std::get<number>(e1.value()) / std::get<number>(e2.value())};
+    } else {
+        return prod({e1, pow(e2, -1_dbl)});
+    }
 }
 
 expression operator+(const expression &ex, double x)

@@ -44,7 +44,7 @@ TEST_CASE("basic")
         REQUIRE(dyn[0].second == "v"_var);
 
         REQUIRE(dyn[1].first == "v"_var);
-        REQUIRE(dyn[1].second == -(.1l * std::pow(.3, -1.)) * sin("x"_var));
+        REQUIRE(dyn[1].second == -(.1l / .3) * sin("x"_var));
 
         auto E = model::pendulum_energy(kw::gconst = .1l, kw::l = .3);
 
