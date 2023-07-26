@@ -13,6 +13,7 @@
 #include <random>
 #include <sstream>
 #include <stdexcept>
+#include <unordered_map>
 #include <vector>
 
 #include <fmt/core.h>
@@ -586,6 +587,10 @@ TEST_CASE("speelpenning complexity")
         }
     };
 
+    // The expected complexities for the derivatives.
+    const std::unordered_map<unsigned, unsigned> sp_compl
+        = {{3u, 3u}, {10u, 24u}, {20u, 54u}, {50u, 144u}, {100u, 294u}, {200u, 594u}};
+
     for (auto nvars : {3u, 10u, 20u, 50u, 100u, 200u}) {
         std::vector<double> inputs, outputs_f, outputs_r;
 
@@ -611,6 +616,8 @@ TEST_CASE("speelpenning complexity")
         auto dc_reverse = add_cfunc<double>(s, "f_reverse", diff_vec, kw::compact_mode = true);
 
         fmt::print("nvars={:<5} decomposition size={:<6}\n", nvars, dc_reverse.size() - nvars - nvars);
+
+        REQUIRE(dc_reverse.size() - nvars - nvars == sp_compl.at(nvars));
 
         s.optimise();
         s.compile();
