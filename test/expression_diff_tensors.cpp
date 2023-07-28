@@ -14,12 +14,14 @@
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/sum.hpp>
@@ -618,6 +620,14 @@ TEST_CASE("speelpenning complexity")
         fmt::print("nvars={:<5} decomposition size={:<6}\n", nvars, dc_reverse.size() - nvars - nvars);
 
         REQUIRE(dc_reverse.size() - nvars - nvars == sp_compl.at(nvars));
+
+        // The central part of the decomposition must consist only of
+        // binary multiplications.
+        for (decltype(dc_reverse.size()) i = nvars; i < dc_reverse.size() - nvars; ++i) {
+            REQUIRE(std::holds_alternative<func>(dc_reverse[i].value()));
+            REQUIRE(std::get<func>(dc_reverse[i].value()).extract<detail::prod_impl>() != nullptr);
+            REQUIRE(std::get<func>(dc_reverse[i].value()).extract<detail::prod_impl>()->args().size() == 2u);
+        }
 
         s.optimise();
         s.compile();
