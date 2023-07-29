@@ -56,7 +56,7 @@ public:
     }
 
     // NOTE: need custom implementations here in order to ensure that
-    // the result of the diff is alwso fixed.
+    // the result of the diff is also fixed.
     expression diff(funcptr_map<expression> &func_map, const std::string &s) const
     {
         assert(args().size() == 1u);
