@@ -34,6 +34,11 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
 
+// NOTE: the step callback needs its own class (rather
+// than using std::function directly) because we want to
+// give the ability to (optionally) define additional member
+// functions in the callback object (beside the call operator).
+
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
@@ -135,7 +140,7 @@ class HEYOKA_DLL_PUBLIC step_callback
 
     // Meta-programming for the generic ctor.
 
-    // Detection for the call operator.
+    // Detection of the call operator.
     template <typename T>
     using step_callback_call_t
         = decltype(std::declval<std::add_lvalue_reference_t<T>>()(std::declval<std::add_lvalue_reference_t<TA>>()));
@@ -163,6 +168,7 @@ public:
     // the constructed step_callback will *NOT* be empty. If we need this,
     // we can implement it with some meta-programming.
     template <typename T, generic_ctor_enabler<T &&> = 0>
+    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     step_callback(T &&f) : m_ptr(std::make_unique<step_callback_inner<internal_type<T &&>, TA>>(std::forward<T>(f)))
     {
     }

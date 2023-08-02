@@ -150,6 +150,7 @@ public:
     // the constructed callable will *NOT* be empty. If we need this,
     // we can implement it with some meta-programming.
     template <typename T, std::enable_if_t<std::negation_v<std::is_same<callable, detail::uncvref_t<T>>>, int> = 0>
+    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     callable(T &&f) : callable(std::forward<T>(f), std::is_same<R(Args...), detail::uncvref_t<T>>{})
     {
     }
