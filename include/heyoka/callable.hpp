@@ -146,6 +146,9 @@ public:
 
     // NOTE: generic ctor is enabled only if it does not
     // compete with copy/move ctors.
+    // NOTE: unlike std::function, if f is a nullptr or an empty std::function/callable
+    // the constructed callable will *NOT* be empty. If we need this,
+    // we can implement it with some meta-programming.
     template <typename T, std::enable_if_t<std::negation_v<std::is_same<callable, detail::uncvref_t<T>>>, int> = 0>
     callable(T &&f) : callable(std::forward<T>(f), std::is_same<R(Args...), detail::uncvref_t<T>>{})
     {
