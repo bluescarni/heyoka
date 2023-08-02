@@ -126,7 +126,7 @@ private:
 };
 
 template <typename TA>
-class HEYOKA_DLL_PUBLIC step_callback
+class HEYOKA_DLL_PUBLIC step_callback_impl
 {
     std::unique_ptr<step_callback_inner_base<TA>> m_ptr;
 
@@ -153,7 +153,7 @@ class HEYOKA_DLL_PUBLIC step_callback
     using generic_ctor_enabler = std::enable_if_t<
         std::conjunction_v<
             // Must not compete with copy/move ctors.
-            std::negation<std::is_same<uncvref_t<T>, step_callback>>,
+            std::negation<std::is_same<uncvref_t<T>, step_callback_impl>>,
             // The internal type must have the correct call operator.
             std::is_same<bool, detected_t<step_callback_call_t, internal_type<T>>>,
             // The internal type must be copy/move constructible and destructible.
@@ -162,29 +162,30 @@ class HEYOKA_DLL_PUBLIC step_callback
         int>;
 
 public:
-    step_callback();
+    step_callback_impl();
 
     // NOTE: unlike std::function, if f is a nullptr or an empty std::function
-    // the constructed step_callback will *NOT* be empty. If we need this,
+    // the constructed step_callback_impl will *NOT* be empty. If we need this,
     // we can implement it with some meta-programming.
     template <typename T, generic_ctor_enabler<T &&> = 0>
     // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
-    step_callback(T &&f) : m_ptr(std::make_unique<step_callback_inner<internal_type<T &&>, TA>>(std::forward<T>(f)))
+    step_callback_impl(T &&f)
+        : m_ptr(std::make_unique<step_callback_inner<internal_type<T &&>, TA>>(std::forward<T>(f)))
     {
     }
 
-    step_callback(const step_callback &);
-    step_callback(step_callback &&) noexcept;
-    step_callback &operator=(const step_callback &);
-    step_callback &operator=(step_callback &&) noexcept;
-    ~step_callback();
+    step_callback_impl(const step_callback_impl &);
+    step_callback_impl(step_callback_impl &&) noexcept;
+    step_callback_impl &operator=(const step_callback_impl &);
+    step_callback_impl &operator=(step_callback_impl &&) noexcept;
+    ~step_callback_impl();
 
     explicit operator bool() const noexcept;
 
     bool operator()(TA &);
     void pre_hook(TA &);
 
-    void swap(step_callback &) noexcept;
+    void swap(step_callback_impl &) noexcept;
 
     [[nodiscard]] std::type_index get_type_index() const;
 
@@ -212,15 +213,15 @@ public:
 };
 
 template <typename TA>
-HEYOKA_DLL_PUBLIC void swap(step_callback<TA> &, step_callback<TA> &) noexcept;
+HEYOKA_DLL_PUBLIC void swap(step_callback_impl<TA> &, step_callback_impl<TA> &) noexcept;
 
 } // namespace detail
 
 template <typename T>
-using step_callback = detail::step_callback<taylor_adaptive<T>>;
+using step_callback = detail::step_callback_impl<taylor_adaptive<T>>;
 
 template <typename T>
-using step_callback_batch = detail::step_callback<taylor_adaptive_batch<T>>;
+using step_callback_batch = detail::step_callback_impl<taylor_adaptive_batch<T>>;
 
 HEYOKA_END_NAMESPACE
 
