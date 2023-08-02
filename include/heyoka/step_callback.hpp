@@ -255,9 +255,7 @@ BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_ada
 // NOTE: these are verbatim re-implementations of the BOOST_CLASS_EXPORT_KEY
 // and BOOST_CLASS_EXPORT_IMPLEMENT macros, which do not work well with class templates.
 #define HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(T, F)                                                                     \
-    namespace boost                                                                                                    \
-    {                                                                                                                  \
-    namespace serialization                                                                                            \
+    namespace boost::serialization                                                                                     \
     {                                                                                                                  \
     template <>                                                                                                        \
     struct guid_defined<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive<F>>> : boost::mpl::true_ {      \
@@ -268,17 +266,10 @@ BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_ada
         /* NOTE: the stringize here will produce a name enclosed by brackets. */                                       \
         return BOOST_PP_STRINGIZE((heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive<F>>));               \
     }                                                                                                                  \
-    }                                                                                                                  \
     }
 
 #define HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(T, F)                                                               \
-    namespace boost                                                                                                    \
-    {                                                                                                                  \
-    namespace archive                                                                                                  \
-    {                                                                                                                  \
-    namespace detail                                                                                                   \
-    {                                                                                                                  \
-    namespace extra_detail                                                                                             \
+    namespace boost::archive::detail::extra_detail                                                                     \
     {                                                                                                                  \
     template <>                                                                                                        \
     struct init_guid<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive<F>>> {                             \
@@ -289,9 +280,6 @@ BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_ada
         = ::boost::serialization::singleton<guid_initializer<                                                          \
             heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive<F>>>>::get_mutable_instance()               \
               .export_guid();                                                                                          \
-    }                                                                                                                  \
-    }                                                                                                                  \
-    }                                                                                                                  \
     }
 
 #define HEYOKA_S11N_STEP_CALLBACK_EXPORT(T, F)                                                                         \
@@ -299,9 +287,7 @@ BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_ada
     HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(T, F)
 
 #define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(T, F)                                                               \
-    namespace boost                                                                                                    \
-    {                                                                                                                  \
-    namespace serialization                                                                                            \
+    namespace boost::serialization                                                                                     \
     {                                                                                                                  \
     template <>                                                                                                        \
     struct guid_defined<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive_batch<F>>>                      \
@@ -313,17 +299,10 @@ BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_ada
         /* NOTE: the stringize here will produce a name enclosed by brackets. */                                       \
         return BOOST_PP_STRINGIZE((heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive_batch<F>>));         \
     }                                                                                                                  \
-    }                                                                                                                  \
     }
 
 #define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_IMPLEMENT(T, F)                                                         \
-    namespace boost                                                                                                    \
-    {                                                                                                                  \
-    namespace archive                                                                                                  \
-    {                                                                                                                  \
-    namespace detail                                                                                                   \
-    {                                                                                                                  \
-    namespace extra_detail                                                                                             \
+    namespace boost::archive::detail::extra_detail                                                                     \
     {                                                                                                                  \
     template <>                                                                                                        \
     struct init_guid<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive_batch<F>>> {                       \
@@ -334,9 +313,6 @@ BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_ada
         = ::boost::serialization::singleton<guid_initializer<                                                          \
             heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive_batch<F>>>>::get_mutable_instance()         \
               .export_guid();                                                                                          \
-    }                                                                                                                  \
-    }                                                                                                                  \
-    }                                                                                                                  \
     }
 
 #define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT(T, F)                                                                   \

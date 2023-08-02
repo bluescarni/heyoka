@@ -255,9 +255,7 @@ struct tracking_level<heyoka::detail::callable_inner<T, R, Args...>> {
 // NOTE: these are verbatim re-implementations of the BOOST_CLASS_EXPORT_KEY
 // and BOOST_CLASS_EXPORT_IMPLEMENT macros, which do not work well with class templates.
 #define HEYOKA_S11N_CALLABLE_EXPORT_KEY(...)                                                                           \
-    namespace boost                                                                                                    \
-    {                                                                                                                  \
-    namespace serialization                                                                                            \
+    namespace boost::serialization                                                                                     \
     {                                                                                                                  \
     template <>                                                                                                        \
     struct guid_defined<heyoka::detail::callable_inner<__VA_ARGS__>> : boost::mpl::true_ {                             \
@@ -268,17 +266,10 @@ struct tracking_level<heyoka::detail::callable_inner<T, R, Args...>> {
         /* NOTE: the stringize here will produce a name enclosed by brackets. */                                       \
         return BOOST_PP_STRINGIZE((heyoka::detail::callable_inner<__VA_ARGS__>));                                      \
     }                                                                                                                  \
-    }                                                                                                                  \
     }
 
 #define HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(...)                                                                     \
-    namespace boost                                                                                                    \
-    {                                                                                                                  \
-    namespace archive                                                                                                  \
-    {                                                                                                                  \
-    namespace detail                                                                                                   \
-    {                                                                                                                  \
-    namespace extra_detail                                                                                             \
+    namespace boost::archive::detail::extra_detail                                                                     \
     {                                                                                                                  \
     template <>                                                                                                        \
     struct init_guid<heyoka::detail::callable_inner<__VA_ARGS__>> {                                                    \
@@ -289,9 +280,6 @@ struct tracking_level<heyoka::detail::callable_inner<T, R, Args...>> {
         = ::boost::serialization::singleton<                                                                           \
               guid_initializer<heyoka::detail::callable_inner<__VA_ARGS__>>>::get_mutable_instance()                   \
               .export_guid();                                                                                          \
-    }                                                                                                                  \
-    }                                                                                                                  \
-    }                                                                                                                  \
     }
 
 #define HEYOKA_S11N_CALLABLE_EXPORT(...)                                                                               \
