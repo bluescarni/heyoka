@@ -75,6 +75,7 @@
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -1398,7 +1399,7 @@ void taylor_adaptive<T>::reset_cooldowns()
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
 taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_steps, T max_delta_t,
-                                         const std::function<bool(taylor_adaptive &)> &cb, bool wtc, bool with_c_out)
+                                         step_callback<T> &cb, bool wtc, bool with_c_out)
 {
     using std::abs;
     using std::isfinite;
@@ -1645,8 +1646,7 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
 // a non-finite state was detected.
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
-taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_steps, T max_delta_t,
-                                        const std::function<bool(taylor_adaptive &)> &cb)
+taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_steps, T max_delta_t, step_callback<T> &cb)
 {
     using std::abs;
     using std::isfinite;
@@ -3158,9 +3158,10 @@ void taylor_adaptive_batch<T>::step(const std::vector<T> &max_delta_ts, bool wtc
 }
 
 template <typename T>
-std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_for_impl(
-    const std::vector<T> &delta_ts, std::size_t max_steps, const std::vector<T> &max_delta_ts,
-    const std::function<bool(taylor_adaptive_batch &)> &cb, bool wtc, bool with_c_out)
+std::optional<continuous_output_batch<T>>
+taylor_adaptive_batch<T>::propagate_for_impl(const std::vector<T> &delta_ts, std::size_t max_steps,
+                                             const std::vector<T> &max_delta_ts, step_callback_batch<T> &cb, bool wtc,
+                                             bool with_c_out)
 {
     // Check the dimensionality of delta_ts.
     if (delta_ts.size() != m_batch_size) {
@@ -3175,7 +3176,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_fo
     }
 
     // NOTE: max_delta_ts is checked in propagate_until_impl().
-    return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb), wtc, with_c_out);
+    return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, cb, wtc, with_c_out);
 }
 
 // NOTE: possible outcomes:
@@ -3194,9 +3195,10 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_fo
 // The continuous output is always updated at the end of each timestep,
 // unless a non-finite state was detected in any batch element.
 template <typename T>
-std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_until_impl(
-    const std::vector<detail::dfloat<T>> &ts, std::size_t max_steps, const std::vector<T> &max_delta_ts,
-    const std::function<bool(taylor_adaptive_batch &)> &cb, bool wtc, bool with_c_out)
+std::optional<continuous_output_batch<T>>
+taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<detail::dfloat<T>> &ts, std::size_t max_steps,
+                                               const std::vector<T> &max_delta_ts, step_callback_batch<T> &cb, bool wtc,
+                                               bool with_c_out)
 {
     using std::abs;
     using std::isfinite;
@@ -3512,9 +3514,10 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
 }
 
 template <typename T>
-std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_until_impl(
-    const std::vector<T> &ts, std::size_t max_steps, const std::vector<T> &max_delta_ts,
-    const std::function<bool(taylor_adaptive_batch &)> &cb, bool wtc, bool with_c_out)
+std::optional<continuous_output_batch<T>>
+taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<T> &ts, std::size_t max_steps,
+                                               const std::vector<T> &max_delta_ts, step_callback_batch<T> &cb, bool wtc,
+                                               bool with_c_out)
 {
     // Check the dimensionality of ts.
     if (ts.size() != m_batch_size) {
@@ -3531,7 +3534,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
     }
 
     // NOTE: max_delta_ts is checked in the other propagate_until_impl() overload.
-    return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb), wtc, with_c_out);
+    return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, cb, wtc, with_c_out);
 }
 
 // NOTE: possible outcomes:
@@ -3545,7 +3548,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch<T>::propagate_un
 template <typename T>
 std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
                                                              const std::vector<T> &max_delta_ts,
-                                                             const std::function<bool(taylor_adaptive_batch &)> &cb)
+                                                             step_callback_batch<T> &cb)
 {
     using std::abs;
     using std::isnan;

@@ -61,6 +61,7 @@
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/step_callback.hpp>
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -794,15 +795,15 @@ inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
             }
         }();
 
-        // Callback (defaults to empty). If a std::function with the correct
-        // signature is passed as argument, return a const reference wrapper to it
+        // Callback (defaults to empty). If a step_callback with the correct
+        // signature is passed as argument, return a reference wrapper to it
         // in order to avoid a useless copy.
         auto cb = [&p]() {
-            using cb_func_t = std::function<bool(taylor_adaptive<T> &)>;
+            using cb_func_t = step_callback<T>;
 
             if constexpr (p.has(kw::callback)) {
                 if constexpr (std::is_same_v<uncvref_t<decltype(p(kw::callback))>, cb_func_t>) {
-                    return std::cref(p(kw::callback));
+                    return std::ref(p(kw::callback));
                 } else {
                     return cb_func_t(std::forward<decltype(p(kw::callback))>(p(kw::callback)));
                 }
@@ -1170,9 +1171,9 @@ public:
 private:
     // Implementations of the propagate_*() functions.
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-    propagate_until_impl(detail::dfloat<T>, std::size_t, T, const std::function<bool(taylor_adaptive &)> &, bool, bool);
-    std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
-    propagate_grid_impl(std::vector<T>, std::size_t, T, const std::function<bool(taylor_adaptive &)> &);
+    propagate_until_impl(detail::dfloat<T>, std::size_t, T, step_callback<T> &, bool, bool);
+    std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid_impl(std::vector<T>, std::size_t, T,
+                                                                                      step_callback<T> &);
 
 public:
     // NOTE: return values:
@@ -1276,15 +1277,15 @@ inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, KwArgs &
             }
         }();
 
-        // Callback (defaults to empty). If a std::function with the correct
-        // signature is passed as argument, return a const reference wrapper to it
+        // Callback (defaults to empty). If a step_callback with the correct
+        // signature is passed as argument, return a reference wrapper to it
         // in order to avoid a useless copy.
         auto cb = [&p]() {
-            using cb_func_t = std::function<bool(taylor_adaptive_batch<T> &)>;
+            using cb_func_t = step_callback_batch<T>;
 
             if constexpr (p.has(kw::callback)) {
                 if constexpr (std::is_same_v<uncvref_t<decltype(p(kw::callback))>, cb_func_t>) {
-                    return std::cref(p(kw::callback));
+                    return std::ref(p(kw::callback));
                 } else {
                     return cb_func_t(std::forward<decltype(p(kw::callback))>(p(kw::callback)));
                 }
@@ -1642,19 +1643,16 @@ public:
 private:
     // Implementations of the propagate_*() functions.
     std::optional<continuous_output_batch<T>> propagate_until_impl(const std::vector<detail::dfloat<T>> &, std::size_t,
-                                                                   const std::vector<T> &,
-                                                                   const std::function<bool(taylor_adaptive_batch &)> &,
+                                                                   const std::vector<T> &, step_callback_batch<T> &,
                                                                    bool, bool);
     std::optional<continuous_output_batch<T>> propagate_until_impl(const std::vector<T> &, std::size_t,
-                                                                   const std::vector<T> &,
-                                                                   const std::function<bool(taylor_adaptive_batch &)> &,
+                                                                   const std::vector<T> &, step_callback_batch<T> &,
                                                                    bool, bool);
     std::optional<continuous_output_batch<T>> propagate_for_impl(const std::vector<T> &, std::size_t,
-                                                                 const std::vector<T> &,
-                                                                 const std::function<bool(taylor_adaptive_batch &)> &,
-                                                                 bool, bool);
+                                                                 const std::vector<T> &, step_callback_batch<T> &, bool,
+                                                                 bool);
     std::vector<T> propagate_grid_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
-                                       const std::function<bool(taylor_adaptive_batch &)> &);
+                                       step_callback_batch<T> &);
 
 public:
     // NOTE: in propagate_for/until(), we can take 'ts' as const reference because it is always

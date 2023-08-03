@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <functional>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -50,6 +49,7 @@
 #include <heyoka/model/nbody.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -1176,13 +1176,13 @@ TEST_CASE("propagate for_until")
     REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], 1000.));
     REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
 
-    // Test the callback is not copied if it is already a std::function.
-    std::function<bool(taylor_adaptive<double> &)> f_cb_until(cb_functor_until{});
-    f_cb_until.target<cb_functor_until>()->n_copies_after = f_cb_until.target<cb_functor_until>()->n_copies;
+    // Test the callback is not copied if it is already a step_callback.
+    step_callback<double> f_cb_until(cb_functor_until{});
+    f_cb_until.extract<cb_functor_until>()->n_copies_after = f_cb_until.extract<cb_functor_until>()->n_copies;
     ta.propagate_until(10., kw::callback = f_cb_until);
 
-    std::function<bool(taylor_adaptive<double> &)> f_cb_for(cb_functor_for{});
-    f_cb_for.target<cb_functor_for>()->n_copies_after = f_cb_for.target<cb_functor_for>()->n_copies;
+    step_callback<double> f_cb_for(cb_functor_for{});
+    f_cb_for.extract<cb_functor_for>()->n_copies_after = f_cb_for.extract<cb_functor_for>()->n_copies;
     ta.propagate_for(10., kw::callback = f_cb_for);
 }
 
@@ -1308,9 +1308,9 @@ TEST_CASE("propagate grid")
         REQUIRE(out[2u * i + 1u] == approximately(out_copy[2u * i + 1u], 1000.));
     }
 
-    // Test the callback is not copied if it is already a std::function.
-    std::function<bool(taylor_adaptive<double> &)> f_cb_grid(cb_functor_grid{});
-    f_cb_grid.target<cb_functor_grid>()->n_copies_after = f_cb_grid.target<cb_functor_grid>()->n_copies;
+    // Test the callback is not copied if it is already a step_callback.
+    step_callback<double> f_cb_grid(cb_functor_grid{});
+    f_cb_grid.extract<cb_functor_grid>()->n_copies_after = f_cb_grid.extract<cb_functor_grid>()->n_copies;
     ta.propagate_grid({1., 5., 10.}, kw::callback = f_cb_grid);
 }
 
