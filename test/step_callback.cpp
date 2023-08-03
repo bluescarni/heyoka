@@ -95,6 +95,8 @@ TEST_CASE("step_callback basics")
 
 #endif
 
+        REQUIRE(step_cb.get_type_index() == typeid(decltype(lam)));
+
         REQUIRE(step_cb.extract<decltype(lam)>() != nullptr);
         REQUIRE(std::as_const(step_cb).extract<decltype(lam)>() != nullptr);
 
@@ -130,6 +132,8 @@ TEST_CASE("step_callback basics")
         step_callback<double> step_cb(&cb0<taylor_adaptive<double>>);
 
         REQUIRE(static_cast<bool>(step_cb));
+
+        REQUIRE(step_cb.get_type_index() == typeid(decltype(&cb0<taylor_adaptive<double>>)));
 
         REQUIRE(step_cb(ta));
         REQUIRE_NOTHROW(step_cb.pre_hook(ta));
