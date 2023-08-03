@@ -1240,7 +1240,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             const auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
             assert(cb); // LCOV_EXCL_LINE
 
-                        // NOTE: use new_time, instead of m_time, in order to prevent
+            // NOTE: use new_time, instead of m_time, in order to prevent
             // passing the wrong time coordinate to the callback if an earlier
             // callback changed it.
 

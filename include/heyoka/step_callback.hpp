@@ -261,6 +261,7 @@ BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_ada
 
 // NOTE: these are verbatim re-implementations of the BOOST_CLASS_EXPORT_KEY
 // and BOOST_CLASS_EXPORT_IMPLEMENT macros, which do not work well with class templates.
+// NOLINTBEGIN
 #define HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(T, F)                                                                     \
     namespace boost::serialization                                                                                     \
     {                                                                                                                  \
@@ -288,11 +289,13 @@ BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_ada
             heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive<F>>>>::get_mutable_instance()               \
               .export_guid();                                                                                          \
     }
+// NOLINTEND
 
 #define HEYOKA_S11N_STEP_CALLBACK_EXPORT(T, F)                                                                         \
     HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(T, F)                                                                         \
     HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(T, F)
 
+// NOLINTBEGIN
 #define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(T, F)                                                               \
     namespace boost::serialization                                                                                     \
     {                                                                                                                  \
@@ -321,6 +324,7 @@ BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_ada
             heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive_batch<F>>>>::get_mutable_instance()         \
               .export_guid();                                                                                          \
     }
+// NOLINTEND
 
 #define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT(T, F)                                                                   \
     HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(T, F)                                                                   \
