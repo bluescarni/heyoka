@@ -1478,9 +1478,6 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
     // Cache the integration direction.
     const auto t_dir = (rem_time >= static_cast<T>(0));
 
-    // Cache the presence/absence of a callback.
-    const auto with_cb = static_cast<bool>(cb);
-
     // Helper to create the continuous output object.
     auto make_c_out = [&]() -> std::optional<continuous_output<T>> {
         if (with_c_out) {
@@ -1537,6 +1534,29 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
         }
     };
 
+    // Cache the presence/absence of a callback.
+    const auto with_cb = static_cast<bool>(cb);
+
+    // Error message for when the callback modifies the time coordinate.
+    constexpr auto cb_time_errmsg
+        = "The invocation of the callback passed to propagate_until() resulted in the alteration of the "
+          "time coordinate of the integrator - this is not supported";
+
+    // Run the callback's pre_hook() function, if needed.
+    if (with_cb) {
+        // NOTE: the callback is not allowed to change the time coordinate
+        // (either via pre_hook() or via its call operator, as shown later).
+        // NOTE: orig_time is guaranteed to be finite
+        // due to the checks done earlier on m_time.
+        const auto orig_time = m_time;
+
+        cb.pre_hook(*this);
+
+        if (m_time != orig_time) {
+            throw std::runtime_error(cb_time_errmsg);
+        }
+    }
+
     while (true) {
         // Compute the max integration times for this timestep.
         // NOTE: rem_time is guaranteed to be finite: we check it explicitly above
@@ -1579,19 +1599,16 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
             // Store the current time coordinate before
             // executing the cb, so that we can check if
             // the cb changes the time coordinate.
+            // NOTE: orig_time is guaranteed to be finite
+            // because the outcome of the step is not err_nf_state.
             const auto orig_time = m_time;
-            // NOTE: this is ensured by the fact that the outcome
-            // of the single step is *not* err_nf_state.
-            assert(isfinite(orig_time));
 
             // Execute the cb.
             const auto ret_cb = cb(*this);
 
             // Check the time coordinate.
             if (m_time != orig_time) {
-                throw std::runtime_error(
-                    "The invocation of the callback passed to propagate_until() resulted in the alteration of the "
-                    "time coordinate of the integrator - this is not supported");
+                throw std::runtime_error(cb_time_errmsg);
             }
 
             if (!ret_cb) {
@@ -1796,12 +1813,32 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
     // Cache the integration direction.
     const auto t_dir = (rem_time >= dl_zero);
 
-    // Cache the presence/absence of a callback.
-    const auto with_cb = static_cast<bool>(cb);
-
     // This flag, if set to something else than success,
     // is used to signal the early interruption of the integration.
     auto interrupt = taylor_outcome::success;
+
+    // Cache the presence/absence of a callback.
+    const auto with_cb = static_cast<bool>(cb);
+
+    // Error message for when the callback modifies the time coordinate.
+    constexpr auto cb_time_errmsg
+        = "The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
+          "time coordinate of the integrator - this is not supported";
+
+    // Run the callback's pre_hook() function, if needed.
+    if (with_cb) {
+        // NOTE: the callback is not allowed to change the time coordinate
+        // (either via pre_hook() or via its call operator, as shown later).
+        // NOTE: orig_time is guaranteed to be finite
+        // because propagate_until() did not return err_nf_state.
+        const auto orig_time = m_time;
+
+        cb.pre_hook(*this);
+
+        if (m_time != orig_time) {
+            throw std::runtime_error(cb_time_errmsg);
+        }
+    }
 
     // Iterate over the remaining grid points.
     for (decltype(grid.size()) cur_grid_idx = 1; cur_grid_idx < grid.size();) {
@@ -1890,10 +1927,10 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
             // Store the current time coordinate before
             // executing the cb, so that we can check if
             // the cb changes the time coordinate.
+            // NOTE: orig_time is guaranteed to contain
+            // a finite value because the outcome of the step
+            // was not err_nf_state.
             const auto orig_time = m_time;
-            // NOTE: this is ensured by the fact that the outcome
-            // of the single step is *not* err_nf_state.
-            assert(isfinite(orig_time));
 
             // Execute the cb.
             assert(cb);
@@ -1901,9 +1938,7 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
 
             // Check the time coordinate.
             if (m_time != orig_time) {
-                throw std::runtime_error(
-                    "The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
-                    "time coordinate of the integrator - this is not supported");
+                throw std::runtime_error(cb_time_errmsg);
             }
 
             return ret_cb;
@@ -3272,9 +3307,6 @@ taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<detail::dfloat<
         m_t_dir[i] = (m_rem_time[i] >= static_cast<T>(0));
     }
 
-    // Cache the presence/absence of a callback.
-    const auto with_cb = static_cast<bool>(cb);
-
     // Helper to create the continuous output object.
     auto make_c_out = [&]() -> std::optional<continuous_output_batch<T>> {
         if (with_c_out) {
@@ -3346,6 +3378,30 @@ taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<detail::dfloat<
             c_out_tcs.insert(c_out_tcs.end(), m_tc.begin(), m_tc.end());
         }
     };
+
+    // Cache the presence/absence of a callback.
+    const auto with_cb = static_cast<bool>(cb);
+
+    // Error message for when the callback modifies the time coordinate.
+    constexpr auto cb_time_errmsg
+        = "The invocation of the callback passed to propagate_until() resulted in the alteration of the "
+          "time coordinate of the integrator - this is not supported";
+
+    // Run the callback's pre_hook() function, if needed.
+    if (with_cb) {
+        // NOTE: the callback is not allowed to change the time coordinate
+        // (either via pre_hook() or via its call operator, as shown later).
+        // NOTE: the hi/lo copies are guaranteed to be finite due to the
+        // checks performed earlier.
+        std::copy(m_time_hi.begin(), m_time_hi.end(), m_time_copy_hi.begin());
+        std::copy(m_time_lo.begin(), m_time_lo.end(), m_time_copy_lo.begin());
+
+        cb.pre_hook(*this);
+
+        if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) {
+            throw std::runtime_error(cb_time_errmsg);
+        }
+    }
 
     while (true) {
         // Compute the max integration times for this timestep.
@@ -3455,6 +3511,8 @@ taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<detail::dfloat<
             // Store the current time coordinate before
             // executing the cb, so that we can check if
             // the cb changes the time coordinate.
+            // NOTE: the hi/lo copies are guaranteed to be finite because no
+            // non-finite outcomes were detected in the step.
             std::copy(m_time_hi.begin(), m_time_hi.end(), m_time_copy_hi.begin());
             std::copy(m_time_lo.begin(), m_time_lo.end(), m_time_copy_lo.begin());
 
@@ -3462,12 +3520,8 @@ taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<detail::dfloat<
             const auto ret_cb = cb(*this);
 
             // Check the time coordinate.
-            // NOTE: we can use normal equality as we are sure that
-            // all components of the time coordinate are finite.
             if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) {
-                throw std::runtime_error(
-                    "The invocation of the callback passed to propagate_until() resulted in the alteration of the "
-                    "time coordinate of the integrator - this is not supported");
+                throw std::runtime_error(cb_time_errmsg);
             }
 
             if (!ret_cb) {
@@ -3711,9 +3765,6 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
         m_t_dir[i] = (m_rem_time[i] >= static_cast<T>(0));
     }
 
-    // Cache the presence/absence of a callback.
-    const auto with_cb = static_cast<bool>(cb);
-
     // Reset the counters and the min/max abs(h) vectors.
     std::size_t iter_counter = 0;
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
@@ -3745,6 +3796,30 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
         return std::any_of(cur_grid_idx.begin(), cur_grid_idx.end(),
                            [n_grid_points](auto idx) { return idx < n_grid_points; });
     };
+
+    // Cache the presence/absence of a callback.
+    const auto with_cb = static_cast<bool>(cb);
+
+    // Error message for when the callback modifies the time coordinate.
+    constexpr auto cb_time_errmsg
+        = "The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
+          "time coordinate of the integrator - this is not supported";
+
+    // Run the callback's pre_hook() function, if needed.
+    if (with_cb) {
+        // NOTE: the callback is not allowed to change the time coordinate
+        // (either via pre_hook() or via its call operator, as shown later).
+        // NOTE: the hi/lo copies are guaranteed to contain finite values
+        // because propagate_until() did not return err_nf_state.
+        std::copy(m_time_hi.begin(), m_time_hi.end(), m_time_copy_hi.begin());
+        std::copy(m_time_lo.begin(), m_time_lo.end(), m_time_copy_lo.begin());
+
+        cb.pre_hook(*this);
+
+        if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) {
+            throw std::runtime_error(cb_time_errmsg);
+        }
+    }
 
     while (cont_cond()) {
         // Establish the time ranges of the last
@@ -3959,6 +4034,9 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
             // Store the current time coordinate before
             // executing the cb, so that we can check if
             // the cb changes the time coordinate.
+            // NOTE: the hi/lo copies are guaranteed to contain
+            // finite values because no err_nf_state outcome was
+            // detected in the step.
             std::copy(m_time_hi.begin(), m_time_hi.end(), m_time_copy_hi.begin());
             std::copy(m_time_lo.begin(), m_time_lo.end(), m_time_copy_lo.begin());
 
@@ -3967,12 +4045,8 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
             const auto ret_cb = cb(*this);
 
             // Check the time coordinate.
-            // NOTE: we can use normal equality as we are sure that
-            // all components of the time coordinate are finite.
             if (m_time_hi != m_time_copy_hi || m_time_lo != m_time_copy_lo) {
-                throw std::runtime_error(
-                    "The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
-                    "time coordinate of the integrator - this is not supported");
+                throw std::runtime_error(cb_time_errmsg);
             }
 
             return ret_cb;
