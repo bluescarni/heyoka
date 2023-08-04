@@ -1923,7 +1923,12 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
         // Small helper to wrap the invocation of the callback
         // while checking that the callback does not change the
         // time coordinate.
-        auto wrap_cb_call = [this, &cb]() {
+        auto wrap_cb_call = [this, &cb
+#if defined(_MSC_VER) && !defined(__clang__)
+                             ,
+                             cb_time_errmsg
+#endif
+        ]() {
             // Store the current time coordinate before
             // executing the cb, so that we can check if
             // the cb changes the time coordinate.
@@ -4030,7 +4035,12 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
         // Small helper to wrap the invocation of the callback
         // while checking that the callback does not change the
         // time coordinate.
-        auto wrap_cb_call = [this, &cb]() {
+        auto wrap_cb_call = [this, &cb
+#if defined(_MSC_VER) && !defined(__clang__)
+                             ,
+                             cb_time_errmsg
+#endif
+        ]() {
             // Store the current time coordinate before
             // executing the cb, so that we can check if
             // the cb changes the time coordinate.
