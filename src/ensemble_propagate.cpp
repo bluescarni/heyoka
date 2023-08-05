@@ -12,7 +12,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <tuple>
@@ -20,6 +19,7 @@
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -43,9 +43,9 @@
 
 // NOTE: these actions will be performed concurrently from
 // multiple threads of execution:
-// - invocation of the generator's call operator and of the propagate callback,
-// - copy construction of the events' callbacks and invocation of the call operator
-//   on the copies.
+// - invocation of the generator's call operator,
+// - copy construction of the events' and step callbacks and
+//   invocation of the call operator on the copies.
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -78,10 +78,13 @@ ensemble_propagate_until_impl(const taylor_adaptive<T> &ta, T t, std::size_t n_i
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
 
+            // Make a local copy of the callback.
+            auto local_cb = cb;
+
             // Do the propagation.
             auto loc_ret
                 = local_ta.propagate_until(t, kw::max_steps = max_steps, kw::max_delta_t = max_delta_t,
-                                           kw::callback = cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
+                                           kw::callback = local_cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
 
             // Assign the results.
             opt_retval[i].emplace(std::tuple_cat(std::make_tuple(std::move(local_ta)), std::move(loc_ret)));
@@ -123,10 +126,13 @@ ensemble_propagate_for_impl(const taylor_adaptive<T> &ta, T delta_t, std::size_t
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
 
+            // Make a local copy of the callback.
+            auto local_cb = cb;
+
             // Do the propagation.
             auto loc_ret
                 = local_ta.propagate_for(delta_t, kw::max_steps = max_steps, kw::max_delta_t = max_delta_t,
-                                         kw::callback = cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
+                                         kw::callback = local_cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
 
             // Assign the results.
             opt_retval[i].emplace(std::tuple_cat(std::make_tuple(std::move(local_ta)), std::move(loc_ret)));
@@ -166,9 +172,12 @@ ensemble_propagate_grid_impl(const taylor_adaptive<T> &ta, std::vector<T> grid, 
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
 
+            // Make a local copy of the callback.
+            auto local_cb = cb;
+
             // Do the propagation.
             auto loc_ret = local_ta.propagate_grid(grid, kw::max_steps = max_steps, kw::max_delta_t = max_delta_t,
-                                                   kw::callback = cb);
+                                                   kw::callback = local_cb);
 
             // Assign the results.
             opt_retval[i].emplace(std::tuple_cat(std::make_tuple(std::move(local_ta)), std::move(loc_ret)));
@@ -246,10 +255,13 @@ ensemble_propagate_until_batch_impl(
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
 
+            // Make a local copy of the callback.
+            auto local_cb = cb;
+
             // Do the propagation.
             auto loc_ret
                 = local_ta.propagate_until(t, kw::max_steps = max_steps, kw::max_delta_t = max_delta_ts,
-                                           kw::callback = cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
+                                           kw::callback = local_cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
 
             // Assign the results.
             opt_retval[i].emplace(std::move(local_ta), std::move(loc_ret));
@@ -290,10 +302,13 @@ ensemble_propagate_for_batch_impl(
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
 
+            // Make a local copy of the callback.
+            auto local_cb = cb;
+
             // Do the propagation.
             auto loc_ret
                 = local_ta.propagate_for(delta_t, kw::max_steps = max_steps, kw::max_delta_t = max_delta_ts,
-                                         kw::callback = cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
+                                         kw::callback = local_cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
 
             // Assign the results.
             opt_retval[i].emplace(std::move(local_ta), std::move(loc_ret));
@@ -320,13 +335,8 @@ std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>> ensemble_propa
     assert(batch_size != 0u); // LCOV_EXCL_LINE
 
     // Splat out the time grid.
-    // LCOV_EXCL_START
-    if (grid_.size() > std::numeric_limits<decltype(grid_.size())>::max() / batch_size) {
-        throw std::overflow_error("Overflow detected in an ensemble propagation");
-    }
-    // LCOV_EXCL_STOP
     std::vector<T> grid;
-    grid.reserve(grid_.size() * batch_size);
+    grid.reserve(boost::safe_numerics::safe<decltype(grid.size())>(grid_.size()) * batch_size);
     for (auto gval : grid_) {
         for (std::uint32_t i = 0; i < batch_size; ++i) {
             grid.push_back(gval);
@@ -350,9 +360,12 @@ std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>> ensemble_propa
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
 
+            // Make a local copy of the callback.
+            auto local_cb = cb;
+
             // Do the propagation.
             auto loc_ret = local_ta.propagate_grid(grid, kw::max_steps = max_steps, kw::max_delta_t = max_delta_ts,
-                                                   kw::callback = cb);
+                                                   kw::callback = local_cb);
 
             // Assign the results.
             opt_retval[i].emplace(std::move(local_ta), std::move(loc_ret));
