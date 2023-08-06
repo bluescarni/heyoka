@@ -12,7 +12,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <tuple>
@@ -20,6 +19,7 @@
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -38,13 +38,14 @@
 
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/ensemble_propagate.hpp>
+#include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
 
 // NOTE: these actions will be performed concurrently from
 // multiple threads of execution:
-// - invocation of the generator's call operator and of the propagate callback,
-// - copy construction of the events' callbacks and invocation of the call operator
-//   on the copies.
+// - invocation of the generator's call operator,
+// - copy construction of the events' and step callbacks and
+//   invocation of the call operator on the copies.
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -55,8 +56,8 @@ template <typename T>
 std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
 ensemble_propagate_until_impl(const taylor_adaptive<T> &ta, T t, std::size_t n_iter,
                               const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &gen,
-                              std::size_t max_steps, T max_delta_t, const std::function<bool(taylor_adaptive<T> &)> &cb,
-                              bool write_tc, bool with_c_out)
+                              std::size_t max_steps, T max_delta_t, step_callback<T> &cb, bool write_tc,
+                              bool with_c_out)
 {
     // NOTE: store the results into a vector of optionals, so that we avoid
     // having to init a large number of default-constructed integrators
@@ -77,10 +78,13 @@ ensemble_propagate_until_impl(const taylor_adaptive<T> &ta, T t, std::size_t n_i
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
 
+            // Make a local copy of the callback.
+            auto local_cb = cb;
+
             // Do the propagation.
             auto loc_ret
                 = local_ta.propagate_until(t, kw::max_steps = max_steps, kw::max_delta_t = max_delta_t,
-                                           kw::callback = cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
+                                           kw::callback = local_cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
 
             // Assign the results.
             opt_retval[i].emplace(std::tuple_cat(std::make_tuple(std::move(local_ta)), std::move(loc_ret)));
@@ -101,8 +105,7 @@ template <typename T>
 std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
 ensemble_propagate_for_impl(const taylor_adaptive<T> &ta, T delta_t, std::size_t n_iter,
                             const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &gen,
-                            std::size_t max_steps, T max_delta_t, const std::function<bool(taylor_adaptive<T> &)> &cb,
-                            bool write_tc, bool with_c_out)
+                            std::size_t max_steps, T max_delta_t, step_callback<T> &cb, bool write_tc, bool with_c_out)
 {
     // NOTE: store the results into a vector of optionals, so that we avoid
     // having to init a large number of default-constructed integrators
@@ -123,10 +126,13 @@ ensemble_propagate_for_impl(const taylor_adaptive<T> &ta, T delta_t, std::size_t
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
 
+            // Make a local copy of the callback.
+            auto local_cb = cb;
+
             // Do the propagation.
             auto loc_ret
                 = local_ta.propagate_for(delta_t, kw::max_steps = max_steps, kw::max_delta_t = max_delta_t,
-                                         kw::callback = cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
+                                         kw::callback = local_cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
 
             // Assign the results.
             opt_retval[i].emplace(std::tuple_cat(std::make_tuple(std::move(local_ta)), std::move(loc_ret)));
@@ -147,7 +153,7 @@ template <typename T>
 std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::vector<T>>>
 ensemble_propagate_grid_impl(const taylor_adaptive<T> &ta, std::vector<T> grid, std::size_t n_iter,
                              const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &gen,
-                             std::size_t max_steps, T max_delta_t, const std::function<bool(taylor_adaptive<T> &)> &cb)
+                             std::size_t max_steps, T max_delta_t, step_callback<T> &cb)
 {
     // NOTE: store the results into a vector of optionals, so that we avoid
     // having to init a large number of default-constructed integrators
@@ -166,9 +172,12 @@ ensemble_propagate_grid_impl(const taylor_adaptive<T> &ta, std::vector<T> grid, 
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
 
+            // Make a local copy of the callback.
+            auto local_cb = cb;
+
             // Do the propagation.
             auto loc_ret = local_ta.propagate_grid(grid, kw::max_steps = max_steps, kw::max_delta_t = max_delta_t,
-                                                   kw::callback = cb);
+                                                   kw::callback = local_cb);
 
             // Assign the results.
             opt_retval[i].emplace(std::tuple_cat(std::make_tuple(std::move(local_ta)), std::move(loc_ret)));
@@ -192,19 +201,19 @@ ensemble_propagate_grid_impl(const taylor_adaptive<T> &ta, std::vector<T> grid, 
         std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>        \
     ensemble_propagate_until_impl<T>(const taylor_adaptive<T> &, T, std::size_t,                                       \
                                      const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,       \
-                                     std::size_t, T, const std::function<bool(taylor_adaptive<T> &)> &, bool, bool);   \
+                                     std::size_t, T, step_callback<T> &, bool, bool);                                  \
                                                                                                                        \
     template HEYOKA_DLL_PUBLIC std::vector<                                                                            \
         std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>        \
     ensemble_propagate_for_impl<T>(const taylor_adaptive<T> &, T, std::size_t,                                         \
                                    const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,         \
-                                   std::size_t, T, const std::function<bool(taylor_adaptive<T> &)> &, bool, bool);     \
+                                   std::size_t, T, step_callback<T> &, bool, bool);                                    \
                                                                                                                        \
     template HEYOKA_DLL_PUBLIC                                                                                         \
         std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::vector<T>>>                 \
         ensemble_propagate_grid_impl<T>(const taylor_adaptive<T> &, std::vector<T>, std::size_t,                       \
                                         const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,    \
-                                        std::size_t, T, const std::function<bool(taylor_adaptive<T> &)> &);
+                                        std::size_t, T, step_callback<T> &);
 // NOLINTEND
 
 HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(double)
@@ -227,8 +236,7 @@ std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output
 ensemble_propagate_until_batch_impl(
     const taylor_adaptive_batch<T> &ta, T t, std::size_t n_iter,
     const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &gen, std::size_t max_steps,
-    const std::vector<T> &max_delta_ts, const std::function<bool(taylor_adaptive_batch<T> &)> &cb, bool write_tc,
-    bool with_c_out)
+    const std::vector<T> &max_delta_ts, step_callback_batch<T> &cb, bool write_tc, bool with_c_out)
 {
     // NOTE: store the results into a vector of optionals, so that we avoid
     // having to init a large number of default-constructed integrators
@@ -247,10 +255,13 @@ ensemble_propagate_until_batch_impl(
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
 
+            // Make a local copy of the callback.
+            auto local_cb = cb;
+
             // Do the propagation.
             auto loc_ret
                 = local_ta.propagate_until(t, kw::max_steps = max_steps, kw::max_delta_t = max_delta_ts,
-                                           kw::callback = cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
+                                           kw::callback = local_cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
 
             // Assign the results.
             opt_retval[i].emplace(std::move(local_ta), std::move(loc_ret));
@@ -272,8 +283,7 @@ std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output
 ensemble_propagate_for_batch_impl(
     const taylor_adaptive_batch<T> &ta, T delta_t, std::size_t n_iter,
     const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &gen, std::size_t max_steps,
-    const std::vector<T> &max_delta_ts, const std::function<bool(taylor_adaptive_batch<T> &)> &cb, bool write_tc,
-    bool with_c_out)
+    const std::vector<T> &max_delta_ts, step_callback_batch<T> &cb, bool write_tc, bool with_c_out)
 {
     // NOTE: store the results into a vector of optionals, so that we avoid
     // having to init a large number of default-constructed integrators
@@ -292,10 +302,13 @@ ensemble_propagate_for_batch_impl(
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
 
+            // Make a local copy of the callback.
+            auto local_cb = cb;
+
             // Do the propagation.
             auto loc_ret
                 = local_ta.propagate_for(delta_t, kw::max_steps = max_steps, kw::max_delta_t = max_delta_ts,
-                                         kw::callback = cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
+                                         kw::callback = local_cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
 
             // Assign the results.
             opt_retval[i].emplace(std::move(local_ta), std::move(loc_ret));
@@ -316,19 +329,14 @@ template <typename T>
 std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>> ensemble_propagate_grid_batch_impl(
     const taylor_adaptive_batch<T> &ta, const std::vector<T> &grid_, std::size_t n_iter,
     const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &gen, std::size_t max_steps,
-    const std::vector<T> &max_delta_ts, const std::function<bool(taylor_adaptive_batch<T> &)> &cb)
+    const std::vector<T> &max_delta_ts, step_callback_batch<T> &cb)
 {
     const auto batch_size = ta.get_batch_size();
     assert(batch_size != 0u); // LCOV_EXCL_LINE
 
     // Splat out the time grid.
-    // LCOV_EXCL_START
-    if (grid_.size() > std::numeric_limits<decltype(grid_.size())>::max() / batch_size) {
-        throw std::overflow_error("Overflow detected in an ensemble propagation");
-    }
-    // LCOV_EXCL_STOP
     std::vector<T> grid;
-    grid.reserve(grid_.size() * batch_size);
+    grid.reserve(boost::safe_numerics::safe<decltype(grid.size())>(grid_.size()) * batch_size);
     for (auto gval : grid_) {
         for (std::uint32_t i = 0; i < batch_size; ++i) {
             grid.push_back(gval);
@@ -352,9 +360,12 @@ std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>> ensemble_propa
             // Generate the integrator for the current iteration.
             auto local_ta = gen(ta, i);
 
+            // Make a local copy of the callback.
+            auto local_cb = cb;
+
             // Do the propagation.
             auto loc_ret = local_ta.propagate_grid(grid, kw::max_steps = max_steps, kw::max_delta_t = max_delta_ts,
-                                                   kw::callback = cb);
+                                                   kw::callback = local_cb);
 
             // Assign the results.
             opt_retval[i].emplace(std::move(local_ta), std::move(loc_ret));
@@ -379,20 +390,20 @@ std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>> ensemble_propa
         ensemble_propagate_until_batch_impl<T>(                                                                        \
             const taylor_adaptive_batch<T> &, T, std::size_t,                                                          \
             const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,       \
-            const std::vector<T> &, const std::function<bool(taylor_adaptive_batch<T> &)> &, bool, bool);              \
+            const std::vector<T> &, step_callback_batch<T> &, bool, bool);                                             \
                                                                                                                        \
     template HEYOKA_DLL_PUBLIC                                                                                         \
         std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>>>                   \
         ensemble_propagate_for_batch_impl<T>(                                                                          \
             const taylor_adaptive_batch<T> &, T, std::size_t,                                                          \
             const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,       \
-            const std::vector<T> &, const std::function<bool(taylor_adaptive_batch<T> &)> &, bool, bool);              \
+            const std::vector<T> &, step_callback_batch<T> &, bool, bool);                                             \
                                                                                                                        \
     template HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>>                       \
     ensemble_propagate_grid_batch_impl<T>(                                                                             \
         const taylor_adaptive_batch<T> &, const std::vector<T> &, std::size_t,                                         \
         const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,           \
-        const std::vector<T> &, const std::function<bool(taylor_adaptive_batch<T> &)> &);
+        const std::vector<T> &, step_callback_batch<T> &);
 // NOLINTEND
 
 HEYOKA_ENSEMBLE_PROPAGATE_BATCH_INST(double)

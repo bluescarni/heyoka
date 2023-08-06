@@ -7,6 +7,10 @@ Changelog
 New
 ~~~
 
+- The step callbacks can now optionally implement a ``pre_hook()``
+  member function that will be called before the first step
+  is taken by a ``propagate_*()`` function
+  (`#334 <https://github.com/bluescarni/heyoka/pull/334>`__).
 - The heyoka library now passes all ``clang-tidy`` checks
   (`#315 <https://github.com/bluescarni/heyoka/pull/315>`__).
 - Introduce several vectorised overloads in the expression
@@ -39,6 +43,10 @@ New
 Changes
 ~~~~~~~
 
+- The step callbacks are now copied in :ref:`ensemble propagations <tut_ensemble>`
+  rather then being shared among threads. The aim of this change
+  is to reduce the likelihood of data races
+  (`#334 <https://github.com/bluescarni/heyoka/pull/334>`__).
 - Comprehensive overhaul of the expression system, including:
   enhanced automatic simplification capabilities for sums,
   products and powers, removal of several specialised primitives

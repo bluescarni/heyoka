@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <functional>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -44,6 +43,7 @@
 #include <heyoka/math/time.hpp>
 #include <heyoka/model/nbody.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -363,10 +363,10 @@ TEST_CASE("propagate grid")
     REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
                         [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
 
-    // Test the callback is not copied if it is already a std::function.
+    // Test the callback is not copied if it is already a step_callback.
     ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03}, 4};
-    std::function<bool(taylor_adaptive_batch<double> &)> f_cb_grid(cb_functor_grid{});
-    f_cb_grid.target<cb_functor_grid>()->n_copies_after = f_cb_grid.target<cb_functor_grid>()->n_copies;
+    step_callback_batch<double> f_cb_grid(cb_functor_grid{});
+    f_cb_grid.extract<cb_functor_grid>()->n_copies_after = f_cb_grid.extract<cb_functor_grid>()->n_copies;
     ta.propagate_grid({10., 10., 10., 10., 100., 100., 100., 100.}, kw::callback = f_cb_grid);
 
     // Callback attempts to change the time coordinate.
@@ -641,13 +641,13 @@ TEST_CASE("propagate for_until")
     ta_copy.propagate_for({10., 11.}, kw::max_delta_t = 1e-4);
     REQUIRE(ta.get_propagate_res() == ta_copy.get_propagate_res());
 
-    // Test the callback is not copied if it is already a std::function.
-    std::function<bool(taylor_adaptive_batch<double> &)> f_cb_until(cb_functor_until{});
-    f_cb_until.target<cb_functor_until>()->n_copies_after = f_cb_until.target<cb_functor_until>()->n_copies;
+    // Test the callback is not copied if it is already a step_callback.
+    step_callback_batch<double> f_cb_until(cb_functor_until{});
+    f_cb_until.extract<cb_functor_until>()->n_copies_after = f_cb_until.extract<cb_functor_until>()->n_copies;
     ta.propagate_until(20., kw::callback = f_cb_until);
 
-    std::function<bool(taylor_adaptive_batch<double> &)> f_cb_for(cb_functor_for{});
-    f_cb_for.target<cb_functor_for>()->n_copies_after = f_cb_for.target<cb_functor_for>()->n_copies;
+    step_callback_batch<double> f_cb_for(cb_functor_for{});
+    f_cb_for.extract<cb_functor_for>()->n_copies_after = f_cb_for.extract<cb_functor_for>()->n_copies;
     ta.propagate_for(10., kw::callback = f_cb_for);
 }
 

@@ -234,7 +234,7 @@ integration will be ``taylor_outcome::err_nf_state``.
 .. versionadded:: 0.7.0
 
 The ``propagate_for()`` and ``propagate_until()`` functions
-can be invoked with two additional optional keyword arguments:
+can be invoked with additional optional keyword arguments:
 
 - ``max_delta_t``: similarly to the ``step()`` function, this value
   represents the maximum timestep size in absolute value;
@@ -248,6 +248,21 @@ can be invoked with two additional optional keyword arguments:
   object as only argument. If the callback returns ``true`` then the integration
   will continue after the invocation of the callback, otherwise the integration
   will be interrupted.
+
+  .. versionadded:: 1.0.0
+
+  Optionally, a function object callback can implement a ``pre_hook()`` member
+  function with signature
+
+  .. code-block:: c++
+
+     void pre_hook(taylor_adaptive<double> &);
+
+
+  that will be invoked once *before* the first step is taken
+  by the ``propagate_for()`` and ``propagate_until()`` functions.
+- ``c_output``: a boolean flag that enables :ref:`continuous output <tut_c_output>`.
+
 
 Propagation over a time grid
 ----------------------------
@@ -297,7 +312,7 @@ fact that they must be finite and ordered monotonically).
 .. versionadded:: 0.7.0
 
 The ``propagate_grid()`` function
-can be invoked with two additional optional keyword arguments:
+can be invoked with additional optional keyword arguments:
 
 - ``max_delta_t``: similarly to the ``step()`` function, this value
   represents the maximum timestep size in absolute value;
@@ -311,6 +326,19 @@ can be invoked with two additional optional keyword arguments:
   object as only argument. If the callback returns ``true`` then the integration
   will continue after the invocation of the callback, otherwise the integration
   will be interrupted.
+
+  .. versionadded:: 1.0.0
+
+  Optionally, a function object callback can implement a ``pre_hook()`` member
+  function with signature
+
+  .. code-block:: c++
+
+     void pre_hook(taylor_adaptive<double> &);
+
+
+  that will be invoked once *before* the first step is taken
+  by the ``propagate_grid()`` function.
 
 Full code listing
 -----------------
