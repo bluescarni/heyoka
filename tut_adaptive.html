@@ -629,7 +629,7 @@ integration will be <code class="docutils literal notranslate"><span class="pre"
 <p><span class="versionmodified added">New in version 0.7.0.</span></p>
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">propagate_for()</span></code> and <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code> functions
-can be invoked with two additional optional keyword arguments:</p>
+can be invoked with additional optional keyword arguments:</p>
 <ul>
 <li><p><code class="docutils literal notranslate"><span class="pre">max_delta_t</span></code>: similarly to the <code class="docutils literal notranslate"><span class="pre">step()</span></code> function, this value
 represents the maximum timestep size in absolute value;</p></li>
@@ -641,7 +641,18 @@ represents the maximum timestep size in absolute value;</p></li>
 object as only argument. If the callback returns <code class="docutils literal notranslate"><span class="pre">true</span></code> then the integration
 will continue after the invocation of the callback, otherwise the integration
 will be interrupted.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 1.0.0.</span></p>
+</div>
+<p>Optionally, a function object callback can implement a <code class="docutils literal notranslate"><span class="pre">pre_hook()</span></code> member
+function with signature</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">pre_hook</span><span class="p">(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>that will be invoked once <em>before</em> the first step is taken
+by the <code class="docutils literal notranslate"><span class="pre">propagate_for()</span></code> and <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code> functions.</p>
 </li>
+<li><p><code class="docutils literal notranslate"><span class="pre">c_output</span></code>: a boolean flag that enables <a class="reference internal" href="tut_d_output.html#tut-c-output"><span class="std std-ref">continuous output</span></a>.</p></li>
 </ul>
 </section>
 <section id="propagation-over-a-time-grid">
@@ -695,7 +706,7 @@ fact that they must be finite and ordered monotonically).</p>
 <p><span class="versionmodified added">New in version 0.7.0.</span></p>
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> function
-can be invoked with two additional optional keyword arguments:</p>
+can be invoked with additional optional keyword arguments:</p>
 <ul>
 <li><p><code class="docutils literal notranslate"><span class="pre">max_delta_t</span></code>: similarly to the <code class="docutils literal notranslate"><span class="pre">step()</span></code> function, this value
 represents the maximum timestep size in absolute value;</p></li>
@@ -707,6 +718,16 @@ represents the maximum timestep size in absolute value;</p></li>
 object as only argument. If the callback returns <code class="docutils literal notranslate"><span class="pre">true</span></code> then the integration
 will continue after the invocation of the callback, otherwise the integration
 will be interrupted.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 1.0.0.</span></p>
+</div>
+<p>Optionally, a function object callback can implement a <code class="docutils literal notranslate"><span class="pre">pre_hook()</span></code> member
+function with signature</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">pre_hook</span><span class="p">(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>that will be invoked once <em>before</em> the first step is taken
+by the <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> function.</p>
 </li>
 </ul>
 </section>

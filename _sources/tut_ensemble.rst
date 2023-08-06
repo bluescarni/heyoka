@@ -66,7 +66,7 @@ The signature of the generator ``gen`` reads:
 
 That is, the generator takes in input a *copy* of the template integrator ``ta``
 and an iteration index ``idx`` in the ``[0, n_iter)`` range. ``gen`` is then expected
-to modify the copy of ``ta`` (e.g., by setting its initial conditions to specific
+to modify ``ta`` (e.g., by setting its initial conditions to specific
 values) and return it.
 
 The ``ensemble_propagate_until()`` function iterates over
@@ -151,22 +151,17 @@ In an ensemble propagation, it is thus important to keep in mind that
 the following actions may be performed
 concurrently by separate threads of execution:
 
-* invocation of the generator's call operator and of the call operator
-  of the callback that can (optionally) be passed to the ``propagate_*()``
-  functions. In other words, both the generator and the ``propagate_*()``
-  callback are shared among several threads of execution and used
-  concurrently;
-* copy construction of the events callbacks and invocation of the
-  call operator on the copies. That is, each thread of execution
+* invocation of the generator's call operator (that is, the generator is
+  shared among multiple threads and must support concurrent invocations
+  of its call operator);
+* copy construction of the callback that can (optionally) be passed to
+  the ``propagate_*()`` functions (that is, step callbacks are **not**
+  shared among multiple threads of execution, and a new copy is created for each
+  invocation of the ``propagate_*()`` functions);
+* copy construction of the events callbacks (that is, each thread of execution
   gets its own copy of the event callbacks thanks to the creation
-  of a new integrator object via the generator.
+  of a new integrator object via the generator).
 
 For instance, an event callback which performs write operations
 on a global variable without using some form of synchronisation
 will result in undefined behaviour when used in an ensemble propagation.
-
-Another example of unsafe usage is a ``propagate_*()`` callback that
-performs write operations into its own data member(s) without
-synchronisation: because the
-``propagate_*()`` callback is shared among several threads, such usage results
-in a data race.

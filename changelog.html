@@ -497,6 +497,10 @@ document.write(`
 <section id="new">
 <h3>New<a class="headerlink" href="#new" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>The step callbacks can now optionally implement a <code class="docutils literal notranslate"><span class="pre">pre_hook()</span></code>
+member function that will be called before the first step
+is taken by a <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> function
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/334">#334</a>).</p></li>
 <li><p>The heyoka library now passes all <code class="docutils literal notranslate"><span class="pre">clang-tidy</span></code> checks
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/315">#315</a>).</p></li>
 <li><p>Introduce several vectorised overloads in the expression
@@ -530,6 +534,10 @@ very large expressions
 <section id="changes">
 <h3>Changes<a class="headerlink" href="#changes" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>The step callbacks are now copied in <a class="reference internal" href="tut_ensemble.html#tut-ensemble"><span class="std std-ref">ensemble propagations</span></a>
+rather then being shared among threads. The aim of this change
+is to reduce the likelihood of data races
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/334">#334</a>).</p></li>
 <li><p>Comprehensive overhaul of the expression system, including:
 enhanced automatic simplification capabilities for sums,
 products and powers, removal of several specialised primitives
