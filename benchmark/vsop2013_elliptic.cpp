@@ -17,6 +17,7 @@
 #include <heyoka/taylor.hpp>
 
 using namespace heyoka;
+using namespace heyoka::model;
 
 int main(int argc, char *argv[])
 {
