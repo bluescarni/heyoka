@@ -186,8 +186,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_fix.cpp"
     # "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
-    # VSOP2013.
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/celmec/vsop2013.cpp"
+    # VSOP2013 details.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_1.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_2.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_3.cpp"
@@ -248,6 +247,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/fixed_centres.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/rotating.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/mascon.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/vsop2013.cpp"
     # Math functions.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cos.cpp"

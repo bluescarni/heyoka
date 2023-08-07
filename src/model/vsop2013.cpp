@@ -30,7 +30,6 @@
 
 #include <fmt/format.h>
 
-#include <heyoka/celmec/vsop2013.hpp>
 #include <heyoka/config.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_1.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_2.hpp>
@@ -49,9 +48,13 @@
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/sum.hpp>
+#include <heyoka/model/vsop2013.hpp>
 #include <heyoka/number.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
+
+namespace model
+{
 
 namespace detail
 {
@@ -411,11 +414,13 @@ std::array<double, 10> get_vsop2013_mus()
 {
     std::array<double, 10> retval{};
 
-    retval[0] = heyoka::detail::vsop2013_gm_sun;
+    retval[0] = detail::vsop2013_gm_sun;
 
-    std::copy(std::begin(heyoka::detail::vsop2013_gm_pl), std::end(heyoka::detail::vsop2013_gm_pl), retval.data() + 1);
+    std::copy(std::begin(detail::vsop2013_gm_pl), std::end(detail::vsop2013_gm_pl), retval.data() + 1);
 
     return retval;
 }
+
+} // namespace model
 
 HEYOKA_END_NAMESPACE
