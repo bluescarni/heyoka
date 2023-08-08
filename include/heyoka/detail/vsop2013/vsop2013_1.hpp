@@ -13,7 +13,7 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-namespace detail
+namespace model::detail
 {
 
 inline constexpr unsigned long vsop2013_1_1_sizes[11]
@@ -34,7 +34,7 @@ extern const double *const vsop2013_1_4_data[11];
 extern const double *const vsop2013_1_5_data[9];
 extern const double *const vsop2013_1_6_data[9];
 
-} // namespace detail
+} // namespace model::detail
 
 HEYOKA_END_NAMESPACE
 

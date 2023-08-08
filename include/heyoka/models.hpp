@@ -14,5 +14,6 @@
 #include <heyoka/model/nbody.hpp>
 #include <heyoka/model/pendulum.hpp>
 #include <heyoka/model/rotating.hpp>
+#include <heyoka/model/vsop2013.hpp>
 
 #endif

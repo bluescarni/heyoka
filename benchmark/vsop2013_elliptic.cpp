@@ -12,11 +12,12 @@
 
 #include <boost/program_options.hpp>
 
-#include <heyoka/celmec/vsop2013.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/model/vsop2013.hpp>
 #include <heyoka/taylor.hpp>
 
 using namespace heyoka;
+using namespace heyoka::model;
 
 int main(int argc, char *argv[])
 {

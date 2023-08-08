@@ -6,8 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_CELMEC_VSOP2013_HPP
-#define HEYOKA_CELMEC_VSOP2013_HPP
+#ifndef HEYOKA_MODEL_VSOP2013_HPP
+#define HEYOKA_MODEL_VSOP2013_HPP
 
 #include <array>
 #include <cstdint>
@@ -29,6 +29,9 @@ namespace kw
 IGOR_MAKE_NAMED_ARGUMENT(thresh);
 
 } // namespace kw
+
+namespace model
+{
 
 namespace detail
 {
@@ -91,6 +94,8 @@ inline std::vector<expression> vsop2013_cartesian_icrf(std::uint32_t pl_idx, KwA
 }
 
 HEYOKA_DLL_PUBLIC std::array<double, 10> get_vsop2013_mus();
+
+} // namespace model
 
 HEYOKA_END_NAMESPACE
 

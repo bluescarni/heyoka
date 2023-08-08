@@ -26,7 +26,6 @@
 
 #include <fmt/format.h>
 
-#include <heyoka/celmec/vsop2013.hpp>
 #include <heyoka/config.hpp>
 #include <heyoka/detail/div.hpp>
 #include <heyoka/detail/sub.hpp>
@@ -36,6 +35,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
 #include <heyoka/model/nbody.hpp>
+#include <heyoka/model/vsop2013.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -1592,8 +1592,8 @@ TEST_CASE("cfunc vsop2013")
 
     const auto [x, y, z, t] = make_vars("x", "y", "z", "t");
 
-    const auto venus_sol1 = vsop2013_cartesian_icrf(2, kw::time = par[0], kw::thresh = thr);
-    const auto venus_sol2 = vsop2013_cartesian_icrf(2, kw::time = t, kw::thresh = thr);
+    const auto venus_sol1 = model::vsop2013_cartesian_icrf(2, kw::time = par[0], kw::thresh = thr);
+    const auto venus_sol2 = model::vsop2013_cartesian_icrf(2, kw::time = t, kw::thresh = thr);
 
     auto ta = taylor_adaptive<double>({prime(x) = venus_sol1[0], prime(y) = venus_sol1[1], prime(z) = venus_sol1[2]},
                                       {0., 0., 0.}, kw::compact_mode = true);

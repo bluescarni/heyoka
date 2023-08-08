@@ -23,9 +23,8 @@
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/splitmix64.hpp>
+#include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
-
-// #include <heyoka/gp.hpp>
 
 #endif

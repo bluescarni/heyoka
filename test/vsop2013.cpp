@@ -13,13 +13,14 @@
 #include <stdexcept>
 #include <vector>
 
-#include <heyoka/celmec/vsop2013.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/model/vsop2013.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
 
 using namespace heyoka;
+using namespace heyoka::model;
 
 const std::vector dates = {2411545.0, 2415545.0, 2419545.0, 2423545.0, 2427545.0, 2431545.0,
                            2435545.0, 2439545.0, 2443545.0, 2447545.0, 2451545.0};
