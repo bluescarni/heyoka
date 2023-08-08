@@ -7,12 +7,16 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <stdexcept>
+#include <string>
 #include <variant>
 #include <vector>
+
+#include <boost/algorithm/string.hpp>
 
 #include <xtensor/xadapt.hpp>
 #include <xtensor/xview.hpp>
 
+#include <heyoka/detail/sub.hpp>
 #include <heyoka/detail/sum_sq.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -60,23 +64,32 @@ TEST_CASE("nbody")
 
         auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true};
 
+        // Check that llvm.pow appears only 3 times: its declaration plus 2 uses
+        // for determining the timestep size.
+        std::vector<boost::iterator_range<std::string::const_iterator>> pow_matches;
+        boost::find_all(pow_matches, ta.get_llvm_state().get_ir(), "@llvm.pow");
+        REQUIRE(pow_matches.size() == 3u);
+
         llvm_state s;
         std::vector<expression> vars;
         for (const auto &p : dyn) {
             vars.push_back(p.first);
         }
 
-        // Check that all sums were replaced by sums of squares.
-        auto n_sums = 0, n_sum_sqs = 0;
+        // Check that all sums were replaced by sums of squares, and check the
+        // number of subtractions.
+        auto n_sums = 0, n_sum_sqs = 0, n_subs = 0;
         for (const auto &[s_ex, _] : ta.get_decomposition()) {
             if (const auto *fptr = std::get_if<func>(&s_ex.value())) {
                 n_sums += static_cast<int>(fptr->extract<detail::sum_impl>() != nullptr);
                 n_sum_sqs += static_cast<int>(fptr->extract<detail::sum_sq_impl>() != nullptr);
+                n_subs += static_cast<int>(fptr->extract<detail::sub_impl>() != nullptr);
             }
         }
 
         REQUIRE(n_sum_sqs == 15);
         REQUIRE(n_sums == 18);
+        REQUIRE(n_subs == 45);
         REQUIRE(ta.get_decomposition().size() == 270u);
 
         const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);

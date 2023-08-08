@@ -1016,7 +1016,7 @@ expression prod_to_div_impl(funcptr_map<expression> &func_map, const expression 
                     return it->second;
                 }
 
-                // Recursively transform product into divisions
+                // Recursively transform products into divisions
                 // in the arguments.
                 std::vector<expression> new_args;
                 new_args.reserve(v.args().size());
