@@ -1073,43 +1073,22 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
 
     get_logger()->trace("dtens creation runtime: {}", sw);
 
-    sw.reset();
-
-    // Unfix the derivatives.
-    //
-    // NOTE: unfixing here is mostly a matter of aestethics. At the moment,
-    // I don't see any reason why we would want to keep the expressions fixed
-    // on output, as 1) if these derivatives are iterated to higher orders,
+    // NOTE: it is unclear at this time if it makes sense here to unfix() the derivatives.
+    // This would have only a cosmetic purpose, as 1) if these derivatives are iterated to higher orders,
     // during decomposition we will be unfixing anyway and 2) unfixing does not
     // imply normalisation, thus we are not changing the symbolic structure
     // of the expressions and pessimising their evaluation.
     //
-    // NOTE: keep also in mind that at this time the derivatives are not *fully* fixed,
-    // in the sense that the entries in subs_map are not themselves fixed, and thus when we do
-    // the substition to create the final expressions, we have inserting unfixed
-    // expressions in the result. This ultimately does not matter as subs() does not
-    // do any normalisation by default, but it would matter if we wanted to manipulate
-    // further the expression of the derivatives while relying on fix() being applied
-    // correctly everywhere.
-    std::vector<expression> unfix_diffs;
-    unfix_diffs.reserve(diff_map.size());
-    for (auto &p : diff_map) {
-        unfix_diffs.push_back(std::move(p.second));
-    }
-    unfix_diffs = unfix(unfix_diffs);
+    // Keep also in mind that at this time the derivatives are not
+    // *fully* fixed, in the sense that the entries in subs_map are not themselves fixed, and thus when we do the
+    // substition to create the final expressions, we have inserting unfixed expressions in the result. This ultimately
+    // does not matter as subs() does not do any normalisation by default, but it would matter if we wanted to
+    // manipulate further the expression of the derivatives while relying on fix() being applied correctly everywhere.
+    // In any case, if we decide to unfix() here at some point we should also consider unfixing
+    // the expressions returned by models, for consistency.
 
-    // Construct the return value.
-    dtens_map_t::sequence_type retval_seq;
-    retval_seq.reserve(unfix_diffs.size());
-    auto diff_map_it = diff_map.begin();
-    for (decltype(unfix_diffs.size()) i = 0; i < unfix_diffs.size(); ++i, ++diff_map_it) {
-        retval_seq.emplace_back(diff_map_it->first, std::move(unfix_diffs[i]));
-    }
-    assert(diff_map_it == diff_map.end());
-    dtens_map_t retval;
-    retval.adopt_sequence(boost::container::ordered_unique_range_t{}, std::move(retval_seq));
-
-    get_logger()->trace("dtens unfix runtime: {}", sw);
+    // Assemble and return the result.
+    dtens_map_t retval(boost::container::ordered_unique_range_t{}, diff_map.begin(), diff_map.end());
 
     // Check sorting.
     assert(std::is_sorted(retval.begin(), retval.end(),
