@@ -19,14 +19,6 @@ Constants and parameters are mathematically equivalent, the only difference bein
 that the value of a constant is determined when the expression is created, whereas
 the value of a parameter is loaded from a user-supplied data array at a later stage.
 
-As a simple example, here is a graphical representation of the
-AST for the expression :math:`\left( 1 - x^2\right)y-x`:
-
-.. image:: images/ast.png
-  :scale: 30%
-  :align: center
-  :alt: Example of a symbolic tree in heyoka
-
 Thanks to the use of modern C++ features (user-defined literals, overloaded operators, etc.),
 the construction of the AST of an expression in heyoka can be accomplished via natural
 mathematical notation:

@@ -40,7 +40,6 @@
     <script src="_static/doctools.js"></script>
     <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/scripts/sphinx-book-theme.js?digest=5a5c038af52cf7bc1a1ec88eea08e6366ee68824"></script>
-    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'tut_expression_system';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -378,9 +377,6 @@ and the leaf nodes can be:</p>
 <p>Constants and parameters are mathematically equivalent, the only difference being
 that the value of a constant is determined when the expression is created, whereas
 the value of a parameter is loaded from a user-supplied data array at a later stage.</p>
-<p>As a simple example, here is a graphical representation of the
-AST for the expression <span class="math notranslate nohighlight">\(\left( 1 - x^2\right)y-x\)</span>:</p>
-<a class="reference internal image-reference" href="_images/ast.png"><img alt="Example of a symbolic tree in heyoka" class="align-center" src="_images/ast.png" style="width: 287.7px; height: 225.29999999999998px;" /></a>
 <p>Thanks to the use of modern C++ features (user-defined literals, overloaded operators, etc.),
 the construction of the AST of an expression in heyoka can be accomplished via natural
 mathematical notation:</p>
