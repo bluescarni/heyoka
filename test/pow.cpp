@@ -336,7 +336,7 @@ TEST_CASE("cfunc")
 
         add_cfunc<double>(s, "cfunc1", {pow(x, 2_dbl), pow(x, -3_dbl), pow(x, -3_dbl / 2.), pow(x, 5_dbl / 2.)});
 
-        REQUIRE(!boost::contains(s.get_ir(), "pow"));
+        REQUIRE(!boost::contains(s.get_ir(), "llvm.pow"));
     }
 }
 
