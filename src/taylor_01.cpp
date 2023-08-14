@@ -1747,6 +1747,9 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
     // Fetch the external type corresponding to fp_scal_t.
     auto *ext_fp_scal_t = llvm_ext_type(fp_scal_t);
 
+    // Fetch the current insertion block.
+    auto *orig_bb = builder.GetInsertBlock();
+
     // The function arguments:
     // - the output pointer (read/write, used also for accumulation),
     // - the pointer to the Taylor coefficients (read-only),
@@ -1904,6 +1907,9 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
 
     // Verify the function.
     s.verify_function(f);
+
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
 }
 
 } // namespace detail
