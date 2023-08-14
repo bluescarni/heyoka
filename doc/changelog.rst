@@ -9,14 +9,14 @@ Changes
 
 - The optimisation pass in an ``llvm_state`` is now automatically
   called during compilation
-  (`#337 <https://github.com/bluescarni/heyoka/pull/337>`__).
+  (`#339 <https://github.com/bluescarni/heyoka/pull/339>`__).
 
 Fix
 ~~~
 
 - Fix LLVM module name not being preserved during
   copy and deserialisation of ``llvm_state``
-  (`#337 <https://github.com/bluescarni/heyoka/pull/337>`__).
+  (`#339 <https://github.com/bluescarni/heyoka/pull/339>`__).
 - Fix broken link in the docs.
 
 1.0.0 (2023-08-10)
