@@ -518,7 +518,11 @@ void llvm_state_add_obj_to_jit(Jit &j, const std::string &obj)
 }
 
 // Helper to create an LLVM module from a IR in string representation.
-auto llvm_state_ir_to_module(const std::string &ir, llvm::LLVMContext &ctx)
+// NOTE: the module name needs to be passed explicitly (although it is already
+// contained in the IR) because apparently llvm::parseIR() discards the module
+// name when parsing.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+auto llvm_state_ir_to_module(const std::string &module_name, const std::string &ir, llvm::LLVMContext &ctx)
 {
     // Create the corresponding memory buffer.
     auto mb = llvm::MemoryBuffer::getMemBuffer(ir);
@@ -537,6 +541,9 @@ auto llvm_state_ir_to_module(const std::string &ir, llvm::LLVMContext &ctx)
         throw std::invalid_argument(fmt::format("IR parsing failed. The full error message:\n{}", ostr.str()));
     }
     // LCOV_EXCL_STOP
+
+    // Set the module name.
+    ret->setModuleIdentifier(module_name);
 
     return ret;
 }
@@ -594,7 +601,7 @@ llvm_state::llvm_state(const llvm_state &other)
         const auto other_ir = other.get_ir();
 
         // Create the module from the IR.
-        m_module = detail::llvm_state_ir_to_module(other_ir, context());
+        m_module = detail::llvm_state_ir_to_module(m_module_name, other_ir, context());
 
         // Create a new builder for the module.
         m_builder = std::make_unique<ir_builder>(context());
@@ -606,7 +613,24 @@ llvm_state::llvm_state(const llvm_state &other)
         // NOTE: compilation will take care of setting up m_ir_snapshot.
         // If no compilation happens, m_ir_snapshot is left empty after init.
         if (other.is_compiled()) {
+            // NOTE: we need to temporarily disable optimisations
+            // before compilation, for the following reason.
+            //
+            // Recall that here we are in the case
+            // in which the 'other' llvm_state had been compiled, but
+            // no object code had been produced yet. This means the IR
+            // had already been optimised, and by running another optimisation
+            // pass now (indirectly, via compile()) we might end
+            // up modifying the already-optimised IR.
+            // By temporarily setting m_opt_level to zero, we are preventing
+            // any modification to the IR and ensuring that, after copying,
+            // we have exactly reproduced the original llvm_state object.
+            const auto orig_opt_level = m_opt_level;
+            m_opt_level = 0;
+
             compile();
+
+            m_opt_level = orig_opt_level;
         }
     }
 }
@@ -774,7 +798,7 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
             m_ir_snapshot.clear();
 
             // Create the module from the IR.
-            m_module = detail::llvm_state_ir_to_module(ir, context());
+            m_module = detail::llvm_state_ir_to_module(m_module_name, ir, context());
 
             // Create a new builder for the module.
             m_builder = std::make_unique<ir_builder>(context());
@@ -787,7 +811,24 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
             // If no compilation happens, m_ir_snapshot is left empty after
             // clearing earlier.
             if (cmp) {
+                // NOTE: we need to temporarily disable optimisations
+                // before compilation, for the following reason.
+                //
+                // Recall that here we are in the case
+                // in which the serialised llvm_state had been compiled, but
+                // no object code had been produced yet. This means the IR
+                // had already been optimised, and by running another optimisation
+                // pass (indirectly, via compile()) now we might end
+                // up modifying the already-optimised IR.
+                // By temporarily setting m_opt_level to zero, we are preventing
+                // any modification to the IR and ensuring that, after deserialisation,
+                // we have exactly reproduced the original llvm_state object.
+                const auto orig_opt_level = m_opt_level;
+                m_opt_level = 0;
+
                 compile();
+
+                m_opt_level = orig_opt_level;
             }
         }
         // LCOV_EXCL_START
@@ -1133,6 +1174,8 @@ void llvm_state::optimise()
     }
 }
 
+// NOTE: we need to emphasise in the docs that compilation
+// triggers an optimisation pass.
 void llvm_state::compile()
 {
     check_uncompiled(__func__);
@@ -1149,7 +1192,10 @@ void llvm_state::compile()
     }
 
     try {
-        // Store a snapshot of the IR before compiling.
+        // Run the optimisation pass.
+        optimise();
+
+        // Store a snapshot of the optimised IR before compiling.
         m_ir_snapshot = get_ir();
 
         // Add the module (this will clear out m_module).

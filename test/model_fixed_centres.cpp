@@ -102,7 +102,6 @@ TEST_CASE("basic")
             s, "en",
             {model::fixed_centres_energy(kw::Gconst = 1.02, kw::masses = {1.01}, kw::positions = {1., 2., 3.})},
             kw::vars = {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
-        s.optimise();
         s.compile();
 
         auto *cf
@@ -144,7 +143,6 @@ TEST_CASE("basic")
 
         REQUIRE(dc.size() == 626u);
 
-        s.optimise();
         s.compile();
 
         auto *cf

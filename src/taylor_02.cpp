@@ -2023,9 +2023,6 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
 
-    // Run the optimisation pass.
-    s.optimise();
-
     return dc;
 }
 

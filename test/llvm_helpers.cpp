@@ -99,9 +99,6 @@ TEST_CASE("sgn scalar")
             // Verify.
             s.verify_function(f);
 
-            // Run the optimisation pass.
-            s.optimise();
-
             // Compile.
             s.compile();
 
@@ -152,9 +149,6 @@ TEST_CASE("sgn scalar mp")
 
         // Verify.
         s.verify_function(f);
-
-        // Run the optimisation pass.
-        s.optimise();
 
         // Compile.
         s.compile();
@@ -225,9 +219,6 @@ TEST_CASE("sgn batch")
                 // Verify.
                 s.verify_function(f);
 
-                // Run the optimisation pass.
-                s.optimise();
-
                 // Compile.
                 s.compile();
 
@@ -296,9 +287,6 @@ TEST_CASE("sincos scalar")
             // Verify.
             s.verify_function(f);
 
-            // Run the optimisation pass.
-            s.optimise();
-
             // Compile.
             s.compile();
 
@@ -362,9 +350,6 @@ TEST_CASE("sincos batch")
 
                 // Verify.
                 s.verify_function(f);
-
-                // Run the optimisation pass.
-                s.optimise();
 
                 // Compile.
                 s.compile();
@@ -434,9 +419,6 @@ TEST_CASE("sincos mp")
         // Verify.
         s.verify_function(f);
 
-        // Run the optimisation pass.
-        s.optimise();
-
         // Compile.
         s.compile();
 
@@ -483,9 +465,6 @@ TEST_CASE("modulus scalar")
 
             // Verify.
             s.verify_function(f);
-
-            // Run the optimisation pass.
-            s.optimise();
 
             // Compile.
             s.compile();
@@ -549,9 +528,6 @@ TEST_CASE("modulus batch")
                 // Verify.
                 s.verify_function(f);
 
-                // Run the optimisation pass.
-                s.optimise();
-
                 // Compile.
                 s.compile();
 
@@ -596,9 +572,6 @@ TEST_CASE("inv_kep_E_scalar")
 
             // Add the function.
             llvm_add_inv_kep_E_wrapper(s, detail::to_llvm_type<fp_t>(s.context()), 1, "hey_kep");
-
-            // Run the optimisation pass.
-            s.optimise();
 
             // Compile.
             s.compile();
@@ -744,9 +717,6 @@ TEST_CASE("inv_kep_E_batch")
 
                 // Add the function.
                 llvm_add_inv_kep_E_wrapper(s, detail::to_llvm_type<fp_t>(s.context()), batch_size, "hey_kep");
-
-                // Run the optimisation pass.
-                s.optimise();
 
                 // Compile.
                 s.compile();
@@ -986,9 +956,6 @@ TEST_CASE("inv_kep_E_scalar mp")
         // Add the function.
         llvm_add_inv_kep_E_wrapper(s, fp_t, 1, "hey_kep");
 
-        // Run the optimisation pass.
-        s.optimise();
-
         // Compile.
         s.compile();
 
@@ -1152,9 +1119,6 @@ TEST_CASE("while_loop")
         // Verify.
         s.verify_function(f);
 
-        // Run the optimisation pass.
-        s.optimise();
-
         // Compile.
         s.compile();
 
@@ -1271,8 +1235,6 @@ TEST_CASE("csc_scalar")
 
             llvm_add_csc(s, to_llvm_type<fp_t>(s.context()), degree, 1);
 
-            s.optimise();
-
             s.compile();
 
             auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(
@@ -1346,8 +1308,6 @@ TEST_CASE("csc_batch")
                 const auto degree = 4u;
 
                 llvm_add_csc(s, to_llvm_type<fp_t>(s.context()), degree, batch_size);
-
-                s.optimise();
 
                 s.compile();
 
@@ -1520,9 +1480,6 @@ TEST_CASE("minmax")
                 // Verify.
                 s.verify_function(f);
 
-                // Run the optimisation pass.
-                s.optimise();
-
                 // Compile.
                 s.compile();
 
@@ -1667,9 +1624,6 @@ TEST_CASE("fma scalar")
             // Verify.
             s.verify_function(f);
 
-            // Run the optimisation pass.
-            s.optimise();
-
             // Compile.
             s.compile();
 
@@ -1727,9 +1681,6 @@ TEST_CASE("fma batch")
 
                 // Verify.
                 s.verify_function(f);
-
-                // Run the optimisation pass.
-                s.optimise();
 
                 // Compile.
                 s.compile();
@@ -1803,9 +1754,6 @@ TEST_CASE("fma scalar mp")
         // Verify.
         s.verify_function(f);
 
-        // Run the optimisation pass.
-        s.optimise();
-
         // Compile.
         s.compile();
 
@@ -1868,9 +1816,6 @@ TEST_CASE("eft_product scalar")
 
             // Verify.
             s.verify_function(f);
-
-            // Run the optimisation pass.
-            s.optimise();
 
             // Compile.
             s.compile();
@@ -1953,9 +1898,6 @@ TEST_CASE("eft_product batch")
 
                 // Verify.
                 s.verify_function(f);
-
-                // Run the optimisation pass.
-                s.optimise();
 
                 // Compile.
                 s.compile();
@@ -2052,9 +1994,6 @@ TEST_CASE("dl mul scalar")
 
             // Verify.
             s.verify_function(f);
-
-            // Run the optimisation pass.
-            s.optimise();
 
             // Compile.
             s.compile();
@@ -2160,9 +2099,6 @@ TEST_CASE("dl mul batch")
 
                 // Verify.
                 s.verify_function(f);
-
-                // Run the optimisation pass.
-                s.optimise();
 
                 // Compile.
                 s.compile();
@@ -2280,9 +2216,6 @@ TEST_CASE("dl div scalar")
             // Verify.
             s.verify_function(f);
 
-            // Run the optimisation pass.
-            s.optimise();
-
             // Compile.
             s.compile();
 
@@ -2384,9 +2317,6 @@ TEST_CASE("dl div batch")
                 // Verify.
                 s.verify_function(f);
 
-                // Run the optimisation pass.
-                s.optimise();
-
                 // Compile.
                 s.compile();
                 // Fetch the function pointer.
@@ -2484,9 +2414,6 @@ TEST_CASE("floor scalar")
             // Verify.
             s.verify_function(f);
 
-            // Run the optimisation pass.
-            s.optimise();
-
             // Compile.
             s.compile();
 
@@ -2539,9 +2466,6 @@ TEST_CASE("floor batch")
 
                 // Verify.
                 s.verify_function(f);
-
-                // Run the optimisation pass.
-                s.optimise();
 
                 // Compile.
                 s.compile();
@@ -2610,9 +2534,6 @@ TEST_CASE("dl floor scalar")
 
             // Verify.
             s.verify_function(f);
-
-            // Run the optimisation pass.
-            s.optimise();
 
             // Compile.
             s.compile();
@@ -2700,9 +2621,6 @@ TEST_CASE("dl floor batch")
 
                 // Verify.
                 s.verify_function(f);
-
-                // Run the optimisation pass.
-                s.optimise();
 
                 // Compile.
                 s.compile();
@@ -2800,9 +2718,6 @@ TEST_CASE("dl modulus scalar")
             // Verify.
             s.verify_function(f);
 
-            // Run the optimisation pass.
-            s.optimise();
-
             // Compile.
             s.compile();
 
@@ -2887,9 +2802,6 @@ TEST_CASE("dl modulus batch")
 
                 // Verify.
                 s.verify_function(f);
-
-                // Run the optimisation pass.
-                s.optimise();
 
                 // Compile.
                 s.compile();
@@ -2988,8 +2900,6 @@ TEST_CASE("to_size_t")
 
         builder.CreateRet(to_size_t(s, in_val));
 
-        s.optimise();
-
         s.compile();
 
         auto f_ptr = reinterpret_cast<std::size_t (*)(std::uint32_t)>(s.jit_lookup("test"));
@@ -3020,8 +2930,6 @@ TEST_CASE("to_size_t")
         store_vector_to_memory(builder, out_val, ret);
 
         builder.CreateRetVoid();
-
-        s.optimise();
 
         s.compile();
 
@@ -3057,8 +2965,6 @@ TEST_CASE("to_size_t")
 
         builder.CreateRet(to_size_t(s, in_val));
 
-        s.optimise();
-
         s.compile();
 
         auto f_ptr = reinterpret_cast<std::size_t (*)(std::uint64_t)>(s.jit_lookup("test"));
@@ -3089,8 +2995,6 @@ TEST_CASE("to_size_t")
         store_vector_to_memory(builder, out_val, ret);
 
         builder.CreateRetVoid();
-
-        s.optimise();
 
         s.compile();
 
@@ -3139,8 +3043,6 @@ TEST_CASE("real_ext_load")
 
     s.verify_function(f);
 
-    s.optimise();
-
     s.compile();
 
     auto f_ptr = reinterpret_cast<void (*)(mppp::real *, mppp::real *)>(s.jit_lookup("test"));
@@ -3182,8 +3084,6 @@ TEST_CASE("switch")
 
         s.verify_function(f);
 
-        s.optimise();
-
         s.compile();
 
         auto f_ptr = reinterpret_cast<std::uint32_t (*)(std::uint32_t)>(s.jit_lookup("test"));
@@ -3215,8 +3115,6 @@ TEST_CASE("switch")
         builder.CreateRet(builder.CreateLoad(builder.getInt32Ty(), out_storage));
 
         s.verify_function(f);
-
-        s.optimise();
 
         s.compile();
 
@@ -3251,8 +3149,6 @@ TEST_CASE("switch")
         builder.CreateRet(builder.CreateLoad(builder.getInt32Ty(), out_storage));
 
         s.verify_function(f);
-
-        s.optimise();
 
         s.compile();
 

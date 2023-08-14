@@ -911,9 +911,6 @@ taylor_adaptive<T>::ed_data::ed_data(llvm_state s, std::vector<t_event_t> tes, s
     // Add the function for the fast exclusion check.
     detail::llvm_add_fex_check(m_state, fp_t, order, 1);
 
-    // Run the optimisation pass.
-    m_state.optimise();
-
     // Compile.
     m_state.compile();
 
@@ -1547,9 +1544,6 @@ taylor_adaptive_batch<T>::ed_data::ed_data(llvm_state s, std::vector<t_event_t> 
     // Add the function for the fast exclusion check.
     // NOTE: the fast exclusion check is vectorised.
     detail::llvm_add_fex_check(m_state, fp_t, order, batch_size);
-
-    // Run the optimisation pass.
-    m_state.optimise();
 
     // Compile.
     m_state.compile();

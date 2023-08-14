@@ -89,12 +89,15 @@ TEST_CASE("copy semantics")
 
         taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
 
+        const auto orig_ir = s.get_ir();
+
         auto s2 = s;
 
         REQUIRE(s2.module_name() == "sample state");
         REQUIRE(s2.opt_level() == 2u);
         REQUIRE(s2.fast_math());
         REQUIRE(!s2.is_compiled());
+        REQUIRE(s2.get_ir() == orig_ir);
 
         s2.compile();
 
@@ -118,12 +121,15 @@ TEST_CASE("copy semantics")
 
         s.compile();
 
+        const auto orig_ir = s.get_ir();
+
         auto s2 = s;
 
         REQUIRE(s2.module_name() == "sample state");
         REQUIRE(s2.opt_level() == 2u);
         REQUIRE(s2.fast_math());
         REQUIRE(s2.is_compiled());
+        REQUIRE(s2.get_ir() == orig_ir);
 
         auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s2.jit_lookup("jet"));
 
@@ -147,12 +153,15 @@ TEST_CASE("copy semantics")
 
         auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("jet"));
 
+        const auto orig_ir = s.get_ir();
+
         auto s2 = s;
 
         REQUIRE(s2.module_name() == "sample state");
         REQUIRE(s2.opt_level() == 2u);
         REQUIRE(s2.fast_math());
         REQUIRE(s2.is_compiled());
+        REQUIRE(s2.get_ir() == orig_ir);
 
         jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s2.jit_lookup("jet"));
 
@@ -200,7 +209,7 @@ TEST_CASE("s11n")
     {
         std::stringstream ss;
 
-        llvm_state s;
+        llvm_state s{kw::mname = "foo"};
 
         const auto orig_ir = s.get_ir();
 
@@ -220,7 +229,7 @@ TEST_CASE("s11n")
 
         REQUIRE(!s.is_compiled());
         REQUIRE(s.get_ir() == orig_ir);
-        REQUIRE(s.module_name() == "");
+        REQUIRE(s.module_name() == "foo");
         REQUIRE(s.opt_level() == 3u);
         REQUIRE(s.fast_math() == false);
         REQUIRE(s.force_avx512() == false);
@@ -230,13 +239,13 @@ TEST_CASE("s11n")
     {
         std::stringstream ss;
 
-        llvm_state s{kw::force_avx512 = true};
+        llvm_state s{kw::force_avx512 = true, kw::mname = "foo"};
 
         taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
 
-        const auto orig_ir = s.get_ir();
-
         s.compile();
+
+        const auto orig_ir = s.get_ir();
 
         {
             boost::archive::binary_oarchive oa(ss);
@@ -253,8 +262,8 @@ TEST_CASE("s11n")
         }
 
         REQUIRE(s.is_compiled());
+        REQUIRE(s.module_name() == "foo");
         REQUIRE(s.get_ir() == orig_ir);
-        REQUIRE(s.module_name() == "");
         REQUIRE(s.opt_level() == 3u);
         REQUIRE(s.fast_math() == false);
         REQUIRE(s.force_avx512() == true);
@@ -264,13 +273,13 @@ TEST_CASE("s11n")
     {
         std::stringstream ss;
 
-        llvm_state s;
+        llvm_state s{kw::mname = "foo"};
 
         taylor_add_jet<double>(s, "jet", {-1_dbl, x + y}, 1, 1, true, false);
 
-        const auto orig_ir = s.get_ir();
-
         s.compile();
+
+        const auto orig_ir = s.get_ir();
 
         s.jit_lookup("jet");
 
@@ -290,7 +299,7 @@ TEST_CASE("s11n")
 
         REQUIRE(s.is_compiled());
         REQUIRE(s.get_ir() == orig_ir);
-        REQUIRE(s.module_name() == "");
+        REQUIRE(s.module_name() == "foo");
         REQUIRE(s.opt_level() == 3u);
         REQUIRE(s.fast_math() == false);
 

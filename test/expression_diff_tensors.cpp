@@ -415,7 +415,6 @@ TEST_CASE("fixed centres check")
 
         llvm_state s;
         add_cfunc<double>(s, "diff", diff_vec, kw::vars = vars);
-        s.optimise();
         s.compile();
 
         auto *fr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
@@ -462,7 +461,6 @@ TEST_CASE("fixed centres check")
             // Compile and fetch the expression of the derivative.
             llvm_state s2;
             add_cfunc<double>(s2, "diff", {ex}, kw::vars = vars);
-            s2.optimise();
             s2.compile();
 
             auto *fr2 = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
@@ -514,7 +512,6 @@ TEST_CASE("speelpenning check")
 
         llvm_state s;
         add_cfunc<double>(s, "diff", diff_vec, kw::vars = vars);
-        s.optimise();
         s.compile();
 
         auto *fr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
@@ -556,7 +553,6 @@ TEST_CASE("speelpenning check")
             // Compile and fetch the expression of the derivative.
             llvm_state s2;
             add_cfunc<double>(s2, "diff", {ex}, kw::vars = vars);
-            s2.optimise();
             s2.compile();
 
             auto *fr2 = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
@@ -629,7 +625,6 @@ TEST_CASE("speelpenning complexity")
             REQUIRE(std::get<func>(dc_reverse[i].value()).extract<detail::prod_impl>()->args().size() == 2u);
         }
 
-        s.optimise();
         s.compile();
     }
 }
