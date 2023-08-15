@@ -310,6 +310,9 @@ std::uint32_t recommended_simd_size<mppp::real>()
 
 // Implementation of the jit class.
 struct llvm_state::jit {
+    // NOTE: this is the llvm_state containing
+    // the jit instance.
+    const llvm_state *m_state = nullptr;
     std::unique_ptr<llvm::orc::LLJIT> m_lljit;
     std::unique_ptr<llvm::TargetMachine> m_tm;
     std::unique_ptr<llvm::orc::ThreadSafeContext> m_ctx;
@@ -318,7 +321,7 @@ struct llvm_state::jit {
 #endif
     std::optional<std::string> m_object_file;
 
-    jit()
+    explicit jit(const llvm_state *state) : m_state(state)
     {
         // Ensure the native target is inited.
         detail::init_native_target();
@@ -414,6 +417,7 @@ struct llvm_state::jit {
 #endif
     }
 
+    jit() = delete;
     jit(const jit &) = delete;
     jit(jit &&) = delete;
     jit &operator=(const jit &) = delete;
@@ -553,7 +557,7 @@ auto llvm_state_ir_to_module(const std::string &module_name, const std::string &
 } // namespace detail
 
 llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool> &&tup)
-    : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_fast_math(std::get<2>(tup)),
+    : m_jitter(std::make_unique<jit>(this)), m_opt_level(std::get<1>(tup)), m_fast_math(std::get<2>(tup)),
       m_force_avx512(std::get<3>(tup)), m_module_name(std::move(std::get<0>(tup)))
 {
     // Create the module.
@@ -577,7 +581,7 @@ llvm_state::llvm_state(const llvm_state &other)
     // NOTE: start off by:
     // - creating a new jit,
     // - copying over the options from other.
-    : m_jitter(std::make_unique<jit>()), m_opt_level(other.m_opt_level), m_fast_math(other.m_fast_math),
+    : m_jitter(std::make_unique<jit>(this)), m_opt_level(other.m_opt_level), m_fast_math(other.m_fast_math),
       m_force_avx512(other.m_force_avx512), m_module_name(other.m_module_name)
 {
     if (other.is_compiled() && other.m_jitter->m_object_file) {
@@ -635,7 +639,16 @@ llvm_state::llvm_state(const llvm_state &other)
     }
 }
 
-llvm_state::llvm_state(llvm_state &&) noexcept = default;
+// NOTE: this needs to be implemented manually as we need
+// to set up correctly the m_state member of the jit instance.
+llvm_state::llvm_state(llvm_state &&other) noexcept
+    : m_jitter(std::move(other.m_jitter)), m_module(std::move(other.m_module)), m_builder(std::move(other.m_builder)),
+      m_opt_level(other.m_opt_level), m_ir_snapshot(std::move(other.m_ir_snapshot)), m_fast_math(other.m_fast_math),
+      m_force_avx512(other.m_force_avx512), m_module_name(std::move(other.m_module_name))
+{
+    // Set up m_state.
+    m_jitter->m_state = this;
+}
 
 llvm_state &llvm_state::operator=(const llvm_state &other)
 {
@@ -650,6 +663,7 @@ llvm_state &llvm_state::operator=(const llvm_state &other)
 // needs to be done in a different order (specifically, we need to
 // ensure that the LLVM objects in this are destroyed in a specific
 // order).
+// NOTE: we also need to set up correctly the m_state member of the jit instance.
 llvm_state &llvm_state::operator=(llvm_state &&other) noexcept
 {
     if (this != &other) {
@@ -657,6 +671,9 @@ llvm_state &llvm_state::operator=(llvm_state &&other) noexcept
         m_builder = std::move(other.m_builder);
         m_module = std::move(other.m_module);
         m_jitter = std::move(other.m_jitter);
+
+        // Set up m_state.
+        m_jitter->m_state = this;
 
         // The remaining bits.
         m_opt_level = other.m_opt_level;
@@ -669,7 +686,14 @@ llvm_state &llvm_state::operator=(llvm_state &&other) noexcept
     return *this;
 }
 
-llvm_state::~llvm_state() = default;
+llvm_state::~llvm_state()
+{
+    // NOTE: if this has not been moved-from, ensure
+    // the m_state member of the jit is pointing to this.
+    if (m_jitter) {
+        assert(m_jitter->m_state == this);
+    }
+}
 
 // NOTE: the save/load logic is essentially the same as in the
 // copy constructor. Specifically, we have 2 different paths
@@ -782,7 +806,7 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
         m_builder.reset();
 
         // Reset the jit with a new one.
-        m_jitter = std::make_unique<jit>();
+        m_jitter = std::make_unique<jit>(this);
 
         if (cmp && with_obj) {
             // Assign the ir snapshot.
