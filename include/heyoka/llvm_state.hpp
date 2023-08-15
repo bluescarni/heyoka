@@ -210,19 +210,20 @@ class HEYOKA_DLL_PUBLIC llvm_state
     // end of a constructor.
     HEYOKA_DLL_LOCAL void ctor_setup_math_flags();
 
-public:
-    llvm_state();
-    // NOTE: enable the kwargs ctor only if:
+    // Meta-programming for the kwargs ctor. Enabled if:
     // - there is at least 1 argument (i.e., cannot act as a def ctor),
     // - if there is only 1 argument, it cannot be of type llvm_state
     //   (so that it does not interfere with copy/move ctors).
-    template <typename... KwArgs,
-              std::enable_if_t<
-                  (sizeof...(KwArgs) > 0u)
-                      && (sizeof...(KwArgs) > 1u
-                          || std::conjunction_v<std::negation<std::is_same<detail::uncvref_t<KwArgs>, llvm_state>>...>),
-                  int>
-              = 0>
+    template <typename... KwArgs>
+    using kwargs_ctor_enabler = std::enable_if_t<
+        (sizeof...(KwArgs) > 0u)
+            && (sizeof...(KwArgs) > 1u
+                || std::conjunction_v<std::negation<std::is_same<detail::uncvref_t<KwArgs>, llvm_state>>...>),
+        int>;
+
+public:
+    llvm_state();
+    template <typename... KwArgs, kwargs_ctor_enabler<KwArgs...> = 0>
     explicit llvm_state(KwArgs &&...kw_args) : llvm_state(kw_args_ctor_impl(std::forward<KwArgs>(kw_args)...))
     {
     }
