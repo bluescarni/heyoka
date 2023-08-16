@@ -127,7 +127,18 @@ TEST_CASE("copy semantics")
 
         taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
 
+        // On-the-fly testing for string repr.
+        std::ostringstream oss;
+        oss << s;
+        const auto orig_repr = oss.str();
+
         s.compile();
+
+        oss.str("");
+        oss << s;
+        const auto compiled_repr = oss.str();
+
+        REQUIRE(orig_repr != compiled_repr);
 
         const auto orig_ir = s.get_ir();
         const auto orig_bc = s.get_bc();
