@@ -939,7 +939,7 @@ std::string llvm_type_name(llvm::Type *t)
 
     t->print(ostr, false, true);
 
-    return ostr.str();
+    return retval;
 }
 
 // This function will return true if:

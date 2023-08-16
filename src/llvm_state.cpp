@@ -40,6 +40,8 @@
 #include <llvm/ADT/Triple.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
+#include <llvm/Bitcode/BitcodeReader.h>
+#include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/Config/llvm-config.h>
 #include <llvm/ExecutionEngine/JITSymbol.h>
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
@@ -463,7 +465,7 @@ struct llvm_state::jit {
             ostr << err;
 
             throw std::invalid_argument(fmt::format(
-                "The function for adding a module to the jit failed. The full error message:\n{}", ostr.str()));
+                "The function for adding a module to the jit failed. The full error message:\n{}", err_report));
         }
         // LCOV_EXCL_STOP
     }
@@ -516,40 +518,42 @@ void llvm_state_add_obj_to_jit(Jit &j, const std::string &obj)
         ostr << err;
 
         throw std::invalid_argument(fmt::format(
-            "The function for adding a compiled module to the jit failed. The full error message:\n{}", ostr.str()));
+            "The function for adding a compiled module to the jit failed. The full error message:\n{}", err_report));
     }
     // LCOV_EXCL_STOP
 }
 
-// Helper to create an LLVM module from a IR in string representation.
+// Helper to create an LLVM module from bitcode.
 // NOTE: the module name needs to be passed explicitly (although it is already
-// contained in the IR) because apparently llvm::parseIR() discards the module
+// contained in the bitcode) because apparently llvm::parseBitcodeFile() discards the module
 // name when parsing.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-auto llvm_state_ir_to_module(const std::string &module_name, const std::string &ir, llvm::LLVMContext &ctx)
+auto llvm_state_bc_to_module(const std::string &module_name, const std::string &bc, llvm::LLVMContext &ctx)
 {
     // Create the corresponding memory buffer.
-    auto mb = llvm::MemoryBuffer::getMemBuffer(ir);
+    auto mb = llvm::MemoryBuffer::getMemBuffer(bc);
+    assert(mb);
 
-    // Construct a new module from the parsed IR.
-    llvm::SMDiagnostic err;
-    auto ret = llvm::parseIR(*mb, err, ctx);
+    // Parse the bitcode.
+    auto ret = llvm::parseBitcodeFile(mb->getMemBufferRef(), ctx);
 
     // LCOV_EXCL_START
     if (!ret) {
+        const auto err = ret.takeError();
         std::string err_report;
         llvm::raw_string_ostream ostr(err_report);
 
-        err.print("", ostr);
+        ostr << err;
 
-        throw std::invalid_argument(fmt::format("IR parsing failed. The full error message:\n{}", ostr.str()));
+        throw std::invalid_argument(
+            fmt::format("LLVM bitcode parsing failed. The full error message:\n{}", err_report));
     }
     // LCOV_EXCL_STOP
 
     // Set the module name.
-    ret->setModuleIdentifier(module_name);
+    ret.get()->setModuleIdentifier(module_name);
 
-    return ret;
+    return std::move(ret.get());
 }
 
 } // namespace
@@ -587,25 +591,31 @@ llvm_state::llvm_state(const llvm_state &other)
     if (other.is_compiled() && other.m_jitter->m_object_file) {
         // 'other' was compiled and code was generated.
         // We leave module and builder empty, copy over the
-        // IR snapshot and add the cached compiled module
+        // IR/bitcode snapshots and add the cached compiled module
         // to the jit.
         m_ir_snapshot = other.m_ir_snapshot;
+        m_bc_snapshot = other.m_bc_snapshot;
+
         // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         detail::llvm_state_add_obj_to_jit(*m_jitter, *other.m_jitter->m_object_file);
     } else {
         // 'other' has not been compiled yet, or
         // it has been compiled but no code has been
         // lazily generated yet.
-        // We will fetch its IR and reconstruct
+        // We will fetch its bitcode and reconstruct
         // module and builder.
 
-        // Get the IR of other.
-        // NOTE: this works regardless of the compiled
-        // status of other.
-        const auto other_ir = other.get_ir();
+        // Is other compiled?
+        const auto other_cmp = other.is_compiled();
 
-        // Create the module from the IR.
-        m_module = detail::llvm_state_ir_to_module(m_module_name, other_ir, context());
+        // Create the module from the bitcode.
+        // NOTE: branch to avoid expensive copy if other
+        // has been compiled.
+        if (other_cmp) {
+            m_module = detail::llvm_state_bc_to_module(m_module_name, other.m_bc_snapshot, context());
+        } else {
+            m_module = detail::llvm_state_bc_to_module(m_module_name, other.get_bc(), context());
+        }
 
         // Create a new builder for the module.
         m_builder = std::make_unique<ir_builder>(context());
@@ -614,16 +624,16 @@ llvm_state::llvm_state(const llvm_state &other)
         ctor_setup_math_flags();
 
         // Compile if needed.
-        // NOTE: compilation will take care of setting up m_ir_snapshot.
-        // If no compilation happens, m_ir_snapshot is left empty after init.
-        if (other.is_compiled()) {
+        // NOTE: compilation will take care of setting up m_ir_snapshot/m_bc_snapshot.
+        // If no compilation happens, m_ir_snapshot/m_bc_snapshot are left empty after init.
+        if (other_cmp) {
             // NOTE: we need to temporarily disable optimisations
             // before compilation, for the following reason.
             //
             // Recall that here we are in the case
-            // in which the 'other' llvm_state had been compiled, but
-            // no object code had been produced yet. This means the IR
-            // had already been optimised, and by running another optimisation
+            // in which the 'other' llvm_state has been compiled, but
+            // no object code has been produced yet. This means the IR
+            // has already been optimised, and by running another optimisation
             // pass now (indirectly, via compile()) we might end
             // up modifying the already-optimised IR.
             // By temporarily setting m_opt_level to zero, we are preventing
@@ -634,6 +644,7 @@ llvm_state::llvm_state(const llvm_state &other)
 
             compile();
 
+            // Restore the original optimisation level.
             m_opt_level = orig_opt_level;
         }
     }
@@ -643,7 +654,8 @@ llvm_state::llvm_state(const llvm_state &other)
 // to set up correctly the m_state member of the jit instance.
 llvm_state::llvm_state(llvm_state &&other) noexcept
     : m_jitter(std::move(other.m_jitter)), m_module(std::move(other.m_module)), m_builder(std::move(other.m_builder)),
-      m_opt_level(other.m_opt_level), m_ir_snapshot(std::move(other.m_ir_snapshot)), m_fast_math(other.m_fast_math),
+      m_opt_level(other.m_opt_level), m_ir_snapshot(std::move(other.m_ir_snapshot)),
+      m_bc_snapshot(std::move(other.m_bc_snapshot)), m_fast_math(other.m_fast_math),
       m_force_avx512(other.m_force_avx512), m_module_name(std::move(other.m_module_name))
 {
     // Set up m_state.
@@ -678,6 +690,7 @@ llvm_state &llvm_state::operator=(llvm_state &&other) noexcept
         // The remaining bits.
         m_opt_level = other.m_opt_level;
         m_ir_snapshot = std::move(other.m_ir_snapshot);
+        m_bc_snapshot = std::move(other.m_bc_snapshot);
         m_fast_math = other.m_fast_math;
         m_force_avx512 = other.m_force_avx512;
         m_module_name = std::move(other.m_module_name);
@@ -695,10 +708,6 @@ llvm_state::~llvm_state()
     }
 }
 
-// NOTE: the save/load logic is essentially the same as in the
-// copy constructor. Specifically, we have 2 different paths
-// depending on whether the state is compiled AND object
-// code was generated.
 template <typename Archive>
 void llvm_state::save_impl(Archive &ar, unsigned) const
 {
@@ -719,20 +728,29 @@ void llvm_state::save_impl(Archive &ar, unsigned) const
     ar << m_force_avx512;
     ar << m_module_name;
 
-    // Store the IR.
-    // NOTE: avoid get_ir() if the module has been compiled,
+    // Store the bitcode.
+    // NOTE: avoid get_bc() if the module has been compiled,
     // and use the snapshot directly, so that we don't make
     // a useless copy.
     if (cmp) {
-        ar << m_ir_snapshot;
+        ar << m_bc_snapshot;
     } else {
-        ar << get_ir();
+        ar << get_bc();
     }
 
     if (with_obj) {
         // Save the object file if available.
         // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         ar << *m_jitter->m_object_file;
+    }
+
+    // Save a copy of the IR snapshot if the state
+    // is compiled and binary code was emitted.
+    // NOTE: we want this because otherwise we would
+    // need to re-parse the bitcode during des11n to
+    // restore the IR snapshot.
+    if (cmp && with_obj) {
+        ar << m_ir_snapshot;
     }
 }
 
@@ -783,15 +801,21 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
     std::string module_name;
     ar >> module_name;
 
-    // Load the ir
-    std::string ir;
-    ar >> ir;
+    // Load the bitcode.
+    std::string bc_snapshot;
+    ar >> bc_snapshot;
 
     // Recover the object file, if available.
     std::optional<std::string> obj_file;
     if (with_obj) {
         obj_file.emplace();
         ar >> *obj_file;
+    }
+
+    // Recover the IR snapshot, if available.
+    std::string ir_snapshot;
+    if (cmp && with_obj) {
+        ar >> ir_snapshot;
     }
 
     try {
@@ -809,20 +833,22 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
         m_jitter = std::make_unique<jit>(this);
 
         if (cmp && with_obj) {
-            // Assign the ir snapshot.
-            m_ir_snapshot = std::move(ir);
+            // Assign the snapshots.
+            m_ir_snapshot = std::move(ir_snapshot);
+            m_bc_snapshot = std::move(bc_snapshot);
 
             // Add the object code to the jit.
             // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
             detail::llvm_state_add_obj_to_jit(*m_jitter, *obj_file);
         } else {
-            // Clear the existing ir snapshot
-            // (it will be replaced with the
-            // actual ir if compilation is needed).
+            // Clear the existing snapshots
+            // (they will be replaced with the
+            // actual ir/bitcode if compilation is needed).
             m_ir_snapshot.clear();
+            m_bc_snapshot.clear();
 
-            // Create the module from the IR.
-            m_module = detail::llvm_state_ir_to_module(m_module_name, ir, context());
+            // Create the module from the bitcode.
+            m_module = detail::llvm_state_bc_to_module(m_module_name, bc_snapshot, context());
 
             // Create a new builder for the module.
             m_builder = std::make_unique<ir_builder>(context());
@@ -831,8 +857,8 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
             ctor_setup_math_flags();
 
             // Compile if needed.
-            // NOTE: compilation will take care of setting up m_ir_snapshot.
-            // If no compilation happens, m_ir_snapshot is left empty after
+            // NOTE: compilation will take care of setting up m_ir_snapshot/m_bc_snapshot.
+            // If no compilation happens, m_ir_snapshot/m_bc_snapshot are left empty after
             // clearing earlier.
             if (cmp) {
                 // NOTE: we need to temporarily disable optimisations
@@ -852,6 +878,7 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
 
                 compile();
 
+                // Restore the original optimisation level.
                 m_opt_level = orig_opt_level;
             }
         }
@@ -962,7 +989,7 @@ void llvm_state::verify_function(llvm::Function *f)
         f->eraseFromParent();
 
         throw std::invalid_argument(fmt::format(
-            "The verification of the function '{}' failed. The full error message:\n{}", fname, ostr.str()));
+            "The verification of the function '{}' failed. The full error message:\n{}", fname, err_report));
     }
 }
 
@@ -1211,7 +1238,7 @@ void llvm_state::compile()
 
         if (llvm::verifyModule(*m_module, &ostr)) {
             throw std::runtime_error(
-                fmt::format("The verification of the module '{}' produced an error:\n{}", m_module_name, ostr.str()));
+                fmt::format("The verification of the module '{}' produced an error:\n{}", m_module_name, out));
         }
     }
 
@@ -1219,8 +1246,9 @@ void llvm_state::compile()
         // Run the optimisation pass.
         optimise();
 
-        // Store a snapshot of the optimised IR before compiling.
+        // Store a snapshot of the optimised IR and bitcode before compiling.
         m_ir_snapshot = get_ir();
+        m_bc_snapshot = get_bc();
 
         // Add the module (this will clear out m_module).
         m_jitter->add_module(std::move(m_module));
@@ -1241,6 +1269,11 @@ void llvm_state::compile()
 bool llvm_state::is_compiled() const
 {
     return !m_module;
+}
+
+bool llvm_state::has_object_code() const
+{
+    return static_cast<bool>(m_jitter->m_object_file);
 }
 
 // NOTE: this function will lookup symbol names,
@@ -1269,13 +1302,34 @@ std::string llvm_state::get_ir() const
         // get the IR from it.
         std::string out;
         llvm::raw_string_ostream ostr(out);
+
         m_module->print(ostr, nullptr);
-        return ostr.str();
+
+        return out;
     } else {
         // The module has been compiled.
         // Return the IR snapshot that
         // was created before the compilation.
         return m_ir_snapshot;
+    }
+}
+
+std::string llvm_state::get_bc() const
+{
+    if (m_module) {
+        // The module has not been compiled yet,
+        // get the bitcode from it.
+        std::string out;
+        llvm::raw_string_ostream ostr(out);
+
+        llvm::WriteBitcodeToFile(*m_module, ostr);
+
+        return out;
+    } else {
+        // The module has been compiled.
+        // Return the bitcode snapshot that
+        // was created before the compilation.
+        return m_bc_snapshot;
     }
 }
 
@@ -1331,15 +1385,23 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
     std::ostringstream oss;
     oss << std::boolalpha;
 
-    oss << "Module name        : " << s.m_module_name << '\n';
-    oss << "Compiled           : " << s.is_compiled() << '\n';
-    oss << "Fast math          : " << s.m_fast_math << '\n';
-    oss << "Force AVX512       : " << s.m_force_avx512 << '\n';
-    oss << "Optimisation level : " << s.m_opt_level << '\n';
-    oss << "Target triple      : " << s.m_jitter->get_target_triple().str() << '\n';
-    oss << "Target CPU         : " << s.m_jitter->get_target_cpu() << '\n';
-    oss << "Target features    : " << s.m_jitter->get_target_features() << '\n';
-    oss << "IR size            : " << s.get_ir().size() << '\n';
+    oss << "Module name       : " << s.m_module_name << '\n';
+    oss << "Compiled          : " << s.is_compiled() << '\n';
+    oss << "Has object code   : " << s.has_object_code() << '\n';
+    oss << "Fast math         : " << s.m_fast_math << '\n';
+    oss << "Force AVX512      : " << s.m_force_avx512 << '\n';
+    oss << "Optimisation level: " << s.m_opt_level << '\n';
+    oss << "Data layout       : " << s.m_jitter->m_lljit->getDataLayout().getStringRepresentation() << '\n';
+    oss << "Target triple     : " << s.m_jitter->get_target_triple().str() << '\n';
+    oss << "Target CPU        : " << s.m_jitter->get_target_cpu() << '\n';
+    oss << "Target features   : " << s.m_jitter->get_target_features() << '\n';
+    oss << "Bitcode size      : ";
+
+    if (s.is_compiled()) {
+        oss << s.m_bc_snapshot.size() << '\n';
+    } else {
+        oss << s.get_bc().size() << '\n';
+    }
 
     return os << oss.str();
 }

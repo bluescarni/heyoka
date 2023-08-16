@@ -133,6 +133,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::unique_ptr<ir_builder> m_builder;
     unsigned m_opt_level;
     std::string m_ir_snapshot;
+    std::string m_bc_snapshot;
     bool m_fast_math;
     bool m_force_avx512;
     std::string m_module_name;
@@ -247,6 +248,7 @@ public:
     [[nodiscard]] bool force_avx512() const;
 
     [[nodiscard]] std::string get_ir() const;
+    [[nodiscard]] std::string get_bc() const;
     void dump_object_code(const std::string &) const;
     [[nodiscard]] const std::string &get_object_code() const;
 
@@ -256,6 +258,7 @@ public:
     void optimise();
 
     [[nodiscard]] bool is_compiled() const;
+    [[nodiscard]] bool has_object_code() const;
 
     void compile();
 
@@ -266,9 +269,10 @@ public:
 
 HEYOKA_END_NAMESPACE
 
-// Current archive version is 2. Changelog:
+// Archive version changelog:
 // - version 1: got rid of the inline_functions setting;
-// - version 2: added the force_avx512 setting.
-BOOST_CLASS_VERSION(heyoka::llvm_state, 2)
+// - version 2: added the force_avx512 setting;
+// - version 3: added the bitcode snapshot.
+BOOST_CLASS_VERSION(heyoka::llvm_state, 3)
 
 #endif
