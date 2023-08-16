@@ -472,7 +472,7 @@ struct llvm_state::jit {
             ostr << err;
 
             throw std::invalid_argument(fmt::format(
-                "The function for adding a module to the jit failed. The full error message:\n{}", err_report));
+                "The function for adding a module to the jit failed. The full error message:\n{}", ostr.str()));
         }
         // LCOV_EXCL_STOP
     }
@@ -525,7 +525,7 @@ void llvm_state_add_obj_to_jit(Jit &j, const std::string &obj)
         ostr << err;
 
         throw std::invalid_argument(fmt::format(
-            "The function for adding a compiled module to the jit failed. The full error message:\n{}", err_report));
+            "The function for adding a compiled module to the jit failed. The full error message:\n{}", ostr.str()));
     }
     // LCOV_EXCL_STOP
 
@@ -560,7 +560,7 @@ auto llvm_state_bc_to_module(const std::string &module_name, const std::string &
         ostr << err;
 
         throw std::invalid_argument(
-            fmt::format("LLVM bitcode parsing failed. The full error message:\n{}", err_report));
+            fmt::format("LLVM bitcode parsing failed. The full error message:\n{}", ostr.str()));
     }
     // LCOV_EXCL_STOP
 
@@ -1003,7 +1003,7 @@ void llvm_state::verify_function(llvm::Function *f)
         f->eraseFromParent();
 
         throw std::invalid_argument(fmt::format(
-            "The verification of the function '{}' failed. The full error message:\n{}", fname, err_report));
+            "The verification of the function '{}' failed. The full error message:\n{}", fname, ostr.str()));
     }
 }
 
@@ -1252,7 +1252,7 @@ void llvm_state::compile()
 
         if (llvm::verifyModule(*m_module, &ostr)) {
             throw std::runtime_error(
-                fmt::format("The verification of the module '{}' produced an error:\n{}", m_module_name, out));
+                fmt::format("The verification of the module '{}' produced an error:\n{}", m_module_name, ostr.str()));
         }
     }
 
@@ -1319,7 +1319,7 @@ std::string llvm_state::get_ir() const
 
         m_module->print(ostr, nullptr);
 
-        return out;
+        return std::move(ostr.str());
     } else {
         // The module has been compiled.
         // Return the IR snapshot that
@@ -1338,7 +1338,7 @@ std::string llvm_state::get_bc() const
 
         llvm::WriteBitcodeToFile(*m_module, ostr);
 
-        return out;
+        return std::move(ostr.str());
     } else {
         // The module has been compiled.
         // Return the bitcode snapshot that

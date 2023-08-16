@@ -67,6 +67,9 @@ TEST_CASE("empty state")
     std::cout << s << '\n';
     std::cout << s.get_ir() << '\n';
 
+    REQUIRE(!s.get_bc().empty());
+    REQUIRE(!s.get_ir().empty());
+
     // Print also some info on the FP types.
     std::cout << "Double digits     : " << std::numeric_limits<double>::digits << '\n';
     std::cout << "Long double digits: " << std::numeric_limits<long double>::digits << '\n';
