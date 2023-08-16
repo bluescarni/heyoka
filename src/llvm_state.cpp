@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <cassert>
 #include <charconv>
 #include <cstddef>
@@ -358,10 +359,18 @@ struct llvm_state::jit {
         // when it is lazily generated.
         m_lljit->getObjTransformLayer().setTransform([this](std::unique_ptr<llvm::MemoryBuffer> obj_buffer) {
             assert(obj_buffer);
-            assert(!m_object_file);
 
-            // Copy obj_buffer to the local m_object_file member.
-            m_object_file.emplace(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd());
+            // NOTE: this callback will be invoked the first time a jit lookup is performed,
+            // even if the object code was copied from another llvm_state or
+            // loaded from an archive. In such a case, m_object_file has already been set up properly and we just sanity
+            // check in debug mode that the content of m_object_file matches the content of obj_buffer.
+            if (m_object_file) {
+                assert(obj_buffer->getBufferSize() == m_object_file->size());
+                assert(std::equal(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd(), m_object_file->begin()));
+            } else {
+                // Copy obj_buffer to the local m_object_file member.
+                m_object_file.emplace(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd());
+            }
 
             return llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>>(std::move(obj_buffer));
         });
@@ -521,6 +530,13 @@ void llvm_state_add_obj_to_jit(Jit &j, const std::string &obj)
             "The function for adding a compiled module to the jit failed. The full error message:\n{}", err_report));
     }
     // LCOV_EXCL_STOP
+
+    // Add the object code also to the
+    // m_object_file member.
+    // NOTE: this function at the moment is used when m_object_file
+    // is supposed to be empty.
+    assert(!j.m_object_file);
+    j.m_object_file.emplace(obj);
 }
 
 // Helper to create an LLVM module from bitcode.
