@@ -4,9 +4,20 @@ Changelog
 1.1.0 (unreleased)
 ------------------
 
+New
+~~~
+
+- It is now possible to get the LLVM bitcode of
+  an ``llvm_state``
+  (`#339 <https://github.com/bluescarni/heyoka/pull/339>`__).
+
 Changes
 ~~~~~~~
 
+- The LLVM bitcode is now used internally (instead of the textual
+  representation of the IR) when copying and serialising
+  an ``llvm_state``
+  (`#339 <https://github.com/bluescarni/heyoka/pull/339>`__).
 - The optimisation pass in an ``llvm_state`` is now automatically
   called during compilation
   (`#339 <https://github.com/bluescarni/heyoka/pull/339>`__).
@@ -14,6 +25,9 @@ Changes
 Fix
 ~~~
 
+- Fix the object file of an ``llvm_state`` not being
+  preserved during copy and deserialisation
+  (`#339 <https://github.com/bluescarni/heyoka/pull/339>`__).
 - Fix LLVM module name not being preserved during
   copy and deserialisation of ``llvm_state``
   (`#339 <https://github.com/bluescarni/heyoka/pull/339>`__).

@@ -62,11 +62,9 @@
 #include <llvm/IR/Operator.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
-#include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/SmallVectorMemoryBuffer.h>
-#include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
