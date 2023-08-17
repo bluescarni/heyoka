@@ -110,7 +110,6 @@ TEST_CASE("fast exclusion check")
 
                     // Add the function and fetch it.
                     detail::llvm_add_fex_check(s, detail::to_llvm_type<fp_t>(s.context()), order, batch_size, use_cs);
-                    s.optimise();
                     s.compile();
                     auto fex_check = reinterpret_cast<void (*)(const fp_t *, const fp_t *, const std::uint32_t *,
                                                                std::uint32_t *)>(s.jit_lookup("fex_check"));

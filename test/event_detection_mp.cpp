@@ -67,8 +67,6 @@ TEST_CASE("poly translator 1")
 
             detail::add_poly_translator_1(s, detail::llvm_type_like(s, input[0]), 5, 1);
 
-            s.optimise();
-
             s.compile();
 
             auto *pt1 = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("poly_translate_1"));
@@ -99,8 +97,6 @@ TEST_CASE("poly csc")
             const auto mname = detail::llvm_mangle_type(detail::llvm_type_like(s, input[0]));
 
             detail::llvm_add_csc(s, detail::llvm_type_like(s, input[0]), 5, 1);
-
-            s.optimise();
 
             s.compile();
 

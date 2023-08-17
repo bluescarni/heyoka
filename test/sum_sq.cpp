@@ -262,7 +262,6 @@ TEST_CASE("cfunc")
 
         const auto dc = add_cfunc<double>(s, "cfunc", {sum_sq({x, y, cos(sum_sq({x, y}))})});
 
-        s.optimise();
         s.compile();
 
         auto *cf_ptr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(

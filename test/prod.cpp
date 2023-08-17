@@ -582,7 +582,6 @@ TEST_CASE("prod split")
         }
     }
 
-    ls.optimise();
     ls.compile();
 
     auto *cf_ptr

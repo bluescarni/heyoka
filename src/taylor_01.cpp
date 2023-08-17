@@ -1733,7 +1733,7 @@ template class t_event_impl<mppp::real, false>;
 // Add a function for computing the dense output
 // via polynomial evaluation.
 void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32_t n_eq, std::uint32_t order,
-                               std::uint32_t batch_size, bool high_accuracy, bool external_linkage, bool optimise)
+                               std::uint32_t batch_size, bool high_accuracy, bool external_linkage)
 {
     // LCOV_EXCL_START
     assert(n_eq > 0u);
@@ -1746,6 +1746,9 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
 
     // Fetch the external type corresponding to fp_scal_t.
     auto *ext_fp_scal_t = llvm_ext_type(fp_scal_t);
+
+    // Fetch the current insertion block.
+    auto *orig_bb = builder.GetInsertBlock();
 
     // The function arguments:
     // - the output pointer (read/write, used also for accumulation),
@@ -1905,10 +1908,8 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
     // Verify the function.
     s.verify_function(f);
 
-    // Run the optimisation pass, if requested.
-    if (optimise) {
-        s.optimise();
-    }
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
 }
 
 } // namespace detail
@@ -1960,7 +1961,7 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
 
     // Add the function for the computation of the dense output.
     // NOTE: the dense output function operates on data in external format.
-    detail::taylor_add_d_out_function(m_llvm_state, fp_t, dim, order, 1, high_accuracy, false, false);
+    detail::taylor_add_d_out_function(m_llvm_state, fp_t, dim, order, 1, high_accuracy, false);
 
     // Fetch it.
     auto *d_out_f = md.getFunction("d_out_f");
@@ -2151,9 +2152,6 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
 
     // Verify the function.
     m_llvm_state.verify_function(f);
-
-    // Run the optimisation pass.
-    m_llvm_state.optimise();
 
     // Compile.
     m_llvm_state.compile();
@@ -2834,9 +2832,6 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
 
     // Verify the function.
     m_llvm_state.verify_function(f);
-
-    // Run the optimisation pass.
-    m_llvm_state.optimise();
 
     // Compile.
     m_llvm_state.compile();

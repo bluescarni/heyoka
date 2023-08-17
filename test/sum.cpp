@@ -459,7 +459,6 @@ TEST_CASE("sum split")
         }
     }
 
-    ls.optimise();
     ls.compile();
 
     auto *cf_ptr

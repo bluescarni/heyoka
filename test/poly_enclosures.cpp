@@ -140,9 +140,6 @@ TEST_CASE("polynomial enclosures")
                 // Verify.
                 s.verify_function(f);
 
-                // Run the optimisation pass.
-                s.optimise();
-
                 // Compile.
                 s.compile();
 
@@ -283,9 +280,6 @@ TEST_CASE("polynomial enclosures mp")
 
                 // Verify.
                 s.verify_function(f);
-
-                // Run the optimisation pass.
-                s.optimise();
 
                 // Compile.
                 s.compile();

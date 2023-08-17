@@ -133,6 +133,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::unique_ptr<ir_builder> m_builder;
     unsigned m_opt_level;
     std::string m_ir_snapshot;
+    std::string m_bc_snapshot;
     bool m_fast_math;
     bool m_force_avx512;
     std::string m_module_name;
@@ -210,19 +211,20 @@ class HEYOKA_DLL_PUBLIC llvm_state
     // end of a constructor.
     HEYOKA_DLL_LOCAL void ctor_setup_math_flags();
 
-public:
-    llvm_state();
-    // NOTE: enable the kwargs ctor only if:
+    // Meta-programming for the kwargs ctor. Enabled if:
     // - there is at least 1 argument (i.e., cannot act as a def ctor),
     // - if there is only 1 argument, it cannot be of type llvm_state
     //   (so that it does not interfere with copy/move ctors).
-    template <typename... KwArgs,
-              std::enable_if_t<
-                  (sizeof...(KwArgs) > 0u)
-                      && (sizeof...(KwArgs) > 1u
-                          || std::conjunction_v<std::negation<std::is_same<detail::uncvref_t<KwArgs>, llvm_state>>...>),
-                  int>
-              = 0>
+    template <typename... KwArgs>
+    using kwargs_ctor_enabler = std::enable_if_t<
+        (sizeof...(KwArgs) > 0u)
+            && (sizeof...(KwArgs) > 1u
+                || std::conjunction_v<std::negation<std::is_same<detail::uncvref_t<KwArgs>, llvm_state>>...>),
+        int>;
+
+public:
+    llvm_state();
+    template <typename... KwArgs, kwargs_ctor_enabler<KwArgs...> = 0>
     explicit llvm_state(KwArgs &&...kw_args) : llvm_state(kw_args_ctor_impl(std::forward<KwArgs>(kw_args)...))
     {
     }
@@ -246,6 +248,7 @@ public:
     [[nodiscard]] bool force_avx512() const;
 
     [[nodiscard]] std::string get_ir() const;
+    [[nodiscard]] std::string get_bc() const;
     void dump_object_code(const std::string &) const;
     [[nodiscard]] const std::string &get_object_code() const;
 
@@ -255,6 +258,7 @@ public:
     void optimise();
 
     [[nodiscard]] bool is_compiled() const;
+    [[nodiscard]] bool has_object_code() const;
 
     void compile();
 
@@ -265,9 +269,10 @@ public:
 
 HEYOKA_END_NAMESPACE
 
-// Current archive version is 2. Changelog:
+// Archive version changelog:
 // - version 1: got rid of the inline_functions setting;
-// - version 2: added the force_avx512 setting.
-BOOST_CLASS_VERSION(heyoka::llvm_state, 2)
+// - version 2: added the force_avx512 setting;
+// - version 3: added the bitcode snapshot.
+BOOST_CLASS_VERSION(heyoka::llvm_state, 3)
 
 #endif

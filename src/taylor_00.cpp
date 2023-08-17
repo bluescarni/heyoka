@@ -105,29 +105,6 @@ std::uint32_t n_pars_in_dc(const taylor_dc_t &dc)
 namespace
 {
 
-// RAII helper to temporarily set the opt level to 0 in an llvm_state.
-struct opt_disabler {
-    llvm_state *m_s;
-    unsigned m_orig_opt_level;
-
-    explicit opt_disabler(llvm_state &s) : m_s(&s), m_orig_opt_level(s.opt_level())
-    {
-        // Disable optimisations.
-        m_s->opt_level() = 0;
-    }
-
-    opt_disabler(const opt_disabler &) = delete;
-    opt_disabler(opt_disabler &&) noexcept = delete;
-    opt_disabler &operator=(const opt_disabler &) = delete;
-    opt_disabler &operator=(opt_disabler &&) noexcept = delete;
-
-    ~opt_disabler()
-    {
-        // Restore the original optimisation level.
-        m_s->opt_level() = m_orig_opt_level;
-    }
-};
-
 // Helper to determine the optimal Taylor order for a given tolerance,
 // following Jorba's prescription.
 // NOTE: when T is mppp::real and tol has a low precision, the use
@@ -292,11 +269,6 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
 
     // Verify the function.
     s.verify_function(f);
-
-    // Run the optimisation pass.
-    // NOTE: this does nothing currently, as the optimisation
-    // level is set to zero from the outside.
-    s.optimise();
 
     return std::tuple{std::move(dc), order};
 }
@@ -467,11 +439,6 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
 
     // Verify the function.
     s.verify_function(f);
-
-    // Run the optimisation pass.
-    // NOTE: this does nothing currently, as the optimisation
-    // level is set to zero from the outside.
-    s.optimise();
 
     return std::tuple{std::move(dc), order};
 }
@@ -714,11 +681,6 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state,
     // Do we have events?
     const auto with_events = !tes.empty() || !ntes.empty();
 
-    // Temporarily disable optimisations in s, so that
-    // we don't optimise twice when adding the step
-    // and then the d_out.
-    std::optional<detail::opt_disabler> od(m_llvm);
-
     // Add the stepper function.
     if (with_events) {
         std::vector<expression> ee;
@@ -768,15 +730,6 @@ void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state,
                                       high_accuracy);
 
     detail::get_logger()->trace("Taylor dense output runtime: {}", sw);
-    sw.reset();
-
-    // Restore the original optimisation level in s.
-    od.reset();
-
-    // Run the optimisation pass manually.
-    m_llvm.optimise();
-
-    detail::get_logger()->trace("Taylor global opt pass runtime: {}", sw);
     sw.reset();
 
     // Run the jit.
@@ -2397,11 +2350,6 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
     // Do we have events?
     const auto with_events = !tes.empty() || !ntes.empty();
 
-    // Temporarily disable optimisations in s, so that
-    // we don't optimise twice when adding the step
-    // and then the d_out.
-    std::optional<detail::opt_disabler> od(m_llvm);
-
     // Add the stepper function.
     if (with_events) {
         std::vector<expression> ee;
@@ -2448,15 +2396,6 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> s
                                       high_accuracy);
 
     detail::get_logger()->trace("Taylor batch dense output runtime: {}", sw);
-    sw.reset();
-
-    // Restore the original optimisation level in s.
-    od.reset();
-
-    // Run the optimisation pass manually.
-    m_llvm.optimise();
-
-    detail::get_logger()->trace("Taylor batch global opt pass runtime: {}", sw);
     sw.reset();
 
     // Run the jit.

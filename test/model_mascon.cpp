@@ -330,7 +330,6 @@ TEST_CASE("basic cmp")
         REQUIRE(dc1.size() == 27u);
         REQUIRE(dc2.size() == 30u);
 
-        s.optimise();
         s.compile();
 
         auto *cf

@@ -86,7 +86,6 @@ TEST_CASE("basic")
 
         REQUIRE(dc.size() == 19u);
 
-        s.optimise();
         s.compile();
 
         auto *cf
@@ -128,7 +127,6 @@ TEST_CASE("basic")
 
         REQUIRE(dc.size() == 20u);
 
-        s.optimise();
         s.compile();
 
         auto *cf

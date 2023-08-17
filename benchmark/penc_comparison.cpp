@@ -133,9 +133,6 @@ void run_benchmark(unsigned order)
     // Verify.
     s.verify_function(f);
 
-    // Run the optimisation pass.
-    s.optimise();
-
     // Compile.
     s.compile();
 

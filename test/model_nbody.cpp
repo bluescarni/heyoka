@@ -96,7 +96,6 @@ TEST_CASE("nbody")
 
         REQUIRE(dc.size() == 146u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -132,7 +131,6 @@ TEST_CASE("nbody")
 
         REQUIRE(dc.size() == 114u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -179,7 +177,6 @@ TEST_CASE("nbody")
 
         REQUIRE(dc.size() == 146u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -228,7 +225,6 @@ TEST_CASE("nbody")
 
         REQUIRE(dc.size() == 114u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -279,7 +275,6 @@ TEST_CASE("nbody")
 
         REQUIRE(dc.size() == 146u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -331,7 +326,6 @@ TEST_CASE("nbody")
 
         REQUIRE(dc.size() == 114u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -378,7 +372,6 @@ TEST_CASE("nbody")
 
         REQUIRE(dc.size() == 124u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -423,7 +416,6 @@ TEST_CASE("nbody")
 
         REQUIRE(dc.size() == 37u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -511,7 +503,6 @@ TEST_CASE("np1body")
 
         REQUIRE(dc.size() == 158u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -547,7 +538,6 @@ TEST_CASE("np1body")
 
         REQUIRE(dc.size() == 123u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -583,7 +573,6 @@ TEST_CASE("np1body")
 
         REQUIRE(dc.size() == 158u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -619,7 +608,6 @@ TEST_CASE("np1body")
 
         REQUIRE(dc.size() == 123u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -657,7 +645,6 @@ TEST_CASE("np1body")
 
         REQUIRE(dc.size() == 158u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -696,7 +683,6 @@ TEST_CASE("np1body")
 
         REQUIRE(dc.size() == 123u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -730,7 +716,6 @@ TEST_CASE("np1body")
 
         REQUIRE(dc.size() == 136u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -768,7 +753,6 @@ TEST_CASE("np1body")
 
         REQUIRE(dc.size() == 141u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
@@ -803,7 +787,6 @@ TEST_CASE("np1body")
 
         REQUIRE(dc.size() == 31u);
 
-        s.optimise();
         s.compile();
 
         double en_out = 0;
