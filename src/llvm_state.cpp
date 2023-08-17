@@ -359,9 +359,9 @@ struct llvm_state::jit {
             assert(obj_buffer);
 
             // NOTE: this callback will be invoked the first time a jit lookup is performed,
-            // even if the object code was copied from another llvm_state or
-            // loaded from an archive. In such a case, m_object_file has already been set up properly and we just sanity
-            // check in debug mode that the content of m_object_file matches the content of obj_buffer.
+            // even if the object code was manually injected via llvm_state_add_obj_to_jit()
+            // (e.g., during copy, des11n, etc.). In such a case, m_object_file has already been set up properly and we
+            // just sanity check in debug mode that the content of m_object_file matches the content of obj_buffer.
             if (m_object_file) {
                 assert(obj_buffer->getBufferSize() == m_object_file->size());
                 assert(std::equal(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd(), m_object_file->begin()));
