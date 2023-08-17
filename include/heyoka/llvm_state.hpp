@@ -211,6 +211,9 @@ class HEYOKA_DLL_PUBLIC llvm_state
     // end of a constructor.
     HEYOKA_DLL_LOCAL void ctor_setup_math_flags();
 
+    // Low-level implementation detail for compilation.
+    HEYOKA_DLL_LOCAL void compile_impl();
+
     // Meta-programming for the kwargs ctor. Enabled if:
     // - there is at least 1 argument (i.e., cannot act as a def ctor),
     // - if there is only 1 argument, it cannot be of type llvm_state

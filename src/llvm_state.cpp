@@ -639,27 +639,9 @@ llvm_state::llvm_state(const llvm_state &other)
 
         // Compile if needed.
         // NOTE: compilation will take care of setting up m_ir_snapshot/m_bc_snapshot.
-        // If no compilation happens, m_ir_snapshot/m_bc_snapshot are left empty after init.
+        // If no compilation happens, they are left empty after init.
         if (other_cmp) {
-            // NOTE: we need to temporarily disable optimisations
-            // before compilation, for the following reason.
-            //
-            // Recall that here we are in the case
-            // in which the 'other' llvm_state has been compiled, but
-            // no object code has been produced yet. This means the IR
-            // has already been optimised, and by running another optimisation
-            // pass now (indirectly, via compile()) we might end
-            // up modifying the already-optimised IR.
-            // By temporarily setting m_opt_level to zero, we are preventing
-            // any modification to the IR and ensuring that, after copying,
-            // we have exactly reproduced the original llvm_state object.
-            const auto orig_opt_level = m_opt_level;
-            m_opt_level = 0;
-
-            compile();
-
-            // Restore the original optimisation level.
-            m_opt_level = orig_opt_level;
+            compile_impl();
         }
     }
 }
@@ -872,28 +854,10 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
 
             // Compile if needed.
             // NOTE: compilation will take care of setting up m_ir_snapshot/m_bc_snapshot.
-            // If no compilation happens, m_ir_snapshot/m_bc_snapshot are left empty after
+            // If no compilation happens, they are left empty after
             // clearing earlier.
             if (cmp) {
-                // NOTE: we need to temporarily disable optimisations
-                // before compilation, for the following reason.
-                //
-                // Recall that here we are in the case
-                // in which the serialised llvm_state had been compiled, but
-                // no object code had been produced yet. This means the IR
-                // had already been optimised, and by running another optimisation
-                // pass (indirectly, via compile()) now we might end
-                // up modifying the already-optimised IR.
-                // By temporarily setting m_opt_level to zero, we are preventing
-                // any modification to the IR and ensuring that, after deserialisation,
-                // we have exactly reproduced the original llvm_state object.
-                const auto orig_opt_level = m_opt_level;
-                m_opt_level = 0;
-
-                compile();
-
-                // Restore the original optimisation level.
-                m_opt_level = orig_opt_level;
+                compile_impl();
             }
         }
         // LCOV_EXCL_START
@@ -1239,6 +1203,27 @@ void llvm_state::optimise()
     }
 }
 
+// NOTE: this function is NOT exception-safe, proper cleanup
+// needs to be done externally if needed.
+void llvm_state::compile_impl()
+{
+    // Preconditions.
+    assert(m_module);
+    assert(m_builder);
+    assert(m_ir_snapshot.empty());
+    assert(m_bc_snapshot.empty());
+
+    // Store a snapshot of the current IR and bitcode.
+    m_ir_snapshot = get_ir();
+    m_bc_snapshot = get_bc();
+
+    // Add the module to the jit (this will clear out m_module).
+    m_jitter->add_module(std::move(m_module));
+
+    // Clear out the builder, which won't be usable any more.
+    m_builder.reset();
+}
+
 // NOTE: we need to emphasise in the docs that compilation
 // triggers an optimisation pass.
 void llvm_state::compile()
@@ -1260,15 +1245,9 @@ void llvm_state::compile()
         // Run the optimisation pass.
         optimise();
 
-        // Store a snapshot of the optimised IR and bitcode before compiling.
-        m_ir_snapshot = get_ir();
-        m_bc_snapshot = get_bc();
+        // Run the compilation.
+        compile_impl();
 
-        // Add the module (this will clear out m_module).
-        m_jitter->add_module(std::move(m_module));
-
-        // Clear out the builder, which won't be usable any more.
-        m_builder.reset();
         // LCOV_EXCL_START
     } catch (...) {
         // Reset to a def-cted state in case of error,
