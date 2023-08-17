@@ -249,7 +249,7 @@ target_features get_target_features_impl()
 // Machinery to initialise the native target in
 // LLVM. This needs to be done only once.
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-std::once_flag nt_inited;
+HEYOKA_CONSTINIT std::once_flag nt_inited;
 
 void init_native_target()
 {

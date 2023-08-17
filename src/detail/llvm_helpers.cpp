@@ -209,7 +209,7 @@ llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp, bo
 {
     const auto it = type_map.find(tp);
 
-    const auto *err_msg = "Unable to associate the C++ type '{}' to an LLVM type";
+    constexpr auto *err_msg = "Unable to associate the C++ type '{}' to an LLVM type";
 
     if (it == type_map.end()) {
         // LCOV_EXCL_START

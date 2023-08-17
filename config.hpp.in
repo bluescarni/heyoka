@@ -88,4 +88,17 @@
     }
 // clang-format on
 
+// C++20 constinit.
+// NOTE: this seems to be buggy currently on MSVC:
+// https://github.com/bluescarni/mppp/issues/291
+#if defined(__cpp_constinit) && (!defined(_MSC_VER) || defined(__clang__))
+
+#define HEYOKA_CONSTINIT constinit
+
+#else
+
+#define HEYOKA_CONSTINIT
+
+#endif
+
 #endif
