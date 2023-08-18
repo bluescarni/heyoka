@@ -1208,6 +1208,7 @@ void llvm_state::compile_impl()
 
     // Trigger object code materialisation via lookup.
     jit_lookup(detail::obj_trigger_name);
+    assert(m_jitter->m_object_file);
 }
 
 // NOTE: we need to emphasise in the docs that compilation
