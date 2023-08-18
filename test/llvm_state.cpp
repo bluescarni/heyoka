@@ -91,7 +91,6 @@ TEST_CASE("copy semantics")
         REQUIRE(s.opt_level() == 2u);
         REQUIRE(s.fast_math());
         REQUIRE(!s.is_compiled());
-        REQUIRE(!s.has_object_code());
 
         const auto orig_ir = s.get_ir();
         const auto orig_bc = s.get_bc();
@@ -102,7 +101,6 @@ TEST_CASE("copy semantics")
         REQUIRE(s2.opt_level() == 2u);
         REQUIRE(s2.fast_math());
         REQUIRE(!s2.is_compiled());
-        REQUIRE(!s2.has_object_code());
 
         REQUIRE(s2.get_ir() == orig_ir);
         REQUIRE(s2.get_bc() == orig_bc);
@@ -119,52 +117,7 @@ TEST_CASE("copy semantics")
         REQUIRE(jet[3] == 6);
     }
 
-    // Compile, but don't generate code, and copy.
-    {
-        std::vector<double> jet{2, 3, 0, 0};
-
-        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
-
-        taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
-
-        // On-the-fly testing for string repr.
-        std::ostringstream oss;
-        oss << s;
-        const auto orig_repr = oss.str();
-
-        s.compile();
-
-        oss.str("");
-        oss << s;
-        const auto compiled_repr = oss.str();
-
-        REQUIRE(orig_repr != compiled_repr);
-
-        const auto orig_ir = s.get_ir();
-        const auto orig_bc = s.get_bc();
-
-        auto s2 = s;
-
-        REQUIRE(s2.module_name() == "sample state");
-        REQUIRE(s2.opt_level() == 2u);
-        REQUIRE(s2.fast_math());
-        REQUIRE(s2.is_compiled());
-        REQUIRE(!s2.has_object_code());
-
-        REQUIRE(s2.get_ir() == orig_ir);
-        REQUIRE(s2.get_bc() == orig_bc);
-
-        auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s2.jit_lookup("jet"));
-
-        jptr(jet.data(), nullptr, nullptr);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 6);
-        REQUIRE(jet[3] == 6);
-    }
-
-    // Compile, generate code, and copy.
+    // Compile and copy.
     {
         std::vector<double> jet{2, 3, 0, 0};
 
@@ -185,7 +138,6 @@ TEST_CASE("copy semantics")
         REQUIRE(s2.opt_level() == 2u);
         REQUIRE(s2.fast_math());
         REQUIRE(s2.is_compiled());
-        REQUIRE(s2.has_object_code());
 
         REQUIRE(s2.get_ir() == orig_ir);
         REQUIRE(s2.get_bc() == orig_bc);
@@ -218,12 +170,6 @@ TEST_CASE("get object code")
 
         s.compile();
 
-        REQUIRE_THROWS_MATCHES(
-            s.get_object_code(), std::invalid_argument,
-            Message("Cannot extract the object code from an llvm_state if the binary code has not been generated yet"));
-
-        s.jit_lookup("jet");
-
         REQUIRE(!s.get_object_code().empty());
     }
 }
@@ -232,7 +178,7 @@ TEST_CASE("s11n")
 {
     auto [x, y] = make_vars("x", "y");
 
-    // Def-cted state, no compilation, no object file.
+    // Def-cted state, no compilation.
     {
         std::stringstream ss;
 
@@ -256,7 +202,6 @@ TEST_CASE("s11n")
         }
 
         REQUIRE(!s.is_compiled());
-        REQUIRE(!s.has_object_code());
         REQUIRE(s.get_ir() == orig_ir);
         REQUIRE(s.get_bc() == orig_bc);
         REQUIRE(s.module_name() == "foo");
@@ -265,44 +210,7 @@ TEST_CASE("s11n")
         REQUIRE(s.force_avx512() == false);
     }
 
-    // Compiled state but without object file.
-    {
-        std::stringstream ss;
-
-        llvm_state s{kw::force_avx512 = true, kw::mname = "foo"};
-
-        taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
-
-        s.compile();
-
-        const auto orig_ir = s.get_ir();
-        const auto orig_bc = s.get_bc();
-
-        {
-            boost::archive::binary_oarchive oa(ss);
-
-            oa << s;
-        }
-
-        s = llvm_state{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
-
-        {
-            boost::archive::binary_iarchive ia(ss);
-
-            ia >> s;
-        }
-
-        REQUIRE(s.is_compiled());
-        REQUIRE(!s.has_object_code());
-        REQUIRE(s.module_name() == "foo");
-        REQUIRE(s.get_ir() == orig_ir);
-        REQUIRE(s.get_bc() == orig_bc);
-        REQUIRE(s.opt_level() == 3u);
-        REQUIRE(s.fast_math() == false);
-        REQUIRE(s.force_avx512() == true);
-    }
-
-    // Compiled state with object file.
+    // Compiled state.
     {
         std::stringstream ss;
 
@@ -315,8 +223,6 @@ TEST_CASE("s11n")
         const auto orig_ir = s.get_ir();
         const auto orig_bc = s.get_bc();
 
-        s.jit_lookup("jet");
-
         {
             boost::archive::binary_oarchive oa(ss);
 
@@ -332,7 +238,6 @@ TEST_CASE("s11n")
         }
 
         REQUIRE(s.is_compiled());
-        REQUIRE(s.has_object_code());
         REQUIRE(s.get_ir() == orig_ir);
         REQUIRE(s.get_bc() == orig_bc);
         REQUIRE(s.module_name() == "foo");

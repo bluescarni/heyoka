@@ -53,6 +53,7 @@
 #include <llvm/ExecutionEngine/Orc/ObjectTransformLayer.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/IR/Attributes.h>
+#include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
@@ -353,8 +354,8 @@ struct llvm_state::jit {
         // LCOV_EXCL_STOP
         m_lljit = std::move(*lljit);
 
-        // Setup the machinery to cache the module's binary code
-        // when it is lazily generated.
+        // Setup the machinery to store the module's binary code
+        // when it is generated.
         m_lljit->getObjTransformLayer().setTransform([this](std::unique_ptr<llvm::MemoryBuffer> obj_buffer) {
             assert(obj_buffer);
 
@@ -602,10 +603,10 @@ llvm_state::llvm_state(const llvm_state &other)
     : m_jitter(std::make_unique<jit>(this)), m_opt_level(other.m_opt_level), m_fast_math(other.m_fast_math),
       m_force_avx512(other.m_force_avx512), m_module_name(other.m_module_name)
 {
-    if (other.is_compiled() && other.m_jitter->m_object_file) {
-        // 'other' was compiled and code was generated.
+    if (other.is_compiled()) {
+        // 'other' was compiled.
         // We leave module and builder empty, copy over the
-        // IR/bitcode snapshots and add the cached compiled module
+        // IR/bitcode snapshots and add the compiled module
         // to the jit.
         m_ir_snapshot = other.m_ir_snapshot;
         m_bc_snapshot = other.m_bc_snapshot;
@@ -613,36 +614,18 @@ llvm_state::llvm_state(const llvm_state &other)
         // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         detail::llvm_state_add_obj_to_jit(*m_jitter, *other.m_jitter->m_object_file);
     } else {
-        // 'other' has not been compiled yet, or
-        // it has been compiled but no code has been
-        // lazily generated yet.
+        // 'other' has not been compiled yet.
         // We will fetch its bitcode and reconstruct
-        // module and builder.
-
-        // Is other compiled?
-        const auto other_cmp = other.is_compiled();
-
-        // Create the module from the bitcode.
-        // NOTE: branch to avoid expensive copy if other
-        // has been compiled.
-        if (other_cmp) {
-            m_module = detail::llvm_state_bc_to_module(m_module_name, other.m_bc_snapshot, context());
-        } else {
-            m_module = detail::llvm_state_bc_to_module(m_module_name, other.get_bc(), context());
-        }
+        // module and builder. The IR/bitcode snapshots
+        // are left in their default-constructed (empty)
+        // state.
+        m_module = detail::llvm_state_bc_to_module(m_module_name, other.get_bc(), context());
 
         // Create a new builder for the module.
         m_builder = std::make_unique<ir_builder>(context());
 
         // Setup the math flags in the builder.
         ctor_setup_math_flags();
-
-        // Compile if needed.
-        // NOTE: compilation will take care of setting up m_ir_snapshot/m_bc_snapshot.
-        // If no compilation happens, they are left empty after init.
-        if (other_cmp) {
-            compile_impl();
-        }
     }
 }
 
@@ -697,26 +680,28 @@ llvm_state &llvm_state::operator=(llvm_state &&other) noexcept
 
 llvm_state::~llvm_state()
 {
-    // NOTE: if this has not been moved-from, ensure
-    // the m_state member of the jit is pointing to this.
+    // Sanity checks in debug mode.
     if (m_jitter) {
         assert(m_jitter->m_state == this);
+
+        if (is_compiled()) {
+            assert(m_jitter->m_object_file);
+            assert(!m_builder);
+        } else {
+            assert(!m_jitter->m_object_file);
+            assert(m_builder);
+            assert(m_ir_snapshot.empty());
+            assert(m_bc_snapshot.empty());
+        }
     }
 }
 
 template <typename Archive>
 void llvm_state::save_impl(Archive &ar, unsigned) const
 {
-    // Start by establishing if the state is compiled and binary
-    // code has been emitted.
-    // NOTE: we need both flags when deserializing.
+    // Start by establishing if the state is compiled.
     const auto cmp = is_compiled();
     ar << cmp;
-
-    const auto with_obj = static_cast<bool>(m_jitter->m_object_file);
-    ar << with_obj;
-
-    assert(!with_obj || cmp);
 
     // Store the config options.
     ar << m_opt_level;
@@ -734,18 +719,18 @@ void llvm_state::save_impl(Archive &ar, unsigned) const
         ar << get_bc();
     }
 
-    if (with_obj) {
-        // Save the object file if available.
+    if (cmp) {
+        // Save the object file.
         // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
         ar << *m_jitter->m_object_file;
     }
 
     // Save a copy of the IR snapshot if the state
-    // is compiled and binary code was emitted.
+    // is compiled.
     // NOTE: we want this because otherwise we would
     // need to re-parse the bitcode during des11n to
     // restore the IR snapshot.
-    if (cmp && with_obj) {
+    if (cmp) {
         ar << m_ir_snapshot;
     }
 }
@@ -765,7 +750,7 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
     // are primitive types, no need to reset the
     // addresses.
 
-    // Load the status flags from the archive.
+    // Load the compiled status flag from the archive.
     // NOTE: not sure why clang-tidy wants cmp to be
     // const here, as clearly ar >> cmp is going to
     // write something into it. Perhaps some const_cast
@@ -773,12 +758,6 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
     // NOLINTNEXTLINE(misc-const-correctness)
     bool cmp{};
     ar >> cmp;
-
-    // NOLINTNEXTLINE(misc-const-correctness)
-    bool with_obj{};
-    ar >> with_obj;
-
-    assert(!with_obj || cmp);
 
     // Load the config options.
     // NOLINTNEXTLINE(misc-const-correctness)
@@ -803,14 +782,14 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
 
     // Recover the object file, if available.
     std::optional<std::string> obj_file;
-    if (with_obj) {
+    if (cmp) {
         obj_file.emplace();
         ar >> *obj_file;
     }
 
     // Recover the IR snapshot, if available.
     std::string ir_snapshot;
-    if (cmp && with_obj) {
+    if (cmp) {
         ar >> ir_snapshot;
     }
 
@@ -828,7 +807,7 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
         // Reset the jit with a new one.
         m_jitter = std::make_unique<jit>(this);
 
-        if (cmp && with_obj) {
+        if (cmp) {
             // Assign the snapshots.
             m_ir_snapshot = std::move(ir_snapshot);
             m_bc_snapshot = std::move(bc_snapshot);
@@ -837,9 +816,7 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
             // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
             detail::llvm_state_add_obj_to_jit(*m_jitter, *obj_file);
         } else {
-            // Clear the existing snapshots
-            // (they will be replaced with the
-            // actual ir/bitcode if compilation is needed).
+            // Clear the existing snapshots.
             m_ir_snapshot.clear();
             m_bc_snapshot.clear();
 
@@ -851,14 +828,6 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
 
             // Setup the math flags in the builder.
             ctor_setup_math_flags();
-
-            // Compile if needed.
-            // NOTE: compilation will take care of setting up m_ir_snapshot/m_bc_snapshot.
-            // If no compilation happens, they are left empty after
-            // clearing earlier.
-            if (cmp) {
-                compile_impl();
-            }
         }
         // LCOV_EXCL_START
     } catch (...) {
@@ -1203,6 +1172,40 @@ void llvm_state::optimise()
     }
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// The name of the function used to trigger the
+// materialisation of object code.
+constexpr auto obj_trigger_name = "heyoka.obj_trigger";
+
+} // namespace
+
+} // namespace detail
+
+// NOTE: this adds a public no-op function to the state which is
+// used to trigger the generation of object code after compilation.
+void llvm_state::add_obj_trigger()
+{
+    auto &bld = builder();
+
+    auto *ft = llvm::FunctionType::get(bld.getVoidTy(), {}, false);
+    assert(ft != nullptr);
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, detail::obj_trigger_name, &module());
+
+    // LCOV_EXCL_START
+    if (f == nullptr) {
+        throw std::invalid_argument("Unable to add the object code materialisation trigger to an llvm_state");
+    }
+    // LCOV_EXCL_STOP
+
+    bld.SetInsertPoint(llvm::BasicBlock::Create(context(), "entry", f));
+    bld.CreateRetVoid();
+}
+
 // NOTE: this function is NOT exception-safe, proper cleanup
 // needs to be done externally if needed.
 void llvm_state::compile_impl()
@@ -1222,6 +1225,9 @@ void llvm_state::compile_impl()
 
     // Clear out the builder, which won't be usable any more.
     m_builder.reset();
+
+    // Trigger object code materialisation via lookup.
+    jit_lookup(detail::obj_trigger_name);
 }
 
 // NOTE: we need to emphasise in the docs that compilation
@@ -1229,6 +1235,9 @@ void llvm_state::compile_impl()
 void llvm_state::compile()
 {
     check_uncompiled(__func__);
+
+    // Add the object materialisation trigger function.
+    add_obj_trigger();
 
     // Run a verification on the module before compiling.
     {
@@ -1262,11 +1271,6 @@ void llvm_state::compile()
 bool llvm_state::is_compiled() const
 {
     return !m_module;
-}
-
-bool llvm_state::has_object_code() const
-{
-    return static_cast<bool>(m_jitter->m_object_file);
 }
 
 // NOTE: this function will lookup symbol names,
@@ -1350,10 +1354,7 @@ const std::string &llvm_state::get_object_code() const
             "Cannot extract the object code from an llvm_state which has not been compiled yet");
     }
 
-    if (!m_jitter->m_object_file) {
-        throw std::invalid_argument(
-            "Cannot extract the object code from an llvm_state if the binary code has not been generated yet");
-    }
+    assert(m_jitter->m_object_file);
 
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     return *m_jitter->m_object_file;
@@ -1380,7 +1381,6 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
 
     oss << "Module name       : " << s.m_module_name << '\n';
     oss << "Compiled          : " << s.is_compiled() << '\n';
-    oss << "Has object code   : " << s.has_object_code() << '\n';
     oss << "Fast math         : " << s.m_fast_math << '\n';
     oss << "Force AVX512      : " << s.m_force_avx512 << '\n';
     oss << "Optimisation level: " << s.m_opt_level << '\n';

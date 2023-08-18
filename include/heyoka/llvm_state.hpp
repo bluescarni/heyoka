@@ -211,8 +211,9 @@ class HEYOKA_DLL_PUBLIC llvm_state
     // end of a constructor.
     HEYOKA_DLL_LOCAL void ctor_setup_math_flags();
 
-    // Low-level implementation detail for compilation.
+    // Low-level implementation details for compilation.
     HEYOKA_DLL_LOCAL void compile_impl();
+    HEYOKA_DLL_LOCAL void add_obj_trigger();
 
     // Meta-programming for the kwargs ctor. Enabled if:
     // - there is at least 1 argument (i.e., cannot act as a def ctor),
@@ -261,7 +262,6 @@ public:
     void optimise();
 
     [[nodiscard]] bool is_compiled() const;
-    [[nodiscard]] bool has_object_code() const;
 
     void compile();
 
@@ -275,7 +275,8 @@ HEYOKA_END_NAMESPACE
 // Archive version changelog:
 // - version 1: got rid of the inline_functions setting;
 // - version 2: added the force_avx512 setting;
-// - version 3: added the bitcode snapshot.
+// - version 3: added the bitcode snapshot, compilation
+//   now always triggering code generation.
 BOOST_CLASS_VERSION(heyoka::llvm_state, 3)
 
 #endif
