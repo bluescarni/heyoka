@@ -1226,8 +1226,10 @@ void llvm_state::compile()
         llvm::raw_string_ostream ostr(out);
 
         if (llvm::verifyModule(*m_module, &ostr)) {
+            // LCOV_EXCL_START
             throw std::runtime_error(
                 fmt::format("The verification of the module '{}' produced an error:\n{}", m_module_name, ostr.str()));
+            // LCOV_EXCL_STOP
         }
     }
 
