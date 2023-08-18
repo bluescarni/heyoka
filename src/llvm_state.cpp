@@ -509,7 +509,7 @@ namespace
 
 // Helper to load object code into a jit.
 template <typename Jit>
-void llvm_state_add_obj_to_jit(Jit &j, const std::string &obj)
+void llvm_state_add_obj_to_jit(Jit &j, std::string obj)
 {
     llvm::SmallVector<char, 0> buffer(obj.begin(), obj.end());
     auto err = j.m_lljit->addObjectFile(std::make_unique<llvm::SmallVectorMemoryBuffer>(std::move(buffer)));
@@ -531,7 +531,7 @@ void llvm_state_add_obj_to_jit(Jit &j, const std::string &obj)
     // NOTE: this function at the moment is used when m_object_file
     // is supposed to be empty.
     assert(!j.m_object_file);
-    j.m_object_file.emplace(obj);
+    j.m_object_file.emplace(std::move(obj));
 }
 
 // Helper to create an LLVM module from bitcode.
@@ -794,7 +794,7 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
 
             // Add the object code to the jit.
             // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-            detail::llvm_state_add_obj_to_jit(*m_jitter, *obj_file);
+            detail::llvm_state_add_obj_to_jit(*m_jitter, std::move(*obj_file));
         } else {
             // Clear the existing snapshots.
             m_ir_snapshot.clear();
