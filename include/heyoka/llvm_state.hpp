@@ -270,13 +270,27 @@ public:
     [[nodiscard]] llvm_state make_similar() const;
 };
 
+namespace detail
+{
+
+// The value contained in the in-memory cache.
+struct llvm_mc_value {
+    std::string opt_bc, opt_ir, obj;
+};
+
+// Cache lookup and insertion.
+std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::string &, unsigned);
+void llvm_state_mem_cache_try_insert(std::string, unsigned, llvm_mc_value);
+
+} // namespace detail
+
 HEYOKA_END_NAMESPACE
 
 // Archive version changelog:
 // - version 1: got rid of the inline_functions setting;
 // - version 2: added the force_avx512 setting;
-// - version 3: added the bitcode snapshot, compilation
-//   now always triggering code generation.
+// - version 3: added the bitcode snapshot, simplified
+//   compilation logic.
 BOOST_CLASS_VERSION(heyoka::llvm_state, 3)
 
 #endif

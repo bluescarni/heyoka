@@ -1234,12 +1234,34 @@ void llvm_state::compile()
     }
 
     try {
-        // Run the optimisation pass.
-        optimise();
+        // Fetch the bitcode *before* optimisation.
+        auto orig_bc = get_bc();
 
-        // Run the compilation.
-        compile_impl();
+        if (auto cached_data = detail::llvm_state_mem_cache_lookup(orig_bc, m_opt_level)) {
+            // Cache hit.
 
+            // Assign the snapshots.
+            m_ir_snapshot = std::move(cached_data->opt_ir);
+            m_bc_snapshot = std::move(cached_data->opt_bc);
+
+            // Clear out module and builder.
+            m_module.reset();
+            m_builder.reset();
+
+            // Assign the object file.
+            detail::llvm_state_add_obj_to_jit(*m_jitter, std::move(cached_data->obj));
+        } else {
+            // Run the optimisation pass.
+            optimise();
+
+            // Run the compilation.
+            compile_impl();
+
+            // Try to insert orig_bc into the cache.
+            detail::llvm_state_mem_cache_try_insert(std::move(orig_bc), m_opt_level,
+                                                    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+                                                    {m_bc_snapshot, m_ir_snapshot, *m_jitter->m_object_file});
+        }
         // LCOV_EXCL_START
     } catch (...) {
         // Reset to a def-cted state in case of error,
