@@ -268,6 +268,12 @@ public:
     std::uintptr_t jit_lookup(const std::string &);
 
     [[nodiscard]] llvm_state make_similar() const;
+
+    // Cache management.
+    static std::size_t get_memcache_size();
+    static std::size_t get_memcache_limit();
+    static void set_memcache_limit(std::size_t);
+    static void clear_memcache();
 };
 
 namespace detail

@@ -715,6 +715,11 @@ void llvm_state::save_impl(Archive &ar, unsigned) const
     }
 }
 
+// NOTE: currently loading from an archive won't interact with the
+// memory cache - that is, if the archive contains a compiled module
+// not in the cache *before* loading, it won't have been inserted in the cache
+// *after* loading. I don't think this is an issue at the moment, but if needed
+// we can always implement the feature at a later stage.
 template <typename Archive>
 void llvm_state::load_impl(Archive &ar, unsigned version)
 {

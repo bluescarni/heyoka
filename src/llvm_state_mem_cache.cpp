@@ -20,6 +20,7 @@
 #include <variant>
 
 #include <boost/container_hash/hash.hpp>
+#include <boost/numeric/conversion/cast.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
 #include <boost/unordered_map.hpp>
 
@@ -192,6 +193,9 @@ void llvm_state_mem_cache_try_insert(std::string bc, unsigned opt_level, llvm_mc
         const auto cur_size
             = static_cast<std::size_t>(cur_val.opt_bc.size()) + cur_val.opt_ir.size() + cur_val.obj.size();
 
+        // NOTE: the next 4 lines cannot throw, which ensures that the
+        // cache cannot be left in an inconsistent state.
+
         // Remove the last item in the queue.
         lru_map.erase(cur_it);
         lru_queue.pop_back();
@@ -235,5 +239,42 @@ void llvm_state_mem_cache_try_insert(std::string bc, unsigned opt_level, llvm_mc
 }
 
 } // namespace detail
+
+std::size_t llvm_state::get_memcache_size()
+{
+    // Lock down.
+    const std::lock_guard lock(detail::mem_cache_mutex);
+
+    return detail::mem_cache_size;
+}
+
+std::size_t llvm_state::get_memcache_limit()
+{
+    // Lock down.
+    const std::lock_guard lock(detail::mem_cache_mutex);
+
+    return boost::numeric_cast<std::size_t>(detail::mem_cache_limit);
+}
+
+void llvm_state::set_memcache_limit(std::size_t new_limit)
+{
+    // Lock down.
+    const std::lock_guard lock(detail::mem_cache_mutex);
+
+    detail::mem_cache_limit = boost::numeric_cast<std::uint64_t>(new_limit);
+}
+
+void llvm_state::clear_memcache()
+{
+    // Lock down.
+    const std::lock_guard lock(detail::mem_cache_mutex);
+
+    // Sanity checks.
+    detail::llvm_state_mem_cache_sanity_checks();
+
+    detail::lru_map.clear();
+    detail::lru_queue.clear();
+    detail::mem_cache_size = 0;
+}
 
 HEYOKA_END_NAMESPACE
