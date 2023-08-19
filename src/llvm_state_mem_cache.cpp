@@ -136,7 +136,7 @@ void llvm_state_mem_cache_sanity_checks()
 std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::string &bc, unsigned opt_level)
 {
     // Lock down.
-    std::lock_guard lock(mem_cache_mutex);
+    const std::lock_guard lock(mem_cache_mutex);
 
     // Sanity checks.
     llvm_state_mem_cache_sanity_checks();
@@ -160,7 +160,7 @@ std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::string &bc, 
 void llvm_state_mem_cache_try_insert(std::string bc, unsigned opt_level, llvm_mc_value val)
 {
     // Lock down.
-    std::lock_guard lock(mem_cache_mutex);
+    const std::lock_guard lock(mem_cache_mutex);
 
     // Sanity checks.
     llvm_state_mem_cache_sanity_checks();
