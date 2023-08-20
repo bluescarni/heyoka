@@ -140,6 +140,7 @@ ADD_HEYOKA_TESTCASE(model_fixed_centres)
 ADD_HEYOKA_TESTCASE(model_rotating)
 ADD_HEYOKA_TESTCASE(model_mascon)
 ADD_HEYOKA_TESTCASE(step_callback)
+ADD_HEYOKA_TESTCASE(llvm_state_mem_cache)
 
 if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
   ADD_HEYOKA_TESTCASE(event_detection_mp)
