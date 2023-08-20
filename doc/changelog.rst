@@ -7,6 +7,10 @@ Changelog
 New
 ~~~
 
+- Implement an in-memory cache for ``llvm_state``. The cache is used
+  to avoid re-optimising and re-compiling LLVM code which had
+  already been optimised and compiled during the program execution
+  (`#340 <https://github.com/bluescarni/heyoka/pull/340>`__).
 - It is now possible to get the LLVM bitcode of
   an ``llvm_state``
   (`#339 <https://github.com/bluescarni/heyoka/pull/339>`__).
