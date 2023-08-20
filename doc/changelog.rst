@@ -29,6 +29,8 @@ Changes
 Fix
 ~~~
 
+- Fix compilation in C++20 mode
+  (`#340 <https://github.com/bluescarni/heyoka/pull/340>`__).
 - Fix the object file of an ``llvm_state`` not being
   preserved during copy and deserialisation
   (`#339 <https://github.com/bluescarni/heyoka/pull/339>`__).
