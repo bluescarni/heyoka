@@ -53,3 +53,36 @@ TEST_CASE("basic")
 
     REQUIRE(llvm_state::get_memcache_size() == 0u);
 }
+
+TEST_CASE("priority")
+{
+    // Check that the least recently used items are evicted first.
+    llvm_state::clear_memcache();
+    llvm_state::set_memcache_limit(2048ull * 1024u * 1024u);
+
+    auto ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11};
+    const auto size11 = llvm_state::get_memcache_size();
+
+    llvm_state::clear_memcache();
+    ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-15};
+    const auto size15 = llvm_state::get_memcache_size();
+
+    ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-12};
+    const auto size12 = llvm_state::get_memcache_size() - size15;
+
+    llvm_state::set_memcache_limit(llvm_state::get_memcache_size());
+    ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11};
+    REQUIRE(llvm_state::get_memcache_size() == size12 + size11);
+
+    // Check that cache hit moves element to the front.
+    llvm_state::clear_memcache();
+    llvm_state::set_memcache_limit(2048ull * 1024u * 1024u);
+
+    ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-15};
+    ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-12};
+    ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-15};
+
+    llvm_state::set_memcache_limit(llvm_state::get_memcache_size());
+    ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11};
+    REQUIRE(llvm_state::get_memcache_size() == size15 + size11);
+}
