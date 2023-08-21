@@ -1229,9 +1229,6 @@ void llvm_state::compile()
 {
     check_uncompiled(__func__);
 
-    // Add the object materialisation trigger function.
-    add_obj_trigger();
-
     // Run a verification on the module before compiling.
     {
         std::string out;
@@ -1244,6 +1241,15 @@ void llvm_state::compile()
             // LCOV_EXCL_STOP
         }
     }
+
+    // Add the object materialisation trigger function.
+    // NOTE: do it **after** verification, on the assumption
+    // that add_obj_trigger() is implemented correctly. Like this,
+    // if module verification fails, the user still has the option
+    // to fix the module and re-attempt compilation without having
+    // altered the module and without having already added the trigger
+    // function.
+    add_obj_trigger();
 
     try {
         // Fetch the bitcode *before* optimisation.
