@@ -86,3 +86,24 @@ TEST_CASE("priority")
     ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11};
     REQUIRE(llvm_state::get_memcache_size() == size15 + size11);
 }
+
+// A test to check that the cache shrinks at the first
+// insertion attempt after set_memcache_limit().
+TEST_CASE("shrink test")
+{
+    llvm_state::clear_memcache();
+    llvm_state::set_memcache_limit(2048ull * 1024u * 1024u);
+
+    auto ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11};
+    const auto size11 = llvm_state::get_memcache_size();
+
+    llvm_state::clear_memcache();
+    ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-15};
+    ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-12};
+    const auto cache_size = llvm_state::get_memcache_size();
+
+    llvm_state::set_memcache_limit(size11);
+    REQUIRE(llvm_state::get_memcache_size() == cache_size);
+    ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11};
+    REQUIRE(llvm_state::get_memcache_size() == size11);
+}
