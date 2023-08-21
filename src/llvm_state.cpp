@@ -893,7 +893,7 @@ bool llvm_state::force_avx512() const
 
 unsigned llvm_state::clamp_opt_level(unsigned opt_level)
 {
-    return std::clamp(0u, 3u, opt_level);
+    return std::min<unsigned>(opt_level, 3u);
 }
 
 void llvm_state::check_uncompiled(const char *f) const
