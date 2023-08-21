@@ -1249,7 +1249,12 @@ void llvm_state::compile()
         // Fetch the bitcode *before* optimisation.
         auto orig_bc = get_bc();
 
-        if (auto cached_data = detail::llvm_state_mem_cache_lookup(orig_bc, m_opt_level)) {
+        // Combine m_opt_level and m_force_avx512 into a single value,
+        // as they both affect codegen.
+        assert(m_opt_level <= 3u);
+        const auto olevel = m_opt_level + (static_cast<unsigned>(m_force_avx512) << 2);
+
+        if (auto cached_data = detail::llvm_state_mem_cache_lookup(orig_bc, olevel)) {
             // Cache hit.
 
             // Assign the snapshots.
@@ -1270,7 +1275,7 @@ void llvm_state::compile()
             compile_impl();
 
             // Try to insert orig_bc into the cache.
-            detail::llvm_state_mem_cache_try_insert(std::move(orig_bc), m_opt_level,
+            detail::llvm_state_mem_cache_try_insert(std::move(orig_bc), olevel,
                                                     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
                                                     {m_bc_snapshot, m_ir_snapshot, *m_jitter->m_object_file});
         }
