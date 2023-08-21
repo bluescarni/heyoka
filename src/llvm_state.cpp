@@ -674,6 +674,8 @@ llvm_state::~llvm_state()
             assert(m_bc_snapshot.empty());
         }
     }
+
+    assert(m_opt_level <= 3u);
 }
 
 template <typename Archive>
@@ -852,11 +854,6 @@ llvm::LLVMContext &llvm_state::context()
     return m_jitter->get_context();
 }
 
-unsigned &llvm_state::opt_level()
-{
-    return m_opt_level;
-}
-
 const llvm::Module &llvm_state::module() const
 {
     check_uncompiled(__func__);
@@ -874,9 +871,14 @@ const llvm::LLVMContext &llvm_state::context() const
     return m_jitter->get_context();
 }
 
-const unsigned &llvm_state::opt_level() const
+unsigned llvm_state::get_opt_level() const
 {
     return m_opt_level;
+}
+
+void llvm_state::set_opt_level(unsigned opt_level)
+{
+    m_opt_level = clamp_opt_level(opt_level);
 }
 
 bool llvm_state::fast_math() const
@@ -887,6 +889,11 @@ bool llvm_state::fast_math() const
 bool llvm_state::force_avx512() const
 {
     return m_force_avx512;
+}
+
+unsigned llvm_state::clamp_opt_level(unsigned opt_level)
+{
+    return std::clamp(0u, 3u, opt_level);
 }
 
 void llvm_state::check_uncompiled(const char *f) const

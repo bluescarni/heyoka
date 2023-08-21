@@ -155,6 +155,10 @@ class HEYOKA_DLL_PUBLIC llvm_state
     HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;
     HEYOKA_DLL_LOCAL void check_compiled(const char *) const;
 
+    // Helper to clamp the optimisation level to
+    // the [0, 3] range.
+    static unsigned clamp_opt_level(unsigned);
+
     // Implementation details for the variadic constructor.
     template <typename... KwArgs>
     static auto kw_args_ctor_impl(KwArgs &&...kw_args)
@@ -183,6 +187,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
                     return 3;
                 }
             }();
+            opt_level = clamp_opt_level(opt_level);
 
             // Fast math flag (defaults to false).
             auto fmath = [&p]() -> bool {
@@ -241,15 +246,15 @@ public:
     llvm::Module &module();
     ir_builder &builder();
     llvm::LLVMContext &context();
-    unsigned &opt_level();
 
     [[nodiscard]] const std::string &module_name() const;
     [[nodiscard]] const llvm::Module &module() const;
     [[nodiscard]] const ir_builder &builder() const;
     [[nodiscard]] const llvm::LLVMContext &context() const;
-    [[nodiscard]] const unsigned &opt_level() const;
     [[nodiscard]] bool fast_math() const;
     [[nodiscard]] bool force_avx512() const;
+    [[nodiscard]] unsigned get_opt_level() const;
+    void set_opt_level(unsigned);
 
     [[nodiscard]] std::string get_ir() const;
     [[nodiscard]] std::string get_bc() const;

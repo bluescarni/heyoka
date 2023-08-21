@@ -69,10 +69,25 @@ TEST_CASE("empty state")
 
     REQUIRE(!s.get_bc().empty());
     REQUIRE(!s.get_ir().empty());
+    REQUIRE(s.get_opt_level() == 3u);
 
     // Print also some info on the FP types.
     std::cout << "Double digits     : " << std::numeric_limits<double>::digits << '\n';
     std::cout << "Long double digits: " << std::numeric_limits<long double>::digits << '\n';
+}
+
+TEST_CASE("opt level clamping")
+{
+    // Opt level clamping on construction.
+    auto s = llvm_state(kw::opt_level = 4u, kw::fast_math = true);
+    REQUIRE(s.get_opt_level() == 3u);
+
+    // Opt level clamping on setter.
+    s = llvm_state{kw::mname = "foobarizer"};
+    s.set_opt_level(0u);
+    REQUIRE(s.get_opt_level() == 0u);
+    s.set_opt_level(42u);
+    REQUIRE(s.get_opt_level() == 3u);
 }
 
 TEST_CASE("copy semantics")
@@ -88,7 +103,7 @@ TEST_CASE("copy semantics")
         taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
 
         REQUIRE(s.module_name() == "sample state");
-        REQUIRE(s.opt_level() == 2u);
+        REQUIRE(s.get_opt_level() == 2u);
         REQUIRE(s.fast_math());
         REQUIRE(!s.is_compiled());
 
@@ -98,7 +113,7 @@ TEST_CASE("copy semantics")
         auto s2 = s;
 
         REQUIRE(s2.module_name() == "sample state");
-        REQUIRE(s2.opt_level() == 2u);
+        REQUIRE(s2.get_opt_level() == 2u);
         REQUIRE(s2.fast_math());
         REQUIRE(!s2.is_compiled());
 
@@ -135,7 +150,7 @@ TEST_CASE("copy semantics")
         auto s2 = s;
 
         REQUIRE(s2.module_name() == "sample state");
-        REQUIRE(s2.opt_level() == 2u);
+        REQUIRE(s2.get_opt_level() == 2u);
         REQUIRE(s2.fast_math());
         REQUIRE(s2.is_compiled());
 
@@ -205,7 +220,7 @@ TEST_CASE("s11n")
         REQUIRE(s.get_ir() == orig_ir);
         REQUIRE(s.get_bc() == orig_bc);
         REQUIRE(s.module_name() == "foo");
-        REQUIRE(s.opt_level() == 3u);
+        REQUIRE(s.get_opt_level() == 3u);
         REQUIRE(s.fast_math() == false);
         REQUIRE(s.force_avx512() == false);
     }
@@ -241,7 +256,7 @@ TEST_CASE("s11n")
         REQUIRE(s.get_ir() == orig_ir);
         REQUIRE(s.get_bc() == orig_bc);
         REQUIRE(s.module_name() == "foo");
-        REQUIRE(s.opt_level() == 3u);
+        REQUIRE(s.get_opt_level() == 3u);
         REQUIRE(s.fast_math() == false);
 
         auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("jet"));
@@ -268,7 +283,7 @@ TEST_CASE("make_similar")
     s.compile();
 
     REQUIRE(s.module_name() == "sample state");
-    REQUIRE(s.opt_level() == 2u);
+    REQUIRE(s.get_opt_level() == 2u);
     REQUIRE(s.fast_math());
     REQUIRE(s.is_compiled());
     REQUIRE(s.force_avx512());
@@ -276,7 +291,7 @@ TEST_CASE("make_similar")
     auto s2 = s.make_similar();
 
     REQUIRE(s2.module_name() == "sample state");
-    REQUIRE(s2.opt_level() == 2u);
+    REQUIRE(s2.get_opt_level() == 2u);
     REQUIRE(s2.fast_math());
     REQUIRE(s2.force_avx512());
     REQUIRE(!s2.is_compiled());
