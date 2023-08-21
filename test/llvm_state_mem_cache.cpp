@@ -107,3 +107,17 @@ TEST_CASE("shrink test")
     ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11};
     REQUIRE(llvm_state::get_memcache_size() == size11);
 }
+
+// A test to check that the force_avx512 flag is taken
+// into account when interacting with the cache.
+TEST_CASE("force_avx512 test")
+{
+    llvm_state::clear_memcache();
+    llvm_state::set_memcache_limit(2048ull * 1024u * 1024u);
+
+    auto ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11};
+    const auto size11 = llvm_state::get_memcache_size();
+
+    ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11, kw::force_avx512 = true};
+    REQUIRE(llvm_state::get_memcache_size() > size11);
+}
