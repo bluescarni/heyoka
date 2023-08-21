@@ -18,6 +18,9 @@ New
 Changes
 ~~~~~~~
 
+- The optimisation level for an ``llvm_state`` is now clamped
+  within the ``[0, 3]`` range
+  (`#340 <https://github.com/bluescarni/heyoka/pull/340>`__).
 - The LLVM bitcode is now used internally (instead of the textual
   representation of the IR) when copying and serialising
   an ``llvm_state``
