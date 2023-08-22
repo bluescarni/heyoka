@@ -73,6 +73,7 @@
 
 #endif
 
+#include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
@@ -209,7 +210,7 @@ llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp, bo
 {
     const auto it = type_map.find(tp);
 
-    const auto *err_msg = "Unable to associate the C++ type '{}' to an LLVM type";
+    constexpr auto *err_msg = "Unable to associate the C++ type '{}' to an LLVM type";
 
     if (it == type_map.end()) {
         // LCOV_EXCL_START
@@ -790,11 +791,7 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
             arg_types.push_back(a->getType());
         }
         auto *ft = llvm::FunctionType::get(ret_type, arg_types, false);
-        callee_f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
-        if (callee_f == nullptr) {
-            throw std::invalid_argument(
-                fmt::format("Unable to create the prototype for the external function '{}'", name));
-        }
+        callee_f = llvm_func_create(ft, llvm::Function::ExternalLinkage, name, &s.module());
 
         // Add the function attributes.
         for (const auto &att : attrs) {
@@ -3194,8 +3191,7 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t
     // The return type is void.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     // Create the function
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &md);
-    assert(f != nullptr); // LCOV_EXCL_LINE
+    auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, name, &md);
 
     // Fetch the current insertion block.
     auto *orig_bb = builder.GetInsertBlock();

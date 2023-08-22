@@ -155,6 +155,10 @@ class HEYOKA_DLL_PUBLIC llvm_state
     HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;
     HEYOKA_DLL_LOCAL void check_compiled(const char *) const;
 
+    // Helper to clamp the optimisation level to
+    // the [0, 3] range.
+    static unsigned clamp_opt_level(unsigned);
+
     // Implementation details for the variadic constructor.
     template <typename... KwArgs>
     static auto kw_args_ctor_impl(KwArgs &&...kw_args)
@@ -183,6 +187,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
                     return 3;
                 }
             }();
+            opt_level = clamp_opt_level(opt_level);
 
             // Fast math flag (defaults to false).
             auto fmath = [&p]() -> bool {
@@ -211,6 +216,10 @@ class HEYOKA_DLL_PUBLIC llvm_state
     // end of a constructor.
     HEYOKA_DLL_LOCAL void ctor_setup_math_flags();
 
+    // Low-level implementation details for compilation.
+    HEYOKA_DLL_LOCAL void compile_impl();
+    HEYOKA_DLL_LOCAL void add_obj_trigger();
+
     // Meta-programming for the kwargs ctor. Enabled if:
     // - there is at least 1 argument (i.e., cannot act as a def ctor),
     // - if there is only 1 argument, it cannot be of type llvm_state
@@ -237,15 +246,15 @@ public:
     llvm::Module &module();
     ir_builder &builder();
     llvm::LLVMContext &context();
-    unsigned &opt_level();
 
     [[nodiscard]] const std::string &module_name() const;
     [[nodiscard]] const llvm::Module &module() const;
     [[nodiscard]] const ir_builder &builder() const;
     [[nodiscard]] const llvm::LLVMContext &context() const;
-    [[nodiscard]] const unsigned &opt_level() const;
     [[nodiscard]] bool fast_math() const;
     [[nodiscard]] bool force_avx512() const;
+    [[nodiscard]] unsigned get_opt_level() const;
+    void set_opt_level(unsigned);
 
     [[nodiscard]] std::string get_ir() const;
     [[nodiscard]] std::string get_bc() const;
@@ -258,21 +267,41 @@ public:
     void optimise();
 
     [[nodiscard]] bool is_compiled() const;
-    [[nodiscard]] bool has_object_code() const;
 
     void compile();
 
     std::uintptr_t jit_lookup(const std::string &);
 
     [[nodiscard]] llvm_state make_similar() const;
+
+    // Cache management.
+    static std::size_t get_memcache_size();
+    static std::size_t get_memcache_limit();
+    static void set_memcache_limit(std::size_t);
+    static void clear_memcache();
 };
+
+namespace detail
+{
+
+// The value contained in the in-memory cache.
+struct llvm_mc_value {
+    std::string opt_bc, opt_ir, obj;
+};
+
+// Cache lookup and insertion.
+std::optional<llvm_mc_value> llvm_state_mem_cache_lookup(const std::string &, unsigned);
+void llvm_state_mem_cache_try_insert(std::string, unsigned, llvm_mc_value);
+
+} // namespace detail
 
 HEYOKA_END_NAMESPACE
 
 // Archive version changelog:
 // - version 1: got rid of the inline_functions setting;
 // - version 2: added the force_avx512 setting;
-// - version 3: added the bitcode snapshot.
+// - version 3: added the bitcode snapshot, simplified
+//   compilation logic.
 BOOST_CLASS_VERSION(heyoka::llvm_state, 3)
 
 #endif

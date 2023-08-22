@@ -345,7 +345,7 @@ llvm::Function *constant::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 }
 
 // NOLINTNEXTLINE(cert-err58-cpp)
-const expression pi{func{constant{"pi", detail::pi_constant_func{}, u8"π"}}};
+const expression pi(func(constant("pi", detail::pi_constant_func{}, "π")));
 
 HEYOKA_END_NAMESPACE
 

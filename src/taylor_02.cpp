@@ -59,6 +59,7 @@
 
 #include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
@@ -1845,11 +1846,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &md);
-    if (f == nullptr) {
-        throw std::invalid_argument(fmt::format(
-            "Unable to create a function for the computation of the jet of Taylor derivatives with name '{}'", name));
-    }
+    auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, name, &md);
     // NOTE: a jet function cannot call itself recursively.
     f->addFnAttr(llvm::Attribute::NoRecurse);
 

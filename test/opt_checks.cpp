@@ -34,5 +34,5 @@ TEST_CASE("function inlining")
         ++count;
     }
 
-    REQUIRE(count == 2u);
+    REQUIRE(count == 3u);
 }

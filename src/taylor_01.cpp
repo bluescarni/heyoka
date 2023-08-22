@@ -71,6 +71,7 @@
 #endif
 
 #include <heyoka/detail/cm_utils.hpp>
+#include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/num_identity.hpp>
@@ -1760,15 +1761,8 @@ void taylor_add_d_out_function(llvm_state &s, llvm::Type *fp_scal_t, std::uint32
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
-    auto *f = llvm::Function::Create(
-        ft, external_linkage ? llvm::Function::ExternalLinkage : llvm::Function::InternalLinkage, "d_out_f",
-        &s.module());
-    // LCOV_EXCL_START
-    if (f == nullptr) {
-        throw std::invalid_argument(
-            "Unable to create a function for the dense output in an adaptive Taylor integrator");
-    }
-    // LCOV_EXCL_STOP
+    auto *f = llvm_func_create(ft, external_linkage ? llvm::Function::ExternalLinkage : llvm::Function::InternalLinkage,
+                               "d_out_f", &s.module());
 
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
@@ -1990,12 +1984,7 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "c_out", &md);
-    // LCOV_EXCL_START
-    if (f == nullptr) {
-        throw std::invalid_argument("Unable to create a function for continuous output in a Taylor integrator");
-    }
-    // LCOV_EXCL_STOP
+    auto *f = detail::llvm_func_create(ft, llvm::Function::ExternalLinkage, "c_out", &md);
 
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
@@ -2475,12 +2464,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "c_out", &md);
-    // LCOV_EXCL_START
-    if (f == nullptr) {
-        throw std::invalid_argument("Unable to create a function for continuous output in a Taylor integrator");
-    }
-    // LCOV_EXCL_STOP
+    auto *f = detail::llvm_func_create(ft, llvm::Function::ExternalLinkage, "c_out", &md);
 
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
