@@ -27,6 +27,7 @@
 #include <boost/math/policies/policy.hpp>
 #include <boost/math/tools/toms748_solve.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -259,7 +260,7 @@ std::tuple<T, int> bracketed_root_find(const T *poly, std::uint32_t order, T lb,
 
     // NOTE: iter limit will be derived from the number of binary digits
     // in the significand.
-    const auto iter_limit = [&]() {
+    const boost::uintmax_t iter_limit = [&]() {
 #if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
             // NOTE: we use lb here, but any of lb, ub or the poly
@@ -267,15 +268,7 @@ std::tuple<T, int> bracketed_root_find(const T *poly, std::uint32_t order, T lb,
             // working precision of the root finding scheme.
             // NOTE: since we use bisection for mppp::real, we need to allow
             // for more iterations than the number of digits.
-            const auto ret = boost::numeric_cast<boost::uintmax_t>(lb.get_prec());
-
-            // LCOV_EXCL_START
-            if (ret > std::numeric_limits<boost::uintmax_t>::max() / 2u) {
-                throw std::overflow_error("Overflow condition detected in bracketed_root_find()");
-            }
-            // LCOV_EXCL_STOP
-
-            return ret * 2u;
+            return boost::safe_numerics::safe<boost::uintmax_t>(lb.get_prec()) * 2;
         } else {
 #endif
             return boost::numeric_cast<boost::uintmax_t>(std::numeric_limits<T>::digits);
