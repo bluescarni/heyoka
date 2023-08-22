@@ -131,6 +131,7 @@
 
 #endif
 
+#include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -1186,13 +1187,7 @@ void llvm_state::add_obj_trigger()
 
     auto *ft = llvm::FunctionType::get(bld.getVoidTy(), {}, false);
     assert(ft != nullptr);
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, detail::obj_trigger_name, &module());
-
-    // LCOV_EXCL_START
-    if (f == nullptr) {
-        throw std::invalid_argument("Unable to add the object code materialisation trigger to an llvm_state");
-    }
-    // LCOV_EXCL_STOP
+    auto *f = detail::llvm_func_create(ft, llvm::Function::ExternalLinkage, detail::obj_trigger_name, &module());
 
     bld.SetInsertPoint(llvm::BasicBlock::Create(context(), "entry", f));
     bld.CreateRetVoid();

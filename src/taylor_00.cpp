@@ -61,6 +61,7 @@
 #endif
 
 #include <heyoka/detail/event_detection.hpp>
+#include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
@@ -189,13 +190,7 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
     // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &md);
-    // LCOV_EXCL_START
-    if (f == nullptr) {
-        throw std::invalid_argument(
-            fmt::format("Unable to create a function for an adaptive Taylor stepper with name '{}'", name));
-    }
-    // LCOV_EXCL_STOP
+    auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, name, &md);
     // NOTE: a step function cannot call itself recursively.
     f->addFnAttr(llvm::Attribute::NoRecurse);
 
@@ -330,11 +325,7 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
     // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &md);
-    if (f == nullptr) {
-        throw std::invalid_argument(
-            fmt::format("Unable to create a function for an adaptive Taylor stepper with name '{}'", name));
-    }
+    auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, name, &md);
     // NOTE: a step function cannot call itself recursively.
     f->addFnAttr(llvm::Attribute::NoRecurse);
 

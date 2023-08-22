@@ -63,6 +63,7 @@
 
 #include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/func_cache.hpp>
+#include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
@@ -1598,12 +1599,7 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // Append ".strided" to the function name.
     const auto sname = name + ".strided";
     // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, sname, &md);
-    if (f == nullptr) {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Unable to create a compiled function with name '{}'", sname));
-        // LCOV_EXCL_STOP
-    }
+    auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, sname, &md);
     // NOTE: a cfunc cannot call itself recursively.
     f->addFnAttr(llvm::Attribute::NoRecurse);
 
@@ -1661,12 +1657,7 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     fargs.pop_back();
     ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
-    f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &md);
-    if (f == nullptr) {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Unable to create a compiled function with name '{}'", name));
-        // LCOV_EXCL_STOP
-    }
+    f = llvm_func_create(ft, llvm::Function::ExternalLinkage, name, &md);
 
     // Set the names/attributes of the function arguments.
     out_ptr = f->args().begin();

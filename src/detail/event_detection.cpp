@@ -59,6 +59,7 @@
 
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/num_utils.hpp>
@@ -394,12 +395,7 @@ llvm::Function *add_poly_translator_1(llvm_state &s, llvm::Type *fp_t, std::uint
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "poly_translate_1", &s.module());
-    // LCOV_EXCL_START
-    if (f == nullptr) {
-        throw std::invalid_argument("Unable to create a function for polynomial translation");
-    }
-    // LCOV_EXCL_STOP
+    auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, "poly_translate_1", &s.module());
 
     // Set the names/attributes of the function arguments.
     auto *out_ptr = f->args().begin();
@@ -575,12 +571,7 @@ llvm::Function *llvm_add_poly_rtscc(llvm_state &s, llvm::Type *fp_t, std::uint32
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "poly_rtscc", &md);
-    // LCOV_EXCL_START
-    if (f == nullptr) {
-        throw std::invalid_argument("Unable to create an rtscc function");
-    }
-    // LCOV_EXCL_STOP
+    auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, "poly_rtscc", &md);
 
     // Set the names/attributes of the function arguments.
     // NOTE: out_ptr1/2 are used both in read and write mode,
@@ -687,12 +678,7 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "fex_check", &md);
-    // LCOV_EXCL_START
-    if (f == nullptr) {
-        throw std::invalid_argument("Unable to create an fex_check function");
-    }
-    // LCOV_EXCL_STOP
+    auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, "fex_check", &md);
 
     // Set the names/attributes of the function arguments.
     auto *cf_ptr = f->args().begin();
