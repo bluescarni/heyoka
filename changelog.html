@@ -503,6 +503,10 @@ document.write(`
 <section id="new">
 <h3>New<a class="headerlink" href="#new" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>Implement an in-memory cache for <code class="docutils literal notranslate"><span class="pre">llvm_state</span></code>. The cache is used
+to avoid re-optimising and re-compiling LLVM code which has
+already been optimised and compiled during the program execution
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/340">#340</a>).</p></li>
 <li><p>It is now possible to get the LLVM bitcode of
 an <code class="docutils literal notranslate"><span class="pre">llvm_state</span></code>
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/339">#339</a>).</p></li>
@@ -511,6 +515,9 @@ an <code class="docutils literal notranslate"><span class="pre">llvm_state</span
 <section id="changes">
 <h3>Changes<a class="headerlink" href="#changes" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>The optimisation level for an <code class="docutils literal notranslate"><span class="pre">llvm_state</span></code> is now clamped
+within the <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">3]</span></code> range
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/340">#340</a>).</p></li>
 <li><p>The LLVM bitcode is now used internally (instead of the textual
 representation of the IR) when copying and serialising
 an <code class="docutils literal notranslate"><span class="pre">llvm_state</span></code>
@@ -523,6 +530,8 @@ called during compilation
 <section id="fix">
 <h3>Fix<a class="headerlink" href="#fix" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>Fix compilation in C++20 mode
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/340">#340</a>).</p></li>
 <li><p>Fix the object file of an <code class="docutils literal notranslate"><span class="pre">llvm_state</span></code> not being
 preserved during copy and deserialisation
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/339">#339</a>).</p></li>

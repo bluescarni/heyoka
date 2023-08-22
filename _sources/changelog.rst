@@ -7,6 +7,10 @@ Changelog
 New
 ~~~
 
+- Implement an in-memory cache for ``llvm_state``. The cache is used
+  to avoid re-optimising and re-compiling LLVM code which has
+  already been optimised and compiled during the program execution
+  (`#340 <https://github.com/bluescarni/heyoka/pull/340>`__).
 - It is now possible to get the LLVM bitcode of
   an ``llvm_state``
   (`#339 <https://github.com/bluescarni/heyoka/pull/339>`__).
@@ -14,6 +18,9 @@ New
 Changes
 ~~~~~~~
 
+- The optimisation level for an ``llvm_state`` is now clamped
+  within the ``[0, 3]`` range
+  (`#340 <https://github.com/bluescarni/heyoka/pull/340>`__).
 - The LLVM bitcode is now used internally (instead of the textual
   representation of the IR) when copying and serialising
   an ``llvm_state``
@@ -25,6 +32,8 @@ Changes
 Fix
 ~~~
 
+- Fix compilation in C++20 mode
+  (`#340 <https://github.com/bluescarni/heyoka/pull/340>`__).
 - Fix the object file of an ``llvm_state`` not being
   preserved during copy and deserialisation
   (`#339 <https://github.com/bluescarni/heyoka/pull/339>`__).
