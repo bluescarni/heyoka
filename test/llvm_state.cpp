@@ -10,11 +10,19 @@
 
 #include <initializer_list>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
 #include <vector>
+
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -337,4 +345,25 @@ TEST_CASE("force_avx512")
         s5 = std::move(s4);
         REQUIRE(s5.force_avx512());
     }
+}
+
+TEST_CASE("existing trigger")
+{
+    using Catch::Matchers::Message;
+
+    llvm_state s;
+
+    auto &bld = s.builder();
+
+    auto *ft = llvm::FunctionType::get(bld.getVoidTy(), {}, false);
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "heyoka.obj_trigger", &s.module());
+
+    bld.SetInsertPoint(llvm::BasicBlock::Create(s.context(), "entry", f));
+    bld.CreateRetVoid();
+
+    REQUIRE_THROWS_MATCHES(s.compile(), std::invalid_argument,
+                           Message("Unable to create an LLVM function with name 'heyoka.obj_trigger'"));
+
+    // Check that the second function was properly cleaned up.
+    REQUIRE(std::distance(s.module().begin(), s.module().end()) == 1);
 }
