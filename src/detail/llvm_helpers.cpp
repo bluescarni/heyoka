@@ -778,7 +778,7 @@ llvm::CallInst *llvm_invoke_intrinsic(ir_builder &builder, const std::string &na
 
 // Helper to invoke an external function called 'name' with arguments args and return type ret_type.
 llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::Type *ret_type,
-                                     const std::vector<llvm::Value *> &args, const std::vector<int> &attrs)
+                                     const std::vector<llvm::Value *> &args, const llvm::AttributeList &attrs)
 {
     // Look up the name in the global module table.
     auto *callee_f = s.module().getFunction(name);
@@ -794,10 +794,7 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
         callee_f = llvm_func_create(ft, llvm::Function::ExternalLinkage, name, &s.module());
 
         // Add the function attributes.
-        for (const auto &att : attrs) {
-            // NOTE: convert back to the LLVM attribute enum.
-            callee_f->addFnAttr(boost::numeric_cast<llvm::Attribute::AttrKind>(att));
-        }
+        callee_f->setAttributes(attrs);
     } else {
         // The function declaration exists already. Check that it is only a
         // declaration and not a definition.
@@ -827,6 +824,12 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
     // https://llvm.org/docs/CodeGenerator.html#tail-calls
 
     return r;
+}
+
+llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::Type *ret_type,
+                                     const std::vector<llvm::Value *> &args)
+{
+    return llvm_invoke_external(s, name, ret_type, args, {});
 }
 
 // Append bb to the list of blocks of the function f
@@ -1187,13 +1190,15 @@ llvm::Value *call_extern_vec(llvm_state &s, const std::vector<llvm::Value *> &ar
         }
 
         // Invoke the function and store the scalar result.
-        retvals.push_back(llvm_invoke_external(
-            s, fname, scal_t, scal_args,
-            // NOTE: in theory we may add ReadNone here as well,
-            // but for some reason, at least up to LLVM 10,
-            // this causes strange codegen issues. Revisit
-            // in the future.
-            {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        retvals.push_back(
+            llvm_invoke_external(s, fname, scal_t, scal_args,
+                                 // NOTE: in theory we may add ReadNone here as well,
+                                 // but for some reason, at least up to LLVM 10,
+                                 // this causes strange codegen issues. Revisit
+                                 // in the future.
+                                 llvm::AttributeList::get(s.context(), llvm::AttributeList::FunctionIndex,
+                                                          {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable,
+                                                           llvm::Attribute::WillReturn})));
     }
 
     // Build a vector with the results.
@@ -1615,7 +1620,9 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
 
                 auto *ret_cos = llvm_invoke_external(
                     s, sfn_cos, vec_t, {x},
@@ -1623,7 +1630,9 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
 
                 return {ret_sin, ret_cos};
             }
@@ -1651,7 +1660,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
         std::vector<llvm::Value *> res_sin, res_cos;
         for (const auto &x_scal : x_scalars) {
             llvm_invoke_external(s, "sincosq", builder.getVoidTy(), {x_scal, s_all, c_all},
-                                 {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+                                 llvm::AttributeList::get(s.context(), llvm::AttributeList::FunctionIndex,
+                                                          {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
 
             res_sin.emplace_back(builder.CreateLoad(x_t, s_all));
             res_cos.emplace_back(builder.CreateLoad(x_t, c_all));
@@ -1840,7 +1850,9 @@ llvm::Value *llvm_atan2(llvm_state &s, llvm::Value *y, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -1896,7 +1908,9 @@ llvm::Value *llvm_exp(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -2809,8 +2823,10 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
                     tol_check, llvm_constantfp(s, tp, std::numeric_limits<double>::quiet_NaN()), old_val);
                 builder.CreateStore(new_val, retval);
 
-                llvm_invoke_external(s, "heyoka_inv_kep_E_max_iter", builder.getVoidTy(), {},
-                                     {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+                llvm_invoke_external(
+                    s, "heyoka_inv_kep_E_max_iter", builder.getVoidTy(), {},
+                    llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
+                                             {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
             },
             []() {});
 
@@ -3261,7 +3277,9 @@ llvm::Value *llvm_acos(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -3317,7 +3335,9 @@ llvm::Value *llvm_acosh(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        s.context(), llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -3373,7 +3393,9 @@ llvm::Value *llvm_asin(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -3429,7 +3451,9 @@ llvm::Value *llvm_asinh(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -3485,7 +3509,9 @@ llvm::Value *llvm_atan(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -3541,7 +3567,9 @@ llvm::Value *llvm_atanh(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -3597,7 +3625,9 @@ llvm::Value *llvm_cos(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -3642,7 +3672,9 @@ llvm::Value *llvm_sin(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -3687,7 +3719,9 @@ llvm::Value *llvm_cosh(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -3743,7 +3777,9 @@ llvm::Value *llvm_erf(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -3799,7 +3835,9 @@ llvm::Value *llvm_log(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -3864,7 +3902,9 @@ llvm::Value *llvm_sinh(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -3920,7 +3960,9 @@ llvm::Value *llvm_sqrt(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -3985,7 +4027,9 @@ llvm::Value *llvm_tan(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -4041,7 +4085,9 @@ llvm::Value *llvm_tanh(llvm_state &s, llvm::Value *x)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
@@ -4099,7 +4145,9 @@ llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y)
                     // but for some reason, at least up to LLVM 10,
                     // this causes strange codegen issues. Revisit
                     // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                    llvm::AttributeList::get(
+                        context, llvm::AttributeList::FunctionIndex,
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
             }
         }
 
