@@ -737,14 +737,19 @@ llvm::Value *pairwise_prod(llvm_state &s, std::vector<llvm::Value *> &prod)
 
 // Helper to invoke an intrinsic function with arguments 'args'. 'types' are the argument type(s) for
 // overloaded intrinsics.
+// NOTE: types and args are needed independently of each other. For instance, llvm.pow() is an
+// intrinsic with 2 arguments but the types argument has only 1 element because both arguments
+// always have the same type. I.e., the intrinsic is type-dependent on a single type only (not 2).
 llvm::CallInst *llvm_invoke_intrinsic(ir_builder &builder, const std::string &name,
                                       const std::vector<llvm::Type *> &types, const std::vector<llvm::Value *> &args)
 {
     // Fetch the intrinsic ID from the name.
     const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(name);
-    if (intrinsic_ID == 0) {
+    // LCOV_EXCL_START
+    if (intrinsic_ID == llvm::Intrinsic::not_intrinsic) {
         throw std::invalid_argument(fmt::format("Cannot fetch the ID of the intrinsic '{}'", name));
     }
+    // LCOV_EXCL_STOP
 
     // Fetch the declaration.
     // NOTE: for generic intrinsics to work, we need to specify
@@ -753,13 +758,8 @@ llvm::CallInst *llvm_invoke_intrinsic(ir_builder &builder, const std::string &na
     // And the docs of the getDeclaration() function.
     assert(builder.GetInsertBlock() != nullptr); // LCOV_EXCL_LINE
     auto *callee_f = llvm::Intrinsic::getDeclaration(builder.GetInsertBlock()->getModule(), intrinsic_ID, types);
-    if (callee_f == nullptr) {
-        throw std::invalid_argument(fmt::format("Error getting the declaration of the intrinsic '{}'", name));
-    }
-    if (!callee_f->isDeclaration()) {
-        // It does not make sense to have a definition of a builtin.
-        throw std::invalid_argument(fmt::format("The intrinsic '{}' must be only declared, not defined", name));
-    }
+    // It does not make sense to have a definition of a builtin.
+    assert(callee_f->isDeclaration());
 
     // Check the number of arguments.
     if (callee_f->arg_size() != args.size()) {
