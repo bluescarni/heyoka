@@ -64,11 +64,11 @@ TEST_CASE("nbody")
 
         auto ta = heyoka::taylor_adaptive{dyn, n_ic, kw::compact_mode = true};
 
-        // Check that llvm.pow appears only 3 times: its declaration plus 2 uses
-        // for determining the timestep size.
+        // Check that llvm.pow appears only maximum 3 times: its declaration plus 2 uses
+        // for determining the timestep size. Vectorisation may further reduce this number.
         std::vector<boost::iterator_range<std::string::const_iterator>> pow_matches;
         boost::find_all(pow_matches, ta.get_llvm_state().get_ir(), "@llvm.pow");
-        REQUIRE(pow_matches.size() == 3u);
+        REQUIRE(pow_matches.size() <= 3u);
 
         llvm_state s;
         std::vector<expression> vars;

@@ -952,217 +952,188 @@ void llvm_state::optimise()
     check_uncompiled(__func__);
 
     // NOTE: don't run any optimisation pass at O0.
-    if (m_opt_level > 0u) {
-        // NOTE: the logic here largely mimics (with a lot of simplifications)
-        // the implementation of the 'opt' tool. See:
-        // https://github.com/llvm/llvm-project/blob/release/10.x/llvm/tools/opt/opt.cpp
+    if (m_opt_level == 0u) {
+        return;
+    }
 
-        // For every function in the module, setup its attributes
-        // so that the codegen uses all the features available on
-        // the host CPU.
+    // NOTE: the logic here largely mimics (with a lot of simplifications)
+    // the implementation of the 'opt' tool. See:
+    // https://github.com/llvm/llvm-project/blob/release/10.x/llvm/tools/opt/opt.cpp
+
+    // For every function in the module, setup its attributes
+    // so that the codegen uses all the features available on
+    // the host CPU.
 #if LLVM_VERSION_MAJOR == 10
-        ::setFunctionAttributes(m_jitter->get_target_cpu(), m_jitter->get_target_features(), *m_module);
+    ::setFunctionAttributes(m_jitter->get_target_cpu(), m_jitter->get_target_features(), *m_module);
 #else
-        // NOTE: in LLVM > 10, the setFunctionAttributes() function is gone in favour of another
-        // function in another namespace, which however does not seem to work out of the box
-        // because (I think) it might be reading some non-existent command-line options. See:
-        // https://llvm.org/doxygen/CommandFlags_8cpp_source.html#l00552
-        // Here we are reproducing a trimmed-down version of the same function.
-        const auto cpu = m_jitter->get_target_cpu();
-        const auto features = m_jitter->get_target_features();
+    // NOTE: in LLVM > 10, the setFunctionAttributes() function is gone in favour of another
+    // function in another namespace, which however does not seem to work out of the box
+    // because (I think) it might be reading some non-existent command-line options. See:
+    // https://llvm.org/doxygen/CommandFlags_8cpp_source.html#l00552
+    // Here we are reproducing a trimmed-down version of the same function.
+    const auto cpu = m_jitter->get_target_cpu();
+    const auto features = m_jitter->get_target_features();
 
-        auto &ctx = context();
+    auto &ctx = context();
 
+    for (auto &f : module()) {
+        auto attrs = f.getAttributes();
+
+        llvm::AttrBuilder
+#if LLVM_VERSION_MAJOR < 14
+            new_attrs
+#else
+            new_attrs(ctx)
+#endif
+            ;
+
+        if (!cpu.empty() && !f.hasFnAttribute("target-cpu")) {
+            new_attrs.addAttribute("target-cpu", cpu);
+        }
+
+        if (!features.empty()) {
+            auto old_features = f.getFnAttribute("target-features").getValueAsString();
+
+            if (old_features.empty()) {
+                new_attrs.addAttribute("target-features", features);
+            } else {
+                llvm::SmallString<256> appended(old_features);
+                appended.push_back(',');
+                appended.append(features);
+                new_attrs.addAttribute("target-features", appended);
+            }
+        }
+
+        // Let new_attrs override attrs.
+#if LLVM_VERSION_MAJOR < 14
+        f.setAttributes(attrs.addAttributes(ctx, llvm::AttributeList::FunctionIndex, new_attrs));
+#else
+        f.setAttributes(attrs.addFnAttributes(ctx, new_attrs));
+#endif
+    }
+#endif
+
+    // Force usage of AVX512 registers, if requested.
+    if (m_force_avx512 && detail::get_target_features().avx512f) {
         for (auto &f : module()) {
-            auto attrs = f.getAttributes();
-
-            llvm::AttrBuilder
-#if LLVM_VERSION_MAJOR < 14
-                new_attrs
-#else
-                new_attrs(ctx)
-#endif
-                ;
-
-            if (!cpu.empty() && !f.hasFnAttribute("target-cpu")) {
-                new_attrs.addAttribute("target-cpu", cpu);
-            }
-
-            if (!features.empty()) {
-                auto old_features = f.getFnAttribute("target-features").getValueAsString();
-
-                if (old_features.empty()) {
-                    new_attrs.addAttribute("target-features", features);
-                } else {
-                    llvm::SmallString<256> appended(old_features);
-                    appended.push_back(',');
-                    appended.append(features);
-                    new_attrs.addAttribute("target-features", appended);
-                }
-            }
-
-            // Let new_attrs override attrs.
-#if LLVM_VERSION_MAJOR < 14
-            f.setAttributes(attrs.addAttributes(ctx, llvm::AttributeList::FunctionIndex, new_attrs));
-#else
-            f.setAttributes(attrs.addFnAttributes(ctx, new_attrs));
-#endif
+            f.addFnAttr("prefer-vector-width", "512");
         }
-#endif
-
-        // Force usage of AVX512 registers, if requested.
-        if (m_force_avx512 && detail::get_target_features().avx512f) {
-            for (auto &f : module()) {
-                f.addFnAttr("prefer-vector-width", "512");
-            }
-        }
+    }
 
 #if defined(HEYOKA_USE_NEW_LLVM_PASS_MANAGER)
 
-        // NOTE: adapted from here:
-        // https://llvm.org/docs/NewPassManager.html
+    // NOTE: adapted from here:
+    // https://llvm.org/docs/NewPassManager.html
 
-        // Optimisation level for the module pass manager.
-        // NOTE: the OptimizationLevel class has changed location
-        // since LLVM 14.
+    // Optimisation level for the module pass manager.
+    // NOTE: the OptimizationLevel class has changed location
+    // since LLVM 14.
 #if LLVM_VERSION_MAJOR >= 14
-        using olevel = llvm::OptimizationLevel;
+    using olevel = llvm::OptimizationLevel;
 #else
-        using olevel = llvm::PassBuilder::OptimizationLevel;
+    using olevel = llvm::PassBuilder::OptimizationLevel;
 #endif
 
-        // Create the analysis managers.
-        llvm::LoopAnalysisManager LAM;
-        llvm::FunctionAnalysisManager FAM;
-        llvm::CGSCCAnalysisManager CGAM;
-        llvm::ModuleAnalysisManager MAM;
+    // Create the analysis managers.
+    llvm::LoopAnalysisManager LAM;
+    llvm::FunctionAnalysisManager FAM;
+    llvm::CGSCCAnalysisManager CGAM;
+    llvm::ModuleAnalysisManager MAM;
 
-        // NOTE: in the new pass manager, this seems to be the way to
-        // set the target library info bits. See:
-        // https://github.com/llvm/llvm-project/blob/b7fd30eac3183993806cc218b6deb39eb625c083/llvm/tools/opt/NewPMDriver.cpp#L408
-        // Not sure if this matters, but we did it in the old pass manager
-        // and opt does it too.
-        llvm::TargetLibraryInfoImpl TLII(m_jitter->get_target_triple());
-        FAM.registerPass([&] { return llvm::TargetLibraryAnalysis(TLII); });
+    // NOTE: in the new pass manager, this seems to be the way to
+    // set the target library info bits. See:
+    // https://github.com/llvm/llvm-project/blob/b7fd30eac3183993806cc218b6deb39eb625c083/llvm/tools/opt/NewPMDriver.cpp#L408
+    // Not sure if this matters, but we did it in the old pass manager
+    // and opt does it too.
+    llvm::TargetLibraryInfoImpl TLII(m_jitter->get_target_triple());
+    FAM.registerPass([&] { return llvm::TargetLibraryAnalysis(TLII); });
 
-        // Create the new pass manager builder, passing
-        // the native target machine from the JIT class.
-        // NOTE: the SLP vectorizer (and other tuning options) can be
-        // set through a PipelineTuningOptions options passed as second
-        // argument to this constructor.
-        llvm::PassBuilder PB(m_jitter->m_tm.get());
+    // Create the new pass manager builder, passing
+    // the native target machine from the JIT class.
+    // NOTE: we turn manually on the SLP vectoriser here, which is off
+    // by default. Not sure why it is off, the LLVM docs imply this
+    // is on by default at nonzero optimisation levels for clang and opt.
+    llvm::PipelineTuningOptions pto;
+    pto.SLPVectorization = true;
+    llvm::PassBuilder PB(m_jitter->m_tm.get(), pto);
 
-        // NOTE: this additional pass triggers an LLVM errror during the optimisation phase
-        // on 64-bit ARM similar to this one:
-        //
-        // https://github.com/llvm/llvm-project/issues/54423
-        //
-        // It seems like this is related to the use of scalable
-        // vector extensions. Let's keep this disabled on ARM for now.
-#if !defined(HEYOKA_ARCH_ARM)
+    // Register all the basic analyses with the managers.
+    PB.registerModuleAnalyses(MAM);
+    PB.registerCGSCCAnalyses(CGAM);
+    PB.registerFunctionAnalyses(FAM);
+    PB.registerLoopAnalyses(LAM);
+    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-        // NOTE: this additional pass measurably helps performance
-        // in some benchmarks when dense output is activated.
-        PB.registerVectorizerStartEPCallback(
-            [](llvm::FunctionPassManager &FPM, olevel) { FPM.addPass(llvm::LoadStoreVectorizerPass()); });
+    // Construct the optimisation level.
+    olevel ol{};
 
-#endif
-
-        // Register all the basic analyses with the managers.
-        PB.registerModuleAnalyses(MAM);
-        PB.registerCGSCCAnalyses(CGAM);
-        PB.registerFunctionAnalyses(FAM);
-        PB.registerLoopAnalyses(LAM);
-        PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-        // Construct the optimisation level.
-        olevel ol{};
-
-        switch (m_opt_level) {
-            case 1u:
-                ol = olevel::O1;
-                break;
-            case 2u:
-                ol = olevel::O2;
-                break;
-            default:
-                ol = olevel::O3;
-        }
-
-        // Create the module pass manager.
-        auto MPM = PB.buildPerModuleDefaultPipeline(ol);
-
-        // Optimize the IR.
-        MPM.run(*m_module, MAM);
-
-#else
-
-        // Init the module pass manager.
-        auto module_pm = std::make_unique<llvm::legacy::PassManager>();
-        // These are passes which set up target-specific info
-        // that are used by successive optimisation passes.
-        auto tliwp = std::make_unique<llvm::TargetLibraryInfoWrapperPass>(
-            llvm::TargetLibraryInfoImpl(m_jitter->get_target_triple()));
-        module_pm->add(tliwp.release());
-        module_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
-
-        // NOTE: not sure what this does, presumably some target-specifc
-        // configuration.
-        module_pm->add(static_cast<llvm::LLVMTargetMachine &>(*m_jitter->m_tm).createPassConfig(*module_pm));
-
-        // Init the function pass manager.
-        auto f_pm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
-        f_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
-
-        // NOTE: this additional pass triggers an LLVM errror during the optimisation phase
-        // on 64-bit ARM similar to this one:
-        //
-        // https://github.com/llvm/llvm-project/issues/54423
-        //
-        // It seems like this is related to the use of scalable
-        // vector extensions. Let's keep this disabled on ARM for now.
-#if !defined(HEYOKA_ARCH_ARM)
-
-        // Add an initial pass to vectorize load/stores.
-        // This is useful to ensure that the
-        // pattern adopted in load_vector_from_memory() and
-        // store_vector_to_memory() is translated to
-        // vectorized store/load instructions.
-        auto lsv_pass = std::unique_ptr<llvm::Pass>(llvm::createLoadStoreVectorizerPass());
-        f_pm->add(lsv_pass.release());
-
-#endif
-
-        // We use the helper class PassManagerBuilder to populate the module
-        // pass manager with standard options.
-        llvm::PassManagerBuilder pm_builder;
-        // See here for the defaults:
-        // https://llvm.org/doxygen/PassManagerBuilder_8cpp_source.html
-        // NOTE: we used to have the SLP vectorizer on here, but
-        // we don't activate it any more in favour of explicit vectorization.
-        // NOTE: perhaps in the future we can make the autovectorizer an
-        // option like the fast math flag.
-        pm_builder.OptLevel = m_opt_level;
-        // Enable function inlining.
-        pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
-
-        m_jitter->m_tm->adjustPassManager(pm_builder);
-
-        // Populate both the function pass manager and the module pass manager.
-        pm_builder.populateFunctionPassManager(*f_pm);
-        pm_builder.populateModulePassManager(*module_pm);
-
-        // Run the function pass manager on all functions in the module.
-        f_pm->doInitialization();
-        for (auto &f : *m_module) {
-            f_pm->run(f);
-        }
-        f_pm->doFinalization();
-
-        // Run the module passes.
-        module_pm->run(*m_module);
-#endif
+    switch (m_opt_level) {
+        case 1u:
+            ol = olevel::O1;
+            break;
+        case 2u:
+            ol = olevel::O2;
+            break;
+        default:
+            assert(m_opt_level == 3u);
+            ol = olevel::O3;
     }
+
+    // Create the module pass manager.
+    auto MPM = PB.buildPerModuleDefaultPipeline(ol);
+
+    // Optimize the IR.
+    MPM.run(*m_module, MAM);
+
+#else
+
+    // Init the module pass manager.
+    auto module_pm = std::make_unique<llvm::legacy::PassManager>();
+    // These are passes which set up target-specific info
+    // that are used by successive optimisation passes.
+    auto tliwp = std::make_unique<llvm::TargetLibraryInfoWrapperPass>(
+        llvm::TargetLibraryInfoImpl(m_jitter->get_target_triple()));
+    module_pm->add(tliwp.release());
+    module_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
+
+    // NOTE: not sure what this does, presumably some target-specifc
+    // configuration.
+    module_pm->add(static_cast<llvm::LLVMTargetMachine &>(*m_jitter->m_tm).createPassConfig(*module_pm));
+
+    // Init the function pass manager.
+    auto f_pm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
+    f_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
+
+    // We use the helper class PassManagerBuilder to populate the module
+    // pass manager with standard options.
+    llvm::PassManagerBuilder pm_builder;
+    // See here for the defaults:
+    // https://llvm.org/doxygen/PassManagerBuilder_8cpp_source.html
+    pm_builder.OptLevel = m_opt_level;
+    // Enable function inlining.
+    pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
+    // NOTE: we turn manually on the SLP vectoriser here, which is off
+    // by default. Not sure why it is off, the LLVM docs imply this
+    // is on by default at nonzero optimisation levels for clang and opt.
+    pm_builder.SLPVectorize = true;
+
+    m_jitter->m_tm->adjustPassManager(pm_builder);
+
+    // Populate both the function pass manager and the module pass manager.
+    pm_builder.populateFunctionPassManager(*f_pm);
+    pm_builder.populateModulePassManager(*module_pm);
+
+    // Run the function pass manager on all functions in the module.
+    f_pm->doInitialization();
+    for (auto &f : *m_module) {
+        f_pm->run(f);
+    }
+    f_pm->doFinalization();
+
+    // Run the module passes.
+    module_pm->run(*m_module);
+
+#endif
 }
 
 namespace detail
