@@ -346,8 +346,17 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
             for (const auto &el : vfi) {
                 vf_abi_strs.push_back(el.vf_abi_attr);
             }
+#if LLVM_VERSION_MAJOR >= 14
             ret->addFnAttr(llvm::Attribute::get(context, "vector-function-abi-variant",
                                                 fmt::format("{}", fmt::join(vf_abi_strs, ","))));
+#else
+            {
+                auto attrs = ret->getAttributes();
+                attrs = attrs.addAttribute(context, llvm::AttributeList::FunctionIndex, "vector-function-abi-variant",
+                                           fmt::format("{}", fmt::join(vf_abi_strs, ",")));
+                ret->setAttributes(attrs);
+            }
+#endif
 
             // Now we need to:
             // - add the declarations of the vector variants to the module,

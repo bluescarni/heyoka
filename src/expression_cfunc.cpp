@@ -1699,9 +1699,11 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
 #if LLVM_VERSION_MAJOR >= 14
     fcall->addFnAttr(llvm::Attribute::AlwaysInline);
 #else
-    auto attrs = fcall->getAttributes();
-    attrs = attrs.addAttribute(context, llvm::AttributeList::FunctionIndex, llvm::Attribute::AlwaysInline);
-    fcall->setAttributes(attrs);
+    {
+        auto attrs = fcall->getAttributes();
+        attrs = attrs.addAttribute(context, llvm::AttributeList::FunctionIndex, llvm::Attribute::AlwaysInline);
+        fcall->setAttributes(attrs);
+    }
 #endif
 
     // Finish off the function.
