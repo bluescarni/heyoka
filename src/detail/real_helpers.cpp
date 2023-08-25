@@ -51,6 +51,9 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+namespace
+{
+
 // Various static checks.
 static_assert(sizeof(mppp::real) == sizeof(mppp::mpfr_struct_t));
 static_assert(alignof(mppp::real) == alignof(mppp::mpfr_struct_t));
@@ -59,6 +62,16 @@ static_assert(std::is_signed_v<mpfr_prec_t>);
 static_assert(std::is_signed_v<mpfr_sign_t>);
 static_assert(std::is_signed_v<mpfr_exp_t>);
 static_assert(std::is_signed_v<real_rnd_t>);
+
+// Helper to generate the function attributes list to
+// be used when invoking MPFR primitives.
+llvm::AttributeList get_mpfr_attr_list(llvm::LLVMContext &context)
+{
+    return llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
+                                    {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+}
+
+} // namespace
 
 // Determine if the input type is heyoka.real.N,
 // and, in such case, return N. Otherwise, return 0.
@@ -324,9 +337,7 @@ llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string 
         mpfr_args.push_back(llvm_mpfr_rndn(s));
 
         // Invoke the MPFR primitive.
-        llvm_invoke_external(s, mpfr_name, to_llvm_type<int>(context), mpfr_args,
-                             llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
-                                                      {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
+        llvm_invoke_external(s, mpfr_name, to_llvm_type<int>(context), mpfr_args, get_mpfr_attr_list(context));
 
         // Assemble the result.
         auto *res = llvm_mpfr_view_to_real(s, real_res, limb_arr_res, fp_t);
@@ -387,9 +398,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &s, llvm::Va
         mpfr_args.push_back(llvm_mpfr_rndn(s));
 
         // Invoke the MPFR primitive.
-        llvm_invoke_external(s, "mpfr_sin_cos", to_llvm_type<int>(context), mpfr_args,
-                             llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
-                                                      {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
+        llvm_invoke_external(s, "mpfr_sin_cos", to_llvm_type<int>(context), mpfr_args, get_mpfr_attr_list(context));
 
         // Assemble the result.
         auto *res_sin = llvm_mpfr_view_to_real(s, real_res_sin, limb_arr_res_sin, fp_t);
@@ -459,9 +468,7 @@ llvm::Function *real_nary_cmp(llvm_state &s, llvm::Type *fp_t, const std::string
 
         // Invoke the MPFR primitive.
         auto *cmp_ret
-            = llvm_invoke_external(s, mpfr_name, to_llvm_type<int>(context), mpfr_args,
-                                   llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
-                                                            {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
+            = llvm_invoke_external(s, mpfr_name, to_llvm_type<int>(context), mpfr_args, get_mpfr_attr_list(context));
 
         // Truncate the result to a boolean and return.
         builder.CreateRet(builder.CreateTrunc(cmp_ret, builder.getInt1Ty()));
@@ -628,9 +635,7 @@ llvm::Value *llvm_real_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
         mpfr_args.push_back(llvm_mpfr_rndn(s));
 
         // Invoke the MPFR primitive.
-        llvm_invoke_external(s, "mpfr_set_ui", to_llvm_type<int>(context), mpfr_args,
-                             llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
-                                                      {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
+        llvm_invoke_external(s, "mpfr_set_ui", to_llvm_type<int>(context), mpfr_args, get_mpfr_attr_list(context));
 
         // Assemble the result.
         auto *res = llvm_mpfr_view_to_real(s, real_res, limb_arr_res, fp_t);
@@ -692,10 +697,7 @@ llvm::Value *llvm_real_sgn(llvm_state &s, llvm::Value *x)
 
         // Invoke the MPFR primitive.
         auto *int_t = to_llvm_type<int>(context);
-        auto *cmp_ret
-            = llvm_invoke_external(s, "heyoka_mpfr_sgn", int_t, mpfr_args,
-                                   llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
-                                                            {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
+        auto *cmp_ret = llvm_invoke_external(s, "heyoka_mpfr_sgn", int_t, mpfr_args, get_mpfr_attr_list(context));
 
         // Compute the int32 return value: cmp_ret == 0 ? 0 : (cmp_ret < 0 ? -1 : 1).
         auto *int32_t = builder.getInt32Ty();
