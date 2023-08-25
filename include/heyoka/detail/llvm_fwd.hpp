@@ -24,6 +24,7 @@ class GlobalVariable;
 class ArrayType;
 class Constant;
 class BasicBlock;
+class AttributeList;
 
 // NOTE: IRBuilder is a template with default
 // parameters, hence we declare the default parameters

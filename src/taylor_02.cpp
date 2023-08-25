@@ -1073,8 +1073,10 @@ std::pair<llvm::Value *, llvm::Type *> taylor_compute_jet_compact_mode(
                 builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", wrapper));
 
                 // Invoke the parallel looper.
-                llvm_invoke_external(s, "heyoka_cm_par_looper", builder.getVoidTy(), {builder.getInt32(ncalls), worker},
-                                     {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+                llvm_invoke_external(
+                    s, "heyoka_cm_par_looper", builder.getVoidTy(), {builder.getInt32(ncalls), worker},
+                    llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
+                                             {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
 
                 // Return.
                 builder.CreateRetVoid();
@@ -1159,7 +1161,8 @@ std::pair<llvm::Value *, llvm::Type *> taylor_compute_jet_compact_mode(
 
             // Invoke.
             llvm_invoke_external(s, fname, builder.getVoidTy(), args,
-                                 {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+                                 llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
+                                                          {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
 
             // Update rem and start_idx.
             rem -= cur_size;
