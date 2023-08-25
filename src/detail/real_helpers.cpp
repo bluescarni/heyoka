@@ -290,10 +290,8 @@ llvm::Value *llvm_mpfr_view_to_real(llvm_state &s, llvm::Value *mpfr_struct_inst
 
 // Helper to construct an n-ary LLVM function corresponding to the MPFR primitive 'mpfr_name'.
 // The operands will be of type 'fp_t' (which must be a heyoka.real.N). The name of the function
-// will be built from pname. The return type of the MPFR primitive is assumed to be int.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string &pname, const std::string &mpfr_name,
-                             unsigned nargs)
+// will be built from mpfr_name. The return type of the MPFR primitive is assumed to be int.
+llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string &mpfr_name, unsigned nargs)
 {
     assert(nargs > 0u);
 
@@ -305,7 +303,7 @@ llvm::Function *real_nary_op(llvm_state &s, llvm::Type *fp_t, const std::string 
 
     assert(real_prec > 0);
 
-    const auto fname = fmt::format("heyoka.real.{}.{}", real_prec, pname);
+    const auto fname = fmt::format("heyoka.real.{}.{}", real_prec, mpfr_name);
 
     auto *f = md.getFunction(fname);
 
@@ -425,11 +423,9 @@ namespace
 
 // Helper to construct an n-ary LLVM function corresponding to the MPFR comparison primitive 'mpfr_name'.
 // The operands will be of type 'fp_t' (which must be a heyoka.real.N), the return type is bool. The name of the
-// function will be built from pname. The MPFR primitive must not require a rounding mode argument and it must
+// function will be built from mpfr_name. The MPFR primitive must not require a rounding mode argument and it must
 // return an int.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-llvm::Function *real_nary_cmp(llvm_state &s, llvm::Type *fp_t, const std::string &pname, const std::string &mpfr_name,
-                              unsigned nargs)
+llvm::Function *real_nary_cmp(llvm_state &s, llvm::Type *fp_t, const std::string &mpfr_name, unsigned nargs)
 {
     assert(nargs > 0u);
 
@@ -441,7 +437,7 @@ llvm::Function *real_nary_cmp(llvm_state &s, llvm::Type *fp_t, const std::string
 
     assert(real_prec > 0);
 
-    const auto fname = fmt::format("heyoka.real.{}.{}", real_prec, pname);
+    const auto fname = fmt::format("heyoka.real.{}.{}", real_prec, mpfr_name);
 
     auto *f = md.getFunction(fname);
 
@@ -492,7 +488,7 @@ llvm::Value *llvm_real_fcmp_ult(llvm_state &s, llvm::Value *a, llvm::Value *b)
     assert(a->getType() == b->getType());
     // LCOV_EXCL_STOP
 
-    auto *f = real_nary_cmp(s, a->getType(), "fcmp_ult", "heyoka_mpfr_fcmp_ult", 2u);
+    auto *f = real_nary_cmp(s, a->getType(), "heyoka_mpfr_fcmp_ult", 2u);
 
     return s.builder().CreateCall(f, {a, b});
 }
@@ -507,7 +503,7 @@ llvm::Value *llvm_real_fcmp_oge(llvm_state &s, llvm::Value *a, llvm::Value *b)
     assert(a->getType() == b->getType());
     // LCOV_EXCL_STOP
 
-    auto *f = real_nary_cmp(s, a->getType(), "fcmp_oge", "mpfr_greaterequal_p", 2u);
+    auto *f = real_nary_cmp(s, a->getType(), "mpfr_greaterequal_p", 2u);
 
     return s.builder().CreateCall(f, {a, b});
 }
@@ -522,7 +518,7 @@ llvm::Value *llvm_real_fcmp_ole(llvm_state &s, llvm::Value *a, llvm::Value *b)
     assert(a->getType() == b->getType());
     // LCOV_EXCL_STOP
 
-    auto *f = real_nary_cmp(s, a->getType(), "fcmp_ole", "mpfr_lessequal_p", 2u);
+    auto *f = real_nary_cmp(s, a->getType(), "mpfr_lessequal_p", 2u);
 
     return s.builder().CreateCall(f, {a, b});
 }
@@ -537,7 +533,7 @@ llvm::Value *llvm_real_fcmp_olt(llvm_state &s, llvm::Value *a, llvm::Value *b)
     assert(a->getType() == b->getType());
     // LCOV_EXCL_STOP
 
-    auto *f = real_nary_cmp(s, a->getType(), "fcmp_olt", "mpfr_less_p", 2u);
+    auto *f = real_nary_cmp(s, a->getType(), "mpfr_less_p", 2u);
 
     return s.builder().CreateCall(f, {a, b});
 }
@@ -552,7 +548,7 @@ llvm::Value *llvm_real_fcmp_ogt(llvm_state &s, llvm::Value *a, llvm::Value *b)
     assert(a->getType() == b->getType());
     // LCOV_EXCL_STOP
 
-    auto *f = real_nary_cmp(s, a->getType(), "fcmp_ogt", "mpfr_greater_p", 2u);
+    auto *f = real_nary_cmp(s, a->getType(), "mpfr_greater_p", 2u);
 
     return s.builder().CreateCall(f, {a, b});
 }
@@ -567,7 +563,7 @@ llvm::Value *llvm_real_fcmp_oeq(llvm_state &s, llvm::Value *a, llvm::Value *b)
     assert(a->getType() == b->getType());
     // LCOV_EXCL_STOP
 
-    auto *f = real_nary_cmp(s, a->getType(), "fcmp_oeq", "mpfr_equal_p", 2u);
+    auto *f = real_nary_cmp(s, a->getType(), "mpfr_equal_p", 2u);
 
     return s.builder().CreateCall(f, {a, b});
 }
