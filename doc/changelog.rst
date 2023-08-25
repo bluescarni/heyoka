@@ -18,6 +18,9 @@ New
 Changes
 ~~~~~~~
 
+- The LLVM SLP vectorizer is now enabled when JIT compiling
+  with optimisations
+  (`#341 <https://github.com/bluescarni/heyoka/pull/341>`__).
 - The optimisation level for an ``llvm_state`` is now clamped
   within the ``[0, 3]`` range
   (`#340 <https://github.com/bluescarni/heyoka/pull/340>`__).
