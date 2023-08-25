@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -80,6 +81,7 @@
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/vector_math.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -201,6 +203,248 @@ const auto type_map = []() {
 
     return retval;
 }();
+
+// Helper to determine if the scalar type tp can use the LLVM
+// math intrinsics.
+// NOTE: this is needed because for some types the use of LLVM intrinsics
+// might be buggy or not possible at all (e.g., for mppp::real).
+bool llvm_stype_can_use_math_intrinsics(llvm_state &s, llvm::Type *tp)
+{
+    assert(tp != nullptr);
+    assert(!tp->isVectorTy());
+
+    auto &context = s.context();
+
+    // NOTE: by default we assume it is safe to invoke the LLVM intrinsics
+    // on the fundamental C++ floating-point types.
+    // NOTE: to_llvm_type fails by returning nullptr - in such a case
+    // (which I don't think is currently possible) then the
+    // comparison to tp will fail as tp is not null.
+    return tp == to_llvm_type<float>(context, false) || tp == to_llvm_type<double>(context, false)
+           || tp == to_llvm_type<long double>(context, false);
+}
+
+// Helper to lookup/insert the declaration of an LLVM intrinsic into a module.
+// NOTE: here "name" is expected to be the overloaded name of the intrinsic (that is, without type information).
+// NOTE: types and nargs are needed independently of each other. For instance, llvm.pow is an
+// intrinsic with 2 arguments but the types argument has only 1 element because both arguments
+// must have the same type. I.e., the intrinsic is type-dependent on a single type only (not 2).
+llvm::Function *llvm_lookup_intrinsic(llvm_state &s, const std::string &name, const std::vector<llvm::Type *> &types,
+                                      unsigned nargs)
+{
+    // Fetch the intrinsic ID from the name.
+    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(name);
+    // LCOV_EXCL_START
+    if (intrinsic_ID == llvm::Intrinsic::not_intrinsic) {
+        throw std::invalid_argument(fmt::format("Cannot fetch the ID of the intrinsic '{}'", name));
+    }
+    // LCOV_EXCL_STOP
+
+    // Fetch the declaration.
+    // NOTE: for generic intrinsics to work, we need to specify
+    // the desired argument type(s). See:
+    // https://stackoverflow.com/questions/11985247/llvm-insert-intrinsic-function-cos
+    // And the docs of the getDeclaration() function.
+    auto *f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, types);
+    assert(f != nullptr);
+    // It does not make sense to have a definition of an intrinsic.
+    assert(f->isDeclaration());
+
+    // Check the number of arguments.
+    // LCOV_EXCL_START
+    if (f->arg_size() != nargs) {
+        throw std::invalid_argument(fmt::format("Incorrect number of arguments for the intrinsic '{}': {} are "
+                                                "expected, but {} are needed instead",
+                                                name, nargs, f->arg_size()));
+    }
+    // LCOV_EXCL_STOP
+
+    return f;
+}
+
+// Implementation of an LLVM math function built on top of an intrinsic.
+// intr_name is the name of the intrinsic (without type information),
+// f128/real_name are the names of the functions to be used for the
+// real128/real implementations (if these cannot be implemented
+// on top of the LLVM intrinsics).
+template <typename... Args>
+llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
+#if defined(HEYOKA_HAVE_REAL128)
+                            // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                            const std::string f128_name,
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+                            // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                            const std::string real_name,
+#endif
+
+                            Args *...args)
+{
+    constexpr auto nargs = sizeof...(Args);
+    static_assert(nargs > 0u);
+    static_assert(std::conjunction_v<std::is_same<llvm::Value, Args>...>);
+
+    // Check that all arguments have the same type.
+    const std::array arg_types = {args->getType()...};
+    assert(std::all_of(arg_types.begin() + 1, arg_types.end(), [&arg_types](auto *tp) { return tp == arg_types[0]; }));
+
+    // Determine the type and scalar type of the arguments.
+    auto *x_t = arg_types[0];
+    auto *scal_t = x_t->getScalarType();
+
+    auto &builder = s.builder();
+    auto &context = s.context();
+    auto &md = s.module();
+
+    if (llvm_stype_can_use_math_intrinsics(s, scal_t)) {
+        // We can use the LLVM intrinsics for the given scalar type.
+
+        // Lookup the intrinsic that would be used
+        // in the scalar implementation.
+        auto *s_intr = llvm_lookup_intrinsic(s, intr_name, {scal_t}, boost::numeric_cast<unsigned>(nargs));
+
+        // Lookup the scalar intrinsic name in the vector function info map.
+        const auto &vfi = lookup_vf_info(std::string(s_intr->getName()));
+
+        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_t)) {
+            // The inputs are vectors. Check if we have a vector implementation
+            // with the correct vector width in vfi.
+            const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+            const auto vfi_it
+                = std::lower_bound(vfi.begin(), vfi.end(), vector_width,
+                                   [](const auto &vfi_item, std::uint32_t n) { return vfi_item.width < n; });
+
+            if (vfi_it != vfi.end() && vfi_it->width == vector_width) {
+                // Vector implementation is available, use it.
+                assert(vfi_it->nargs == nargs);
+
+                // NOTE: assign to the vector implementation the same attributes
+                // as the scalar intrinsic.
+                return llvm_invoke_external(s, vfi_it->name, vec_t, {args...}, s_intr->getAttributes());
+            } else {
+                // No vector implementation available, just let LLVM handle it
+                // and hope for the best.
+                // NOTE: we need to call llvm_invoke_intrinsic() (rather than using s_intr) because
+                // now we are invoking the intrinsic on the vector argument.
+                return llvm_invoke_intrinsic(builder, intr_name, {x_t}, {args...});
+            }
+        }
+
+        // The input is **not** a vector. Invoke the scalar intrinsic.
+        auto *ret = builder.CreateCall(s_intr, {args...});
+
+// NOTE: the vector-function-abi-variant attribute was added
+// in LLVM 11:
+// https://releases.llvm.org/11.0.0/docs/ReleaseNotes.html#changes-to-the-llvm-ir
+#if LLVM_VERSION_MAJOR >= 11
+
+        if (!vfi.empty()) {
+            // There exist vector versions of the scalar function. Attach the "vector-function-abi-variant"
+            // attribute to the call so that LLVM's auto-vectorizer can take advantage of these vector variants.
+            std::vector<std::string> vf_abi_strs;
+            vf_abi_strs.reserve(vfi.size());
+            for (const auto &el : vfi) {
+                vf_abi_strs.push_back(el.vf_abi_attr);
+            }
+            ret->addFnAttr(llvm::Attribute::get(context, "vector-function-abi-variant",
+                                                fmt::format("{}", fmt::join(vf_abi_strs, ","))));
+
+            // Now we need to:
+            // - add the declarations of the vector variants to the module,
+            // - ensure that these declarations are not removed by the optimiser,
+            //   otherwise the vector variants will not be picked up.
+
+            // Remember the original insertion block.
+            auto *orig_bb = builder.GetInsertBlock();
+
+            // Add the vector variants and the dummy functions
+            // to prevent them from being removed.
+            for (const auto &el : vfi) {
+                // The vector type for the current variant.
+                auto *cur_vec_t = make_vector_type(scal_t, el.width);
+
+                // The signature of the current variant.
+                auto *vec_ft = llvm::FunctionType::get(
+                    cur_vec_t,
+                    std::vector<llvm::Type *>(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(nargs),
+                                              cur_vec_t),
+                    false);
+
+                // Try to lookup the variant in the module.
+                auto *vf_ptr = md.getFunction(el.name);
+
+                if (vf_ptr == nullptr) {
+                    // The declaration of the variant is not there yet, create it.
+                    vf_ptr = llvm_func_create(vec_ft, llvm::Function::ExternalLinkage, el.name, &md);
+                } else {
+                    // The declaration of the variant is already there.
+                    // Check that the signatures match.
+                    assert(vf_ptr->getFunctionType() == vec_ft);
+                }
+
+                // Copy the attributes from the scalar intrinsic.
+                // NOTE: in case vf_ptr existed already, this might be redundant,
+                // but let's just do it for peace of mind. Like this, we are sure
+                // the attributes are set correctly.
+                vf_ptr->setAttributes(s_intr->getAttributes());
+
+                // Create the name of the dummy function to ensure the variant is not optimised out.
+                const auto dummy_name = fmt::format("heyoka.dummy_vector_call.{}", el.name);
+
+                if (auto *dummy_ptr = md.getFunction(dummy_name); dummy_ptr == nullptr) {
+                    // The dummy function has not been defined yet, do it.
+                    auto *dummy = llvm_func_create(vec_ft, llvm::Function::ExternalLinkage, dummy_name, &md);
+
+                    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", dummy));
+
+                    // The dummy function just forwards its arguments to the variant.
+                    std::vector<llvm::Value *> dummy_args;
+                    for (auto *dummy_arg = dummy->args().begin(); dummy_arg != dummy->args().end(); ++dummy_arg) {
+                        dummy_args.emplace_back(dummy_arg);
+                    }
+
+                    builder.CreateRet(builder.CreateCall(vf_ptr, dummy_args));
+                } else {
+                    // The declaration of the dummy function is already there.
+                    // Check that the signatures match.
+                    assert(dummy_ptr->getFunctionType() == vec_ft);
+                }
+            }
+
+            // Restore the original insertion block.
+            builder.SetInsertPoint(orig_bb);
+        }
+
+#endif
+
+        return ret;
+    }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    // NOTE: this handles both the scalar and vector cases.
+    if (scal_t == to_llvm_type<mppp::real128>(context, false)) {
+        return call_extern_vec(s, {args...}, f128_name);
+    }
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    // NOTE: this handles only the scalar case.
+    if (llvm_is_real(x_t) != 0) {
+        auto *f = real_nary_op(s, x_t, real_name, boost::numeric_cast<unsigned>(nargs));
+        return s.builder().CreateCall(f, {args...});
+    }
+
+#endif
+
+    // LCOV_EXCL_START
+    throw std::invalid_argument(
+        fmt::format("Invalid type '{}' encountered in the implementation of the intrinsic-based math function '{}'",
+                    llvm_type_name(x_t), intr_name));
+    // LCOV_EXCL_STOP
+}
 
 } // namespace
 
@@ -3652,48 +3896,14 @@ llvm::Value *llvm_cos(llvm_state &s, llvm::Value *x)
 // Sine.
 llvm::Value *llvm_sin(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of x.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false) || x_t == to_llvm_type<long double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn
-                = sleef_function_name(context, "sin", x_t, boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return llvm_invoke_intrinsic(s.builder(), "llvm.sin", {x->getType()}, {x});
+    return llvm_math_intr(s, "llvm.sin",
 #if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "sinq");
+                          "sinq",
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_sin", 1u);
-        return s.builder().CreateCall(f, {x});
+                          "mpfr_sin",
 #endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of sin()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+                          x);
 }
 
 // Hyperbolic cosine.
