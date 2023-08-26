@@ -556,7 +556,7 @@ int main(int argc, char **argv)
 
         TargetOptions dopt;
 
-#define foobar(name) std::cout << #name << dopt.name << " vs " << Options.name << std::endl
+#define foobar(name) std::cout << #name << " " << dopt.name << " vs " << Options.name << std::endl
 
         foobar(UnsafeFPMath);
         foobar(NoInfsFPMath);
