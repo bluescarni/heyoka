@@ -11,6 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <iostream>
+
 #include "BreakpointPrinter.h"
 #include "NewPMDriver.h"
 #include "llvm/ADT/Triple.h"
@@ -551,6 +553,70 @@ int main(int argc, char **argv)
         CPUStr = codegen::getCPUStr();
         FeaturesStr = codegen::getFeaturesStr();
         // Machine = GetTargetMachine(ModuleTriple, CPUStr, FeaturesStr, Options);
+
+        TargetOptions dopt;
+
+#define foobar(name) std::cout << #name << dopt.name << " vs " << Options.name << std::endl
+
+        foobar(UnsafeFPMath);
+        foobar(NoInfsFPMath);
+        foobar(NoNaNsFPMath);
+        foobar(NoTrappingFPMath);
+        foobar(NoSignedZerosFPMath);
+        foobar(ApproxFuncFPMath);
+        foobar(EnableAIXExtendedAltivecABI);
+        foobar(HonorSignDependentRoundingFPMathOption);
+        foobar(NoZerosInBSS);
+        foobar(GuaranteedTailCallOpt);
+        foobar(StackSymbolOrdering);
+        foobar(EnableFastISel);
+        foobar(EnableGlobalISel);
+        // foobar(GlobalISelAbort);
+        // foobar(SwiftAsyncFramePointer);
+        foobar(UseInitArray);
+        foobar(LowerGlobalDtorsViaCxaAtExit);
+        foobar(DisableIntegratedAS);
+        // foobar(CompressDebugSections);
+        foobar(RelaxELFRelocations);
+        foobar(FunctionSections);
+        foobar(DataSections);
+        foobar(IgnoreXCOFFVisibility);
+        foobar(XCOFFTracebackTable);
+        foobar(UniqueSectionNames);
+        foobar(UniqueBasicBlockSectionNames);
+        foobar(TrapUnreachable);
+        foobar(NoTrapAfterNoreturn);
+        foobar(TLSSize);
+        foobar(EmulatedTLS);
+        foobar(ExplicitEmulatedTLS);
+        foobar(EnableIPRA);
+        foobar(EmitStackSizeSection);
+        foobar(EnableMachineOutliner);
+        foobar(EnableMachineFunctionSplitter);
+        foobar(SupportsDefaultOutlining);
+        foobar(EmitAddrsig);
+        // foobar(BBSections);
+        foobar(BBSectionsFuncListBuf);
+        foobar(EmitCallSiteInfo);
+        foobar(SupportsDebugEntryValues);
+        foobar(EnableDebugEntryValues);
+        foobar(ValueTrackingVariableLocations);
+        foobar(ForceDwarfFrameSection);
+        foobar(XRayOmitFunctionIndex);
+        foobar(DebugStrictDwarf);
+        foobar(Hotpatch);
+        foobar(PPCGenScalarMASSEntries);
+        foobar(JMCInstrument);
+        foobar(EnableCFIFixup);
+        foobar(MisExpect);
+        foobar(StackUsageOutput);
+        foobar(LoopAlignment);
+        foobar(FloatABIType);
+        foobar(AllowFPOpFusion);
+        foobar(ThreadModel);
+        // foobar(EABIVersion);
+        // foobar(DebuggerTuning);
+        // foobar(ExceptionModel);
 
         auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
         jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::Aggressive);
