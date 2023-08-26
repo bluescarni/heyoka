@@ -1058,6 +1058,14 @@ void llvm_state::optimise()
     // NOTE: we turn manually on the SLP vectoriser here, which is off
     // by default. Not sure why it is off, the LLVM docs imply this
     // is on by default at nonzero optimisation levels for clang and opt.
+    // NOTE: the reason for this inconsistency is that opt uses PB.parsePassPipeline()
+    // (instead of PB.buildPerModuleDefaultPipeline()) to set up the optimisation
+    // pipeline. Indeed, if we replace PB.buildPerModuleDefaultPipeline(ol) with
+    // PB.buildPerModuleDefaultPipeline(MPM, "default<O3>") (which
+    // corresponds to invoking "opt -passes='default<O3>'"), we do NOT need to set
+    // SLP vectorization on here to get the SLP vectorizer. Not sure if we should consider
+    // switching to this alternative way of setting up the optimisation pipeline
+    // in the future.
     llvm::PipelineTuningOptions pto;
     pto.SLPVectorization = true;
     llvm::PassBuilder PB(m_jitter->m_tm.get(), pto);
