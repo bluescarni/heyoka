@@ -30,6 +30,7 @@
 #include <utility>
 #include <vector>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/core/demangle.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <boost/numeric/conversion/cast.hpp>
@@ -232,6 +233,8 @@ bool llvm_stype_can_use_math_intrinsics(llvm_state &s, llvm::Type *tp)
 llvm::Function *llvm_lookup_intrinsic(llvm_state &s, const std::string &name, const std::vector<llvm::Type *> &types,
                                       unsigned nargs)
 {
+    assert(boost::starts_with(name, "llvm."));
+
     // Fetch the intrinsic ID from the name.
     const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(name);
     // LCOV_EXCL_START
@@ -283,6 +286,8 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
     constexpr auto nargs = sizeof...(Args);
     static_assert(nargs > 0u);
     static_assert(std::conjunction_v<std::is_same<llvm::Value, Args>...>);
+
+    assert(boost::starts_with(intr_name, "llvm."));
 
     // Check that all arguments have the same type.
     const std::array arg_types = {args->getType()...};
