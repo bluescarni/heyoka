@@ -89,7 +89,12 @@
 #endif
 
 // NOTE: new pass manager API.
-#if LLVM_VERSION_MAJOR >= 13
+// NOTE: this is available since LLVM 13, but in that
+// version it seems like auto-vectorization with
+// vector-function-abi-variant is not working
+// properly with the new pass manager. Hence, we
+// enable it from LLVM 14.
+#if LLVM_VERSION_MAJOR >= 14
 
 #define HEYOKA_USE_NEW_LLVM_PASS_MANAGER
 
