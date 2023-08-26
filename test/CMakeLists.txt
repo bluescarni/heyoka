@@ -16,7 +16,7 @@ set_property(TARGET heyoka_test PROPERTY CXX_EXTENSIONS NO)
 target_link_libraries(heyoka_test PRIVATE spdlog::spdlog heyoka)
 
 function(ADD_HEYOKA_TESTCASE arg1)
-  add_executable(${arg1} ${arg1}.cpp)
+  add_executable(${arg1} ${arg1}.cpp ${ARGN})
   target_link_libraries(${arg1} PRIVATE heyoka_test heyoka xtensor xtensor-blas fmt::fmt heyoka_llvm_internal Boost::boost)
   target_compile_definitions(${arg1} PRIVATE XTENSOR_USE_FLENS_BLAS)
   target_compile_options(${arg1} PRIVATE
@@ -159,3 +159,8 @@ if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
   ADD_HEYOKA_TESTCASE(taylor_kepE_mp)
   ADD_HEYOKA_TESTCASE(taylor_time_f_mp)
 endif()
+
+ADD_HEYOKA_TESTCASE(opt_new
+  AnalysisWrappers.cpp
+  BreakpointPrinter.cpp
+  NewPMDriver.cpp)
