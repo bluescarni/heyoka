@@ -19,8 +19,6 @@
 #include <heyoka/detail/vector_math.hpp>
 #include <heyoka/llvm_state.hpp>
 
-// LCOV_EXCL_START
-
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
@@ -81,6 +79,8 @@ auto make_vf_map()
 #if defined(HEYOKA_WITH_SLEEF)
 
     add_vfinfo_sleef(retval, "llvm.sin.f64", "sin", "d", 1);
+    add_vfinfo_sleef(retval, "llvm.cos.f64", "cos", "d", 1);
+    add_vfinfo_sleef(retval, "llvm.log.f64", "log", "d", 1);
 
 #endif
 
@@ -119,5 +119,3 @@ const std::vector<vf_info> &lookup_vf_info(const std::string &name)
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
-
-// LCOV_EXCL_STOP
