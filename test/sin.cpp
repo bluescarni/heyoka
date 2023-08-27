@@ -290,8 +290,6 @@ TEST_CASE("vfabi")
     //     REQUIRE(count == 3u);
     // }
 
-#endif
-
     // Some more extensive testing specific to x86, only for this function.
     auto [c, d, e] = make_vars("c", "d", "e");
 
@@ -341,4 +339,6 @@ TEST_CASE("vfabi")
         //   5-argument version.
         REQUIRE(count == 11u);
     }
+
+#endif
 }
