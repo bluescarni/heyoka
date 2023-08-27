@@ -291,4 +291,54 @@ TEST_CASE("vfabi")
     // }
 
 #endif
+
+    // Some more extensive testing specific to x86, only for this function.
+    auto [c, d, e] = make_vars("c", "d", "e");
+
+    llvm_state s2;
+
+    add_cfunc<double>(s2, "cfunc1", {sin(a), sin(b), sin(c), sin(d)});
+    add_cfunc<double>(s2, "cfunc2", {sin(a), sin(b), sin(c), sin(d), sin(e)});
+
+    s2.compile();
+
+    auto *cf1_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s2.jit_lookup("cfunc1"));
+    auto *cf2_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s2.jit_lookup("cfunc2"));
+
+    const std::vector ins2{1., 2., 3., 4., 5.};
+    std::vector<double> outs2(5u, 0.);
+
+    cf1_ptr(outs2.data(), ins2.data(), nullptr, nullptr);
+
+    REQUIRE(outs2[0] == approximately(std::sin(1.)));
+    REQUIRE(outs2[1] == approximately(std::sin(2.)));
+    REQUIRE(outs2[2] == approximately(std::sin(3.)));
+    REQUIRE(outs2[3] == approximately(std::sin(4.)));
+
+    cf2_ptr(outs2.data(), ins2.data(), nullptr, nullptr);
+
+    REQUIRE(outs2[0] == approximately(std::sin(1.)));
+    REQUIRE(outs2[1] == approximately(std::sin(2.)));
+    REQUIRE(outs2[2] == approximately(std::sin(3.)));
+    REQUIRE(outs2[3] == approximately(std::sin(4.)));
+    REQUIRE(outs2[4] == approximately(std::sin(5.)));
+
+    ir = s2.get_ir();
+
+    count = 0u;
+    for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.sin.f64", boost::is_iequal()));
+         it != string_find_iterator(); ++it) {
+        ++count;
+    }
+
+    if (tf.avx) {
+        // NOTE: occurrences of the scalar version:
+        // - 4 + 5 calls in the strided cfuncs,
+        // - 1 declaration,
+        // - 1 call to deal with the remainder in the
+        //   5-argument version.
+        REQUIRE(count == 11u);
+    }
 }
