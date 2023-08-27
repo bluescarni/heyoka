@@ -299,7 +299,12 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 
     auto &builder = s.builder();
     auto &context = s.context();
+
+#if LLVM_VERSION_MAJOR >= 11
+
     auto &md = s.module();
+
+#endif
 
     if (llvm_stype_can_use_math_intrinsics(s, scal_t)) {
         // We can use the LLVM intrinsics for the given scalar type.
@@ -307,6 +312,21 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
         // Lookup the intrinsic that would be used
         // in the scalar implementation.
         auto *s_intr = llvm_lookup_intrinsic(s, intr_name, {scal_t}, boost::numeric_cast<unsigned>(nargs));
+
+        // Setup the function attributes to be used in the declaration of the vector
+        // implementation/variants.
+        // NOTE: normally we want the vector implementation/variants to have the same
+        // attributes as the scalar counterpart, but this results in codegen issues in
+        // LLVM 10. This is probably related to the ReadNone attribute issue mentioned
+        // elsewhere.
+        const auto vec_attrs =
+#if LLVM_VERSION_MAJOR == 10
+            llvm::AttributeList::get(
+                context, llvm::AttributeList::FunctionIndex,
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+#else
+            s_intr->getAttributes();
+#endif
 
         // Lookup the scalar intrinsic name in the vector function info map.
         const auto &vfi = lookup_vf_info(std::string(s_intr->getName()));
@@ -322,10 +342,7 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
             if (vfi_it != vfi.end() && vfi_it->width == vector_width) {
                 // Vector implementation is available, use it.
                 assert(vfi_it->nargs == nargs);
-
-                // NOTE: assign to the vector implementation the same attributes
-                // as the scalar intrinsic.
-                return llvm_invoke_external(s, vfi_it->name, vec_t, {args...}, s_intr->getAttributes());
+                return llvm_invoke_external(s, vfi_it->name, vec_t, {args...}, vec_attrs);
             } else {
                 // No vector implementation available, just let LLVM handle it
                 // and hope for the best.
@@ -338,13 +355,13 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
         // The input is **not** a vector. Invoke the scalar intrinsic.
         auto *ret = builder.CreateCall(s_intr, {args...});
 
-// NOTE: the vector-function-abi-variant attribute was added
-// in LLVM 11:
-// https://releases.llvm.org/11.0.0/docs/ReleaseNotes.html#changes-to-the-llvm-ir
+        // NOTE: the vector-function-abi-variant attribute was added
+        // in LLVM 11:
+        // https://releases.llvm.org/11.0.0/docs/ReleaseNotes.html#changes-to-the-llvm-ir
 #if LLVM_VERSION_MAJOR >= 11
 
         if (!vfi.empty()) {
-            // There exist vector versions of the scalar function. Attach the "vector-function-abi-variant"
+            // There exist vector variants of the scalar function. Attach the "vector-function-abi-variant"
             // attribute to the call so that LLVM's auto-vectorizer can take advantage of these vector variants.
             std::vector<std::string> vf_abi_strs;
             vf_abi_strs.reserve(vfi.size());
@@ -396,11 +413,11 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
                     assert(vf_ptr->getFunctionType() == vec_ft);
                 }
 
-                // Copy the attributes from the scalar intrinsic.
+                // Setup the attributes for the variant.
                 // NOTE: in case vf_ptr existed already, this might be redundant,
                 // but let's just do it for peace of mind. Like this, we are sure
                 // the attributes are set correctly.
-                vf_ptr->setAttributes(s_intr->getAttributes());
+                vf_ptr->setAttributes(vec_attrs);
 
                 // Create the name of the dummy function to ensure the variant is not optimised out.
                 const auto dummy_name = fmt::format("heyoka.dummy_vector_call.{}", el.name);
