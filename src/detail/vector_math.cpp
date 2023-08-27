@@ -65,6 +65,9 @@ auto add_vfinfo_sleef(vf_map_t &retval, const char *scalar_name, const char *sle
     } else if (features.aarch64) {
         retval[scalar_name] = {make_sleef_vfinfo(2, "advsimd")};
     } else if (features.vsx) {
+        // NOTE: at this time the sleef conda package for PPC64 does not seem
+        // to provide VSX3 functions. Thus, for now we use only the
+        // VSX implementations.
         retval[scalar_name] = {make_sleef_vfinfo(2, "vsx")};
     }
 }
@@ -78,9 +81,16 @@ auto make_vf_map()
 
 #if defined(HEYOKA_WITH_SLEEF)
 
+    // NOTE: currently we are not adding here any sqrt() implementation provided
+    // by sleef, on the assumption that usually sqrt() is implemented directly in hardware
+    // and thus there's no need to go through sleef. This is certainly true for x86,
+    // but I am not 100% sure for the other archs. Let's keep this in mind.
+
+    // Double-precision.
     add_vfinfo_sleef(retval, "llvm.sin.f64", "sin", "d", 1);
     add_vfinfo_sleef(retval, "llvm.cos.f64", "cos", "d", 1);
     add_vfinfo_sleef(retval, "llvm.log.f64", "log", "d", 1);
+    add_vfinfo_sleef(retval, "llvm.exp.f64", "exp", "d", 1);
 
 #endif
 
