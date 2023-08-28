@@ -24,6 +24,8 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+// LCOV_EXCL_START
+
 namespace
 {
 
@@ -114,6 +116,8 @@ auto make_vf_map()
 }
 
 } // namespace
+
+// LCOV_EXCL_STOP
 
 const std::vector<vf_info> &lookup_vf_info(const std::string &name)
 {
