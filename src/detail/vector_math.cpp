@@ -42,9 +42,10 @@ auto make_vfinfo(const char *s_name, std::string v_name, std::uint32_t width, st
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 auto add_vfinfo_sleef(vf_map_t &retval, const char *scalar_name, const char *sleef_base_name, const char *sleef_tp,
-                      std::uint32_t nargs)
+                      std::uint32_t nargs = 1)
 {
     assert(retval.find(scalar_name) == retval.end());
+    assert(nargs > 0u);
 
     auto make_sleef_vfinfo = [&](std::uint32_t width, const char *iset) {
         return make_vfinfo(scalar_name, fmt::format("Sleef_{}{}{}_u10{}", sleef_base_name, sleef_tp, width, iset),
@@ -87,10 +88,11 @@ auto make_vf_map()
     // but I am not 100% sure for the other archs. Let's keep this in mind.
 
     // Double-precision.
-    add_vfinfo_sleef(retval, "llvm.sin.f64", "sin", "d", 1);
-    add_vfinfo_sleef(retval, "llvm.cos.f64", "cos", "d", 1);
-    add_vfinfo_sleef(retval, "llvm.log.f64", "log", "d", 1);
-    add_vfinfo_sleef(retval, "llvm.exp.f64", "exp", "d", 1);
+    add_vfinfo_sleef(retval, "llvm.sin.f64", "sin", "d");
+    add_vfinfo_sleef(retval, "llvm.cos.f64", "cos", "d");
+    add_vfinfo_sleef(retval, "llvm.log.f64", "log", "d");
+    add_vfinfo_sleef(retval, "llvm.exp.f64", "exp", "d");
+    add_vfinfo_sleef(retval, "llvm.pow.f64", "pow", "d", 2);
 
 #endif
 

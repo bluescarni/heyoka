@@ -285,13 +285,14 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 {
     constexpr auto nargs = sizeof...(Args);
     static_assert(nargs > 0u);
-    static_assert(std::conjunction_v<std::is_same<llvm::Value, Args>...>);
+    static_assert((std::is_same_v<llvm::Value, Args> && ...));
 
     assert(boost::starts_with(intr_name, "llvm."));
+    assert(((args != nullptr) && ...));
 
     // Check that all arguments have the same type.
     const std::array arg_types = {args->getType()...};
-    assert(std::all_of(arg_types.begin() + 1, arg_types.end(), [&arg_types](auto *tp) { return tp == arg_types[0]; }));
+    assert(((args->getType() == arg_types[0]) && ...));
 
     // Determine the type and scalar type of the arguments.
     auto *x_t = arg_types[0];
@@ -299,12 +300,6 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 
     auto &builder = s.builder();
     auto &context = s.context();
-
-#if LLVM_VERSION_MAJOR >= 11
-
-    auto &md = s.module();
-
-#endif
 
     if (llvm_stype_can_use_math_intrinsics(s, scal_t)) {
         // We can use the LLVM intrinsics for the given scalar type.
@@ -361,6 +356,8 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 #if LLVM_VERSION_MAJOR >= 11
 
         if (!vfi.empty()) {
+            auto &md = s.module();
+
             // There exist vector variants of the scalar function. Attach the "vector-function-abi-variant"
             // attribute to the call so that LLVM's auto-vectorizer can take advantage of these vector variants.
             std::vector<std::string> vf_abi_strs;
@@ -4228,52 +4225,14 @@ llvm::Value *llvm_tanh(llvm_state &s, llvm::Value *x)
 // Exponentiation.
 llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    assert(y != nullptr);
-    assert(x->getType() == y->getType());
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the arguments.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false) || x_t == to_llvm_type<long double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn
-                = sleef_function_name(context, "pow", x_t, boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x, y},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        auto *ret = llvm_invoke_intrinsic(s.builder(), "llvm.pow", {x->getType()}, {x, y});
-
-        return ret;
+    return llvm_math_intr(s, "llvm.pow",
 #if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x, y}, "powq");
+                          "powq",
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_pow", 2u);
-        return s.builder().CreateCall(f, {x, y});
+                          "mpfr_pow",
 #endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of pow()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+                          x, y);
 }
 
 // This helper returns the type to be used for the internal LLVM representation
