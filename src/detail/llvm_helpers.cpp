@@ -265,6 +265,33 @@ llvm::Function *llvm_lookup_intrinsic(llvm_state &s, const std::string &name, co
     return f;
 }
 
+// Generate a set of standard function attributes for use in math functions.
+//
+// The idea here is to copy the attributes from LLVM's math intrinsics,
+// which unlock several optimisation opportunities thanks to the way the default LLVM
+// floating-point environment is set up:
+//
+// https://llvm.org/docs/LangRef.html#floating-point-environment
+//
+// In LLVM 10, however, we have to use a custom-made set of attributes because using
+// the intrinsics' attributes results in codegen issues. This is probably related
+// to the ReadNone attribute issue mentioned elsewhere.
+auto llvm_math_func_attrs(llvm_state &s)
+{
+#if LLVM_VERSION_MAJOR == 10
+    return llvm::AttributeList::get(
+        s.context(), llvm::AttributeList::FunctionIndex,
+        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+#else
+    // NOTE: use the fabs() f64 intrinsic - hopefully it does not matter
+    // which intrinsic we pick.
+    auto *f = llvm_lookup_intrinsic(s, "llvm.fabs", {to_llvm_type<double>(s.context())}, 1);
+    assert(f != nullptr);
+
+    return f->getAttributes();
+#endif
+}
+
 // Implementation of an LLVM math function built on top of an intrinsic.
 // intr_name is the name of the intrinsic (without type information),
 // f128/real_name are the names of the functions to be used for the
@@ -288,6 +315,7 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
     static_assert((std::is_same_v<llvm::Value, Args> && ...));
 
     assert(boost::starts_with(intr_name, "llvm."));
+
     assert(((args != nullptr) && ...));
 
     // Check that all arguments have the same type.
@@ -310,18 +338,7 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 
         // Setup the function attributes to be used in the declaration of the vector
         // implementation/variants.
-        // NOTE: normally we want the vector implementation/variants to have the same
-        // attributes as the scalar counterpart, but this results in codegen issues in
-        // LLVM 10. This is probably related to the ReadNone attribute issue mentioned
-        // elsewhere.
-        const auto vec_attrs =
-#if LLVM_VERSION_MAJOR == 10
-            llvm::AttributeList::get(
-                context, llvm::AttributeList::FunctionIndex,
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
-#else
-            s_intr->getAttributes();
-#endif
+        const auto vec_attrs = llvm_math_func_attrs(s);
 
         // Lookup the scalar intrinsic name in the vector function info map.
         const auto &vfi = lookup_vf_info(std::string(s_intr->getName()));
