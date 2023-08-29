@@ -292,7 +292,7 @@ auto llvm_math_func_attrs(llvm_state &s)
 #endif
 }
 
-// Implementation of an LLVM math function built on top of an intrinsic.
+// Implementation of an LLVM math function built on top of an intrinsic (if possible).
 // intr_name is the name of the intrinsic (without type information),
 // f128/real_name are the names of the functions to be used for the
 // real128/real implementations (if these cannot be implemented
