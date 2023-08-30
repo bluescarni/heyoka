@@ -454,7 +454,6 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
     auto *scal_t = x_t->getScalarType();
 
     auto &builder = s.builder();
-    auto &context = s.context();
 
     if (llvm_stype_can_use_math_intrinsics(s, scal_t)) {
         // We can use the LLVM intrinsics for the given scalar type.
@@ -499,7 +498,7 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 #if defined(HEYOKA_HAVE_REAL128)
 
     // NOTE: this handles both the scalar and vector cases.
-    if (scal_t == to_llvm_type<mppp::real128>(context, false)) {
+    if (scal_t == to_llvm_type<mppp::real128>(s.context(), false)) {
         return call_extern_vec(s, {args...}, f128_name);
     }
 
