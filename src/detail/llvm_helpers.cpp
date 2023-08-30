@@ -352,7 +352,7 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
                                    [](const auto &vfi_item, std::uint32_t n) { return vfi_item.width < n; });
 
             if (vfi_it != vfi.end() && vfi_it->width == vector_width) {
-                // Vector implementation is available, use it.
+                // A vector implementation is available, use it.
                 assert(vfi_it->nargs == nargs);
                 return llvm_invoke_external(s, vfi_it->name, vec_t, {args...}, vec_attrs);
             } else {
