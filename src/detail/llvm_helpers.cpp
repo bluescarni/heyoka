@@ -295,41 +295,36 @@ auto llvm_math_func_attrs(llvm_state &s)
 #endif
 }
 
-// Call the function f with scalar arguments args attaching vector-function-abi-variant attributes
-// to enable auto-vectorization. The necessary vfabi information is stored in vfi.
-// vec_attrs are the function attributes for the vector variants.
-llvm::CallInst *llvm_call_with_vfabi(llvm_state &s, llvm::Function *f, const std::vector<llvm::Value *> &args,
+// Attach the vfabi attributes to "call", which must be a call to a function with scalar arguments.
+// The necessary vfabi information is stored in vfi, vec_attrs are the function attributes for the vector variants.
+// The return value is "call".
+llvm::CallInst *llvm_add_vfabi_attrs([[maybe_unused]] llvm_state &s, [[maybe_unused]] llvm::CallInst *call,
                                      [[maybe_unused]] const std::vector<vf_info> &vfi,
                                      [[maybe_unused]] const llvm::AttributeList &vec_attrs)
 {
-#if !defined(NDEBUG)
-
-    assert(!args.empty());
-    assert(f != nullptr);
-    auto *ft = f->getFunctionType();
-    assert(ft->getNumParams() == args.size());
-    assert(std::all_of(ft->param_begin(), ft->param_end(), [](auto *p) { return p != nullptr && !p->isVectorTy(); }));
-
-#endif
-
-    auto &builder = s.builder();
-
-    // Create the scalar call.
-    auto *ret = builder.CreateCall(f, args);
-
     // NOTE: the vector-function-abi-variant attribute was added
     // in LLVM 11:
     // https://releases.llvm.org/11.0.0/docs/ReleaseNotes.html#changes-to-the-llvm-ir
 #if LLVM_VERSION_MAJOR >= 11
 
+    assert(call != nullptr);
+
+    const auto *ft = call->getCalledFunction()->getFunctionType();
+
+    const auto num_args = ft->getNumParams();
+
+    assert(num_args != 0u);
+    assert(std::all_of(ft->param_begin(), ft->param_end(), [](auto *p) { return p != nullptr && !p->isVectorTy(); }));
+
     auto &context = s.context();
+    auto &builder = s.builder();
 
     if (!vfi.empty()) {
         // There exist vector variants of the scalar function.
         auto &md = s.module();
 
         // Fetch the type of the scalar arguments.
-        auto *scal_t = f->getFunctionType()->getParamType(0);
+        auto *scal_t = ft->getParamType(0);
 
         // Attach the "vector-function-abi-variant" attribute to the call so that LLVM's auto-vectorizer can take
         // advantage of these vector variants.
@@ -339,14 +334,14 @@ llvm::CallInst *llvm_call_with_vfabi(llvm_state &s, llvm::Function *f, const std
             vf_abi_strs.push_back(el.vf_abi_attr);
         }
 #if LLVM_VERSION_MAJOR >= 14
-        ret->addFnAttr(llvm::Attribute::get(context, "vector-function-abi-variant",
-                                            fmt::format("{}", fmt::join(vf_abi_strs, ","))));
+        call->addFnAttr(llvm::Attribute::get(context, "vector-function-abi-variant",
+                                             fmt::format("{}", fmt::join(vf_abi_strs, ","))));
 #else
         {
-            auto attrs = ret->getAttributes();
+            auto attrs = call->getAttributes();
             attrs = attrs.addAttribute(context, llvm::AttributeList::FunctionIndex, "vector-function-abi-variant",
                                        fmt::format("{}", fmt::join(vf_abi_strs, ",")));
-            ret->setAttributes(attrs);
+            call->setAttributes(attrs);
         }
 #endif
 
@@ -362,7 +357,7 @@ llvm::CallInst *llvm_call_with_vfabi(llvm_state &s, llvm::Function *f, const std
         // to prevent them from being removed.
         for (const auto &el : vfi) {
             assert(el.width > 0u);
-            assert(el.nargs == args.size());
+            assert(el.nargs == num_args);
 
             // The vector type for the current variant.
             auto *cur_vec_t = make_vector_type(scal_t, el.width);
@@ -370,7 +365,7 @@ llvm::CallInst *llvm_call_with_vfabi(llvm_state &s, llvm::Function *f, const std
             // The signature of the current variant.
             auto *vec_ft = llvm::FunctionType::get(
                 cur_vec_t,
-                std::vector<llvm::Type *>(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(args.size()),
+                std::vector<llvm::Type *>(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(num_args),
                                           cur_vec_t),
                 false);
 
@@ -421,7 +416,7 @@ llvm::CallInst *llvm_call_with_vfabi(llvm_state &s, llvm::Function *f, const std
 
 #endif
 
-    return ret;
+    return call;
 }
 
 // Implementation of an LLVM math function built on top of an intrinsic (if possible).
@@ -498,7 +493,7 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 
         // The input is **not** a vector. Invoke the scalar intrinsic attaching vector
         // variants if available.
-        return llvm_call_with_vfabi(s, s_intr, {args...}, vfi, vec_attrs);
+        return llvm_add_vfabi_attrs(s, builder.CreateCall(s_intr, {args...}), vfi, vec_attrs);
     }
 
 #if defined(HEYOKA_HAVE_REAL128)
