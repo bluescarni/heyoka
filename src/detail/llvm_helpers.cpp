@@ -234,6 +234,7 @@ llvm::Function *llvm_lookup_intrinsic(ir_builder &builder, const std::string &na
                                       const std::vector<llvm::Type *> &types, unsigned nargs)
 {
     assert(boost::starts_with(name, "llvm."));
+    assert(types.size() <= nargs);
 
     // Fetch the intrinsic ID from the name.
     const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(name);
@@ -1414,9 +1415,11 @@ void llvm_switch_u32(llvm_state &s, llvm::Value *val, const std::function<void()
     builder.SetInsertPoint(merge_bb);
 }
 
-// Helper to invoke an external function with vector arguments.
+// Helper to invoke an external scalar function with arguments
+// which may be vectors.
 // The call will be decomposed into a sequence of calls with scalar arguments,
 // and the return values will be re-assembled as a vector.
+// If the arguments are vectors, they must all have the same size.
 // NOTE: there are some assumptions about valid function attributes
 // in this implementation, need to keep these into account when using
 // this helper.
@@ -1439,7 +1442,7 @@ llvm::Value *call_extern_vec(llvm_state &s, const std::vector<llvm::Value *> &ar
     }
 
     // Fetch the vector size.
-    auto vec_size = scalars[0].size();
+    const auto vec_size = scalars[0].size();
 
     // Fetch the type of the scalar arguments.
     auto *const scal_t = scalars[0][0]->getType();
@@ -1452,7 +1455,7 @@ llvm::Value *call_extern_vec(llvm_state &s, const std::vector<llvm::Value *> &ar
 
     // Invoke the function on each set of scalars.
     std::vector<llvm::Value *> retvals, scal_args;
-    for (decltype(vec_size) i = 0; i < vec_size; ++i) {
+    for (decltype(scalars[0].size()) i = 0; i < vec_size; ++i) {
         // Setup the vector of scalar arguments.
         scal_args.clear();
         for (const auto &scal_set : scalars) {
