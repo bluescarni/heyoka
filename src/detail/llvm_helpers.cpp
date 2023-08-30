@@ -230,8 +230,8 @@ bool llvm_stype_can_use_math_intrinsics(llvm_state &s, llvm::Type *tp)
 // NOTE: types and nargs are needed independently of each other. For instance, llvm.pow is an
 // intrinsic with 2 arguments but the types argument has only 1 element because both arguments
 // must have the same type. I.e., the intrinsic is type-dependent on a single type only (not 2).
-llvm::Function *llvm_lookup_intrinsic(llvm_state &s, const std::string &name, const std::vector<llvm::Type *> &types,
-                                      unsigned nargs)
+llvm::Function *llvm_lookup_intrinsic(ir_builder &builder, const std::string &name,
+                                      const std::vector<llvm::Type *> &types, unsigned nargs)
 {
     assert(boost::starts_with(name, "llvm."));
 
@@ -248,7 +248,9 @@ llvm::Function *llvm_lookup_intrinsic(llvm_state &s, const std::string &name, co
     // the desired argument type(s). See:
     // https://stackoverflow.com/questions/11985247/llvm-insert-intrinsic-function-cos
     // And the docs of the getDeclaration() function.
-    auto *f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, types);
+    assert(builder.GetInsertBlock() != nullptr);
+    assert(builder.GetInsertBlock()->getModule() != nullptr);
+    auto *f = llvm::Intrinsic::getDeclaration(builder.GetInsertBlock()->getModule(), intrinsic_ID, types);
     assert(f != nullptr);
     // It does not make sense to have a definition of an intrinsic.
     assert(f->isDeclaration());
@@ -285,7 +287,7 @@ auto llvm_math_func_attrs(llvm_state &s)
 #else
     // NOTE: use the fabs() f64 intrinsic - hopefully it does not matter
     // which intrinsic we pick.
-    auto *f = llvm_lookup_intrinsic(s, "llvm.fabs", {to_llvm_type<double>(s.context())}, 1);
+    auto *f = llvm_lookup_intrinsic(s.builder(), "llvm.fabs", {to_llvm_type<double>(s.context())}, 1);
     assert(f != nullptr);
 
     return f->getAttributes();
@@ -334,7 +336,7 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 
         // Lookup the intrinsic that would be used
         // in the scalar implementation.
-        auto *s_intr = llvm_lookup_intrinsic(s, intr_name, {scal_t}, boost::numeric_cast<unsigned>(nargs));
+        auto *s_intr = llvm_lookup_intrinsic(builder, intr_name, {scal_t}, boost::numeric_cast<unsigned>(nargs));
 
         // Setup the function attributes to be used in the declaration of the vector
         // implementation/variants.
@@ -1032,31 +1034,7 @@ llvm::Value *pairwise_prod(llvm_state &s, std::vector<llvm::Value *> &prod)
 llvm::CallInst *llvm_invoke_intrinsic(ir_builder &builder, const std::string &name,
                                       const std::vector<llvm::Type *> &types, const std::vector<llvm::Value *> &args)
 {
-    // Fetch the intrinsic ID from the name.
-    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(name);
-    // LCOV_EXCL_START
-    if (intrinsic_ID == llvm::Intrinsic::not_intrinsic) {
-        throw std::invalid_argument(fmt::format("Cannot fetch the ID of the intrinsic '{}'", name));
-    }
-    // LCOV_EXCL_STOP
-
-    // Fetch the declaration.
-    // NOTE: for generic intrinsics to work, we need to specify
-    // the desired argument type(s). See:
-    // https://stackoverflow.com/questions/11985247/llvm-insert-intrinsic-function-cos
-    // And the docs of the getDeclaration() function.
-    assert(builder.GetInsertBlock() != nullptr); // LCOV_EXCL_LINE
-    auto *callee_f = llvm::Intrinsic::getDeclaration(builder.GetInsertBlock()->getModule(), intrinsic_ID, types);
-    // It does not make sense to have a definition of a builtin.
-    assert(callee_f->isDeclaration());
-
-    // Check the number of arguments.
-    if (callee_f->arg_size() != args.size()) {
-        throw std::invalid_argument(
-            fmt::format("Incorrect # of arguments passed while calling the intrinsic '{}': {} are "
-                        "expected, but {} were provided instead",
-                        name, callee_f->arg_size(), args.size()));
-    }
+    auto *callee_f = llvm_lookup_intrinsic(builder, name, types, boost::numeric_cast<unsigned>(args.size()));
 
     // Create the function call.
     auto *r = builder.CreateCall(callee_f, args);
