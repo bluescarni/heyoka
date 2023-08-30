@@ -295,6 +295,135 @@ auto llvm_math_func_attrs(llvm_state &s)
 #endif
 }
 
+// Call the function f with scalar arguments args attaching vector-function-abi-variant attributes
+// to enable auto-vectorization. The necessary vfabi information is stored in vfi.
+// vec_attrs are the function attributes for the vector variants.
+llvm::CallInst *llvm_call_with_vfabi(llvm_state &s, llvm::Function *f, const std::vector<llvm::Value *> &args,
+                                     [[maybe_unused]] const std::vector<vf_info> &vfi,
+                                     [[maybe_unused]] const llvm::AttributeList &vec_attrs)
+{
+#if !defined(NDEBUG)
+
+    assert(!args.empty());
+    assert(f != nullptr);
+    auto *ft = f->getFunctionType();
+    assert(ft->getNumParams() == args.size());
+    assert(std::all_of(ft->param_begin(), ft->param_end(), [](auto *p) { return p != nullptr && !p->isVectorTy(); }));
+
+#endif
+
+    auto &builder = s.builder();
+
+    // Create the scalar call.
+    auto *ret = builder.CreateCall(f, args);
+
+    // NOTE: the vector-function-abi-variant attribute was added
+    // in LLVM 11:
+    // https://releases.llvm.org/11.0.0/docs/ReleaseNotes.html#changes-to-the-llvm-ir
+#if LLVM_VERSION_MAJOR >= 11
+
+    auto &context = s.context();
+
+    if (!vfi.empty()) {
+        // There exist vector variants of the scalar function.
+        auto &md = s.module();
+
+        // Fetch the type of the scalar arguments.
+        auto *scal_t = f->getFunctionType()->getParamType(0);
+
+        // Attach the "vector-function-abi-variant" attribute to the call so that LLVM's auto-vectorizer can take
+        // advantage of these vector variants.
+        std::vector<std::string> vf_abi_strs;
+        vf_abi_strs.reserve(vfi.size());
+        for (const auto &el : vfi) {
+            vf_abi_strs.push_back(el.vf_abi_attr);
+        }
+#if LLVM_VERSION_MAJOR >= 14
+        ret->addFnAttr(llvm::Attribute::get(context, "vector-function-abi-variant",
+                                            fmt::format("{}", fmt::join(vf_abi_strs, ","))));
+#else
+        {
+            auto attrs = ret->getAttributes();
+            attrs = attrs.addAttribute(context, llvm::AttributeList::FunctionIndex, "vector-function-abi-variant",
+                                       fmt::format("{}", fmt::join(vf_abi_strs, ",")));
+            ret->setAttributes(attrs);
+        }
+#endif
+
+        // Now we need to:
+        // - add the declarations of the vector variants to the module,
+        // - ensure that these declarations are not removed by the optimiser,
+        //   otherwise the vector variants will not be picked up.
+
+        // Remember the original insertion block.
+        auto *orig_bb = builder.GetInsertBlock();
+
+        // Add the vector variants and the dummy functions
+        // to prevent them from being removed.
+        for (const auto &el : vfi) {
+            assert(el.width > 0u);
+            assert(el.nargs == args.size());
+
+            // The vector type for the current variant.
+            auto *cur_vec_t = make_vector_type(scal_t, el.width);
+
+            // The signature of the current variant.
+            auto *vec_ft = llvm::FunctionType::get(
+                cur_vec_t,
+                std::vector<llvm::Type *>(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(args.size()),
+                                          cur_vec_t),
+                false);
+
+            // Try to lookup the variant in the module.
+            auto *vf_ptr = md.getFunction(el.name);
+
+            if (vf_ptr == nullptr) {
+                // The declaration of the variant is not there yet, create it.
+                vf_ptr = llvm_func_create(vec_ft, llvm::Function::ExternalLinkage, el.name, &md);
+            } else {
+                // The declaration of the variant is already there.
+                // Check that the signatures match.
+                assert(vf_ptr->getFunctionType() == vec_ft);
+            }
+
+            // Setup the attributes for the variant.
+            // NOTE: in case vf_ptr existed already, this might be redundant,
+            // but let's just do it for peace of mind. Like this, we are sure
+            // the attributes are set correctly.
+            vf_ptr->setAttributes(vec_attrs);
+
+            // Create the name of the dummy function to ensure the variant is not optimised out.
+            const auto dummy_name = fmt::format("heyoka.dummy_vector_call.{}", el.name);
+
+            if (auto *dummy_ptr = md.getFunction(dummy_name); dummy_ptr == nullptr) {
+                // The dummy function has not been defined yet, do it.
+                auto *dummy = llvm_func_create(vec_ft, llvm::Function::ExternalLinkage, dummy_name, &md);
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", dummy));
+
+                // The dummy function just forwards its arguments to the variant.
+                std::vector<llvm::Value *> dummy_args;
+                for (auto *dummy_arg = dummy->args().begin(); dummy_arg != dummy->args().end(); ++dummy_arg) {
+                    dummy_args.emplace_back(dummy_arg);
+                }
+
+                builder.CreateRet(builder.CreateCall(vf_ptr, dummy_args));
+            } else {
+                // The declaration of the dummy function is already there.
+                // Check that the signatures match.
+                assert(dummy_ptr->getFunctionType() == vec_ft);
+            }
+        }
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    }
+
+#endif
+
+    return ret;
+}
+
 // Implementation of an LLVM math function built on top of an intrinsic (if possible).
 // intr_name is the name of the intrinsic (without type information),
 // f128/real_name are the names of the functions to be used for the
@@ -367,108 +496,9 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
             }
         }
 
-        // The input is **not** a vector. Invoke the scalar intrinsic.
-        auto *ret = builder.CreateCall(s_intr, {args...});
-
-        // NOTE: the vector-function-abi-variant attribute was added
-        // in LLVM 11:
-        // https://releases.llvm.org/11.0.0/docs/ReleaseNotes.html#changes-to-the-llvm-ir
-#if LLVM_VERSION_MAJOR >= 11
-
-        if (!vfi.empty()) {
-            auto &md = s.module();
-
-            // There exist vector variants of the scalar function. Attach the "vector-function-abi-variant"
-            // attribute to the call so that LLVM's auto-vectorizer can take advantage of these vector variants.
-            std::vector<std::string> vf_abi_strs;
-            vf_abi_strs.reserve(vfi.size());
-            for (const auto &el : vfi) {
-                vf_abi_strs.push_back(el.vf_abi_attr);
-            }
-#if LLVM_VERSION_MAJOR >= 14
-            ret->addFnAttr(llvm::Attribute::get(context, "vector-function-abi-variant",
-                                                fmt::format("{}", fmt::join(vf_abi_strs, ","))));
-#else
-            {
-                auto attrs = ret->getAttributes();
-                attrs = attrs.addAttribute(context, llvm::AttributeList::FunctionIndex, "vector-function-abi-variant",
-                                           fmt::format("{}", fmt::join(vf_abi_strs, ",")));
-                ret->setAttributes(attrs);
-            }
-#endif
-
-            // Now we need to:
-            // - add the declarations of the vector variants to the module,
-            // - ensure that these declarations are not removed by the optimiser,
-            //   otherwise the vector variants will not be picked up.
-
-            // Remember the original insertion block.
-            auto *orig_bb = builder.GetInsertBlock();
-
-            // Add the vector variants and the dummy functions
-            // to prevent them from being removed.
-            for (const auto &el : vfi) {
-                assert(el.width > 0u);
-                assert(el.nargs == nargs);
-
-                // The vector type for the current variant.
-                auto *cur_vec_t = make_vector_type(scal_t, el.width);
-
-                // The signature of the current variant.
-                auto *vec_ft = llvm::FunctionType::get(
-                    cur_vec_t,
-                    std::vector<llvm::Type *>(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(nargs),
-                                              cur_vec_t),
-                    false);
-
-                // Try to lookup the variant in the module.
-                auto *vf_ptr = md.getFunction(el.name);
-
-                if (vf_ptr == nullptr) {
-                    // The declaration of the variant is not there yet, create it.
-                    vf_ptr = llvm_func_create(vec_ft, llvm::Function::ExternalLinkage, el.name, &md);
-                } else {
-                    // The declaration of the variant is already there.
-                    // Check that the signatures match.
-                    assert(vf_ptr->getFunctionType() == vec_ft);
-                }
-
-                // Setup the attributes for the variant.
-                // NOTE: in case vf_ptr existed already, this might be redundant,
-                // but let's just do it for peace of mind. Like this, we are sure
-                // the attributes are set correctly.
-                vf_ptr->setAttributes(vec_attrs);
-
-                // Create the name of the dummy function to ensure the variant is not optimised out.
-                const auto dummy_name = fmt::format("heyoka.dummy_vector_call.{}", el.name);
-
-                if (auto *dummy_ptr = md.getFunction(dummy_name); dummy_ptr == nullptr) {
-                    // The dummy function has not been defined yet, do it.
-                    auto *dummy = llvm_func_create(vec_ft, llvm::Function::ExternalLinkage, dummy_name, &md);
-
-                    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", dummy));
-
-                    // The dummy function just forwards its arguments to the variant.
-                    std::vector<llvm::Value *> dummy_args;
-                    for (auto *dummy_arg = dummy->args().begin(); dummy_arg != dummy->args().end(); ++dummy_arg) {
-                        dummy_args.emplace_back(dummy_arg);
-                    }
-
-                    builder.CreateRet(builder.CreateCall(vf_ptr, dummy_args));
-                } else {
-                    // The declaration of the dummy function is already there.
-                    // Check that the signatures match.
-                    assert(dummy_ptr->getFunctionType() == vec_ft);
-                }
-            }
-
-            // Restore the original insertion block.
-            builder.SetInsertPoint(orig_bb);
-        }
-
-#endif
-
-        return ret;
+        // The input is **not** a vector. Invoke the scalar intrinsic attaching vector
+        // variants if available.
+        return llvm_call_with_vfabi(s, s_intr, {args...}, vfi, vec_attrs);
     }
 
 #if defined(HEYOKA_HAVE_REAL128)
