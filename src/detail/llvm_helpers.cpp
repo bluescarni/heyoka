@@ -407,6 +407,9 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
             // Add the vector variants and the dummy functions
             // to prevent them from being removed.
             for (const auto &el : vfi) {
+                assert(el.width > 0u);
+                assert(el.nargs == nargs);
+
                 // The vector type for the current variant.
                 auto *cur_vec_t = make_vector_type(scal_t, el.width);
 
