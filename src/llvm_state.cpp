@@ -71,12 +71,6 @@
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/Transforms/Vectorize/LoadStoreVectorizer.h>
 
-#if LLVM_VERSION_MAJOR == 10
-
-#include <llvm/CodeGen/CommandFlags.inc>
-
-#endif
-
 #if LLVM_VERSION_MAJOR < 14
 
 // NOTE: this header was moved in LLVM 14.
@@ -321,9 +315,6 @@ struct llvm_state::jit {
     std::unique_ptr<llvm::orc::LLJIT> m_lljit;
     std::unique_ptr<llvm::TargetMachine> m_tm;
     std::unique_ptr<llvm::orc::ThreadSafeContext> m_ctx;
-#if LLVM_VERSION_MAJOR == 10
-    std::unique_ptr<llvm::Triple> m_triple;
-#endif
     std::optional<std::string> m_object_file;
 
     jit()
@@ -400,12 +391,6 @@ struct llvm_state::jit {
         // Create the context.
         m_ctx = std::make_unique<llvm::orc::ThreadSafeContext>(std::make_unique<llvm::LLVMContext>());
 
-#if LLVM_VERSION_MAJOR == 10
-        // NOTE: on LLVM 10, we cannot fetch the target triple
-        // from the lljit class. Thus, we get it from the jtmb instead.
-        m_triple = std::make_unique<llvm::Triple>(jtmb->getTargetTriple());
-#endif
-
         // NOTE: by default, errors in the execution session are printed
         // to screen. A custom error reported can be specified, ideally
         // we would like th throw here but I am not sure whether throwing
@@ -456,11 +441,7 @@ struct llvm_state::jit {
     }
     [[nodiscard]] const llvm::Triple &get_target_triple() const
     {
-#if LLVM_VERSION_MAJOR == 10
-        return *m_triple;
-#else
         return m_lljit->getTargetTriple();
-#endif
     }
 
     void add_module(std::unique_ptr<llvm::Module> m) const
@@ -968,14 +949,6 @@ void llvm_state::optimise()
     // For every function in the module, setup its attributes
     // so that the codegen uses all the features available on
     // the host CPU.
-#if LLVM_VERSION_MAJOR == 10
-    ::setFunctionAttributes(m_jitter->get_target_cpu(), m_jitter->get_target_features(), *m_module);
-#else
-    // NOTE: in LLVM > 10, the setFunctionAttributes() function is gone in favour of another
-    // function in another namespace, which however does not seem to work out of the box
-    // because (I think) it might be reading some non-existent command-line options. See:
-    // https://llvm.org/doxygen/CommandFlags_8cpp_source.html#l00552
-    // Here we are reproducing a trimmed-down version of the same function.
     const auto cpu = m_jitter->get_target_cpu();
     const auto features = m_jitter->get_target_features();
 
@@ -1016,7 +989,6 @@ void llvm_state::optimise()
         f.setAttributes(attrs.addFnAttributes(ctx, new_attrs));
 #endif
     }
-#endif
 
     // Force usage of AVX512 registers, if requested.
     if (m_force_avx512 && detail::get_target_features().avx512f) {

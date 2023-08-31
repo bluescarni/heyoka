@@ -52,7 +52,7 @@ TEST_CASE("pow vect")
 {
     auto ta = taylor_adaptive<double>{model::pendulum(), std::vector<double>(2u, 0.)};
 
-#if defined(HEYOKA_WITH_SLEEF) && LLVM_VERSION_MAJOR >= 11
+#if defined(HEYOKA_WITH_SLEEF)
 
     auto md_ir = ta.get_llvm_state().get_ir();
 

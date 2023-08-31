@@ -144,9 +144,3 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build
         run: bash tools/gha_llvm11_conda_asan.sh
-  conda_llvm10_asan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Build
-        run: bash tools/gha_llvm10_conda_asan.sh

@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.1.0 (unreleased)
+2.0.0 (unreleased)
 ------------------
 
 New
@@ -18,6 +18,9 @@ New
 Changes
 ~~~~~~~
 
+- **BREAKING**: the minimum supported LLVM version is now 11
+  (`#342 <https://github.com/bluescarni/heyoka/pull/342>`__).
+  This is a :ref:`breaking change <bchanges_2_0_0>`.
 - The LLVM SLP vectorizer is now enabled when JIT compiling
   with optimisations
   (`#341 <https://github.com/bluescarni/heyoka/pull/341>`__).

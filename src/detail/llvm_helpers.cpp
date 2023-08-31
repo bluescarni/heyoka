@@ -278,24 +278,14 @@ llvm::Function *llvm_lookup_intrinsic(ir_builder &builder, const std::string &na
 // floating-point environment is set up:
 //
 // https://llvm.org/docs/LangRef.html#floating-point-environment
-//
-// In LLVM 10, however, we have to use a custom-made set of attributes because using
-// the intrinsics' attributes results in codegen issues. This is probably related
-// to the ReadNone attribute issue mentioned elsewhere.
 llvm::AttributeList llvm_ext_math_func_attrs(llvm_state &s)
 {
-#if LLVM_VERSION_MAJOR == 10
-    return llvm::AttributeList::get(
-        s.context(), llvm::AttributeList::FunctionIndex,
-        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
-#else
     // NOTE: use the fabs() f64 intrinsic - hopefully it does not matter
     // which intrinsic we pick.
     auto *f = llvm_lookup_intrinsic(s.builder(), "llvm.fabs", {to_llvm_type<double>(s.context())}, 1);
     assert(f != nullptr);
 
     return f->getAttributes();
-#endif
 }
 
 // Attach the vfabi attributes to "call", which must be a call to a function with scalar arguments.
@@ -303,14 +293,8 @@ llvm::AttributeList llvm_ext_math_func_attrs(llvm_state &s)
 // The attributes of the scalar function will be attached to the vector variants.
 // NOTE: this will insert the declarations of the vector variants into the module, if needed
 // (plus all the boilerplate necessary for preventing the declarations from being optimised out).
-llvm::CallInst *llvm_add_vfabi_attrs([[maybe_unused]] llvm_state &s, [[maybe_unused]] llvm::CallInst *call,
-                                     [[maybe_unused]] const std::vector<vf_info> &vfi)
+llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const std::vector<vf_info> &vfi)
 {
-    // NOTE: the vector-function-abi-variant attribute was added
-    // in LLVM 11:
-    // https://releases.llvm.org/11.0.0/docs/ReleaseNotes.html#changes-to-the-llvm-ir
-#if LLVM_VERSION_MAJOR >= 11
-
     assert(call != nullptr);
 
     const auto *f = call->getCalledFunction();
@@ -423,8 +407,6 @@ llvm::CallInst *llvm_add_vfabi_attrs([[maybe_unused]] llvm_state &s, [[maybe_unu
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
     }
-
-#endif
 
     return call;
 }
@@ -593,8 +575,6 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
                 return llvm_invoke_external(s, vfi_it->name, vec_t, {args...}, s_intr->getAttributes());
             }
 
-#if LLVM_VERSION_MAJOR >= 11
-
             if (!vfi.empty()) {
                 // We have *some* vector implementations available (albeit not with the correct
                 // size). Decompose into scalar calls adding the vfabi info to let the LLVM auto-vectorizer do its
@@ -606,8 +586,6 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
                     },
                     vfi);
             }
-
-#endif
 
             // No vector implementation available, just let LLVM handle it.
             // NOTE: this will lookup and invoke an intrinsic for vector arguments.
@@ -1123,13 +1101,7 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
             // (the vector type to gather).
             vec_tp,
 #endif
-            ptrs,
-#if LLVM_VERSION_MAJOR == 10
-            boost::numeric_cast<unsigned>(align)
-#else
-            llvm::Align(align)
-#endif
-        );
+            ptrs, llvm::Align(align));
     } else {
         // LCOV_EXCL_START
         assert(!llvm::isa<llvm_vector_type>(ptrs->getType()));

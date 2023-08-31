@@ -256,7 +256,7 @@ TEST_CASE("vfabi")
     REQUIRE(outs[0] == approximately(std::exp(1.)));
     REQUIRE(outs[1] == approximately(std::exp(2.)));
 
-#if defined(HEYOKA_WITH_SLEEF) && LLVM_VERSION_MAJOR >= 11
+#if defined(HEYOKA_WITH_SLEEF)
 
     const auto &tf = detail::get_target_features();
 

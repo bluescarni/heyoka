@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 1.1.0 LANGUAGES CXX C)
+project(heyoka VERSION 2.0.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -148,8 +148,8 @@ endif()
 # if needed.
 find_package(LLVM REQUIRED CONFIG)
 
-if(${LLVM_VERSION_MAJOR} LESS 10)
-  message(FATAL_ERROR "LLVM >= 10 is required.")
+if(${LLVM_VERSION_MAJOR} LESS 11)
+  message(FATAL_ERROR "LLVM >= 11 is required.")
 endif()
 
 # Mandatory dependency on fmt.
