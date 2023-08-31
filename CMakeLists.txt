@@ -50,6 +50,7 @@ mark_as_advanced(HEYOKA_HIDE_LLVM_SYMBOLS)
 #
 # https://cmake.org/cmake/help/v3.15/module/GNUInstallDirs.html
 # https://cmake.org/pipermail/cmake/2013-July/055375.html
+include(GNUInstallDirs)
 if(UNIX AND NOT APPLE)
     include(GNUInstallDirs)
     set(_HEYOKA_INSTALL_LIBDIR_DEFAULT "${CMAKE_INSTALL_LIBDIR}")
