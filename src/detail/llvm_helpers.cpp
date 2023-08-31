@@ -440,10 +440,12 @@ llvm::CallInst *llvm_add_vfabi_attrs([[maybe_unused]] llvm_state &s, [[maybe_unu
 //
 // make_s_call will be used to generate the scalar call on the scalar arguments.
 //
-// vfi contains the information about the vector variants of the scalar function.
-llvm::Value *llvm_vectorise_call(llvm_state &s, const std::vector<llvm::Value *> &args,
-                                 const std::function<llvm::CallInst *(const std::vector<llvm::Value *> &)> &make_s_call,
-                                 const std::vector<vf_info> &vfi)
+// vfi contains the information about the vector variants of the scalar function. The information in vfi
+// will be attached to the scalar call(s).
+llvm::Value *
+llvm_scalarise_vector_call(llvm_state &s, const std::vector<llvm::Value *> &args,
+                           const std::function<llvm::CallInst *(const std::vector<llvm::Value *> &)> &make_s_call,
+                           const std::vector<vf_info> &vfi)
 {
     assert(!args.empty());
     // Make sure all arguments are of the same type.
@@ -483,6 +485,17 @@ llvm::Value *llvm_vectorise_call(llvm_state &s, const std::vector<llvm::Value *>
 
         // Invoke the scalar function, add the vector variants info, and store the scalar result.
         auto *s_call = make_s_call(scal_args);
+
+        // A few debug checks.
+#if !defined(NDEBUG)
+
+        auto *called_f = s_call->getCalledFunction();
+        // All arguments in the function call must be scalars.
+        assert(std::all_of(called_f->arg_begin(), called_f->arg_end(),
+                           [](const auto &arg) { return !arg.getType()->isVectorTy(); }));
+
+#endif
+
         retvals.emplace_back(llvm_add_vfabi_attrs(s, s_call, vfi));
     }
 
@@ -499,14 +512,14 @@ llvm::Value *llvm_vectorise_call(llvm_state &s, const std::vector<llvm::Value *>
 // attrs is the list of attributes to attach to the scalar function.
 // It is assumed that the return type of the math function is the same as the
 // arguments' type.
-llvm::Value *llvm_vectorise_ext_math_call(llvm_state &s, const std::vector<llvm::Value *> &args,
-                                          const std::string &fname, const std::vector<vf_info> &vfi,
-                                          const llvm::AttributeList &attrs)
+llvm::Value *llvm_scalarise_ext_math_vector_call(llvm_state &s, const std::vector<llvm::Value *> &args,
+                                                 const std::string &fname, const std::vector<vf_info> &vfi,
+                                                 const llvm::AttributeList &attrs)
 {
     // NOTE: this is not supposed to be used with intrinsics.
     assert(!boost::starts_with(fname, "llvm."));
 
-    return llvm_vectorise_call(
+    return llvm_scalarise_vector_call(
         s, args,
         [&](const std::vector<llvm::Value *> &scal_args) {
             assert(!scal_args.empty());
@@ -586,7 +599,7 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
                 // We have *some* vector implementations available (albeit not with the correct
                 // size). Decompose into scalar calls adding the vfabi info to let the LLVM auto-vectorizer do its
                 // thing.
-                return llvm_vectorise_call(
+                return llvm_scalarise_vector_call(
                     s, {args...},
                     [&builder, s_intr](const std::vector<llvm::Value *> &scal_args) {
                         return builder.CreateCall(s_intr, scal_args);
@@ -610,9 +623,9 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 
     // NOTE: this handles both the scalar and vector cases.
     if (scal_t == to_llvm_type<mppp::real128>(s.context(), false)) {
-        return llvm_vectorise_ext_math_call(s, {args...}, f128_name, lookup_vf_info(f128_name),
-                                            // NOTE: use the standard math function attributes.
-                                            llvm_ext_math_func_attrs(s));
+        return llvm_scalarise_ext_math_vector_call(s, {args...}, f128_name, lookup_vf_info(f128_name),
+                                                   // NOTE: use the standard math function attributes.
+                                                   llvm_ext_math_func_attrs(s));
     }
 
 #endif
