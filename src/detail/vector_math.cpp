@@ -99,6 +99,8 @@ auto make_vf_map()
     add_vfinfo_sleef(retval, "cosh", "cosh", "d");
     add_vfinfo_sleef(retval, "asin", "asin", "d");
     add_vfinfo_sleef(retval, "acos", "acos", "d");
+    add_vfinfo_sleef(retval, "asinh", "asinh", "d");
+    add_vfinfo_sleef(retval, "acosh", "acosh", "d");
 
 #endif
 
