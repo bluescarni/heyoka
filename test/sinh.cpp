@@ -242,7 +242,9 @@ TEST_CASE("vfabi")
     REQUIRE(outs[0] == approximately(std::sinh(1.)));
     REQUIRE(outs[1] == approximately(std::sinh(2.)));
 
-#if defined(HEYOKA_WITH_SLEEF)
+    // NOTE: autovec with external scalar functions seems to work
+    // only since LLVM 16.
+#if defined(HEYOKA_WITH_SLEEF) && LLVM_VERSION_MAJOR >= 16
 
     const auto &tf = detail::get_target_features();
 
@@ -265,14 +267,9 @@ TEST_CASE("vfabi")
         REQUIRE(count == 3u);
     }
 
-#if LLVM_VERSION_MAJOR >= 16
-
-    // NOTE: LLVM16 is currently the version tested in the CI on arm64.
     if (tf.aarch64) {
         REQUIRE(count == 3u);
     }
-
-#endif
 
     // NOTE: currently no auto-vectorization happens on ppc64 due apparently
     // to the way the target machine is being set up by orc/lljit (it works
@@ -332,10 +329,6 @@ TEST_CASE("vfabi")
         REQUIRE(count == 11u);
     }
 
-    // NOTE: this next test seems to work properly starting
-    // from LLVM 13.
-#if LLVM_VERSION_MAJOR >= 13
-
     // Check that the autovec works also on batch sizes which do not correspond
     // exactly to an available vector width.
     llvm_state s3;
@@ -371,15 +364,9 @@ TEST_CASE("vfabi")
         REQUIRE(count == 3u);
     }
 
-#if LLVM_VERSION_MAJOR >= 16
-
     if (tf.aarch64) {
         REQUIRE(count == 3u);
     }
-
-#endif
-
-#endif
 
 #endif
 }
