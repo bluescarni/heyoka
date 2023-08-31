@@ -230,6 +230,7 @@ bool llvm_stype_can_use_math_intrinsics(llvm_state &s, llvm::Type *tp)
 // NOTE: types and nargs are needed independently of each other. For instance, llvm.pow is an
 // intrinsic with 2 arguments but the types argument has only 1 element because both arguments
 // must have the same type. I.e., the intrinsic is type-dependent on a single type only (not 2).
+// NOTE: for intrinsics, it is not necessary to set up manually the function attributes, as LLVM takes care of it.
 llvm::Function *llvm_lookup_intrinsic(ir_builder &builder, const std::string &name,
                                       const std::vector<llvm::Type *> &types, unsigned nargs)
 {
@@ -268,7 +269,8 @@ llvm::Function *llvm_lookup_intrinsic(ir_builder &builder, const std::string &na
     return f;
 }
 
-// Generate a set of standard function attributes for use in math functions.
+// Generate a set of function attributes to be used when invoking
+// external math functions.
 //
 // The idea here is to copy the attributes from LLVM's math intrinsics,
 // which unlock several optimisation opportunities thanks to the way the default LLVM
@@ -279,7 +281,7 @@ llvm::Function *llvm_lookup_intrinsic(ir_builder &builder, const std::string &na
 // In LLVM 10, however, we have to use a custom-made set of attributes because using
 // the intrinsics' attributes results in codegen issues. This is probably related
 // to the ReadNone attribute issue mentioned elsewhere.
-auto llvm_math_func_attrs(llvm_state &s)
+llvm::AttributeList llvm_ext_math_func_attrs(llvm_state &s)
 {
 #if LLVM_VERSION_MAJOR == 10
     return llvm::AttributeList::get(
@@ -296,11 +298,12 @@ auto llvm_math_func_attrs(llvm_state &s)
 }
 
 // Attach the vfabi attributes to "call", which must be a call to a function with scalar arguments.
-// The necessary vfabi information is stored in vfi, vec_attrs are the function attributes for the vector variants.
-// The return value is "call".
+// The necessary vfabi information is stored in vfi. The function returns "call".
+// The attributes of the scalar function will be attached to the vector variants.
+// NOTE: this will insert the declarations of the vector variants into the module, if needed
+// (plus all the boilerplate necessary for preventing the declarations from being optimised out).
 llvm::CallInst *llvm_add_vfabi_attrs([[maybe_unused]] llvm_state &s, [[maybe_unused]] llvm::CallInst *call,
-                                     [[maybe_unused]] const std::vector<vf_info> &vfi,
-                                     [[maybe_unused]] const llvm::AttributeList &vec_attrs)
+                                     [[maybe_unused]] const std::vector<vf_info> &vfi)
 {
     // NOTE: the vector-function-abi-variant attribute was added
     // in LLVM 11:
@@ -309,7 +312,8 @@ llvm::CallInst *llvm_add_vfabi_attrs([[maybe_unused]] llvm_state &s, [[maybe_unu
 
     assert(call != nullptr);
 
-    const auto *ft = call->getCalledFunction()->getFunctionType();
+    const auto *f = call->getCalledFunction();
+    const auto *ft = f->getFunctionType();
 
     const auto num_args = ft->getNumParams();
 
@@ -375,17 +379,22 @@ llvm::CallInst *llvm_add_vfabi_attrs([[maybe_unused]] llvm_state &s, [[maybe_unu
             if (vf_ptr == nullptr) {
                 // The declaration of the variant is not there yet, create it.
                 vf_ptr = llvm_func_create(vec_ft, llvm::Function::ExternalLinkage, el.name, &md);
+
+                // NOTE: setting the attributes on the vector variant is not strictly required
+                // for the auto-vectorizer to work. However, in other parts of the code, the vector
+                // variants are invoked directly (via llvm_invoke_external()) and in those cases
+                // proper attributes do help the optimiser. Thus, we want to make sure
+                // that the attributes are set consistently regardless of where the declarations
+                // of the vector variants are created. The convention we follow is that the attributes
+                // of the vector variants must match the attributes of the scalar counterpart.
+                vf_ptr->setAttributes(f->getAttributes());
             } else {
                 // The declaration of the variant is already there.
-                // Check that the signatures match.
+                // Check that the signatures and attributes match.
                 assert(vf_ptr->getFunctionType() == vec_ft);
+                // TODO: restore when sincos is fixed.
+                // assert(vf_ptr->getAttributes() == f->getAttributes());
             }
-
-            // Setup the attributes for the variant.
-            // NOTE: in case vf_ptr existed already, this might be redundant,
-            // but let's just do it for peace of mind. Like this, we are sure
-            // the attributes are set correctly.
-            vf_ptr->setAttributes(vec_attrs);
 
             // Create the name of the dummy function to ensure the variant is not optimised out.
             const auto dummy_name = fmt::format("heyoka.dummy_vector_call.{}", el.name);
@@ -417,6 +426,68 @@ llvm::CallInst *llvm_add_vfabi_attrs([[maybe_unused]] llvm_state &s, [[maybe_unu
 #endif
 
     return call;
+}
+
+// Helper to invoke an external scalar math function with arguments
+// which may be vectors.
+// The call will be decomposed into a sequence of calls with scalar arguments,
+// and the return values will be re-assembled as a vector.
+// If the arguments are vectors, they must all have the same size.
+// vfi contains the information about the vector variants of the scalar function.
+// attrs is the list of attributes to attach to the scalar function.
+llvm::Value *llvm_vectorise_ext_math_call(llvm_state &s, const std::vector<llvm::Value *> &args,
+                                          const std::string &fname, const std::vector<vf_info> &vfi,
+                                          const llvm::AttributeList &attrs)
+{
+    // NOTE: this is not supposed to be used with intrinsics.
+    assert(!boost::starts_with(fname, "llvm."));
+    assert(!args.empty());
+    // Make sure all arguments are of the same type.
+    assert(std::all_of(args.begin() + 1, args.end(),
+                       [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
+    // Make sure all arguments are either vectors or scalars.
+    assert(std::all_of(args.begin(), args.end(), [](const auto &arg) { return arg->getType()->isVectorTy(); })
+           || std::all_of(args.begin(), args.end(), [](const auto &arg) { return !arg->getType()->isVectorTy(); }));
+
+    auto &builder = s.builder();
+
+    // Decompose each argument into a vector of scalars.
+    std::vector<std::vector<llvm::Value *>> scalars;
+    scalars.reserve(args.size());
+    for (const auto &arg : args) {
+        scalars.push_back(vector_to_scalars(builder, arg));
+    }
+
+    // Fetch the vector size.
+    const auto vec_size = scalars[0].size();
+
+    assert(vec_size > 0u);
+
+    // Fetch the type of the scalar arguments.
+    auto *const scal_t = scalars[0][0]->getType();
+
+    // LCOV_EXCL_START
+    // Make sure the vector size is the same for all arguments.
+    assert(std::all_of(scalars.begin() + 1, scalars.end(),
+                       [vec_size](const auto &arg) { return arg.size() == vec_size; }));
+    // LCOV_EXCL_STOP
+
+    // Invoke the function on each set of scalars.
+    std::vector<llvm::Value *> retvals, scal_args;
+    for (decltype(scalars[0].size()) i = 0; i < vec_size; ++i) {
+        // Setup the vector of scalar arguments.
+        scal_args.clear();
+        for (const auto &scal_set : scalars) {
+            scal_args.push_back(scal_set[i]);
+        }
+
+        // Invoke the scalar function and store the scalar result.
+        auto *s_call = llvm_invoke_external(s, fname, scal_t, scal_args, attrs);
+        retvals.emplace_back(llvm_add_vfabi_attrs(s, s_call, vfi));
+    }
+
+    // Build a vector with the results.
+    return scalars_to_vector(builder, retvals);
 }
 
 // Implementation of an LLVM math function built on top of an intrinsic (if possible).
@@ -462,10 +533,6 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
         // in the scalar implementation.
         auto *s_intr = llvm_lookup_intrinsic(builder, intr_name, {scal_t}, boost::numeric_cast<unsigned>(nargs));
 
-        // Setup the function attributes to be used in the declaration of the vector
-        // implementation/variants.
-        const auto vec_attrs = llvm_math_func_attrs(s);
-
         // Lookup the scalar intrinsic name in the vector function info map.
         const auto &vfi = lookup_vf_info(std::string(s_intr->getName()));
 
@@ -480,26 +547,29 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
             if (vfi_it != vfi.end() && vfi_it->width == vector_width) {
                 // A vector implementation is available, use it.
                 assert(vfi_it->nargs == nargs);
-                return llvm_invoke_external(s, vfi_it->name, vec_t, {args...}, vec_attrs);
+                // NOTE: make sure to use the same attributes as the scalar intrinsic for the vector
+                // call. This ensures that the vector variant is declared with the same attributes as those that would
+                // be declared by the llvm_add_vfabi_attrs() call a few lines below.
+                return llvm_invoke_external(s, vfi_it->name, vec_t, {args...}, s_intr->getAttributes());
             } else {
-                // No vector implementation available, just let LLVM handle it
-                // and hope for the best.
-                // NOTE: we need to call llvm_invoke_intrinsic() (rather than using s_intr) because
-                // now we are invoking the intrinsic on the vector argument.
+                // No vector implementation available, just let LLVM handle it.
                 return llvm_invoke_intrinsic(builder, intr_name, {x_t}, {args...});
             }
         }
 
         // The input is **not** a vector. Invoke the scalar intrinsic attaching vector
         // variants if available.
-        return llvm_add_vfabi_attrs(s, builder.CreateCall(s_intr, {args...}), vfi, vec_attrs);
+        auto *ret = builder.CreateCall(s_intr, {args...});
+        return llvm_add_vfabi_attrs(s, ret, vfi);
     }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
     // NOTE: this handles both the scalar and vector cases.
     if (scal_t == to_llvm_type<mppp::real128>(s.context(), false)) {
-        return call_extern_vec(s, {args...}, f128_name);
+        return llvm_vectorise_ext_math_call(s, {args...}, f128_name, lookup_vf_info(f128_name),
+                                            // NOTE: use the standard math function attributes.
+                                            llvm_ext_math_func_attrs(s));
     }
 
 #endif
@@ -1105,8 +1175,8 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
                             "are expected, but {} were provided instead",
                             name, callee_f->arg_size(), args.size()));
         }
-        // NOTE: perhaps in the future we should consider adding more checks here
-        // (e.g., argument types, return type).
+        // NOTE: in the future we should consider adding more checks here
+        // (e.g., argument types, return type, attributes, etc.).
     }
 
     // Create the function call.
