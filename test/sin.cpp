@@ -340,6 +340,10 @@ TEST_CASE("vfabi")
         REQUIRE(count == 11u);
     }
 
+    // NOTE: this next test seems to work properly starting
+    // from LLVM 13.
+#if LLVM_VERSION_MAJOR >= 13
+
     // Check that the autovec works also on batch sizes which do not correspond
     // exactly to an available vector width.
     llvm_state s3;
@@ -380,6 +384,8 @@ TEST_CASE("vfabi")
     if (tf.aarch64) {
         REQUIRE(count == 3u);
     }
+
+#endif
 
 #endif
 
