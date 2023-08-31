@@ -487,7 +487,7 @@ set(_HEYOKA_MIN_MPPP_VERSION "0.27")
 if(HEYOKA_WITH_MPPP)
     find_package(mp++ REQUIRED CONFIG)
     if(${mp++_VERSION} VERSION_LESS ${_HEYOKA_MIN_MPPP_VERSION})
-        message(FATAL_ERROR "mp++ >= ${_HEYOKA_MIN_MPPP_VERSION} is required.")
+        message(FATAL_ERROR "mp++ >= ${_HEYOKA_MIN_MPPP_VERSION} is required, but version ${mp++_VERSION} was found instead.")
     endif()
 
     # NOTE: this is necessary for the serialisation of several classes.
