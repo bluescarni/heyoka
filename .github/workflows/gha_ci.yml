@@ -85,22 +85,17 @@ jobs:
           cmake --build . --config Release
           copy Release\heyoka.dll test\Release\
           ctest -j4 -V -C Release
-  windows_2019_llvm16:
+  windows_2022_llvm16:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v3
-      - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v1.1
       - uses: conda-incubator/setup-miniconda@v2
         with:
-          miniforge-variant: Mambaforge
           miniforge-version: latest
-          use-mamba: true
       - name: Build
         shell: pwsh
         run: |
-          mamba update -n base mamba -y
-          mamba install cmake "llvmdev=16.*" tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel fmt spdlog sleef zlib libzlib "mppp>=0.27" -y
+          conda install -y cmake 'llvmdev=16.*' tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel fmt spdlog sleef zlib libzlib 'mppp>=0.27'
           mkdir build
           cd build
           cmake ../ -G "Visual Studio 17 2022" -A x64 -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_MPPP=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_WITH_SLEEF=yes -DMPPP_GMP_INCLUDE_DIR=C:\Miniconda\envs\test\Library\include -DMPPP_GMP_LIBRARY=C:\Miniconda\envs\test\Library\lib\mpir.lib
