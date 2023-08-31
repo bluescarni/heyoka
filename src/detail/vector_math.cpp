@@ -95,6 +95,7 @@ auto make_vf_map()
     add_vfinfo_sleef(retval, "llvm.log.f64", "log", "d");
     add_vfinfo_sleef(retval, "llvm.exp.f64", "exp", "d");
     add_vfinfo_sleef(retval, "llvm.pow.f64", "pow", "d", 2);
+    add_vfinfo_sleef(retval, "sinh", "sinh", "d");
 
 #endif
 
