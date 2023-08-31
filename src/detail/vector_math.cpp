@@ -105,6 +105,8 @@ auto make_vf_map()
     add_vfinfo_sleef(retval, "tanh", "tanh", "d");
     add_vfinfo_sleef(retval, "atan", "atan", "d");
     add_vfinfo_sleef(retval, "atanh", "atanh", "d");
+    add_vfinfo_sleef(retval, "atan2", "atan2", "d", 2);
+    add_vfinfo_sleef(retval, "erf", "erf", "d");
 
 #endif
 
