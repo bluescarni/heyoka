@@ -99,6 +99,7 @@ jobs:
       - name: Build
         shell: pwsh
         run: |
+          mamba update -n base mamba -y
           mamba install -y cmake 'llvmdev=16.*' tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel fmt spdlog sleef zlib libzlib 'mppp>=0.27'
           mkdir build
           cd build
