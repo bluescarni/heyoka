@@ -342,7 +342,7 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
         // Remember the original insertion block.
         auto *orig_bb = builder.GetInsertBlock();
 
-        // Add the vector variants and the dummy functions
+        // Add the vector variants and the boilerplate
         // to prevent them from being removed.
         for (const auto &el : vfi) {
             assert(el.width > 0u);
@@ -382,6 +382,12 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
             }
 
             // Create the name of the dummy function to ensure the variant is not optimised out.
+            //
+            // NOTE: another way of doing this involves the llvm.used global variable - need
+            // to learn about the metadata API apparently.
+            //
+            // https://llvm.org/docs/LangRef.html#the-llvm-used-global-variable
+            // https://godbolt.org/z/1neaG4bYj
             const auto dummy_name = fmt::format("heyoka.dummy_vector_call.{}", el.name);
 
             if (auto *dummy_ptr = md.getFunction(dummy_name); dummy_ptr == nullptr) {
@@ -4113,59 +4119,7 @@ llvm::Value *llvm_sin(llvm_state &s, llvm::Value *x)
 // Hyperbolic cosine.
 llvm::Value *llvm_cosh(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn = sleef_function_name(context, "cosh", x_t,
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "cosh");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an cosh function,
-                               // because LLVM complains about the symbol "coshl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_coshl"
-#else
-                               "coshl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "coshq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_cosh", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of cosh()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "cosh", x);
 }
 
 // Error function.
