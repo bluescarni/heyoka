@@ -486,7 +486,6 @@ llvm_scalarise_vector_call(llvm_state &s, const std::vector<llvm::Value *> &args
         // Invoke the scalar function, add the vector variants info, and store the scalar result.
         auto *s_call = make_s_call(scal_args);
 
-        // A few debug checks.
 #if !defined(NDEBUG)
 
         auto *called_f = s_call->getCalledFunction();
@@ -610,6 +609,7 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 #endif
 
             // No vector implementation available, just let LLVM handle it.
+            // NOTE: this will lookup and invoke an intrinsic for vector arguments.
             return llvm_invoke_intrinsic(builder, intr_name, {x_t}, {args...});
         }
 
