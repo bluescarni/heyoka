@@ -635,7 +635,7 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
     // NOTE: this handles only the scalar case.
     if (llvm_is_real(x_t) != 0) {
         auto *f = real_nary_op(s, x_t, real_name, boost::numeric_cast<unsigned>(nargs));
-        return s.builder().CreateCall(f, {args...});
+        return builder.CreateCall(f, {args...});
     }
 
 #endif
