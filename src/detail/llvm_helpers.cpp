@@ -428,19 +428,23 @@ llvm::CallInst *llvm_add_vfabi_attrs([[maybe_unused]] llvm_state &s, [[maybe_unu
     return call;
 }
 
-// Helper to invoke an external scalar math function with arguments
-// which may be vectors.
-// The call will be decomposed into a sequence of calls with scalar arguments,
-// and the return values will be re-assembled as a vector.
-// If the arguments are vectors, they must all have the same size.
+// Helper to invoke a scalar function with arguments which may or may not
+// be vectors.
+//
+// In the former case, the call will be decomposed into a sequence of calls with scalar arguments,
+// and the return values will be re-assembled as a vector. Vector arguments must all have the same size.
+//
+// In the latter case, this function will be equivalent to invoking the scalar function on the scalar arguments.
+//
+// In both cases, all arguments must be of the same type.
+//
+// make_s_call will be used to generate the scalar call on the scalar arguments.
+//
 // vfi contains the information about the vector variants of the scalar function.
-// attrs is the list of attributes to attach to the scalar function.
-llvm::Value *llvm_vectorise_ext_math_call(llvm_state &s, const std::vector<llvm::Value *> &args,
-                                          const std::string &fname, const std::vector<vf_info> &vfi,
-                                          const llvm::AttributeList &attrs)
+llvm::Value *llvm_vectorise_call(llvm_state &s, const std::vector<llvm::Value *> &args,
+                                 const std::function<llvm::CallInst *(const std::vector<llvm::Value *> &)> &make_s_call,
+                                 const std::vector<vf_info> &vfi)
 {
-    // NOTE: this is not supposed to be used with intrinsics.
-    assert(!boost::starts_with(fname, "llvm."));
     assert(!args.empty());
     // Make sure all arguments are of the same type.
     assert(std::all_of(args.begin() + 1, args.end(),
@@ -460,11 +464,7 @@ llvm::Value *llvm_vectorise_ext_math_call(llvm_state &s, const std::vector<llvm:
 
     // Fetch the vector size.
     const auto vec_size = scalars[0].size();
-
     assert(vec_size > 0u);
-
-    // Fetch the type of the scalar arguments.
-    auto *const scal_t = scalars[0][0]->getType();
 
     // LCOV_EXCL_START
     // Make sure the vector size is the same for all arguments.
@@ -481,13 +481,40 @@ llvm::Value *llvm_vectorise_ext_math_call(llvm_state &s, const std::vector<llvm:
             scal_args.push_back(scal_set[i]);
         }
 
-        // Invoke the scalar function and store the scalar result.
-        auto *s_call = llvm_invoke_external(s, fname, scal_t, scal_args, attrs);
+        // Invoke the scalar function, add the vector variants info, and store the scalar result.
+        auto *s_call = make_s_call(scal_args);
         retvals.emplace_back(llvm_add_vfabi_attrs(s, s_call, vfi));
     }
 
     // Build a vector with the results.
     return scalars_to_vector(builder, retvals);
+}
+
+// Helper to invoke an external scalar math function with arguments
+// which may be vectors.
+// The call will be decomposed into a sequence of calls with scalar arguments,
+// and the return values will be re-assembled as a vector.
+// If the arguments are vectors, they must all have the same size.
+// vfi contains the information about the vector variants of the scalar function.
+// attrs is the list of attributes to attach to the scalar function.
+// It is assumed that the return type of the math function is the same as the
+// arguments' type.
+llvm::Value *llvm_vectorise_ext_math_call(llvm_state &s, const std::vector<llvm::Value *> &args,
+                                          const std::string &fname, const std::vector<vf_info> &vfi,
+                                          const llvm::AttributeList &attrs)
+{
+    // NOTE: this is not supposed to be used with intrinsics.
+    assert(!boost::starts_with(fname, "llvm."));
+
+    return llvm_vectorise_call(
+        s, args,
+        [&](const std::vector<llvm::Value *> &scal_args) {
+            assert(!scal_args.empty());
+            assert(!args.empty());
+            assert(scal_args[0]->getType() == args[0]->getType()->getScalarType());
+            return llvm_invoke_external(s, fname, scal_args[0]->getType(), scal_args, attrs);
+        },
+        vfi);
 }
 
 // Implementation of an LLVM math function built on top of an intrinsic (if possible).
@@ -545,16 +572,32 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
                                    [](const auto &vfi_item, std::uint32_t n) { return vfi_item.width < n; });
 
             if (vfi_it != vfi.end() && vfi_it->width == vector_width) {
-                // A vector implementation is available, use it.
+                // A vector implementation with precisely the correct width is available, use it.
                 assert(vfi_it->nargs == nargs);
                 // NOTE: make sure to use the same attributes as the scalar intrinsic for the vector
                 // call. This ensures that the vector variant is declared with the same attributes as those that would
-                // be declared by the llvm_add_vfabi_attrs() call a few lines below.
+                // be declared by invoking llvm_add_vfabi_attrs() on the scalar invocation.
                 return llvm_invoke_external(s, vfi_it->name, vec_t, {args...}, s_intr->getAttributes());
-            } else {
-                // No vector implementation available, just let LLVM handle it.
-                return llvm_invoke_intrinsic(builder, intr_name, {x_t}, {args...});
             }
+
+#if LLVM_VERSION_MAJOR >= 11
+
+            if (!vfi.empty()) {
+                // We have *some* vector implementations available (albeit not with the correct
+                // size). Decompose into scalar calls adding the vfabi info to let the LLVM auto-vectorizer do its
+                // thing.
+                return llvm_vectorise_call(
+                    s, {args...},
+                    [&builder, s_intr](const std::vector<llvm::Value *> &scal_args) {
+                        return builder.CreateCall(s_intr, scal_args);
+                    },
+                    vfi);
+            }
+
+#endif
+
+            // No vector implementation available, just let LLVM handle it.
+            return llvm_invoke_intrinsic(builder, intr_name, {x_t}, {args...});
         }
 
         // The input is **not** a vector. Invoke the scalar intrinsic attaching vector
