@@ -50,7 +50,6 @@ mark_as_advanced(HEYOKA_HIDE_LLVM_SYMBOLS)
 #
 # https://cmake.org/cmake/help/v3.15/module/GNUInstallDirs.html
 # https://cmake.org/pipermail/cmake/2013-July/055375.html
-include(GNUInstallDirs)
 if(UNIX AND NOT APPLE)
     include(GNUInstallDirs)
     set(_HEYOKA_INSTALL_LIBDIR_DEFAULT "${CMAKE_INSTALL_LIBDIR}")
@@ -144,9 +143,19 @@ if(YACMA_COMPILER_IS_MSVC)
 endif()
 
 # Mandatory dependency on LLVM.
+#
 # NOTE: do it early so that we can set up
 # compiler flags based on the LLVM version
 # if needed.
+#
+# NOTE: forcibly include GNUInstallDirs (even
+# though we might have already included it
+# earlier) in order to work around an apparent issue
+# in Findzstd.cmake triggered by the LLVM config-file packages.
+# See:
+#
+# https://github.com/llvm/llvm-project/issues/58558
+include(GNUInstallDirs)
 find_package(LLVM REQUIRED CONFIG)
 
 if(${LLVM_VERSION_MAJOR} LESS 11)
