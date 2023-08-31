@@ -3769,117 +3769,13 @@ llvm::Value *llvm_asinh(llvm_state &s, llvm::Value *x)
 // Inverse tangent.
 llvm::Value *llvm_atan(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn = sleef_function_name(context, "atan", x_t,
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "atan");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an atan function,
-                               // because LLVM complains about the symbol "atanl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_atanl"
-#else
-                               "atanl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "atanq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_atan", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of atan()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "atan", x);
 }
 
 // Inverse hyperbolic tangent.
 llvm::Value *llvm_atanh(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn = sleef_function_name(context, "atanh", x_t,
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "atanh");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an atanh function,
-                               // because LLVM complains about the symbol "atanhl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_atanhl"
-#else
-                               "atanhl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "atanhq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_atanh", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of atanh()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "atanh", x);
 }
 
 // Cosine.
@@ -4047,117 +3943,13 @@ llvm::Value *llvm_square(llvm_state &s, llvm::Value *x)
 // Tangent.
 llvm::Value *llvm_tan(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn
-                = sleef_function_name(context, "tan", x_t, boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "tan");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an tan function,
-                               // because LLVM complains about the symbol "tanl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_tanl"
-#else
-                               "tanl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "tanq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_tan", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of tan()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "tan", x);
 }
 
 // Hyperbolic tangent.
 llvm::Value *llvm_tanh(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn = sleef_function_name(context, "tanh", x_t,
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "tanh");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an tanh function,
-                               // because LLVM complains about the symbol "tanhl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_tanhl"
-#else
-                               "tanhl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "tanhq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_tanh", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of tanh()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "tanh", x);
 }
 
 // Exponentiation.
