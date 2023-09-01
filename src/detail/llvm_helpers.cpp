@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -19,6 +20,7 @@
 #include <limits>
 #include <locale>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -29,6 +31,7 @@
 #include <utility>
 #include <vector>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/core/demangle.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <boost/numeric/conversion/cast.hpp>
@@ -78,8 +81,8 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/logging_impl.hpp>
-#include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/vector_math.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -201,6 +204,551 @@ const auto type_map = []() {
 
     return retval;
 }();
+
+// Helper to determine if the scalar type tp can use the LLVM
+// math intrinsics.
+// NOTE: this is needed because for some types the use of LLVM intrinsics
+// might be buggy or not possible at all (e.g., for mppp::real).
+bool llvm_stype_can_use_math_intrinsics(llvm_state &s, llvm::Type *tp)
+{
+    assert(tp != nullptr);
+    assert(!tp->isVectorTy());
+
+    auto &context = s.context();
+
+    // NOTE: by default we assume it is safe to invoke the LLVM intrinsics
+    // on the fundamental C++ floating-point types.
+    // NOTE: to_llvm_type fails by returning nullptr - in such a case
+    // (which I don't think is currently possible) then the
+    // comparison to tp will fail as tp is not null.
+    return tp == to_llvm_type<float>(context, false) || tp == to_llvm_type<double>(context, false)
+           || tp == to_llvm_type<long double>(context, false);
+}
+
+// Helper to lookup/insert the declaration of an LLVM intrinsic into a module.
+// NOTE: here "name" is expected to be the overloaded name of the intrinsic (that is, without type information).
+// NOTE: types and nargs are needed independently of each other. For instance, llvm.pow is an
+// intrinsic with 2 arguments but the types argument has only 1 element because both arguments
+// must have the same type. I.e., the intrinsic is type-dependent on a single type only (not 2).
+// NOTE: for intrinsics, it is not necessary to set up manually the function attributes, as LLVM takes care of it.
+llvm::Function *llvm_lookup_intrinsic(ir_builder &builder, const std::string &name,
+                                      const std::vector<llvm::Type *> &types, unsigned nargs)
+{
+    assert(boost::starts_with(name, "llvm."));
+    assert(types.size() <= nargs);
+
+    // Fetch the intrinsic ID from the name.
+    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(name);
+    // LCOV_EXCL_START
+    if (intrinsic_ID == llvm::Intrinsic::not_intrinsic) {
+        throw std::invalid_argument(fmt::format("Cannot fetch the ID of the intrinsic '{}'", name));
+    }
+    // LCOV_EXCL_STOP
+
+    // Fetch the declaration.
+    // NOTE: for generic intrinsics to work, we need to specify
+    // the desired argument type(s). See:
+    // https://stackoverflow.com/questions/11985247/llvm-insert-intrinsic-function-cos
+    // And the docs of the getDeclaration() function.
+    assert(builder.GetInsertBlock() != nullptr);
+    assert(builder.GetInsertBlock()->getModule() != nullptr);
+    auto *f = llvm::Intrinsic::getDeclaration(builder.GetInsertBlock()->getModule(), intrinsic_ID, types);
+    assert(f != nullptr);
+    // It does not make sense to have a definition of an intrinsic.
+    assert(f->isDeclaration());
+
+    // Check the number of arguments.
+    // LCOV_EXCL_START
+    if (f->arg_size() != nargs) {
+        throw std::invalid_argument(fmt::format("Incorrect number of arguments for the intrinsic '{}': {} are "
+                                                "expected, but {} are needed instead",
+                                                name, nargs, f->arg_size()));
+    }
+    // LCOV_EXCL_STOP
+
+    return f;
+}
+
+// Generate a set of function attributes to be used when invoking
+// external math functions.
+//
+// The idea here is to copy the attributes from LLVM's math intrinsics,
+// which unlock several optimisation opportunities thanks to the way the default LLVM
+// floating-point environment is set up:
+//
+// https://llvm.org/docs/LangRef.html#floating-point-environment
+llvm::AttributeList llvm_ext_math_func_attrs(llvm_state &s)
+{
+    // NOTE: use the fabs() f64 intrinsic - hopefully it does not matter
+    // which intrinsic we pick.
+    auto *f = llvm_lookup_intrinsic(s.builder(), "llvm.fabs", {to_llvm_type<double>(s.context())}, 1);
+    assert(f != nullptr);
+
+    return f->getAttributes();
+}
+
+// Attach the vfabi attributes to "call", which must be a call to a function with scalar arguments.
+// The necessary vfabi information is stored in vfi. The function returns "call".
+// The attributes of the scalar function will be attached to the vector variants.
+// NOTE: this will insert the declarations of the vector variants into the module, if needed
+// (plus all the boilerplate necessary for preventing the declarations from being optimised out).
+llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const std::vector<vf_info> &vfi)
+{
+    assert(call != nullptr);
+
+    const auto *f = call->getCalledFunction();
+    const auto *ft = f->getFunctionType();
+
+    const auto num_args = ft->getNumParams();
+
+    assert(num_args != 0u);
+    assert(std::all_of(ft->param_begin(), ft->param_end(), [](auto *p) { return p != nullptr && !p->isVectorTy(); }));
+
+    auto &context = s.context();
+    auto &builder = s.builder();
+
+    if (!vfi.empty()) {
+        // There exist vector variants of the scalar function.
+        auto &md = s.module();
+
+        // Fetch the type of the scalar arguments.
+        auto *scal_t = ft->getParamType(0);
+
+        // Attach the "vector-function-abi-variant" attribute to the call so that LLVM's auto-vectorizer can take
+        // advantage of these vector variants.
+        std::vector<std::string> vf_abi_strs;
+        vf_abi_strs.reserve(vfi.size());
+        for (const auto &el : vfi) {
+            vf_abi_strs.push_back(el.vf_abi_attr);
+        }
+#if LLVM_VERSION_MAJOR >= 14
+        call->addFnAttr(llvm::Attribute::get(context, "vector-function-abi-variant",
+                                             fmt::format("{}", fmt::join(vf_abi_strs, ","))));
+#else
+        {
+            auto attrs = call->getAttributes();
+            attrs = attrs.addAttribute(context, llvm::AttributeList::FunctionIndex, "vector-function-abi-variant",
+                                       fmt::format("{}", fmt::join(vf_abi_strs, ",")));
+            call->setAttributes(attrs);
+        }
+#endif
+
+        // Now we need to:
+        // - add the declarations of the vector variants to the module,
+        // - ensure that these declarations are not removed by the optimiser,
+        //   otherwise the vector variants will not be picked up.
+
+        // Remember the original insertion block.
+        auto *orig_bb = builder.GetInsertBlock();
+
+        // Add the vector variants and the boilerplate
+        // to prevent them from being removed.
+        for (const auto &el : vfi) {
+            assert(el.width > 0u);
+            assert(el.nargs == num_args);
+
+            // The vector type for the current variant.
+            auto *cur_vec_t = make_vector_type(scal_t, el.width);
+
+            // The signature of the current variant.
+            auto *vec_ft = llvm::FunctionType::get(
+                cur_vec_t,
+                std::vector<llvm::Type *>(boost::numeric_cast<std::vector<llvm::Type *>::size_type>(num_args),
+                                          cur_vec_t),
+                false);
+
+            // Try to lookup the variant in the module.
+            auto *vf_ptr = md.getFunction(el.name);
+
+            if (vf_ptr == nullptr) {
+                // The declaration of the variant is not there yet, create it.
+                vf_ptr = llvm_func_create(vec_ft, llvm::Function::ExternalLinkage, el.name, &md);
+
+                // NOTE: setting the attributes on the vector variant is not strictly required
+                // for the auto-vectorizer to work. However, in other parts of the code, the vector
+                // variants are invoked directly (via llvm_invoke_external()) and in those cases
+                // proper attributes do help the optimiser. Thus, we want to make sure
+                // that the attributes are set consistently regardless of where the declarations
+                // of the vector variants are created. The convention we follow is that the attributes
+                // of the vector variants must match the attributes of the scalar counterpart.
+                vf_ptr->setAttributes(f->getAttributes());
+            } else {
+                // The declaration of the variant is already there.
+                // Check that the signatures and attributes match.
+                assert(vf_ptr->getFunctionType() == vec_ft);
+                assert(vf_ptr->getAttributes() == f->getAttributes());
+            }
+
+            // Create the name of the dummy function to ensure the variant is not optimised out.
+            //
+            // NOTE: another way of doing this involves the llvm.used global variable - need
+            // to learn about the metadata API apparently.
+            //
+            // https://llvm.org/docs/LangRef.html#the-llvm-used-global-variable
+            // https://godbolt.org/z/1neaG4bYj
+            const auto dummy_name = fmt::format("heyoka.dummy_vector_call.{}", el.name);
+
+            if (auto *dummy_ptr = md.getFunction(dummy_name); dummy_ptr == nullptr) {
+                // The dummy function has not been defined yet, do it.
+                auto *dummy = llvm_func_create(vec_ft, llvm::Function::ExternalLinkage, dummy_name, &md);
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", dummy));
+
+                // The dummy function just forwards its arguments to the variant.
+                std::vector<llvm::Value *> dummy_args;
+                for (auto *dummy_arg = dummy->args().begin(); dummy_arg != dummy->args().end(); ++dummy_arg) {
+                    dummy_args.emplace_back(dummy_arg);
+                }
+
+                builder.CreateRet(builder.CreateCall(vf_ptr, dummy_args));
+            } else {
+                // The declaration of the dummy function is already there.
+                // Check that the signatures match.
+                assert(dummy_ptr->getFunctionType() == vec_ft);
+            }
+        }
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    }
+
+    return call;
+}
+
+// Helper to invoke a scalar function with arguments which may or may not
+// be vectors.
+//
+// In the former case, the call will be decomposed into a sequence of calls with scalar arguments,
+// and the return values will be re-assembled as a vector. Vector arguments must all have the same size.
+//
+// In the latter case, this function will be equivalent to invoking the scalar function on the scalar arguments.
+//
+// In both cases, all arguments must be of the same type.
+//
+// make_s_call will be used to generate the scalar call on the scalar arguments.
+//
+// vfi contains the information about the vector variants of the scalar function. The information in vfi
+// will be attached to the scalar call(s).
+llvm::Value *
+llvm_scalarise_vector_call(llvm_state &s, const std::vector<llvm::Value *> &args,
+                           const std::function<llvm::CallInst *(const std::vector<llvm::Value *> &)> &make_s_call,
+                           const std::vector<vf_info> &vfi)
+{
+    assert(!args.empty());
+    // Make sure all arguments are of the same type.
+    assert(std::all_of(args.begin() + 1, args.end(),
+                       [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
+    // Make sure all arguments are either vectors or scalars.
+    assert(std::all_of(args.begin(), args.end(), [](const auto &arg) { return arg->getType()->isVectorTy(); })
+           || std::all_of(args.begin(), args.end(), [](const auto &arg) { return !arg->getType()->isVectorTy(); }));
+
+    auto &builder = s.builder();
+
+    // Decompose each argument into a vector of scalars.
+    std::vector<std::vector<llvm::Value *>> scalars;
+    scalars.reserve(args.size());
+    for (const auto &arg : args) {
+        scalars.push_back(vector_to_scalars(builder, arg));
+    }
+
+    // Fetch the vector size.
+    const auto vec_size = scalars[0].size();
+    assert(vec_size > 0u);
+
+    // LCOV_EXCL_START
+    // Make sure the vector size is the same for all arguments.
+    assert(std::all_of(scalars.begin() + 1, scalars.end(),
+                       [vec_size](const auto &arg) { return arg.size() == vec_size; }));
+    // LCOV_EXCL_STOP
+
+    // Invoke the function on each set of scalars.
+    std::vector<llvm::Value *> retvals, scal_args;
+    for (decltype(scalars[0].size()) i = 0; i < vec_size; ++i) {
+        // Setup the vector of scalar arguments.
+        scal_args.clear();
+        for (const auto &scal_set : scalars) {
+            scal_args.push_back(scal_set[i]);
+        }
+
+        // Invoke the scalar function, add the vector variants info, and store the scalar result.
+        auto *s_call = make_s_call(scal_args);
+
+#if !defined(NDEBUG)
+
+        auto *called_f = s_call->getCalledFunction();
+        // All arguments in the function call must be scalars.
+        assert(std::all_of(called_f->arg_begin(), called_f->arg_end(),
+                           [](const auto &arg) { return !arg.getType()->isVectorTy(); }));
+
+#endif
+
+        retvals.emplace_back(llvm_add_vfabi_attrs(s, s_call, vfi));
+    }
+
+    // Build a vector with the results.
+    return scalars_to_vector(builder, retvals);
+}
+
+// Helper to invoke an external scalar math function with arguments
+// which may be vectors.
+// The call will be decomposed into a sequence of calls with scalar arguments,
+// and the return values will be re-assembled as a vector.
+// If the arguments are vectors, they must all have the same size.
+// vfi contains the information about the vector variants of the scalar function.
+// attrs is the list of attributes to attach to the scalar function.
+// It is assumed that the return type of the math function is the same as the
+// arguments' type.
+llvm::Value *llvm_scalarise_ext_math_vector_call(llvm_state &s, const std::vector<llvm::Value *> &args,
+                                                 const std::string &fname, const std::vector<vf_info> &vfi,
+                                                 const llvm::AttributeList &attrs)
+{
+    // NOTE: this is not supposed to be used with intrinsics.
+    assert(!boost::starts_with(fname, "llvm."));
+
+    return llvm_scalarise_vector_call(
+        s, args,
+        [&](const std::vector<llvm::Value *> &scal_args) {
+            assert(!scal_args.empty());
+            assert(!args.empty());
+            assert(scal_args[0]->getType() == args[0]->getType()->getScalarType());
+            return llvm_invoke_external(s, fname, scal_args[0]->getType(), scal_args, attrs);
+        },
+        vfi);
+}
+
+// Implementation of an LLVM math function built on top of an intrinsic (if possible).
+// intr_name is the name of the intrinsic (without type information),
+// f128/real_name are the names of the functions to be used for the
+// real128/real implementations (if these cannot be implemented
+// on top of the LLVM intrinsics).
+template <typename... Args>
+llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
+#if defined(HEYOKA_HAVE_REAL128)
+                            // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                            const std::string f128_name,
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+                            // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                            const std::string real_name,
+#endif
+
+                            Args *...args)
+{
+    constexpr auto nargs = sizeof...(Args);
+    static_assert(nargs > 0u);
+    static_assert((std::is_same_v<llvm::Value, Args> && ...));
+
+    assert(boost::starts_with(intr_name, "llvm."));
+
+    assert(((args != nullptr) && ...));
+
+    // Check that all arguments have the same type.
+    const std::array arg_types = {args->getType()...};
+    assert(((args->getType() == arg_types[0]) && ...));
+
+    // Determine the type and scalar type of the arguments.
+    auto *x_t = arg_types[0];
+    auto *scal_t = x_t->getScalarType();
+
+    auto &builder = s.builder();
+
+    if (llvm_stype_can_use_math_intrinsics(s, scal_t)) {
+        // We can use the LLVM intrinsics for the given scalar type.
+
+        // Lookup the intrinsic that would be used
+        // in the scalar implementation.
+        auto *s_intr = llvm_lookup_intrinsic(builder, intr_name, {scal_t}, boost::numeric_cast<unsigned>(nargs));
+
+        // Lookup the scalar intrinsic name in the vector function info map.
+        const auto &vfi = lookup_vf_info(std::string(s_intr->getName()));
+
+        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_t)) {
+            // The inputs are vectors. Check if we have a vector implementation
+            // with the correct vector width in vfi.
+            const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+            const auto vfi_it
+                = std::lower_bound(vfi.begin(), vfi.end(), vector_width,
+                                   [](const auto &vfi_item, std::uint32_t n) { return vfi_item.width < n; });
+
+            if (vfi_it != vfi.end() && vfi_it->width == vector_width) {
+                // A vector implementation with precisely the correct width is available, use it.
+                assert(vfi_it->nargs == nargs);
+                // NOTE: make sure to use the same attributes as the scalar intrinsic for the vector
+                // call. This ensures that the vector variant is declared with the same attributes as those that would
+                // be declared by invoking llvm_add_vfabi_attrs() on the scalar invocation.
+                return llvm_invoke_external(s, vfi_it->name, vec_t, {args...}, s_intr->getAttributes());
+            }
+
+            if (!vfi.empty()) {
+                // We have *some* vector implementations available (albeit not with the correct
+                // size). Decompose into scalar calls adding the vfabi info to let the LLVM auto-vectorizer do its
+                // thing.
+                return llvm_scalarise_vector_call(
+                    s, {args...},
+                    [&builder, s_intr](const std::vector<llvm::Value *> &scal_args) {
+                        return builder.CreateCall(s_intr, scal_args);
+                    },
+                    vfi);
+            }
+
+            // No vector implementation available, just let LLVM handle it.
+            // NOTE: this will lookup and invoke an intrinsic for vector arguments.
+            return llvm_invoke_intrinsic(builder, intr_name, {x_t}, {args...});
+        }
+
+        // The input is **not** a vector. Invoke the scalar intrinsic attaching vector
+        // variants if available.
+        auto *ret = builder.CreateCall(s_intr, {args...});
+        return llvm_add_vfabi_attrs(s, ret, vfi);
+    }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    // NOTE: this handles both the scalar and vector cases.
+    if (scal_t == to_llvm_type<mppp::real128>(s.context(), false)) {
+        return llvm_scalarise_ext_math_vector_call(s, {args...}, f128_name, lookup_vf_info(f128_name),
+                                                   // NOTE: use the standard math function attributes.
+                                                   llvm_ext_math_func_attrs(s));
+    }
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    // NOTE: this handles only the scalar case.
+    if (llvm_is_real(x_t) != 0) {
+        auto *f = real_nary_op(s, x_t, real_name, boost::numeric_cast<unsigned>(nargs));
+        return builder.CreateCall(f, {args...});
+    }
+
+#endif
+
+    // LCOV_EXCL_START
+    throw std::invalid_argument(
+        fmt::format("Invalid type '{}' encountered in the implementation of the intrinsic-based math function '{}'",
+                    llvm_type_name(x_t), intr_name));
+    // LCOV_EXCL_STOP
+}
+
+// Get the suffix of a C math function corresponding to the scalar type scal_t. For instance,
+// for sin() we have the following possibilities:
+//
+// - sinf(float) (suffix "f"),
+// - sin(double) (suffix ""),
+// - sinl(long double) (suffix "l"),
+// - sinq(__float128) (suffix "q").
+//
+// If no C math function is available for the type scal_t, return an empty value.
+std::optional<std::string> get_cmath_func_suffix(llvm_state &s, llvm::Type *scal_t)
+{
+    assert(scal_t != nullptr);
+    assert(!scal_t->isVectorTy());
+
+    auto &context = s.context();
+
+    if (scal_t == to_llvm_type<float>(context, false)) {
+        return "f";
+    }
+
+    if (scal_t == to_llvm_type<double>(context, false)) {
+        return "";
+    }
+
+    if (scal_t == to_llvm_type<long double>(context, false)) {
+        return "l";
+    }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    if (scal_t == to_llvm_type<mppp::real128>(context, false)) {
+        return "q";
+    }
+
+#endif
+
+    return {};
+}
+
+// Implementation of an LLVM math function built on top of a
+// function from the C math library, if possible. base_name is the name
+// of the double-precision variant of the C math function. base_name
+// will also be used to create the MPFR name for the real implementation.
+template <typename... Args>
+llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, Args *...args)
+{
+    constexpr auto nargs = sizeof...(Args);
+    static_assert(nargs > 0u);
+    static_assert((std::is_same_v<llvm::Value, Args> && ...));
+
+    assert(!base_name.empty());
+
+    assert(((args != nullptr) && ...));
+
+    // Check that all arguments have the same type.
+    const std::array arg_types = {args->getType()...};
+    assert(((args->getType() == arg_types[0]) && ...));
+
+    // Determine the type and scalar type of the arguments.
+    auto *x_t = arg_types[0];
+    auto *scal_t = x_t->getScalarType();
+
+    // Check if we have a cmath function available for the implementation.
+    if (const auto suffix = get_cmath_func_suffix(s, scal_t)) {
+        // Build the function name.
+        const auto scal_name = base_name + *suffix;
+
+        // Lookup the scalar name in the vector function info map.
+        const auto &vfi = lookup_vf_info(scal_name);
+
+        // Fetch the math function attributes.
+        // NOTE: these will be used in all math function invocations
+        // to ensure that scalar and vector versions are declared consistently
+        // with the same attributes.
+        const auto attrs = llvm_ext_math_func_attrs(s);
+
+        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_t)) {
+            // The inputs are vectors. Check if we have a vector implementation
+            // with the correct vector width in vfi.
+            const auto vector_width = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+            const auto vfi_it
+                = std::lower_bound(vfi.begin(), vfi.end(), vector_width,
+                                   [](const auto &vfi_item, std::uint32_t n) { return vfi_item.width < n; });
+
+            if (vfi_it != vfi.end() && vfi_it->width == vector_width) {
+                // A vector implementation with precisely the correct width is available, use it.
+                assert(vfi_it->nargs == nargs);
+                return llvm_invoke_external(s, vfi_it->name, vec_t, {args...}, attrs);
+            }
+
+            // A vector implementation with the correct width is **not** available: scalarise the
+            // vector call.
+            // NOTE: if there are other vector implementations available, these will be made available
+            // to the autovectorizer via the info contained in vfi.
+            return llvm_scalarise_ext_math_vector_call(s, {args...}, scal_name, vfi, attrs);
+        }
+
+        // The input is **not** a vector. Invoke the scalar function attaching vector
+        // variants if available.
+        auto *ret = llvm_invoke_external(s, scal_name, scal_t, {args...}, attrs);
+        return llvm_add_vfabi_attrs(s, ret, vfi);
+    }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    // NOTE: this handles only the scalar case.
+    if (llvm_is_real(x_t) != 0) {
+        auto *f = real_nary_op(s, x_t, "mpfr_" + base_name, boost::numeric_cast<unsigned>(nargs));
+        return s.builder().CreateCall(f, {args...});
+    }
+
+#endif
+
+    // LCOV_EXCL_START
+    throw std::invalid_argument(
+        fmt::format("Invalid type '{}' encountered in the LLVM implementation of the C math function '{}'",
+                    llvm_type_name(x_t), base_name));
+    // LCOV_EXCL_STOP
+}
 
 } // namespace
 
@@ -557,13 +1105,7 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
             // (the vector type to gather).
             vec_tp,
 #endif
-            ptrs,
-#if LLVM_VERSION_MAJOR == 10
-            boost::numeric_cast<unsigned>(align)
-#else
-            llvm::Align(align)
-#endif
-        );
+            ptrs, llvm::Align(align));
     } else {
         // LCOV_EXCL_START
         assert(!llvm::isa<llvm_vector_type>(ptrs->getType()));
@@ -743,31 +1285,7 @@ llvm::Value *pairwise_prod(llvm_state &s, std::vector<llvm::Value *> &prod)
 llvm::CallInst *llvm_invoke_intrinsic(ir_builder &builder, const std::string &name,
                                       const std::vector<llvm::Type *> &types, const std::vector<llvm::Value *> &args)
 {
-    // Fetch the intrinsic ID from the name.
-    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(name);
-    // LCOV_EXCL_START
-    if (intrinsic_ID == llvm::Intrinsic::not_intrinsic) {
-        throw std::invalid_argument(fmt::format("Cannot fetch the ID of the intrinsic '{}'", name));
-    }
-    // LCOV_EXCL_STOP
-
-    // Fetch the declaration.
-    // NOTE: for generic intrinsics to work, we need to specify
-    // the desired argument type(s). See:
-    // https://stackoverflow.com/questions/11985247/llvm-insert-intrinsic-function-cos
-    // And the docs of the getDeclaration() function.
-    assert(builder.GetInsertBlock() != nullptr); // LCOV_EXCL_LINE
-    auto *callee_f = llvm::Intrinsic::getDeclaration(builder.GetInsertBlock()->getModule(), intrinsic_ID, types);
-    // It does not make sense to have a definition of a builtin.
-    assert(callee_f->isDeclaration());
-
-    // Check the number of arguments.
-    if (callee_f->arg_size() != args.size()) {
-        throw std::invalid_argument(
-            fmt::format("Incorrect # of arguments passed while calling the intrinsic '{}': {} are "
-                        "expected, but {} were provided instead",
-                        name, callee_f->arg_size(), args.size()));
-    }
+    auto *callee_f = llvm_lookup_intrinsic(builder, name, types, boost::numeric_cast<unsigned>(args.size()));
 
     // Create the function call.
     auto *r = builder.CreateCall(callee_f, args);
@@ -810,8 +1328,8 @@ llvm::CallInst *llvm_invoke_external(llvm_state &s, const std::string &name, llv
                             "are expected, but {} were provided instead",
                             name, callee_f->arg_size(), args.size()));
         }
-        // NOTE: perhaps in the future we should consider adding more checks here
-        // (e.g., argument types, return type).
+        // NOTE: in the future we should consider adding more checks here
+        // (e.g., argument types, return type, attributes, etc.).
     }
 
     // Create the function call.
@@ -1142,67 +1660,6 @@ void llvm_switch_u32(llvm_state &s, llvm::Value *val, const std::function<void()
     // Emit the merge block.
     llvm_append_block(f, merge_bb);
     builder.SetInsertPoint(merge_bb);
-}
-
-// Helper to invoke an external function with vector arguments.
-// The call will be decomposed into a sequence of calls with scalar arguments,
-// and the return values will be re-assembled as a vector.
-// NOTE: there are some assumptions about valid function attributes
-// in this implementation, need to keep these into account when using
-// this helper.
-llvm::Value *call_extern_vec(llvm_state &s, const std::vector<llvm::Value *> &args, const std::string &fname)
-{
-    // LCOV_EXCL_START
-    assert(!args.empty());
-    // Make sure all vector arguments are of the same type.
-    assert(std::all_of(args.begin() + 1, args.end(),
-                       [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
-    // LCOV_EXCL_STOP
-
-    auto &builder = s.builder();
-
-    // Decompose each argument into a vector of scalars.
-    std::vector<std::vector<llvm::Value *>> scalars;
-    scalars.reserve(args.size());
-    for (const auto &arg : args) {
-        scalars.push_back(vector_to_scalars(builder, arg));
-    }
-
-    // Fetch the vector size.
-    auto vec_size = scalars[0].size();
-
-    // Fetch the type of the scalar arguments.
-    auto *const scal_t = scalars[0][0]->getType();
-
-    // LCOV_EXCL_START
-    // Make sure the vector size is the same for all arguments.
-    assert(std::all_of(scalars.begin() + 1, scalars.end(),
-                       [vec_size](const auto &arg) { return arg.size() == vec_size; }));
-    // LCOV_EXCL_STOP
-
-    // Invoke the function on each set of scalars.
-    std::vector<llvm::Value *> retvals, scal_args;
-    for (decltype(vec_size) i = 0; i < vec_size; ++i) {
-        // Setup the vector of scalar arguments.
-        scal_args.clear();
-        for (const auto &scal_set : scalars) {
-            scal_args.push_back(scal_set[i]);
-        }
-
-        // Invoke the function and store the scalar result.
-        retvals.push_back(
-            llvm_invoke_external(s, fname, scal_t, scal_args,
-                                 // NOTE: in theory we may add ReadNone here as well,
-                                 // but for some reason, at least up to LLVM 10,
-                                 // this causes strange codegen issues. Revisit
-                                 // in the future.
-                                 llvm::AttributeList::get(s.context(), llvm::AttributeList::FunctionIndex,
-                                                          {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable,
-                                                           llvm::Attribute::WillReturn})));
-    }
-
-    // Build a vector with the results.
-    return scalars_to_vector(builder, retvals);
 }
 
 // Create an LLVM for loop in the form:
@@ -1586,67 +2043,39 @@ llvm::Value *llvm_fcmp_oeq(llvm_state &s, llvm::Value *a, llvm::Value *b)
 }
 
 // Helper to compute sin and cos simultaneously.
+// NOTE: although there exists a SLEEF function for computing sin/cos
+// at the same time, we cannot use it directly because it returns a pair
+// of SIMD vectors rather than a single one and that does not play
+// well with the calling conventions. In theory we could write a wrapper
+// for these sincos functions using pointers for output values,
+// but compiling such a wrapper requires correctly
+// setting up the SIMD compilation flags. Perhaps we can consider this in the
+// future to improve performance.
+// NOTE: for the vfabi machinery, I think we would need to create internal scalar
+// and vector functions that implement the sincos() primitive. Then we would call
+// the scalar primitive attaching the vfabi info about the vector variants. For this
+// to work it looks like we would need a list of SIMD widths supported on the
+// CPU, possibly implemented in target_features.
+// NOTE: another possible improvement is an optimisation pass that automatically detects
+// sin/cos usages that can be compressed in a single sincos call. If this were to work,
+// we could just implement this a sin + cos and let the optimisation pass do
+// the heavy lifting.
 std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *x)
 {
     // LCOV_EXCL_START
     assert(x != nullptr);
     // LCOV_EXCL_STOP
 
-    auto &context = s.context();
-    auto &builder = s.builder();
+    [[maybe_unused]] auto *x_t = x->getType();
+    [[maybe_unused]] auto *scal_t = x_t->getScalarType();
 
-    // Determine the scalar type of the vector arguments.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false) || x_t == to_llvm_type<long double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            // NOTE: although there exists a SLEEF function for computing sin/cos
-            // at the same time, we cannot use it directly because it returns a pair
-            // of SIMD vectors rather than a single one and that does not play
-            // well with the calling conventions. In theory we could write a wrapper
-            // for these sincos functions using pointers for output values,
-            // but compiling such a wrapper requires correctly
-            // setting up the SIMD compilation flags. Perhaps we can consider this in the
-            // future to improve performance.
-            const auto sfn_sin = sleef_function_name(context, "sin", vec_t->getElementType(),
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-            const auto sfn_cos = sleef_function_name(context, "cos", vec_t->getElementType(),
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-
-            if (!sfn_sin.empty() && !sfn_cos.empty()) {
-                auto *ret_sin = llvm_invoke_external(
-                    s, sfn_sin, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-
-                auto *ret_cos = llvm_invoke_external(
-                    s, sfn_cos, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-
-                return {ret_sin, ret_cos};
-            }
-        }
-
-        // Compute sin and cos via intrinsics.
-        auto *sin_x = llvm_invoke_intrinsic(builder, "llvm.sin", {x->getType()}, {x});
-        auto *cos_x = llvm_invoke_intrinsic(builder, "llvm.cos", {x->getType()}, {x});
-
-        return {sin_x, cos_x};
+    // NOTE: real128 has a specialised primitive for this.
 #if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        // NOTE: for __float128 we cannot use the intrinsics, we need
-        // to call an external function.
+
+    auto &context = s.context();
+
+    if (scal_t == to_llvm_type<mppp::real128>(context, false)) {
+        auto &builder = s.builder();
 
         // Convert the vector argument to scalars.
         auto x_scalars = vector_to_scalars(builder, x);
@@ -1655,89 +2084,46 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
         // the results in res_scalars.
         // NOTE: need temp storage because sincosq uses pointers
         // for output values.
-        auto *s_all = builder.CreateAlloca(x_t);
-        auto *c_all = builder.CreateAlloca(x_t);
+        auto *s_all = builder.CreateAlloca(scal_t);
+        auto *c_all = builder.CreateAlloca(scal_t);
         std::vector<llvm::Value *> res_sin, res_cos;
         for (const auto &x_scal : x_scalars) {
             llvm_invoke_external(s, "sincosq", builder.getVoidTy(), {x_scal, s_all, c_all},
-                                 llvm::AttributeList::get(s.context(), llvm::AttributeList::FunctionIndex,
+                                 llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
                                                           {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
 
-            res_sin.emplace_back(builder.CreateLoad(x_t, s_all));
-            res_cos.emplace_back(builder.CreateLoad(x_t, c_all));
+            res_sin.emplace_back(builder.CreateLoad(scal_t, s_all));
+            res_cos.emplace_back(builder.CreateLoad(scal_t, c_all));
         }
 
         // Reconstruct the return value as a vector.
         return {scalars_to_vector(builder, res_sin), scalars_to_vector(builder, res_cos)};
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        return llvm_real_sincos(s, x);
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of sincos()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
     }
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if (llvm_is_real(x_t) != 0) {
+        return llvm_real_sincos(s, x);
+    }
+
+#endif
+
+    return {llvm_sin(s, x), llvm_cos(s, x)};
 }
 
 // Helper to compute abs(x_v).
 llvm::Value *llvm_abs(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    // Determine the scalar type of x.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t->isFloatingPointTy()) {
+    return llvm_math_intr(s, "llvm.fabs",
 #if defined(HEYOKA_HAVE_REAL128)
-        if (x_t == to_llvm_type<mppp::real128>(s.context(), false)) {
-            return call_extern_vec(s, {x}, "fabsq");
-        } else {
-#endif
-            return llvm_invoke_intrinsic(s.builder(), "llvm.fabs", {x->getType()}, {x});
-#if defined(HEYOKA_HAVE_REAL128)
-        }
+                          "fabsq",
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_abs", 1u);
-
-        return s.builder().CreateCall(f, {x});
+                          "mpfr_abs",
 #endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Unable to abs values of type '{}'", llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
-}
-
-// Helper to reduce x modulo y, that is, to compute:
-// x - y * floor(x / y).
-llvm::Value *llvm_modulus(llvm_state &s, llvm::Value *x, llvm::Value *y)
-{
-    auto &builder = s.builder();
-
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of the vector arguments.
-    auto *x_t = x->getType()->getScalarType();
-
-    auto &context = s.context();
-
-    if (x_t == llvm::Type::getFP128Ty(context)) {
-        return call_extern_vec(s, {x, y}, "heyoka_modulus128");
-    } else {
-#endif
-        auto *quo = llvm_fdiv(s, x, y);
-        auto *fl_quo = llvm_invoke_intrinsic(builder, "llvm.floor", {quo->getType()}, {quo});
-
-        return llvm_fsub(s, x, llvm_fmul(s, y, fl_quo));
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
+                          x);
 }
 
 // Minimum value, floating-point arguments. Implemented as std::min():
@@ -1813,191 +2199,65 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
 
         // Compute and return the result.
         return builder.CreateSub(icmp0, icmp1);
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(val->getType()) != 0) {
-        return llvm_real_sgn(s, val);
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of sgn()",
-                                                llvm_type_name(val->getType())));
-        // LCOV_EXCL_STOP
     }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if (llvm_is_real(val->getType()) != 0) {
+        return llvm_real_sgn(s, val);
+    }
+
+#endif
+
+    // LCOV_EXCL_START
+    throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of sgn()",
+                                            llvm_type_name(val->getType())));
+    // LCOV_EXCL_STOP
 }
 
 // Two-argument arctan.
 llvm::Value *llvm_atan2(llvm_state &s, llvm::Value *y, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(y != nullptr);
-    assert(x != nullptr);
-    assert(y->getType() == x->getType());
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the arguments.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn = sleef_function_name(context, "atan2", x_t,
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {y, x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {y, x}, "atan2");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {y, x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an atan2l function,
-                               // because LLVM complains about the symbol "atan2l" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_atan2l"
-#else
-                               "atan2l"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {y, x}, "atan2q");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_atan2", 2u);
-        return s.builder().CreateCall(f, {y, x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of atan2()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "atan2", y, x);
 }
 
 // Exponential.
 llvm::Value *llvm_exp(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of x.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false) || x_t == to_llvm_type<long double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn
-                = sleef_function_name(context, "exp", x_t, boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return llvm_invoke_intrinsic(s.builder(), "llvm.exp", {x->getType()}, {x});
+    return llvm_math_intr(s, "llvm.exp",
 #if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "expq");
+                          "expq",
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_exp", 1u);
-        return s.builder().CreateCall(f, {x});
+                          "mpfr_exp",
 #endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of exp()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+                          x);
 }
 
 // Fused multiply-add.
 llvm::Value *llvm_fma(llvm_state &s, llvm::Value *x, llvm::Value *y, llvm::Value *z)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    assert(y != nullptr);
-    assert(z != nullptr);
-    assert(x->getType() == y->getType());
-    assert(x->getType() == z->getType());
-    // LCOV_EXCL_STOP
-
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t->isFloatingPointTy()) {
+    return llvm_math_intr(s, "llvm.fma",
 #if defined(HEYOKA_HAVE_REAL128)
-        if (x_t == to_llvm_type<mppp::real128>(s.context(), false)) {
-            return call_extern_vec(s, {x, y, z}, "fmaq");
-        } else {
-#endif
-            return llvm_invoke_intrinsic(s.builder(), "llvm.fma", {x->getType()}, {x, y, z});
-#if defined(HEYOKA_HAVE_REAL128)
-        }
+                          "fmaq",
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_fma", 3u);
-        return s.builder().CreateCall(f, {x, y, z});
+                          "mpfr_fma",
 #endif
-        // LCOV_EXCL_START
-    } else {
-        throw std::invalid_argument(fmt::format("Unable to fma values of type '{}'", llvm_type_name(x->getType())));
-    }
-    // LCOV_EXCL_STOP
+                          x, y, z);
 }
 
 // Floor.
 llvm::Value *llvm_floor(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    // Determine the scalar type of x.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t->isFloatingPointTy()) {
+    return llvm_math_intr(s, "llvm.floor",
 #if defined(HEYOKA_HAVE_REAL128)
-        if (x_t == to_llvm_type<mppp::real128>(s.context(), false)) {
-            return call_extern_vec(s, {x}, "floorq");
-        } else {
-#endif
-            return llvm_invoke_intrinsic(s.builder(), "llvm.floor", {x->getType()}, {x});
-#if defined(HEYOKA_HAVE_REAL128)
-        }
+                          "floorq",
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_floor", 1u);
-
-        return s.builder().CreateCall(f, {x});
+                          "mpfr_floor",
 #endif
-        // LCOV_EXCL_START
-    } else {
-        throw std::invalid_argument(fmt::format("Unable to floor values of type '{}'", llvm_type_name(x->getType())));
-    }
-    // LCOV_EXCL_STOP
+                          x);
 }
 
 // Add a function to count the number of sign changes in the coefficients
@@ -3257,606 +3517,88 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t
 // Inverse cosine.
 llvm::Value *llvm_acos(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn = sleef_function_name(context, "acos", x_t,
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "acos");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an acos function,
-                               // because LLVM complains about the symbol "acosl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_acosl"
-#else
-                               "acosl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "acosq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_acos", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of acos()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "acos", x);
 }
 
 // Inverse hyperbolic cosine.
 llvm::Value *llvm_acosh(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn = sleef_function_name(context, "acosh", x_t,
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        s.context(), llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "acosh");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an acosh function,
-                               // because LLVM complains about the symbol "acoshl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_acoshl"
-#else
-                               "acoshl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "acoshq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_acosh", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of acosh()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "acosh", x);
 }
 
 // Inverse sine.
 llvm::Value *llvm_asin(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn = sleef_function_name(context, "asin", x_t,
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "asin");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an asin function,
-                               // because LLVM complains about the symbol "asinl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_asinl"
-#else
-                               "asinl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "asinq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_asin", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of asin()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "asin", x);
 }
 
 // Inverse hyperbolic sine.
 llvm::Value *llvm_asinh(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn = sleef_function_name(context, "asinh", x_t,
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "asinh");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an asinh function,
-                               // because LLVM complains about the symbol "asinhl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_asinhl"
-#else
-                               "asinhl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "asinhq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_asinh", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of asinh()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "asinh", x);
 }
 
 // Inverse tangent.
 llvm::Value *llvm_atan(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn = sleef_function_name(context, "atan", x_t,
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "atan");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an atan function,
-                               // because LLVM complains about the symbol "atanl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_atanl"
-#else
-                               "atanl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "atanq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_atan", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of atan()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "atan", x);
 }
 
 // Inverse hyperbolic tangent.
 llvm::Value *llvm_atanh(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn = sleef_function_name(context, "atanh", x_t,
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "atanh");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an atanh function,
-                               // because LLVM complains about the symbol "atanhl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_atanhl"
-#else
-                               "atanhl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "atanhq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_atanh", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of atanh()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "atanh", x);
 }
 
 // Cosine.
 llvm::Value *llvm_cos(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of x.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false) || x_t == to_llvm_type<long double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn
-                = sleef_function_name(context, "cos", x_t, boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return llvm_invoke_intrinsic(s.builder(), "llvm.cos", {x->getType()}, {x});
+    return llvm_math_intr(s, "llvm.cos",
 #if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "cosq");
+                          "cosq",
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_cos", 1u);
-        return s.builder().CreateCall(f, {x});
+                          "mpfr_cos",
 #endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of cos()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+                          x);
 }
 
 // Sine.
 llvm::Value *llvm_sin(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of x.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false) || x_t == to_llvm_type<long double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn
-                = sleef_function_name(context, "sin", x_t, boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return llvm_invoke_intrinsic(s.builder(), "llvm.sin", {x->getType()}, {x});
+    return llvm_math_intr(s, "llvm.sin",
 #if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "sinq");
+                          "sinq",
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_sin", 1u);
-        return s.builder().CreateCall(f, {x});
+                          "mpfr_sin",
 #endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of sin()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+                          x);
 }
 
 // Hyperbolic cosine.
 llvm::Value *llvm_cosh(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn = sleef_function_name(context, "cosh", x_t,
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "cosh");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an cosh function,
-                               // because LLVM complains about the symbol "coshl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_coshl"
-#else
-                               "coshl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "coshq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_cosh", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of cosh()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "cosh", x);
 }
 
 // Error function.
 llvm::Value *llvm_erf(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn
-                = sleef_function_name(context, "erf", x_t, boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "erf");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an erf function,
-                               // because LLVM complains about the symbol "erfl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_erfl"
-#else
-                               "erfl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "erfq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_erf", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of erf()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "erf", x);
 }
 
 // Natural logarithm.
 llvm::Value *llvm_log(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of x.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false) || x_t == to_llvm_type<long double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn
-                = sleef_function_name(context, "log", x_t, boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return llvm_invoke_intrinsic(s.builder(), "llvm.log", {x->getType()}, {x});
+    return llvm_math_intr(s, "llvm.log",
 #if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "logq");
+                          "logq",
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_log", 1u);
-        return s.builder().CreateCall(f, {x});
+                          "mpfr_log",
 #endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of log()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+                          x);
 }
 
 // Sigmoid.
@@ -3882,106 +3624,20 @@ llvm::Value *llvm_sigmoid(llvm_state &s, llvm::Value *x)
 // Hyperbolic sine.
 llvm::Value *llvm_sinh(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn = sleef_function_name(context, "sinh", x_t,
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "sinh");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an sinh function,
-                               // because LLVM complains about the symbol "sinhl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_sinhl"
-#else
-                               "sinhl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "sinhq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_sinh", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of sinh()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "sinh", x);
 }
 
 // Square root.
 llvm::Value *llvm_sqrt(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of x.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false) || x_t == to_llvm_type<long double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn = sleef_function_name(context, "sqrt", x_t,
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return llvm_invoke_intrinsic(s.builder(), "llvm.sqrt", {x->getType()}, {x});
+    return llvm_math_intr(s, "llvm.sqrt",
 #if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "sqrtq");
+                          "sqrtq",
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_sqrt", 1u);
-        return s.builder().CreateCall(f, {x});
+                          "mpfr_sqrt",
 #endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of sqrt()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+                          x);
 }
 
 // Squaring.
@@ -4007,168 +3663,26 @@ llvm::Value *llvm_square(llvm_state &s, llvm::Value *x)
 // Tangent.
 llvm::Value *llvm_tan(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn
-                = sleef_function_name(context, "tan", x_t, boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "tan");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an tan function,
-                               // because LLVM complains about the symbol "tanl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_tanl"
-#else
-                               "tanl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "tanq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_tan", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of tan()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "tan", x);
 }
 
 // Hyperbolic tangent.
 llvm::Value *llvm_tanh(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the argument.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn = sleef_function_name(context, "tanh", x_t,
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        return call_extern_vec(s, {x}, "tanh");
-    } else if (x_t == to_llvm_type<long double>(context, false)) {
-        return call_extern_vec(s, {x},
-#if defined(_MSC_VER)
-                               // NOTE: it seems like the MSVC stdlib does not have an tanh function,
-                               // because LLVM complains about the symbol "tanhl" not being
-                               // defined. Hence, use our own wrapper instead.
-                               "heyoka_tanhl"
-#else
-                               "tanhl"
-#endif
-        );
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x}, "tanhq");
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_tanh", 1u);
-        return s.builder().CreateCall(f, {x});
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of tanh()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+    return llvm_math_cmath(s, "tanh", x);
 }
 
 // Exponentiation.
 llvm::Value *llvm_pow(llvm_state &s, llvm::Value *x, llvm::Value *y)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    assert(y != nullptr);
-    assert(x->getType() == y->getType());
-    // LCOV_EXCL_STOP
-
-    auto &context = s.context();
-
-    // Determine the scalar type of the arguments.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false) || x_t == to_llvm_type<long double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            if (const auto sfn
-                = sleef_function_name(context, "pow", x_t, boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x, y},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-            }
-        }
-
-        auto *ret = llvm_invoke_intrinsic(s.builder(), "llvm.pow", {x->getType()}, {x, y});
-
-        return ret;
+    return llvm_math_intr(s, "llvm.pow",
 #if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        return call_extern_vec(s, {x, y}, "powq");
+                          "powq",
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_pow", 2u);
-        return s.builder().CreateCall(f, {x, y});
+                          "mpfr_pow",
 #endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of pow()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+                          x, y);
 }
 
 // This helper returns the type to be used for the internal LLVM representation

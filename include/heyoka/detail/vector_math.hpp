@@ -6,23 +6,34 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_DETAIL_SLEEF_HPP
-#define HEYOKA_DETAIL_SLEEF_HPP
+#ifndef HEYOKA_DETAIL_VECTOR_MATH_HPP
+#define HEYOKA_DETAIL_VECTOR_MATH_HPP
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/visibility.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
 
-HEYOKA_DLL_PUBLIC std::string sleef_function_name(llvm::LLVMContext &, const std::string &, llvm::Type *,
-                                                  std::uint32_t);
+struct vf_info {
+    // The name of the vector function
+    // to be invoked (e.g., from SLEEF).
+    std::string name;
+    // The vfabi attribute corresponding
+    // to the vector function.
+    std::string vf_abi_attr;
+    // Number of SIMD lanes.
+    std::uint32_t width = 0;
+    // Number of arguments.
+    std::uint32_t nargs = 0;
+};
+
+const std::vector<vf_info> &lookup_vf_info(const std::string &);
 
 } // namespace detail
 

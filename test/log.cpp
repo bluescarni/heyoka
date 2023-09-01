@@ -18,6 +18,8 @@
 #include <type_traits>
 #include <vector>
 
+#include <boost/algorithm/string/find_iterator.hpp>
+#include <boost/algorithm/string/finder.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
 #include <llvm/Config/llvm-config.h>
@@ -206,4 +208,69 @@ TEST_CASE("normalise")
 
     REQUIRE(normalise(log(x)) == log(x));
     REQUIRE(normalise(subs(log(x), {{x, .1_dbl}})) == log(.1_dbl));
+}
+
+// Test to check vectorisation via the vector-function-abi-variant machinery.
+TEST_CASE("vfabi")
+{
+    llvm_state s;
+
+    auto [a, b] = make_vars("a", "b");
+
+    add_cfunc<double>(s, "cfunc", {log(a), log(b)});
+
+    s.compile();
+
+    auto *cf_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+
+    const std::vector ins{1., 2.};
+    std::vector<double> outs(2u, 0.);
+
+    cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+
+    REQUIRE(outs[0] == approximately(std::log(1.)));
+    REQUIRE(outs[1] == approximately(std::log(2.)));
+
+#if defined(HEYOKA_WITH_SLEEF)
+
+    const auto &tf = detail::get_target_features();
+
+    auto ir = s.get_ir();
+
+    using string_find_iterator = boost::find_iterator<std::string::iterator>;
+
+    auto count = 0u;
+    for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.log.f64", boost::is_iequal()));
+         it != string_find_iterator(); ++it) {
+        ++count;
+    }
+
+    // NOTE: at the moment we have comprehensive coverage of LLVM versions
+    // in the CI only for x86_64.
+    if (tf.sse2) {
+        // NOTE: occurrences of the scalar version:
+        // - 2 calls in the strided cfunc,
+        // - 1 declaration.
+        REQUIRE(count == 3u);
+    }
+
+#if LLVM_VERSION_MAJOR >= 16
+
+    // NOTE: LLVM16 is currently the version tested in the CI on arm64.
+    if (tf.aarch64) {
+        REQUIRE(count == 3u);
+    }
+
+#endif
+
+    // NOTE: currently no auto-vectorization happens on ppc64 due apparently
+    // to the way the target machine is being set up by orc/lljit (it works
+    // fine with the opt tool). When this is resolved, we can test ppc64 too.
+
+    // if (tf.vsx) {
+    //     REQUIRE(count == 3u);
+    // }
+
+#endif
 }

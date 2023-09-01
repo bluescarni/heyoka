@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 1.1.0 LANGUAGES CXX C)
+project(heyoka VERSION 2.0.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -143,13 +143,23 @@ if(YACMA_COMPILER_IS_MSVC)
 endif()
 
 # Mandatory dependency on LLVM.
+#
 # NOTE: do it early so that we can set up
 # compiler flags based on the LLVM version
 # if needed.
+#
+# NOTE: forcibly include GNUInstallDirs (even
+# though we might have already included it
+# earlier) in order to work around an apparent issue
+# in Findzstd.cmake triggered by the LLVM config-file packages.
+# See:
+#
+# https://github.com/llvm/llvm-project/issues/58558
+include(GNUInstallDirs)
 find_package(LLVM REQUIRED CONFIG)
 
-if(${LLVM_VERSION_MAJOR} LESS 10)
-  message(FATAL_ERROR "LLVM >= 10 is required.")
+if(${LLVM_VERSION_MAJOR} LESS 11)
+  message(FATAL_ERROR "LLVM >= 11 is required.")
 endif()
 
 # Mandatory dependency on fmt.
@@ -170,6 +180,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sum_sq.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/div.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sub.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vector_math.cpp"
     # NOTE: this will be an empty file in case we are not
     # building with support for real.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"
@@ -275,13 +286,9 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/prod.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/constants.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/logging_impl.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/step_callback.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state_mem_cache.cpp"
-    # NOTE: sleef.cpp needs to be compiled even if we are not
-    # building with sleef support on.
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
 )
 
 if(HEYOKA_WITH_SLEEF)
@@ -476,7 +483,7 @@ set(_HEYOKA_MIN_MPPP_VERSION "0.27")
 if(HEYOKA_WITH_MPPP)
     find_package(mp++ REQUIRED CONFIG)
     if(${mp++_VERSION} VERSION_LESS ${_HEYOKA_MIN_MPPP_VERSION})
-        message(FATAL_ERROR "mp++ >= ${_HEYOKA_MIN_MPPP_VERSION} is required.")
+        message(FATAL_ERROR "mp++ >= ${_HEYOKA_MIN_MPPP_VERSION} is required, but version ${mp++_VERSION} was found instead.")
     endif()
 
     # NOTE: this is necessary for the serialisation of several classes.

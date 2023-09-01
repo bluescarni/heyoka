@@ -68,9 +68,7 @@ struct target_features {
 #endif
 };
 
-// NOTE: no need to make this DLL-public as long
-// as this is used only in library code.
-const target_features &get_target_features();
+HEYOKA_DLL_PUBLIC const target_features &get_target_features();
 
 } // namespace detail
 

@@ -10,8 +10,14 @@
 
 #include <boost/algorithm/string/find_iterator.hpp>
 #include <boost/algorithm/string/finder.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 
+#include <llvm/Config/llvm-config.h>
+
+#include <heyoka/config.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/model/nbody.hpp>
+#include <heyoka/model/pendulum.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -34,5 +40,37 @@ TEST_CASE("function inlining")
         ++count;
     }
 
-    REQUIRE(count == 3u);
+    // NOTE: in general we expect 3 functions definitions, but auto-vectorization
+    // could bump up this number. I think 6 is the maximum right now (3 possible
+    // vector width on x86 - 2, 4, 8).
+    REQUIRE(count <= 6u);
+}
+
+// Vectorization of the pow() function when determining
+// the timestep size in an integrator.
+TEST_CASE("pow vect")
+{
+    auto ta = taylor_adaptive<double>{model::pendulum(), std::vector<double>(2u, 0.)};
+
+#if defined(HEYOKA_WITH_SLEEF)
+
+    auto md_ir = ta.get_llvm_state().get_ir();
+
+    const auto &tf = detail::get_target_features();
+
+    // NOTE: run the check only on some archs/LLVM versions.
+    if (tf.sse2) {
+        REQUIRE(!boost::algorithm::contains(md_ir, "llvm.pow"));
+    }
+
+#if LLVM_VERSION_MAJOR >= 16
+
+    // NOTE: LLVM16 is currently the version tested in the CI on arm64.
+    if (tf.aarch64) {
+        REQUIRE(!boost::algorithm::contains(md_ir, "llvm.pow"));
+    }
+
+#endif
+
+#endif
 }

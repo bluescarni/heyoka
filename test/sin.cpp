@@ -18,6 +18,8 @@
 #include <type_traits>
 #include <vector>
 
+#include <boost/algorithm/string/find_iterator.hpp>
+#include <boost/algorithm/string/finder.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
 #include <llvm/Config/llvm-config.h>
@@ -224,4 +226,168 @@ TEST_CASE("normalise")
 
     REQUIRE(normalise(sin(x)) == sin(x));
     REQUIRE(normalise(subs(sin(x), {{x, .1_dbl}})) == sin(.1_dbl));
+}
+
+// Test to check vectorisation via the vector-function-abi-variant machinery.
+TEST_CASE("vfabi")
+{
+    llvm_state s;
+
+    auto [a, b] = make_vars("a", "b");
+
+    add_cfunc<double>(s, "cfunc", {sin(a), sin(b)});
+
+    s.compile();
+
+    auto *cf_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+
+    const std::vector ins{1., 2.};
+    std::vector<double> outs(2u, 0.);
+
+    cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+
+    REQUIRE(outs[0] == approximately(std::sin(1.)));
+    REQUIRE(outs[1] == approximately(std::sin(2.)));
+
+#if defined(HEYOKA_WITH_SLEEF)
+
+    const auto &tf = detail::get_target_features();
+
+    auto ir = s.get_ir();
+
+    using string_find_iterator = boost::find_iterator<std::string::iterator>;
+
+    auto count = 0u;
+    for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.sin.f64", boost::is_iequal()));
+         it != string_find_iterator(); ++it) {
+        ++count;
+    }
+
+    // NOTE: at the moment we have comprehensive coverage of LLVM versions
+    // in the CI only for x86_64.
+    if (tf.sse2) {
+        // NOTE: occurrences of the scalar version:
+        // - 2 calls in the strided cfunc,
+        // - 1 declaration.
+        REQUIRE(count == 3u);
+    }
+
+#if LLVM_VERSION_MAJOR >= 16
+
+    // NOTE: LLVM16 is currently the version tested in the CI on arm64.
+    if (tf.aarch64) {
+        REQUIRE(count == 3u);
+    }
+
+#endif
+
+    // NOTE: currently no auto-vectorization happens on ppc64 due apparently
+    // to the way the target machine is being set up by orc/lljit (it works
+    // fine with the opt tool). When this is resolved, we can test ppc64 too.
+
+    // if (tf.vsx) {
+    //     REQUIRE(count == 3u);
+    // }
+
+    // Some more extensive testing specific to x86, only for this function.
+    auto [c, d, e] = make_vars("c", "d", "e");
+
+    llvm_state s2;
+
+    add_cfunc<double>(s2, "cfunc1", {sin(a), sin(b), sin(c), sin(d)});
+    add_cfunc<double>(s2, "cfunc2", {sin(a), sin(b), sin(c), sin(d), sin(e)});
+
+    s2.compile();
+
+    auto *cf1_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s2.jit_lookup("cfunc1"));
+    auto *cf2_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s2.jit_lookup("cfunc2"));
+
+    const std::vector ins2{1., 2., 3., 4., 5.};
+    std::vector<double> outs2(5u, 0.);
+
+    cf1_ptr(outs2.data(), ins2.data(), nullptr, nullptr);
+
+    REQUIRE(outs2[0] == approximately(std::sin(1.)));
+    REQUIRE(outs2[1] == approximately(std::sin(2.)));
+    REQUIRE(outs2[2] == approximately(std::sin(3.)));
+    REQUIRE(outs2[3] == approximately(std::sin(4.)));
+
+    cf2_ptr(outs2.data(), ins2.data(), nullptr, nullptr);
+
+    REQUIRE(outs2[0] == approximately(std::sin(1.)));
+    REQUIRE(outs2[1] == approximately(std::sin(2.)));
+    REQUIRE(outs2[2] == approximately(std::sin(3.)));
+    REQUIRE(outs2[3] == approximately(std::sin(4.)));
+    REQUIRE(outs2[4] == approximately(std::sin(5.)));
+
+    ir = s2.get_ir();
+
+    count = 0u;
+    for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.sin.f64", boost::is_iequal()));
+         it != string_find_iterator(); ++it) {
+        ++count;
+    }
+
+    if (tf.avx) {
+        // NOTE: occurrences of the scalar version:
+        // - 4 + 5 calls in the strided cfuncs,
+        // - 1 declaration,
+        // - 1 call to deal with the remainder in the
+        //   5-argument version.
+        REQUIRE(count == 11u);
+    }
+
+    // NOTE: this next test seems to work properly starting
+    // from LLVM 13.
+#if LLVM_VERSION_MAJOR >= 13
+
+    // Check that the autovec works also on batch sizes which do not correspond
+    // exactly to an available vector width.
+    llvm_state s3;
+
+    add_cfunc<double>(s3, "cfunc", {sin(a)}, kw::batch_size = 3u);
+
+    s3.compile();
+
+    auto *cf3_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s3.jit_lookup("cfunc"));
+
+    std::vector<double> ins3 = {1., 2., 3.}, outs3 = {0., 0., 0.};
+
+    cf3_ptr(outs3.data(), ins3.data(), nullptr, nullptr);
+
+    REQUIRE(outs3[0] == approximately(std::sin(1.)));
+    REQUIRE(outs3[1] == approximately(std::sin(2.)));
+    REQUIRE(outs3[2] == approximately(std::sin(3.)));
+
+    ir = s3.get_ir();
+
+    count = 0u;
+    for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.sin.f64", boost::is_iequal()));
+         it != string_find_iterator(); ++it) {
+        ++count;
+    }
+
+    if (tf.sse2) {
+        // NOTE: occurrences of the scalar version:
+        // - 1 call in the remainder of the unstrided cfunc,
+        // - 1 call in the remainder of the strided cfunc,
+        // - 1 declaration.
+        REQUIRE(count == 3u);
+    }
+
+#if LLVM_VERSION_MAJOR >= 16
+
+    if (tf.aarch64) {
+        REQUIRE(count == 3u);
+    }
+
+#endif
+
+#endif
+
+#endif
 }
