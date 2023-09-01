@@ -1,12 +1,15 @@
 Changelog
 =========
 
-1.1.0 (unreleased)
+2.0.0 (unreleased)
 ------------------
 
 New
 ~~~
 
+- heyoka can now automatically vectorise scalar calls to
+  floating-point math functions
+  (`#342 <https://github.com/bluescarni/heyoka/pull/342>`__).
 - Implement an in-memory cache for ``llvm_state``. The cache is used
   to avoid re-optimising and re-compiling LLVM code which has
   already been optimised and compiled during the program execution
@@ -18,6 +21,12 @@ New
 Changes
 ~~~~~~~
 
+- **BREAKING**: the minimum supported LLVM version is now 11
+  (`#342 <https://github.com/bluescarni/heyoka/pull/342>`__).
+  This is a :ref:`breaking change <bchanges_2_0_0>`.
+- The LLVM SLP vectorizer is now enabled when JIT compiling
+  with optimisations
+  (`#341 <https://github.com/bluescarni/heyoka/pull/341>`__).
 - The optimisation level for an ``llvm_state`` is now clamped
   within the ``[0, 3]`` range
   (`#340 <https://github.com/bluescarni/heyoka/pull/340>`__).

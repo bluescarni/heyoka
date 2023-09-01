@@ -9,7 +9,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
-    <title>Changelog &#8212; heyoka 1.1.0 documentation</title>
+    <title>Changelog &#8212; heyoka 2.0.0 documentation</title>
   
   
   
@@ -349,7 +349,7 @@ document.write(`
             </div>
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">1.1.0 (unreleased)</a><ul class="nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">2.0.0 (unreleased)</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#new">New</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#changes">Changes</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fix">Fix</a></li>
@@ -499,10 +499,13 @@ document.write(`
   <section id="changelog">
 <h1>Changelog<a class="headerlink" href="#changelog" title="Permalink to this heading">#</a></h1>
 <section id="unreleased">
-<h2>1.1.0 (unreleased)<a class="headerlink" href="#unreleased" title="Permalink to this heading">#</a></h2>
+<h2>2.0.0 (unreleased)<a class="headerlink" href="#unreleased" title="Permalink to this heading">#</a></h2>
 <section id="new">
 <h3>New<a class="headerlink" href="#new" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>heyoka can now automatically vectorise scalar calls to
+floating-point math functions
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/342">#342</a>).</p></li>
 <li><p>Implement an in-memory cache for <code class="docutils literal notranslate"><span class="pre">llvm_state</span></code>. The cache is used
 to avoid re-optimising and re-compiling LLVM code which has
 already been optimised and compiled during the program execution
@@ -515,6 +518,12 @@ an <code class="docutils literal notranslate"><span class="pre">llvm_state</span
 <section id="changes">
 <h3>Changes<a class="headerlink" href="#changes" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p><strong>BREAKING</strong>: the minimum supported LLVM version is now 11
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/342">#342</a>).
+This is a <a class="reference internal" href="breaking_changes.html#bchanges-2-0-0"><span class="std std-ref">breaking change</span></a>.</p></li>
+<li><p>The LLVM SLP vectorizer is now enabled when JIT compiling
+with optimisations
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/341">#341</a>).</p></li>
 <li><p>The optimisation level for an <code class="docutils literal notranslate"><span class="pre">llvm_state</span></code> is now clamped
 within the <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">3]</span></code> range
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/340">#340</a>).</p></li>
@@ -1438,7 +1447,7 @@ on more general classes of functions, and add
   </div>
   <nav class="bd-toc-nav page-toc">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">1.1.0 (unreleased)</a><ul class="nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">2.0.0 (unreleased)</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#new">New</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#changes">Changes</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fix">Fix</a></li>

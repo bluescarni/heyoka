@@ -3,6 +3,14 @@
 Breaking changes
 ================
 
+.. _bchanges_2_0_0:
+
+2.0.0
+-----
+
+- The minimum supported LLVM version has been bumped
+  from 10 to 11.
+
 .. _bchanges_1_0_0:
 
 1.0.0
