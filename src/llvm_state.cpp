@@ -149,6 +149,17 @@ namespace
 // Make sure our definition of ir_builder matches llvm::IRBuilder<>.
 static_assert(std::is_same_v<ir_builder, llvm::IRBuilder<>>, "Inconsistent definition of the ir_builder type.");
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+// Make sure that the size and alignment of __float128
+// and mppp::real128 coincide. This is required if we
+// want to be able to use mppp::real128 as an alias
+// for __float128.
+static_assert(sizeof(__float128) == sizeof(mppp::real128));
+static_assert(alignof(__float128) == alignof(mppp::real128));
+
+#endif
+
 // LCOV_EXCL_START
 
 // Regex to match the PowerPC ISA version from the

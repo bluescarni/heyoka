@@ -286,13 +286,9 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/prod.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/constants.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/logging_impl.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/step_callback.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state_mem_cache.cpp"
-    # NOTE: sleef.cpp needs to be compiled even if we are not
-    # building with sleef support on.
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
 )
 
 if(HEYOKA_WITH_SLEEF)

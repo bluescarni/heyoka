@@ -81,7 +81,6 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/logging_impl.hpp>
-#include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/vector_math.hpp>
 #include <heyoka/detail/visibility.hpp>
