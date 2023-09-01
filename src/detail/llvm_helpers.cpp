@@ -2066,8 +2066,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
     assert(x != nullptr);
     // LCOV_EXCL_STOP
 
-    auto *x_t = x->getType();
-    auto *scal_t = x_t->getScalarType();
+    [[maybe_unused]] auto *x_t = x->getType();
+    [[maybe_unused]] auto *scal_t = x_t->getScalarType();
 
     // NOTE: real128 has a specialised primitive for this.
 #if defined(HEYOKA_HAVE_REAL128)
