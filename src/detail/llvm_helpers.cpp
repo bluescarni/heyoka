@@ -2210,31 +2210,6 @@ llvm::Value *llvm_abs(llvm_state &s, llvm::Value *x)
     }
 }
 
-// Helper to reduce x modulo y, that is, to compute:
-// x - y * floor(x / y).
-llvm::Value *llvm_modulus(llvm_state &s, llvm::Value *x, llvm::Value *y)
-{
-    auto &builder = s.builder();
-
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of the vector arguments.
-    auto *x_t = x->getType()->getScalarType();
-
-    auto &context = s.context();
-
-    if (x_t == llvm::Type::getFP128Ty(context)) {
-        return call_extern_vec(s, {x, y}, "heyoka_modulus128");
-    } else {
-#endif
-        auto *quo = llvm_fdiv(s, x, y);
-        auto *fl_quo = llvm_invoke_intrinsic(builder, "llvm.floor", {quo->getType()}, {quo});
-
-        return llvm_fsub(s, x, llvm_fmul(s, y, fl_quo));
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
-}
-
 // Minimum value, floating-point arguments. Implemented as std::min():
 // return (b < a) ? b : a;
 llvm::Value *llvm_min(llvm_state &s, llvm::Value *a, llvm::Value *b)

@@ -31,16 +31,6 @@ static_assert(alignof(__float128) == alignof(mppp::real128));
 // and LLVM in the implementation of __float128,
 // and needs to be investigated more.
 
-// A small wrapper used in the implementation of llvm_modulus. This will return:
-// x - y * floor(x / y)
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_modulus128(__float128 x, __float128 y) noexcept
-{
-    const auto quo = mppp::real128{x / y};
-    const auto fl_quo = mppp::floor(quo);
-
-    return mppp::fma(-mppp::real128{y}, fl_quo, mppp::real128{x}).m_value;
-}
-
 #endif
 
 #if defined(_MSC_VER)
