@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- heyoka can now automatically vectorise scalar calls to
+  floating-point math functions
+  (`#342 <https://github.com/bluescarni/heyoka/pull/342>`__).
 - Implement an in-memory cache for ``llvm_state``. The cache is used
   to avoid re-optimising and re-compiling LLVM code which has
   already been optimised and compiled during the program execution
