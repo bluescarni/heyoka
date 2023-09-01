@@ -377,8 +377,7 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
                 // The declaration of the variant is already there.
                 // Check that the signatures and attributes match.
                 assert(vf_ptr->getFunctionType() == vec_ft);
-                // TODO: restore when sincos is fixed.
-                // assert(vf_ptr->getAttributes() == f->getAttributes());
+                assert(vf_ptr->getAttributes() == f->getAttributes());
             }
 
             // Create the name of the dummy function to ensure the variant is not optimised out.
@@ -2108,67 +2107,39 @@ llvm::Value *llvm_fcmp_oeq(llvm_state &s, llvm::Value *a, llvm::Value *b)
 }
 
 // Helper to compute sin and cos simultaneously.
+// NOTE: although there exists a SLEEF function for computing sin/cos
+// at the same time, we cannot use it directly because it returns a pair
+// of SIMD vectors rather than a single one and that does not play
+// well with the calling conventions. In theory we could write a wrapper
+// for these sincos functions using pointers for output values,
+// but compiling such a wrapper requires correctly
+// setting up the SIMD compilation flags. Perhaps we can consider this in the
+// future to improve performance.
+// NOTE: for the vfabi machinery, I think we would need to create internal scalar
+// and vector functions that implement the sincos() primitive. Then we would call
+// the scalar primitive attaching the vfabi info about the vector variants. For this
+// to work it looks like we would need a list of SIMD widths supported on the
+// CPU, possibly implemented in target_features.
+// NOTE: another possible improvement is an optimisation pass that automatically detects
+// sin/cos usages that can be compressed in a single sincos call. If this were to work,
+// we could just implement this a sin + cos and let the optimisation pass do
+// the heavy lifting.
 std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *x)
 {
     // LCOV_EXCL_START
     assert(x != nullptr);
     // LCOV_EXCL_STOP
 
-    auto &context = s.context();
-    auto &builder = s.builder();
+    auto *x_t = x->getType();
+    auto *scal_t = x_t->getScalarType();
 
-    // Determine the scalar type of the vector arguments.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t == to_llvm_type<double>(context, false) || x_t == to_llvm_type<long double>(context, false)) {
-        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-            // NOTE: although there exists a SLEEF function for computing sin/cos
-            // at the same time, we cannot use it directly because it returns a pair
-            // of SIMD vectors rather than a single one and that does not play
-            // well with the calling conventions. In theory we could write a wrapper
-            // for these sincos functions using pointers for output values,
-            // but compiling such a wrapper requires correctly
-            // setting up the SIMD compilation flags. Perhaps we can consider this in the
-            // future to improve performance.
-            const auto sfn_sin = sleef_function_name(context, "sin", vec_t->getElementType(),
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-            const auto sfn_cos = sleef_function_name(context, "cos", vec_t->getElementType(),
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-
-            if (!sfn_sin.empty() && !sfn_cos.empty()) {
-                auto *ret_sin = llvm_invoke_external(
-                    s, sfn_sin, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-
-                auto *ret_cos = llvm_invoke_external(
-                    s, sfn_cos, vec_t, {x},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    llvm::AttributeList::get(
-                        context, llvm::AttributeList::FunctionIndex,
-                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-
-                return {ret_sin, ret_cos};
-            }
-        }
-
-        // Compute sin and cos via intrinsics.
-        auto *sin_x = llvm_invoke_intrinsic(builder, "llvm.sin", {x->getType()}, {x});
-        auto *cos_x = llvm_invoke_intrinsic(builder, "llvm.cos", {x->getType()}, {x});
-
-        return {sin_x, cos_x};
+    // NOTE: real128 has a specialised primitive for this.
 #if defined(HEYOKA_HAVE_REAL128)
-    } else if (x_t == to_llvm_type<mppp::real128>(context, false)) {
-        // NOTE: for __float128 we cannot use the intrinsics, we need
-        // to call an external function.
+
+    auto &context = s.context();
+
+    if (scal_t == to_llvm_type<mppp::real128>(context, false)) {
+        auto &builder = s.builder();
 
         // Convert the vector argument to scalars.
         auto x_scalars = vector_to_scalars(builder, x);
@@ -2177,31 +2148,33 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
         // the results in res_scalars.
         // NOTE: need temp storage because sincosq uses pointers
         // for output values.
-        auto *s_all = builder.CreateAlloca(x_t);
-        auto *c_all = builder.CreateAlloca(x_t);
+        auto *s_all = builder.CreateAlloca(scal_t);
+        auto *c_all = builder.CreateAlloca(scal_t);
         std::vector<llvm::Value *> res_sin, res_cos;
         for (const auto &x_scal : x_scalars) {
             llvm_invoke_external(s, "sincosq", builder.getVoidTy(), {x_scal, s_all, c_all},
-                                 llvm::AttributeList::get(s.context(), llvm::AttributeList::FunctionIndex,
+                                 llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
                                                           {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
 
-            res_sin.emplace_back(builder.CreateLoad(x_t, s_all));
-            res_cos.emplace_back(builder.CreateLoad(x_t, c_all));
+            res_sin.emplace_back(builder.CreateLoad(scal_t, s_all));
+            res_cos.emplace_back(builder.CreateLoad(scal_t, c_all));
         }
 
         // Reconstruct the return value as a vector.
         return {scalars_to_vector(builder, res_sin), scalars_to_vector(builder, res_cos)};
-#endif
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        return llvm_real_sincos(s, x);
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of sincos()",
-                                                llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
     }
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if (llvm_is_real(x_t) != 0) {
+        return llvm_real_sincos(s, x);
+    }
+
+#endif
+
+    return {llvm_sin(s, x), llvm_cos(s, x)};
 }
 
 // Helper to compute abs(x_v).
