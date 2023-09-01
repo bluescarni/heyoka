@@ -1663,69 +1663,6 @@ void llvm_switch_u32(llvm_state &s, llvm::Value *val, const std::function<void()
     builder.SetInsertPoint(merge_bb);
 }
 
-// Helper to invoke an external scalar function with arguments
-// which may be vectors.
-// The call will be decomposed into a sequence of calls with scalar arguments,
-// and the return values will be re-assembled as a vector.
-// If the arguments are vectors, they must all have the same size.
-// NOTE: there are some assumptions about valid function attributes
-// in this implementation, need to keep these into account when using
-// this helper.
-llvm::Value *call_extern_vec(llvm_state &s, const std::vector<llvm::Value *> &args, const std::string &fname)
-{
-    // LCOV_EXCL_START
-    assert(!args.empty());
-    // Make sure all vector arguments are of the same type.
-    assert(std::all_of(args.begin() + 1, args.end(),
-                       [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
-    // LCOV_EXCL_STOP
-
-    auto &builder = s.builder();
-
-    // Decompose each argument into a vector of scalars.
-    std::vector<std::vector<llvm::Value *>> scalars;
-    scalars.reserve(args.size());
-    for (const auto &arg : args) {
-        scalars.push_back(vector_to_scalars(builder, arg));
-    }
-
-    // Fetch the vector size.
-    const auto vec_size = scalars[0].size();
-
-    // Fetch the type of the scalar arguments.
-    auto *const scal_t = scalars[0][0]->getType();
-
-    // LCOV_EXCL_START
-    // Make sure the vector size is the same for all arguments.
-    assert(std::all_of(scalars.begin() + 1, scalars.end(),
-                       [vec_size](const auto &arg) { return arg.size() == vec_size; }));
-    // LCOV_EXCL_STOP
-
-    // Invoke the function on each set of scalars.
-    std::vector<llvm::Value *> retvals, scal_args;
-    for (decltype(scalars[0].size()) i = 0; i < vec_size; ++i) {
-        // Setup the vector of scalar arguments.
-        scal_args.clear();
-        for (const auto &scal_set : scalars) {
-            scal_args.push_back(scal_set[i]);
-        }
-
-        // Invoke the function and store the scalar result.
-        retvals.push_back(
-            llvm_invoke_external(s, fname, scal_t, scal_args,
-                                 // NOTE: in theory we may add ReadNone here as well,
-                                 // but for some reason, at least up to LLVM 10,
-                                 // this causes strange codegen issues. Revisit
-                                 // in the future.
-                                 llvm::AttributeList::get(s.context(), llvm::AttributeList::FunctionIndex,
-                                                          {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable,
-                                                           llvm::Attribute::WillReturn})));
-    }
-
-    // Build a vector with the results.
-    return scalars_to_vector(builder, retvals);
-}
-
 // Create an LLVM for loop in the form:
 //
 // while (cond()) {
@@ -2180,34 +2117,14 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
 // Helper to compute abs(x_v).
 llvm::Value *llvm_abs(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    // Determine the scalar type of x.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t->isFloatingPointTy()) {
+    return llvm_math_intr(s, "llvm.fabs",
 #if defined(HEYOKA_HAVE_REAL128)
-        if (x_t == to_llvm_type<mppp::real128>(s.context(), false)) {
-            return call_extern_vec(s, {x}, "fabsq");
-        } else {
-#endif
-            return llvm_invoke_intrinsic(s.builder(), "llvm.fabs", {x->getType()}, {x});
-#if defined(HEYOKA_HAVE_REAL128)
-        }
+                          "fabsq",
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_abs", 1u);
-
-        return s.builder().CreateCall(f, {x});
+                          "mpfr_abs",
 #endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Unable to abs values of type '{}'", llvm_type_name(x->getType())));
-        // LCOV_EXCL_STOP
-    }
+                          x);
 }
 
 // Minimum value, floating-point arguments. Implemented as std::min():
@@ -2283,16 +2200,20 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
 
         // Compute and return the result.
         return builder.CreateSub(icmp0, icmp1);
-#if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(val->getType()) != 0) {
-        return llvm_real_sgn(s, val);
-#endif
-    } else {
-        // LCOV_EXCL_START
-        throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of sgn()",
-                                                llvm_type_name(val->getType())));
-        // LCOV_EXCL_STOP
     }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if (llvm_is_real(val->getType()) != 0) {
+        return llvm_real_sgn(s, val);
+    }
+
+#endif
+
+    // LCOV_EXCL_START
+    throw std::invalid_argument(fmt::format("Invalid type '{}' encountered in the LLVM implementation of sgn()",
+                                            llvm_type_name(val->getType())));
+    // LCOV_EXCL_STOP
 }
 
 // Two-argument arctan.
@@ -2317,69 +2238,27 @@ llvm::Value *llvm_exp(llvm_state &s, llvm::Value *x)
 // Fused multiply-add.
 llvm::Value *llvm_fma(llvm_state &s, llvm::Value *x, llvm::Value *y, llvm::Value *z)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    assert(y != nullptr);
-    assert(z != nullptr);
-    assert(x->getType() == y->getType());
-    assert(x->getType() == z->getType());
-    // LCOV_EXCL_STOP
-
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t->isFloatingPointTy()) {
+    return llvm_math_intr(s, "llvm.fma",
 #if defined(HEYOKA_HAVE_REAL128)
-        if (x_t == to_llvm_type<mppp::real128>(s.context(), false)) {
-            return call_extern_vec(s, {x, y, z}, "fmaq");
-        } else {
-#endif
-            return llvm_invoke_intrinsic(s.builder(), "llvm.fma", {x->getType()}, {x, y, z});
-#if defined(HEYOKA_HAVE_REAL128)
-        }
+                          "fmaq",
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_fma", 3u);
-        return s.builder().CreateCall(f, {x, y, z});
+                          "mpfr_fma",
 #endif
-        // LCOV_EXCL_START
-    } else {
-        throw std::invalid_argument(fmt::format("Unable to fma values of type '{}'", llvm_type_name(x->getType())));
-    }
-    // LCOV_EXCL_STOP
+                          x, y, z);
 }
 
 // Floor.
 llvm::Value *llvm_floor(llvm_state &s, llvm::Value *x)
 {
-    // LCOV_EXCL_START
-    assert(x != nullptr);
-    // LCOV_EXCL_STOP
-
-    // Determine the scalar type of x.
-    auto *x_t = x->getType()->getScalarType();
-
-    if (x_t->isFloatingPointTy()) {
+    return llvm_math_intr(s, "llvm.floor",
 #if defined(HEYOKA_HAVE_REAL128)
-        if (x_t == to_llvm_type<mppp::real128>(s.context(), false)) {
-            return call_extern_vec(s, {x}, "floorq");
-        } else {
-#endif
-            return llvm_invoke_intrinsic(s.builder(), "llvm.floor", {x->getType()}, {x});
-#if defined(HEYOKA_HAVE_REAL128)
-        }
+                          "floorq",
 #endif
 #if defined(HEYOKA_HAVE_REAL)
-    } else if (llvm_is_real(x->getType()) != 0) {
-        auto *f = real_nary_op(s, x->getType(), "mpfr_floor", 1u);
-
-        return s.builder().CreateCall(f, {x});
+                          "mpfr_floor",
 #endif
-        // LCOV_EXCL_START
-    } else {
-        throw std::invalid_argument(fmt::format("Unable to floor values of type '{}'", llvm_type_name(x->getType())));
-    }
-    // LCOV_EXCL_STOP
+                          x);
 }
 
 // Add a function to count the number of sign changes in the coefficients

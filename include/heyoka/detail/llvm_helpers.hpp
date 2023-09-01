@@ -113,8 +113,6 @@ HEYOKA_DLL_PUBLIC std::string llvm_type_name(llvm::Type *);
 
 HEYOKA_DLL_PUBLIC bool compare_function_signature(llvm::Function *, llvm::Type *, const std::vector<llvm::Type *> &);
 
-HEYOKA_DLL_PUBLIC llvm::Value *call_extern_vec(llvm_state &, const std::vector<llvm::Value *> &, const std::string &);
-
 void llvm_append_block(llvm::Function *, llvm::BasicBlock *);
 
 // Math helpers.
