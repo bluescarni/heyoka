@@ -111,8 +111,6 @@ HEYOKA_DLL_PUBLIC void llvm_switch_u32(llvm_state &, llvm::Value *, const std::f
 
 HEYOKA_DLL_PUBLIC std::string llvm_type_name(llvm::Type *);
 
-HEYOKA_DLL_PUBLIC bool compare_function_signature(llvm::Function *, llvm::Type *, const std::vector<llvm::Type *> &);
-
 void llvm_append_block(llvm::Function *, llvm::BasicBlock *);
 
 // Math helpers.

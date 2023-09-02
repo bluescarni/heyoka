@@ -1460,38 +1460,6 @@ std::string llvm_type_name(llvm::Type *t)
     return std::move(ostr.str());
 }
 
-// This function will return true if:
-//
-// - the return type of f is ret, and
-// - the argument types of f are the same as in 'args'.
-//
-// Otherwise, the function will return false.
-bool compare_function_signature(llvm::Function *f, llvm::Type *ret, const std::vector<llvm::Type *> &args)
-{
-    assert(f != nullptr);
-    assert(ret != nullptr);
-
-    if (ret != f->getReturnType()) {
-        // Mismatched return types.
-        return false;
-    }
-
-    auto *it = f->arg_begin();
-    for (auto *arg_type : args) {
-        if (it == f->arg_end() || it->getType() != arg_type) {
-            // f has fewer arguments than args, or the current
-            // arguments' types do not match.
-            return false;
-        }
-        ++it;
-    }
-
-    // In order for the signatures to match,
-    // we must be at the end of f's arguments list
-    // (otherwise f has more arguments than args).
-    return it == f->arg_end();
-}
-
 // Create an LLVM if statement in the form:
 // if (cond) {
 //   then_f();
@@ -2418,14 +2386,6 @@ llvm::Function *llvm_add_csc(llvm_state &s, llvm::Type *scal_t, std::uint32_t n,
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
-    } else {
-        // LCOV_EXCL_START
-        // The function was created before. Check if the signatures match.
-        if (!compare_function_signature(f, builder.getVoidTy(), fargs)) {
-            throw std::invalid_argument(
-                "Inconsistent function signature for the sign changes counter function detected");
-        }
-        // LCOV_EXCL_STOP
     }
 
     return f;
@@ -3098,11 +3058,6 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
-    } else {
-        // The function was created before. Check if the signatures match.
-        if (!compare_function_signature(f, tp, fargs)) {
-            throw std::invalid_argument("Inconsistent function signature for the inverse Kepler equation detected");
-        }
     }
 
     return f;
