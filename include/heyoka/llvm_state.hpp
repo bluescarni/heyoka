@@ -215,6 +215,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
     HEYOKA_DLL_LOCAL void ctor_setup_math_flags();
 
     // Low-level implementation details for compilation.
+    HEYOKA_DLL_LOCAL void optimise();
     HEYOKA_DLL_LOCAL void compile_impl();
     HEYOKA_DLL_LOCAL void add_obj_trigger();
 
@@ -261,8 +262,6 @@ public:
 
     void verify_function(const std::string &);
     void verify_function(llvm::Function *);
-
-    void optimise();
 
     [[nodiscard]] bool is_compiled() const;
 
