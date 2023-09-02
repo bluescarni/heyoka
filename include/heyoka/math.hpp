@@ -33,6 +33,5 @@
 #include <heyoka/math/tan.hpp>
 #include <heyoka/math/tanh.hpp>
 #include <heyoka/math/time.hpp>
-#include <heyoka/math/tpoly.hpp>
 
 #endif

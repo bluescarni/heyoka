@@ -278,17 +278,6 @@ llvm::Function *taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, con
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
-    } else {
-        // LCOV_EXCL_START
-        // The function was created before. Check if the signatures match.
-        // NOTE: there could be a mismatch if the derivative function was created
-        // and then optimised - optimisation might remove arguments which are compile-time
-        // constants.
-        if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument(
-                "Inconsistent function signature for the Taylor derivative of division in compact mode detected");
-        }
-        // LCOV_EXCL_STOP
     }
 
     return f;
@@ -383,17 +372,6 @@ llvm::Function *taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, con
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
-    } else {
-        // LCOV_EXCL_START
-        // The function was created before. Check if the signatures match.
-        // NOTE: there could be a mismatch if the derivative function was created
-        // and then optimised - optimisation might remove arguments which are compile-time
-        // constants.
-        if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument(
-                "Inconsistent function signature for the Taylor derivative of division in compact mode detected");
-        }
-        // LCOV_EXCL_STOP
     }
 
     return f;
@@ -463,17 +441,6 @@ llvm::Function *taylor_c_diff_func_div_impl(llvm_state &s, llvm::Type *fp_t, con
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
-    } else {
-        // LCOV_EXCL_START
-        // The function was created before. Check if the signatures match.
-        // NOTE: there could be a mismatch if the derivative function was created
-        // and then optimised - optimisation might remove arguments which are compile-time
-        // constants.
-        if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument(
-                "Inconsistent function signature for the Taylor derivative of division in compact mode detected");
-        }
-        // LCOV_EXCL_STOP
     }
 
     return f;

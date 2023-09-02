@@ -801,18 +801,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, llvm::Type *fp_t, 
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
-        // LCOV_EXCL_START
-    } else {
-        // The function was created before. Check if the signatures match.
-        // NOTE: there could be a mismatch if the derivative function was created
-        // and then optimised - optimisation might remove arguments which are compile-time
-        // constants.
-        if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of square() "
-                                        "in compact mode detected");
-        }
     }
-    // LCOV_EXCL_STOP
 
     return f;
 }
@@ -928,18 +917,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, llvm::Type *fp_t, co
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
-        // LCOV_EXCL_START
-    } else {
-        // The function was created before. Check if the signatures match.
-        // NOTE: there could be a mismatch if the derivative function was created
-        // and then optimised - optimisation might remove arguments which are compile-time
-        // constants.
-        if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of the square root "
-                                        "in compact mode detected");
-        }
     }
-    // LCOV_EXCL_STOP
 
     return f;
 }
@@ -1060,18 +1038,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, llvm::Type *fp_t, con
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
-        // LCOV_EXCL_START
-    } else {
-        // The function was created before. Check if the signatures match.
-        // NOTE: there could be a mismatch if the derivative function was created
-        // and then optimised - optimisation might remove arguments which are compile-time
-        // constants.
-        if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument(
-                "Inconsistent function signatures for the Taylor derivative of pow() in compact mode detected");
-        }
     }
-    // LCOV_EXCL_STOP
 
     return f;
 }
