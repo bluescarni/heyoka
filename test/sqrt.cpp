@@ -209,7 +209,7 @@ TEST_CASE("cfunc_mp")
 // Test to check vectorisation.
 TEST_CASE("slp vect")
 {
-    llvm_state s;
+    llvm_state s{kw::slp_vectorize = true};
 
     auto [a, b] = make_vars("a", "b");
 

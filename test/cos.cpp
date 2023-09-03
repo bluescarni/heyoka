@@ -246,7 +246,7 @@ TEST_CASE("normalise")
 // Test to check vectorisation via the vector-function-abi-variant machinery.
 TEST_CASE("vfabi")
 {
-    llvm_state s;
+    llvm_state s{kw::slp_vectorize = true};
 
     auto [a, b] = make_vars("a", "b");
 

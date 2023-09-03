@@ -569,9 +569,9 @@ auto llvm_state_bc_to_module(const std::string &module_name, const std::string &
 
 } // namespace detail
 
-llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool> &&tup)
+llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup)
     : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_fast_math(std::get<2>(tup)),
-      m_force_avx512(std::get<3>(tup)), m_module_name(std::move(std::get<0>(tup)))
+      m_force_avx512(std::get<3>(tup)), m_slp_vectorize(std::get<4>(tup)), m_module_name(std::move(std::get<0>(tup)))
 {
     // Create the module.
     m_module = std::make_unique<llvm::Module>(m_module_name, context());
@@ -595,7 +595,7 @@ llvm_state::llvm_state(const llvm_state &other)
     // - creating a new jit,
     // - copying over the options from other.
     : m_jitter(std::make_unique<jit>()), m_opt_level(other.m_opt_level), m_fast_math(other.m_fast_math),
-      m_force_avx512(other.m_force_avx512), m_module_name(other.m_module_name)
+      m_force_avx512(other.m_force_avx512), m_slp_vectorize(other.m_slp_vectorize), m_module_name(other.m_module_name)
 {
     if (other.is_compiled()) {
         // 'other' was compiled.
@@ -652,6 +652,7 @@ llvm_state &llvm_state::operator=(llvm_state &&other) noexcept
         m_bc_snapshot = std::move(other.m_bc_snapshot);
         m_fast_math = other.m_fast_math;
         m_force_avx512 = other.m_force_avx512;
+        m_slp_vectorize = other.m_slp_vectorize;
         m_module_name = std::move(other.m_module_name);
     }
 
@@ -687,6 +688,7 @@ void llvm_state::save_impl(Archive &ar, unsigned) const
     ar << m_opt_level;
     ar << m_fast_math;
     ar << m_force_avx512;
+    ar << m_slp_vectorize;
     ar << m_module_name;
 
     // Store the bitcode.
@@ -758,6 +760,10 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
     ar >> force_avx512;
 
     // NOLINTNEXTLINE(misc-const-correctness)
+    bool slp_vectorize{};
+    ar >> slp_vectorize;
+
+    // NOLINTNEXTLINE(misc-const-correctness)
     std::string module_name;
     ar >> module_name;
 
@@ -783,6 +789,7 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
         m_opt_level = opt_level;
         m_fast_math = fast_math;
         m_force_avx512 = force_avx512;
+        m_slp_vectorize = slp_vectorize;
         m_module_name = module_name;
 
         // Reset module and builder to the def-cted state.
@@ -887,6 +894,16 @@ bool llvm_state::fast_math() const
 bool llvm_state::force_avx512() const
 {
     return m_force_avx512;
+}
+
+bool llvm_state::get_slp_vectorize() const
+{
+    return m_slp_vectorize;
+}
+
+void llvm_state::set_slp_vectorize(bool flag)
+{
+    m_slp_vectorize = flag;
 }
 
 unsigned llvm_state::clamp_opt_level(unsigned opt_level)
@@ -1038,7 +1055,7 @@ void llvm_state::optimise()
 
     // Create the new pass manager builder, passing
     // the native target machine from the JIT class.
-    // NOTE: we turn manually on the SLP vectoriser here, which is off
+    // NOTE: if requested, we turn manually on the SLP vectoriser here, which is off
     // by default. Not sure why it is off, the LLVM docs imply this
     // is on by default at nonzero optimisation levels for clang and opt.
     // NOTE: the reason for this inconsistency is that opt uses PB.parsePassPipeline()
@@ -1050,7 +1067,7 @@ void llvm_state::optimise()
     // switching to this alternative way of setting up the optimisation pipeline
     // in the future.
     llvm::PipelineTuningOptions pto;
-    pto.SLPVectorization = true;
+    pto.SLPVectorization = m_slp_vectorize;
     llvm::PassBuilder PB(m_jitter->m_tm.get(), pto);
 
     // Register all the basic analyses with the managers.
@@ -1108,10 +1125,10 @@ void llvm_state::optimise()
     pm_builder.OptLevel = m_opt_level;
     // Enable function inlining.
     pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
-    // NOTE: we turn manually on the SLP vectoriser here, which is off
+    // NOTE: if requested, we turn manually on the SLP vectoriser here, which is off
     // by default. Not sure why it is off, the LLVM docs imply this
     // is on by default at nonzero optimisation levels for clang and opt.
-    pm_builder.SLPVectorize = true;
+    pm_builder.SLPVectorize = m_slp_vectorize;
 
     m_jitter->m_tm->adjustPassManager(pm_builder);
 
@@ -1217,10 +1234,11 @@ void llvm_state::compile()
         // Fetch the bitcode *before* optimisation.
         auto orig_bc = get_bc();
 
-        // Combine m_opt_level and m_force_avx512 into a single value,
-        // as they both affect codegen.
+        // Combine m_opt_level, m_force_avx512 and m_slp_vectorize into a single value,
+        // as they all affect codegen.
         assert(m_opt_level <= 3u);
-        const auto olevel = m_opt_level + (static_cast<unsigned>(m_force_avx512) << 2);
+        const auto olevel = m_opt_level + (static_cast<unsigned>(m_force_avx512) << 2)
+                            + (static_cast<unsigned>(m_slp_vectorize) << 3);
 
         if (auto cached_data = detail::llvm_state_mem_cache_lookup(orig_bc, olevel)) {
             // Cache hit.
@@ -1361,7 +1379,7 @@ const std::string &llvm_state::module_name() const
 llvm_state llvm_state::make_similar() const
 {
     return llvm_state(kw::mname = m_module_name, kw::opt_level = m_opt_level, kw::fast_math = m_fast_math,
-                      kw::force_avx512 = m_force_avx512);
+                      kw::force_avx512 = m_force_avx512, kw::slp_vectorize = m_slp_vectorize);
 }
 
 std::ostream &operator<<(std::ostream &os, const llvm_state &s)
@@ -1373,6 +1391,7 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
     oss << "Compiled          : " << s.is_compiled() << '\n';
     oss << "Fast math         : " << s.m_fast_math << '\n';
     oss << "Force AVX512      : " << s.m_force_avx512 << '\n';
+    oss << "SLP vectorization : " << s.m_slp_vectorize << '\n';
     oss << "Optimisation level: " << s.m_opt_level << '\n';
     oss << "Data layout       : " << s.m_jitter->m_lljit->getDataLayout().getStringRepresentation() << '\n';
     oss << "Target triple     : " << s.m_jitter->get_target_triple().str() << '\n';

@@ -231,7 +231,7 @@ TEST_CASE("normalise")
 // Test to check vectorisation via the vector-function-abi-variant machinery.
 TEST_CASE("vfabi")
 {
-    llvm_state s;
+    llvm_state s{kw::slp_vectorize = true};
 
     auto [a, b] = make_vars("a", "b");
 
@@ -293,7 +293,7 @@ TEST_CASE("vfabi")
     // Some more extensive testing specific to x86, only for this function.
     auto [c, d, e] = make_vars("c", "d", "e");
 
-    llvm_state s2;
+    llvm_state s2{kw::slp_vectorize = true};
 
     add_cfunc<double>(s2, "cfunc1", {sin(a), sin(b), sin(c), sin(d)});
     add_cfunc<double>(s2, "cfunc2", {sin(a), sin(b), sin(c), sin(d), sin(e)});
@@ -346,7 +346,7 @@ TEST_CASE("vfabi")
 
     // Check that the autovec works also on batch sizes which do not correspond
     // exactly to an available vector width.
-    llvm_state s3;
+    llvm_state s3{kw::slp_vectorize = true};
 
     add_cfunc<double>(s3, "cfunc", {sin(a)}, kw::batch_size = 3u);
 
