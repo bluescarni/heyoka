@@ -50,7 +50,7 @@ TEST_CASE("function inlining")
 // the timestep size in an integrator.
 TEST_CASE("pow vect")
 {
-    auto ta = taylor_adaptive<double>{model::pendulum(), std::vector<double>(2u, 0.)};
+    auto ta = taylor_adaptive<double>{model::pendulum(), std::vector<double>(2u, 0.), kw::slp_vectorize = true};
 
 #if defined(HEYOKA_WITH_SLEEF)
 

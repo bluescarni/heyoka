@@ -85,6 +85,7 @@ IGOR_MAKE_NAMED_ARGUMENT(fast_math);
 // can get rid of this in the future when AVX512 implementations improve
 // and LLVM learns to discriminate good and bad implementations.
 IGOR_MAKE_NAMED_ARGUMENT(force_avx512);
+IGOR_MAKE_NAMED_ARGUMENT(slp_vectorize);
 
 } // namespace kw
 
@@ -134,6 +135,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::string m_bc_snapshot;
     bool m_fast_math;
     bool m_force_avx512;
+    bool m_slp_vectorize;
     std::string m_module_name;
 
     // Serialization.
@@ -205,10 +207,19 @@ class HEYOKA_DLL_PUBLIC llvm_state
                 }
             }();
 
-            return std::tuple{std::move(mod_name), opt_level, fmath, force_avx512};
+            // Enable SLP vectorization (defaults to false).
+            auto slp_vectorize = [&p]() -> bool {
+                if constexpr (p.has(kw::slp_vectorize)) {
+                    return std::forward<decltype(p(kw::slp_vectorize))>(p(kw::slp_vectorize));
+                } else {
+                    return false;
+                }
+            }();
+
+            return std::tuple{std::move(mod_name), opt_level, fmath, force_avx512, slp_vectorize};
         }
     }
-    explicit llvm_state(std::tuple<std::string, unsigned, bool, bool> &&);
+    explicit llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&);
 
     // Small shared helper to setup the math flags in the builder at the
     // end of a constructor.
@@ -254,6 +265,8 @@ public:
     [[nodiscard]] bool force_avx512() const;
     [[nodiscard]] unsigned get_opt_level() const;
     void set_opt_level(unsigned);
+    [[nodiscard]] bool get_slp_vectorize() const;
+    void set_slp_vectorize(bool);
 
     [[nodiscard]] std::string get_ir() const;
     [[nodiscard]] std::string get_bc() const;
@@ -298,7 +311,7 @@ HEYOKA_END_NAMESPACE
 // - version 1: got rid of the inline_functions setting;
 // - version 2: added the force_avx512 setting;
 // - version 3: added the bitcode snapshot, simplified
-//   compilation logic.
+//   compilation logic, slp_vectorize flag.
 BOOST_CLASS_VERSION(heyoka::llvm_state, 3)
 
 #endif

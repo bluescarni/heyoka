@@ -121,3 +121,22 @@ TEST_CASE("force_avx512 test")
     ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11, kw::force_avx512 = true};
     REQUIRE(llvm_state::get_memcache_size() > size11);
 }
+
+// Same test for the slp_vectorize option.
+TEST_CASE("slp_vectorize test")
+{
+    llvm_state::clear_memcache();
+    llvm_state::set_memcache_limit(2048ull * 1024u * 1024u);
+
+    auto ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11};
+    const auto size11 = llvm_state::get_memcache_size();
+
+    ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11, kw::slp_vectorize = true};
+    REQUIRE(llvm_state::get_memcache_size() > size11);
+
+    const auto new_size = llvm_state::get_memcache_size();
+
+    ta = taylor_adaptive<double>{
+        model::pendulum(), {1., 0.}, kw::tol = 1e-11, kw::slp_vectorize = true, kw::force_avx512 = true};
+    REQUIRE(llvm_state::get_memcache_size() > new_size);
+}

@@ -78,6 +78,7 @@ TEST_CASE("empty state")
     REQUIRE(!s.get_bc().empty());
     REQUIRE(!s.get_ir().empty());
     REQUIRE(s.get_opt_level() == 3u);
+    REQUIRE(!s.get_slp_vectorize());
 
     // Print also some info on the FP types.
     std::cout << "Double digits     : " << std::numeric_limits<double>::digits << '\n';
@@ -114,6 +115,7 @@ TEST_CASE("copy semantics")
         REQUIRE(s.get_opt_level() == 2u);
         REQUIRE(s.fast_math());
         REQUIRE(!s.is_compiled());
+        REQUIRE(!s.get_slp_vectorize());
 
         const auto orig_ir = s.get_ir();
         const auto orig_bc = s.get_bc();
@@ -124,6 +126,7 @@ TEST_CASE("copy semantics")
         REQUIRE(s2.get_opt_level() == 2u);
         REQUIRE(s2.fast_math());
         REQUIRE(!s2.is_compiled());
+        REQUIRE(!s2.get_slp_vectorize());
 
         REQUIRE(s2.get_ir() == orig_ir);
         REQUIRE(s2.get_bc() == orig_bc);
@@ -144,11 +147,13 @@ TEST_CASE("copy semantics")
     {
         std::vector<double> jet{2, 3, 0, 0};
 
-        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
+        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::slp_vectorize = true};
 
         taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
 
         s.compile();
+
+        REQUIRE(s.get_slp_vectorize());
 
         auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("jet"));
 
@@ -161,6 +166,7 @@ TEST_CASE("copy semantics")
         REQUIRE(s2.get_opt_level() == 2u);
         REQUIRE(s2.fast_math());
         REQUIRE(s2.is_compiled());
+        REQUIRE(s2.get_slp_vectorize());
 
         REQUIRE(s2.get_ir() == orig_ir);
         REQUIRE(s2.get_bc() == orig_bc);
@@ -216,7 +222,8 @@ TEST_CASE("s11n")
             oa << s;
         }
 
-        s = llvm_state{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::force_avx512 = true};
+        s = llvm_state{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::force_avx512 = true,
+                       kw::slp_vectorize = true};
 
         {
             boost::archive::binary_iarchive ia(ss);
@@ -231,13 +238,14 @@ TEST_CASE("s11n")
         REQUIRE(s.get_opt_level() == 3u);
         REQUIRE(s.fast_math() == false);
         REQUIRE(s.force_avx512() == false);
+        REQUIRE(!s.get_slp_vectorize());
     }
 
     // Compiled state.
     {
         std::stringstream ss;
 
-        llvm_state s{kw::mname = "foo"};
+        llvm_state s{kw::mname = "foo", kw::slp_vectorize = true};
 
         taylor_add_jet<double>(s, "jet", {-1_dbl, x + y}, 1, 1, true, false);
 
@@ -266,6 +274,7 @@ TEST_CASE("s11n")
         REQUIRE(s.module_name() == "foo");
         REQUIRE(s.get_opt_level() == 3u);
         REQUIRE(s.fast_math() == false);
+        REQUIRE(s.get_slp_vectorize());
 
         auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("jet"));
 
@@ -285,7 +294,8 @@ TEST_CASE("make_similar")
 {
     auto [x, y] = make_vars("x", "y");
 
-    llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::force_avx512 = true};
+    llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::force_avx512 = true,
+                 kw::slp_vectorize = true};
     taylor_add_jet<double>(s, "jet", {-1_dbl, x + y}, 1, 1, true, false);
 
     s.compile();
@@ -295,6 +305,7 @@ TEST_CASE("make_similar")
     REQUIRE(s.fast_math());
     REQUIRE(s.is_compiled());
     REQUIRE(s.force_avx512());
+    REQUIRE(s.get_slp_vectorize());
 
     auto s2 = s.make_similar();
 
@@ -304,6 +315,7 @@ TEST_CASE("make_similar")
     REQUIRE(s2.force_avx512());
     REQUIRE(!s2.is_compiled());
     REQUIRE(s.get_ir() != s2.get_ir());
+    REQUIRE(s2.get_slp_vectorize());
 }
 
 TEST_CASE("force_avx512")
@@ -344,6 +356,53 @@ TEST_CASE("force_avx512")
         llvm_state s5;
         s5 = std::move(s4);
         REQUIRE(s5.force_avx512());
+    }
+}
+
+TEST_CASE("slp_vectorize")
+{
+    {
+        llvm_state s;
+        REQUIRE(!s.get_slp_vectorize());
+
+        llvm_state s2(s);
+        REQUIRE(!s2.get_slp_vectorize());
+
+        llvm_state s3(std::move(s2));
+        REQUIRE(!s3.get_slp_vectorize());
+
+        llvm_state s4;
+        s4 = s3;
+        REQUIRE(!s4.get_slp_vectorize());
+
+        llvm_state s5;
+        s5 = std::move(s4);
+        REQUIRE(!s5.get_slp_vectorize());
+
+        s5.set_slp_vectorize(true);
+        REQUIRE(s5.get_slp_vectorize());
+    }
+
+    {
+        llvm_state s{kw::slp_vectorize = true};
+        REQUIRE(s.get_slp_vectorize());
+
+        llvm_state s2(s);
+        REQUIRE(s2.get_slp_vectorize());
+
+        llvm_state s3(std::move(s2));
+        REQUIRE(s3.get_slp_vectorize());
+
+        llvm_state s4;
+        s4 = s3;
+        REQUIRE(s4.get_slp_vectorize());
+
+        llvm_state s5;
+        s5 = std::move(s4);
+        REQUIRE(s5.get_slp_vectorize());
+
+        s5.set_slp_vectorize(false);
+        REQUIRE(!s5.get_slp_vectorize());
     }
 }
 
