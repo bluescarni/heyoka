@@ -24,9 +24,10 @@ Changes
 - **BREAKING**: the minimum supported LLVM version is now 11
   (`#342 <https://github.com/bluescarni/heyoka/pull/342>`__).
   This is a :ref:`breaking change <bchanges_2_0_0>`.
-- The LLVM SLP vectorizer is now enabled when JIT compiling
-  with optimisations
+- The LLVM SLP vectorizer can now be enabled
   (`#341 <https://github.com/bluescarni/heyoka/pull/341>`__).
+  This feature is opt-in due to the fact that enabling it
+  can considerably increase JIT compilation times.
 - The optimisation level for an ``llvm_state`` is now clamped
   within the ``[0, 3]`` range
   (`#340 <https://github.com/bluescarni/heyoka/pull/340>`__).
