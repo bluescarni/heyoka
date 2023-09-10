@@ -28,6 +28,7 @@ IGOR_MAKE_NAMED_ARGUMENT(compact_mode);
 IGOR_MAKE_NAMED_ARGUMENT(high_accuracy);
 IGOR_MAKE_NAMED_ARGUMENT(parallel_mode);
 IGOR_MAKE_NAMED_ARGUMENT(prec);
+IGOR_MAKE_NAMED_ARGUMENT(mu);
 
 } // namespace kw
 
