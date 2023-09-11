@@ -9,6 +9,7 @@
 #ifndef HEYOKA_MODELS_HPP
 #define HEYOKA_MODELS_HPP
 
+#include <heyoka/model/cr3bp.hpp>
 #include <heyoka/model/fixed_centres.hpp>
 #include <heyoka/model/mascon.hpp>
 #include <heyoka/model/nbody.hpp>

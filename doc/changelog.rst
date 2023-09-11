@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add model for the circular restricted three-body problem
+  (`#345 <https://github.com/bluescarni/heyoka/pull/345>`__).
 - heyoka can now automatically vectorise scalar calls to
   floating-point math functions
   (`#342 <https://github.com/bluescarni/heyoka/pull/342>`__).
