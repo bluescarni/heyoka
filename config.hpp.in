@@ -31,6 +31,12 @@
 
 #endif
 
+#if !defined(MPPP_WITH_FMT)
+
+#error mp++ must be configured with support for the fmt library.
+
+#endif
+
 #if defined(MPPP_WITH_QUADMATH)
 
 #define HEYOKA_HAVE_REAL128
