@@ -503,9 +503,15 @@ document.write(`
 <section id="new">
 <h3>New<a class="headerlink" href="#new" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>Add model for the circular restricted three-body problem
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/345">#345</a>).</p></li>
 <li><p>heyoka can now automatically vectorise scalar calls to
 floating-point math functions
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/342">#342</a>).</p></li>
+<li><p>The LLVM SLP vectorizer can now be enabled
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/341">#341</a>).
+This feature is opt-in due to the fact that enabling it
+can considerably increase JIT compilation times.</p></li>
 <li><p>Implement an in-memory cache for <code class="docutils literal notranslate"><span class="pre">llvm_state</span></code>. The cache is used
 to avoid re-optimising and re-compiling LLVM code which has
 already been optimised and compiled during the program execution
@@ -521,10 +527,6 @@ an <code class="docutils literal notranslate"><span class="pre">llvm_state</span
 <li><p><strong>BREAKING</strong>: the minimum supported LLVM version is now 11
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/342">#342</a>).
 This is a <a class="reference internal" href="breaking_changes.html#bchanges-2-0-0"><span class="std std-ref">breaking change</span></a>.</p></li>
-<li><p>The LLVM SLP vectorizer can now be enabled
-(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/341">#341</a>).
-This feature is opt-in due to the fact that enabling it
-can considerably increase JIT compilation times.</p></li>
 <li><p>The optimisation level for an <code class="docutils literal notranslate"><span class="pre">llvm_state</span></code> is now clamped
 within the <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">3]</span></code> range
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/340">#340</a>).</p></li>

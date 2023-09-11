@@ -7,9 +7,15 @@ Changelog
 New
 ~~~
 
+- Add model for the circular restricted three-body problem
+  (`#345 <https://github.com/bluescarni/heyoka/pull/345>`__).
 - heyoka can now automatically vectorise scalar calls to
   floating-point math functions
   (`#342 <https://github.com/bluescarni/heyoka/pull/342>`__).
+- The LLVM SLP vectorizer can now be enabled
+  (`#341 <https://github.com/bluescarni/heyoka/pull/341>`__).
+  This feature is opt-in due to the fact that enabling it
+  can considerably increase JIT compilation times.
 - Implement an in-memory cache for ``llvm_state``. The cache is used
   to avoid re-optimising and re-compiling LLVM code which has
   already been optimised and compiled during the program execution
@@ -24,10 +30,6 @@ Changes
 - **BREAKING**: the minimum supported LLVM version is now 11
   (`#342 <https://github.com/bluescarni/heyoka/pull/342>`__).
   This is a :ref:`breaking change <bchanges_2_0_0>`.
-- The LLVM SLP vectorizer can now be enabled
-  (`#341 <https://github.com/bluescarni/heyoka/pull/341>`__).
-  This feature is opt-in due to the fact that enabling it
-  can considerably increase JIT compilation times.
 - The optimisation level for an ``llvm_state`` is now clamped
   within the ``[0, 3]`` range
   (`#340 <https://github.com/bluescarni/heyoka/pull/340>`__).
