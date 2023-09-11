@@ -259,6 +259,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/rotating.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/mascon.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/vsop2013.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/cr3bp.cpp"
     # Math functions.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cos.cpp"
@@ -488,6 +489,11 @@ if(HEYOKA_WITH_MPPP)
     # NOTE: this is necessary for the serialisation of several classes.
     if(NOT mp++_WITH_BOOST_S11N)
         message(FATAL_ERROR "mp++ must be installed with support for Boost.serialization.")
+    endif()
+
+    # NOTE: needed for formatting numbers.
+    if(NOT mp++_WITH_FMT)
+        message(FATAL_ERROR "mp++ must be installed with support for fmt.")
     endif()
 
     target_link_libraries(heyoka PUBLIC mp++::mp++)

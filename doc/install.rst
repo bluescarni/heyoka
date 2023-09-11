@@ -37,7 +37,8 @@ Additionally, heyoka has the following **optional** dependencies:
   which provides support for arbitrary-precision integrations on all platforms,
   and for quadruple-precision integrations on platforms
   supporting the non-standard ``__float128`` type. heyoka requires
-  an mp++ installation with support for Boost.serialization
+  an mp++ installation with support for Boost.serialization and for the
+  {fmt} library
   (see the :ref:`mp++ installation instructions <mppp:installation>`).
   The minimum required version of mp++ is 0.27;
 * the `SLEEF <https://sleef.org/>`__ vectorized math library (improves the performance

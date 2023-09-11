@@ -54,7 +54,6 @@ inline constexpr auto cr3bp = [](auto &&...kw_args) -> std::vector<std::pair<exp
     return std::apply(detail::cr3bp_impl, detail::cr3bp_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
 };
 
-// NOTE: this returns a specific energy.
 inline constexpr auto cr3bp_jacobi = [](auto &&...kw_args) -> expression {
     return std::apply(detail::cr3bp_jacobi_impl,
                       detail::cr3bp_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
