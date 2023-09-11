@@ -268,15 +268,6 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     return std::tuple{std::move(dc), order};
 }
 
-// NOTE: in compact mode, care must be taken when adding multiple stepper functions to the same llvm state
-// with the same floating-point type, batch size and number of u variables. The potential issue there
-// is that when the first stepper is added, the compact mode AD functions are created and then optimised.
-// The optimisation pass might alter the functions in a way that makes them incompatible with subsequent
-// uses in the second stepper (e.g., an argument might be removed from the signature because it is a
-// compile-time constant). A workaround to avoid issues is to set the optimisation level to zero
-// in the state, add the 2 steppers and then run a single optimisation pass. This is what we do
-// in the integrators' ctors.
-// NOTE: document this eventually.
 template <typename T, typename U>
 auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &sys, const T &tol,
                               std::uint32_t batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode)
