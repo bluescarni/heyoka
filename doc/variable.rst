@@ -54,7 +54,7 @@ Functions
 
    Swap primitive.
 
-   This function will efficiently swap the names of *a* and *b*.
+   This function will efficiently swap *a* and *b*.
 
    :param a: the first variable.
    :param b: the second variable.
@@ -75,7 +75,7 @@ Functions
 
    Equality comparison operators.
 
-   These comparison operators compare the variables' names.
+   Two variables are considered equal if they have the same name.
 
    :param a: the first variable.
    :param b: the second variable.
