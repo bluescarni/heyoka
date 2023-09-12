@@ -47,7 +47,7 @@ variable &variable::operator=(const variable &) = default;
 
 variable &variable::operator=(variable &&) noexcept = default;
 
-const std::string &variable::name() const
+const std::string &variable::name() const noexcept
 {
     return m_name;
 }
@@ -67,12 +67,12 @@ std::ostream &operator<<(std::ostream &os, const variable &var)
     return os << var.name();
 }
 
-bool operator==(const variable &v1, const variable &v2)
+bool operator==(const variable &v1, const variable &v2) noexcept
 {
     return v1.name() == v2.name();
 }
 
-bool operator!=(const variable &v1, const variable &v2)
+bool operator!=(const variable &v1, const variable &v2) noexcept
 {
     return !(v1 == v2);
 }

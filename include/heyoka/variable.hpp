@@ -56,15 +56,15 @@ public:
     variable &operator=(const variable &);
     variable &operator=(variable &&) noexcept;
 
-    [[nodiscard]] const std::string &name() const;
+    [[nodiscard]] const std::string &name() const noexcept;
 };
 
 HEYOKA_DLL_PUBLIC std::size_t hash(const variable &);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const variable &);
 
-HEYOKA_DLL_PUBLIC bool operator==(const variable &, const variable &);
-HEYOKA_DLL_PUBLIC bool operator!=(const variable &, const variable &);
+HEYOKA_DLL_PUBLIC bool operator==(const variable &, const variable &) noexcept;
+HEYOKA_DLL_PUBLIC bool operator!=(const variable &, const variable &) noexcept;
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const variable &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);
