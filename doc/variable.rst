@@ -5,7 +5,7 @@ The :cpp:class:`~heyoka::variable` class
 
 *#include <heyoka/variable.hpp>*
 
-.. cpp:namespace:: heyoka
+.. cpp:namespace-push:: heyoka
 
 .. cpp:class:: variable
 
