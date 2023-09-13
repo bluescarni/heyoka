@@ -3,10 +3,10 @@
 Variables
 =========
 
+*#include <heyoka/variable.hpp>*
+
 The :cpp:class:`~heyoka::variable` class
 ----------------------------------------
-
-*#include <heyoka/variable.hpp>*
 
 .. cpp:namespace-push:: heyoka
 
@@ -72,6 +72,9 @@ Functions
    :return: a reference to *os*.
 
    :exception: any exception thrown by the stream operator of ``std::string``.
+
+Operators
+---------
 
 .. cpp:function:: bool operator==(const variable &a, const variable &b) noexcept
 .. cpp:function:: bool operator!=(const variable &a, const variable &b) noexcept
