@@ -1,7 +1,10 @@
 .. _variable:
 
+Variables
+=========
+
 The :cpp:class:`~heyoka::variable` class
-========================================
+----------------------------------------
 
 *#include <heyoka/variable.hpp>*
 
@@ -81,3 +84,19 @@ Functions
    :param b: the second variable.
 
    :return: the result of the comparison.
+
+
+.. cpp:namespace-pop::
+
+Standard library specialisations
+--------------------------------
+
+.. cpp:struct:: template <> std::hash<heyoka::variable>
+
+   Specialisation of ``std::hash`` for :cpp:class:`heyoka::variable`.
+
+   .. cpp:function:: std::size_t operator()(const heyoka::variable &v) const noexcept
+
+      :param v: the input :cpp:class:`heyoka::variable`.
+
+      :return: a hash value for *v*.
