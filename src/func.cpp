@@ -640,7 +640,7 @@ bool operator<(const func &a, const func &b)
         return false;
     }
 
-    // The type indices are equal, check the names next.
+    // Check the names.
     if (a.get_name() < b.get_name()) {
         return true;
     }
