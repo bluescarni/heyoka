@@ -105,6 +105,7 @@ HEYOKA_DLL_PUBLIC bool is_negative_one(const number &);
 HEYOKA_DLL_PUBLIC bool is_negative(const number &);
 HEYOKA_DLL_PUBLIC bool is_integer(const number &);
 
+HEYOKA_DLL_PUBLIC number operator+(number);
 HEYOKA_DLL_PUBLIC number operator-(const number &);
 
 HEYOKA_DLL_PUBLIC number operator+(const number &, const number &);

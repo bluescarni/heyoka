@@ -928,3 +928,34 @@ TEST_CASE("move semantics")
     REQUIRE(x3 == number{3.});
     REQUIRE(x2 == number{0.});
 }
+
+TEST_CASE("basic arith")
+{
+    number n{42.};
+
+    REQUIRE(+n == n);
+    REQUIRE(-n == number{-42.});
+}
+
+TEST_CASE("copy assignment")
+{
+    number n1{42.};
+    number n2{42.f};
+
+    n2 = n1;
+
+    REQUIRE(n2 == number{42.});
+}
+
+TEST_CASE("swap")
+{
+    REQUIRE(std::is_nothrow_swappable_v<number>);
+
+    number n1{42.};
+    number n2{42.f};
+
+    swap(n1, n2);
+
+    REQUIRE(n2 == number{42.});
+    REQUIRE(n1 == number{42.f});
+}
