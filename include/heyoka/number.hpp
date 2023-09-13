@@ -70,12 +70,12 @@ private:
     }
 
 public:
-    number();
-    explicit number(float);
-    explicit number(double);
-    explicit number(long double);
+    number() noexcept;
+    explicit number(float) noexcept;
+    explicit number(double) noexcept;
+    explicit number(long double) noexcept;
 #if defined(HEYOKA_HAVE_REAL128)
-    explicit number(mppp::real128);
+    explicit number(mppp::real128) noexcept;
 #endif
 #if defined(HEYOKA_HAVE_REAL)
     explicit number(mppp::real);
@@ -87,7 +87,7 @@ public:
     number &operator=(const number &);
     number &operator=(number &&) noexcept;
 
-    [[nodiscard]] const value_type &value() const;
+    [[nodiscard]] const value_type &value() const noexcept;
 };
 
 namespace detail
@@ -113,9 +113,9 @@ HEYOKA_DLL_PUBLIC number operator-(const number &, const number &);
 HEYOKA_DLL_PUBLIC number operator*(const number &, const number &);
 HEYOKA_DLL_PUBLIC number operator/(const number &, const number &);
 
-HEYOKA_DLL_PUBLIC bool operator==(const number &, const number &);
-HEYOKA_DLL_PUBLIC bool operator!=(const number &, const number &);
-HEYOKA_DLL_PUBLIC bool operator<(const number &, const number &);
+HEYOKA_DLL_PUBLIC bool operator==(const number &, const number &) noexcept;
+HEYOKA_DLL_PUBLIC bool operator!=(const number &, const number &) noexcept;
+HEYOKA_DLL_PUBLIC bool operator<(const number &, const number &) noexcept;
 
 HEYOKA_DLL_PUBLIC number exp(const number &);
 HEYOKA_DLL_PUBLIC number binomial(const number &, const number &);

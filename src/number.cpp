@@ -72,17 +72,17 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-number::number() : number(0.) {}
+number::number() noexcept : number(0.) {}
 
-number::number(float x) : m_value(x) {}
+number::number(float x) noexcept : m_value(x) {}
 
-number::number(double x) : m_value(x) {}
+number::number(double x) noexcept : m_value(x) {}
 
-number::number(long double x) : m_value(x) {}
+number::number(long double x) noexcept : m_value(x) {}
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-number::number(mppp::real128 x) : m_value(x) {}
+number::number(mppp::real128 x) noexcept : m_value(x) {}
 
 #endif
 
@@ -126,7 +126,7 @@ number &number::operator=(number &&other) noexcept
     return *this;
 }
 
-const number::value_type &number::value() const
+const number::value_type &number::value() const noexcept
 {
     return m_value;
 }
@@ -253,6 +253,11 @@ bool is_integer(const number &n)
         n.value());
 }
 
+number operator+(number n)
+{
+    return n;
+}
+
 number operator-(const number &n)
 {
     return std::visit([](const auto &arg) { return number{-arg}; }, n.value());
@@ -377,7 +382,7 @@ number operator/(const number &n1, const number &n2)
 // verifying decompositions: when the original expression is
 // reconstructed from the subexpressions and we compare, the
 // check would fail due to NaN != NaN.
-bool operator==(const number &n1, const number &n2)
+bool operator==(const number &n1, const number &n2) noexcept
 {
     return std::visit(
         [](const auto &v1, const auto &v2) -> bool {
@@ -396,7 +401,7 @@ bool operator==(const number &n1, const number &n2)
         n1.value(), n2.value());
 }
 
-bool operator!=(const number &n1, const number &n2)
+bool operator!=(const number &n1, const number &n2) noexcept
 {
     return !(n1 == n2);
 }
@@ -405,7 +410,7 @@ bool operator!=(const number &n1, const number &n2)
 // same type in order to be considered equivalent. Also, NaNs are considered
 // greater than any other value, so that they will be placed at the
 // end of a sorted range.
-bool operator<(const number &n1, const number &n2)
+bool operator<(const number &n1, const number &n2) noexcept
 {
     return std::visit(
         [&](const auto &v1, const auto &v2) -> bool {
