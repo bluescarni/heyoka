@@ -142,14 +142,14 @@ namespace detail
 std::size_t hash(const number &n) noexcept
 {
     return std::visit(
-        [](const auto &v) -> std::size_t {
+        [&n](const auto &v) -> std::size_t {
             using std::isnan;
 
             if (isnan(v)) {
-                // NOTE: enforce same hash for all NaN values,
-                // because NaNs are considered equal to each other
+                // NOTE: enforce that all NaN values of a given type
+                // have the same hash, because NaNs are considered equal to each other
                 // by the comparison operator.
-                return std::hash<int>{}(42);
+                return std::hash<std::size_t>{}(n.value().index());
             } else {
                 return std::hash<detail::uncvref_t<decltype(v)>>{}(v);
             }
@@ -712,10 +712,12 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
         // Generate the struct.
         return llvm::ConstantStruct::get(struct_tp, {sign, exp, limb_arr});
 #endif
-    } else {
-        throw std::invalid_argument(
-            fmt::format("Cannot generate an LLVM constant of type '{}'", detail::llvm_type_name(tp)));
     }
+
+    // LCOV_EXCL_START
+    throw std::invalid_argument(
+        fmt::format("Cannot generate an LLVM constant of type '{}'", detail::llvm_type_name(tp)));
+    // LCOV_EXCL_STOP
 }
 
 namespace detail
