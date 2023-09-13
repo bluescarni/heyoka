@@ -450,7 +450,7 @@ std::vector<expression> rename_variables(const std::vector<expression> &v_ex,
 namespace detail
 {
 
-std::size_t hash(funcptr_map<std::size_t> &func_map, const expression &ex)
+std::size_t hash(funcptr_map<std::size_t> &func_map, const expression &ex) noexcept
 {
     return std::visit(
         [&func_map](const auto &v) {
@@ -475,20 +475,20 @@ std::size_t hash(funcptr_map<std::size_t> &func_map, const expression &ex)
 
                 return retval;
             } else {
-                return hash(v);
+                return std::hash<type>{}(v);
             }
         },
         ex.value());
 }
 
-} // namespace detail
-
-std::size_t hash(const expression &ex)
+std::size_t hash(const expression &ex) noexcept
 {
     detail::funcptr_map<std::size_t> func_map;
 
-    return detail::hash(func_map, ex);
+    return hash(func_map, ex);
 }
+
+} // namespace detail
 
 namespace detail
 {

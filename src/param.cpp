@@ -52,10 +52,15 @@ void swap(param &p0, param &p1) noexcept
     std::swap(p0.m_index, p1.m_index);
 }
 
-std::size_t hash(const param &p)
+namespace detail
+{
+
+std::size_t hash(const param &p) noexcept
 {
     return std::hash<std::uint32_t>{}(p.idx());
 }
+
+} // namespace detail
 
 std::ostream &operator<<(std::ostream &os, const param &p)
 {

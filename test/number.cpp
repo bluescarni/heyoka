@@ -96,7 +96,7 @@ TEST_CASE("number lt")
 
 TEST_CASE("number hash eq")
 {
-    auto hash_number = [](const number &n) { return hash(n); };
+    auto hash_number = [](const number &n) { return std::hash<number>{}(n); };
 
     REQUIRE(number{1.1} == number{1.1});
     REQUIRE(number{1.1} != number{1.2});

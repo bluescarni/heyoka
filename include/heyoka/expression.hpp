@@ -221,11 +221,11 @@ HEYOKA_DLL_PUBLIC detail::prime_wrapper operator""_p(const char *, std::size_t);
 namespace detail
 {
 
-std::size_t hash(funcptr_map<std::size_t> &, const expression &);
+std::size_t hash(funcptr_map<std::size_t> &, const expression &) noexcept;
+
+HEYOKA_DLL_PUBLIC std::size_t hash(const expression &) noexcept;
 
 } // namespace detail
-
-HEYOKA_DLL_PUBLIC std::size_t hash(const expression &);
 
 namespace detail
 {
@@ -797,9 +797,9 @@ namespace std
 // Specialisation of std::hash for expression.
 template <>
 struct hash<heyoka::expression> {
-    size_t operator()(const heyoka::expression &ex) const
+    size_t operator()(const heyoka::expression &ex) const noexcept
     {
-        return heyoka::hash(ex);
+        return heyoka::detail::hash(ex);
     }
 };
 

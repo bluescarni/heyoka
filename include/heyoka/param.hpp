@@ -13,6 +13,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <ostream>
 #include <string>
 #include <unordered_map>
@@ -63,7 +64,12 @@ public:
     [[nodiscard]] const std::uint32_t &idx() const;
 };
 
-HEYOKA_DLL_PUBLIC std::size_t hash(const param &);
+namespace detail
+{
+
+HEYOKA_DLL_PUBLIC std::size_t hash(const param &) noexcept;
+
+} // namespace detail
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const param &);
 
@@ -96,5 +102,18 @@ HEYOKA_DLL_PUBLIC void update_connections(std::vector<std::vector<std::size_t>> 
                                                     double);
 
 HEYOKA_END_NAMESPACE
+
+namespace std
+{
+
+template <>
+struct hash<heyoka::param> {
+    size_t operator()(const heyoka::param &p) const noexcept
+    {
+        return heyoka::detail::hash(p);
+    }
+};
+
+} // namespace std
 
 #endif

@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <cstddef>
+#include <functional>
 #include <ostream>
 #include <string>
 #include <unordered_map>
@@ -59,7 +60,12 @@ public:
     [[nodiscard]] const std::string &name() const noexcept;
 };
 
-HEYOKA_DLL_PUBLIC std::size_t hash(const variable &);
+namespace detail
+{
+
+HEYOKA_DLL_PUBLIC std::size_t hash(const variable &) noexcept;
+
+} // namespace detail
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const variable &);
 
@@ -89,5 +95,18 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
 
 HEYOKA_END_NAMESPACE
+
+namespace std
+{
+
+template <>
+struct hash<heyoka::variable> {
+    size_t operator()(const heyoka::variable &v) const noexcept
+    {
+        return heyoka::detail::hash(v);
+    }
+};
+
+} // namespace std
 
 #endif

@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <cstddef>
+#include <functional>
 #include <ostream>
 #include <string>
 #include <type_traits>
@@ -89,7 +90,12 @@ public:
     [[nodiscard]] const value_type &value() const;
 };
 
-HEYOKA_DLL_PUBLIC std::size_t hash(const number &);
+namespace detail
+{
+
+HEYOKA_DLL_PUBLIC std::size_t hash(const number &) noexcept;
+
+} // namespace detail
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const number &);
 
@@ -147,5 +153,18 @@ HEYOKA_DLL_PUBLIC number number_like(llvm_state &, llvm::Type *, double);
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
+
+namespace std
+{
+
+template <>
+struct hash<heyoka::number> {
+    size_t operator()(const heyoka::number &n) const noexcept
+    {
+        return heyoka::detail::hash(n);
+    }
+};
+
+} // namespace std
 
 #endif

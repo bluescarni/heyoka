@@ -136,7 +136,10 @@ void swap(number &n0, number &n1) noexcept
     std::swap(n0.m_value, n1.m_value);
 }
 
-std::size_t hash(const number &n)
+namespace detail
+{
+
+std::size_t hash(const number &n) noexcept
 {
     return std::visit(
         [](const auto &v) -> std::size_t {
@@ -153,6 +156,8 @@ std::size_t hash(const number &n)
         },
         n.value());
 }
+
+} // namespace detail
 
 std::ostream &operator<<(std::ostream &os, const number &n)
 {

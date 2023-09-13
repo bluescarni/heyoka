@@ -57,10 +57,15 @@ void swap(variable &v0, variable &v1) noexcept
     std::swap(v0.m_name, v1.m_name);
 }
 
-std::size_t hash(const variable &v)
+namespace detail
+{
+
+std::size_t hash(const variable &v) noexcept
 {
     return std::hash<std::string>{}(v.name());
 }
+
+} // namespace detail
 
 std::ostream &operator<<(std::ostream &os, const variable &var)
 {
