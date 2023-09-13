@@ -139,6 +139,7 @@ void swap(number &n0, number &n1) noexcept
 namespace detail
 {
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 std::size_t hash(const number &n) noexcept
 {
     return std::visit(
@@ -382,6 +383,7 @@ number operator/(const number &n1, const number &n2)
 // verifying decompositions: when the original expression is
 // reconstructed from the subexpressions and we compare, the
 // check would fail due to NaN != NaN.
+// NOLINTNEXTLINE(bugprone-exception-escape)
 bool operator==(const number &n1, const number &n2) noexcept
 {
     return std::visit(
@@ -401,6 +403,7 @@ bool operator==(const number &n1, const number &n2) noexcept
         n1.value(), n2.value());
 }
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 bool operator!=(const number &n1, const number &n2) noexcept
 {
     return !(n1 == n2);
@@ -410,6 +413,7 @@ bool operator!=(const number &n1, const number &n2) noexcept
 // same type in order to be considered equivalent. Also, NaNs are considered
 // greater than any other value, so that they will be placed at the
 // end of a sorted range.
+// NOLINTNEXTLINE(bugprone-exception-escape)
 bool operator<(const number &n1, const number &n2) noexcept
 {
     return std::visit(

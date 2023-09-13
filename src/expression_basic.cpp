@@ -450,6 +450,7 @@ std::vector<expression> rename_variables(const std::vector<expression> &v_ex,
 namespace detail
 {
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 std::size_t hash(funcptr_map<std::size_t> &func_map, const expression &ex) noexcept
 {
     return std::visit(
@@ -481,6 +482,7 @@ std::size_t hash(funcptr_map<std::size_t> &func_map, const expression &ex) noexc
         ex.value());
 }
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 std::size_t hash(const expression &ex) noexcept
 {
     detail::funcptr_map<std::size_t> func_map;

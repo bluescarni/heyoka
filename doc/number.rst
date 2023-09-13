@@ -123,7 +123,7 @@ Operators
    Equality comparison operators.
 
    Two numbers are considered equal if:
-   
+
    - their active types are equal, and
    - their values are equal.
 
@@ -139,7 +139,7 @@ Operators
    Less-than comparison operator.
 
    *x* is less than *y* if:
-   
+
    - the active type of *x* is narrower than the active type of *y*, or
    - the active types of *x* and *y* are the same, and the value of *x* is less than the value of *y*.
 
