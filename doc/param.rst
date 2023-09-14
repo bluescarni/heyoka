@@ -14,7 +14,7 @@ The :cpp:class:`~heyoka::param` class
    system.
 
    A parameter is a constant whose value, unlike :cpp:class:`~heyoka::number`,
-   is *not* fixed at the time of the creation of a symbolic expressions. Instead,
+   is *not* fixed at the time of the creation of a symbolic expression. Instead,
    the value of a parameter is loaded at a later stage (e.g., during the numerical
    integration of a system of ODEs) from a user-supplied array of parameter values.
    Parameters are uniquely identified by a zero-based index representing
