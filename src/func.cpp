@@ -138,7 +138,7 @@ HEYOKA_S11N_FUNC_EXPORT(heyoka::detail::null_func)
 
 HEYOKA_BEGIN_NAMESPACE
 
-// NOTE: if memory allocation fails when constructing the shared_ptr,
+// NOTE: if memory allocation fails when constructing the shared_ptr m_ptr,
 // then delete will be called on the pointee of p (obtained via
 // p.release()). Since we are using the default deleter for p,
 // this is all correct/consistent and cannot result in memory leaks.
