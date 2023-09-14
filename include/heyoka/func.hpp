@@ -604,7 +604,7 @@ public:
     func();
 
     template <typename T, generic_ctor_enabler<T &&> = 0>
-    explicit func(T &&x) : m_ptr(std::make_unique<detail::func_inner<detail::uncvref_t<T>>>(std::forward<T>(x)))
+    explicit func(T &&x) : m_ptr(std::make_shared<detail::func_inner<detail::uncvref_t<T>>>(std::forward<T>(x)))
     {
     }
 
