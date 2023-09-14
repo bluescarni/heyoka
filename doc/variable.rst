@@ -1,5 +1,3 @@
-.. _variable:
-
 Variables
 =========
 
@@ -13,7 +11,9 @@ The :cpp:class:`~heyoka::variable` class
 .. cpp:class:: variable
 
    This class is used to represent symbolic variables in heyoka's expression
-   system. Variables are uniquely identified by their name.
+   system.
+
+   Variables are uniquely identified by their name.
 
    .. note::
 
@@ -87,7 +87,6 @@ Operators
    :param b: the second variable.
 
    :return: the result of the comparison.
-
 
 .. cpp:namespace-pop::
 

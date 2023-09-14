@@ -49,19 +49,19 @@ class HEYOKA_DLL_PUBLIC param
     }
 
 public:
-    param();
+    param() noexcept;
 
-    explicit param(std::uint32_t);
+    explicit param(std::uint32_t) noexcept;
 
-    param(const param &);
+    param(const param &) noexcept;
     param(param &&) noexcept;
 
-    param &operator=(const param &);
+    param &operator=(const param &) noexcept;
     param &operator=(param &&) noexcept;
 
     ~param();
 
-    [[nodiscard]] const std::uint32_t &idx() const;
+    [[nodiscard]] std::uint32_t idx() const noexcept;
 };
 
 namespace detail
@@ -73,8 +73,8 @@ HEYOKA_DLL_PUBLIC std::size_t hash(const param &) noexcept;
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const param &);
 
-HEYOKA_DLL_PUBLIC bool operator==(const param &, const param &);
-HEYOKA_DLL_PUBLIC bool operator!=(const param &, const param &);
+HEYOKA_DLL_PUBLIC bool operator==(const param &, const param &) noexcept;
+HEYOKA_DLL_PUBLIC bool operator!=(const param &, const param &) noexcept;
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const param &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);

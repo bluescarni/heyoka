@@ -11,7 +11,9 @@ The :cpp:class:`~heyoka::number` class
 .. cpp:class:: number
 
    This class is used to represent numerical constants in heyoka's expression
-   system. It consists of a union of several floating-point types.
+   system.
+
+   It consists of a union of several floating-point types.
 
    .. cpp:type:: value_type = std::variant<float, double, long double, mppp::real128, mppp::real>
 

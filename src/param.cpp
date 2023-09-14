@@ -27,22 +27,22 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-param::param() : param(0) {}
+param::param() noexcept : param(0) {}
 
-param::param(std::uint32_t idx) : m_index(idx) {}
+param::param(std::uint32_t idx) noexcept : m_index(idx) {}
 
-param::param(const param &) = default;
+param::param(const param &) noexcept = default;
 
 param::param(param &&) noexcept = default;
 
-param &param::operator=(const param &) = default;
+param &param::operator=(const param &) noexcept = default;
 
 param &param::operator=(param &&) noexcept = default;
 
 // NOLINTNEXTLINE(performance-trivially-destructible)
 param::~param() = default;
 
-const std::uint32_t &param::idx() const
+std::uint32_t param::idx() const noexcept
 {
     return m_index;
 }
@@ -67,12 +67,12 @@ std::ostream &operator<<(std::ostream &os, const param &p)
     return os << fmt::format("p{}", p.idx());
 }
 
-bool operator==(const param &p0, const param &p1)
+bool operator==(const param &p0, const param &p1) noexcept
 {
     return p0.idx() == p1.idx();
 }
 
-bool operator!=(const param &p0, const param &p1)
+bool operator!=(const param &p0, const param &p1) noexcept
 {
     return !(p0 == p1);
 }

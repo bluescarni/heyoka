@@ -14,3 +14,4 @@ Mention reference semantics for non-trivial expressions.
 
    variable.rst
    number.rst
+   param.rst
