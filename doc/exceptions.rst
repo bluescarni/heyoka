@@ -5,7 +5,9 @@ Exceptions
 
 *#include <heyoka/exceptions.hpp>*
 
-.. cpp:class:: heyoka::not_implemented_error final : public std::runtime_error
+.. cpp:namespace-push:: heyoka
+
+.. cpp:class:: not_implemented_error final : public std::runtime_error
 
    Exception to signal that a feature/functionality is not implemented.
 
