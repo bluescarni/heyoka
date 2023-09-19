@@ -85,8 +85,8 @@ public:
 
     ~func_base();
 
-    [[nodiscard]] const std::string &get_name() const;
-    [[nodiscard]] const std::vector<expression> &args() const;
+    [[nodiscard]] const std::string &get_name() const noexcept;
+    [[nodiscard]] const std::vector<expression> &args() const noexcept;
 };
 
 namespace detail

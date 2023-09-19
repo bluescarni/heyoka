@@ -83,12 +83,12 @@ func_base &func_base::operator=(func_base &&) noexcept = default;
 
 func_base::~func_base() = default;
 
-const std::string &func_base::get_name() const
+const std::string &func_base::get_name() const noexcept
 {
     return m_name;
 }
 
-const std::vector<expression> &func_base::args() const
+const std::vector<expression> &func_base::args() const noexcept
 {
     return m_args;
 }
