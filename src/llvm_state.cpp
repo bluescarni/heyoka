@@ -38,7 +38,6 @@
 
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/SmallVector.h>
-#include <llvm/ADT/Triple.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/Bitcode/BitcodeReader.h>
@@ -115,6 +114,17 @@
 #include <llvm/Pass.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
+
+#endif
+
+#if LLVM_VERSION_MAJOR >= 17
+
+// NOTE: this header was moved in LLVM 17.
+#include <llvm/TargetParser/Triple.h>
+
+#else
+
+#include <llvm/ADT/Triple.h>
 
 #endif
 

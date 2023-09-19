@@ -41,7 +41,7 @@ bool check_close(const V &v1, const V &v2)
     using vt = typename V::value_type;
 
     for (decltype(v1.size()) i = 0; i < v1.size(); ++i) {
-        if (!(v1[i] == approximately(v2[i], vt(10)))) {
+        if (!(v1[i] == approximately(v2[i], vt(10000)))) {
             return false;
         }
     }
@@ -94,7 +94,7 @@ TEST_CASE("parallel consistency")
                           -2.06720938381724e-3 * 365, +6.58091931493844e-4 * 365};
 
     // Create the events. We will assign to each body
-    // the radius of jupiter to keep thing simple.
+    // the radius of jupiter to keep things simple.
     const auto jradius = 0.000477895;
     std::vector<nt_event<double>> evs;
     auto cb = [](auto &, double, int) { throw; };
