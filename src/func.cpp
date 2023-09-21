@@ -146,11 +146,11 @@ func::func(std::unique_ptr<detail::func_inner_base> p) : m_ptr(p.release()) {}
 
 func::func() : func(detail::null_func{}) {}
 
-func::func(const func &) = default;
+func::func(const func &) noexcept = default;
 
 func::func(func &&) noexcept = default;
 
-func &func::operator=(const func &) = default;
+func &func::operator=(const func &) noexcept = default;
 
 func &func::operator=(func &&) noexcept = default;
 
