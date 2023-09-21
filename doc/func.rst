@@ -92,6 +92,8 @@ The :cpp:class:`~heyoka::func` class
 
       :cpp:class:`func` is copy/move constructible, copy/move assignable and destructible.
 
+      The only valid operations on a moved-from :cpp:class:`func` are destruction and copy/move assignment.
+
    .. cpp:function:: [[nodiscard]] const std::string &get_name() const noexcept
 
       Name getter.
