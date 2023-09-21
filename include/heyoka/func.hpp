@@ -104,7 +104,6 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
 
     [[nodiscard]] virtual std::type_index get_type_index() const = 0;
     [[nodiscard]] virtual const void *get_ptr() const = 0;
-    virtual void *get_ptr() = 0;
 
     [[nodiscard]] virtual const std::string &get_name() const = 0;
 
@@ -335,10 +334,6 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     }
     // Raw value getters.
     [[nodiscard]] const void *get_ptr() const final
-    {
-        return std::addressof(m_value);
-    }
-    void *get_ptr() final
     {
         return std::addressof(m_value);
     }
