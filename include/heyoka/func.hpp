@@ -333,14 +333,14 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     {
         return typeid(T);
     }
-    // Raw getters for the internal instance.
+    // Raw value getters.
     [[nodiscard]] const void *get_ptr() const final
     {
-        return &m_value;
+        return std::addressof(m_value);
     }
     void *get_ptr() final
     {
-        return &m_value;
+        return std::addressof(m_value);
     }
 
     [[nodiscard]] const std::string &get_name() const final
@@ -348,7 +348,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         // NOTE: make sure we are invoking the member functions
         // from func_base (these functions could have been overriden
         // in the derived class).
-        return static_cast<const func_base *>(&m_value)->get_name();
+        return static_cast<const func_base &>(m_value).get_name();
     }
 
     void to_stream(std::ostringstream &oss) const final
@@ -377,11 +377,11 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
 
     [[nodiscard]] const std::vector<expression> &args() const final
     {
-        return static_cast<const func_base *>(&m_value)->args();
+        return static_cast<const func_base &>(m_value).args();
     }
     std::pair<expression *, expression *> get_mutable_args_range() final
     {
-        return static_cast<func_base *>(&m_value)->get_mutable_args_range();
+        return static_cast<func_base &>(m_value).get_mutable_args_range();
     }
 
     // diff.
