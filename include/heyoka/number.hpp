@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <cstddef>
+#include <functional>
 #include <ostream>
 #include <string>
 #include <type_traits>
@@ -69,12 +70,12 @@ private:
     }
 
 public:
-    number();
-    explicit number(float);
-    explicit number(double);
-    explicit number(long double);
+    number() noexcept;
+    explicit number(float) noexcept;
+    explicit number(double) noexcept;
+    explicit number(long double) noexcept;
 #if defined(HEYOKA_HAVE_REAL128)
-    explicit number(mppp::real128);
+    explicit number(mppp::real128) noexcept;
 #endif
 #if defined(HEYOKA_HAVE_REAL)
     explicit number(mppp::real);
@@ -86,10 +87,15 @@ public:
     number &operator=(const number &);
     number &operator=(number &&) noexcept;
 
-    [[nodiscard]] const value_type &value() const;
+    [[nodiscard]] const value_type &value() const noexcept;
 };
 
-HEYOKA_DLL_PUBLIC std::size_t hash(const number &);
+namespace detail
+{
+
+HEYOKA_DLL_PUBLIC std::size_t hash(const number &) noexcept;
+
+} // namespace detail
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const number &);
 
@@ -99,6 +105,7 @@ HEYOKA_DLL_PUBLIC bool is_negative_one(const number &);
 HEYOKA_DLL_PUBLIC bool is_negative(const number &);
 HEYOKA_DLL_PUBLIC bool is_integer(const number &);
 
+HEYOKA_DLL_PUBLIC number operator+(number);
 HEYOKA_DLL_PUBLIC number operator-(const number &);
 
 HEYOKA_DLL_PUBLIC number operator+(const number &, const number &);
@@ -106,9 +113,9 @@ HEYOKA_DLL_PUBLIC number operator-(const number &, const number &);
 HEYOKA_DLL_PUBLIC number operator*(const number &, const number &);
 HEYOKA_DLL_PUBLIC number operator/(const number &, const number &);
 
-HEYOKA_DLL_PUBLIC bool operator==(const number &, const number &);
-HEYOKA_DLL_PUBLIC bool operator!=(const number &, const number &);
-HEYOKA_DLL_PUBLIC bool operator<(const number &, const number &);
+HEYOKA_DLL_PUBLIC bool operator==(const number &, const number &) noexcept;
+HEYOKA_DLL_PUBLIC bool operator!=(const number &, const number &) noexcept;
+HEYOKA_DLL_PUBLIC bool operator<(const number &, const number &) noexcept;
 
 HEYOKA_DLL_PUBLIC number exp(const number &);
 HEYOKA_DLL_PUBLIC number binomial(const number &, const number &);
@@ -147,5 +154,18 @@ HEYOKA_DLL_PUBLIC number number_like(llvm_state &, llvm::Type *, double);
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
+
+namespace std
+{
+
+template <>
+struct hash<heyoka::number> {
+    size_t operator()(const heyoka::number &n) const noexcept
+    {
+        return heyoka::detail::hash(n);
+    }
+};
+
+} // namespace std
 
 #endif

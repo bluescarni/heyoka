@@ -15,6 +15,18 @@
 
 using namespace heyoka;
 
+TEST_CASE("variable basics")
+{
+    variable var{"pippo"};
+
+    REQUIRE(var.name() == "pippo");
+
+    variable var2{"pluto"};
+
+    REQUIRE(var != var2);
+    REQUIRE(!(var == var2));
+}
+
 TEST_CASE("variable s11n")
 {
     variable var{"pippo"};

@@ -47,7 +47,7 @@ variable &variable::operator=(const variable &) = default;
 
 variable &variable::operator=(variable &&) noexcept = default;
 
-const std::string &variable::name() const
+const std::string &variable::name() const noexcept
 {
     return m_name;
 }
@@ -57,22 +57,27 @@ void swap(variable &v0, variable &v1) noexcept
     std::swap(v0.m_name, v1.m_name);
 }
 
-std::size_t hash(const variable &v)
+namespace detail
+{
+
+std::size_t hash(const variable &v) noexcept
 {
     return std::hash<std::string>{}(v.name());
 }
+
+} // namespace detail
 
 std::ostream &operator<<(std::ostream &os, const variable &var)
 {
     return os << var.name();
 }
 
-bool operator==(const variable &v1, const variable &v2)
+bool operator==(const variable &v1, const variable &v2) noexcept
 {
     return v1.name() == v2.name();
 }
 
-bool operator!=(const variable &v1, const variable &v2)
+bool operator!=(const variable &v1, const variable &v2) noexcept
 {
     return !(v1 == v2);
 }

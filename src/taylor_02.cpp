@@ -1749,14 +1749,6 @@ taylor_run_ceval(llvm_state &s, llvm::Type *fp_t,
 namespace
 {
 
-// NOTE: in compact mode, care must be taken when adding multiple jet functions to the same llvm state
-// with the same floating-point type, batch size and number of u variables. The potential issue there
-// is that when the first jet is added, the compact mode AD functions are created and then optimised.
-// The optimisation pass might alter the functions in a way that makes them incompatible with subsequent
-// uses in the second jet (e.g., an argument might be removed from the signature because it is a
-// compile-time constant). A workaround to avoid issues is to set the optimisation level to zero
-// in the state, add the 2 jets and then run a single optimisation pass.
-// NOTE: document this eventually.
 template <typename T, typename U>
 auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, std::uint32_t order,
                          std::uint32_t batch_size, bool high_accuracy, bool compact_mode,

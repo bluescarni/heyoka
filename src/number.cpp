@@ -72,17 +72,17 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-number::number() : number(0.) {}
+number::number() noexcept : number(0.) {}
 
-number::number(float x) : m_value(x) {}
+number::number(float x) noexcept : m_value(x) {}
 
-number::number(double x) : m_value(x) {}
+number::number(double x) noexcept : m_value(x) {}
 
-number::number(long double x) : m_value(x) {}
+number::number(long double x) noexcept : m_value(x) {}
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-number::number(mppp::real128 x) : m_value(x) {}
+number::number(mppp::real128 x) noexcept : m_value(x) {}
 
 #endif
 
@@ -126,7 +126,7 @@ number &number::operator=(number &&other) noexcept
     return *this;
 }
 
-const number::value_type &number::value() const
+const number::value_type &number::value() const noexcept
 {
     return m_value;
 }
@@ -136,23 +136,29 @@ void swap(number &n0, number &n1) noexcept
     std::swap(n0.m_value, n1.m_value);
 }
 
-std::size_t hash(const number &n)
+namespace detail
+{
+
+// NOLINTNEXTLINE(bugprone-exception-escape)
+std::size_t hash(const number &n) noexcept
 {
     return std::visit(
-        [](const auto &v) -> std::size_t {
+        [&n](const auto &v) -> std::size_t {
             using std::isnan;
 
             if (isnan(v)) {
-                // NOTE: enforce same hash for all NaN values,
-                // because NaNs are considered equal to each other
+                // NOTE: enforce that all NaN values of a given type
+                // have the same hash, because NaNs are considered equal to each other
                 // by the comparison operator.
-                return std::hash<int>{}(42);
+                return std::hash<std::size_t>{}(n.value().index());
             } else {
                 return std::hash<detail::uncvref_t<decltype(v)>>{}(v);
             }
         },
         n.value());
 }
+
+} // namespace detail
 
 std::ostream &operator<<(std::ostream &os, const number &n)
 {
@@ -246,6 +252,11 @@ bool is_integer(const number &n)
             return isfinite(arg) && trunc(arg) == arg;
         },
         n.value());
+}
+
+number operator+(number n)
+{
+    return n;
 }
 
 number operator-(const number &n)
@@ -372,7 +383,8 @@ number operator/(const number &n1, const number &n2)
 // verifying decompositions: when the original expression is
 // reconstructed from the subexpressions and we compare, the
 // check would fail due to NaN != NaN.
-bool operator==(const number &n1, const number &n2)
+// NOLINTNEXTLINE(bugprone-exception-escape)
+bool operator==(const number &n1, const number &n2) noexcept
 {
     return std::visit(
         [](const auto &v1, const auto &v2) -> bool {
@@ -391,7 +403,8 @@ bool operator==(const number &n1, const number &n2)
         n1.value(), n2.value());
 }
 
-bool operator!=(const number &n1, const number &n2)
+// NOLINTNEXTLINE(bugprone-exception-escape)
+bool operator!=(const number &n1, const number &n2) noexcept
 {
     return !(n1 == n2);
 }
@@ -400,7 +413,8 @@ bool operator!=(const number &n1, const number &n2)
 // same type in order to be considered equivalent. Also, NaNs are considered
 // greater than any other value, so that they will be placed at the
 // end of a sorted range.
-bool operator<(const number &n1, const number &n2)
+// NOLINTNEXTLINE(bugprone-exception-escape)
+bool operator<(const number &n1, const number &n2) noexcept
 {
     return std::visit(
         [&](const auto &v1, const auto &v2) -> bool {
@@ -707,10 +721,12 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
         // Generate the struct.
         return llvm::ConstantStruct::get(struct_tp, {sign, exp, limb_arr});
 #endif
-    } else {
-        throw std::invalid_argument(
-            fmt::format("Cannot generate an LLVM constant of type '{}'", detail::llvm_type_name(tp)));
     }
+
+    // LCOV_EXCL_START
+    throw std::invalid_argument(
+        fmt::format("Cannot generate an LLVM constant of type '{}'", detail::llvm_type_name(tp)));
+    // LCOV_EXCL_STOP
 }
 
 namespace detail

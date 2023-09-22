@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cstddef>
+#include <functional>
 #include <initializer_list>
 #include <iostream>
 #include <sstream>
@@ -603,8 +604,8 @@ TEST_CASE("func hash eq consistency")
     auto ex = x + y;
 
     REQUIRE(z * ex + ex == z * (x + y) + (x + y));
-    REQUIRE(hash(z * ex + ex) == hash(z * (x + y) + (x + y)));
-    REQUIRE(hash(z * copy(ex) + copy(ex)) == hash(z * (x + y) + (x + y)));
+    REQUIRE(std::hash<expression>{}(z * ex + ex) == std::hash<expression>{}(z * (x + y) + (x + y)));
+    REQUIRE(std::hash<expression>{}(z * copy(ex) + copy(ex)) == std::hash<expression>{}(z * (x + y) + (x + y)));
 }
 
 struct func_19 : func_base {

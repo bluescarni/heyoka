@@ -15,6 +15,19 @@
 
 using namespace heyoka;
 
+TEST_CASE("param basic")
+{
+    param p;
+
+    REQUIRE(p.idx() == 0u);
+
+    param p2{23};
+    p2 = p;
+    REQUIRE(p2.idx() == 0u);
+    REQUIRE(p2 == p);
+    REQUIRE(!(p2 != p));
+}
+
 TEST_CASE("param s11n")
 {
     param p{42};

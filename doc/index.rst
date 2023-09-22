@@ -115,6 +115,7 @@ Dario Izzo (European Space Agency).
    install.rst
    basic_tutorials.rst
    advanced_tutorials.rst
+   api_reference.rst
    benchmarks.rst
    ad_notes.rst
    changelog.rst

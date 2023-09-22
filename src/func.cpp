@@ -83,12 +83,12 @@ func_base &func_base::operator=(func_base &&) noexcept = default;
 
 func_base::~func_base() = default;
 
-const std::string &func_base::get_name() const
+const std::string &func_base::get_name() const noexcept
 {
     return m_name;
 }
 
-const std::vector<expression> &func_base::args() const
+const std::vector<expression> &func_base::args() const noexcept
 {
     return m_args;
 }
@@ -138,15 +138,19 @@ HEYOKA_S11N_FUNC_EXPORT(heyoka::detail::null_func)
 
 HEYOKA_BEGIN_NAMESPACE
 
+// NOTE: if memory allocation fails when constructing the shared_ptr m_ptr,
+// then delete will be called on the pointee of p (obtained via
+// p.release()). Since we are using the default deleter for p,
+// this is all correct/consistent and cannot result in memory leaks.
 func::func(std::unique_ptr<detail::func_inner_base> p) : m_ptr(p.release()) {}
 
 func::func() : func(detail::null_func{}) {}
 
-func::func(const func &) = default;
+func::func(const func &) noexcept = default;
 
 func::func(func &&) noexcept = default;
 
-func &func::operator=(const func &) = default;
+func &func::operator=(const func &) noexcept = default;
 
 func &func::operator=(func &&) noexcept = default;
 
@@ -640,7 +644,7 @@ bool operator<(const func &a, const func &b)
         return false;
     }
 
-    // The type indices are equal, check the names next.
+    // Check the names.
     if (a.get_name() < b.get_name()) {
         return true;
     }
