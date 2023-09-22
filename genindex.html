@@ -18,12 +18,12 @@
   </script>
   
   <!-- Loaded before other Sphinx assets -->
-  <link href="_static/styles/theme.css?digest=e353d410970836974a52" rel="stylesheet" />
-<link href="_static/styles/bootstrap.css?digest=e353d410970836974a52" rel="stylesheet" />
-<link href="_static/styles/pydata-sphinx-theme.css?digest=e353d410970836974a52" rel="stylesheet" />
+  <link href="_static/styles/theme.css?digest=ac02cc09edc035673794" rel="stylesheet" />
+<link href="_static/styles/bootstrap.css?digest=ac02cc09edc035673794" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=ac02cc09edc035673794" rel="stylesheet" />
 
   
-  <link href="_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=e353d410970836974a52" rel="stylesheet" />
+  <link href="_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=ac02cc09edc035673794" rel="stylesheet" />
   <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
@@ -32,8 +32,9 @@
     <link rel="stylesheet" href="_static/styles/sphinx-book-theme.css?digest=14f4ca6b54d191a8c7657f6c759bf11a5fb86285" type="text/css" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
-  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=e353d410970836974a52" />
-<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=e353d410970836974a52" />
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=ac02cc09edc035673794" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=ac02cc09edc035673794" />
+  <script src="_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=ac02cc09edc035673794"></script>
 
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
     <script src="_static/doctools.js"></script>
@@ -52,6 +53,15 @@
   
   
   <a class="skip-link" href="#main-content">Skip to main content</a>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>
+    Back to top
+  </button>
+
   
   <input type="checkbox"
           class="sidebar-toggle"
@@ -144,6 +154,21 @@
 <li class="toctree-l2"><a class="reference internal" href="tut_s11n.html">Serialisation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_ensemble.html">Ensemble propagations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_parallel_mode.html">Parallel mode</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="api_reference.html">API Reference</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-3"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="definitions.html">Macros and definitions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="namespaces.html">Namespaces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="kwargs.html">Keyword arguments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="exceptions.html">Exceptions</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="expression_system.html">Expression system</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-4"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="variable.html">Variables</a></li>
+<li class="toctree-l3"><a class="reference internal" href="number.html">Numerical constants</a></li>
+<li class="toctree-l3"><a class="reference internal" href="param.html">Runtime parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="func.html">Functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="expression.html">Expressions</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a></li>
@@ -259,10 +284,10 @@
 
 <script>
 document.write(`
-  <button class="theme-switch-button btn btn-sm btn-outline-primary navbar-btn rounded-circle" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
-    <span class="theme-switch" data-mode="light"><i class="fa-solid fa-sun"></i></span>
-    <span class="theme-switch" data-mode="dark"><i class="fa-solid fa-moon"></i></span>
-    <span class="theme-switch" data-mode="auto"><i class="fa-solid fa-circle-half-stroke"></i></span>
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
   </button>
 `);
 </script>
@@ -270,7 +295,7 @@ document.write(`
 <script>
 document.write(`
   <button class="btn btn-sm navbar-btn search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
-    <i class="fa-solid fa-magnifying-glass"></i>
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
   </button>
 `);
 </script>
@@ -303,8 +328,134 @@ document.write(`
 <h1 id="index">Index</h1>
 
 <div class="genindex-jumpbox">
+ <a href="#H"><strong>H</strong></a>
+ | <a href="#S"><strong>S</strong></a>
  
 </div>
+<h2 id="H">H</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="expression.html#_CPPv4N6heyoka10expressionE">heyoka::expression (C++ class)</a>
+</li>
+      <li><a href="func.html#_CPPv4N6heyoka4funcE">heyoka::func (C++ class)</a>
+</li>
+      <li><a href="func.html#_CPPv4NK6heyoka4func4argsEv">heyoka::func::args (C++ function)</a>
+</li>
+      <li><a href="func.html#_CPPv4I0EIQaantNSt7same_asI4funcNSt14remove_cvref_tI1TEEEE6is_udfINSt14remove_cvref_tI1TEEEEN6heyoka4func4funcERR1T">heyoka::func::func (C++ function)</a>, <a href="func.html#_CPPv4N6heyoka4func4funcERK4func">[1]</a>, <a href="func.html#_CPPv4N6heyoka4func4funcERR4func">[2]</a>, <a href="func.html#_CPPv4N6heyoka4func4funcEv">[3]</a>
+</li>
+      <li><a href="func.html#_CPPv4NK6heyoka4func8get_nameEv">heyoka::func::get_name (C++ function)</a>
+</li>
+      <li><a href="func.html#_CPPv4N6heyoka4funcaSERK4func">heyoka::func::operator= (C++ function)</a>, <a href="func.html#_CPPv4N6heyoka4funcaSERR4func">[1]</a>
+</li>
+      <li><a href="func.html#_CPPv4N6heyoka4funcD0Ev">heyoka::func::~func (C++ function)</a>
+</li>
+      <li><a href="func.html#_CPPv4N6heyoka9func_baseE">heyoka::func_base (C++ class)</a>
+</li>
+      <li><a href="func.html#_CPPv4NK6heyoka9func_base4argsEv">heyoka::func_base::args (C++ function)</a>
+</li>
+      <li><a href="func.html#_CPPv4N6heyoka9func_base9func_baseENSt6stringENSt6vectorI10expressionEE">heyoka::func_base::func_base (C++ function)</a>, <a href="func.html#_CPPv4N6heyoka9func_base9func_baseERK9func_base">[1]</a>, <a href="func.html#_CPPv4N6heyoka9func_base9func_baseERR9func_base">[2]</a>
+</li>
+      <li><a href="func.html#_CPPv4NK6heyoka9func_base8get_nameEv">heyoka::func_base::get_name (C++ function)</a>
+</li>
+      <li><a href="func.html#_CPPv4N6heyoka9func_baseaSERK9func_base">heyoka::func_base::operator= (C++ function)</a>, <a href="func.html#_CPPv4N6heyoka9func_baseaSERR9func_base">[1]</a>
+</li>
+      <li><a href="func.html#_CPPv4N6heyoka9func_baseD0Ev">heyoka::func_base::~func_base (C++ function)</a>
+</li>
+      <li><a href="func.html#_CPPv4I0EN6heyoka6is_udfE">heyoka::is_udf (C++ concept)</a>
+</li>
+      <li><a href="exceptions.html#_CPPv4N6heyoka21not_implemented_errorE">heyoka::not_implemented_error (C++ class)</a>
+</li>
+      <li><a href="number.html#_CPPv4N6heyoka6numberE">heyoka::number (C++ class)</a>
+</li>
+      <li><a href="number.html#_CPPv4N6heyoka6number6numberEN4mppp4realE">heyoka::number::number (C++ function)</a>, <a href="number.html#_CPPv4N6heyoka6number6numberEN4mppp7real128E">[1]</a>, <a href="number.html#_CPPv4N6heyoka6number6numberERK6number">[2]</a>, <a href="number.html#_CPPv4N6heyoka6number6numberERR6number">[3]</a>, <a href="number.html#_CPPv4N6heyoka6number6numberEd">[4]</a>, <a href="number.html#_CPPv4N6heyoka6number6numberEe">[5]</a>, <a href="number.html#_CPPv4N6heyoka6number6numberEf">[6]</a>, <a href="number.html#_CPPv4N6heyoka6number6numberEv">[7]</a>
+</li>
+      <li><a href="number.html#_CPPv4N6heyoka6numberaSERK6number">heyoka::number::operator= (C++ function)</a>, <a href="number.html#_CPPv4N6heyoka6numberaSERR6number">[1]</a>
+</li>
+      <li><a href="number.html#_CPPv4NK6heyoka6number5valueEv">heyoka::number::value (C++ function)</a>
+</li>
+      <li><a href="number.html#_CPPv4N6heyoka6number10value_typeE">heyoka::number::value_type (C++ type)</a>
+</li>
+      <li><a href="number.html#_CPPv4N6heyoka6numberD0Ev">heyoka::number::~number (C++ function)</a>
+</li>
+      <li><a href="number.html#_CPPv4N6heyokaneERK6numberRK6number">heyoka::operator!= (C++ function)</a>, <a href="param.html#_CPPv4N6heyokaneERK5paramRK5param">[1]</a>, <a href="variable.html#_CPPv4N6heyokaneERK8variableRK8variable">[2]</a>
+</li>
+      <li><a href="number.html#_CPPv4N6heyokamlERK6numberRK6number">heyoka::operator* (C++ function)</a>
+</li>
+      <li><a href="number.html#_CPPv4N6heyokaplE6number">heyoka::operator+ (C++ function)</a>, <a href="number.html#_CPPv4N6heyokaplERK6numberRK6number">[1]</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="number.html#_CPPv4N6heyokamiERK6number">heyoka::operator- (C++ function)</a>, <a href="number.html#_CPPv4N6heyokamiERK6numberRK6number">[1]</a>
+</li>
+      <li><a href="number.html#_CPPv4N6heyokadvERK6numberRK6number">heyoka::operator/ (C++ function)</a>
+</li>
+      <li><a href="number.html#_CPPv4N6heyokaltERK6numberRK6number">heyoka::operator&lt; (C++ function)</a>
+</li>
+      <li><a href="number.html#_CPPv4N6heyokalsERNSt7ostreamERK6number">heyoka::operator&lt;&lt; (C++ function)</a>, <a href="param.html#_CPPv4N6heyokalsERNSt7ostreamERK5param">[1]</a>, <a href="variable.html#_CPPv4N6heyokalsERNSt7ostreamERK8variable">[2]</a>
+</li>
+      <li><a href="number.html#_CPPv4N6heyokaeqERK6numberRK6number">heyoka::operator== (C++ function)</a>, <a href="param.html#_CPPv4N6heyokaeqERK5paramRK5param">[1]</a>, <a href="variable.html#_CPPv4N6heyokaeqERK8variableRK8variable">[2]</a>
+</li>
+      <li><a href="param.html#_CPPv4N6heyoka5paramE">heyoka::param (C++ class)</a>
+</li>
+      <li><a href="param.html#_CPPv4NK6heyoka5param3idxEv">heyoka::param::idx (C++ function)</a>
+</li>
+      <li><a href="param.html#_CPPv4N6heyoka5paramaSERK5param">heyoka::param::operator= (C++ function)</a>, <a href="param.html#_CPPv4N6heyoka5paramaSERR5param">[1]</a>
+</li>
+      <li><a href="param.html#_CPPv4N6heyoka5param5paramENSt8uint32_tE">heyoka::param::param (C++ function)</a>, <a href="param.html#_CPPv4N6heyoka5param5paramERK5param">[1]</a>, <a href="param.html#_CPPv4N6heyoka5param5paramERR5param">[2]</a>, <a href="param.html#_CPPv4N6heyoka5param5paramEv">[3]</a>
+</li>
+      <li><a href="param.html#_CPPv4N6heyoka5paramD0Ev">heyoka::param::~param (C++ function)</a>
+</li>
+      <li><a href="number.html#_CPPv4N6heyoka4swapER6numberR6number">heyoka::swap (C++ function)</a>, <a href="param.html#_CPPv4N6heyoka4swapER5paramR5param">[1]</a>, <a href="variable.html#_CPPv4N6heyoka4swapER8variableR8variable">[2]</a>
+</li>
+      <li><a href="variable.html#_CPPv4N6heyoka8variableE">heyoka::variable (C++ class)</a>
+</li>
+      <li><a href="variable.html#_CPPv4NK6heyoka8variable4nameEv">heyoka::variable::name (C++ function)</a>
+</li>
+      <li><a href="variable.html#_CPPv4N6heyoka8variableaSERK8variable">heyoka::variable::operator= (C++ function)</a>, <a href="variable.html#_CPPv4N6heyoka8variableaSERR8variable">[1]</a>
+</li>
+      <li><a href="variable.html#_CPPv4N6heyoka8variable8variableENSt6stringE">heyoka::variable::variable (C++ function)</a>, <a href="variable.html#_CPPv4N6heyoka8variable8variableERK8variable">[1]</a>, <a href="variable.html#_CPPv4N6heyoka8variable8variableERR8variable">[2]</a>, <a href="variable.html#_CPPv4N6heyoka8variable8variableEv">[3]</a>
+</li>
+      <li><a href="variable.html#_CPPv4N6heyoka8variableD0Ev">heyoka::variable::~variable (C++ function)</a>
+</li>
+      <li><a href="definitions.html#c.HEYOKA_VERSION_MAJOR">HEYOKA_VERSION_MAJOR (C macro)</a>
+</li>
+      <li><a href="definitions.html#c.HEYOKA_VERSION_MINOR">HEYOKA_VERSION_MINOR (C macro)</a>
+</li>
+      <li><a href="definitions.html#c.HEYOKA_VERSION_PATCH">HEYOKA_VERSION_PATCH (C macro)</a>
+</li>
+      <li><a href="definitions.html#c.HEYOKA_VERSION_STRING">HEYOKA_VERSION_STRING (C macro)</a>
+</li>
+      <li><a href="definitions.html#c.HEYOKA_WITH_MPPP">HEYOKA_WITH_MPPP (C macro)</a>
+</li>
+      <li><a href="definitions.html#c.HEYOKA_WITH_REAL">HEYOKA_WITH_REAL (C macro)</a>
+</li>
+      <li><a href="definitions.html#c.HEYOKA_WITH_REAL128">HEYOKA_WITH_REAL128 (C macro)</a>
+</li>
+      <li><a href="definitions.html#c.HEYOKA_WITH_SLEEF">HEYOKA_WITH_SLEEF (C macro)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="S">S</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="number.html#_CPPv4IENSt4hashIN6heyoka6numberEEE">std::hash&lt;heyoka::number&gt; (C++ struct)</a>
+</li>
+      <li><a href="number.html#_CPPv4NKSt4hashIN6heyoka6numberEEclERKN6heyoka6numberE">std::hash&lt;heyoka::number&gt;::operator() (C++ function)</a>
+</li>
+      <li><a href="param.html#_CPPv4IENSt4hashIN6heyoka5paramEEE">std::hash&lt;heyoka::param&gt; (C++ struct)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="param.html#_CPPv4NKSt4hashIN6heyoka5paramEEclERKN6heyoka5paramE">std::hash&lt;heyoka::param&gt;::operator() (C++ function)</a>
+</li>
+      <li><a href="variable.html#_CPPv4IENSt4hashIN6heyoka8variableEEE">std::hash&lt;heyoka::variable&gt; (C++ struct)</a>
+</li>
+      <li><a href="variable.html#_CPPv4NKSt4hashIN6heyoka8variableEEclERKN6heyoka8variableE">std::hash&lt;heyoka::variable&gt;::operator() (C++ function)</a>
+</li>
+  </ul></td>
+</tr></table>
+
 
 
                 </article>
@@ -312,16 +463,12 @@ document.write(`
 
               
               
-                <footer class="bd-footer-article">
-                  
-<div class="footer-article-items footer-article__inner">
-  
-    <div class="footer-article-item"><!-- Previous / next buttons -->
+              
+              
+                <footer class="prev-next-footer">
+                  <!-- Previous / next buttons -->
 <div class="prev-next-area">
-</div></div>
-  
 </div>
-
                 </footer>
               
             </div>
@@ -370,8 +517,8 @@ By Francesco Biscani, Dario Izzo
   </div>
   
   <!-- Scripts loaded after <body> so the DOM is not blocked -->
-  <script src="_static/scripts/bootstrap.js?digest=e353d410970836974a52"></script>
-<script src="_static/scripts/pydata-sphinx-theme.js?digest=e353d410970836974a52"></script>
+  <script src="_static/scripts/bootstrap.js?digest=ac02cc09edc035673794"></script>
+<script src="_static/scripts/pydata-sphinx-theme.js?digest=ac02cc09edc035673794"></script>
 
   <footer class="bd-footer">
   </footer>

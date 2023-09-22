@@ -1,12 +1,13 @@
 Changelog
 =========
 
-2.0.0 (unreleased)
+2.0.0 (2023-09-22)
 ------------------
 
 New
 ~~~
 
+- Support LLVM 17 (`#346 <https://github.com/bluescarni/heyoka/pull/346>`__).
 - Add model for the circular restricted three-body problem
   (`#345 <https://github.com/bluescarni/heyoka/pull/345>`__).
 - heyoka can now automatically vectorise scalar calls to

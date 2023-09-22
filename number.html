@@ -1,0 +1,786 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+    <title>Numerical constants &#8212; heyoka 2.0.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "light";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=ac02cc09edc035673794" rel="stylesheet" />
+<link href="_static/styles/bootstrap.css?digest=ac02cc09edc035673794" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=ac02cc09edc035673794" rel="stylesheet" />
+
+  
+  <link href="_static/vendor/fontawesome/6.1.2/css/all.min.css?digest=ac02cc09edc035673794" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" href="_static/styles/sphinx-book-theme.css?digest=14f4ca6b54d191a8c7657f6c759bf11a5fb86285" type="text/css" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=ac02cc09edc035673794" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=ac02cc09edc035673794" />
+  <script src="_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=ac02cc09edc035673794"></script>
+
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?digest=5a5c038af52cf7bc1a1ec88eea08e6366ee68824"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'number';</script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Runtime parameters" href="param.html" />
+    <link rel="prev" title="Variables" href="variable.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>
+    Back to top
+  </button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__primary"
+          id="__primary"/>
+  <label class="overlay overlay-primary" for="__primary"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          name="__secondary"
+          id="__secondary"/>
+  <label class="overlay overlay-secondary" for="__secondary"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+  
+    <nav class="bd-header navbar navbar-expand-lg bd-navbar">
+    </nav>
+  
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/white_logo.png" class="logo__image only-light" alt="Logo image"/>
+    <script>document.write(`<img src="_static/white_logo.png" class="logo__image only-dark" alt="Logo image"/>`);</script>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item"><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="basic_tutorials.html">Basic tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-1"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="tut_taylor_method.html">Taylor’s method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_expression_system.html">The expression system</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_adaptive.html">The adaptive integrator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_adaptive_custom.html">Customising the adaptive integrator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_param.html">Runtime parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_nonauto.html">Non-autonomous systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_d_output.html">Dense &amp; continuous output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_events.html">Event detection</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="advanced_tutorials.html">Advanced tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-2"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="tut_batch_mode.html">Batch mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_extended_precision.html">Computations in extended precision</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_arbitrary_precision.html">Computations in arbitrary precision</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_s11n.html">Serialisation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_ensemble.html">Ensemble propagations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_parallel_mode.html">Parallel mode</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="api_reference.html">API Reference</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-3"><i class="fa-solid fa-chevron-down"></i></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="definitions.html">Macros and definitions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="namespaces.html">Namespaces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="kwargs.html">Keyword arguments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="exceptions.html">Exceptions</a></li>
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="expression_system.html">Expression system</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-4"><i class="fa-solid fa-chevron-down"></i></label><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="variable.html">Variables</a></li>
+<li class="toctree-l3 current active"><a class="current reference internal" href="#">Numerical constants</a></li>
+<li class="toctree-l3"><a class="reference internal" href="param.html">Runtime parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="func.html">Functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="expression.html">Expressions</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ad_notes.html">Notes on automatic differentiation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="breaking_changes.html">Breaking changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="acknowledgement.html">Acknowledgement</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bibliography.html">Bibliography</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><label class="sidebar-toggle primary-toggle btn btn-sm" for="__primary" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</label></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/bluescarni/heyoka" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fnumber.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="_sources/number.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="theme-switch nav-link" data-mode="light"><i class="fa-solid fa-sun fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="dark"><i class="fa-solid fa-moon fa-lg"></i></span>
+    <span class="theme-switch nav-link" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg"></i></span>
+  </button>
+`);
+</script>
+
+<script>
+document.write(`
+  <button class="btn btn-sm navbar-btn search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<label class="sidebar-toggle secondary-toggle btn btn-sm" for="__secondary"title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</label>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Numerical constants</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-number-class">The <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">number</span></code> class</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#functions">Functions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#operators">Operators</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#standard-library-specialisations">Standard library specialisations</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article" role="main">
+                  
+  <section id="numerical-constants">
+<h1>Numerical constants<a class="headerlink" href="#numerical-constants" title="Permalink to this heading">#</a></h1>
+<p><em>#include &lt;heyoka/number.hpp&gt;</em></p>
+<section id="the-number-class">
+<h2>The <a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">number</span></code></a> class<a class="headerlink" href="#the-number-class" title="Permalink to this heading">#</a></h2>
+<dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka6numberE">
+<span id="_CPPv3N6heyoka6numberE"></span><span id="_CPPv2N6heyoka6numberE"></span><span id="heyoka::number"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">number</span></span></span><a class="headerlink" href="#_CPPv4N6heyoka6numberE" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>This class is used to represent numerical constants in heyoka’s expression
+system.</p>
+<p>It consists of a union of several floating-point types.</p>
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka6number10value_typeE">
+<span id="_CPPv3N6heyoka6number10value_typeE"></span><span id="_CPPv2N6heyoka6number10value_typeE"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">value_type</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">variant</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">float</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="kt"><span class="pre">long</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">mppp</span></span><span class="p"><span class="pre">::</span></span><a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v0.27)"><span class="n"><span class="pre">real128</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">mppp</span></span><span class="p"><span class="pre">::</span></span><a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v0.27)"><span class="n"><span class="pre">real</span></span></a><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4N6heyoka6number10value_typeE" title="Permalink to this definition">#</a><br /></dt>
+<dd><div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> and <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a> are supported only if heyoka was built
+with support for the mp++ library (see the <a class="reference internal" href="install.html#installation"><span class="std std-ref">installation instructions</span></a>).</p>
+</div>
+<p>The union of floating-point types.</p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka6number6numberEv">
+<span id="_CPPv3N6heyoka6number6numberEv"></span><span id="_CPPv2N6heyoka6number6numberEv"></span><span id="heyoka::number::number"></span><span class="sig-name descname"><span class="n"><span class="pre">number</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka6number6numberEv" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>The default constructor initialises the internal union with the <code class="docutils literal notranslate"><span class="pre">0.</span></code> literal.</p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka6number6numberERK6number">
+<span id="_CPPv3N6heyoka6number6numberERK6number"></span><span id="_CPPv2N6heyoka6number6numberERK6number"></span><span id="heyoka::number::number__numberCR"></span><span class="sig-name descname"><span class="n"><span class="pre">number</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6number6numberERK6number" title="heyoka::number::number"><span class="n"><span class="pre">number</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka6number6numberERK6number" title="Permalink to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka6number6numberERR6number">
+<span id="_CPPv3N6heyoka6number6numberERR6number"></span><span id="_CPPv2N6heyoka6number6numberERR6number"></span><span id="heyoka::number::number__numberRR"></span><span class="sig-name descname"><span class="n"><span class="pre">number</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6heyoka6number6numberERR6number" title="heyoka::number::number"><span class="n"><span class="pre">number</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka6number6numberERR6number" title="Permalink to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka6numberaSERK6number">
+<span id="_CPPv3N6heyoka6numberaSERK6number"></span><span id="_CPPv2N6heyoka6numberaSERK6number"></span><span id="heyoka::number::assign-operator__numberCR"></span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka6numberaSERK6number" title="Permalink to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka6numberaSERR6number">
+<span id="_CPPv3N6heyoka6numberaSERR6number"></span><span id="_CPPv2N6heyoka6numberaSERR6number"></span><span id="heyoka::number::assign-operator__numberRR"></span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka6numberaSERR6number" title="Permalink to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka6numberD0Ev">
+<span id="_CPPv3N6heyoka6numberD0Ev"></span><span id="_CPPv2N6heyoka6numberD0Ev"></span><span id="heyoka::number::~number"></span><span class="sig-name descname"><span class="n"><span class="pre">~number</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka6numberD0Ev" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Numbers are copy/move constructible, copy/move assignable and destructible.</p>
+<p>Moved-from numbers are guaranteed to be in the default-constructed state.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Exception<span class="colon">:</span></dt>
+<dd class="field-odd"><p>any exception thrown by the copy constructor/copy assignment operator of <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka6number6numberEf">
+<span id="_CPPv3N6heyoka6number6numberEf"></span><span id="_CPPv2N6heyoka6number6numberEf"></span><span id="heyoka::number::number__float"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">number</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">float</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka6number6numberEf" title="Permalink to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka6number6numberEd">
+<span id="_CPPv3N6heyoka6number6numberEd"></span><span id="_CPPv2N6heyoka6number6numberEd"></span><span id="heyoka::number::number__double"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">number</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka6number6numberEd" title="Permalink to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka6number6numberEe">
+<span id="_CPPv3N6heyoka6number6numberEe"></span><span id="_CPPv2N6heyoka6number6numberEe"></span><span id="heyoka::number::number__l-double"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">number</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">long</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka6number6numberEe" title="Permalink to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka6number6numberEN4mppp7real128E">
+<span id="_CPPv3N6heyoka6number6numberEN4mppp7real128E"></span><span id="_CPPv2N6heyoka6number6numberEN4mppp7real128E"></span><span id="heyoka::number::number__mppp::real128"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">number</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">mppp</span></span><span class="p"><span class="pre">::</span></span><a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v0.27)"><span class="n"><span class="pre">real128</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka6number6numberEN4mppp7real128E" title="Permalink to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka6number6numberEN4mppp4realE">
+<span id="_CPPv3N6heyoka6number6numberEN4mppp4realE"></span><span id="_CPPv2N6heyoka6number6numberEN4mppp4realE"></span><span id="heyoka::number::number__mppp::real"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">number</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">mppp</span></span><span class="p"><span class="pre">::</span></span><a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v0.27)"><span class="n"><span class="pre">real</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka6number6numberEN4mppp4realE" title="Permalink to this definition">#</a><br /></dt>
+<dd><div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> and <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a> overloads are available only
+if heyoka was built with support for the mp++ library (see the <a class="reference internal" href="install.html#installation"><span class="std std-ref">installation instructions</span></a>).</p>
+</div>
+<p>Numbers can be initialised from values of the supported floating-point types.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>x</strong> – the construction argument.</p>
+</dd>
+<dt class="field-even">Exception<span class="colon">:</span></dt>
+<dd class="field-even"><p>any exception raised by the copy constructor of <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK6heyoka6number5valueEv">
+<span id="_CPPv3NK6heyoka6number5valueEv"></span><span id="_CPPv2NK6heyoka6number5valueEv"></span><span id="heyoka::number::valueC"></span><span class="p"><span class="pre">[[</span></span><span class="pre">nodiscard</span><span class="p"><span class="pre">]]</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6number10value_typeE" title="heyoka::number::value_type"><span class="n"><span class="pre">value_type</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">value</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4NK6heyoka6number5valueEv" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Value getter.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>a reference to the internal union of floating-point types.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="functions">
+<h2>Functions<a class="headerlink" href="#functions" title="Permalink to this heading">#</a></h2>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka4swapER6numberR6number">
+<span id="_CPPv3N6heyoka4swapER6numberR6number"></span><span id="_CPPv2N6heyoka4swapER6numberR6number"></span><span id="heyoka::swap__numberR.numberR"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">swap</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">a</span></span>, <a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">b</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka4swapER6numberR6number" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Swap primitive.</p>
+<p>This function will efficiently swap <em>a</em> and <em>b</em>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>a</strong> – the first number.</p></li>
+<li><p><strong>b</strong> – the second number.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyokalsERNSt7ostreamERK6number">
+<span id="_CPPv3N6heyokalsERNSt7ostreamERK6number"></span><span id="_CPPv2N6heyokalsERNSt7ostreamERK6number"></span><span id="heyoka::lshift-operator__osR.numberCR"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ostream</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">&lt;&lt;</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ostream</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">os</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">n</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyokalsERNSt7ostreamERK6number" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Stream operator.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>os</strong> – the output stream.</p></li>
+<li><p><strong>n</strong> – the input number.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>a reference to <em>os</em>.</p>
+</dd>
+<dt class="field-odd">Exception<span class="colon">:</span></dt>
+<dd class="field-odd"><p>any exception thrown by streaming the value of <em>n</em>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="operators">
+<h2>Operators<a class="headerlink" href="#operators" title="Permalink to this heading">#</a></h2>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyokaplE6number">
+<span id="_CPPv3N6heyokaplE6number"></span><span id="_CPPv2N6heyokaplE6number"></span><span id="heyoka::add-operator__number"></span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">+</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">n</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyokaplE6number" title="Permalink to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyokamiERK6number">
+<span id="_CPPv3N6heyokamiERK6number"></span><span id="_CPPv2N6heyokamiERK6number"></span><span id="heyoka::sub-operator__numberCR"></span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">-</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">n</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyokamiERK6number" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>The <a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">number</span></code></a> class supports the identity and negation operators.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>n</strong> – the input argument.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>n</em> or its negation.</p>
+</dd>
+<dt class="field-odd">Exception<span class="colon">:</span></dt>
+<dd class="field-odd"><p>any exception raised by the constructors of <a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">number</span></code></a>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyokaplERK6numberRK6number">
+<span id="_CPPv3N6heyokaplERK6numberRK6number"></span><span id="_CPPv2N6heyokaplERK6numberRK6number"></span><span id="heyoka::add-operator__numberCR.numberCR"></span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">+</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">y</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyokaplERK6numberRK6number" title="Permalink to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyokamiERK6numberRK6number">
+<span id="_CPPv3N6heyokamiERK6numberRK6number"></span><span id="_CPPv2N6heyokamiERK6numberRK6number"></span><span id="heyoka::sub-operator__numberCR.numberCR"></span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">-</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">y</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyokamiERK6numberRK6number" title="Permalink to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyokamlERK6numberRK6number">
+<span id="_CPPv3N6heyokamlERK6numberRK6number"></span><span id="_CPPv2N6heyokamlERK6numberRK6number"></span><span id="heyoka::mul-operator__numberCR.numberCR"></span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">*</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">y</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyokamlERK6numberRK6number" title="Permalink to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyokadvERK6numberRK6number">
+<span id="_CPPv3N6heyokadvERK6numberRK6number"></span><span id="_CPPv2N6heyokadvERK6numberRK6number"></span><span id="heyoka::div-operator__numberCR.numberCR"></span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">/</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">y</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyokadvERK6numberRK6number" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>The <a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">number</span></code></a> class supports elementary binary arithmetics.</p>
+<p>If the active floating-point types of <em>x</em> and <em>y</em> differ, the active type of the result
+will be the wider among the operands’ types.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – the first operand.</p></li>
+<li><p><strong>y</strong> – the second operand.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>the result of the binary operation.</p>
+</dd>
+<dt class="field-odd">Exception<span class="colon">:</span></dt>
+<dd class="field-odd"><p>any exception raised by the constructors of <a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">number</span></code></a> or by the implementation of the
+underlying arithmetic operation.</p>
+</dd>
+<dt class="field-even">Throws<span class="colon">:</span></dt>
+<dd class="field-even"><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">invalid_argument</span></span></span> – if the active types of <em>x</em> and <em>y</em> differ and they don’t support mixed-mode airthmetics.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyokaeqERK6numberRK6number">
+<span id="_CPPv3N6heyokaeqERK6numberRK6number"></span><span id="_CPPv2N6heyokaeqERK6numberRK6number"></span><span id="heyoka::eq-operator__numberCR.numberCR"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">==</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">y</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyokaeqERK6numberRK6number" title="Permalink to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyokaneERK6numberRK6number">
+<span id="_CPPv3N6heyokaneERK6numberRK6number"></span><span id="_CPPv2N6heyokaneERK6numberRK6number"></span><span id="heyoka::neq-operator__numberCR.numberCR"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">!=</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">y</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyokaneERK6numberRK6number" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Equality comparison operators.</p>
+<p>Two numbers are considered equal if:</p>
+<ul class="simple">
+<li><p>their active types are equal, and</p></li>
+<li><p>their values are equal.</p></li>
+</ul>
+<p>Two NaN values are considered equivalent by these comparison operators.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – the first operand.</p></li>
+<li><p><strong>y</strong> – the second operand.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>the result of the comparison.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyokaltERK6numberRK6number">
+<span id="_CPPv3N6heyokaltERK6numberRK6number"></span><span id="_CPPv2N6heyokaltERK6numberRK6number"></span><span id="heyoka::lt-operator__numberCR.numberCR"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">&lt;</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">x</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">y</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyokaltERK6numberRK6number" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Less-than comparison operator.</p>
+<p><em>x</em> is less than <em>y</em> if:</p>
+<ul class="simple">
+<li><p>the active type of <em>x</em> is narrower than the active type of <em>y</em>, or</p></li>
+<li><p>the active types of <em>x</em> and <em>y</em> are the same, and the value of <em>x</em> is less than the value of <em>y</em>.</p></li>
+</ul>
+<p>NaN values are considered greater than non-NaN values by this operator.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – the first operand.</p></li>
+<li><p><strong>y</strong> – the second operand.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>the result of the comparison.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="standard-library-specialisations">
+<h2>Standard library specialisations<a class="headerlink" href="#standard-library-specialisations" title="Permalink to this heading">#</a></h2>
+<dl class="cpp struct">
+<dt class="sig sig-object cpp" id="_CPPv4IENSt4hashIN6heyoka6numberEEE">
+<span id="_CPPv3IENSt4hashIN6heyoka6numberEEE"></span><span id="_CPPv2IENSt4hashIN6heyoka6numberEEE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">hash</span></span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">heyoka</span></span><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4IENSt4hashIN6heyoka6numberEEE" title="Permalink to this definition">#</a><br /></dt>
+<dd><p>Specialisation of <code class="docutils literal notranslate"><span class="pre">std::hash</span></code> for <a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">heyoka::number</span></code></a>.</p>
+<p>The hash value of NaNs depends only on the active floating-point type. That is, all NaNs
+of a floating-point type hash to the same value.</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NKSt4hashIN6heyoka6numberEEclERKN6heyoka6numberE">
+<span id="_CPPv3NKSt4hashIN6heyoka6numberEEclERKN6heyoka6numberE"></span><span id="_CPPv2NKSt4hashIN6heyoka6numberEEclERKN6heyoka6numberE"></span><span id="std::hash:heyoka::number:::call-operator__heyoka::numberCRC"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">()</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">heyoka</span></span><span class="p"><span class="pre">::</span></span><a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">n</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4NKSt4hashIN6heyoka6numberEEclERKN6heyoka6numberE" title="Permalink to this definition">#</a><br /></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>n</strong> – the input <a class="reference internal" href="#_CPPv4N6heyoka6numberE" title="heyoka::number"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">heyoka::number</span></code></a>.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>a hash value for <em>n</em>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer">
+                  <!-- Previous / next buttons -->
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="variable.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Variables</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="param.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Runtime parameters</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-number-class">The <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">number</span></code> class</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#functions">Functions</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#operators">Operators</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#standard-library-specialisations">Standard library specialisations</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Francesco Biscani, Dario Izzo
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  <p class="copyright">
+    
+      © Copyright 2020, 2021, 2022, 2023 Francesco Biscani, Dario Izzo.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/bootstrap.js?digest=ac02cc09edc035673794"></script>
+<script src="_static/scripts/pydata-sphinx-theme.js?digest=ac02cc09edc035673794"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

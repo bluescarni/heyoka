@@ -9,7 +9,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
-    <title>Advanced tutorials &#8212; heyoka 2.0.0 documentation</title>
+    <title>Keyword arguments &#8212; heyoka 2.0.0 documentation</title>
   
   
   
@@ -41,11 +41,11 @@
     <script src="_static/doctools.js"></script>
     <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/scripts/sphinx-book-theme.js?digest=5a5c038af52cf7bc1a1ec88eea08e6366ee68824"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'advanced_tutorials';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'kwargs';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Batch mode" href="tut_batch_mode.html" />
-    <link rel="prev" title="Event detection" href="tut_events.html" />
+    <link rel="next" title="Exceptions" href="exceptions.html" />
+    <link rel="prev" title="Namespaces" href="namespaces.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -150,7 +150,7 @@
 <li class="toctree-l2"><a class="reference internal" href="tut_events.html">Event detection</a></li>
 </ul>
 </li>
-<li class="toctree-l1 current active has-children"><a class="current reference internal" href="#">Advanced tutorials</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-2"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="advanced_tutorials.html">Advanced tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-2"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="tut_batch_mode.html">Batch mode</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_extended_precision.html">Computations in extended precision</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_arbitrary_precision.html">Computations in arbitrary precision</a></li>
@@ -159,10 +159,10 @@
 <li class="toctree-l2"><a class="reference internal" href="tut_parallel_mode.html">Parallel mode</a></li>
 </ul>
 </li>
-<li class="toctree-l1 has-children"><a class="reference internal" href="api_reference.html">API Reference</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-3"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="api_reference.html">API Reference</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-3"><i class="fa-solid fa-chevron-down"></i></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="definitions.html">Macros and definitions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="namespaces.html">Namespaces</a></li>
-<li class="toctree-l2"><a class="reference internal" href="kwargs.html">Keyword arguments</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Keyword arguments</a></li>
 <li class="toctree-l2"><a class="reference internal" href="exceptions.html">Exceptions</a></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="expression_system.html">Expression system</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-4"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="variable.html">Variables</a></li>
@@ -251,7 +251,7 @@
       
       
       
-      <li><a href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fadvanced_tutorials.html&body=Your%20issue%20content%20here." target="_blank"
+      <li><a href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fkwargs.html&body=Your%20issue%20content%20here." target="_blank"
    class="btn btn-sm btn-source-issues-button dropdown-item"
    title="Open an issue"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -281,7 +281,7 @@
       
       
       
-      <li><a href="_sources/advanced_tutorials.rst" target="_blank"
+      <li><a href="_sources/kwargs.rst" target="_blank"
    class="btn btn-sm btn-download-source-button dropdown-item"
    title="Download source file"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -361,7 +361,7 @@ document.write(`
               
 
 <div id="jb-print-docs-body" class="onlyprint">
-    <h1>Advanced tutorials</h1>
+    <h1>Keyword arguments</h1>
     <!-- Table of contents -->
     <div id="print-main-content">
         <div id="jb-print-toc">
@@ -375,34 +375,9 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article" role="main">
                   
-  <section id="advanced-tutorials">
-<span id="id1"></span><h1>Advanced tutorials<a class="headerlink" href="#advanced-tutorials" title="Permalink to this heading">#</a></h1>
-<div class="admonition important">
-<p class="admonition-title">Important</p>
-<p>More <a class="reference external" href="https://bluescarni.github.io/heyoka.py/advanced_tutorials.html#adv-tutorials" title="(in heyoka.py)"><span class="xref std std-ref">tutorials</span></a> and <a class="reference external" href="https://bluescarni.github.io/heyoka.py/examples.html#examples" title="(in heyoka.py)"><span class="xref std std-ref">examples</span></a> are available in the documentation
-of heyoka’s <a class="reference external" href="https://bluescarni.github.io/heyoka.py">Python bindings</a>.</p>
-</div>
-<p>In this section we will show some of heyoka’s more advanced functionalities,
-including multiprecision computations and vectorisation via batch mode.</p>
-<p>Because in batch mode indexing over the state vector as a flat 1D array
-can quickly become complicated and confusing, in these tutorials we will
-make extensive use of <a class="reference external" href="https://xtensor.readthedocs.io/en/latest/">xtensor</a>,
-a C++ library which, among many other features, provides an API very similar
-to <a class="reference external" href="https://numpy.org/">NumPy</a> for working with multidimensional arrays.
-It is outside the scope of this document to give a full overview on xtensor’s
-API and capabilities. Here, however, we will use only some of xtensor’s most basic
-features, and, for a reader familiar with NumPy and its multidimensional array API,
-the tutorials should not be hard to follow.</p>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="tut_batch_mode.html">Batch mode</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_extended_precision.html">Computations in extended precision</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_arbitrary_precision.html">Computations in arbitrary precision</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_s11n.html">Serialisation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_ensemble.html">Ensemble propagations</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_parallel_mode.html">Parallel mode</a></li>
-</ul>
-</div>
+  <section id="keyword-arguments">
+<span id="kwargs"></span><h1>Keyword arguments<a class="headerlink" href="#keyword-arguments" title="Permalink to this heading">#</a></h1>
+<p>TBD</p>
 </section>
 
 
@@ -417,20 +392,20 @@ the tutorials should not be hard to follow.</p>
                   <!-- Previous / next buttons -->
 <div class="prev-next-area">
     <a class="left-prev"
-       href="tut_events.html"
+       href="namespaces.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Event detection</p>
+        <p class="prev-next-title">Namespaces</p>
       </div>
     </a>
     <a class="right-next"
-       href="tut_batch_mode.html"
+       href="exceptions.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Batch mode</p>
+        <p class="prev-next-title">Exceptions</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>

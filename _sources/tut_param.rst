@@ -20,7 +20,7 @@ for large ODE systems.
 
 In order to avoid having to re-create a new integrator if the value of a constant
 in an expression changes, heyoka's expression system provides a node type,
-called ``param`` (or *runtime parameter*), which
+called :cpp:class:`~heyoka::param` (or *runtime parameter*), which
 represents mathematical constants whose value is not known at the time of
 construction of the expression.
 
@@ -47,7 +47,7 @@ With respect to the previous examples, where :math:`g/l` had been
 hard-coded to ``9.8``, now :math:`g/l` is represented as ``par[0] / par[1]``.
 The syntax ``par[i]`` indicates a runtime parameter that is stored
 at the index ``i`` in an array of parameter values. The array of
-parameter values is optionally passed to the constructor as the keyword argument
+parameter values is optionally passed to the constructor as the :ref:`keyword argument <kwargs>`
 ``kw::pars`` (which, in this case, contains the values ``9.8`` for :math:`g` and ``1.``
 for :math:`l`).
 If an array of parameter values is not passed to the constructor,
