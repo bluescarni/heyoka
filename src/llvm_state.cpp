@@ -364,7 +364,15 @@ struct llvm_state::jit {
         auto lljit = lljit_builder.create();
         // LCOV_EXCL_START
         if (!lljit) {
-            throw std::invalid_argument("Error creating an LLJIT object");
+            auto err = lljit.takeError();
+
+            std::string err_report;
+            llvm::raw_string_ostream ostr(err_report);
+
+            ostr << err;
+
+            throw std::invalid_argument(
+                fmt::format("Could not create an LLJIT object. The full error message is:\n{}", ostr.str()));
         }
         // LCOV_EXCL_STOP
         m_lljit = std::move(*lljit);
