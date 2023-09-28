@@ -782,8 +782,8 @@ TEST_CASE("vsop2013 mus")
     REQUIRE(mus[9] == 2.1886997654259696800e-12);
 }
 
-// Bug: low-precision ephmeris may have zero inclination,
-// which leads to singularities when converting to cartesian.
+// Bug: low-precision solutions may have zero inclination,
+// which leads to singularities when converting to Cartesian.
 TEST_CASE("vsop2013 low prec zero inc")
 {
     auto ex = vsop2013_cartesian(1, kw::time = "tm"_var, kw::thresh = 1e-1)[0];

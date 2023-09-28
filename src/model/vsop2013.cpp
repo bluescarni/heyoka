@@ -348,9 +348,13 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
 
     // Check for zero eccentricity.
     bool zero_ecc = false;
+    // NOTE: not sure if this is possible at all, but better safe than sorry.
+    // Let's exclude it from code coverage checks for the time being.
+    // LCOV_EXCL_START
     if (const auto *num_ptr = std::get_if<number>(&e.value())) {
         zero_ecc = is_zero(*num_ptr);
     }
+    // LCOV_EXCL_STOP
 
     // cos(om), sin(om), q1/a, q2/a.
     expression com, som, q1_a, q2_a;
