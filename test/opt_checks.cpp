@@ -65,6 +65,8 @@ TEST_CASE("pow vect")
 
 #if LLVM_VERSION_MAJOR >= 16
 
+    std::cout << md_ir << '\n';
+
     // NOTE: LLVM16 is currently the version tested in the CI on arm64.
     if (tf.aarch64) {
         REQUIRE(!boost::algorithm::contains(md_ir, "llvm.pow"));
