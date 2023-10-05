@@ -446,8 +446,6 @@ TEST_CASE("vfabi")
 
     auto ir = s.get_ir();
 
-    std::cout << ir << '\n';
-
     using string_find_iterator = boost::find_iterator<std::string::iterator>;
 
     auto count = 0u;
