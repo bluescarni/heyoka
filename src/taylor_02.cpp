@@ -975,6 +975,7 @@ std::pair<llvm::Value *, llvm::Type *> taylor_compute_jet_compact_mode(
         //
         // to pass the data necessary to the parallel workers.
         par_data_t = llvm::StructType::get(context, {builder.getInt32Ty(), ext_fp_ptr_t, ext_fp_ptr_t});
+        // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
         gl_par_data = new llvm::GlobalVariable(md, par_data_t, false, llvm::GlobalVariable::InternalLinkage,
                                                llvm::ConstantAggregateZero::get(par_data_t));
 
