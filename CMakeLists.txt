@@ -174,6 +174,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/cm_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_celmec.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/dfloat.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/num_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/num_identity.cpp"
