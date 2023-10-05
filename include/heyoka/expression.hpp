@@ -20,11 +20,9 @@
 #include <optional>
 #include <ostream>
 #include <sstream>
-#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -79,7 +77,7 @@ private:
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &m_value;
+        ar & m_value;
     }
 
 public:
@@ -138,9 +136,9 @@ HEYOKA_DLL_PUBLIC expression operator""_ldbl(unsigned long long);
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <char... Chars>
-inline expression operator"" _f128()
+inline expression operator""_f128()
 {
-    return expression{mppp::literals::operator"" _rq<Chars...>()};
+    return expression{mppp::literals::operator""_rq < Chars... > ()};
 }
 
 #endif

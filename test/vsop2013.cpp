@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/model/vsop2013.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -779,4 +780,27 @@ TEST_CASE("vsop2013 mus")
     REQUIRE(mus[0] == 2.9591220836841438269e-04);
     REQUIRE(mus[3] == 8.9970116036316091182e-10);
     REQUIRE(mus[9] == 2.1886997654259696800e-12);
+}
+
+// Bug: low-precision solutions may have zero inclination,
+// which leads to singularities when converting to Cartesian.
+TEST_CASE("vsop2013 low prec zero inc")
+{
+    auto ex = vsop2013_cartesian(1, kw::time = "tm"_var, kw::thresh = 1e-1)[0];
+
+    llvm_state s;
+
+    add_cfunc<double>(s, "f", {ex});
+
+    s.compile();
+
+    auto *cf_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("f"));
+
+    double out = 0, in = 0;
+
+    cf_ptr(&out, &in, nullptr, nullptr);
+
+    REQUIRE(!std::isnan(out));
+    REQUIRE(out != 0);
 }

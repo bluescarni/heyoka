@@ -364,7 +364,15 @@ struct llvm_state::jit {
         auto lljit = lljit_builder.create();
         // LCOV_EXCL_START
         if (!lljit) {
-            throw std::invalid_argument("Error creating an LLJIT object");
+            auto err = lljit.takeError();
+
+            std::string err_report;
+            llvm::raw_string_ostream ostr(err_report);
+
+            ostr << err;
+
+            throw std::invalid_argument(
+                fmt::format("Could not create an LLJIT object. The full error message is:\n{}", ostr.str()));
         }
         // LCOV_EXCL_STOP
         m_lljit = std::move(*lljit);
@@ -579,6 +587,7 @@ auto llvm_state_bc_to_module(const std::string &module_name, const std::string &
 
 } // namespace detail
 
+// NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
 llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup)
     : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_fast_math(std::get<2>(tup)),
       m_force_avx512(std::get<3>(tup)), m_slp_vectorize(std::get<4>(tup)), m_module_name(std::move(std::get<0>(tup)))
@@ -1071,11 +1080,10 @@ void llvm_state::optimise()
     // NOTE: the reason for this inconsistency is that opt uses PB.parsePassPipeline()
     // (instead of PB.buildPerModuleDefaultPipeline()) to set up the optimisation
     // pipeline. Indeed, if we replace PB.buildPerModuleDefaultPipeline(ol) with
-    // PB.buildPerModuleDefaultPipeline(MPM, "default<O3>") (which
-    // corresponds to invoking "opt -passes='default<O3>'"), we do NOT need to set
-    // SLP vectorization on here to get the SLP vectorizer. Not sure if we should consider
-    // switching to this alternative way of setting up the optimisation pipeline
-    // in the future.
+    // PB.parsePassPipeline(MPM, "default<O3>") (which corresponds to invoking
+    // "opt -passes='default<O3>'"), we do NOT need to set SLP vectorization on
+    // here to get the SLP vectorizer. Not sure if we should consider switching to this
+    // alternative way of setting up the optimisation pipeline in the future.
     llvm::PipelineTuningOptions pto;
     pto.SLPVectorization = m_slp_vectorize;
     llvm::PassBuilder PB(m_jitter->m_tm.get(), pto);

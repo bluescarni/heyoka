@@ -324,6 +324,12 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
                              qp = sqrt(qp_2);
                          });
 
+    // Check if qp is zero. This indicates a zero inclination orbit.
+    bool zero_inc = false;
+    if (const auto *num_ptr = std::get_if<number>(&qp.value())) {
+        zero_inc = is_zero(*num_ptr);
+    }
+
     // E, e, sqrt(1 - e**2), cos(i), sin(i), cos(Om), sin(Om), sin(E), cos(E)
     expression E, e, sqrt_1me2, ci, si, cOm, sOm, sin_E, cos_E;
     tbb::parallel_invoke(
@@ -337,12 +343,26 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
             ci = 1_dbl - 2_dbl * qp_2;
             si = sqrt(1_dbl - ci * ci);
         },
-        [&]() { cOm = q / qp; }, [&]() { sOm = p / qp; });
+        // NOTE: for zero inclination, set conventionally Om to zero.
+        [&]() { cOm = zero_inc ? 1_dbl : q / qp; }, [&]() { sOm = zero_inc ? 0_dbl : p / qp; });
+
+    // Check for zero eccentricity.
+    bool zero_ecc = false;
+    // NOTE: not sure if this is possible at all, but better safe than sorry.
+    // Let's exclude it from code coverage checks for the time being.
+    // LCOV_EXCL_START
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        zero_ecc = is_zero(*num_ptr);
+    }
+    // LCOV_EXCL_STOP
 
     // cos(om), sin(om), q1/a, q2/a.
     expression com, som, q1_a, q2_a;
-    tbb::parallel_invoke([&]() { com = (k * cOm + h * sOm) / e; }, [&]() { som = (h * cOm - k * sOm) / e; },
-                         [&]() { q1_a = cos_E - e; }, [&]() { q2_a = sqrt_1me2 * sin_E; });
+    tbb::parallel_invoke(
+        // NOTE: for zero eccentricity, set conventionally om to zero.
+        [&]() { com = zero_ecc ? 1_dbl : (k * cOm + h * sOm) / e; },
+        [&]() { som = zero_ecc ? 0_dbl : (h * cOm - k * sOm) / e; }, [&]() { q1_a = cos_E - e; },
+        [&]() { q2_a = sqrt_1me2 * sin_E; });
 
     // Prepare the entries of the rotation matrix, and a few auxiliary quantities.
     expression R00, R01, R10, R11, R20, R21, v_num, v_den;
