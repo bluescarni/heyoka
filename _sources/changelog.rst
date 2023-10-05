@@ -1,6 +1,16 @@
 Changelog
 =========
 
+2.0.1 (unreleased)
+------------------
+
+Fix
+~~~
+
+- Fix orbital elements singularity when using the VSOP2013
+  theory at low precision
+  (`#348 <https://github.com/bluescarni/heyoka/pull/348>`__).
+
 2.0.0 (2023-09-22)
 ------------------
 
