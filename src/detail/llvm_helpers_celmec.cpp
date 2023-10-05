@@ -413,9 +413,12 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto *fE = builder.CreateAlloca(tp);
     // Helper to compute f(E).
     auto fE_compute = [&]() {
-        auto *ret = llvm_fmul(s, ecc, builder.CreateLoad(tp, sin_E));
-        ret = llvm_fsub(s, builder.CreateLoad(tp, retval), ret);
-        return llvm_fsub(s, ret, M);
+        // e*sin(E).
+        auto *e_sinE = llvm_fmul(s, ecc, builder.CreateLoad(tp, sin_E));
+        // E - M.
+        auto *e_m_M = llvm_fsub(s, builder.CreateLoad(tp, retval), M);
+        // E - M - e*sin(E).
+        return llvm_fsub(s, e_m_M, e_sinE);
     };
     // Compute and store the initial value of f(E).
     builder.CreateStore(fE_compute(), fE);
