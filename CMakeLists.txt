@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 2.0.1 LANGUAGES CXX C)
+project(heyoka VERSION 3.0.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -174,6 +174,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/cm_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers_celmec.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/dfloat.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/num_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/num_identity.cpp"
@@ -301,7 +302,7 @@ if(HEYOKA_WITH_SLEEF)
 endif()
 
 # Setup the heyoka ABI version number.
-set(HEYOKA_ABI_VERSION 23)
+set(HEYOKA_ABI_VERSION 24)
 
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.
@@ -347,6 +348,9 @@ if(HEYOKA_ENABLE_IPO)
     unset(_HEYOKA_IPO_RESULT)
     unset(_HEYOKA_IPO_OUTPUT)
 endif()
+
+# Add a define to signal that we are building the library.
+target_compile_definitions(heyoka PRIVATE HEYOKA_BUILD_LIBRARY)
 
 message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
 message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
@@ -539,7 +543,10 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config.cmake"
 install(EXPORT heyoka_export NAMESPACE heyoka:: DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
 # Take care of versioning.
 include(CMakePackageConfigHelpers)
-write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" COMPATIBILITY SameMinorVersion)
+# NOTE: since we use semantic versioning, the correct setting here is SameMajorVersion: it requires equality
+# in the major version, but higher minor versions will be considered compatible. So, if heyoka 2.0.0 is requested
+# and 2.1.0 is found, then all is good. However, the reverse will lead to a failure.
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" COMPATIBILITY SameMajorVersion)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
 
 # Cleanup.

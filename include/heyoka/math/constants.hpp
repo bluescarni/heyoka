@@ -74,14 +74,11 @@ private:
     str_func_t m_str_func;
     std::optional<std::string> m_repr;
 
+    // Serialization.
     friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar &boost::serialization::base_object<func_base>(*this);
-        ar &m_str_func;
-        ar &m_repr;
-    }
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     [[nodiscard]] HEYOKA_DLL_LOCAL llvm::Constant *make_llvm_const(llvm_state &, llvm::Type *) const;
 

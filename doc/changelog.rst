@@ -1,12 +1,19 @@
 Changelog
 =========
 
-2.0.1 (unreleased)
+3.0.0 (unreleased)
 ------------------
 
 Fix
 ~~~
 
+- Prevent accidental leaking in the public headers of
+  serialisation implementation details
+  (`#350 <https://github.com/bluescarni/heyoka/pull/350>`__).
+- Fix wrong version compatibility setting in the CMake config-file package
+  (`#350 <https://github.com/bluescarni/heyoka/pull/350>`__).
+- Work around test failure on ARM + LLVM 17
+  (`#350 <https://github.com/bluescarni/heyoka/pull/350>`__).
 - Fix orbital elements singularity when using the VSOP2013
   theory at low precision
   (`#348 <https://github.com/bluescarni/heyoka/pull/348>`__).

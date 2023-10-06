@@ -65,10 +65,12 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -124,6 +126,16 @@ number &number::operator=(number &&other) noexcept
     }
 
     return *this;
+}
+
+void number::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << m_value;
+}
+
+void number::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> m_value;
 }
 
 const number::value_type &number::value() const noexcept

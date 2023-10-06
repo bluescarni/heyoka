@@ -51,6 +51,7 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/variant_s11n.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -58,6 +59,7 @@
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -122,6 +124,16 @@ expression &expression::operator=(expression &&other) noexcept
     }
 
     return *this;
+}
+
+void expression::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << m_value;
+}
+
+void expression::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> m_value;
 }
 
 const expression::value_type &expression::value() const

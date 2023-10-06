@@ -9,7 +9,6 @@
 #ifndef HEYOKA_CALLABLE_HPP
 #define HEYOKA_CALLABLE_HPP
 
-#include <cassert>
 #include <functional>
 #include <memory>
 #include <type_traits>
@@ -100,7 +99,7 @@ private:
     void serialize(Archive &ar, unsigned)
     {
         ar &boost::serialization::base_object<callable_inner_base<R, Args...>>(*this);
-        ar &m_value;
+        ar & m_value;
     }
 };
 
@@ -122,7 +121,7 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS callable<R(Args...)>
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &m_ptr;
+        ar & m_ptr;
     }
 
     // Dispatching of the generic constructor with specialisation

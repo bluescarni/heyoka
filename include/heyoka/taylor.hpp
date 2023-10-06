@@ -17,11 +17,9 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
-#include <limits>
 #include <memory>
 #include <optional>
 #include <ostream>
-#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -215,6 +213,10 @@ inline void save(Archive &ar, const std::tuple<heyoka::taylor_outcome, Args...> 
         }
     };
 
+    // NOTE: this is a right fold, which, in conjunction with the
+    // builtin comma operator, ensures that the serialisation of
+    // the tuple elements proceeds in the correct order and with
+    // the correct sequencing.
     std::apply([&tf](const auto &...x) { (tf(x), ...); }, tup);
 }
 
@@ -357,9 +359,9 @@ private:
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &eq;
-        ar &callback;
-        ar &dir;
+        ar & eq;
+        ar & callback;
+        ar & dir;
     }
 
     void finalise_ctor(event_direction);
@@ -458,10 +460,10 @@ private:
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &eq;
-        ar &callback;
-        ar &cooldown;
-        ar &dir;
+        ar & eq;
+        ar & callback;
+        ar & cooldown;
+        ar & dir;
     }
 
     void finalise_ctor(callback_t, T, event_direction);
@@ -862,7 +864,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_base<mppp::real, Derived>
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &m_prec;
+        ar & m_prec;
     }
 
 protected:
