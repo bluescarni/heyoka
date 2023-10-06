@@ -17,11 +17,9 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
-#include <limits>
 #include <memory>
 #include <optional>
 #include <ostream>
-#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -357,9 +355,9 @@ private:
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &eq;
-        ar &callback;
-        ar &dir;
+        ar & eq;
+        ar & callback;
+        ar & dir;
     }
 
     void finalise_ctor(event_direction);
@@ -458,10 +456,10 @@ private:
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &eq;
-        ar &callback;
-        ar &cooldown;
-        ar &dir;
+        ar & eq;
+        ar & callback;
+        ar & cooldown;
+        ar & dir;
     }
 
     void finalise_ctor(callback_t, T, event_direction);
@@ -862,7 +860,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_base<mppp::real, Derived>
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &m_prec;
+        ar & m_prec;
     }
 
 protected:
