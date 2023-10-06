@@ -58,6 +58,7 @@
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -122,6 +123,16 @@ expression &expression::operator=(expression &&other) noexcept
     }
 
     return *this;
+}
+
+void expression::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << m_value;
+}
+
+void expression::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> m_value;
 }
 
 const expression::value_type &expression::value() const
