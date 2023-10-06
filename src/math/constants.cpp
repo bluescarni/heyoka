@@ -56,6 +56,7 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/optional_s11n.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -141,6 +142,20 @@ constant::constant(std::string name, str_func_t f, std::optional<std::string> re
     if (!m_str_func) {
         throw std::invalid_argument("Cannot construct a constant with an empty string function");
     }
+}
+
+void constant::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << boost::serialization::base_object<func_base>(*this);
+    ar << m_str_func;
+    ar << m_repr;
+}
+
+void constant::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> boost::serialization::base_object<func_base>(*this);
+    ar >> m_str_func;
+    ar >> m_repr;
 }
 
 // Fetch the internal type of the string
