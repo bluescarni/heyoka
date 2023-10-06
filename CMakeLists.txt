@@ -349,6 +349,9 @@ if(HEYOKA_ENABLE_IPO)
     unset(_HEYOKA_IPO_OUTPUT)
 endif()
 
+# Add a define to signal that we are building the library.
+target_compile_definitions(heyoka PRIVATE HEYOKA_BUILD_LIBRARY)
+
 message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
 message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
 
