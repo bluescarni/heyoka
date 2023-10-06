@@ -13,7 +13,6 @@
 
 #include <cassert>
 #include <cmath>
-#include <string>
 #include <tuple>
 #include <utility>
 
@@ -39,6 +38,7 @@ struct dfloat {
 
     dfloat() : hi(0), lo(0) {}
     explicit dfloat(F x) : hi(x), lo(0) {}
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     explicit dfloat(F h, F l) : hi(h), lo(l) {}
 
     explicit operator F() const
@@ -52,8 +52,8 @@ private:
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &hi;
-        ar &lo;
+        ar & hi;
+        ar & lo;
     }
 };
 
@@ -79,8 +79,8 @@ private:
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &hi;
-        ar &lo;
+        ar & hi;
+        ar & lo;
     }
 };
 

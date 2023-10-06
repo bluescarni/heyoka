@@ -11,7 +11,7 @@
 
 #include <cassert>
 #include <cmath>
-#include <cstddef>
+#include <cstdint>
 
 #include <boost/math/special_functions/binomial.hpp>
 #include <boost/math/tools/config.hpp>

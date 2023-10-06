@@ -22,7 +22,6 @@
 #include <typeindex>
 #include <typeinfo>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -64,8 +63,8 @@ class HEYOKA_DLL_PUBLIC func_base
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &m_name;
-        ar &m_args;
+        ar & m_name;
+        ar & m_args;
     }
 
     // NOTE: func_inner needs access to get_mutable_args_range().
@@ -533,7 +532,7 @@ private:
     void serialize(Archive &ar, unsigned)
     {
         ar &boost::serialization::base_object<func_inner_base>(*this);
-        ar &m_value;
+        ar & m_value;
     }
 };
 
@@ -574,7 +573,7 @@ class HEYOKA_DLL_PUBLIC func
         }
         // LCOV_EXCL_STOP
 
-        ar &m_ptr;
+        ar & m_ptr;
     }
 
     // Just two small helpers to make sure that whenever we require

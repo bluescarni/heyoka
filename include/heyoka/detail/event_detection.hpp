@@ -12,7 +12,6 @@
 #include <heyoka/config.hpp>
 
 #include <cstdint>
-#include <type_traits>
 
 #if defined(HEYOKA_HAVE_REAL128)
 

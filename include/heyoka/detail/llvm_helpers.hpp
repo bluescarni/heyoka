@@ -9,13 +9,11 @@
 #ifndef HEYOKA_DETAIL_LLVM_HELPERS_HPP
 #define HEYOKA_DETAIL_LLVM_HELPERS_HPP
 
-#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
 #include <map>
 #include <string>
-#include <type_traits>
 #include <typeinfo>
 #include <utility>
 #include <vector>
