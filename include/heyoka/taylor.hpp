@@ -213,6 +213,10 @@ inline void save(Archive &ar, const std::tuple<heyoka::taylor_outcome, Args...> 
         }
     };
 
+    // NOTE: this is a right fold, which, in conjunction with the
+    // builtin comma operator, ensures that the serialisation of
+    // the tuple elements proceeds in the correct order and with
+    // the correct sequencing.
     std::apply([&tf](const auto &...x) { (tf(x), ...); }, tup);
 }
 

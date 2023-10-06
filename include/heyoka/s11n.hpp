@@ -143,16 +143,6 @@ inline void serialize(Archive &ar, std::variant<Args...> &var, unsigned v)
     split_free(ar, var, v);
 }
 
-template <typename Archive, typename... Args>
-inline void serialize(Archive &ar, std::tuple<Args...> &tup, unsigned)
-{
-    // NOTE: this is a right fold, which, in conjunction with the
-    // builtin comma operator, ensures that the serialisation of
-    // the tuple elements proceeds in the correct order and with
-    // the correct sequencing.
-    std::apply([&ar](auto &...x) { (void(ar & x), ...); }, tup);
-}
-
 // NOTE: inspired by the boost::optional implementation.
 template <typename Archive, typename T>
 inline void save(Archive &ar, const std::optional<T> &opt, unsigned)
