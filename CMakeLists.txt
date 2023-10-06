@@ -543,7 +543,10 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config.cmake"
 install(EXPORT heyoka_export NAMESPACE heyoka:: DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
 # Take care of versioning.
 include(CMakePackageConfigHelpers)
-write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" COMPATIBILITY SameMinorVersion)
+# NOTE: since we use semantic versioning, the correct setting here is SameMajorVersion: it requires equality
+# in the major version, but higher minor versions will be considered compatible. So, if heyoka 2.0.0 is requested
+# and 2.1.0 is found, then all is good. However, the reverse will lead to a failure.
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" COMPATIBILITY SameMajorVersion)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
 
 # Cleanup.
