@@ -21,6 +21,7 @@
 
 #include <boost/core/demangle.hpp>
 #include <boost/math/constants/constants.hpp>
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/core.h>
 
@@ -220,15 +221,8 @@ std::pair<number, number> inv_kep_E_dl_twopi_like(llvm_state &s, llvm::Type *fp_
 
 #if defined(HEYOKA_HAVE_REAL)
     } else if (const auto prec = llvm_is_real(fp_t)) {
-        // Overflow check.
-        // LCOV_EXCL_START
-        if (prec > std::numeric_limits<mpfr_prec_t>::max() / 4) {
-            throw std::overflow_error("Overflow detected in inv_kep_E_dl_twopi_like()");
-        }
-        // LCOV_EXCL_STOP
-
         // Generate the 2*pi constant with prec * 4 precision.
-        auto twopi = mppp::real_pi(prec * 4);
+        auto twopi = mppp::real_pi(boost::safe_numerics::safe<::mpfr_prec_t>(prec) * 4);
         mppp::mul_2ui(twopi, twopi, 1ul);
 
         // Fetch the hi/lo components in precision prec.
