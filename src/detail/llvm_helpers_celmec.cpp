@@ -333,7 +333,8 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto *ecc
         = builder.CreateSelect(ecc_invalid, llvm_constantfp(s, tp, std::numeric_limits<double>::quiet_NaN()), ecc_arg);
 
-    // Create the return value.
+    // Create the storage for the return value. This will hold the
+    // iteratively-determined value for E.
     auto *retval = builder.CreateAlloca(tp);
 
     // Fetch 2pi in double-length precision.
@@ -384,6 +385,8 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto *ub = llvm_codegen(s, tp, nextafter(dl_twopi_hi, number_like(s, fp_t, 0.)));
     // NOTE: perhaps a dedicated clamp() primitive could give better
     // performance for real?
+    // NOTE: in case ig ends up being NaN (because ecc and/or M are nan or for whatever
+    // other reason), then ig will remain NaN after these comparisons.
     ig = llvm_max(s, ig, lb);
     ig = llvm_min(s, ig, ub);
 
@@ -403,8 +406,6 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     builder.CreateStore(sin_cos_E.first, sin_E);
     builder.CreateStore(sin_cos_E.second, cos_E);
 
-    // Variable to hold the value of f(E) = E - e*sin(E) - M.
-    auto *fE = builder.CreateAlloca(tp);
     // Helper to compute f(E).
     auto fE_compute = [&]() {
         // e*sin(E).
@@ -414,6 +415,8 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         // E - M - e*sin(E).
         return llvm_fsub(s, e_m_M, e_sinE);
     };
+    // Variable to hold the value of f(E) = E - e*sin(E) - M.
+    auto *fE = builder.CreateAlloca(tp);
     // Compute and store the initial value of f(E).
     builder.CreateStore(fE_compute(), fE);
 
@@ -437,6 +440,9 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
 
         // Keep on iterating as long as abs(f(E)) > tol.
         // NOTE: need reduction only in batch mode.
+        // NOTE: if E is NaN, then f(E) is NaN and the condition abs(f(E)) > tol
+        // is false. This means that if a NaN value arises, the iteration will stop
+        // immediately.
         auto *tol_check = llvm_fcmp_ogt(s, llvm_abs(s, builder.CreateLoad(tp, fE)), tol);
         auto *tol_cond = (batch_size == 1u) ? tol_check : builder.CreateOrReduce(tol_check);
 
