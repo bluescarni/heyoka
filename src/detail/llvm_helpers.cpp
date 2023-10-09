@@ -2149,13 +2149,7 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
         auto *cmp1 = llvm_fcmp_olt(s, val, zero);
 
         // Convert to int32.
-        llvm::Type *int_type{};
-        if (auto *v_t = llvm::dyn_cast<llvm_vector_type>(cmp0->getType())) {
-            int_type
-                = make_vector_type(builder.getInt32Ty(), boost::numeric_cast<std::uint32_t>(v_t->getNumElements()));
-        } else {
-            int_type = builder.getInt32Ty();
-        }
+        llvm::Type *int_type = make_vector_type(builder.getInt32Ty(), get_vector_size(val));
         auto *icmp0 = builder.CreateZExt(cmp0, int_type);
         auto *icmp1 = builder.CreateZExt(cmp1, int_type);
 
