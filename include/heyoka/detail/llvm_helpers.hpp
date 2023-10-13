@@ -171,8 +171,9 @@ HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *>
 llvm_penc_cargo_shisha(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
 
 llvm::Function *llvm_add_inv_kep_E(llvm_state &, llvm::Type *, std::uint32_t);
-
 HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper(llvm_state &, llvm::Type *, std::uint32_t, const std::string &);
+
+llvm::Function *llvm_add_inv_kep_F(llvm_state &, llvm::Type *, std::uint32_t);
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array(llvm_state &, llvm::Type *, std::uint32_t);
 
