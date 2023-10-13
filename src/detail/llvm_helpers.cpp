@@ -2132,6 +2132,7 @@ llvm::Value *llvm_max_nan(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
 // Branchless sign function.
 // NOTE: requires FP value.
+// NOTE: this will return 0 if val is NaN.
 llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
 {
     assert(val != nullptr);
@@ -3196,14 +3197,6 @@ llvm::Value *llvm_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
-
-// NOTE: this function will be called by the LLVM implementation
-// of the inverse Kepler function when the maximum number of iterations
-// is exceeded.
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter() noexcept
-{
-    heyoka::detail::get_logger()->warn("iteration limit exceeded while solving the elliptic inverse Kepler equation");
-}
 
 #if !defined(NDEBUG)
 

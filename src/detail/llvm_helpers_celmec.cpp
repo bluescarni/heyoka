@@ -53,7 +53,9 @@
 
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 
@@ -598,3 +600,11 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, llvm::Type *scal_t, std::uint32_t
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
+
+// NOTE: this function will be called by the LLVM implementation
+// of the inverse Kepler function when the maximum number of iterations
+// is exceeded.
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter() noexcept
+{
+    heyoka::detail::get_logger()->warn("iteration limit exceeded while solving the elliptic inverse Kepler equation");
+}
