@@ -273,6 +273,60 @@ number inv_kep_E_eps_like(llvm_state &s, llvm::Type *tp)
     // LCOV_EXCL_STOP
 }
 
+// Helper to clamp the floating-point value x to the range [lb, ub].
+// This is guaranteed to return NaN if x is NaN.
+// NOTE: perhaps a dedicated clamp() primitive could give better
+// performance for real? In such a case, we would need to take
+// care that NaN is handled correctly.
+llvm::Value *llvm_clamp(llvm_state &s, llvm::Value *x, llvm::Value *lb, llvm::Value *ub)
+{
+    // NOTE: if x is NaN, then ret will remain NaN after these comparisons.
+    auto *ret = llvm_max(s, x, lb);
+    ret = llvm_min(s, ret, ub);
+
+    return ret;
+}
+
+// Helper to accurately reduce the input floating-point value x to the standard trigonometric
+// range [0, 2pi). This will return NaN if x is NaN.
+llvm::Value *llvm_trig_arg_reduce(llvm_state &s, llvm::Value *x)
+{
+    // The type of x.
+    auto *tp = x->getType();
+
+    // The scalar type of x.
+    auto *fp_t = tp->getScalarType();
+
+    // NOTE: the current implementation employs double-length arithmetic
+    // to ameliorate catastrophic cancellation. A more rigorous approach
+    // is described in the classic paper:
+    //
+    // https://redirect.cs.umbc.edu/~phatak/645/supl/Ng-ArgReduction.pdf
+    //
+    // Another pragmatic approach is to compute sin(x)/cos(x) (on the assumption
+    // of properly-implemented sin/cos primitives) and then use atan2(). Performance
+    // vs accuracy tradeoff wrt the current approach is to be assessed.
+
+    // Fetch 2pi in double-length precision.
+    const auto [dl_twopi_hi, dl_twopi_lo] = inv_kep_E_dl_twopi_like(s, fp_t);
+
+#if !defined(NDEBUG)
+    assert(dl_twopi_hi == number_like(s, fp_t, 2.) * inv_kep_E_pi_like(s, fp_t)); // LCOV_EXCL_LINE
+#endif
+
+    // Reduce x modulo 2*pi in extended precision.
+    auto *retval = llvm_dl_modulus(s, x, llvm_constantfp(s, tp, 0.), llvm_codegen(s, tp, dl_twopi_hi),
+                                   llvm_codegen(s, tp, dl_twopi_lo))
+                       .first;
+
+    // NOTE: I am not 100% sure that double-length arithmetic is guaranteed to return
+    // a hi part in the [0, 2pi) range for the reduction. Just to be sure, let us further clamp.
+    return llvm_clamp(s, retval, llvm_constantfp(s, tp, 0.),
+                      // NOTE: half-open interval implemented as closed interval with
+                      // upper bound set to the floating-point number immediately preceding 2pi.
+                      llvm_codegen(s, tp, nextafter(dl_twopi_hi, number_like(s, fp_t, 0.))));
+}
+
 } // namespace
 
 // Implementation of the inverse Kepler equation.
@@ -335,21 +389,8 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto *ecc
         = builder.CreateSelect(ecc_invalid, llvm_constantfp(s, tp, std::numeric_limits<double>::quiet_NaN()), ecc_arg);
 
-    // Create the storage for the return value. This will hold the
-    // iteratively-determined value for E.
-    auto *retval = builder.CreateAlloca(tp);
-
-    // Fetch 2pi in double-length precision.
-    const auto [dl_twopi_hi, dl_twopi_lo] = inv_kep_E_dl_twopi_like(s, fp_t);
-
-#if !defined(NDEBUG)
-    assert(dl_twopi_hi == number_like(s, fp_t, 2.) * inv_kep_E_pi_like(s, fp_t)); // LCOV_EXCL_LINE
-#endif
-
-    // Reduce M modulo 2*pi in extended precision.
-    auto *M = llvm_dl_modulus(s, M_arg, llvm_constantfp(s, tp, 0.), llvm_codegen(s, tp, dl_twopi_hi),
-                              llvm_codegen(s, tp, dl_twopi_lo))
-                  .first;
+    // Reduce M to the [0, 2pi) range.
+    auto *M = llvm_trig_arg_reduce(s, M_arg);
 
     // Compute the initial guess from the usual elliptic expansion
     // to the third order in eccentricities:
@@ -382,17 +423,16 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto *ig2 = llvm_fmul(s, tmp3, tmp4);
     auto *ig = llvm_fadd(s, ig1, ig2);
 
-    // Make extra sure the initial guess is in the [0, 2*pi) range.
-    auto *lb = llvm_constantfp(s, tp, 0.);
-    auto *ub = llvm_codegen(s, tp, nextafter(dl_twopi_hi, number_like(s, fp_t, 0.)));
-    // NOTE: perhaps a dedicated clamp() primitive could give better
-    // performance for real?
+    // Clamp the initial guess to the [0, 2pi) range.
     // NOTE: in case ig ends up being NaN (because ecc and/or M are nan or for whatever
-    // other reason), then ig will remain NaN after these comparisons.
-    ig = llvm_max(s, ig, lb);
-    ig = llvm_min(s, ig, ub);
+    // other reason), then ig will remain NaN.
+    auto *lb = llvm_constantfp(s, tp, 0.);
+    auto *ub = llvm_codegen(s, tp, nextafter(inv_kep_E_dl_twopi_like(s, fp_t).first, number_like(s, fp_t, 0.)));
+    ig = llvm_clamp(s, ig, lb, ub);
 
-    // Store it.
+    // Store the initial guess in the storage for the return value. This will hold the
+    // iteratively-determined value for E.
+    auto *retval = builder.CreateAlloca(tp);
     builder.CreateStore(ig, retval);
 
     // Create the counter.
@@ -428,16 +468,20 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // loop can stop because we achieved the desired tolerance.
     // NOTE: this is only allocated, it will be immediately written to
     // the first time loop_cond is evaluated.
+    // NOTE: this needs to persist outside loop_cond because we will use it
+    // after the loop in case we exceeded the max iter number.
     auto *vec_bool_t = make_vector_type(builder.getInt1Ty(), batch_size);
     auto *tol_check_ptr = builder.CreateAlloca(vec_bool_t);
 
     // Define the stopping condition functor.
-    // NOTE: hard-code this for the time being.
+    // NOTE: hard-code max_iter for the time being. It would probably
+    // make sense to make it dependent on the epsilon of fp_t though?
     auto *max_iter = builder.getInt32(50);
     auto loop_cond
         = [&,
            // NOTE: tolerance is 4 * eps.
            tol = llvm_codegen(s, tp, inv_kep_E_eps_like(s, fp_t) * number_like(s, fp_t, 4.))]() -> llvm::Value * {
+        // Check the number of iterations.
         auto *c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
 
         // Keep on iterating as long as abs(f(E)) > tol.
@@ -457,11 +501,11 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
 
     // Run the loop.
     llvm_while_loop(s, loop_cond, [&, one_c = llvm_constantfp(s, tp, 1.)]() {
-        // Compute the new value.
+        // Compute the new value via the Newton-Raphson formula.
         auto *old_val = builder.CreateLoad(tp, retval);
-        auto *new_val = llvm_fdiv(s, builder.CreateLoad(tp, fE),
-                                  llvm_fsub(s, one_c, llvm_fmul(s, ecc, builder.CreateLoad(tp, cos_E))));
-        new_val = llvm_fsub(s, old_val, new_val);
+        auto *fdiv = llvm_fdiv(s, builder.CreateLoad(tp, fE),
+                               llvm_fsub(s, one_c, llvm_fmul(s, ecc, builder.CreateLoad(tp, cos_E))));
+        auto *new_val = llvm_fsub(s, old_val, fdiv);
 
         // Bisect if new_val > ub.
         // NOTE: '>' is fine here, ub is the maximum allowed value.
