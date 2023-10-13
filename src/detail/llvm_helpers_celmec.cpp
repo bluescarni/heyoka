@@ -329,7 +329,7 @@ llvm::Value *llvm_trig_arg_reduce(llvm_state &s, llvm::Value *x)
 
 } // namespace
 
-// Implementation of the inverse Kepler equation.
+// Implementation of the inverse Kepler equation for the eccentric anomaly E.
 llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size)
 {
     assert(batch_size > 0u);

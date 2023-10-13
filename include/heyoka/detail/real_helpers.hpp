@@ -34,6 +34,7 @@ llvm::Value *llvm_real_fneg(llvm_state &, llvm ::Value *);
 llvm::Function *real_nary_op(llvm_state &, llvm::Type *, const std::string &, unsigned);
 std::pair<llvm::Value *, llvm::Value *> llvm_real_sincos(llvm_state &, llvm::Value *);
 llvm::Value *llvm_real_fcmp_ult(llvm_state &, llvm::Value *, llvm::Value *);
+llvm::Value *llvm_real_fcmp_uge(llvm_state &, llvm::Value *, llvm::Value *);
 llvm::Value *llvm_real_fcmp_oge(llvm_state &, llvm::Value *, llvm::Value *);
 llvm::Value *llvm_real_fcmp_ole(llvm_state &, llvm::Value *, llvm::Value *);
 llvm::Value *llvm_real_fcmp_olt(llvm_state &, llvm::Value *, llvm::Value *);
