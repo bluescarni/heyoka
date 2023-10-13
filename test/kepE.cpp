@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -18,7 +17,6 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
-#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
