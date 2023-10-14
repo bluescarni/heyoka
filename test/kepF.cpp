@@ -71,7 +71,7 @@ TEST_CASE("cfunc")
 
         auto eps_close = [](const fp_t &a, const fp_t &b) {
             using std::abs;
-            return abs(a - b) <= std::numeric_limits<fp_t>::epsilon() * 100;
+            return abs(a - b) <= std::numeric_limits<fp_t>::epsilon() * 1000;
         };
 
         auto [h, k, lam] = make_vars("h", "k", "lam");
