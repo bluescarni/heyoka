@@ -160,6 +160,49 @@ expression kepF(expression h, expression k, expression lam)
     return expression{func{detail::kepF_impl{std::move(h), std::move(k), std::move(lam)}}};
 }
 
+#define HEYOKA_DEFINE_KEPF_OVERLOADS(type)                                                                             \
+    expression kepF(expression h, type k, type lam)                                                                    \
+    {                                                                                                                  \
+        return kepF(std::move(h), expression{std::move(k)}, expression{std::move(lam)});                               \
+    }                                                                                                                  \
+    expression kepF(type h, expression k, type lam)                                                                    \
+    {                                                                                                                  \
+        return kepF(expression{std::move(h)}, std::move(k), expression{std::move(lam)});                               \
+    }                                                                                                                  \
+    expression kepF(type h, type k, expression lam)                                                                    \
+    {                                                                                                                  \
+        return kepF(expression{std::move(h)}, expression{std::move(k)}, std::move(lam));                               \
+    }                                                                                                                  \
+    expression kepF(expression h, expression k, type lam)                                                              \
+    {                                                                                                                  \
+        return kepF(std::move(h), std::move(k), expression{std::move(lam)});                                           \
+    }                                                                                                                  \
+    expression kepF(expression h, type k, expression lam)                                                              \
+    {                                                                                                                  \
+        return kepF(std::move(h), expression{std::move(k)}, std::move(lam));                                           \
+    }                                                                                                                  \
+    expression kepF(type h, expression k, expression lam)                                                              \
+    {                                                                                                                  \
+        return kepF(expression{std::move(h)}, std::move(k), std::move(lam));                                           \
+    }
+
+HEYOKA_DEFINE_KEPF_OVERLOADS(double)
+HEYOKA_DEFINE_KEPF_OVERLOADS(long double)
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DEFINE_KEPF_OVERLOADS(mppp::real128);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_DEFINE_KEPF_OVERLOADS(mppp::real);
+
+#endif
+
+#undef HEYOKA_DEFINE_KEPF_OVERLOADS
+
 HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::kepF_impl)

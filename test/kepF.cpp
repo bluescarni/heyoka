@@ -106,6 +106,64 @@ TEST_CASE("kepF diff")
     }
 }
 
+#define HEYOKA_TEST_KEPF_OVERLOAD(type)                                                                                \
+    {                                                                                                                  \
+        auto k = kepF("x"_var, static_cast<type>(1.1), static_cast<type>(1.3));                                        \
+        REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);                                                       \
+        REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{static_cast<type>(1.1)});      \
+        REQUIRE(std::get<number>(std::get<func>(k.value()).args()[2].value()) == number{static_cast<type>(1.3)});      \
+    }                                                                                                                  \
+    {                                                                                                                  \
+        auto k = kepF(static_cast<type>(1.1), "y"_var, static_cast<type>(1.3));                                        \
+        REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{static_cast<type>(1.1)});      \
+        REQUIRE(std::get<func>(k.value()).args()[1] == "y"_var);                                                       \
+        REQUIRE(std::get<number>(std::get<func>(k.value()).args()[2].value()) == number{static_cast<type>(1.3)});      \
+    }                                                                                                                  \
+    {                                                                                                                  \
+        auto k = kepF(static_cast<type>(1.1), static_cast<type>(1.3), "z"_var);                                        \
+        REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{static_cast<type>(1.1)});      \
+        REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{static_cast<type>(1.3)});      \
+        REQUIRE(std::get<func>(k.value()).args()[2] == "z"_var);                                                       \
+    }                                                                                                                  \
+    {                                                                                                                  \
+        auto k = kepF("x"_var, "y"_var, static_cast<type>(1.3));                                                       \
+        REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);                                                       \
+        REQUIRE(std::get<func>(k.value()).args()[1] == "y"_var);                                                       \
+        REQUIRE(std::get<number>(std::get<func>(k.value()).args()[2].value()) == number{static_cast<type>(1.3)});      \
+    }                                                                                                                  \
+    {                                                                                                                  \
+        auto k = kepF("x"_var, static_cast<type>(1.3), "z"_var);                                                       \
+        REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);                                                       \
+        REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{static_cast<type>(1.3)});      \
+        REQUIRE(std::get<func>(k.value()).args()[2] == "z"_var);                                                       \
+    }                                                                                                                  \
+    {                                                                                                                  \
+        auto k = kepF(static_cast<type>(1.3), "y"_var, "z"_var);                                                       \
+        REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{static_cast<type>(1.3)});      \
+        REQUIRE(std::get<func>(k.value()).args()[1] == "y"_var);                                                       \
+        REQUIRE(std::get<func>(k.value()).args()[2] == "z"_var);                                                       \
+    }
+
+TEST_CASE("kepF overloads")
+{
+    HEYOKA_TEST_KEPF_OVERLOAD(double);
+    HEYOKA_TEST_KEPF_OVERLOAD(long double);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    HEYOKA_TEST_KEPF_OVERLOAD(mppp::real128);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    HEYOKA_TEST_KEPF_OVERLOAD(mppp::real);
+
+#endif
+}
+
+#undef HEYOKA_TEST_KEPF_OVERLOAD
+
 TEST_CASE("kepF s11n")
 {
     std::stringstream ss;

@@ -64,6 +64,31 @@ public:
 
 HEYOKA_DLL_PUBLIC expression kepF(expression, expression, expression);
 
+#define HEYOKA_DECLARE_KEPF_OVERLOADS(type)                                                                            \
+    HEYOKA_DLL_PUBLIC expression kepF(expression, type, type);                                                         \
+    HEYOKA_DLL_PUBLIC expression kepF(type, expression, type);                                                         \
+    HEYOKA_DLL_PUBLIC expression kepF(type, type, expression);                                                         \
+    HEYOKA_DLL_PUBLIC expression kepF(expression, expression, type);                                                   \
+    HEYOKA_DLL_PUBLIC expression kepF(expression, type, expression);                                                   \
+    HEYOKA_DLL_PUBLIC expression kepF(type, expression, expression)
+
+HEYOKA_DECLARE_KEPF_OVERLOADS(double);
+HEYOKA_DECLARE_KEPF_OVERLOADS(long double);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DECLARE_KEPF_OVERLOADS(mppp::real128);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_DECLARE_KEPF_OVERLOADS(mppp::real);
+
+#endif
+
+#undef HEYOKA_DECLARE_KEPF_OVERLOADS
+
 HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::kepF_impl)
