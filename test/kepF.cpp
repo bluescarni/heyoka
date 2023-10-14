@@ -65,8 +65,15 @@ constexpr bool skip_batch_ld =
 
 TEST_CASE("cfunc")
 {
+    using std::isnan;
+
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using fp_t = decltype(fp_x);
+
+        auto eps_close = [](const fp_t &a, const fp_t &b) {
+            using std::abs;
+            return abs(a - b) <= std::numeric_limits<fp_t>::epsilon() * 10;
+        };
 
         auto [h, k, lam] = make_vars("h", "k", "lam");
 
@@ -129,7 +136,6 @@ TEST_CASE("cfunc")
             cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
 
             for (auto i = 0u; i < batch_size; ++i) {
-                using std::isnan;
                 using std::cos;
                 using std::sin;
 
@@ -139,8 +145,8 @@ TEST_CASE("cfunc")
                 auto hval = ins[i];
                 auto kval = ins[i + batch_size];
                 auto lamval = ins[i + 2u * batch_size];
-                REQUIRE(cos(lamval) == approximately(cos(Fval + hval * cos(Fval) - kval * sin(Fval)), fp_t(10000)));
-                REQUIRE(sin(lamval) == approximately(sin(Fval + hval * cos(Fval) - kval * sin(Fval)), fp_t(10000)));
+                REQUIRE(eps_close(cos(lamval), cos(Fval + hval * cos(Fval) - kval * sin(Fval))));
+                REQUIRE(eps_close(sin(lamval), sin(Fval + hval * cos(Fval) - kval * sin(Fval))));
 
                 // Second output.
                 REQUIRE(!isnan(outs[i + batch_size]));
@@ -148,8 +154,8 @@ TEST_CASE("cfunc")
                 hval = pars[i];
                 kval = pars[i + batch_size];
                 lamval = ins[i + 2u * batch_size];
-                REQUIRE(cos(lamval) == approximately(cos(Fval + hval * cos(Fval) - kval * sin(Fval)), fp_t(10000)));
-                REQUIRE(sin(lamval) == approximately(sin(Fval + hval * cos(Fval) - kval * sin(Fval)), fp_t(10000)));
+                REQUIRE(eps_close(cos(lamval), cos(Fval + hval * cos(Fval) - kval * sin(Fval))));
+                REQUIRE(eps_close(sin(lamval), sin(Fval + hval * cos(Fval) - kval * sin(Fval))));
 
                 // Third output.
                 REQUIRE(!isnan(outs[i + batch_size * 2u]));
@@ -157,8 +163,8 @@ TEST_CASE("cfunc")
                 hval = .5;
                 kval = .3;
                 lamval = ins[i + 2u * batch_size];
-                REQUIRE(cos(lamval) == approximately(cos(Fval + hval * cos(Fval) - kval * sin(Fval)), fp_t(10000)));
-                REQUIRE(sin(lamval) == approximately(sin(Fval + hval * cos(Fval) - kval * sin(Fval)), fp_t(10000)));
+                REQUIRE(eps_close(cos(lamval), cos(Fval + hval * cos(Fval) - kval * sin(Fval))));
+                REQUIRE(eps_close(sin(lamval), sin(Fval + hval * cos(Fval) - kval * sin(Fval))));
             }
         }
     };
@@ -171,4 +177,46 @@ TEST_CASE("cfunc")
             tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
+
+    // Check nan/invalid values handling.
+    auto [h, k, lam] = make_vars("h", "k", "lam");
+
+    llvm_state s;
+
+    add_cfunc<double>(s, "cfunc", {kepF(h, k, lam)});
+
+    s.compile();
+
+    auto *cf_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+
+    double out = 0;
+    double ins[3] = {.1, .2, std::numeric_limits<double>::quiet_NaN()};
+    cf_ptr(&out, ins, nullptr, nullptr);
+
+    REQUIRE(isnan(out));
+
+    ins[0] = std::numeric_limits<double>::quiet_NaN();
+    ins[1] = .2;
+    ins[2] = 1.;
+
+    cf_ptr(&out, ins, nullptr, nullptr);
+
+    REQUIRE(isnan(out));
+
+    ins[0] = .2;
+    ins[1] = std::numeric_limits<double>::quiet_NaN();
+    ins[2] = 1.;
+
+    cf_ptr(&out, ins, nullptr, nullptr);
+
+    REQUIRE(isnan(out));
+
+    ins[0] = .2;
+    ins[1] = 1.;
+    ins[2] = 1.;
+
+    cf_ptr(&out, ins, nullptr, nullptr);
+
+    REQUIRE(isnan(out));
 }
