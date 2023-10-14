@@ -757,8 +757,9 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // Clamp the initial guess to the [0, 2pi) range.
     // NOTE: in case ig ends up being NaN (because the arguments are nan or for whatever
     // other reason), then ig will remain NaN.
+    const auto twopi_num = inv_kep_E_dl_twopi_like(s, fp_t).first;
     auto *lb = llvm_constantfp(s, tp, 0.);
-    auto *ub = llvm_codegen(s, tp, nextafter(inv_kep_E_dl_twopi_like(s, fp_t).first, number_like(s, fp_t, 0.)));
+    auto *ub = llvm_codegen(s, tp, nextafter(twopi_num, number_like(s, fp_t, 0.)));
     ig = llvm_clamp(s, ig, lb, ub);
 
     // Store the initial guess in the storage for the return value. This will hold the
@@ -832,6 +833,11 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
         return builder.CreateSelect(c_cond, tol_cond, llvm::ConstantInt::get(tol_cond->getType(), 0u));
     };
 
+    // Compute the bisection bounds - i.e., the bounds which are guaranteed
+    // to contain the root. These are [-1, 2pi + 1).
+    auto *lb_bisec = llvm_constantfp(s, tp, -1.);
+    auto *ub_bisec = llvm_codegen(s, tp, nextafter(twopi_num + number_like(s, fp_t, 1.), number_like(s, fp_t, 0.)));
+
     // Run the loop.
     llvm_while_loop(s, loop_cond, [&, one_c = llvm_constantfp(s, tp, 1.)]() {
         // Compute the new value via the Newton-Raphson formula.
@@ -841,17 +847,16 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
         auto *fdiv = llvm_fdiv(s, builder.CreateLoad(tp, fF), diff);
         auto *new_val = llvm_fsub(s, old_val, fdiv);
 
-        // Bisect if new_val > ub.
-        // NOTE: '>' is fine here, ub is the maximum allowed value.
-        auto *bcheck = llvm_fcmp_ogt(s, new_val, ub);
+        // Bisect if new_val > ub_bisec.
+        auto *bcheck = llvm_fcmp_ogt(s, new_val, ub_bisec);
         new_val = builder.CreateSelect(
-            bcheck, llvm_fmul(s, llvm_codegen(s, tp, number_like(s, fp_t, 1. / 2)), llvm_fadd(s, old_val, ub)),
+            bcheck, llvm_fmul(s, llvm_codegen(s, tp, number_like(s, fp_t, 1. / 2)), llvm_fadd(s, old_val, ub_bisec)),
             new_val);
 
-        // Bisect if new_val < lb.
-        bcheck = llvm_fcmp_olt(s, new_val, lb);
+        // Bisect if new_val < lb_bisec.
+        bcheck = llvm_fcmp_olt(s, new_val, lb_bisec);
         new_val = builder.CreateSelect(
-            bcheck, llvm_fmul(s, llvm_codegen(s, tp, number_like(s, fp_t, 1. / 2)), llvm_fadd(s, old_val, lb)),
+            bcheck, llvm_fmul(s, llvm_codegen(s, tp, number_like(s, fp_t, 1. / 2)), llvm_fadd(s, old_val, lb_bisec)),
             new_val);
 
         // Store the new value.
@@ -889,8 +894,24 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
         },
         []() {});
 
+    // Load the result.
+    llvm::Value *ret = builder.CreateLoad(tp, retval);
+
+    // Codegen 2pi, used below.
+    auto *twopi_const = llvm_codegen(s, tp, twopi_num);
+
+    // Reduce the result to the standard trigonometric range [0, 2pi).
+    // NOTE: this reduction will not change ret if it is NaN.
+    // Is ret < 0?
+    auto *ret_lt_0 = llvm_fcmp_olt(s, ret, llvm_constantfp(s, tp, 0.));
+    ret = builder.CreateSelect(ret_lt_0, llvm_fadd(s, twopi_const, ret), ret);
+
+    // Is ret >= 2pi?
+    auto *ret_ge_2pi = llvm_fcmp_oge(s, ret, twopi_const);
+    ret = builder.CreateSelect(ret_ge_2pi, llvm_fsub(s, ret, twopi_const), ret);
+
     // Return the result.
-    builder.CreateRet(builder.CreateLoad(tp, retval));
+    builder.CreateRet(ret);
 
     // Verify.
     s.verify_function(f);
