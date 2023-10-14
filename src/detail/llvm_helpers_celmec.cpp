@@ -508,6 +508,9 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         auto *new_val = llvm_fsub(s, old_val, fdiv);
 
         // Bisect if new_val > ub.
+        // NOTE: for the bisection we can use the same [0, 2pi) bounds
+        // used earlier to clamp the initial guess. This is because
+        // for an M in [0, 2pi), E is also in [0, 2pi).
         // NOTE: '>' is fine here, ub is the maximum allowed value.
         auto *bcheck = llvm_fcmp_ogt(s, new_val, ub);
         new_val = builder.CreateSelect(
