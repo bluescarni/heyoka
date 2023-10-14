@@ -42,14 +42,17 @@ class HEYOKA_DLL_PUBLIC kepF_impl : public func_base
 {
     friend class boost::serialization::access;
     template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar &boost::serialization::base_object<func_base>(*this);
-    }
+    HEYOKA_DLL_LOCAL void serialize(Archive &, unsigned);
+
+    template <typename T>
+    HEYOKA_DLL_LOCAL expression diff_impl(funcptr_map<expression> &, const T &) const;
 
 public:
     kepF_impl();
     explicit kepF_impl(expression, expression, expression);
+
+    expression diff(funcptr_map<expression> &, const std::string &) const;
+    expression diff(funcptr_map<expression> &, const param &) const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;

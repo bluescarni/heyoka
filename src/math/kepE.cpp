@@ -55,6 +55,7 @@
 #include <heyoka/math/kepE.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>

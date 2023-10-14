@@ -33,7 +33,9 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepF.hpp>
+#include <heyoka/math/sin.hpp>
 
 #include "catch.hpp"
 #include "test_utils.hpp"
@@ -61,6 +63,46 @@ constexpr bool skip_batch_ld =
     false
 #endif
     ;
+
+TEST_CASE("kepF def ctor")
+{
+    detail::kepF_impl k;
+
+    REQUIRE(k.args().size() == 3u);
+    REQUIRE(k.args()[0] == 0_dbl);
+    REQUIRE(k.args()[1] == 0_dbl);
+    REQUIRE(k.args()[2] == 0_dbl);
+}
+
+TEST_CASE("kepF diff")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    {
+        REQUIRE(diff(kepF(x, y, z), x)
+                == -cos(kepF(x, y, z)) / (1_dbl - x * sin(kepF(x, y, z)) - y * cos(kepF(x, y, z))));
+        REQUIRE(diff(kepF(x, y, z), y)
+                == sin(kepF(x, y, z)) / (1_dbl - x * sin(kepF(x, y, z)) - y * cos(kepF(x, y, z))));
+        REQUIRE(diff(kepF(x, y, z), z) == 1_dbl / (1_dbl - x * sin(kepF(x, y, z)) - y * cos(kepF(x, y, z))));
+        auto F = kepF(x * x, x * y, x * z);
+        REQUIRE(diff(F, x) == (y * sin(F) - 2_dbl * x * cos(F) + z) / (1_dbl - x * x * sin(F) - x * y * cos(F)));
+        REQUIRE(diff(F, y) == (x * sin(F)) / (1_dbl - x * x * sin(F) - x * y * cos(F)));
+    }
+
+    {
+        REQUIRE(diff(kepF(par[0], y, z), par[0])
+                == -cos(kepF(par[0], y, z)) / (1_dbl - par[0] * sin(kepF(par[0], y, z)) - y * cos(kepF(par[0], y, z))));
+        REQUIRE(diff(kepF(x, par[1], z), par[1])
+                == sin(kepF(x, par[1], z)) / (1_dbl - x * sin(kepF(x, par[1], z)) - par[1] * cos(kepF(x, par[1], z))));
+        REQUIRE(diff(kepF(x, y, par[2]), par[2])
+                == 1_dbl / (1_dbl - x * sin(kepF(x, y, par[2])) - y * cos(kepF(x, y, par[2]))));
+        auto F = kepF(par[0] * par[0], par[0] * par[1], par[0] * par[2]);
+        REQUIRE(diff(F, par[0])
+                == (par[1] * sin(F) - 2_dbl * par[0] * cos(F) + par[2])
+                       / (1_dbl - par[0] * par[0] * sin(F) - par[0] * par[1] * cos(F)));
+        REQUIRE(diff(F, par[1]) == (par[0] * sin(F)) / (1_dbl - par[0] * par[0] * sin(F) - par[0] * par[1] * cos(F)));
+    }
+}
 
 TEST_CASE("cfunc")
 {
