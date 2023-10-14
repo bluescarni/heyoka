@@ -12,6 +12,7 @@
 #include <initializer_list>
 #include <limits>
 #include <random>
+#include <sstream>
 #include <tuple>
 #include <vector>
 
@@ -36,6 +37,7 @@
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepF.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 #include "test_utils.hpp"
@@ -102,6 +104,31 @@ TEST_CASE("kepF diff")
                        / (1_dbl - par[0] * par[0] * sin(F) - par[0] * par[1] * cos(F)));
         REQUIRE(diff(F, par[1]) == (par[0] * sin(F)) / (1_dbl - par[0] * par[0] * sin(F) - par[0] * par[1] * cos(F)));
     }
+}
+
+TEST_CASE("kepF s11n")
+{
+    std::stringstream ss;
+
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    auto ex = kepF(x, y, z);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == kepF(x, y, z));
 }
 
 TEST_CASE("cfunc")
