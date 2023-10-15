@@ -504,6 +504,13 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         //   of the bounds). This is what Boost's bisection implementation does,
         //   but I am not sure I understand if/how this works in case of a root
         //   equal to or very close to zero.
+        // In the future, we should consider:
+        // - understanding and enabling bounding range checking with relative tolerance,
+        // - take a further step if we stop because abs(f(E)) < tol and the magnitude
+        //   of the derivative of f(E) is less than 1: use the value of
+        //   the derivative of f(E) (computed during the NR step) to find a small bounding
+        //   range and take a few bisection steps to refine the solution. Or maybe directly
+        //   compute the position of the root using the linear approximation of f(E)?
         auto *tol = llvm_codegen(s, tp, inv_kep_E_eps_like(s, fp_t) * number_like(s, fp_t, 4.));
 
         // Load the current values of f(E) and E.
