@@ -402,7 +402,7 @@ TEST_CASE("cfunc mp")
 
     std::uniform_real_distribution<double> lam_dist(-1e5, 1e5), h_dist(std::nextafter(-1., 0.), 1.);
 
-    auto generate_hk = [&h_dist]() {
+    auto generate_hk = [&]() {
         // Generate h.
         auto h_val = h_dist(rng);
 
