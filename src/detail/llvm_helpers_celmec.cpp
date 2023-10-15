@@ -423,12 +423,22 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto *ig2 = llvm_fmul(s, tmp3, tmp4);
     auto *ig = llvm_fadd(s, ig1, ig2);
 
-    // Clamp the initial guess to the [0, 2pi) range.
-    // NOTE: in case ig ends up being NaN (because ecc and/or M are nan or for whatever
+    // Compute the initial bounding range - that is, the bounds for E which
+    // are guaranteed to contain the root. These are [0, 2pi).
+    const auto twopi_num = inv_kep_E_dl_twopi_like(s, fp_t).first;
+    auto *lb_init = llvm_constantfp(s, tp, 0.);
+    auto *ub_init = llvm_codegen(s, tp, nextafter(twopi_num, number_like(s, fp_t, 0.)));
+
+    // Store them.
+    auto *lb_storage = builder.CreateAlloca(tp);
+    auto *ub_storage = builder.CreateAlloca(tp);
+    builder.CreateStore(lb_init, lb_storage);
+    builder.CreateStore(ub_init, ub_storage);
+
+    // Clamp the initial guess to the initial bounding range.
+    // NOTE: in case ig ends up being NaN (because the arguments are NaN or for whatever
     // other reason), then ig will remain NaN.
-    auto *lb = llvm_constantfp(s, tp, 0.);
-    auto *ub = llvm_codegen(s, tp, nextafter(inv_kep_E_dl_twopi_like(s, fp_t).first, number_like(s, fp_t, 0.)));
-    ig = llvm_clamp(s, ig, lb, ub);
+    ig = llvm_clamp(s, ig, lb_init, ub_init);
 
     // Store the initial guess in the storage for the return value. This will hold the
     // iteratively-determined value for E.
@@ -463,7 +473,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     builder.CreateStore(fE_compute(), fE);
 
     // Create a variable to hold the result of the tolerance check
-    // computed at the beginning of each iteration of the main loop.
+    // computed at the beginning of each iteration of the NR loop.
     // This is "true" if the loop needs to continue, or "false" if the
     // loop can stop because we achieved the desired tolerance.
     // NOTE: this is only allocated, it will be immediately written to
@@ -473,55 +483,94 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto *vec_bool_t = make_vector_type(builder.getInt1Ty(), batch_size);
     auto *tol_check_ptr = builder.CreateAlloca(vec_bool_t);
 
-    // Define the stopping condition functor.
+    // Define the continuing condition functor. This will return "true"
+    // if the NR loop needs to continue, "false" if it can be stopped
+    // (either because a solution has been found, or because the max
+    // number of iterations has been exceeded).
     // NOTE: hard-code max_iter for the time being. It would probably
     // make sense to make it dependent on the epsilon of fp_t though?
     auto *max_iter = builder.getInt32(50);
-    auto loop_cond
-        = [&,
-           // NOTE: tolerance is 4 * eps.
-           tol = llvm_codegen(s, tp, inv_kep_E_eps_like(s, fp_t) * number_like(s, fp_t, 4.))]() -> llvm::Value * {
-        // Check the number of iterations.
-        auto *c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
+    auto loop_cond = [&]() -> llvm::Value * {
+        // NOTE: we use an *absolute* tolerance of 4*eps for both the check
+        // on the magnitude of f(E) and on the magnitude of the bounding
+        // range. This of course means that the final result is not guaranteed
+        // to be the best possible approximation of E, for at least the
+        // following reasons:
+        // - abs(f(E)) < tol is a poor criterion when the derivative of
+        //   f(E) is small, because large variations in E result in small
+        //   variations of f(E);
+        // - the check on the bounding range should not use an absolute
+        //   tolerance but a relative one (i.e., rescaled wrt the extrema
+        //   of the bounds). This is what Boost's bisection implementation does,
+        //   but I am not sure I understand if/how this works in case of a root
+        //   equal to or very close to zero.
+        auto *tol = llvm_codegen(s, tp, inv_kep_E_eps_like(s, fp_t) * number_like(s, fp_t, 4.));
 
-        // Keep on iterating as long as abs(f(E)) > tol.
-        // NOTE: need reduction only in batch mode.
-        // NOTE: if E is NaN, then f(E) is NaN and the condition abs(f(E)) > tol
-        // is false. This means that if a NaN value arises, the iteration will stop
-        // immediately.
-        auto *tol_check = llvm_fcmp_ogt(s, llvm_abs(s, builder.CreateLoad(tp, fE)), tol);
+        // Load the current values of f(E) and E.
+        auto *cur_fE = builder.CreateLoad(tp, fE);
+        auto *cur_E = builder.CreateLoad(tp, retval);
+
+        // Compute the sign of f(E).
+        // NOTE: this will be zero if f(E) is NaN.
+        auto *fE_sgn = llvm_sgn(s, cur_fE);
+
+        // Update the bounds.
+        // NOTE: if f(E) is NaN, then new_ub/new_lb will also be set to NaN.
+        auto *cur_ub = builder.CreateLoad(tp, ub_storage);
+        auto *cur_lb = builder.CreateLoad(tp, lb_storage);
+        auto *zero_c = vector_splat(builder, builder.getInt32(0), batch_size);
+        auto *new_ub = builder.CreateSelect(builder.CreateICmpSGE(fE_sgn, zero_c), cur_E, cur_ub);
+        auto *new_lb = builder.CreateSelect(builder.CreateICmpSLE(fE_sgn, zero_c), cur_E, cur_lb);
+        builder.CreateStore(new_ub, ub_storage);
+        builder.CreateStore(new_lb, lb_storage);
+
+        // Compute the size of the new bounding range.
+        auto *bsize = llvm_fsub(s, new_ub, new_lb);
+
+        // First tolerance check: abs(f(E)) > tol.
+        // NOTE: if E is NaN, then f(E) is NaN and tol1_check is false.
+        auto *tol1_check = llvm_fcmp_ogt(s, llvm_abs(s, cur_fE), tol);
+
+        // Second tolerance check: (ub - lb) > tol.
+        // NOTE: if E is NaN, then tol2_check is false.
+        auto *tol2_check = llvm_fcmp_ogt(s, bsize, tol);
+
+        // Put them together with a logical AND.
+        auto *tol_check
+            = builder.CreateSelect(tol1_check, tol2_check, llvm::ConstantInt::get(tol2_check->getType(), 0u));
+        // NOTE: we need OR reduction in batch mode: continue if *any* element of the batch
+        // needs more iterations.
         auto *tol_cond = (batch_size == 1u) ? tol_check : builder.CreateOrReduce(tol_check);
 
         // Store the result of the tolerance check.
         builder.CreateStore(tol_check, tol_check_ptr);
 
-        // NOTE: this is a way of creating a logical AND.
+        // Check the number of iterations.
+        auto *c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
+
+        // Combine tolerance check and number of iterations check with a logical AND.
         return builder.CreateSelect(c_cond, tol_cond, llvm::ConstantInt::get(tol_cond->getType(), 0u));
     };
 
     // Run the loop.
-    llvm_while_loop(s, loop_cond, [&, one_c = llvm_constantfp(s, tp, 1.)]() {
+    llvm_while_loop(s, loop_cond, [&]() {
         // Compute the new value via the Newton-Raphson formula.
         auto *old_val = builder.CreateLoad(tp, retval);
+        auto *one_c = llvm_constantfp(s, tp, 1.);
         auto *fdiv = llvm_fdiv(s, builder.CreateLoad(tp, fE),
                                llvm_fsub(s, one_c, llvm_fmul(s, ecc, builder.CreateLoad(tp, cos_E))));
         auto *new_val = llvm_fsub(s, old_val, fdiv);
 
-        // Bisect if new_val > ub.
-        // NOTE: for the bisection we can use the same [0, 2pi) bounds
-        // used earlier to clamp the initial guess. This is because
-        // for an M in [0, 2pi), E is also in [0, 2pi).
-        // NOTE: '>' is fine here, ub is the maximum allowed value.
-        auto *bcheck = llvm_fcmp_ogt(s, new_val, ub);
-        new_val = builder.CreateSelect(
-            bcheck, llvm_fmul(s, llvm_codegen(s, tp, number_like(s, fp_t, 1. / 2)), llvm_fadd(s, old_val, ub)),
-            new_val);
+        // Bisect if new_val > cur_ub.
+        auto *half_c = llvm_codegen(s, tp, number_like(s, fp_t, 1. / 2));
+        auto *cur_ub = builder.CreateLoad(tp, ub_storage);
+        auto *bcheck = llvm_fcmp_ogt(s, new_val, cur_ub);
+        new_val = builder.CreateSelect(bcheck, llvm_fmul(s, half_c, llvm_fadd(s, old_val, cur_ub)), new_val);
 
-        // Bisect if new_val < lb.
-        bcheck = llvm_fcmp_olt(s, new_val, lb);
-        new_val = builder.CreateSelect(
-            bcheck, llvm_fmul(s, llvm_codegen(s, tp, number_like(s, fp_t, 1. / 2)), llvm_fadd(s, old_val, lb)),
-            new_val);
+        // Bisect if new_val < cur_lb.
+        auto *cur_lb = builder.CreateLoad(tp, lb_storage);
+        bcheck = llvm_fcmp_olt(s, new_val, cur_lb);
+        new_val = builder.CreateSelect(bcheck, llvm_fmul(s, half_c, llvm_fadd(s, old_val, cur_lb)), new_val);
 
         // Store the new value.
         builder.CreateStore(new_val, retval);
@@ -539,7 +588,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
                             counter);
     });
 
-    // Check the counter.
+    // After exiting the NR loop, check the counter.
     llvm_if_then_else(
         s, builder.CreateICmpEQ(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter),
         [&]() {
@@ -754,13 +803,22 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
 
     auto *ig = llvm_fadd(s, llvm_fadd(s, ig1, ig2), llvm_fadd(s, ig3, ig4));
 
-    // Clamp the initial guess to the [0, 2pi) range.
-    // NOTE: in case ig ends up being NaN (because the arguments are nan or for whatever
-    // other reason), then ig will remain NaN.
+    // Compute the initial bounding range - that is, the bounds for F which
+    // are guaranteed to contain the root. These are [-1, 2pi + 1).
     const auto twopi_num = inv_kep_E_dl_twopi_like(s, fp_t).first;
-    auto *lb = llvm_constantfp(s, tp, 0.);
-    auto *ub = llvm_codegen(s, tp, nextafter(twopi_num, number_like(s, fp_t, 0.)));
-    ig = llvm_clamp(s, ig, lb, ub);
+    auto *lb_init = llvm_constantfp(s, tp, -1.);
+    auto *ub_init = llvm_codegen(s, tp, nextafter(twopi_num + number_like(s, fp_t, 1.), number_like(s, fp_t, 0.)));
+
+    // Store them.
+    auto *lb_storage = builder.CreateAlloca(tp);
+    auto *ub_storage = builder.CreateAlloca(tp);
+    builder.CreateStore(lb_init, lb_storage);
+    builder.CreateStore(ub_init, ub_storage);
+
+    // Clamp the initial guess to the initial bounding range.
+    // NOTE: in case ig ends up being NaN (because the arguments are NaN or for whatever
+    // other reason), then ig will remain NaN.
+    ig = llvm_clamp(s, ig, lb_init, ub_init);
 
     // Store the initial guess in the storage for the return value. This will hold the
     // iteratively-determined value for F.
@@ -797,7 +855,7 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
     builder.CreateStore(fF_compute(), fF);
 
     // Create a variable to hold the result of the tolerance check
-    // computed at the beginning of each iteration of the main loop.
+    // computed at the beginning of each iteration of the NR loop.
     // This is "true" if the loop needs to continue, or "false" if the
     // loop can stop because we achieved the desired tolerance.
     // NOTE: this is only allocated, it will be immediately written to
@@ -807,57 +865,95 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto *vec_bool_t = make_vector_type(builder.getInt1Ty(), batch_size);
     auto *tol_check_ptr = builder.CreateAlloca(vec_bool_t);
 
-    // Define the stopping condition functor.
+    // Define the continuing condition functor. This will return "true"
+    // if the NR loop needs to continue, "false" if it can be stopped
+    // (either because a solution has been found, or because the max
+    // number of iterations has been exceeded).
     // NOTE: hard-code max_iter for the time being. It would probably
     // make sense to make it dependent on the epsilon of fp_t though?
     auto *max_iter = builder.getInt32(50);
-    auto loop_cond
-        = [&,
-           // NOTE: tolerance is 4 * eps.
-           tol = llvm_codegen(s, tp, inv_kep_E_eps_like(s, fp_t) * number_like(s, fp_t, 4.))]() -> llvm::Value * {
-        // Check the number of iterations.
-        auto *c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
+    auto loop_cond = [&]() -> llvm::Value * {
+        // NOTE: we use an *absolute* tolerance of 4*eps for both the check
+        // on the magnitude of f(F) and on the magnitude of the bounding
+        // range. This of course means that the final result is not guaranteed
+        // to be the best possible approximation of F, for at least the
+        // following reasons:
+        // - abs(f(F)) < tol is a poor criterion when the derivative of
+        //   f(F) is small, because large variations in F result in small
+        //   variations of f(F);
+        // - the check on the bounding range should not use an absolute
+        //   tolerance but a relative one (i.e., rescaled wrt the extrema
+        //   of the bounds). This is what Boost's bisection implementation does,
+        //   but I am not sure I understand if/how this works in case of a root
+        //   equal to or very close to zero.
+        auto *tol = llvm_codegen(s, tp, inv_kep_E_eps_like(s, fp_t) * number_like(s, fp_t, 4.));
 
-        // Keep on iterating as long as abs(f(F)) > tol.
-        // NOTE: need reduction only in batch mode.
-        // NOTE: if F is NaN, then f(F) is NaN and the condition abs(f(F)) > tol
-        // is false. This means that if a NaN value arises, the iteration will stop
-        // immediately.
-        auto *tol_check = llvm_fcmp_ogt(s, llvm_abs(s, builder.CreateLoad(tp, fF)), tol);
+        // Load the current values of f(F) and F.
+        auto *cur_fF = builder.CreateLoad(tp, fF);
+        auto *cur_F = builder.CreateLoad(tp, retval);
+
+        // Compute the sign of f(F).
+        // NOTE: this will be zero if f(F) is NaN.
+        auto *fF_sgn = llvm_sgn(s, cur_fF);
+
+        // Update the bounds.
+        // NOTE: if f(F) is NaN, then new_ub/new_lb will also be set to NaN.
+        auto *cur_ub = builder.CreateLoad(tp, ub_storage);
+        auto *cur_lb = builder.CreateLoad(tp, lb_storage);
+        auto *zero_c = vector_splat(builder, builder.getInt32(0), batch_size);
+        auto *new_ub = builder.CreateSelect(builder.CreateICmpSGE(fF_sgn, zero_c), cur_F, cur_ub);
+        auto *new_lb = builder.CreateSelect(builder.CreateICmpSLE(fF_sgn, zero_c), cur_F, cur_lb);
+        builder.CreateStore(new_ub, ub_storage);
+        builder.CreateStore(new_lb, lb_storage);
+
+        // Compute the size of the new bounding range.
+        auto *bsize = llvm_fsub(s, new_ub, new_lb);
+
+        // First tolerance check: abs(f(F)) > tol.
+        // NOTE: if F is NaN, then f(F) is NaN and tol1_check is false.
+        auto *tol1_check = llvm_fcmp_ogt(s, llvm_abs(s, cur_fF), tol);
+
+        // Second tolerance check: (ub - lb) > tol.
+        // NOTE: if F is NaN, then tol2_check is false.
+        auto *tol2_check = llvm_fcmp_ogt(s, bsize, tol);
+
+        // Put them together with a logical AND.
+        auto *tol_check
+            = builder.CreateSelect(tol1_check, tol2_check, llvm::ConstantInt::get(tol2_check->getType(), 0u));
+        // NOTE: we need OR reduction in batch mode: continue if *any* element of the batch
+        // needs more iterations.
         auto *tol_cond = (batch_size == 1u) ? tol_check : builder.CreateOrReduce(tol_check);
 
         // Store the result of the tolerance check.
         builder.CreateStore(tol_check, tol_check_ptr);
 
-        // NOTE: this is a way of creating a logical AND.
+        // Check the number of iterations.
+        auto *c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
+
+        // Combine tolerance check and number of iterations check with a logical AND.
         return builder.CreateSelect(c_cond, tol_cond, llvm::ConstantInt::get(tol_cond->getType(), 0u));
     };
 
-    // Compute the bisection bounds - i.e., the bounds which are guaranteed
-    // to contain the root. These are [-1, 2pi + 1).
-    auto *lb_bisec = llvm_constantfp(s, tp, -1.);
-    auto *ub_bisec = llvm_codegen(s, tp, nextafter(twopi_num + number_like(s, fp_t, 1.), number_like(s, fp_t, 0.)));
-
     // Run the loop.
-    llvm_while_loop(s, loop_cond, [&, one_c = llvm_constantfp(s, tp, 1.)]() {
+    llvm_while_loop(s, loop_cond, [&]() {
         // Compute the new value via the Newton-Raphson formula.
         auto *old_val = builder.CreateLoad(tp, retval);
+        auto *one_c = llvm_constantfp(s, tp, 1.);
         auto *diff = llvm_fsub(s, one_c, llvm_fmul(s, h, builder.CreateLoad(tp, sin_F)));
         diff = llvm_fsub(s, diff, llvm_fmul(s, k, builder.CreateLoad(tp, cos_F)));
         auto *fdiv = llvm_fdiv(s, builder.CreateLoad(tp, fF), diff);
         auto *new_val = llvm_fsub(s, old_val, fdiv);
 
-        // Bisect if new_val > ub_bisec.
-        auto *bcheck = llvm_fcmp_ogt(s, new_val, ub_bisec);
-        new_val = builder.CreateSelect(
-            bcheck, llvm_fmul(s, llvm_codegen(s, tp, number_like(s, fp_t, 1. / 2)), llvm_fadd(s, old_val, ub_bisec)),
-            new_val);
+        // Bisect if new_val > cur_ub.
+        auto *half_c = llvm_codegen(s, tp, number_like(s, fp_t, 1. / 2));
+        auto *cur_ub = builder.CreateLoad(tp, ub_storage);
+        auto *bcheck = llvm_fcmp_ogt(s, new_val, cur_ub);
+        new_val = builder.CreateSelect(bcheck, llvm_fmul(s, half_c, llvm_fadd(s, old_val, cur_ub)), new_val);
 
-        // Bisect if new_val < lb_bisec.
-        bcheck = llvm_fcmp_olt(s, new_val, lb_bisec);
-        new_val = builder.CreateSelect(
-            bcheck, llvm_fmul(s, llvm_codegen(s, tp, number_like(s, fp_t, 1. / 2)), llvm_fadd(s, old_val, lb_bisec)),
-            new_val);
+        // Bisect if new_val < cur_lb.
+        auto *cur_lb = builder.CreateLoad(tp, lb_storage);
+        bcheck = llvm_fcmp_olt(s, new_val, cur_lb);
+        new_val = builder.CreateSelect(bcheck, llvm_fmul(s, half_c, llvm_fadd(s, old_val, cur_lb)), new_val);
 
         // Store the new value.
         builder.CreateStore(new_val, retval);
@@ -875,7 +971,7 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
                             counter);
     });
 
-    // Check the counter.
+    // After exiting the NR loop, check the counter.
     llvm_if_then_else(
         s, builder.CreateICmpEQ(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter),
         [&]() {

@@ -228,22 +228,6 @@ TEST_CASE("cfunc")
             ins.resize(batch_size * 3u);
             pars.resize(batch_size * 2u);
 
-            for (auto i = 0u; i < batch_size; ++i) {
-                // Generate the hs and ks.
-                auto [hval, kval] = generate_hk();
-                // Generate the lam.
-                auto lamval = lam_dist(rng);
-
-                ins[i] = hval;
-                ins[i + batch_size] = kval;
-                ins[i + 2u * batch_size] = lamval;
-
-                // Generate another pair of hs and ks for the pars.
-                std::tie(hval, kval) = generate_hk();
-                pars[i] = hval;
-                pars[i + batch_size] = kval;
-            }
-
             llvm_state s{kw::opt_level = opt_level};
 
             add_cfunc<fp_t>(s, "cfunc", {kepF(h, k, lam), kepF(par[0], par[1], lam), kepF(.5_dbl, .3_dbl, lam)},
@@ -259,38 +243,56 @@ TEST_CASE("cfunc")
             auto *cf_ptr
                 = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
 
-            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+            for (auto niter = 0; niter < 100; ++niter) {
+                for (auto i = 0u; i < batch_size; ++i) {
+                    // Generate the hs and ks.
+                    auto [hval, kval] = generate_hk();
+                    // Generate the lam.
+                    auto lamval = lam_dist(rng);
 
-            for (auto i = 0u; i < batch_size; ++i) {
-                using std::cos;
-                using std::sin;
+                    ins[i] = hval;
+                    ins[i + batch_size] = kval;
+                    ins[i + 2u * batch_size] = lamval;
 
-                // First output.
-                REQUIRE(!isnan(outs[i]));
-                auto Fval = outs[i];
-                auto hval = ins[i];
-                auto kval = ins[i + batch_size];
-                auto lamval = ins[i + 2u * batch_size];
-                REQUIRE(eps_close(cos(lamval), cos(Fval + hval * cos(Fval) - kval * sin(Fval))));
-                REQUIRE(eps_close(sin(lamval), sin(Fval + hval * cos(Fval) - kval * sin(Fval))));
+                    // Generate another pair of hs and ks for the pars.
+                    std::tie(hval, kval) = generate_hk();
+                    pars[i] = hval;
+                    pars[i + batch_size] = kval;
+                }
 
-                // Second output.
-                REQUIRE(!isnan(outs[i + batch_size]));
-                Fval = outs[i + batch_size];
-                hval = pars[i];
-                kval = pars[i + batch_size];
-                lamval = ins[i + 2u * batch_size];
-                REQUIRE(eps_close(cos(lamval), cos(Fval + hval * cos(Fval) - kval * sin(Fval))));
-                REQUIRE(eps_close(sin(lamval), sin(Fval + hval * cos(Fval) - kval * sin(Fval))));
+                cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
 
-                // Third output.
-                REQUIRE(!isnan(outs[i + batch_size * 2u]));
-                Fval = outs[i + batch_size * 2u];
-                hval = .5;
-                kval = .3;
-                lamval = ins[i + 2u * batch_size];
-                REQUIRE(eps_close(cos(lamval), cos(Fval + hval * cos(Fval) - kval * sin(Fval))));
-                REQUIRE(eps_close(sin(lamval), sin(Fval + hval * cos(Fval) - kval * sin(Fval))));
+                for (auto i = 0u; i < batch_size; ++i) {
+                    using std::cos;
+                    using std::sin;
+
+                    // First output.
+                    REQUIRE(!isnan(outs[i]));
+                    auto Fval = outs[i];
+                    auto hval = ins[i];
+                    auto kval = ins[i + batch_size];
+                    auto lamval = ins[i + 2u * batch_size];
+                    REQUIRE(eps_close(cos(lamval), cos(Fval + hval * cos(Fval) - kval * sin(Fval))));
+                    REQUIRE(eps_close(sin(lamval), sin(Fval + hval * cos(Fval) - kval * sin(Fval))));
+
+                    // Second output.
+                    REQUIRE(!isnan(outs[i + batch_size]));
+                    Fval = outs[i + batch_size];
+                    hval = pars[i];
+                    kval = pars[i + batch_size];
+                    lamval = ins[i + 2u * batch_size];
+                    REQUIRE(eps_close(cos(lamval), cos(Fval + hval * cos(Fval) - kval * sin(Fval))));
+                    REQUIRE(eps_close(sin(lamval), sin(Fval + hval * cos(Fval) - kval * sin(Fval))));
+
+                    // Third output.
+                    REQUIRE(!isnan(outs[i + batch_size * 2u]));
+                    Fval = outs[i + batch_size * 2u];
+                    hval = .5;
+                    kval = .3;
+                    lamval = ins[i + 2u * batch_size];
+                    REQUIRE(eps_close(cos(lamval), cos(Fval + hval * cos(Fval) - kval * sin(Fval))));
+                    REQUIRE(eps_close(sin(lamval), sin(Fval + hval * cos(Fval) - kval * sin(Fval))));
+                }
             }
         }
     };
@@ -345,4 +347,40 @@ TEST_CASE("cfunc")
     cf_ptr(&out, ins, nullptr, nullptr);
 
     REQUIRE(isnan(out));
+}
+
+// A numerically-difficult case in which the shrinking bounding range tolerance
+// check is necessary to prevent the NR from bouncing around the root endlessly.
+TEST_CASE("cfunc bound")
+{
+    using std::cos;
+    using std::isnan;
+    using std::sin;
+
+    auto [h, k, lam] = make_vars("h", "k", "lam");
+
+    llvm_state s;
+
+    add_cfunc<double>(s, "cfunc", {kepF(h, k, lam)});
+
+    s.compile();
+
+    auto *cf_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cfunc"));
+
+    double Fval = 0;
+    const auto hval = 0.9796044983076618306583327466796618;
+    const auto kval = 0.1800214955091904156514459600657574;
+    const auto lamval = 93548.66355109098367393016815185547;
+    double ins[3] = {hval, kval, lamval};
+
+    cf_ptr(&Fval, ins, nullptr, nullptr);
+
+    auto eps_close = [](double a, double b) {
+        using std::abs;
+        return abs(a - b) <= std::numeric_limits<double>::epsilon() * 100;
+    };
+
+    REQUIRE(!isnan(Fval));
+    REQUIRE(eps_close(cos(lamval), cos(Fval + hval * cos(Fval) - kval * sin(Fval))));
 }
