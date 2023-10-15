@@ -384,3 +384,105 @@ TEST_CASE("cfunc bound")
     REQUIRE(!isnan(Fval));
     REQUIRE(eps_close(cos(lamval), cos(Fval + hval * cos(Fval) - kval * sin(Fval))));
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("cfunc mp")
+{
+    using fp_t = mppp::real;
+
+    const auto prec = 237;
+
+    auto eps_close = [&](const fp_t &a, const fp_t &b) {
+        using std::abs;
+        return abs(a - b) <= mppp::real{1ul, -(prec - 1), prec} * 10000;
+    };
+
+    auto [h, k, lam] = make_vars("h", "k", "lam");
+
+    std::uniform_real_distribution<double> lam_dist(-1e5, 1e5), h_dist(std::nextafter(-1., 0.), 1.);
+
+    auto generate_hk = [&h_dist]() {
+        // Generate h.
+        auto h_val = h_dist(rng);
+
+        // Generate a k such that h**2+k**2<1.
+        const auto max_abs_k = std::sqrt(1. - h_val * h_val);
+        std::uniform_real_distribution<double> k_dist(std::nextafter(-max_abs_k, 0.), max_abs_k);
+        auto k_val = mppp::real(k_dist(rng), prec);
+
+        return std::make_pair(mppp::real(h_val, prec), std::move(k_val));
+    };
+
+    std::vector<fp_t> outs, ins, pars;
+
+    outs.resize(3u, mppp::real{0, prec});
+    ins.resize(3u);
+    pars.resize(2u);
+
+    for (auto compact_mode : {false, true}) {
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            add_cfunc<fp_t>(s, "cfunc", {kepF(h, k, lam), kepF(par[0], par[1], lam), kepF(.5_dbl, .3_dbl, lam)},
+                            kw::compact_mode = compact_mode, kw::prec = prec);
+
+            if (opt_level == 0u && compact_mode) {
+                REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.kepF."));
+            }
+
+            s.compile();
+
+            auto *cf_ptr
+                = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("cfunc"));
+
+            // Generate the hs and ks.
+            auto [hval, kval] = generate_hk();
+            // Generate the lam.
+            auto lamval = mppp::real(lam_dist(rng), prec);
+
+            ins[0] = hval;
+            ins[1] = kval;
+            ins[2] = lamval;
+
+            // Generate another pair of hs and ks for the pars.
+            std::tie(hval, kval) = generate_hk();
+            pars[0] = hval;
+            pars[1] = kval;
+
+            cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
+
+            using std::cos;
+            using std::sin;
+
+            // First output.
+            REQUIRE(!isnan(outs[0]));
+            auto Fval = outs[0];
+            hval = ins[0];
+            kval = ins[1];
+            lamval = ins[2];
+            REQUIRE(eps_close(cos(lamval), cos(Fval + hval * cos(Fval) - kval * sin(Fval))));
+            REQUIRE(eps_close(sin(lamval), sin(Fval + hval * cos(Fval) - kval * sin(Fval))));
+
+            // Second output.
+            REQUIRE(!isnan(outs[1]));
+            Fval = outs[1];
+            hval = pars[0];
+            kval = pars[1];
+            lamval = ins[2];
+            REQUIRE(eps_close(cos(lamval), cos(Fval + hval * cos(Fval) - kval * sin(Fval))));
+            REQUIRE(eps_close(sin(lamval), sin(Fval + hval * cos(Fval) - kval * sin(Fval))));
+
+            // Third output.
+            REQUIRE(!isnan(outs[2]));
+            Fval = outs[2];
+            hval = mppp::real(.5, prec);
+            kval = mppp::real(.3, prec);
+            lamval = ins[2];
+            REQUIRE(eps_close(cos(lamval), cos(Fval + hval * cos(Fval) - kval * sin(Fval))));
+            REQUIRE(eps_close(sin(lamval), sin(Fval + hval * cos(Fval) - kval * sin(Fval))));
+        }
+    }
+}
+
+#endif
