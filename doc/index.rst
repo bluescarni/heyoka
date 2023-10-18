@@ -120,5 +120,6 @@ Dario Izzo (European Space Agency).
    ad_notes.rst
    changelog.rst
    breaking_changes.rst
+   known_issues.rst
    acknowledgement.rst
    bibliography.rst
