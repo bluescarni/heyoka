@@ -73,35 +73,26 @@ public:
 
 HEYOKA_DLL_PUBLIC expression kepE(expression, expression);
 
-HEYOKA_DLL_PUBLIC expression kepE(expression, double);
-HEYOKA_DLL_PUBLIC expression kepE(expression, long double);
+#define HEYOKA_DECLARE_KEPE_OVERLOADS(type)                                                                            \
+    HEYOKA_DLL_PUBLIC expression kepE(expression, type);                                                               \
+    HEYOKA_DLL_PUBLIC expression kepE(type, expression);
+
+HEYOKA_DECLARE_KEPE_OVERLOADS(double);
+HEYOKA_DECLARE_KEPE_OVERLOADS(long double);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC expression kepE(expression, mppp::real128);
+HEYOKA_DECLARE_KEPE_OVERLOADS(mppp::real128);
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-HEYOKA_DLL_PUBLIC expression kepE(expression, mppp::real);
+HEYOKA_DECLARE_KEPE_OVERLOADS(mppp::real);
 
 #endif
 
-HEYOKA_DLL_PUBLIC expression kepE(double, expression);
-HEYOKA_DLL_PUBLIC expression kepE(long double, expression);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC expression kepE(mppp::real128, expression);
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-HEYOKA_DLL_PUBLIC expression kepE(mppp::real, expression);
-
-#endif
+#undef HEYOKA_DECLARE_KEPE_OVERLOADS
 
 HEYOKA_END_NAMESPACE
 

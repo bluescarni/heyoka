@@ -846,61 +846,32 @@ expression kepE(expression e, expression M)
     return expression{func{detail::kepE_impl{std::move(e), std::move(M)}}};
 }
 
-expression kepE(expression e, double M)
-{
-    return kepE(std::move(e), expression(M));
-}
+#define HEYOKA_DEFINE_KEPE_OVERLOADS(type)                                                                             \
+    expression kepE(expression e, type M)                                                                              \
+    {                                                                                                                  \
+        return kepE(std::move(e), expression{std::move(M)});                                                           \
+    }                                                                                                                  \
+    expression kepE(type e, expression M)                                                                              \
+    {                                                                                                                  \
+        return kepE(expression{std::move(e)}, std::move(M));                                                           \
+    }
 
-expression kepE(expression e, long double M)
-{
-    return kepE(std::move(e), expression(M));
-}
+HEYOKA_DEFINE_KEPE_OVERLOADS(double)
+HEYOKA_DEFINE_KEPE_OVERLOADS(long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-expression kepE(expression e, mppp::real128 M)
-{
-    return kepE(std::move(e), expression(M));
-}
+HEYOKA_DEFINE_KEPE_OVERLOADS(mppp::real128);
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-expression kepE(expression e, mppp::real M)
-{
-    return kepE(std::move(e), expression(std::move(M)));
-}
+HEYOKA_DEFINE_KEPE_OVERLOADS(mppp::real);
 
 #endif
 
-expression kepE(double e, expression M)
-{
-    return kepE(expression(e), std::move(M));
-}
-
-expression kepE(long double e, expression M)
-{
-    return kepE(expression(e), std::move(M));
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-expression kepE(mppp::real128 e, expression M)
-{
-    return kepE(expression(e), std::move(M));
-}
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-expression kepE(mppp::real e, expression M)
-{
-    return kepE(expression(std::move(e)), std::move(M));
-}
-
-#endif
+#undef HEYOKA_DEFINE_KEPE_OVERLOADS
 
 HEYOKA_END_NAMESPACE
 
