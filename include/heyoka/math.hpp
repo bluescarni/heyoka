@@ -21,6 +21,7 @@
 #include <heyoka/math/cosh.hpp>
 #include <heyoka/math/erf.hpp>
 #include <heyoka/math/exp.hpp>
+#include <heyoka/math/kepDE.hpp>
 #include <heyoka/math/kepE.hpp>
 #include <heyoka/math/kepF.hpp>
 #include <heyoka/math/log.hpp>

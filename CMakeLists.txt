@@ -264,6 +264,7 @@ set(HEYOKA_SRC_FILES
     # Math functions.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepF.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepDE.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cos.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/exp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/log.cpp"
