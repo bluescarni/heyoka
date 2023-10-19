@@ -1025,6 +1025,322 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
     return f;
 }
 
+// Implementation of the inverse Kepler equation for the delta eccentric anomaly.
+// See Battin, section 4.3.
+llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size)
+{
+    assert(batch_size > 0u);
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch vector floating-point type.
+    auto *tp = make_vector_type(fp_t, batch_size);
+
+    // Fetch the function name.
+    const auto fname = fmt::format("heyoka.inv_kep_DE.{}", llvm_mangle_type(tp));
+
+    // The function arguments:
+    // - s0 and c0,
+    // - delta mean anomaly.
+    const std::vector<llvm::Type *> fargs{tp, tp, tp};
+
+    // Try to see if we already created the function.
+    auto *f = md.getFunction(fname);
+
+    if (f != nullptr) {
+        // The function was already created, return it.
+        return f;
+    }
+
+    // The function was not created before, do it now.
+
+    // Fetch the current insertion block.
+    auto *orig_bb = builder.GetInsertBlock();
+
+    // The return type is tp.
+    auto *ft = llvm::FunctionType::get(tp, fargs, false);
+    // Create the function
+    f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+    assert(f != nullptr);
+
+    // Fetch the necessary function arguments.
+    auto *s0_arg = f->args().begin();
+    auto *c0_arg = f->args().begin() + 1;
+    auto *DM_arg = f->args().begin() + 2;
+
+    // Create a new basic block to start insertion into.
+    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+    // s0**2 + c0**2.
+    auto *s02 = llvm_square(s, s0_arg);
+    auto *c02 = llvm_square(s, c0_arg);
+    auto *s02c02 = llvm_fadd(s, s02, c02);
+
+    // Is s02c02 a quiet NaN or >=1?
+    auto *s02c02_invalid = llvm_fcmp_uge(s, s02c02, llvm_constantfp(s, tp, 1.));
+
+    // Replace invalid values of s0 and c0 with quiet NaNs.
+    auto *s0 = builder.CreateSelect(s02c02_invalid, llvm_constantfp(s, tp, std::numeric_limits<double>::quiet_NaN()),
+                                    s0_arg);
+    auto *c0 = builder.CreateSelect(s02c02_invalid, llvm_constantfp(s, tp, std::numeric_limits<double>::quiet_NaN()),
+                                    c0_arg);
+
+    // Reduce DM to the [0, 2pi) range.
+    auto *DM = llvm_trig_arg_reduce(s, DM_arg);
+
+    // Compute the initial guess following kep3:
+    // https://github.com/esa/kep3/blob/e171a4a61431f3cd120898821c0d64c0e25a814e/src/core_astro/propagate_lagrangian.cpp#L60
+    auto [sDM, cDM] = llvm_sincos(s, DM);
+    // c0*cos(DM).
+    auto *c0_cDM = llvm_fmul(s, c0, cDM);
+    // s0*cos(DM).
+    auto *s0_cDM = llvm_fmul(s, s0, cDM);
+    // c0*sin(DM).
+    auto *c0_sDM = llvm_fmul(s, c0, sDM);
+    // s0*sin(DM).
+    auto *s0_sDM = llvm_fmul(s, s0, sDM);
+    // 1/2 constant.
+    auto *c_1_2 = llvm_codegen(s, tp, number_like(s, fp_t, 1. / 2));
+    // c0 * cosDM - s0 * sinDM.
+    auto *c0cDM_s0sDM = llvm_fsub(s, c0_cDM, s0_sDM);
+    // c0 * sinDM + s0 * cosDM.
+    auto *c0sDM_s0cDM = llvm_fadd(s, c0_sDM, s0_cDM);
+    // c0 * sinDM + s0 * cosDM - s0.
+    auto *c0sDM_s0cDM_s0 = llvm_fsub(s, c0sDM_s0cDM, s0);
+
+    // Put it together.
+    auto *ig1 = llvm_fadd(s, DM, c0sDM_s0cDM_s0);
+    auto *ig2 = llvm_fmul(s, c0cDM_s0sDM, c0sDM_s0cDM_s0);
+
+    auto *tmp1 = llvm_fmul(s, c_1_2, c0sDM_s0cDM_s0);
+    auto *tmp2 = llvm_square(s, c0cDM_s0sDM);
+    auto *tmp3 = llvm_fadd(s, tmp2, tmp2);
+    auto *tmp4 = llvm_fmul(s, c0sDM_s0cDM_s0, c0sDM_s0cDM);
+    auto *tmp5 = llvm_fsub(s, tmp3, tmp4);
+
+    auto *ig3 = llvm_fmul(s, tmp1, tmp5);
+
+    auto *ig = llvm_fadd(s, llvm_fadd(s, ig1, ig2), ig3);
+
+    // Compute the initial bounding range - that is, the bounds for DE which
+    // are guaranteed to contain the root. These are [-1, 2pi + 1).
+    const auto twopi_num = inv_kep_E_dl_twopi_like(s, fp_t).first;
+    auto *lb_init = llvm_constantfp(s, tp, -1.);
+    auto *ub_init = llvm_codegen(s, tp, nextafter(twopi_num + number_like(s, fp_t, 1.), number_like(s, fp_t, 0.)));
+
+    // Store them.
+    auto *lb_storage = builder.CreateAlloca(tp);
+    auto *ub_storage = builder.CreateAlloca(tp);
+    builder.CreateStore(lb_init, lb_storage);
+    builder.CreateStore(ub_init, ub_storage);
+
+    // Clamp the initial guess to the initial bounding range.
+    // NOTE: in case ig ends up being NaN (because the arguments are NaN or for whatever
+    // other reason), then ig will remain NaN.
+    ig = llvm_clamp(s, ig, lb_init, ub_init);
+
+    // Store the initial guess in the storage for the return value. This will hold the
+    // iteratively-determined value for DE.
+    auto *retval = builder.CreateAlloca(tp);
+    builder.CreateStore(ig, retval);
+
+    // Create the counter.
+    auto *counter = builder.CreateAlloca(builder.getInt32Ty());
+    builder.CreateStore(builder.getInt32(0), counter);
+
+    // Variables to store sin(DE) and cos(DE).
+    auto *sin_DE = builder.CreateAlloca(tp);
+    auto *cos_DE = builder.CreateAlloca(tp);
+
+    // Write the initial values for sin_DE and cos_DE.
+    auto sin_cos_DE = llvm_sincos(s, builder.CreateLoad(tp, retval));
+    builder.CreateStore(sin_cos_DE.first, sin_DE);
+    builder.CreateStore(sin_cos_DE.second, cos_DE);
+
+    // Helper to compute f(DE).
+    auto fDE_compute = [&]() {
+        // s0*(1 - cos(DE)).
+        auto *one_c = llvm_constantfp(s, tp, 1.);
+        auto *one_cDE = llvm_fsub(s, one_c, builder.CreateLoad(tp, cos_DE));
+        auto *s0_one_cDE = llvm_fmul(s, s0, one_cDE);
+        // c0*sin(DE).
+        auto *c0_sDE = llvm_fmul(s, c0, builder.CreateLoad(tp, sin_DE));
+        // DE - DM.
+        auto *DE_DM = llvm_fsub(s, builder.CreateLoad(tp, retval), DM);
+        // DE - DM + s0*(1 - cos(DE)) - c0*sin(DE).
+        return llvm_fsub(s, llvm_fadd(s, DE_DM, s0_one_cDE), c0_sDE);
+    };
+    // Variable to hold the value of f(DE).
+    auto *fDE = builder.CreateAlloca(tp);
+    // Compute and store the initial value of f(DE).
+    builder.CreateStore(fDE_compute(), fDE);
+
+    // Create a variable to hold the result of the tolerance check
+    // computed at the beginning of each iteration of the NR loop.
+    // This is "true" if the loop needs to continue, or "false" if the
+    // loop can stop because we achieved the desired tolerance.
+    // NOTE: this is only allocated, it will be immediately written to
+    // the first time loop_cond is evaluated.
+    // NOTE: this needs to persist outside loop_cond because we will use it
+    // after the loop in case we exceeded the max iter number.
+    auto *vec_bool_t = make_vector_type(builder.getInt1Ty(), batch_size);
+    auto *tol_check_ptr = builder.CreateAlloca(vec_bool_t);
+
+    // Define the continuing condition functor. This will return "true"
+    // if the NR loop needs to continue, "false" if it can be stopped
+    // (either because a solution has been found, or because the max
+    // number of iterations has been exceeded).
+    // NOTE: hard-code max_iter for the time being. It would probably
+    // make sense to make it dependent on the epsilon of fp_t though?
+    auto *max_iter = builder.getInt32(50);
+    auto loop_cond = [&]() -> llvm::Value * {
+        // NOTE: we use an *absolute* tolerance of 4*eps for both the check
+        // on the magnitude of f(DE) and on the magnitude of the bounding
+        // range. This of course means that the final result is not guaranteed
+        // to be the best possible approximation of DE, for at least the
+        // following reasons:
+        // - abs(f(DE)) < tol is a poor criterion when the derivative of
+        //   f(DE) is small, because large variations in DE result in small
+        //   variations of f(DE);
+        // - the check on the bounding range should not use an absolute
+        //   tolerance but a relative one (i.e., rescaled wrt the extrema
+        //   of the bounds). This is what Boost's bisection implementation does,
+        //   but I am not sure I understand if/how this works in case of a root
+        //   equal to or very close to zero.
+        auto *tol = llvm_codegen(s, tp, inv_kep_E_eps_like(s, fp_t) * number_like(s, fp_t, 4.));
+
+        // Load the current values of f(DE) and DE.
+        auto *cur_fDE = builder.CreateLoad(tp, fDE);
+        auto *cur_DE = builder.CreateLoad(tp, retval);
+
+        // Compute the sign of f(DE).
+        // NOTE: this will be zero if f(DE) is NaN.
+        auto *fDE_sgn = llvm_sgn(s, cur_fDE);
+
+        // Update the bounds.
+        // NOTE: if f(DE) is NaN, then new_ub/new_lb will also be set to NaN.
+        auto *cur_ub = builder.CreateLoad(tp, ub_storage);
+        auto *cur_lb = builder.CreateLoad(tp, lb_storage);
+        auto *zero_c = vector_splat(builder, builder.getInt32(0), batch_size);
+        auto *new_ub = builder.CreateSelect(builder.CreateICmpSGE(fDE_sgn, zero_c), cur_DE, cur_ub);
+        auto *new_lb = builder.CreateSelect(builder.CreateICmpSLE(fDE_sgn, zero_c), cur_DE, cur_lb);
+        builder.CreateStore(new_ub, ub_storage);
+        builder.CreateStore(new_lb, lb_storage);
+
+        // Compute the size of the new bounding range.
+        auto *bsize = llvm_fsub(s, new_ub, new_lb);
+
+        // First tolerance check: abs(f(DE)) > tol.
+        // NOTE: if DE is NaN, then f(DE) is NaN and tol1_check is false.
+        auto *tol1_check = llvm_fcmp_ogt(s, llvm_abs(s, cur_fDE), tol);
+
+        // Second tolerance check: (ub - lb) > tol.
+        // NOTE: if DE is NaN, then tol2_check is false.
+        auto *tol2_check = llvm_fcmp_ogt(s, bsize, tol);
+
+        // Put them together with a logical AND.
+        auto *tol_check
+            = builder.CreateSelect(tol1_check, tol2_check, llvm::ConstantInt::get(tol2_check->getType(), 0u));
+        // NOTE: we need OR reduction in batch mode: continue if *any* element of the batch
+        // needs more iterations.
+        auto *tol_cond = (batch_size == 1u) ? tol_check : builder.CreateOrReduce(tol_check);
+
+        // Store the result of the tolerance check.
+        builder.CreateStore(tol_check, tol_check_ptr);
+
+        // Check the number of iterations.
+        auto *c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
+
+        // Combine tolerance check and number of iterations check with a logical AND.
+        return builder.CreateSelect(c_cond, tol_cond, llvm::ConstantInt::get(tol_cond->getType(), 0u));
+    };
+
+    // Run the loop.
+    llvm_while_loop(s, loop_cond, [&]() {
+        // Compute the new value via the Newton-Raphson formula.
+        auto *old_val = builder.CreateLoad(tp, retval);
+        auto *one_c = llvm_constantfp(s, tp, 1.);
+        auto *diff = llvm_fadd(s, one_c, llvm_fmul(s, s0, builder.CreateLoad(tp, sin_DE)));
+        diff = llvm_fsub(s, diff, llvm_fmul(s, c0, builder.CreateLoad(tp, cos_DE)));
+        auto *fdiv = llvm_fdiv(s, builder.CreateLoad(tp, fDE), diff);
+        auto *new_val = llvm_fsub(s, old_val, fdiv);
+
+        // Bisect if new_val > cur_ub.
+        auto *half_c = llvm_codegen(s, tp, number_like(s, fp_t, 1. / 2));
+        auto *cur_ub = builder.CreateLoad(tp, ub_storage);
+        auto *bcheck = llvm_fcmp_ogt(s, new_val, cur_ub);
+        new_val = builder.CreateSelect(bcheck, llvm_fmul(s, half_c, llvm_fadd(s, old_val, cur_ub)), new_val);
+
+        // Bisect if new_val < cur_lb.
+        auto *cur_lb = builder.CreateLoad(tp, lb_storage);
+        bcheck = llvm_fcmp_olt(s, new_val, cur_lb);
+        new_val = builder.CreateSelect(bcheck, llvm_fmul(s, half_c, llvm_fadd(s, old_val, cur_lb)), new_val);
+
+        // Store the new value.
+        builder.CreateStore(new_val, retval);
+
+        // Update sin_DE/cos_DE.
+        sin_cos_DE = llvm_sincos(s, new_val);
+        builder.CreateStore(sin_cos_DE.first, sin_DE);
+        builder.CreateStore(sin_cos_DE.second, cos_DE);
+
+        // Update f(DE).
+        builder.CreateStore(fDE_compute(), fDE);
+
+        // Update the counter.
+        builder.CreateStore(builder.CreateAdd(builder.CreateLoad(builder.getInt32Ty(), counter), builder.getInt32(1)),
+                            counter);
+    });
+
+    // After exiting the NR loop, check the counter.
+    llvm_if_then_else(
+        s, builder.CreateICmpEQ(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter),
+        [&]() {
+            // Load the tol_check variable.
+            auto *tol_check = builder.CreateLoad(vec_bool_t, tol_check_ptr);
+
+            // Set to quiet NaN in the return value all the lanes for which tol_check is 1.
+            auto *old_val = builder.CreateLoad(tp, retval);
+            auto *new_val = builder.CreateSelect(
+                tol_check, llvm_constantfp(s, tp, std::numeric_limits<double>::quiet_NaN()), old_val);
+            builder.CreateStore(new_val, retval);
+
+            llvm_invoke_external(s, "heyoka_inv_kep_DE_max_iter", builder.getVoidTy(), {},
+                                 llvm::AttributeList::get(context, llvm::AttributeList::FunctionIndex,
+                                                          {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn}));
+        },
+        []() {});
+
+    // Load the result.
+    llvm::Value *ret = builder.CreateLoad(tp, retval);
+
+    // Codegen 2pi, used below.
+    auto *twopi_const = llvm_codegen(s, tp, twopi_num);
+
+    // Reduce the result to the standard trigonometric range [0, 2pi).
+    // NOTE: this reduction will not change ret if it is NaN.
+    // Is ret < 0?
+    auto *ret_lt_0 = llvm_fcmp_olt(s, ret, llvm_constantfp(s, tp, 0.));
+    ret = builder.CreateSelect(ret_lt_0, llvm_fadd(s, twopi_const, ret), ret);
+
+    // Is ret >= 2pi?
+    auto *ret_ge_2pi = llvm_fcmp_oge(s, ret, twopi_const);
+    ret = builder.CreateSelect(ret_ge_2pi, llvm_fsub(s, ret, twopi_const), ret);
+
+    // Return the result.
+    builder.CreateRet(ret);
+
+    // Verify.
+    s.verify_function(f);
+
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
+
+    return f;
+}
+
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
@@ -1033,15 +1349,23 @@ HEYOKA_END_NAMESPACE
 
 // NOTE: these functions will be called when numerical root finding exceeds the maximum number
 // of allowed iterations.
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter() noexcept
+extern "C" {
+
+HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter() noexcept
 {
     heyoka::detail::get_logger()->warn("iteration limit exceeded while solving the elliptic inverse Kepler equation");
 }
 
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_F_max_iter() noexcept
+HEYOKA_DLL_PUBLIC void heyoka_inv_kep_F_max_iter() noexcept
 {
     heyoka::detail::get_logger()->warn(
         "iteration limit exceeded while solving the inverse Kepler equation for the eccentric longitude F");
+}
+
+HEYOKA_DLL_PUBLIC void heyoka_inv_kep_DE_max_iter() noexcept
+{
+    heyoka::detail::get_logger()->warn("iteration limit exceeded while solving the inverse Kepler equation for DE");
+}
 }
 
 // LCOV_EXCL_STOP

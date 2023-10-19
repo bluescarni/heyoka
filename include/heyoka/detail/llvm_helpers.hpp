@@ -174,6 +174,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &, llvm::Type *, std::uint32_t);
 HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper(llvm_state &, llvm::Type *, std::uint32_t, const std::string &);
 
 llvm::Function *llvm_add_inv_kep_F(llvm_state &, llvm::Type *, std::uint32_t);
+llvm::Function *llvm_add_inv_kep_DE(llvm_state &, llvm::Type *, std::uint32_t);
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array(llvm_state &, llvm::Type *, std::uint32_t);
 
