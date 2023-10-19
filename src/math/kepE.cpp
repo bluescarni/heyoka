@@ -147,9 +147,9 @@ taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 2u);
 
-    // Make a copy of e.
+    // Make a copy of e, since we will be soon moving this.
     // NOTE: the arguments here have already been decomposed, thus
-    // args()[0] is a non-function value .
+    // args()[0] is a non-function value.
     assert(!std::holds_alternative<func>(args()[0].value()));
     auto e_copy = args()[0];
 
@@ -167,7 +167,9 @@ taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
                              std::vector<std::uint32_t>{});
 
     // Add the hidden deps.
-    // NOTE: hidden deps on e*cos(a) and sin(a) (in this order).
+    // NOTE: hidden deps on e*cos(a) and sin(a). The order in which the hidden deps
+    // are added here must match the order in which the hidden deps are consumed
+    // in the Taylor diff implementations.
     (u_vars_defs.end() - 4)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
     (u_vars_defs.end() - 4)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 3u));
 
@@ -200,7 +202,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::v
         // Invoke and return.
         return builder.CreateCall(fkep, {e, M});
     } else {
-        return vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
+        return vector_splat(builder, llvm_constantfp(s, fp_t, 0.), batch_size);
     }
 }
 
@@ -398,6 +400,8 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::v
     return llvm_fdiv(s, dividend, divisor);
 }
 
+// LCOV_EXCL_START
+
 // All the other cases.
 template <typename U, typename V, typename... Args>
 llvm::Value *taylor_diff_kepE_impl(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &, const U &, const V &,
@@ -408,6 +412,8 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &, llvm::Type *, const std::vector
         "An invalid argument type was encountered while trying to build the Taylor derivative of kepE()");
 }
 
+// LCOV_EXCL_STOP
+
 llvm::Value *taylor_diff_kepE(llvm_state &s, llvm::Type *fp_t, const kepE_impl &f,
                               const std::vector<std::uint32_t> &deps, const std::vector<llvm::Value *> &arr,
                               llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
@@ -415,6 +421,7 @@ llvm::Value *taylor_diff_kepE(llvm_state &s, llvm::Type *fp_t, const kepE_impl &
 {
     assert(f.args().size() == 2u);
 
+    // LCOV_EXCL_START
     if (deps.size() != 2u) {
         throw std::invalid_argument(
             fmt::format("A hidden dependency vector of size 2 is expected in order to compute the Taylor "
@@ -422,6 +429,7 @@ llvm::Value *taylor_diff_kepE(llvm_state &s, llvm::Type *fp_t, const kepE_impl &
                         "instead",
                         deps.size()));
     }
+    // LCOV_EXCL_STOP
 
     return std::visit(
         [&](const auto &v1, const auto &v2) {
