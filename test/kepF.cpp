@@ -483,6 +483,43 @@ TEST_CASE("cfunc mp")
             REQUIRE(eps_close(sin(lamval), sin(Fval + hval * cos(Fval) - kval * sin(Fval))));
         }
     }
+
+    // Check nan/invalid values handling.
+    llvm_state s;
+
+    add_cfunc<mppp::real>(s, "cfunc", {kepF(h, k, lam)}, kw::prec = prec);
+
+    s.compile();
+
+    auto *cf_ptr = reinterpret_cast<void (*)(mppp::real *, const mppp::real *, const mppp::real *, const mppp::real *)>(
+        s.jit_lookup("cfunc"));
+
+    mppp::real out(0, prec);
+    REQUIRE(ins.size() == 3u);
+
+    ins[0] = mppp::real{.1, prec};
+    ins[1] = mppp::real{.2, prec};
+    ins[2] = mppp::real{std::numeric_limits<double>::quiet_NaN(), prec};
+    cf_ptr(&out, ins.data(), nullptr, nullptr);
+    REQUIRE(isnan(out));
+
+    ins[0] = mppp::real{std::numeric_limits<double>::quiet_NaN(), prec};
+    ins[1] = mppp::real{.1, prec};
+    ins[2] = mppp::real{.2, prec};
+    cf_ptr(&out, ins.data(), nullptr, nullptr);
+    REQUIRE(isnan(out));
+
+    ins[0] = mppp::real{.1, prec};
+    ins[1] = mppp::real{std::numeric_limits<double>::quiet_NaN(), prec};
+    ins[2] = mppp::real{.2, prec};
+    cf_ptr(&out, ins.data(), nullptr, nullptr);
+    REQUIRE(isnan(out));
+
+    ins[0] = mppp::real{.2, prec};
+    ins[1] = mppp::real{1., prec};
+    ins[2] = mppp::real{1., prec};
+    cf_ptr(&out, ins.data(), nullptr, nullptr);
+    REQUIRE(isnan(out));
 }
 
 #endif
