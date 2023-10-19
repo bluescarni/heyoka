@@ -110,7 +110,7 @@ llvm::Value *kepDE_llvm_eval_impl(llvm_state &s, llvm::Type *fp_t, const func_ba
 {
     return llvm_eval_helper(
         [&s, fp_t, batch_size](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
-            auto *kepDE_func = llvm_add_inv_kep_F(s, fp_t, batch_size);
+            auto *kepDE_func = llvm_add_inv_kep_DE(s, fp_t, batch_size);
 
             return s.builder().CreateCall(kepDE_func, {args[0], args[1], args[2]});
         },
@@ -135,7 +135,7 @@ namespace
     return llvm_c_eval_func_helper(
         "kepDE",
         [&s, batch_size, fp_t](const std::vector<llvm::Value *> &args, bool) -> llvm::Value * {
-            auto *kepDE_func = llvm_add_inv_kep_F(s, fp_t, batch_size);
+            auto *kepDE_func = llvm_add_inv_kep_DE(s, fp_t, batch_size);
 
             return s.builder().CreateCall(kepDE_func, {args[0], args[1], args[2]});
         },
