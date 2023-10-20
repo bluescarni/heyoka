@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -58,6 +59,12 @@ public:
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
+
+    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
+
+    llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
+                             const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
+                             std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
 };
 
 } // namespace detail
