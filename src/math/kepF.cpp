@@ -238,7 +238,7 @@ taylor_diff_kepF_impl(llvm_state &s, llvm::Type *fp_t, const std::vector<std::ui
                       // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                       std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
-    assert(deps.size() == 4u);
+    assert(deps.size() == 4u); // LCOV_EXCL_LINE
 
     auto &builder = s.builder();
 
