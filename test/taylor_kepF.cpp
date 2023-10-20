@@ -70,14 +70,11 @@ TEST_CASE("taylor kepF")
         auto *cf_ptr
             = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *, const fp_t *)>(s_cfunc.jit_lookup("cfunc"));
 
-        auto kepF_num = [cf_ptr, cf_in = std::vector<fp_t>(3u)](fp_t h, fp_t k, fp_t lam) mutable {
-            cf_in[0] = h;
-            cf_in[1] = k;
-            cf_in[2] = lam;
-
+        auto kepF_num = [cf_ptr](fp_t h, fp_t k, fp_t lam) {
+            const fp_t cf_in[3] = {h, k, lam};
             fp_t cf_out(0);
 
-            cf_ptr(&cf_out, cf_in.data(), nullptr, nullptr);
+            cf_ptr(&cf_out, cf_in, nullptr, nullptr);
 
             return cf_out;
         };
