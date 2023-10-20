@@ -17,6 +17,7 @@
 #include <utility>
 #include <vector>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <boost/math/tools/roots.hpp>
@@ -143,6 +144,10 @@ TEST_CASE("taylor kepE")
                                  high_accuracy, compact_mode);
 
             s.compile();
+
+            if (opt_level == 0u && compact_mode) {
+                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepE.num_num"));
+            }
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
@@ -356,6 +361,10 @@ TEST_CASE("taylor kepE")
                                  high_accuracy, compact_mode);
 
             s.compile();
+
+            if (opt_level == 0u && compact_mode) {
+                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepE.var_num"));
+            }
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
@@ -611,6 +620,10 @@ TEST_CASE("taylor kepE")
 
             s.compile();
 
+            if (opt_level == 0u && compact_mode) {
+                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepE.num_var"));
+            }
+
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{.2}, fp_t{.3}};
@@ -839,6 +852,10 @@ TEST_CASE("taylor kepE")
             taylor_add_jet<fp_t>(s, "jet", {kepE(x, y), kepE(y, x)}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
+
+            if (opt_level == 0u && compact_mode) {
+                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepE.var_var"));
+            }
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 

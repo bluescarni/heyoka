@@ -212,18 +212,21 @@ TEST_CASE("taylor pow")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 1, 1,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {pow(expression{number{fp_t{3}}}, par[0]), x + y}, 1, 1, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
+            if (opt_level == 0u && compact_mode) {
+                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.pow.num_par"));
+            }
+
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}}, pars = {fp_t{1} / fp_t{3}};
             jet.resize(4);
 
-            jptr(jet.data(), nullptr, nullptr);
+            jptr(jet.data(), pars.data(), nullptr);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -484,6 +487,10 @@ TEST_CASE("taylor pow")
                                  1, 1, high_accuracy, compact_mode);
 
             s.compile();
+
+            if (opt_level == 0u && compact_mode) {
+                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.pow.var_num"));
+            }
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
