@@ -160,8 +160,7 @@ TEST_CASE("taylor kepF")
         }
     };
 
-    // TODO enable compact mode.
-    for (auto cm : {false, false}) {
+    for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
             tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
             tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });

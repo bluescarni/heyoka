@@ -344,6 +344,184 @@ llvm::Value *kepF_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::
     return taylor_diff_kepF(s, fp_t, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
+namespace
+{
+
+// Derivative of kepF(number, number).
+template <typename U, typename V, typename W,
+          std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>, is_num_param<W>>, int> = 0>
+llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, const U &n0, const V &n1, const W &n2,
+                                             std::uint32_t n_uvars, std::uint32_t batch_size)
+{
+    return taylor_c_diff_func_numpar(
+        s, fp_t, n_uvars, batch_size, "kepF", 4,
+        [&s, fp_t, batch_size](const auto &args) {
+            // LCOV_EXCL_START
+            assert(args.size() == 3u);
+            assert(args[0] != nullptr);
+            assert(args[1] != nullptr);
+            assert(args[2] != nullptr);
+            // LCOV_EXCL_STOP
+
+            // Create/fetch the Kepler solver.
+            auto *fkep = llvm_add_inv_kep_F(s, fp_t, batch_size);
+
+            return s.builder().CreateCall(fkep, args);
+        },
+        n0, n1, n2);
+}
+
+// Derivative of kepF(number, number, var).
+template <typename U, typename V, std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
+llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, const U &n0, const V &n1,
+                                             const variable &var, std::uint32_t n_uvars, std::uint32_t batch_size)
+{
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "kepF", n_uvars, batch_size, {n0, n1, var}, 4);
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
+
+    // Try to see if we already created the function.
+    auto f = md.getFunction(fname);
+
+    if (f != nullptr) {
+        // The function was created already, return it.
+        return f;
+    }
+
+    // The function was not created before, do it now.
+
+    // Create/fetch the Kepler solver.
+    auto *fkep = llvm_add_inv_kep_F(s, fp_t, batch_size);
+
+    // Fetch the current insertion block.
+    auto *orig_bb = builder.GetInsertBlock();
+
+    // The return type is val_t.
+    auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+    // Create the function
+    f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+    assert(f != nullptr);
+
+    // Fetch the necessary function arguments.
+    auto ord = f->args().begin();
+    auto u_idx = f->args().begin() + 1;
+    auto diff_ptr = f->args().begin() + 2;
+    auto par_ptr = f->args().begin() + 3;
+    auto num_h = f->args().begin() + 5;
+    auto num_k = f->args().begin() + 6;
+    auto lam_idx = f->args().begin() + 7;
+    auto c_idx = f->args().begin() + 8;
+    auto d_idx = f->args().begin() + 9;
+
+    // Create a new basic block to start insertion into.
+    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+    // Create the return value.
+    auto *retval = builder.CreateAlloca(val_t);
+
+    // Create the accumulator.
+    auto *acc = builder.CreateAlloca(val_t);
+
+    llvm_if_then_else(
+        s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
+        [&]() {
+            // For order 0, invoke the function on the order 0 of lam_idx.
+            builder.CreateStore(
+                builder.CreateCall(fkep,
+                                   {taylor_c_diff_numparam_codegen(s, fp_t, n0, num_h, par_ptr, batch_size),
+                                    taylor_c_diff_numparam_codegen(s, fp_t, n1, num_k, par_ptr, batch_size),
+                                    taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), lam_idx)}),
+                retval);
+        },
+        [&]() {
+            // Create FP vector versions of the order.
+            auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
+
+            // Compute the divisor: ord * (1 - c^[0] - d^[0]).
+            auto *one_fp = vector_splat(builder, llvm_constantfp(s, fp_t, 1.), batch_size);
+            auto divisor
+                = llvm_fsub(s, one_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
+            divisor
+                = llvm_fsub(s, divisor, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), d_idx));
+            divisor = llvm_fmul(s, ord_v, divisor);
+
+            // Init the dividend: ord * lam^[n] (h/k are constants here).
+            auto dividend = llvm_fmul(s, ord_v, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, lam_idx));
+
+            // Init the accumulator.
+            builder.CreateStore(vector_splat(builder, llvm_constantfp(s, fp_t, 0.), batch_size), acc);
+
+            // Run the loop.
+            llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
+                auto *j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
+
+                auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
+                auto d_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
+                auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
+                auto tmp1 = llvm_fmul(s, j_v, aj);
+                auto tmp2 = llvm_fadd(s, c_nj, d_nj);
+                auto tmp = llvm_fmul(s, tmp1, tmp2);
+
+                builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), tmp), acc);
+            });
+
+            // Write the result.
+            builder.CreateStore(llvm_fdiv(s, llvm_fadd(s, dividend, builder.CreateLoad(val_t, acc)), divisor), retval);
+        });
+
+    // Return the result.
+    builder.CreateRet(builder.CreateLoad(val_t, retval));
+
+    // Verify.
+    s.verify_function(f);
+
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
+
+    return f;
+}
+
+// LCOV_EXCL_START
+
+// All the other cases.
+template <typename U, typename V, typename W, typename... Args>
+llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &, llvm::Type *, const U &, const V &, const W &, std::uint32_t,
+                                             std::uint32_t, const Args &...)
+{
+    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
+                                "of kepF() in compact mode");
+}
+
+// LCOV_EXCL_STOP
+
+llvm::Function *taylor_c_diff_func_kepF(llvm_state &s, llvm::Type *fp_t, const kepF_impl &fn, std::uint32_t n_uvars,
+                                        std::uint32_t batch_size)
+{
+    assert(fn.args().size() == 3u);
+
+    return std::visit(
+        [&](const auto &v1, const auto &v2, const auto &v3) {
+            return taylor_c_diff_func_kepF_impl(s, fp_t, v1, v2, v3, n_uvars, batch_size);
+        },
+        fn.args()[0].value(), fn.args()[1].value(), fn.args()[2].value());
+}
+
+} // namespace
+
+llvm::Function *kepF_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                              std::uint32_t batch_size, bool) const
+{
+    return taylor_c_diff_func_kepF(s, fp_t, *this, n_uvars, batch_size);
+}
+
 } // namespace detail
 
 // NOTE: constant folding here would need a JIT-compiled version of kepF().
