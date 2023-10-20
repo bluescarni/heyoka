@@ -370,6 +370,80 @@ taylor_diff_kepF_impl(llvm_state &s, llvm::Type *fp_t, const std::vector<std::ui
     return llvm_fdiv(s, dividend, divisor);
 }
 
+// Derivative of kepF(var, number, number).
+template <typename U, typename V, std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
+llvm::Value *
+taylor_diff_kepF_impl(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps, const variable &var,
+                      const U &num0, const V &num1, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                      // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                      std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    assert(deps.size() == 4u); // LCOV_EXCL_LINE
+
+    auto &builder = s.builder();
+
+    // Fetch the index of the k variable argument.
+    const auto h_idx = uname_to_index(var.name());
+
+    // Do the codegen for the number arguments.
+    auto *k = taylor_codegen_numparam(s, fp_t, num0, par_ptr, batch_size);
+    auto *lam = taylor_codegen_numparam(s, fp_t, num1, par_ptr, batch_size);
+
+    if (order == 0u) {
+        // Create/fetch the Kepler solver.
+        auto *fkep = llvm_add_inv_kep_F(s, fp_t, batch_size);
+
+        // Invoke and return.
+        return builder.CreateCall(fkep, {taylor_fetch_diff(arr, h_idx, 0, n_uvars), k, lam});
+    }
+
+    // Splat the order.
+    auto *n = vector_splat(builder, llvm_constantfp(s, fp_t, static_cast<double>(order)), batch_size);
+
+    // Compute the divisor: n * (1 - c^[0] - d^[0]).
+    const auto c_idx = deps[0], d_idx = deps[1];
+    auto *one_fp = vector_splat(builder, llvm_constantfp(s, fp_t, 1.), batch_size);
+    auto *divisor = llvm_fsub(s, one_fp, taylor_fetch_diff(arr, c_idx, 0, n_uvars));
+    divisor = llvm_fsub(s, divisor, taylor_fetch_diff(arr, d_idx, 0, n_uvars));
+    divisor = llvm_fmul(s, n, divisor);
+
+    // Compute the first part of the dividend: -n * h^[n] * f^[0] (the derivatives of k and lam are zero because
+    // here k and lam are constants and the order is > 0).
+    const auto f_idx = deps[3];
+    auto *dividend = llvm_fmul(s, n, taylor_fetch_diff(arr, h_idx, order, n_uvars));
+    dividend = llvm_fmul(s, dividend, taylor_fetch_diff(arr, f_idx, 0, n_uvars));
+    dividend = llvm_fneg(s, dividend);
+
+    // Compute the second part of the dividend only for order > 1, in order to avoid
+    // an empty summation.
+    if (order > 1u) {
+        std::vector<llvm::Value *> sum;
+
+        // NOTE: iteration in the [1, order) range.
+        for (std::uint32_t j = 1; j < order; ++j) {
+            auto *fac = vector_splat(builder, llvm_constantfp(s, fp_t, static_cast<double>(j)), batch_size);
+
+            auto *cnj = taylor_fetch_diff(arr, c_idx, order - j, n_uvars);
+            auto *dnj = taylor_fetch_diff(arr, d_idx, order - j, n_uvars);
+            auto *fnj = taylor_fetch_diff(arr, f_idx, order - j, n_uvars);
+            auto *aj = taylor_fetch_diff(arr, idx, j, n_uvars);
+            auto *hj = taylor_fetch_diff(arr, h_idx, j, n_uvars);
+
+            auto *tmp1 = llvm_fadd(s, cnj, dnj);
+            auto *tmp2 = llvm_fmul(s, hj, fnj);
+            auto *tmp3 = llvm_fmul(s, aj, tmp1);
+            auto *tmp4 = llvm_fsub(s, tmp3, tmp2);
+            auto *tmp = llvm_fmul(s, fac, tmp4);
+            sum.push_back(tmp);
+        }
+
+        // Update the dividend.
+        dividend = llvm_fadd(s, dividend, pairwise_sum(s, sum));
+    }
+
+    return llvm_fdiv(s, dividend, divisor);
+}
+
 // LCOV_EXCL_START
 
 // All the other cases.
@@ -506,7 +580,6 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
     llvm_if_then_else(
         s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
         [&]() {
-            // For order 0, invoke the function on the order 0 of lam_idx.
             builder.CreateStore(
                 builder.CreateCall(fkep,
                                    {taylor_c_diff_numparam_codegen(s, fp_t, n0, num_h, par_ptr, batch_size),
@@ -576,7 +649,7 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "kepF", n_uvars, batch_size, {n0, n1, var}, 4);
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "kepF", n_uvars, batch_size, {n0, var, n1}, 4);
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -626,7 +699,6 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
     llvm_if_then_else(
         s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
         [&]() {
-            // For order 0, invoke the function on the order 0 of lam_idx.
             builder.CreateStore(
                 builder.CreateCall(fkep, {taylor_c_diff_numparam_codegen(s, fp_t, n0, num_h, par_ptr, batch_size),
                                           taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), k_idx),
@@ -667,6 +739,131 @@ llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, co
                 auto *tmp2 = llvm_fmul(s, kj, e_nj);
                 auto *tmp3 = llvm_fmul(s, aj, tmp1);
                 auto *tmp4 = llvm_fadd(s, tmp3, tmp2);
+                auto *tmp = llvm_fmul(s, j_v, tmp4);
+
+                builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), tmp), acc);
+            });
+
+            // Write the result.
+            builder.CreateStore(llvm_fdiv(s, llvm_fadd(s, dividend, builder.CreateLoad(val_t, acc)), divisor), retval);
+        });
+
+    // Return the result.
+    builder.CreateRet(builder.CreateLoad(val_t, retval));
+
+    // Verify.
+    s.verify_function(f);
+
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
+
+    return f;
+}
+
+// Derivative of kepF(var, number, number).
+template <typename U, typename V, std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
+llvm::Function *taylor_c_diff_func_kepF_impl(llvm_state &s, llvm::Type *fp_t, const variable &var, const U &n0,
+                                             const V &n1, std::uint32_t n_uvars, std::uint32_t batch_size)
+{
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the vector floating-point type.
+    auto *val_t = make_vector_type(fp_t, batch_size);
+
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "kepF", n_uvars, batch_size, {var, n0, n1}, 4);
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
+
+    // Try to see if we already created the function.
+    auto f = md.getFunction(fname);
+
+    if (f != nullptr) {
+        // The function was created already, return it.
+        return f;
+    }
+
+    // The function was not created before, do it now.
+
+    // Create/fetch the Kepler solver.
+    auto *fkep = llvm_add_inv_kep_F(s, fp_t, batch_size);
+
+    // Fetch the current insertion block.
+    auto *orig_bb = builder.GetInsertBlock();
+
+    // The return type is val_t.
+    auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+    // Create the function
+    f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+    assert(f != nullptr);
+
+    // Fetch the necessary function arguments.
+    auto ord = f->args().begin();
+    auto u_idx = f->args().begin() + 1;
+    auto diff_ptr = f->args().begin() + 2;
+    auto par_ptr = f->args().begin() + 3;
+    auto h_idx = f->args().begin() + 5;
+    auto num_k = f->args().begin() + 6;
+    auto num_lam = f->args().begin() + 7;
+    auto c_idx = f->args().begin() + 8;
+    auto d_idx = f->args().begin() + 9;
+    auto f_idx = f->args().begin() + 11;
+
+    // Create a new basic block to start insertion into.
+    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+    // Create the return value.
+    auto *retval = builder.CreateAlloca(val_t);
+
+    // Create the accumulator.
+    auto *acc = builder.CreateAlloca(val_t);
+
+    llvm_if_then_else(
+        s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
+        [&]() {
+            builder.CreateStore(
+                builder.CreateCall(fkep, {taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), h_idx),
+                                          taylor_c_diff_numparam_codegen(s, fp_t, n0, num_k, par_ptr, batch_size),
+                                          taylor_c_diff_numparam_codegen(s, fp_t, n1, num_lam, par_ptr, batch_size)}),
+                retval);
+        },
+        [&]() {
+            // Create FP vector versions of the order.
+            auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
+
+            // Compute the divisor: ord * (1 - c^[0] - d^[0]).
+            auto *one_fp = vector_splat(builder, llvm_constantfp(s, fp_t, 1.), batch_size);
+            auto divisor
+                = llvm_fsub(s, one_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
+            divisor
+                = llvm_fsub(s, divisor, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), d_idx));
+            divisor = llvm_fmul(s, ord_v, divisor);
+
+            // Init the dividend: -ord * h^[n] * f^[0] (k/lam are constants here).
+            auto dividend = llvm_fmul(s, ord_v, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, h_idx));
+            dividend
+                = llvm_fmul(s, dividend, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), f_idx));
+            dividend = llvm_fneg(s, dividend);
+
+            // Init the accumulator.
+            builder.CreateStore(vector_splat(builder, llvm_constantfp(s, fp_t, 0.), batch_size), acc);
+
+            // Run the loop.
+            llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
+                auto *j_v = vector_splat(builder, llvm_ui_to_fp(s, j, fp_t), batch_size);
+
+                auto c_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), c_idx);
+                auto d_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
+                auto f_nj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.CreateSub(ord, j), f_idx);
+                auto aj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, u_idx);
+                auto hj = taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, j, h_idx);
+
+                auto *tmp1 = llvm_fadd(s, c_nj, d_nj);
+                auto *tmp2 = llvm_fmul(s, hj, f_nj);
+                auto *tmp3 = llvm_fmul(s, aj, tmp1);
+                auto *tmp4 = llvm_fsub(s, tmp3, tmp2);
                 auto *tmp = llvm_fmul(s, j_v, tmp4);
 
                 builder.CreateStore(llvm_fadd(s, builder.CreateLoad(val_t, acc), tmp), acc);
