@@ -286,6 +286,65 @@ TEST_CASE("taylor kepF")
             REQUIRE(jet[14] == approximately((jet[8] * 2 + jet[10] * 2) / 6));
             REQUIRE(jet[15] == approximately((jet[9] * 2 + jet[11] * 2) / 6));
         }
+
+        // Number-var-var test.
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            taylor_add_jet<fp_t>(s, "jet", {kepF(par[0], x, y), x + y}, 3, 2, high_accuracy, compact_mode);
+
+            s.compile();
+
+            if (opt_level == 0u && compact_mode) {
+                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepF.par_var_var"));
+            }
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{.5}, fp_t{-.125}, fp_t{3}, fp_t{5}}, pars{fp_t(.2), fp_t(.2)};
+            jet.resize(16);
+
+            jptr(jet.data(), pars.data(), nullptr);
+
+            REQUIRE(jet[0] == .5);
+            REQUIRE(jet[1] == -.125);
+
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == 5);
+
+            REQUIRE(jet[4] == approximately(kepF_num(pars[0], jet[0], jet[2])));
+            REQUIRE(jet[5] == approximately(kepF_num(pars[1], jet[1], jet[3])));
+
+            REQUIRE(jet[6] == 3.5);
+            REQUIRE(jet[7] == 4.875);
+
+            auto den0 = 1 - pars[0] * sin(jet[4]) - jet[0] * cos(jet[4]);
+            auto den1 = 1 - pars[1] * sin(jet[5]) - jet[1] * cos(jet[5]);
+
+            REQUIRE(jet[8] == approximately((jet[4] * sin(jet[4]) + jet[6]) / den0 / 2));
+            REQUIRE(jet[9] == approximately((jet[5] * sin(jet[5]) + jet[7]) / den1 / 2));
+
+            REQUIRE(jet[10] == (jet[4] + jet[6]) / 2);
+            REQUIRE(jet[11] == (jet[5] + jet[7]) / 2);
+
+            auto Fp0 = jet[8] * 2;
+            auto Fp1 = jet[9] * 2;
+
+            auto tmp0 = -pars[0] * cos(jet[4]) * Fp0 - jet[4] * cos(jet[4]) + jet[0] * sin(jet[4]) * Fp0;
+            auto tmp1 = -pars[1] * cos(jet[5]) * Fp1 - jet[5] * cos(jet[5]) + jet[1] * sin(jet[5]) * Fp1;
+
+            REQUIRE(jet[12]
+                    == approximately(((Fp0 * sin(jet[4]) + jet[4] * cos(jet[4]) * Fp0 + 2 * jet[10]) * den0
+                                      - (jet[4] * sin(jet[4]) + jet[6]) * tmp0)
+                                     / (den0 * den0) / 6));
+            REQUIRE(jet[13]
+                    == approximately(((Fp1 * sin(jet[5]) + jet[5] * cos(jet[5]) * Fp1 + 2 * jet[11]) * den1
+                                      - (jet[5] * sin(jet[5]) + jet[7]) * tmp1)
+                                     / (den1 * den1) / 6));
+
+            REQUIRE(jet[14] == approximately((jet[8] * 2 + jet[10] * 2) / 6));
+            REQUIRE(jet[15] == approximately((jet[9] * 2 + jet[11] * 2) / 6));
+        }
     };
 
     for (auto cm : {false, true}) {
