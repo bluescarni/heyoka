@@ -658,7 +658,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
                 auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Compute the divisor: ord * (1 - c^[0]).
-                auto *one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
+                auto *one_fp = vector_splat(builder, llvm_constantfp(s, fp_t, 1.), batch_size);
                 auto divisor
                     = llvm_fsub(s, one_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
                 divisor = llvm_fmul(s, ord_v, divisor);
@@ -667,7 +667,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
                 auto dividend = llvm_fmul(s, ord_v, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, M_idx));
 
                 // Init the accumulator.
-                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
+                builder.CreateStore(vector_splat(builder, llvm_constantfp(s, fp_t, 0.), batch_size), acc);
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
@@ -815,6 +815,8 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
     return f;
 }
 
+// LCOV_EXCL_START
+
 // All the other cases.
 template <typename U, typename V, typename... Args>
 llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &, llvm::Type *, const U &, const V &, std::uint32_t,
@@ -823,6 +825,8 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &, llvm::Type *, const U
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of kepE() in compact mode");
 }
+
+// LCOV_EXCL_STOP
 
 llvm::Function *taylor_c_diff_func_kepE(llvm_state &s, llvm::Type *fp_t, const kepE_impl &fn, std::uint32_t n_uvars,
                                         std::uint32_t batch_size)
