@@ -4,6 +4,21 @@ Changelog
 3.1.0 (unreleased)
 ------------------
 
+New
+~~~
+
+- Implement the eccentric longitude :math:`F` in the expression
+  system (`#352 <https://github.com/bluescarni/heyoka/pull/352>`__).
+- Implement the delta eccentric anomaly :math:`\Delta E` in the expression
+  system (`#352 <https://github.com/bluescarni/heyoka/pull/352>`__).
+  Taylor derivatives are not implemented yet.
+
+Fix
+~~~
+
+- Improve the numerical stability of the Kepler solver
+  (`#352 <https://github.com/bluescarni/heyoka/pull/352>`__).
+
 3.0.0 (2023-10-07)
 ------------------
 
