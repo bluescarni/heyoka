@@ -32,6 +32,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/preprocessor/arithmetic/add.hpp>
@@ -112,6 +113,19 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
     assert(fp_t != nullptr);
     assert(n_uvars > 0u);
 
+    // LCOV_EXCL_START
+
+    // Check that name does not contain periods ".". Periods are used
+    // to separate fields in the mangled name.
+    if (boost::contains(name, ".")) {
+        throw std::invalid_argument(
+            fmt::format("Cannot generate a mangled name for the compact mode Taylor derivative of the mathematical "
+                        "function '{}': the function name cannot contain '.' symbols",
+                        name));
+    }
+
+    // LCOV_EXCL_STOP
+
     // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
@@ -181,6 +195,13 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
     // for n_uvars.
     if (with_var) {
         fname += fmt::format("n_uvars_{}.", n_uvars);
+    } else {
+        // NOTE: make sure we put something in this field even
+        // if we do not have variables in the arguments. This ensures
+        // that a mangled function name has a fixed number of fields, and that
+        // n_uvars_{} cannot possibly be interpreted as the mangled
+        // name of a floating-point type.
+        fname += "no_uvars.";
     }
 
     // Finally, add the mangling for the floating-point type.
