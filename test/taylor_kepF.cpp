@@ -86,6 +86,7 @@ TEST_CASE("taylor kepF")
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {kepF(fp_t(.1), par[0], .3_dbl), x + y}, 2, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet2", {kepF(fp_t(.1), par[0], .3_dbl), x + y}, 2, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -124,6 +125,7 @@ TEST_CASE("taylor kepF")
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {kepF(fp_t(.1), par[0], x), x + y}, 3, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet2", {kepF(fp_t(.1), par[0], x), x + y}, 3, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -174,6 +176,7 @@ TEST_CASE("taylor kepF")
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {kepF(fp_t(.1), x, par[0]), x + y}, 3, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet2", {kepF(fp_t(.1), x, par[0]), x + y}, 3, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -233,6 +236,7 @@ TEST_CASE("taylor kepF")
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {kepF(x, fp_t(.1), par[0]), x + y}, 3, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet2", {kepF(x, fp_t(.1), par[0]), x + y}, 3, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -292,6 +296,7 @@ TEST_CASE("taylor kepF")
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {kepF(par[0], x, y), x + y}, 3, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet2", {kepF(par[0], x, y), x + y}, 3, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -351,6 +356,7 @@ TEST_CASE("taylor kepF")
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {kepF(x, par[0], y), x + y}, 3, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet2", {kepF(x, par[0], y), x + y}, 3, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -410,6 +416,7 @@ TEST_CASE("taylor kepF")
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {kepF(x, y, par[0]), x + y}, 3, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet2", {kepF(x, y, par[0]), x + y}, 3, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -475,6 +482,7 @@ TEST_CASE("taylor kepF")
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {kepF(x, y, z), x + y, y}, 3, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet2", {kepF(x, y, z), x + y, y}, 3, 2, high_accuracy, compact_mode);
 
             s.compile();
 
