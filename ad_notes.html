@@ -9,7 +9,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
-    <title>Notes on automatic differentiation &#8212; heyoka 3.0.0 documentation</title>
+    <title>Notes on automatic differentiation &#8212; heyoka 3.1.0 documentation</title>
   
   
   
@@ -179,6 +179,7 @@
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">Notes on automatic differentiation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="breaking_changes.html">Breaking changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="known_issues.html">Known issues</a></li>
 <li class="toctree-l1"><a class="reference internal" href="acknowledgement.html">Acknowledgement</a></li>
 <li class="toctree-l1"><a class="reference internal" href="bibliography.html">Bibliography</a></li>
 </ul>
@@ -421,7 +422,8 @@ document.write(`
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#celestial-mechanics">Celestial mechanics</a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-of-kepler-s-elliptic-equation">Inverse of Kepler’s elliptic equation</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#kepler-s-eccentric-anomaly">Kepler’s eccentric anomaly</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#eccentric-longitude">Eccentric longitude</a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#time-functions">Time functions</a><ul class="nav section-nav flex-column">
@@ -761,9 +763,9 @@ and <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> to obta
 </section>
 <section id="celestial-mechanics">
 <h2>Celestial mechanics<a class="headerlink" href="#celestial-mechanics" title="Permalink to this heading">#</a></h2>
-<section id="inverse-of-kepler-s-elliptic-equation">
-<h3>Inverse of Kepler’s elliptic equation<a class="headerlink" href="#inverse-of-kepler-s-elliptic-equation" title="Permalink to this heading">#</a></h3>
-<p>The inverse of Kepler’s elliptic equation is the bivariate function <span class="math notranslate nohighlight">\(E = E\left( e, M \right)\)</span> implicitly defined by the
+<section id="kepler-s-eccentric-anomaly">
+<span id="kepe-ad"></span><h3>Kepler’s eccentric anomaly<a class="headerlink" href="#kepler-s-eccentric-anomaly" title="Permalink to this heading">#</a></h3>
+<p>The <a class="reference external" href="https://en.wikipedia.org/wiki/Eccentric_anomaly">eccentric anomaly</a> is the bivariate function <span class="math notranslate nohighlight">\(E = E\left( e, M \right)\)</span> implicitly defined by the
 trascendental equation</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-54">
 <span class="eqno">(63)<a class="headerlink" href="#equation-ad-notes-54" title="Permalink to this equation">#</a></span>\[M = E - e \sin E,\]</div>
@@ -802,24 +804,61 @@ d^{\left[ n - j \right]}\left( t \right)e^{\left[ j \right]}\left( t \right)
 \right)
 \right].\]</div>
 </section>
+<section id="eccentric-longitude">
+<h3>Eccentric longitude<a class="headerlink" href="#eccentric-longitude" title="Permalink to this heading">#</a></h3>
+<p>The <a class="reference external" href="https://articles.adsabs.harvard.edu//full/1972CeMec...5..303B/0000309.000.html">eccentric longitude</a>
+is the trivariate function <span class="math notranslate nohighlight">\(F = F\left( h, k, \lambda \right)\)</span> implicitly defined by the
+trascendental equation</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-61">
+<span class="eqno">(71)<a class="headerlink" href="#equation-ad-notes-61" title="Permalink to this equation">#</a></span>\[\lambda = F + h\cos F - k\sin F,\]</div>
+<p>with <span class="math notranslate nohighlight">\(h^2+k^2 &lt; 1\)</span>. Given <span class="math notranslate nohighlight">\(a\left( t \right) = F\left( h\left( t \right), k \left( t \right), \lambda \left( t \right) \right)\)</span>,
+we have</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-62">
+<span class="eqno">(72)<a class="headerlink" href="#equation-ad-notes-62" title="Permalink to this equation">#</a></span>\[a^\prime\left( t \right) = \frac{k^\prime \left( t \right)\sin a\left(t \right) - h^\prime \left( t \right)\cos a\left(t \right)
++ \lambda^\prime\left( t \right)}{1-h\left( t \right)\sin a\left(t \right) -k\left( t \right)\cos a\left(t \right)}.\]</div>
+<p>After the introduction of the auxiliary functions</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-63">
+<span class="eqno">(73)<a class="headerlink" href="#equation-ad-notes-63" title="Permalink to this equation">#</a></span>\[\begin{split}\begin{cases}
+c\left( t \right) = h\left( t \right) \sin a\left(t \right), \\
+d\left( t \right) = k\left( t \right) \cos a\left(t \right), \\
+e\left( t \right) = \sin a\left(t \right), \\
+f\left( t \right) = \cos a\left(t \right), \\
+\end{cases}\end{split}\]</div>
+<p>we can then proceed in the same way as explained for the <a class="reference internal" href="#kepe-ad"><span class="std std-ref">eccentric anomaly</span></a>.
+The final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-64">
+<span class="eqno">(74)<a class="headerlink" href="#equation-ad-notes-64" title="Permalink to this equation">#</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left(1 - c^{\left[ 0 \right]}\left( t \right) -d^{\left[ 0 \right]}\left( t \right)\right)}
+\left\{
+n\left( k^{\left[ n \right]}\left( t \right) e^{\left[ 0 \right]}\left( t \right)
+- h^{\left[ n \right]}\left( t \right) f^{\left[ 0 \right]}\left( t \right)
++ \lambda^{\left[ n \right]}\left( t \right)\right) +
+\sum_{j=1}^{n-1}j\left[
+   a^{\left[ j \right]}\left( t \right) \left(
+      c^{\left[ n - j \right]}\left( t \right) + d^{\left[ n - j \right]}\left( t \right)
+   \right)
+   + k^{\left[ j \right]}\left( t \right) e^{\left[ n - j \right]}\left( t \right)
+   - h^{\left[ j \right]}\left( t \right) f^{\left[ n - j \right]}\left( t \right)
+\right]
+\right\}.\]</div>
+</section>
 </section>
 <section id="time-functions">
 <h2>Time functions<a class="headerlink" href="#time-functions" title="Permalink to this heading">#</a></h2>
 <section id="time-polynomials">
 <h3>Time polynomials<a class="headerlink" href="#time-polynomials" title="Permalink to this heading">#</a></h3>
 <p>Given the time polynomial of order <span class="math notranslate nohighlight">\(n\)</span></p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-61">
-<span class="eqno">(71)<a class="headerlink" href="#equation-ad-notes-61" title="Permalink to this equation">#</a></span>\[p_n\left( t \right) = \sum_{i=0}^n a_i t^i,\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-65">
+<span class="eqno">(75)<a class="headerlink" href="#equation-ad-notes-65" title="Permalink to this equation">#</a></span>\[p_n\left( t \right) = \sum_{i=0}^n a_i t^i,\]</div>
 <p>its derivative of order <span class="math notranslate nohighlight">\(j\)</span> is</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-62">
-<span class="eqno">(72)<a class="headerlink" href="#equation-ad-notes-62" title="Permalink to this equation">#</a></span>\[\left(p_n\left( t \right)\right)^{\left( j \right)} = \sum_{i=j}^n \left( i \right)_j a_i t^{i - j},\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-66">
+<span class="eqno">(76)<a class="headerlink" href="#equation-ad-notes-66" title="Permalink to this equation">#</a></span>\[\left(p_n\left( t \right)\right)^{\left( j \right)} = \sum_{i=j}^n \left( i \right)_j a_i t^{i - j},\]</div>
 <p>where <span class="math notranslate nohighlight">\(\left( i \right)_j\)</span> is the <a class="reference external" href="https://en.wikipedia.org/wiki/Falling_and_rising_factorials">falling factorial</a>.
 The normalised derivative of order <span class="math notranslate nohighlight">\(j\)</span> is</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-63">
-<span class="eqno">(73)<a class="headerlink" href="#equation-ad-notes-63" title="Permalink to this equation">#</a></span>\[\left(p_n\left( t \right)\right)^{\left[ j \right]} = \frac{1}{j!}\sum_{i=j}^n \left( i \right)_j a_i t^{i - j},\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-67">
+<span class="eqno">(77)<a class="headerlink" href="#equation-ad-notes-67" title="Permalink to this equation">#</a></span>\[\left(p_n\left( t \right)\right)^{\left[ j \right]} = \frac{1}{j!}\sum_{i=j}^n \left( i \right)_j a_i t^{i - j},\]</div>
 <p>which, with the help of elementary relations involving factorials and after re-arranging the indices, can be rewritten as</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-64">
-<span class="eqno">(74)<a class="headerlink" href="#equation-ad-notes-64" title="Permalink to this equation">#</a></span>\[\left(p_n\left( t \right)\right)^{\left[ j \right]} = \sum_{i=0}^{n-j} {i+j \choose j} a_{i+j} t^i.\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-68">
+<span class="eqno">(78)<a class="headerlink" href="#equation-ad-notes-68" title="Permalink to this equation">#</a></span>\[\left(p_n\left( t \right)\right)^{\left[ j \right]} = \sum_{i=0}^{n-j} {i+j \choose j} a_{i+j} t^i.\]</div>
 </section>
 </section>
 </section>
@@ -915,7 +954,8 @@ The normalised derivative of order <span class="math notranslate nohighlight">\(
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#celestial-mechanics">Celestial mechanics</a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#inverse-of-kepler-s-elliptic-equation">Inverse of Kepler’s elliptic equation</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#kepler-s-eccentric-anomaly">Kepler’s eccentric anomaly</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#eccentric-longitude">Eccentric longitude</a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#time-functions">Time functions</a><ul class="nav section-nav flex-column">

@@ -20,7 +20,7 @@ The :cpp:class:`~heyoka::variable` class
       Variable names beginning with a double underscore (``__``) are reserved
       for internal use.
 
-   .. cpp:function:: variable()
+   .. cpp:function:: variable() noexcept
 
       Default constructor.
 
