@@ -100,7 +100,7 @@ namespace detail
 //
 // for the function implementing the Taylor derivative in compact mode of the mathematical function
 // called "name". The mangled name is assembled from "name", the types of the arguments args, the number
-// of uvars and the scalar or vector floating-point type in use (which depends on T and batch_size).
+// of uvars and the scalar or vector floating-point type in use (which depends on fp_t and batch_size).
 // NOTE: the values in args are inconsequential, only the types matter.
 std::pair<std::string, std::vector<llvm::Type *>>
 taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const std::string &name,
