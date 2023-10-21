@@ -159,7 +159,7 @@ TEST_CASE("kepDE overloads")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL128)
+#if defined(HEYOKA_HAVE_REAL)
 
     HEYOKA_TEST_KEPDE_OVERLOAD(mppp::real);
 

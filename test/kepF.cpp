@@ -155,7 +155,7 @@ TEST_CASE("kepF overloads")
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL128)
+#if defined(HEYOKA_HAVE_REAL)
 
     HEYOKA_TEST_KEPF_OVERLOAD(mppp::real);
 
