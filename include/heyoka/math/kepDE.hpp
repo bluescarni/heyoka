@@ -6,13 +6,12 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MATH_KEPE_HPP
-#define HEYOKA_MATH_KEPE_HPP
+#ifndef HEYOKA_MATH_KEPDE_HPP
+#define HEYOKA_MATH_KEPDE_HPP
 
 #include <heyoka/config.hpp>
 
 #include <cstdint>
-#include <string>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -39,18 +38,18 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC kepE_impl : public func_base
+class HEYOKA_DLL_PUBLIC kepDE_impl : public func_base
 {
     friend class boost::serialization::access;
     template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar &boost::serialization::base_object<func_base>(*this);
-    }
+    HEYOKA_DLL_LOCAL void serialize(Archive &, unsigned);
+
+    template <typename T>
+    HEYOKA_DLL_LOCAL expression diff_impl(funcptr_map<expression> &, const T &) const;
 
 public:
-    kepE_impl();
-    explicit kepE_impl(expression, expression);
+    kepDE_impl();
+    explicit kepDE_impl(expression, expression, expression);
 
     expression diff(funcptr_map<expression> &, const std::string &) const;
     expression diff(funcptr_map<expression> &, const param &) const;
@@ -59,43 +58,39 @@ public:
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
-
-    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
-
-    llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
-                             const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
-                             std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
-
-    llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
 };
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression kepE(expression, expression);
+HEYOKA_DLL_PUBLIC expression kepDE(expression, expression, expression);
 
-#define HEYOKA_DECLARE_KEPE_OVERLOADS(type)                                                                            \
-    HEYOKA_DLL_PUBLIC expression kepE(expression, type);                                                               \
-    HEYOKA_DLL_PUBLIC expression kepE(type, expression);
+#define HEYOKA_DECLARE_KEPDE_OVERLOADS(type)                                                                           \
+    HEYOKA_DLL_PUBLIC expression kepDE(expression, type, type);                                                        \
+    HEYOKA_DLL_PUBLIC expression kepDE(type, expression, type);                                                        \
+    HEYOKA_DLL_PUBLIC expression kepDE(type, type, expression);                                                        \
+    HEYOKA_DLL_PUBLIC expression kepDE(expression, expression, type);                                                  \
+    HEYOKA_DLL_PUBLIC expression kepDE(expression, type, expression);                                                  \
+    HEYOKA_DLL_PUBLIC expression kepDE(type, expression, expression)
 
-HEYOKA_DECLARE_KEPE_OVERLOADS(double);
-HEYOKA_DECLARE_KEPE_OVERLOADS(long double);
+HEYOKA_DECLARE_KEPDE_OVERLOADS(double);
+HEYOKA_DECLARE_KEPDE_OVERLOADS(long double);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DECLARE_KEPE_OVERLOADS(mppp::real128);
+HEYOKA_DECLARE_KEPDE_OVERLOADS(mppp::real128);
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-HEYOKA_DECLARE_KEPE_OVERLOADS(mppp::real);
+HEYOKA_DECLARE_KEPDE_OVERLOADS(mppp::real);
 
 #endif
 
-#undef HEYOKA_DECLARE_KEPE_OVERLOADS
+#undef HEYOKA_DECLARE_KEPDE_OVERLOADS
 
 HEYOKA_END_NAMESPACE
 
-HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::kepE_impl)
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::kepDE_impl)
 
 #endif

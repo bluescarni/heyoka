@@ -55,6 +55,7 @@
 #include <heyoka/math/kepE.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
@@ -146,9 +147,9 @@ taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 2u);
 
-    // Make a copy of e.
+    // Make a copy of e, since we will be soon moving this.
     // NOTE: the arguments here have already been decomposed, thus
-    // args()[0] is a non-function value .
+    // args()[0] is a non-function value.
     assert(!std::holds_alternative<func>(args()[0].value()));
     auto e_copy = args()[0];
 
@@ -166,7 +167,9 @@ taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
                              std::vector<std::uint32_t>{});
 
     // Add the hidden deps.
-    // NOTE: hidden deps on e*cos(a) and sin(a) (in this order).
+    // NOTE: hidden deps on e*cos(a) and sin(a). The order in which the hidden deps
+    // are added here must match the order in which the hidden deps are consumed
+    // in the Taylor diff implementations.
     (u_vars_defs.end() - 4)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
     (u_vars_defs.end() - 4)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 3u));
 
@@ -199,7 +202,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::v
         // Invoke and return.
         return builder.CreateCall(fkep, {e, M});
     } else {
-        return vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size);
+        return vector_splat(builder, llvm_constantfp(s, fp_t, 0.), batch_size);
     }
 }
 
@@ -297,11 +300,11 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::v
     }
 
     // Splat the order.
-    auto *n = vector_splat(builder, llvm_codegen(s, fp_t, number{static_cast<double>(order)}), batch_size);
+    auto *n = vector_splat(builder, llvm_constantfp(s, fp_t, static_cast<double>(order)), batch_size);
 
     // Compute the divisor: n * (1 - c^[0]).
     const auto c_idx = deps[0];
-    auto *one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
+    auto *one_fp = vector_splat(builder, llvm_constantfp(s, fp_t, 1.), batch_size);
     auto *divisor = llvm_fmul(s, n, llvm_fsub(s, one_fp, taylor_fetch_diff(arr, c_idx, 0, n_uvars)));
 
     // Compute the first part of the dividend: n * M^[n] (the derivative of e is zero because
@@ -315,7 +318,7 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::v
 
         // NOTE: iteration in the [1, order) range.
         for (std::uint32_t j = 1; j < order; ++j) {
-            auto *fac = vector_splat(builder, llvm_codegen(s, fp_t, number(static_cast<double>(j))), batch_size);
+            auto *fac = vector_splat(builder, llvm_constantfp(s, fp_t, static_cast<double>(j)), batch_size);
 
             auto *cnj = taylor_fetch_diff(arr, c_idx, order - j, n_uvars);
             auto *aj = taylor_fetch_diff(arr, idx, j, n_uvars);
@@ -397,6 +400,8 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &s, llvm::Type *fp_t, const std::v
     return llvm_fdiv(s, dividend, divisor);
 }
 
+// LCOV_EXCL_START
+
 // All the other cases.
 template <typename U, typename V, typename... Args>
 llvm::Value *taylor_diff_kepE_impl(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &, const U &, const V &,
@@ -407,6 +412,8 @@ llvm::Value *taylor_diff_kepE_impl(llvm_state &, llvm::Type *, const std::vector
         "An invalid argument type was encountered while trying to build the Taylor derivative of kepE()");
 }
 
+// LCOV_EXCL_STOP
+
 llvm::Value *taylor_diff_kepE(llvm_state &s, llvm::Type *fp_t, const kepE_impl &f,
                               const std::vector<std::uint32_t> &deps, const std::vector<llvm::Value *> &arr,
                               llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
@@ -414,6 +421,7 @@ llvm::Value *taylor_diff_kepE(llvm_state &s, llvm::Type *fp_t, const kepE_impl &
 {
     assert(f.args().size() == 2u);
 
+    // LCOV_EXCL_START
     if (deps.size() != 2u) {
         throw std::invalid_argument(
             fmt::format("A hidden dependency vector of size 2 is expected in order to compute the Taylor "
@@ -421,6 +429,7 @@ llvm::Value *taylor_diff_kepE(llvm_state &s, llvm::Type *fp_t, const kepE_impl &
                         "instead",
                         deps.size()));
     }
+    // LCOV_EXCL_STOP
 
     return std::visit(
         [&](const auto &v1, const auto &v2) {
@@ -649,7 +658,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
                 auto ord_v = vector_splat(builder, llvm_ui_to_fp(s, ord, fp_t), batch_size);
 
                 // Compute the divisor: ord * (1 - c^[0]).
-                auto *one_fp = vector_splat(builder, llvm_codegen(s, fp_t, number{1.}), batch_size);
+                auto *one_fp = vector_splat(builder, llvm_constantfp(s, fp_t, 1.), batch_size);
                 auto divisor
                     = llvm_fsub(s, one_fp, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
                 divisor = llvm_fmul(s, ord_v, divisor);
@@ -658,7 +667,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
                 auto dividend = llvm_fmul(s, ord_v, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, ord, M_idx));
 
                 // Init the accumulator.
-                builder.CreateStore(vector_splat(builder, llvm_codegen(s, fp_t, number{0.}), batch_size), acc);
+                builder.CreateStore(vector_splat(builder, llvm_constantfp(s, fp_t, 0.), batch_size), acc);
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
@@ -806,6 +815,8 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, llvm::Type *fp_t, co
     return f;
 }
 
+// LCOV_EXCL_START
+
 // All the other cases.
 template <typename U, typename V, typename... Args>
 llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &, llvm::Type *, const U &, const V &, std::uint32_t,
@@ -814,6 +825,8 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &, llvm::Type *, const U
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of kepE() in compact mode");
 }
+
+// LCOV_EXCL_STOP
 
 llvm::Function *taylor_c_diff_func_kepE(llvm_state &s, llvm::Type *fp_t, const kepE_impl &fn, std::uint32_t n_uvars,
                                         std::uint32_t batch_size)
@@ -845,61 +858,32 @@ expression kepE(expression e, expression M)
     return expression{func{detail::kepE_impl{std::move(e), std::move(M)}}};
 }
 
-expression kepE(expression e, double M)
-{
-    return kepE(std::move(e), expression(M));
-}
+#define HEYOKA_DEFINE_KEPE_OVERLOADS(type)                                                                             \
+    expression kepE(expression e, type M)                                                                              \
+    {                                                                                                                  \
+        return kepE(std::move(e), expression{std::move(M)});                                                           \
+    }                                                                                                                  \
+    expression kepE(type e, expression M)                                                                              \
+    {                                                                                                                  \
+        return kepE(expression{std::move(e)}, std::move(M));                                                           \
+    }
 
-expression kepE(expression e, long double M)
-{
-    return kepE(std::move(e), expression(M));
-}
+HEYOKA_DEFINE_KEPE_OVERLOADS(double)
+HEYOKA_DEFINE_KEPE_OVERLOADS(long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-expression kepE(expression e, mppp::real128 M)
-{
-    return kepE(std::move(e), expression(M));
-}
+HEYOKA_DEFINE_KEPE_OVERLOADS(mppp::real128);
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-expression kepE(expression e, mppp::real M)
-{
-    return kepE(std::move(e), expression(std::move(M)));
-}
+HEYOKA_DEFINE_KEPE_OVERLOADS(mppp::real);
 
 #endif
 
-expression kepE(double e, expression M)
-{
-    return kepE(expression(e), std::move(M));
-}
-
-expression kepE(long double e, expression M)
-{
-    return kepE(expression(e), std::move(M));
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-expression kepE(mppp::real128 e, expression M)
-{
-    return kepE(expression(e), std::move(M));
-}
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-expression kepE(mppp::real e, expression M)
-{
-    return kepE(expression(std::move(e)), std::move(M));
-}
-
-#endif
+#undef HEYOKA_DEFINE_KEPE_OVERLOADS
 
 HEYOKA_END_NAMESPACE
 

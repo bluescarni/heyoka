@@ -1879,6 +1879,31 @@ llvm::Value *llvm_fcmp_ult(llvm_state &s, llvm::Value *a, llvm::Value *b)
     }
 }
 
+llvm::Value *llvm_fcmp_uge(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    auto *fp_t = a->getType();
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return builder.CreateFCmpUGE(a, b);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm_real_fcmp_uge(s, a, b);
+#endif
+    } else {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format("Unable to fcmp_uge values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
+    }
+}
+
 llvm::Value *llvm_fcmp_oge(llvm_state &s, llvm::Value *a, llvm::Value *b)
 {
     // LCOV_EXCL_START
@@ -2132,6 +2157,7 @@ llvm::Value *llvm_max_nan(llvm_state &s, llvm::Value *a, llvm::Value *b)
 
 // Branchless sign function.
 // NOTE: requires FP value.
+// NOTE: this will return 0 if val is NaN.
 llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
 {
     assert(val != nullptr);
@@ -2149,13 +2175,7 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
         auto *cmp1 = llvm_fcmp_olt(s, val, zero);
 
         // Convert to int32.
-        llvm::Type *int_type{};
-        if (auto *v_t = llvm::dyn_cast<llvm_vector_type>(cmp0->getType())) {
-            int_type
-                = make_vector_type(builder.getInt32Ty(), boost::numeric_cast<std::uint32_t>(v_t->getNumElements()));
-        } else {
-            int_type = builder.getInt32Ty();
-        }
+        llvm::Type *int_type = make_vector_type(builder.getInt32Ty(), get_vector_size(val));
         auto *icmp0 = builder.CreateZExt(cmp0, int_type);
         auto *icmp1 = builder.CreateZExt(cmp1, int_type);
 
@@ -3202,14 +3222,6 @@ llvm::Value *llvm_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
-
-// NOTE: this function will be called by the LLVM implementation
-// of the inverse Kepler function when the maximum number of iterations
-// is exceeded.
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter() noexcept
-{
-    heyoka::detail::get_logger()->warn("iteration limit exceeded while solving the elliptic inverse Kepler equation");
-}
 
 #if !defined(NDEBUG)
 

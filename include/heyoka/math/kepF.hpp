@@ -6,8 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MATH_KEPE_HPP
-#define HEYOKA_MATH_KEPE_HPP
+#ifndef HEYOKA_MATH_KEPF_HPP
+#define HEYOKA_MATH_KEPF_HPP
 
 #include <heyoka/config.hpp>
 
@@ -39,18 +39,18 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC kepE_impl : public func_base
+class HEYOKA_DLL_PUBLIC kepF_impl : public func_base
 {
     friend class boost::serialization::access;
     template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar &boost::serialization::base_object<func_base>(*this);
-    }
+    HEYOKA_DLL_LOCAL void serialize(Archive &, unsigned);
+
+    template <typename T>
+    HEYOKA_DLL_LOCAL expression diff_impl(funcptr_map<expression> &, const T &) const;
 
 public:
-    kepE_impl();
-    explicit kepE_impl(expression, expression);
+    kepF_impl();
+    explicit kepF_impl(expression, expression, expression);
 
     expression diff(funcptr_map<expression> &, const std::string &) const;
     expression diff(funcptr_map<expression> &, const param &) const;
@@ -71,31 +71,35 @@ public:
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression kepE(expression, expression);
+HEYOKA_DLL_PUBLIC expression kepF(expression, expression, expression);
 
-#define HEYOKA_DECLARE_KEPE_OVERLOADS(type)                                                                            \
-    HEYOKA_DLL_PUBLIC expression kepE(expression, type);                                                               \
-    HEYOKA_DLL_PUBLIC expression kepE(type, expression);
+#define HEYOKA_DECLARE_KEPF_OVERLOADS(type)                                                                            \
+    HEYOKA_DLL_PUBLIC expression kepF(expression, type, type);                                                         \
+    HEYOKA_DLL_PUBLIC expression kepF(type, expression, type);                                                         \
+    HEYOKA_DLL_PUBLIC expression kepF(type, type, expression);                                                         \
+    HEYOKA_DLL_PUBLIC expression kepF(expression, expression, type);                                                   \
+    HEYOKA_DLL_PUBLIC expression kepF(expression, type, expression);                                                   \
+    HEYOKA_DLL_PUBLIC expression kepF(type, expression, expression)
 
-HEYOKA_DECLARE_KEPE_OVERLOADS(double);
-HEYOKA_DECLARE_KEPE_OVERLOADS(long double);
+HEYOKA_DECLARE_KEPF_OVERLOADS(double);
+HEYOKA_DECLARE_KEPF_OVERLOADS(long double);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DECLARE_KEPE_OVERLOADS(mppp::real128);
+HEYOKA_DECLARE_KEPF_OVERLOADS(mppp::real128);
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-HEYOKA_DECLARE_KEPE_OVERLOADS(mppp::real);
+HEYOKA_DECLARE_KEPF_OVERLOADS(mppp::real);
 
 #endif
 
-#undef HEYOKA_DECLARE_KEPE_OVERLOADS
+#undef HEYOKA_DECLARE_KEPF_OVERLOADS
 
 HEYOKA_END_NAMESPACE
 
-HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::kepE_impl)
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::kepF_impl)
 
 #endif
