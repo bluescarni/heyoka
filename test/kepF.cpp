@@ -38,6 +38,7 @@
 #include <heyoka/math/kepF.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
 #include "test_utils.hpp"
@@ -163,6 +164,18 @@ TEST_CASE("kepF overloads")
 }
 
 #undef HEYOKA_TEST_KEPF_OVERLOAD
+
+TEST_CASE("kepF cse")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    llvm_state s;
+
+    auto dc = taylor_add_jet<double>(s, "jet", {cos(kepF(x, y, z)) + sin(kepF(x, y, z)) + kepF(x, y, z), x, y}, 1, 1,
+                                     false, false);
+
+    REQUIRE(dc.size() == 12u);
+}
 
 TEST_CASE("kepF s11n")
 {
