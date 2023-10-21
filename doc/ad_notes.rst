@@ -588,10 +588,12 @@ and :eq:`eq_leibniz_00` to obtain, for :math:`n > 0`:
 Celestial mechanics
 -------------------
 
-Inverse of Kepler's elliptic equation
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _kepE_ad:
 
-The inverse of Kepler's elliptic equation is the bivariate function :math:`E = E\left( e, M \right)` implicitly defined by the
+Kepler's eccentric anomaly
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The `eccentric anomaly <https://en.wikipedia.org/wiki/Eccentric_anomaly>`__ is the bivariate function :math:`E = E\left( e, M \right)` implicitly defined by the
 trascendental equation
 
 .. math::
@@ -660,6 +662,59 @@ and :eq:`eq_leibniz_00` and re-arrange to obtain, for :math:`n > 0`:
    d^{\left[ n - j \right]}\left( t \right)e^{\left[ j \right]}\left( t \right)
    \right)
    \right].
+
+Eccentric longitude
+^^^^^^^^^^^^^^^^^^^
+
+The `eccentric longitude <https://articles.adsabs.harvard.edu//full/1972CeMec...5..303B/0000309.000.html>`__
+is the trivariate function :math:`F = F\left( h, k, \lambda \right)` implicitly defined by the
+trascendental equation
+
+.. math::
+   :label:
+
+   \lambda = F + h\cos F - k\sin F,
+
+with :math:`h^2+k^2 < 1`. Given :math:`a\left( t \right) = F\left( h\left( t \right), k \left( t \right), \lambda \left( t \right) \right)`,
+we have
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = \frac{k^\prime \left( t \right)\sin a\left(t \right) - h^\prime \left( t \right)\cos a\left(t \right)
+   + \lambda^\prime\left( t \right)}{1-h\left( t \right)\sin a\left(t \right) -k\left( t \right)\cos a\left(t \right)}.
+
+After the introduction of the auxiliary functions
+
+.. math::
+   :label:
+
+   \begin{cases}
+   c\left( t \right) = h\left( t \right) \sin a\left(t \right), \\
+   d\left( t \right) = k\left( t \right) \cos a\left(t \right), \\
+   e\left( t \right) = \sin a\left(t \right), \\
+   f\left( t \right) = \cos a\left(t \right), \\
+   \end{cases}
+
+we can then proceed in the same way as explained for the :ref:`eccentric anomaly <kepE_ad>`.
+The final result, for :math:`n > 0`, is:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left(1 - c^{\left[ 0 \right]}\left( t \right) -d^{\left[ 0 \right]}\left( t \right)\right)}
+   \left\{
+   n\left( k^{\left[ n \right]}\left( t \right) e^{\left[ 0 \right]}\left( t \right)
+   - h^{\left[ n \right]}\left( t \right) f^{\left[ 0 \right]}\left( t \right)
+   + \lambda^{\left[ n \right]}\left( t \right)\right) +
+   \sum_{j=1}^{n-1}j\left[
+      a^{\left[ j \right]}\left( t \right) \left(
+         c^{\left[ n - j \right]}\left( t \right) + d^{\left[ n - j \right]}\left( t \right)
+      \right)
+      + k^{\left[ j \right]}\left( t \right) e^{\left[ n - j \right]}\left( t \right)
+      - h^{\left[ j \right]}\left( t \right) f^{\left[ n - j \right]}\left( t \right)
+   \right]
+   \right\}.
 
 Time functions
 --------------
