@@ -16,6 +16,8 @@ New
 Fix
 ~~~
 
+- Improve the numerical stability of the VSOP2013 model
+  (`#353 <https://github.com/bluescarni/heyoka/pull/353>`__).
 - Improve the numerical stability of the Kepler solver
   (`#352 <https://github.com/bluescarni/heyoka/pull/352>`__).
 

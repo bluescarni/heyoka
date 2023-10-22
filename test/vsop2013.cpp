@@ -633,7 +633,7 @@ TEST_CASE("cartesian")
                                           {0., 0., 0.},
                                           kw::compact_mode = true};
 
-        REQUIRE(ta.get_decomposition().size() == 1811u);
+        REQUIRE(ta.get_decomposition().size() == 2258u);
 
         const std::vector x_values
             = {0.3493879042, -0.3953232516, 0.2950960732,  -0.3676232510, 0.2077238852, -0.2846205582,
@@ -710,7 +710,7 @@ TEST_CASE("cartesian icrf")
                                           {0., 0., 0.},
                                           kw::compact_mode = true};
 
-        REQUIRE(ta.get_decomposition().size() == 1827u);
+        REQUIRE(ta.get_decomposition().size() == 2296u);
 
         const std::vector x_values
             = {0.3493878714, -0.3953232726, 0.2950960118,  -0.3676232407, 0.2077238019, -0.2846205184,
