@@ -41,9 +41,8 @@
 #include <heyoka/detail/vsop2013/vsop2013_8.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_9.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/math/atan2.hpp>
 #include <heyoka/math/cos.hpp>
-#include <heyoka/math/kepE.hpp>
+#include <heyoka/math/kepF.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>
@@ -306,86 +305,76 @@ constexpr double vsop2013_gm_sun = 2.9591220836841438269e-04;
 // are referred to the Dynamical Frame J2000.
 std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression t_expr, double thresh)
 {
+    // Compute the gravitational parameter for pl_idx.
+    assert(pl_idx >= 1u && pl_idx <= 9u); // LCOV_EXCL_LINE
+    const auto mu = vsop2013_gm_sun + vsop2013_gm_pl[pl_idx - 1u];
+
     // Get the elliptic orbital elements.
-    expression a, lam, k, h, q, p;
+    expression a, lam, k, h, q_, p_;
 
     tbb::parallel_invoke([&]() { a = vsop2013_elliptic_impl(pl_idx, 1, t_expr, thresh); },
                          [&]() { lam = vsop2013_elliptic_impl(pl_idx, 2, t_expr, thresh); },
                          [&]() { k = vsop2013_elliptic_impl(pl_idx, 3, t_expr, thresh); },
                          [&]() { h = vsop2013_elliptic_impl(pl_idx, 4, t_expr, thresh); },
-                         [&]() { q = vsop2013_elliptic_impl(pl_idx, 5, t_expr, thresh); },
-                         [&]() { p = vsop2013_elliptic_impl(pl_idx, 6, t_expr, thresh); });
+                         [&]() { q_ = vsop2013_elliptic_impl(pl_idx, 5, t_expr, thresh); },
+                         [&]() { p_ = vsop2013_elliptic_impl(pl_idx, 6, t_expr, thresh); });
 
-    // M, k**2 + h**2, q**2 + p**2, sqrt(q**2 + p**2).
-    expression M, kh_2, qp_2, qp;
-    tbb::parallel_invoke([&]() { M = lam - atan2(h, k); }, [&]() { kh_2 = k * k + h * h; },
-                         [&]() {
-                             qp_2 = q * q + p * p;
-                             qp = sqrt(qp_2);
-                         });
+    // NOTE: we follow the procedure described here to convert the equinoctial elements
+    // to Cartesian coordinates:
+    // https://articles.adsabs.harvard.edu//full/1972CeMec...5..303B/0000309.000.html
+    // Note that the definitions of q and p in this paper are different
+    // from the definitions in the VSOP2013 readme, and we thus need to convert.
 
-    // Check if qp is zero. This indicates a zero inclination orbit.
-    bool zero_inc = false;
-    if (const auto *num_ptr = std::get_if<number>(&qp.value())) {
-        zero_inc = is_zero(*num_ptr);
-    }
+    // sin(i/2)**2 = q_**2 + p_**2.
+    auto si22 = q_ * q_ + p_ * p_;
 
-    // E, e, sqrt(1 - e**2), cos(i), sin(i), cos(Om), sin(Om), sin(E), cos(E)
-    expression E, e, sqrt_1me2, ci, si, cOm, sOm, sin_E, cos_E;
-    tbb::parallel_invoke(
-        [&]() {
-            e = sqrt(kh_2);
-            E = kepE(e, M);
-            tbb::parallel_invoke([&]() { sin_E = sin(E); }, [&]() { cos_E = cos(E); });
-        },
-        [&]() { sqrt_1me2 = sqrt(1_dbl - kh_2); },
-        [&]() {
-            ci = 1_dbl - 2_dbl * qp_2;
-            si = sqrt(1_dbl - ci * ci);
-        },
-        // NOTE: for zero inclination, set conventionally Om to zero.
-        [&]() { cOm = zero_inc ? 1_dbl : q / qp; }, [&]() { sOm = zero_inc ? 0_dbl : p / qp; });
+    // cos(i/2).
+    auto ci2 = sqrt(1_dbl - si22);
 
-    // Check for zero eccentricity.
-    bool zero_ecc = false;
-    // NOTE: not sure if this is possible at all, but better safe than sorry.
-    // Let's exclude it from code coverage checks for the time being.
-    // LCOV_EXCL_START
-    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
-        zero_ecc = is_zero(*num_ptr);
-    }
-    // LCOV_EXCL_STOP
+    // Compute q and p:
+    // https://articles.adsabs.harvard.edu/full/gif/1972CeMec...5..303B/0000305.000.html
+    auto q = q_ / ci2;
+    auto p = p_ / ci2;
 
-    // cos(om), sin(om), q1/a, q2/a.
-    expression com, som, q1_a, q2_a;
-    tbb::parallel_invoke(
-        // NOTE: for zero eccentricity, set conventionally om to zero.
-        [&]() { com = zero_ecc ? 1_dbl : (k * cOm + h * sOm) / e; },
-        [&]() { som = zero_ecc ? 0_dbl : (h * cOm - k * sOm) / e; }, [&]() { q1_a = cos_E - e; },
-        [&]() { q2_a = sqrt_1me2 * sin_E; });
+    // Now follow https://articles.adsabs.harvard.edu//full/1972CeMec...5..303B/0000309.000.html.
+    auto e2 = h * h + k * k;
+    auto e_quot = 1_dbl + sqrt(1_dbl - e2);
+    auto F = kepF(h, k, lam);
+    auto cF = cos(F), sF = sin(F);
+    auto lam_F = h * cF - k * sF;
+    auto lam_F_e_quot = lam_F / e_quot;
 
-    // Prepare the entries of the rotation matrix, and a few auxiliary quantities.
-    expression R00, R01, R10, R11, R20, R21, v_num, v_den;
-    tbb::parallel_invoke([&]() { R00 = cOm * com - sOm * ci * som; }, [&]() { R01 = cOm * som + sOm * ci * com; },
-                         [&]() { R10 = sOm * com + cOm * ci * som; }, [&]() { R11 = sOm * som - cOm * ci * com; },
-                         [&]() { R20 = si * som; }, [&]() { R21 = si * com; }, [&]() { v_num = sqrt_1me2 * cos_E; },
-                         [&]() { v_den = sqrt(a) * (1_dbl - e * cos_E); });
+    auto X1 = a * (cF - k - h * lam_F_e_quot);
+    auto Y1 = a * (sF - h + k * lam_F_e_quot);
 
-    // Compute the gravitational parameter for pl_idx.
-    assert(pl_idx >= 1u && pl_idx <= 9u); // LCOV_EXCL_LINE
-    const auto mu = std::sqrt(vsop2013_gm_sun + vsop2013_gm_pl[pl_idx - 1u]);
+    auto p2 = p * p;
+    auto q2 = q * q;
+    auto p2_m_q2 = p2 - q2;
+    auto p2_p_q2 = p2 + q2;
+    auto two_p = p + p;
+    auto two_pq = two_p * q;
+    auto two_q = q + q;
 
-    // Prepare the return value.
-    std::vector<expression> retval(6u);
+    auto x = (1_dbl - p2_m_q2) * X1 + two_pq * Y1;
+    auto y = two_pq * X1 + (1_dbl + p2_m_q2) * Y1;
+    auto z = two_q * Y1 - two_p * X1;
 
-    tbb::parallel_invoke([&]() { retval[0] = a * (q1_a * R00 - q2_a * R01); },
-                         [&]() { retval[1] = a * (q1_a * R10 - q2_a * R11); },
-                         [&]() { retval[2] = a * (q1_a * R20 + q2_a * R21); },
-                         [&]() { retval[3] = mu * (-sin_E * R00 - v_num * R01) / v_den; },
-                         [&]() { retval[4] = mu * (-sin_E * R10 - v_num * R11) / v_den; },
-                         [&]() { retval[5] = mu * (-sin_E * R20 + v_num * R21) / v_den; });
+    // Velocities.
+    auto n = sqrt(mu / (a * a * a));
+    auto Fp = n / (1_dbl - h * sF - k * cF);
+    auto n_Fp = n - Fp;
+    auto n_Fp_equot = n_Fp / e_quot;
 
-    return retval;
+    auto VX1 = a * (-sF * Fp - h * n_Fp_equot);
+    auto VY1 = a * (cF * Fp + k * n_Fp_equot);
+
+    auto vx = (1_dbl - p2_m_q2) * VX1 + two_pq * VY1;
+    auto vy = two_pq * VX1 + (1_dbl + p2_m_q2) * VY1;
+    auto vz = two_q * VY1 - two_p * VX1;
+
+    auto quot = (1_dbl + p2_p_q2);
+
+    return {x / quot, y / quot, z / quot, vx / quot, vy / quot, vz / quot};
 }
 
 // Implementation of the function constructing the VSOP2013 Cartesian series as heyoka expressions. The coordinates
@@ -407,25 +396,12 @@ std::vector<expression> vsop2013_cartesian_icrf_impl(std::uint32_t pl_idx, expre
     const auto &vye = cart_dfj2000[4];
     const auto &vze = cart_dfj2000[5];
 
-    std::vector<expression> retval(6u);
-
-    tbb::parallel_invoke(
-        [&]() {
-            retval[0] = std::cos(phi) * xe - std::sin(phi) * std::cos(eps) * ye + std::sin(phi) * std::sin(eps) * ze;
-        },
-        [&]() {
-            retval[1] = std::sin(phi) * xe + std::cos(phi) * std::cos(eps) * ye - std::cos(phi) * std::sin(eps) * ze;
-        },
-        [&]() { retval[2] = std::sin(eps) * ye + std::cos(eps) * ze; },
-        [&]() {
-            retval[3] = std::cos(phi) * vxe - std::sin(phi) * std::cos(eps) * vye + std::sin(phi) * std::sin(eps) * vze;
-        },
-        [&]() {
-            retval[4] = std::sin(phi) * vxe + std::cos(phi) * std::cos(eps) * vye - std::cos(phi) * std::sin(eps) * vze;
-        },
-        [&]() { retval[5] = std::sin(eps) * vye + std::cos(eps) * vze; });
-
-    return retval;
+    return {std::cos(phi) * xe - std::sin(phi) * std::cos(eps) * ye + std::sin(phi) * std::sin(eps) * ze,
+            std::sin(phi) * xe + std::cos(phi) * std::cos(eps) * ye - std::cos(phi) * std::sin(eps) * ze,
+            std::sin(eps) * ye + std::cos(eps) * ze,
+            std::cos(phi) * vxe - std::sin(phi) * std::cos(eps) * vye + std::sin(phi) * std::sin(eps) * vze,
+            std::sin(phi) * vxe + std::cos(phi) * std::cos(eps) * vye - std::cos(phi) * std::sin(eps) * vze,
+            std::sin(eps) * vye + std::cos(eps) * vze};
 }
 
 } // namespace detail
