@@ -62,6 +62,7 @@
 #endif
 
 #include <heyoka/detail/cm_utils.hpp>
+#include <heyoka/detail/fast_unordered.hpp>
 #include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>

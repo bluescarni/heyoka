@@ -58,6 +58,7 @@
 #endif
 
 #include <heyoka/detail/cm_utils.hpp>
+#include <heyoka/detail/fast_unordered.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -749,7 +750,7 @@ auto taylor_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vect
         // will contain {f : [[a, b, c], [d, e, f]]}.
         // After construction, we have verified that for each function
         // in the map the sets of arguments have all the same size.
-        std::unordered_map<llvm::Function *, std::vector<std::vector<std::variant<std::uint32_t, number>>>> tmp_map;
+        fast_umap<llvm::Function *, std::vector<std::vector<std::variant<std::uint32_t, number>>>> tmp_map;
 
         for (const auto &ex : seg) {
             // Get the function for the computation of the derivative.
@@ -783,7 +784,7 @@ auto taylor_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vect
 
         // Now we build the transposition of tmp_map: from {f : [[a, b, c], [d, e, f]]}
         // to {f : [[a, d], [b, e], [c, f]]}.
-        std::unordered_map<llvm::Function *, std::vector<std::variant<std::vector<std::uint32_t>, std::vector<number>>>>
+        fast_umap<llvm::Function *, std::vector<std::variant<std::vector<std::uint32_t>, std::vector<number>>>>
             tmp_map_transpose;
         for (const auto &[func, vv] : tmp_map) {
             assert(!vv.empty()); // LCOV_EXCL_LINE
