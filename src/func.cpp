@@ -598,6 +598,9 @@ void swap(func &a, func &b) noexcept
     std::swap(a.m_ptr, b.m_ptr);
 }
 
+// NOTE: it is very important that the implementation here is kept exactly in sync
+// with the implementation of expression hashing for non-recursive expressions. If one
+// changes, the other must as well.
 std::size_t func::hash(detail::funcptr_map<std::size_t> &func_map) const
 {
     // NOTE: the hash value is computed by combining the hash values of:
