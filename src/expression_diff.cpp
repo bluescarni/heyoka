@@ -1059,7 +1059,7 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
         spdlog::stopwatch sw_inner;
 
         // NOTE: in order to choose between forward and reverse mode, we adopt the standard approach
-        // of comparing the number of inputs and outputs. A more accurate (yet more exepensive) approach
+        // of comparing the number of inputs and outputs. A more accurate (yet more expensive) approach
         // would be to do the computation in both modes (e.g., in parallel) and pick the mode which
         // results in the shortest decomposition. Perhaps we can consider this for a future extension.
         if (cur_nouts >= args.size()) {
