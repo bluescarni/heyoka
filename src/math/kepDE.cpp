@@ -85,7 +85,7 @@ expression kepDE_impl::diff_impl(funcptr_map<expression> &func_map, const T &s) 
 
     const expression DE{func{*this}};
 
-    return (detail::diff(func_map, s0, s) * (cos(DE) - 1_dbl) - detail::diff(func_map, c0, s) * sin(DE)
+    return (detail::diff(func_map, s0, s) * (cos(DE) - 1_dbl) + detail::diff(func_map, c0, s) * sin(DE)
             + detail::diff(func_map, DM, s))
            / (1_dbl + s0 * sin(DE) - c0 * cos(DE));
 }
