@@ -507,7 +507,7 @@ std::size_t hash(const expression &ex) noexcept
     // NOTE: we must be very careful with this optimisation: we need to make sure the hash computation
     // result is the same whether the optimisation is enabled or not. That is, the hash
     // **must** be the same regardless of whether a non-recursive expression is standalone
-    // or it is part of a larger (non-recursive) expression.
+    // or it is part of a larger expression.
     return std::visit(
         [&ex](const auto &v) {
             using type = detail::uncvref_t<decltype(v)>;
