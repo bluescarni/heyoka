@@ -84,12 +84,12 @@ TEST_CASE("kepDE diff")
         REQUIRE(diff(kepDE(x, y, z), x)
                 == (cos(kepDE(x, y, z)) - 1_dbl) / (1_dbl + x * sin(kepDE(x, y, z)) - y * cos(kepDE(x, y, z))));
         REQUIRE(diff(kepDE(x, y, z), y)
-                == -sin(kepDE(x, y, z)) / (1_dbl + x * sin(kepDE(x, y, z)) - y * cos(kepDE(x, y, z))));
+                == sin(kepDE(x, y, z)) / (1_dbl + x * sin(kepDE(x, y, z)) - y * cos(kepDE(x, y, z))));
         REQUIRE(diff(kepDE(x, y, z), z) == 1_dbl / (1_dbl + x * sin(kepDE(x, y, z)) - y * cos(kepDE(x, y, z))));
         auto DE = kepDE(x * x, x * y, x * z);
         REQUIRE(diff(DE, x)
-                == (2_dbl * x * (cos(DE) - 1_dbl) - y * sin(DE) + z) / (1_dbl + x * x * sin(DE) - x * y * cos(DE)));
-        REQUIRE(diff(DE, y) == (-x * sin(DE)) / (1_dbl + x * x * sin(DE) - x * y * cos(DE)));
+                == (2_dbl * x * (cos(DE) - 1_dbl) + y * sin(DE) + z) / (1_dbl + x * x * sin(DE) - x * y * cos(DE)));
+        REQUIRE(diff(DE, y) == (x * sin(DE)) / (1_dbl + x * x * sin(DE) - x * y * cos(DE)));
     }
 
     {
@@ -97,16 +97,16 @@ TEST_CASE("kepDE diff")
                 == (cos(kepDE(par[0], y, z)) - 1_dbl)
                        / (1_dbl + par[0] * sin(kepDE(par[0], y, z)) - y * cos(kepDE(par[0], y, z))));
         REQUIRE(diff(kepDE(x, par[1], z), par[1])
-                == -sin(kepDE(x, par[1], z))
+                == sin(kepDE(x, par[1], z))
                        / (1_dbl + x * sin(kepDE(x, par[1], z)) - par[1] * cos(kepDE(x, par[1], z))));
         REQUIRE(diff(kepDE(x, y, par[2]), par[2])
                 == 1_dbl / (1_dbl + x * sin(kepDE(x, y, par[2])) - y * cos(kepDE(x, y, par[2]))));
         auto DE = kepDE(par[0] * par[0], par[0] * par[1], par[0] * par[2]);
         REQUIRE(diff(DE, par[0])
-                == (2_dbl * par[0] * (cos(DE) - 1_dbl) - par[1] * sin(DE) + par[2])
+                == (2_dbl * par[0] * (cos(DE) - 1_dbl) + par[1] * sin(DE) + par[2])
                        / (1_dbl + par[0] * par[0] * sin(DE) - par[0] * par[1] * cos(DE)));
         REQUIRE(diff(DE, par[1])
-                == (-par[0] * sin(DE)) / (1_dbl + par[0] * par[0] * sin(DE) - par[0] * par[1] * cos(DE)));
+                == (par[0] * sin(DE)) / (1_dbl + par[0] * par[0] * sin(DE) - par[0] * par[1] * cos(DE)));
     }
 }
 
