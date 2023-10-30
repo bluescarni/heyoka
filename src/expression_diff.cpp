@@ -450,7 +450,7 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
 }
 
 // Forward-mode implementation of diff_tensors().
-template <typename DiffMap, typename Dep, typename Adj, typename SubsMap>
+template <typename DiffMap, typename Dep, typename Adj>
 void diff_tensors_forward_impl(
     // The map of derivatives. It wil be updated as new derivatives
     // are computed.
@@ -473,10 +473,7 @@ void diff_tensors_forward_impl(
     const std::vector<expression> &args,
     // Iterator in diff_map pointing to the first
     // derivative for the previous order.
-    typename DiffMap::iterator prev_begin,
-    // The substitution map to recover the original
-    // variables when constructing the derivatives.
-    const SubsMap &subs_map)
+    typename DiffMap::iterator prev_begin)
 {
     assert(dc.size() > nvars);
 
@@ -640,7 +637,7 @@ void diff_tensors_forward_impl(
             // Check if we already computed this derivative.
             if (const auto it = diff_map.find(tmp_v_idx); it == diff_map.end()) {
                 // The derivative is new.
-                auto cur_der = subs(diffs[diffs.size() - cur_nouts + out_idx], subs_map);
+                auto cur_der = diffs[diffs.size() - cur_nouts + out_idx];
 
                 [[maybe_unused]] const auto [_, flag] = diff_map.try_emplace(tmp_v_idx, std::move(cur_der));
                 assert(flag);
@@ -650,7 +647,7 @@ void diff_tensors_forward_impl(
 }
 
 // Reverse-mode implementation of diff_tensors().
-template <typename DiffMap, typename Dep, typename Adj, typename SubsMap>
+template <typename DiffMap, typename Dep, typename Adj>
 void diff_tensors_reverse_impl(
     // The map of derivatives. It wil be updated as new derivatives
     // are computed.
@@ -673,10 +670,7 @@ void diff_tensors_reverse_impl(
     const std::vector<expression> &args,
     // Iterator in diff_map pointing to the first
     // derivative for the previous order.
-    typename DiffMap::iterator prev_begin,
-    // The substitution map to recover the original
-    // variables when constructing the derivatives.
-    const SubsMap &subs_map)
+    typename DiffMap::iterator prev_begin)
 {
     assert(dc.size() > nvars);
 
@@ -836,7 +830,7 @@ void diff_tensors_reverse_impl(
                 expression cur_der = 0_dbl;
 
                 if (const auto it_dmap = dmap.find(args[j]); it_dmap != dmap.end()) {
-                    cur_der = subs(it_dmap->second, subs_map);
+                    cur_der = it_dmap->second;
                 }
 
                 [[maybe_unused]] const auto [_, flag] = diff_map.try_emplace(tmp_v_idx, std::move(cur_der));
@@ -1063,9 +1057,37 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
         // would be to do the computation in both modes (e.g., in parallel) and pick the mode which
         // results in the shortest decomposition. Perhaps we can consider this for a future extension.
         if (cur_nouts >= args.size()) {
-            diff_tensors_forward_impl(diff_map, cur_nouts, dc, dep, revdep, adj, nvars, args, prev_begin, subs_map);
+            diff_tensors_forward_impl(diff_map, cur_nouts, dc, dep, revdep, adj, nvars, args, prev_begin);
         } else {
-            diff_tensors_reverse_impl(diff_map, cur_nouts, dc, dep, revdep, adj, nvars, args, prev_begin, subs_map);
+            diff_tensors_reverse_impl(diff_map, cur_nouts, dc, dep, revdep, adj, nvars, args, prev_begin);
+        }
+
+        // NOTE: the derivatives we just added to diff_map are still expressed in terms of u variables.
+        // We need to apply the substitution map subs_map in order to recover the expressions in terms
+        // of the original variables. It is important that we do this now (rather then when constructing
+        // the derivatives in diff_tensors_*_impl()) because now we can do the substitution in a vectorised
+        // fashion, which greatly reduces the internal redundancy of the resulting expressions.
+
+        // Locate in diff_map the iterator to where we began adding derivatives for the current order.
+        tmp_v_idx[0] = 0;
+        tmp_v_idx[1] = cur_order + 1u;
+        std::fill(tmp_v_idx.begin() + 2, tmp_v_idx.end(), static_cast<std::uint32_t>(0));
+        const auto new_begin = diff_map.find(tmp_v_idx);
+        assert(new_begin != diff_map.end());
+
+        // Create the vector of expressions for the substitution.
+        std::vector<expression> subs_ret;
+        for (auto it = new_begin; it != diff_map.end(); ++it) {
+            subs_ret.push_back(it->second);
+        }
+
+        // Do the substitution.
+        subs_ret = subs(subs_ret, subs_map);
+
+        // Replace the original expressions in diff_map.
+        decltype(subs_ret.size()) i = 0;
+        for (auto it = new_begin; i < subs_ret.size(); ++i, ++it) {
+            it->second = subs_ret[i];
         }
 
         get_logger()->trace("dtens diff runtime for order {}: {}", cur_order + 1u, sw_inner);
