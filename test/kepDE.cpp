@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <array>
 #include <cmath>
 #include <initializer_list>
 #include <limits>
@@ -107,6 +108,88 @@ TEST_CASE("kepDE diff")
                        / (1_dbl + par[0] * par[0] * sin(DE) - par[0] * par[1] * cos(DE)));
         REQUIRE(diff(DE, par[1])
                 == (par[0] * sin(DE)) / (1_dbl + par[0] * par[0] * sin(DE) - par[0] * par[1] * cos(DE)));
+    }
+
+    // Use numerical differencing as a further check.
+    {
+        llvm_state s;
+
+        auto der = diff(kepDE(x, y, z), x);
+        add_cfunc<double>(s, "der", {der});
+        add_cfunc<double>(s, "f", {kepDE(x, y, z)});
+        s.compile();
+
+        auto *der_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("der"));
+        auto *f_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("f"));
+
+        double out_der{};
+        const std::array in_der = {.1, .1, 1.1};
+        der_ptr(&out_der, in_der.data(), nullptr, nullptr);
+
+        double out_f[2] = {};
+        const auto in_f1 = in_der;
+        auto in_f2 = in_der;
+        in_f2[0] += 1e-8;
+        f_ptr(out_f, in_f1.data(), nullptr, nullptr);
+        f_ptr(out_f + 1, in_f2.data(), nullptr, nullptr);
+
+        REQUIRE(out_der == approximately((out_f[1] - out_f[0]) / 1e-8, 1e9));
+    }
+
+    {
+        llvm_state s;
+
+        auto der = diff(kepDE(x, y, z), y);
+        add_cfunc<double>(s, "der", {der});
+        add_cfunc<double>(s, "f", {kepDE(x, y, z)});
+        s.compile();
+
+        auto *der_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("der"));
+        auto *f_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("f"));
+
+        double out_der{};
+        const std::array in_der = {.1, .1, 1.1};
+        der_ptr(&out_der, in_der.data(), nullptr, nullptr);
+
+        double out_f[2] = {};
+        const auto in_f1 = in_der;
+        auto in_f2 = in_der;
+        in_f2[1] += 1e-8;
+        f_ptr(out_f, in_f1.data(), nullptr, nullptr);
+        f_ptr(out_f + 1, in_f2.data(), nullptr, nullptr);
+
+        REQUIRE(out_der == approximately((out_f[1] - out_f[0]) / 1e-8, 1e8));
+    }
+
+    {
+        llvm_state s;
+
+        auto der = diff(kepDE(x, y, z), z);
+        add_cfunc<double>(s, "der", {der});
+        add_cfunc<double>(s, "f", {kepDE(x, y, z)});
+        s.compile();
+
+        auto *der_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("der"));
+        auto *f_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("f"));
+
+        double out_der{};
+        const std::array in_der = {.1, .1, 1.1};
+        der_ptr(&out_der, in_der.data(), nullptr, nullptr);
+
+        double out_f[2] = {};
+        const auto in_f1 = in_der;
+        auto in_f2 = in_der;
+        in_f2[2] += 1e-8;
+        f_ptr(out_f, in_f1.data(), nullptr, nullptr);
+        f_ptr(out_f + 1, in_f2.data(), nullptr, nullptr);
+
+        REQUIRE(out_der == approximately((out_f[1] - out_f[0]) / 1e-8, 1e8));
     }
 }
 
