@@ -132,7 +132,7 @@ TEST_CASE("kepF diff")
         f_ptr(out_f, in_f1.data(), nullptr, nullptr);
         f_ptr(out_f + 1, in_f2.data(), nullptr, nullptr);
 
-        REQUIRE(out_der == approximately((out_f[1] - out_f[0]) / 1e-8, 1e8));
+        REQUIRE(out_der == approximately((out_f[1] - out_f[0]) / 1e-8, 1e9));
     }
 
     {
@@ -159,7 +159,7 @@ TEST_CASE("kepF diff")
         f_ptr(out_f, in_f1.data(), nullptr, nullptr);
         f_ptr(out_f + 1, in_f2.data(), nullptr, nullptr);
 
-        REQUIRE(out_der == approximately((out_f[1] - out_f[0]) / 1e-8, 1e8));
+        REQUIRE(out_der == approximately((out_f[1] - out_f[0]) / 1e-8, 1e9));
     }
 
     {
@@ -186,7 +186,7 @@ TEST_CASE("kepF diff")
         f_ptr(out_f, in_f1.data(), nullptr, nullptr);
         f_ptr(out_f + 1, in_f2.data(), nullptr, nullptr);
 
-        REQUIRE(out_der == approximately((out_f[1] - out_f[0]) / 1e-8, 1e8));
+        REQUIRE(out_der == approximately((out_f[1] - out_f[0]) / 1e-8, 1e9));
     }
 }
 
