@@ -1456,7 +1456,7 @@ std::vector<expression> dtens::get_jacobian() const
 
     const auto sr = get_derivatives(1);
     std::vector<expression> retval;
-    retval.reserve(get_nvars());
+    retval.reserve(boost::safe_numerics::safe<decltype(retval.size())>(get_nvars()) * get_nouts());
     std::transform(sr.begin(), sr.end(), std::back_inserter(retval), [](const auto &p) { return p.second; });
 
     return retval;
