@@ -495,7 +495,7 @@ std::size_t hash(funcptr_map<std::size_t> &func_map, const expression &ex) noexc
         ex.value());
 }
 
-// NOLINTNEXTLINE(bugprone-exception-escape)
+// NOLINTNEXTLINE(bugprone-exception-escape,misc-no-recursion)
 std::size_t hash(const expression &ex) noexcept
 {
     // NOTE: we implement an optimisation here: if either the expression is **not** a function,
@@ -509,6 +509,7 @@ std::size_t hash(const expression &ex) noexcept
     // **must** be the same regardless of whether a non-recursive expression is standalone
     // or it is part of a larger expression.
     return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&ex](const auto &v) {
             using type = detail::uncvref_t<decltype(v)>;
 
