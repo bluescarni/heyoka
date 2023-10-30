@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <ostream>
@@ -1421,6 +1422,44 @@ dtens::subrange dtens::get_derivatives(std::uint32_t component, std::uint32_t or
     }
 
     return subrange{b, e};
+}
+
+std::vector<expression> dtens::get_gradient() const
+{
+    if (get_nouts() != 1u) {
+        throw std::invalid_argument(fmt::format("The gradient can be requested only for a function with a single "
+                                                "output, but the number of outputs is instead {}",
+                                                get_nouts()));
+    }
+
+    if (get_order() == 0u) {
+        throw std::invalid_argument("First-order derivatives are not available");
+    }
+
+    const auto sr = get_derivatives(0, 1);
+    std::vector<expression> retval;
+    retval.reserve(get_nvars());
+    std::transform(sr.begin(), sr.end(), std::back_inserter(retval), [](const auto &p) { return p.second; });
+
+    return retval;
+}
+
+std::vector<expression> dtens::get_jacobian() const
+{
+    if (get_nouts() == 0u) {
+        throw std::invalid_argument("Cannot return the Jacobian of a function with no outputs");
+    }
+
+    if (get_order() == 0u) {
+        throw std::invalid_argument("First-order derivatives are not available");
+    }
+
+    const auto sr = get_derivatives(1);
+    std::vector<expression> retval;
+    retval.reserve(get_nvars());
+    std::transform(sr.begin(), sr.end(), std::back_inserter(retval), [](const auto &p) { return p.second; });
+
+    return retval;
 }
 
 std::uint32_t dtens::get_nvars() const
