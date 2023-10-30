@@ -22,6 +22,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/container_hash/hash.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
@@ -1895,5 +1896,88 @@ TEST_CASE("cfunc sum_to_sub")
                                          && std::get<func>(ex.value()).template extract<detail::sum_impl>() != nullptr;
                               })
                 == 1);
+    }
+}
+
+// Test to check that the optimisation for hashing non-recursive
+// expressions is correct.
+TEST_CASE("hash opt")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    // Non-recursive function.
+    {
+        auto ex = x + y;
+
+        const auto nr_hash = std::hash<expression>{}(ex);
+
+        auto ex2 = z * ex;
+
+        const auto full_hash = std::hash<expression>{}(ex2);
+
+        // Compute manually the hash of ex2.
+        std::size_t seed = std::hash<std::string>{}(std::get<func>(ex2.value()).get_name());
+
+        boost::hash_combine(seed, std::hash<variable>{}(std::get<variable>(z.value())));
+        boost::hash_combine(seed, nr_hash);
+
+        REQUIRE(seed == full_hash);
+    }
+
+    // Variable.
+    {
+        auto ex = x;
+
+        const auto nr_hash = std::hash<expression>{}(ex);
+
+        auto ex2 = ex + 2. * y;
+
+        const auto full_hash = std::hash<expression>{}(ex2);
+
+        // Compute manually the hash of ex2.
+        std::size_t seed = std::hash<std::string>{}(std::get<func>(ex2.value()).get_name());
+
+        boost::hash_combine(seed, nr_hash);
+        boost::hash_combine(seed, std::hash<expression>{}(2. * y));
+
+        REQUIRE(seed == full_hash);
+    }
+
+    // Parameter.
+    {
+        auto ex = par[0];
+
+        const auto nr_hash = std::hash<expression>{}(ex);
+
+        auto ex2 = ex + 2. * y;
+
+        const auto full_hash = std::hash<expression>{}(ex2);
+
+        // Compute manually the hash of ex2.
+        std::size_t seed = std::hash<std::string>{}(std::get<func>(ex2.value()).get_name());
+
+        boost::hash_combine(seed, nr_hash);
+        boost::hash_combine(seed, std::hash<expression>{}(2. * y));
+
+        REQUIRE(seed == full_hash);
+    }
+
+    // Number.
+    {
+        auto ex = 1.1_dbl;
+
+        const auto nr_hash = std::hash<expression>{}(ex);
+
+        auto ex2 = ex + 2. * y;
+
+        const auto full_hash = std::hash<expression>{}(ex2);
+
+        // Compute manually the hash of ex2.
+        std::size_t seed = std::hash<std::string>{}(std::get<func>(ex2.value()).get_name());
+
+        boost::hash_combine(seed, nr_hash);
+        boost::hash_combine(seed, std::hash<expression>{}(2. * y));
+
+        REQUIRE(seed == full_hash);
     }
 }

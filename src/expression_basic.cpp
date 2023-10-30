@@ -526,7 +526,8 @@ std::size_t hash(const expression &ex) noexcept
 
                     for (const auto &arg : v.args()) {
                         // NOTE: for non-function arguments, calling hash(arg)
-                        // is identical to calling detail::hash(func_map, arg):
+                        // is identical to calling detail::hash(func_map, arg)
+                        // (as we do in func::hash()):
                         // both ultimately end up using directly the std::hash
                         // specialisation on the arg.
                         boost::hash_combine(seed, hash(arg));
