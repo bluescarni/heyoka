@@ -501,6 +501,8 @@ public:
 
     [[nodiscard]] subrange get_derivatives(std::uint32_t, std::uint32_t) const;
     [[nodiscard]] subrange get_derivatives(std::uint32_t) const;
+    [[nodiscard]] std::vector<expression> get_gradient() const;
+    [[nodiscard]] std::vector<expression> get_jacobian() const;
 };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const dtens &);

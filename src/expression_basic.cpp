@@ -27,6 +27,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/container_hash/hash.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
 
 #include <llvm/IR/Function.h>
@@ -494,12 +495,60 @@ std::size_t hash(funcptr_map<std::size_t> &func_map, const expression &ex) noexc
         ex.value());
 }
 
-// NOLINTNEXTLINE(bugprone-exception-escape)
+// NOLINTNEXTLINE(bugprone-exception-escape,misc-no-recursion)
 std::size_t hash(const expression &ex) noexcept
 {
-    detail::funcptr_map<std::size_t> func_map;
+    // NOTE: we implement an optimisation here: if either the expression is **not** a function,
+    // or if it is a function and none of its arguments are functions (i.e., it is a non-recursive
+    // expression), then we do not recurse into detail::hash() and we do not create/update the
+    // funcptr_map cache. This allows us to avoid memory allocations, in an effort to optimise the
+    // computation of hashes in decompositions, where the elementary subexpressions are
+    // non-recursive by definition.
+    // NOTE: we must be very careful with this optimisation: we need to make sure the hash computation
+    // result is the same whether the optimisation is enabled or not. That is, the hash
+    // **must** be the same regardless of whether a non-recursive expression is standalone
+    // or it is part of a larger expression.
+    return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
+        [&ex](const auto &v) {
+            using type = detail::uncvref_t<decltype(v)>;
 
-    return hash(func_map, ex);
+            if constexpr (std::is_same_v<type, func>) {
+                const auto no_func_args = std::none_of(v.args().begin(), v.args().end(), [](const auto &x) {
+                    return std::holds_alternative<func>(x.value());
+                });
+
+                if (no_func_args) {
+                    // NOTE: it is very important that here we replicate *exactly* the logic
+                    // of func::hash(), so that we produce the same hash value that would
+                    // be produced if ex were part of a larger expression.
+                    std::size_t seed = std::hash<std::string>{}(v.get_name());
+
+                    for (const auto &arg : v.args()) {
+                        // NOTE: for non-function arguments, calling hash(arg)
+                        // is identical to calling detail::hash(func_map, arg)
+                        // (as we do in func::hash()):
+                        // both ultimately end up using directly the std::hash
+                        // specialisation on the arg.
+                        boost::hash_combine(seed, hash(arg));
+                    }
+
+                    return seed;
+                } else {
+                    // The regular, non-optimised path.
+                    detail::funcptr_map<std::size_t> func_map;
+
+                    return hash(func_map, ex);
+                }
+            } else {
+                // ex is not a function, compute its hash directly
+                // via a std::hash specialisation.
+                // NOTE: this is the same logic implemented in detail::hash(),
+                // except we avoid the unnecessary creation of a funcptr_map.
+                return std::hash<type>{}(v);
+            }
+        },
+        ex.value());
 }
 
 } // namespace detail
