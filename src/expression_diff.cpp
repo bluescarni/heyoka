@@ -1468,14 +1468,23 @@ std::vector<expression> dtens::get_jacobian() const
 
 std::uint32_t dtens::get_nvars() const
 {
-    if (p_impl->m_map.empty()) {
-        return 0;
-    }
-
     // NOTE: we ensure in the diff_tensors() implementation
     // that the number of diff variables is representable
     // by std::uint32_t.
-    return static_cast<std::uint32_t>(begin()->first.size() - 1u);
+    auto ret = static_cast<std::uint32_t>(get_args().size());
+
+#if !defined(NDEBUG)
+
+    if (p_impl->m_map.empty()) {
+        assert(ret == 0u);
+    } else {
+        assert(!begin()->first.empty());
+        assert(ret == begin()->first.size() - 1u);
+    }
+
+#endif
+
+    return ret;
 }
 
 std::uint32_t dtens::get_nouts() const
