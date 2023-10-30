@@ -1441,6 +1441,8 @@ std::vector<expression> dtens::get_gradient() const
     retval.reserve(get_nvars());
     std::transform(sr.begin(), sr.end(), std::back_inserter(retval), [](const auto &p) { return p.second; });
 
+    assert(retval.size() == get_nvars());
+
     return retval;
 }
 
@@ -1458,6 +1460,8 @@ std::vector<expression> dtens::get_jacobian() const
     std::vector<expression> retval;
     retval.reserve(boost::safe_numerics::safe<decltype(retval.size())>(get_nvars()) * get_nouts());
     std::transform(sr.begin(), sr.end(), std::back_inserter(retval), [](const auto &p) { return p.second; });
+
+    assert(retval.size() == boost::safe_numerics::safe<decltype(retval.size())>(get_nvars()) * get_nouts());
 
     return retval;
 }
