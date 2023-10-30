@@ -13,6 +13,14 @@ New
   system (`#352 <https://github.com/bluescarni/heyoka/pull/352>`__).
   Taylor derivatives are not implemented yet.
 
+Changes
+~~~~~~~
+
+- Substantial performance improvements in the computation of
+  derivative tensors of large expressions with a high degree
+  of internal redundancy
+  (`#354 <https://github.com/bluescarni/heyoka/pull/354>`__).
+
 Fix
 ~~~
 
