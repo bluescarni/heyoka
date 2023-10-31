@@ -20,8 +20,9 @@ using namespace heyoka;
 
 TEST_CASE("impl")
 {
+    auto linear = [](expression ret) -> expression { return ret; };
     auto [x] = make_vars("x");
-    auto my_net = model::ffnn_impl({x}, 2, {2, 2}, {heyoka::tanh, heyoka::tanh, [](auto ret) { return ret; }},
+    auto my_net = model::ffnn_impl({x}, 2, {2, 2}, {heyoka::tanh, heyoka::tanh, heyoka::tanh},
                                    {1_dbl, 2_dbl, 3_dbl, 4_dbl, 5_dbl, 6_dbl, 7_dbl, 8_dbl, 9_dbl, 0_dbl, 1_dbl, 2_dbl,
                                     3_dbl, 4_dbl, 5_dbl, 6_dbl});
 }

@@ -70,18 +70,30 @@ std::vector<expression> compute_layer(std::uint32_t layer_id, const std::vector<
     auto n_neurons_curr_layer = n_neurons[layer_id];
 
     std::vector<expression> retval(n_neurons_curr_layer, 0_dbl);
-    fmt::print("nneurons: {}", n_neurons_prev_layer);
+    fmt::print("net_wb: {}\n", net_wb.size());
     std::cout << std::endl;
 
     for (std::uint32_t i = 0u; i < n_neurons_curr_layer; ++i) {
         for (std::uint32_t j = 0u; j < n_neurons_prev_layer; ++j) {
-            fmt::print("layer, i, j: {}, {}, {}", layer_id, i, j);
+            fmt::print("layer, i, j, idx: {}, {}, {}\n", layer_id, i, j, flattenw(i, j, n_neurons, layer_id));
             std::cout << std::endl;
-            retval[i] += net_wb[flattenw(i, j, n_neurons, layer_id)] * inputs[j];
+            retval[i] += 1_dbl;//net_wb[flattenw(i, j, n_neurons, layer_id)] * inputs[j];
         }
-        retval[i] += net_wb[flattenb(i, n_neurons, layer_id, n_net_w)];
+        fmt::print("idxb {}\n", flattenb(i, n_neurons, layer_id, n_net_w));
+        std::cout << std::endl;
+
+        retval[i]+= 1_dbl; //net_wb[flattenb(i, n_neurons, layer_id, n_net_w)];
+
+        fmt::print("\n{}\n", retval[i]);
+        fmt::print("Here1");
+
+        std::cout << std::endl;
         retval[i] = activation(retval[i]);
+        fmt::print("Here2");
+        std::cout << std::endl;
     }
+    fmt::print("Here3");
+
     return retval;
 }
 } // namespace detail
