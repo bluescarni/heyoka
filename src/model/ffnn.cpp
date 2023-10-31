@@ -24,46 +24,11 @@ namespace model
 {
 namespace detail
 {
-// From the i-th neuron of the layer_id and the incoming j-th connection, returns the corresponding weight position in
-// the flattened structure. NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-std::vector<expression>::size_type flattenw(std::uint32_t i, std::uint32_t j,
-                                            const std::vector<std::uint32_t> &n_neurons, std::uint32_t layer_id)
-{
-    assert(layer_id > 0);
-    // The weight for the jth-neuron of the ith layer will be placed after all previous layers.
-    // We start counting how many in flattened.
-    std::uint32_t counter = 0;
-    for (std::uint32_t k = 1; k < layer_id; ++k) {
-        counter += n_neurons[k] * n_neurons[k - 1];
-    }
-    // We then add the weights used for the previous neurons on the same layer.
-    counter += i * n_neurons[layer_id - 1];
-    // And return the index corresponding to the j-th weight.
-    return counter + j;
-}
-
-// From the i-th neuron of the layer_id, returns the corresponding bias position in the
-// flattened structure.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-std::vector<expression>::size_type flattenb(std::uint32_t i, const std::vector<std::uint32_t> &n_neurons,
-                                            // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                                            std::uint32_t layer_id, std::uint32_t n_net_w)
-{
-    assert(layer_id > 0);
-    // The weight for the jth-neuron of the ith layer will be placed after all previous layers.
-    // We start counting how many in flattened.
-    std::uint32_t counter = 0;
-    for (std::uint32_t k = 1; k < layer_id; ++k) {
-        counter += n_neurons[k];
-    }
-    // And return the index corresponding to the i-th bias.
-    return counter + i + n_net_w;
-}
-
 std::vector<expression> compute_layer(std::uint32_t layer_id, const std::vector<expression> &inputs,
                                       const std::vector<std::uint32_t> &n_neurons,
                                       const std::function<expression(const expression &)> &activation,
-                                      const std::vector<expression> &net_wb, std::uint32_t n_net_w)
+                                      const std::vector<expression> &net_wb, std::uint32_t n_net_w,
+                                      std::uint32_t &wcounter, std::uint32_t &bcounter)
 {
     assert(layer_id > 0);
     auto n_neurons_prev_layer = boost::numeric_cast<std::uint32_t>(inputs.size());
@@ -75,25 +40,20 @@ std::vector<expression> compute_layer(std::uint32_t layer_id, const std::vector<
 
     for (std::uint32_t i = 0u; i < n_neurons_curr_layer; ++i) {
         for (std::uint32_t j = 0u; j < n_neurons_prev_layer; ++j) {
-            fmt::print("layer, i, j, idx: {}, {}, {}\n", layer_id, i, j, flattenw(i, j, n_neurons, layer_id));
+            fmt::print("layer, i, j, idx: {}, {}, {}, {}\n", layer_id, i, j, wcounter);
             std::cout << std::endl;
-            retval[i] += 1_dbl;//net_wb[flattenw(i, j, n_neurons, layer_id)] * inputs[j];
+            // Add the weight and update the weight counter
+            retval[i] += net_wb[wcounter] * inputs[j];
+            ++wcounter;
         }
-        fmt::print("idxb {}\n", flattenb(i, n_neurons, layer_id, n_net_w));
+        fmt::print("idxb {}\n", bcounter + n_net_w);
         std::cout << std::endl;
-
-        retval[i]+= 1_dbl; //net_wb[flattenb(i, n_neurons, layer_id, n_net_w)];
-
-        fmt::print("\n{}\n", retval[i]);
-        fmt::print("Here1");
-
-        std::cout << std::endl;
+        // Add the bias and update the counter
+        retval[i] += net_wb[bcounter + n_net_w];
+        ++bcounter;
+        // Activation function
         retval[i] = activation(retval[i]);
-        fmt::print("Here2");
-        std::cout << std::endl;
     }
-    fmt::print("Here3");
-
     return retval;
 }
 } // namespace detail
@@ -156,10 +116,10 @@ std::vector<expression> ffnn_impl(
     // Now we build the expressions recursively going from layer to layer (L = f(Wx+b)))
 
     std::vector<expression> retval = in;
+    std::uint32_t wcounter = 0;
+    std::uint32_t bcounter = 0;
     for (std::uint32_t i = 1u; i < n_layers; ++i) {
-        fmt::print("{},{}", i, n_neurons[i]);
-        std::cout << std::endl;
-        retval = detail::compute_layer(i, retval, n_neurons, activations[i], net_wb, n_net_w);
+        retval = detail::compute_layer(i, retval, n_neurons, activations[i - 1], net_wb, n_net_w, wcounter, bcounter);
     }
     return retval;
 }
