@@ -140,6 +140,7 @@ ADD_HEYOKA_TESTCASE(model_fixed_centres)
 ADD_HEYOKA_TESTCASE(model_rotating)
 ADD_HEYOKA_TESTCASE(model_mascon)
 ADD_HEYOKA_TESTCASE(model_cr3bp)
+ADD_HEYOKA_TESTCASE(model_ffnn)
 ADD_HEYOKA_TESTCASE(step_callback)
 ADD_HEYOKA_TESTCASE(llvm_state_mem_cache)
 

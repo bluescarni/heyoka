@@ -28,6 +28,7 @@ namespace model
 // The expression will contain the weights and biases of the neural network flattened into `pars` with the following conventions:
 //
 // from the left to right layer of parameters: [flattened weights1, flattened weights2,  ... , biases1, bises2, ...]
+//
 HEYOKA_DLL_PUBLIC std::vector<expression>
 ffnn_impl(const std::vector<expression> &, std::uint32_t, const std::vector<std::uint32_t> &,
           const std::vector<std::function<expression(const expression &)>> &,
