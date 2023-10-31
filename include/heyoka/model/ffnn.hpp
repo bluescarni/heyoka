@@ -9,6 +9,7 @@
 #ifndef HEYOKA_MODEL_FFNN_HPP
 #define HEYOKA_MODEL_FFNN_HPP
 
+#include <atomic>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -28,9 +29,9 @@ namespace model
 //
 // from the left to right layer of parameters: [flattened weights1, flattened weights2,  ... , biases1, bises2, ...]
 HEYOKA_DLL_PUBLIC std::vector<expression>
-ffnn_impl(const std::vector<expression> & in, unsigned n_out, const std::vector<unsigned> &n_neurons_per_hidden_layer,
-          const std::vector<std::function<expression(const expression &)>> &activations,
-          const std::vector<expression> &pars);
+ffnn_impl(const std::vector<expression> &, std::uint32_t, const std::vector<std::uint32_t> &,
+          const std::vector<std::function<expression(const expression &)>> &,
+          const std::vector<expression> &);
 } // namespace model
 
 HEYOKA_END_NAMESPACE
