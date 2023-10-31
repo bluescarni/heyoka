@@ -34,3 +34,5 @@ ffnn_impl(const std::vector<expression> & in, unsigned n_out, const std::vector<
 } // namespace model
 
 HEYOKA_END_NAMESPACE
+
+#endif

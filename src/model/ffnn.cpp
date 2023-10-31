@@ -7,19 +7,11 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cmath>
-#include <stdexcept>
-#include <utility>
-#include <variant>
 #include <vector>
-
-#include <fmt/core.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/math/pow.hpp>
-#include <heyoka/math/sqrt.hpp>
-#include <heyoka/model/cr3bp.hpp>
-#include <heyoka/number.hpp>
+#include <heyoka/model/ffnn.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
