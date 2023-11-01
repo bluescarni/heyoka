@@ -113,7 +113,7 @@ std::vector<expression> ffnn_impl(
             n_net_wb, net_wb.size()));
     }
 
-    // Now we build the expressions recursively going from layer to layer (L = f(Wx+b)))
+    // Now we build the expressions recursively transvering from layer to layer (L = f(Wx+b)))
 
     std::vector<expression> retval = in;
     std::uint32_t wcounter = 0;
