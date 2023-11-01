@@ -10,11 +10,9 @@
 #define HEYOKA_MATH_RELU_HPP
 
 #include <cstdint>
-// #include <string>
 #include <vector>
 
 #include <heyoka/config.hpp>
-// #include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
