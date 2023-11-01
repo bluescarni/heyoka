@@ -74,20 +74,20 @@ auto ffnn_common_opts(KwArgs &&...kw_args)
 
     // Network weights and biases. Defaults to heyoka parameters.
     auto nn_wb = [&p, &nn_hidden, &inputs, n_out]() {
+        // Number of hidden layers (defined as all neuronal columns that are nor input nor output neurons)
+        auto n_hidden_layers = boost::numeric_cast<std::uint32_t>(nn_hidden.size());
+        // Number of neuronal layers (counting input and output)
+        auto n_layers = n_hidden_layers + 2;
+        // Number of inputs
+        auto n_in = boost::numeric_cast<std::uint32_t>(inputs.size());
+        // Number of neurons per neuronal layer
+        std::vector<std::uint32_t> n_neurons = nn_hidden;
+        n_neurons.insert(n_neurons.begin(), n_in);
+        n_neurons.insert(n_neurons.end(), n_out);
         std::vector<expression> retval{};
         if constexpr (p.has(kw::nn_wb)) {
             retval = p(kw::nn_wb);
         } else {
-            // Number of hidden layers (defined as all neuronal columns that are nor input nor output neurons)
-            auto n_hidden_layers = boost::numeric_cast<std::uint32_t>(nn_hidden.size());
-            // Number of neuronal layers (counting input and output)
-            auto n_layers = n_hidden_layers + 2;
-            // Number of inputs
-            auto n_in = boost::numeric_cast<std::uint32_t>(inputs.size());
-            // Number of neurons per neuronal layer
-            std::vector<std::uint32_t> n_neurons = nn_hidden;
-            n_neurons.insert(n_neurons.begin(), n_in);
-            n_neurons.insert(n_neurons.end(), n_out);
             // Number of network parameters (wb: weights and biases, w: only weights)
             std::uint32_t n_wb = 0u;
             for (std::uint32_t i = 1u; i < n_layers; ++i) {
@@ -95,8 +95,8 @@ auto ffnn_common_opts(KwArgs &&...kw_args)
                 n_wb += n_neurons[i];
             }
             retval.resize(n_wb);
-            for (decltype(retval.size()) i = 0; i < retval.size(); ++i) {
-                retval[i] = heyoka::par[i];
+            for (decltype(retval.size()) i = 0u; i < retval.size(); ++i) {
+                retval[i] = heyoka::par[boost::numeric_cast<std::uint32_t>(i)];
             }
         }
         return retval;

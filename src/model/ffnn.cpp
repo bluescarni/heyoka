@@ -108,5 +108,5 @@ std::vector<expression> ffnn_impl(const std::vector<expression> &in, const std::
     }
     return retval;
 }
-} // namespace model
+} // namespace model::detail
 HEYOKA_END_NAMESPACE
