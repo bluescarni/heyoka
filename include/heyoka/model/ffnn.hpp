@@ -74,8 +74,9 @@ auto ffnn_common_opts(KwArgs &&...kw_args)
 
     // Network weights and biases. Defaults to heyoka parameters.
     auto nn_wb = [&p, &nn_hidden, &inputs, n_out]() {
+        std::vector<expression> retval{};
         if constexpr (p.has(kw::nn_wb)) {
-            return std::vector<expression> {p(kw::nn_wb)};
+            retval = p(kw::nn_wb);
         } else {
             // Number of hidden layers (defined as all neuronal columns that are nor input nor output neurons)
             auto n_hidden_layers = boost::numeric_cast<std::uint32_t>(nn_hidden.size());
@@ -93,12 +94,12 @@ auto ffnn_common_opts(KwArgs &&...kw_args)
                 n_wb += n_neurons[i - 1] * n_neurons[i];
                 n_wb += n_neurons[i];
             }
-            std::vector<expression> retval(n_wb);
+            retval.resize(n_wb);
             for (decltype(retval.size()) i = 0; i < retval.size(); ++i) {
                 retval[i] = heyoka::par[i];
             }
-            return retval;
         }
+        return retval;
     }();
 
     return std::tuple{std::move(inputs), std::move(nn_hidden), std::move(n_out), std::move(activations),

@@ -74,19 +74,22 @@ TEST_CASE("igor_iface")
 {
     auto [x, y, z] = make_vars("x", "y", "z");
     {
-        auto igor_v = model::ffnn(kw::inputs = {x, y}, kw::nn_hidden = std::vector<std::uint32_t>{2u}, kw::n_out = 1u, 
-                 kw::activations = std::vector<std::function<expression(const expression &)>>{heyoka::sin, heyoka::cos},
-                 kw::nn_wb = {1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl});
+        auto igor_v = model::ffnn(
+            kw::inputs = {x, y}, kw::nn_hidden = std::vector<std::uint32_t>{2u}, kw::n_out = 1u,
+            kw::activations = std::vector<std::function<expression(const expression &)>>{heyoka::sin, heyoka::cos},
+            kw::nn_wb = {1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl});
         auto vanilla_v = model::detail::ffnn_impl({x, y}, {2u}, 1u, {heyoka::sin, heyoka::cos},
                                                   {1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl});
         REQUIRE(igor_v == vanilla_v);
     }
     // We test the expected setting for the default weights+biases expressions to par[i].
     {
-        auto igor_v = model::ffnn(kw::inputs = {x, y}, kw::nn_hidden = std::vector<std::uint32_t>{2u}, kw::n_out = 1u, 
-                 kw::activations = std::vector<std::function<expression(const expression &)>>{heyoka::sin, heyoka::cos});
-        auto vanilla_v = model::detail::ffnn_impl({x, y}, {2u}, 1u, {heyoka::sin, heyoka::cos},
-                                                  {par[0], par[1], par[2], par[3], par[4], par[5], par[6], par[7], par[8]});
+        auto igor_v = model::ffnn(
+            kw::inputs = {x, y}, kw::nn_hidden = std::vector<std::uint32_t>{2u}, kw::n_out = 1u,
+            kw::activations = std::vector<std::function<expression(const expression &)>>{heyoka::sin, heyoka::cos});
+        auto vanilla_v
+            = model::detail::ffnn_impl({x, y}, {2u}, 1u, {heyoka::sin, heyoka::cos},
+                                       {par[0], par[1], par[2], par[3], par[4], par[5], par[6], par[7], par[8]});
         REQUIRE(igor_v == vanilla_v);
     }
 }
