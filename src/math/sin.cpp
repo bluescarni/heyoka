@@ -223,6 +223,8 @@ llvm::Value *taylor_diff_sin_impl(llvm_state &s, llvm::Type *fp_t, const sin_imp
     return llvm_fdiv(s, ret_acc, div);
 }
 
+// LCOV_EXCL_START
+
 // All the other cases.
 template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
 llvm::Value *taylor_diff_sin_impl(llvm_state &, llvm::Type *, const sin_impl &, const std::vector<std::uint32_t> &,
@@ -233,18 +235,22 @@ llvm::Value *taylor_diff_sin_impl(llvm_state &, llvm::Type *, const sin_impl &, 
         "An invalid argument type was encountered while trying to build the Taylor derivative of a sine");
 }
 
+// LCOV_EXCL_STOP
+
 llvm::Value *taylor_diff_sin(llvm_state &s, llvm::Type *fp_t, const sin_impl &f, const std::vector<std::uint32_t> &deps,
                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     assert(f.args().size() == 1u);
 
+    // LCOV_EXCL_START
     if (deps.size() != 1u) {
         throw std::invalid_argument(
             fmt::format("A hidden dependency vector of size 1 is expected in order to compute the Taylor "
                         "derivative of the sine, but a vector of size {} was passed instead",
                         deps.size()));
     }
+    // LCOV_EXCL_STOP
 
     return std::visit(
         [&](const auto &v) {
@@ -370,6 +376,8 @@ llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, llvm::Type *fp_t, con
     return f;
 }
 
+// LCOV_EXCL_START
+
 // All the other cases.
 template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &, llvm::Type *, const sin_impl &, const U &, std::uint32_t,
@@ -378,6 +386,8 @@ llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &, llvm::Type *, const si
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a sine in compact mode");
 }
+
+// LCOV_EXCL_STOP
 
 llvm::Function *taylor_c_diff_func_sin(llvm_state &s, llvm::Type *fp_t, const sin_impl &fn, std::uint32_t n_uvars,
                                        std::uint32_t batch_size)
