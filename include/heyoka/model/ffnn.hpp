@@ -40,7 +40,7 @@ auto ffnn_common_opts(const KwArgs &...kw_args)
     static_assert(!p.has_unnamed_arguments(), "This function accepts only named arguments");
 
     // Network inputs. Mandatory.
-    // The kw::inputs must be a range of values from which
+    // The kw::inputs argument must be a range of values from which
     // an expression can be constructed.
     std::vector<expression> inputs;
     if constexpr (p.has(kw::inputs)) {
@@ -102,18 +102,18 @@ auto ffnn_common_opts(const KwArgs &...kw_args)
         // overflows when manipulating indices and sizes.
         using su32 = boost::safe_numerics::safe<std::uint32_t>;
 
-        // Number of hidden layers (defined as all neuronal columns that are nor input nor output neurons)
+        // Number of hidden layers (defined as all neuronal columns that are nor input nor output neurons).
         auto n_hidden_layers = su32(nn_hidden.size());
-        // Number of neuronal layers (counting input and output)
+        // Number of neuronal layers (counting input and output).
         auto n_layers = n_hidden_layers + 2;
-        // Number of inputs
+        // Number of inputs.
         auto n_in = su32(inputs.size());
-        // Number of neurons per neuronal layer
+        // Number of neurons per neuronal layer.
         std::vector<su32> n_neurons{n_in};
         n_neurons.insert(n_neurons.end(), nn_hidden.begin(), nn_hidden.end());
         n_neurons.insert(n_neurons.end(), n_out);
 
-        // Number of network parameters (wb: weights and biases, w: only weights)
+        // Number of network parameters (wb: weights and biases, w: only weights).
         su32 n_wb = 0;
         for (su32 i = 1; i < n_layers; ++i) {
             n_wb += n_neurons[i - 1] * n_neurons[i];

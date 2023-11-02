@@ -47,15 +47,15 @@ std::vector<expression> compute_layer(su32 layer_id, const std::vector<expressio
     for (su32 i = 0; i < n_neurons_curr_layer; ++i) {
         for (su32 j = 0; j < n_neurons_prev_layer; ++j) {
 
-            // Add the weight and update the weight counter
+            // Add the weight and update the weight counter.
             retval[i] += nn_wb[wcounter] * inputs[j];
             ++wcounter;
         }
 
-        // Add the bias and update the counter
+        // Add the bias and update the counter.
         retval[i] += nn_wb[bcounter + n_net_w];
         ++bcounter;
-        // Activation function
+        // Activation function.
         retval[i] = activation(retval[i]);
     }
     return retval;
@@ -68,7 +68,7 @@ std::vector<expression> ffnn_impl(const std::vector<expression> &in, const std::
                                   const std::vector<std::function<expression(const expression &)>> &activations,
                                   const std::vector<expression> &nn_wb)
 {
-    // Sanity checks
+    // Sanity checks.
     if (activations.empty()) {
         throw std::invalid_argument("Cannot create a FFNN with an empty list of activation functions");
     }
@@ -96,24 +96,24 @@ std::vector<expression> ffnn_impl(const std::vector<expression> &in, const std::
     // indices and sizes.
     using detail::su32;
 
-    // Number of hidden layers (defined as all neuronal columns that are nor input nor output neurons)
+    // Number of hidden layers (defined as all neuronal columns that are nor input nor output neurons).
     auto n_hidden_layers = su32(nn_hidden.size());
-    // Number of neuronal layers (counting input and output)
+    // Number of neuronal layers (counting input and output).
     auto n_layers = n_hidden_layers + 2;
-    // Number of inputs
+    // Number of inputs.
     auto n_in = su32(in.size());
-    // Number of neurons per neuronal layer
+    // Number of neurons per neuronal layer.
     std::vector<su32> n_neurons{n_in};
     n_neurons.insert(n_neurons.end(), nn_hidden.begin(), nn_hidden.end());
     n_neurons.insert(n_neurons.end(), n_out);
-    // Number of network parameters (wb: weights and biases, w: only weights)
+    // Number of network parameters (wb: weights and biases, w: only weights).
     su32 n_net_wb = 0, n_net_w = 0;
     for (su32 i = 1; i < n_layers; ++i) {
         n_net_wb += n_neurons[i - 1u] * n_neurons[i];
         n_net_w += n_neurons[i - 1u] * n_neurons[i];
         n_net_wb += n_neurons[i];
     }
-    // Sanity check
+    // Sanity check.
     if (nn_wb.size() != n_net_wb) {
         throw std::invalid_argument(fmt::format(
             "The number of network parameters, detected from its structure to be {}, does not match the size of "
@@ -121,7 +121,7 @@ std::vector<expression> ffnn_impl(const std::vector<expression> &in, const std::
             static_cast<std::uint32_t>(n_net_wb), nn_wb.size()));
     }
 
-    // Now we build the expressions recursively transvering from layer to layer (L = f(Wx+b)))
+    // Now we build the expressions recursively transvering from layer to layer (L = f(Wx+b))).
     std::vector<expression> retval = in;
     su32 wcounter = 0, bcounter = 0;
     for (su32 i = 1; i < n_layers; ++i) {
