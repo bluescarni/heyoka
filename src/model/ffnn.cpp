@@ -7,12 +7,15 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <algorithm>
-#include <cmath>
-#include <iostream>
+#include <cassert>
+#include <cstdint>
+#include <functional>
+#include <stdexcept>
 #include <vector>
 
+#include <boost/numeric/conversion/cast.hpp>
+
 #include <fmt/core.h>
-#include <fmt/ranges.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
@@ -22,19 +25,20 @@ HEYOKA_BEGIN_NAMESPACE
 
 namespace model::detail
 {
+
 std::vector<expression> compute_layer(std::uint32_t layer_id, const std::vector<expression> &inputs,
                                       const std::vector<std::uint32_t> &n_neurons,
                                       const std::function<expression(const expression &)> &activation,
                                       const std::vector<expression> &nn_wb, std::uint32_t n_net_w,
                                       std::uint32_t &wcounter, std::uint32_t &bcounter)
 {
-    assert(layer_id > 0);
+    assert(layer_id > 0u);
     auto n_neurons_prev_layer = boost::numeric_cast<std::uint32_t>(inputs.size());
     auto n_neurons_curr_layer = n_neurons[layer_id];
 
     std::vector<expression> retval(n_neurons_curr_layer, 0_dbl);
-    for (std::uint32_t i = 0u; i < n_neurons_curr_layer; ++i) {
-        for (std::uint32_t j = 0u; j < n_neurons_prev_layer; ++j) {
+    for (std::uint32_t i = 0; i < n_neurons_curr_layer; ++i) {
+        for (std::uint32_t j = 0; j < n_neurons_prev_layer; ++j) {
 
             // Add the weight and update the weight counter
             retval[i] += nn_wb[wcounter] * inputs[j];
@@ -69,7 +73,7 @@ std::vector<expression> ffnn_impl(const std::vector<expression> &in, const std::
     if (n_out == 0) {
         throw std::invalid_argument("The number of network outputs cannot be zero.");
     }
-    if (!std::all_of(nn_hidden.begin(), nn_hidden.end(), [](std::uint32_t item) { return item > 0; })) {
+    if (!std::all_of(nn_hidden.begin(), nn_hidden.end(), [](std::uint32_t item) { return item > 0u; })) {
         throw std::invalid_argument("The number of neurons for each hidden layer must be greater than zero!");
     }
 
@@ -108,5 +112,7 @@ std::vector<expression> ffnn_impl(const std::vector<expression> &in, const std::
     }
     return retval;
 }
+
 } // namespace model::detail
+
 HEYOKA_END_NAMESPACE

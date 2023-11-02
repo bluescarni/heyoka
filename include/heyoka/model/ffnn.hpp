@@ -9,13 +9,17 @@
 #ifndef HEYOKA_MODEL_FFNN_HPP
 #define HEYOKA_MODEL_FFNN_HPP
 
-#include <atomic>
+#include <cstdint>
+#include <functional>
 #include <tuple>
 #include <utility>
 #include <vector>
 
+#include <boost/numeric/conversion/cast.hpp>
+
 #include <heyoka/config.hpp>
 #include <heyoka/detail/igor.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 
@@ -25,8 +29,9 @@ namespace model
 {
 namespace detail
 {
+
 template <typename... KwArgs>
-auto ffnn_common_opts(KwArgs &&...kw_args)
+auto ffnn_common_opts(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
@@ -37,7 +42,7 @@ auto ffnn_common_opts(KwArgs &&...kw_args)
         if constexpr (p.has(kw::inputs)) {
             return std::vector<expression>{p(kw::inputs)};
         } else {
-            static_assert(::heyoka::detail::always_false_v<KwArgs...>,
+            static_assert(heyoka::detail::always_false_v<KwArgs...>,
                           "The 'inputs' keyword argument is necessary but it was not provided");
         }
     }();
@@ -47,7 +52,7 @@ auto ffnn_common_opts(KwArgs &&...kw_args)
         if constexpr (p.has(kw::nn_hidden)) {
             return std::vector<std::uint32_t>{p(kw::nn_hidden)};
         } else {
-            static_assert(::heyoka::detail::always_false_v<KwArgs...>,
+            static_assert(heyoka::detail::always_false_v<KwArgs...>,
                           "The 'nn_hidden' keyword argument is necessary but it was not provided");
         }
     }();
@@ -57,7 +62,7 @@ auto ffnn_common_opts(KwArgs &&...kw_args)
         if constexpr (p.has(kw::n_out)) {
             return std::uint32_t{p(kw::n_out)};
         } else {
-            static_assert(::heyoka::detail::always_false_v<KwArgs...>,
+            static_assert(heyoka::detail::always_false_v<KwArgs...>,
                           "The 'n_out' keyword argument is necessary but it was not provided");
         }
     }();
@@ -67,7 +72,7 @@ auto ffnn_common_opts(KwArgs &&...kw_args)
         if constexpr (p.has(kw::activations)) {
             return std::vector<std::function<expression(const expression &)>>{p(kw::activations)};
         } else {
-            static_assert(::heyoka::detail::always_false_v<KwArgs...>,
+            static_assert(heyoka::detail::always_false_v<KwArgs...>,
                           "The 'activations' keyword argument is necessary but it was not provided");
         }
     }();
