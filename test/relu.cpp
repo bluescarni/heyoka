@@ -92,6 +92,21 @@ TEST_CASE("def ctor")
     }
 }
 
+TEST_CASE("normalise")
+{
+    {
+        auto ex = relu(fix(.1_dbl));
+        ex = normalise(unfix(ex));
+        REQUIRE(ex == .1_dbl);
+    }
+
+    {
+        auto ex = relup(fix(-.1_dbl));
+        ex = normalise(unfix(ex));
+        REQUIRE(ex == 0_dbl);
+    }
+}
+
 TEST_CASE("diff")
 {
     auto [x, y] = make_vars("x", "y");
