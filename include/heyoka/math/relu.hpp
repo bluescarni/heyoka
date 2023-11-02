@@ -6,12 +6,10 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MATH_SIN_HPP
-#define HEYOKA_MATH_SIN_HPP
+#ifndef HEYOKA_MATH_RELU_HPP
+#define HEYOKA_MATH_RELU_HPP
 
 #include <cstdint>
-#include <string>
-#include <unordered_map>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -26,7 +24,7 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC sin_impl : public func_base
+class HEYOKA_DLL_PUBLIC relu_impl : public func_base
 {
     friend class boost::serialization::access;
     template <typename Archive>
@@ -36,32 +34,46 @@ class HEYOKA_DLL_PUBLIC sin_impl : public func_base
     }
 
 public:
-    sin_impl();
-    explicit sin_impl(expression);
-
-    [[nodiscard]] std::vector<expression> gradient() const;
+    relu_impl();
+    explicit relu_impl(expression);
 
     [[nodiscard]] expression normalise() const;
 
-    [[nodiscard]] double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
-    [[nodiscard]] long double eval_ldbl(const std::unordered_map<std::string, long double> &,
-                                        const std::vector<long double> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    [[nodiscard]] mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                                          const std::vector<mppp::real128> &) const;
-#endif
-
-    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
-                        const std::vector<double> &) const;
-    [[nodiscard]] double eval_num_dbl(const std::vector<double> &) const;
-    [[nodiscard]] double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
+    [[nodiscard]] std::vector<expression> gradient() const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 
-    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
+    llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
+                             const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
+                             std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
+
+    llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
+};
+
+class HEYOKA_DLL_PUBLIC relup_impl : public func_base
+{
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+    }
+
+public:
+    relup_impl();
+    explicit relup_impl(expression);
+
+    [[nodiscard]] expression normalise() const;
+
+    [[nodiscard]] std::vector<expression> gradient() const;
+
+    [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
+                                         llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
+
+    [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 
     llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
@@ -72,10 +84,14 @@ public:
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression sin(expression);
+HEYOKA_DLL_PUBLIC expression relu(expression);
+
+HEYOKA_DLL_PUBLIC expression relup(expression);
 
 HEYOKA_END_NAMESPACE
 
-HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::sin_impl)
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::relu_impl)
+
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::relup_impl)
 
 #endif

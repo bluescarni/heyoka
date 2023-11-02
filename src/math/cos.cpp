@@ -22,7 +22,7 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
-#include <fmt/format.h>
+#include <fmt/core.h>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -223,6 +223,8 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &s, llvm::Type *fp_t, const cos_imp
     return llvm_fdiv(s, ret_acc, div);
 }
 
+// LCOV_EXCL_START
+
 // All the other cases.
 template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
 llvm::Value *taylor_diff_cos_impl(llvm_state &, llvm::Type *, const cos_impl &, const std::vector<std::uint32_t> &,
@@ -232,6 +234,8 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &, llvm::Type *, const cos_impl &, 
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a cosine");
 }
+
+// LCOV_EXCL_STOP
 
 llvm::Value *taylor_diff_cos(llvm_state &s, llvm::Type *fp_t, const cos_impl &f, const std::vector<std::uint32_t> &deps,
                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
@@ -370,6 +374,8 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, llvm::Type *fp_t, con
     return f;
 }
 
+// LCOV_EXCL_START
+
 // All the other cases.
 template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &, llvm::Type *, const cos_impl &, const U &, std::uint32_t,
@@ -378,6 +384,8 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &, llvm::Type *, const co
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a cosine in compact mode");
 }
+
+// LCOV_EXCL_STOP
 
 llvm::Function *taylor_c_diff_func_cos(llvm_state &s, llvm::Type *fp_t, const cos_impl &fn, std::uint32_t n_uvars,
                                        std::uint32_t batch_size)

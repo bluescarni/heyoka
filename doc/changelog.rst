@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Implement ``ReLU`` and its derivative in the expression
+  system (`#356 <https://github.com/bluescarni/heyoka/pull/356>`__).
 - Implement the eccentric longitude :math:`F` in the expression
   system (`#352 <https://github.com/bluescarni/heyoka/pull/352>`__).
 - Implement the delta eccentric anomaly :math:`\Delta E` in the expression
@@ -24,6 +26,8 @@ Changes
 Fix
 ~~~
 
+- Fix compiler warning when building without SLEEF support
+  (`#356 <https://github.com/bluescarni/heyoka/pull/356>`__).
 - Improve the numerical stability of the VSOP2013 model
   (`#353 <https://github.com/bluescarni/heyoka/pull/353>`__).
 - Improve the numerical stability of the Kepler solver

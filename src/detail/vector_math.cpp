@@ -31,6 +31,10 @@ namespace
 
 using vf_map_t = std::unordered_map<std::string, std::vector<vf_info>>;
 
+// NOTE: make_vfinfo() is necessary if *any* vectorisation backend is active,
+// but at the moment we have only SLEEF.
+#if defined(HEYOKA_WITH_SLEEF)
+
 auto make_vfinfo(const char *s_name, std::string v_name, std::uint32_t width, std::uint32_t nargs)
 {
     assert(nargs == 1u || nargs == 2u);
@@ -39,6 +43,8 @@ auto make_vfinfo(const char *s_name, std::string v_name, std::uint32_t width, st
     ret.vf_abi_attr = fmt::format("_ZGV_LLVM_N{}{}_{}({})", width, nargs == 1u ? "v" : "vv", s_name, ret.name);
     return ret;
 }
+
+#endif
 
 #if defined(HEYOKA_WITH_SLEEF)
 

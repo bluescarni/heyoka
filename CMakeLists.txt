@@ -270,6 +270,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/log.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/pow.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sigmoid.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/relu.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sin.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sqrt.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/tan.cpp"
