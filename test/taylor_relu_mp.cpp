@@ -35,7 +35,7 @@ T cpp_relup(T x)
     return x > 0 ? T(1, x.get_prec()) : T(0, x.get_prec());
 }
 
-TEST_CASE("kepF")
+TEST_CASE("relu")
 {
     using fp_t = mppp::real;
 
