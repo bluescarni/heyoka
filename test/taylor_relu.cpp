@@ -64,6 +64,7 @@ TEST_CASE("taylor relu relup")
         {
             llvm_state s{kw::opt_level = opt_level};
 
+            taylor_add_jet<fp_t>(s, "jet2", {relu(par[0]) + relup(par[1]), x + y}, 3, 2, high_accuracy, compact_mode);
             taylor_add_jet<fp_t>(s, "jet", {relu(par[0]) + relup(par[1]), x + y}, 3, 2, high_accuracy, compact_mode);
 
             s.compile();
@@ -109,6 +110,7 @@ TEST_CASE("taylor relu relup")
         {
             llvm_state s{kw::opt_level = opt_level};
 
+            taylor_add_jet<fp_t>(s, "jet2", {relu(x) + relup(y), x + y}, 3, 2, high_accuracy, compact_mode);
             taylor_add_jet<fp_t>(s, "jet", {relu(x) + relup(y), x + y}, 3, 2, high_accuracy, compact_mode);
 
             s.compile();

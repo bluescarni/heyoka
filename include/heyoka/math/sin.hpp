@@ -9,7 +9,7 @@
 #ifndef HEYOKA_MATH_SIN_HPP
 #define HEYOKA_MATH_SIN_HPP
 
-#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>

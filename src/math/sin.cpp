@@ -22,7 +22,7 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
-#include <fmt/format.h>
+#include <fmt/core.h>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>

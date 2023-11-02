@@ -34,6 +34,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/relu.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
