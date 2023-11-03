@@ -833,6 +833,8 @@ std::pair<std::string, std::vector<llvm::Type *>> llvm_c_eval_func_name_args(llv
                                                                              std::uint32_t batch_size,
                                                                              const std::vector<expression> &args)
 {
+    assert(std::find(name.begin(), name.end(), '.') == name.end());
+
     // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 

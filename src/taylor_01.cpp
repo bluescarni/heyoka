@@ -110,6 +110,7 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &context, llvm::Type *fp_t, const
                              const std::vector<std::variant<variable, number, param>> &args,
                              std::uint32_t n_hidden_deps)
 {
+    assert(std::find(name.begin(), name.end(), '.') == name.end());
     assert(fp_t != nullptr);
     assert(n_uvars > 0u);
 
