@@ -261,6 +261,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/mascon.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/vsop2013.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/cr3bp.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/ffnn.cpp"
     # Math functions.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepF.cpp"
