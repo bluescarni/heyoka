@@ -10,6 +10,7 @@
 #define HEYOKA_MATH_RELU_HPP
 
 #include <cstdint>
+#include <sstream>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -26,16 +27,21 @@ namespace detail
 
 class HEYOKA_DLL_PUBLIC relu_impl : public func_base
 {
+    double m_slope;
+
     friend class boost::serialization::access;
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
         ar &boost::serialization::base_object<func_base>(*this);
+        ar & m_slope;
     }
 
 public:
     relu_impl();
-    explicit relu_impl(expression);
+    explicit relu_impl(expression, double);
+
+    void to_stream(std::ostringstream &) const;
 
     [[nodiscard]] expression normalise() const;
 
@@ -55,16 +61,21 @@ public:
 
 class HEYOKA_DLL_PUBLIC relup_impl : public func_base
 {
+    double m_slope;
+
     friend class boost::serialization::access;
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
         ar &boost::serialization::base_object<func_base>(*this);
+        ar & m_slope;
     }
 
 public:
     relup_impl();
-    explicit relup_impl(expression);
+    explicit relup_impl(expression, double);
+
+    void to_stream(std::ostringstream &) const;
 
     [[nodiscard]] expression normalise() const;
 
@@ -84,9 +95,18 @@ public:
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression relu(expression);
+HEYOKA_DLL_PUBLIC expression relu(expression, double = 0);
 
-HEYOKA_DLL_PUBLIC expression relup(expression);
+HEYOKA_DLL_PUBLIC expression relup(expression, double = 0);
+
+class HEYOKA_DLL_PUBLIC leaky_relu
+{
+    double m_slope;
+
+public:
+    explicit leaky_relu(double);
+    expression operator()(expression) const;
+};
 
 HEYOKA_END_NAMESPACE
 
