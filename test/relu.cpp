@@ -130,6 +130,14 @@ TEST_CASE("stream op")
     }
 }
 
+TEST_CASE("leaky wrappers")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(leaky_relu(.01)(x) == relu(x, 0.01));
+    REQUIRE(leaky_relup(.01)(y) == relup(y, 0.01));
+}
+
 TEST_CASE("names")
 {
     {

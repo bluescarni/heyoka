@@ -655,6 +655,16 @@ expression leaky_relu::operator()(expression x) const
     return relu(std::move(x), m_slope);
 }
 
+leaky_relup::leaky_relup(double slope) : m_slope(slope)
+{
+    detail::relu_slope_check(slope);
+}
+
+expression leaky_relup::operator()(expression x) const
+{
+    return relup(std::move(x), m_slope);
+}
+
 HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::relu_impl)

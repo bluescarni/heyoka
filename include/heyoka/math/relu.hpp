@@ -108,6 +108,15 @@ public:
     expression operator()(expression) const;
 };
 
+class HEYOKA_DLL_PUBLIC leaky_relup
+{
+    double m_slope;
+
+public:
+    explicit leaky_relup(double);
+    expression operator()(expression) const;
+};
+
 HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::relu_impl)
