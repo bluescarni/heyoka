@@ -7,8 +7,11 @@ Changelog
 New
 ~~~
 
-- Implement ``ReLU`` and its derivative in the expression
-  system (`#356 <https://github.com/bluescarni/heyoka/pull/356>`__).
+- Implement (leaky) ``ReLU`` and its derivative in the expression
+  system (`#357 <https://github.com/bluescarni/heyoka/pull/357>`__,
+  `#356 <https://github.com/bluescarni/heyoka/pull/356>`__).
+- Add feed-forward neural network model
+  (`#355 <https://github.com/bluescarni/heyoka/pull/355>`__).
 - Implement the eccentric longitude :math:`F` in the expression
   system (`#352 <https://github.com/bluescarni/heyoka/pull/352>`__).
 - Implement the delta eccentric anomaly :math:`\Delta E` in the expression
