@@ -6,8 +6,11 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
+#include <sstream>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -42,30 +45,92 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-relu_impl::relu_impl() : relu_impl(0_dbl) {}
+namespace
+{
 
-relu_impl::relu_impl(expression ex) : func_base("relu", std::vector{std::move(ex)}) {}
+// Checker for the slope parameter of the leaky ReLU.
+void relu_slope_check(double slope)
+{
+    if (!std::isfinite(slope) || slope < 0) {
+        throw std::invalid_argument(fmt::format("The slope parameter for a leaky ReLU must be finite and non-negative, "
+                                                "but the value {} was provided instead",
+                                                slope));
+    }
+}
+
+// Helper to build a unique name for a relu/relup function, depending
+// on the slope value.
+std::string relu_name(const char *base, double slope)
+{
+    if (slope == 0) {
+        return base;
+    } else {
+        // NOTE: we print the slope value in hex format, then we replace
+        // the decimal point '.' with an underscore '_' (as the '.' is used
+        // as a separator in the name mangling scheme for compact mode functions).
+        auto ret = fmt::format("{}_{:a}", base, slope);
+        std::replace(ret.begin(), ret.end(), '.', '_');
+
+        return ret;
+    }
+}
+
+} // namespace
+
+relu_impl::relu_impl() : relu_impl(0_dbl, 0.) {}
+
+relu_impl::relu_impl(expression ex, double slope)
+    : func_base(relu_name("relu", slope), std::vector{std::move(ex)}), m_slope(slope)
+{
+    relu_slope_check(slope);
+}
+
+double relu_impl::get_slope() const noexcept
+{
+    return m_slope;
+}
+
+void relu_impl::to_stream(std::ostringstream &oss) const
+{
+    assert(args().size() == 1u);
+
+    if (m_slope == 0) {
+        oss << "relu(";
+        stream_expression(oss, args()[0]);
+        oss << ')';
+    } else {
+        oss << "leaky_relu(";
+        stream_expression(oss, args()[0]);
+        oss << fmt::format(", {})", m_slope);
+    }
+}
 
 [[nodiscard]] expression relu_impl::normalise() const
 {
     assert(args().size() == 1u);
-    return relu(args()[0]);
+    return relu(args()[0], m_slope);
 }
 
 [[nodiscard]] std::vector<expression> relu_impl::gradient() const
 {
     assert(args().size() == 1u);
-    return {relup(args()[0])};
+    return {relup(args()[0], m_slope)};
 }
 
 namespace
 {
 
 // LLVM implementation of relu.
-llvm::Value *llvm_relu(llvm_state &s, llvm::Value *x)
+llvm::Value *llvm_relu(llvm_state &s, llvm::Value *x, double slope)
 {
     auto *zero_c = llvm_constantfp(s, x->getType(), 0.);
-    return s.builder().CreateSelect(llvm_fcmp_ogt(s, x, zero_c), x, zero_c);
+
+    if (slope == 0) {
+        return s.builder().CreateSelect(llvm_fcmp_ogt(s, x, zero_c), x, zero_c);
+    } else {
+        auto *slope_c = llvm_constantfp(s, x->getType(), slope);
+        return s.builder().CreateSelect(llvm_fcmp_ogt(s, x, zero_c), x, llvm_fmul(s, slope_c, x));
+    }
 }
 
 } // namespace
@@ -76,9 +141,9 @@ llvm::Value *llvm_relu(llvm_state &s, llvm::Value *x)
                                                 bool high_accuracy) const
 {
     return llvm_eval_helper(
-        [&s](const std::vector<llvm::Value *> &args, bool) {
+        [&](const std::vector<llvm::Value *> &args, bool) {
             assert(args.size() == 1u);
-            return llvm_relu(s, args[0]);
+            return llvm_relu(s, args[0], m_slope);
         },
         *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
@@ -87,10 +152,10 @@ llvm::Function *relu_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std
                                             bool high_accuracy) const
 {
     return llvm_c_eval_func_helper(
-        "relu",
+        get_name(),
         [&](const std::vector<llvm::Value *> &args, bool) {
             assert(args.size() == 1u);
-            return llvm_relu(s, args[0]);
+            return llvm_relu(s, args[0], m_slope);
         },
         *this, s, fp_t, batch_size, high_accuracy);
 }
@@ -103,10 +168,10 @@ template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Value *taylor_diff_relu_impl(llvm_state &s, llvm::Type *fp_t, const relu_impl &,
                                    const std::vector<std::uint32_t> &, const U &num, const std::vector<llvm::Value *> &,
                                    llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                   std::uint32_t batch_size)
+                                   std::uint32_t batch_size, double slope)
 {
     if (order == 0u) {
-        return llvm_relu(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
+        return llvm_relu(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size), slope);
     } else {
         return vector_splat(s.builder(), llvm_constantfp(s, fp_t, 0.), batch_size);
     }
@@ -115,7 +180,8 @@ llvm::Value *taylor_diff_relu_impl(llvm_state &s, llvm::Type *fp_t, const relu_i
 // Derivative of relu(variable).
 llvm::Value *taylor_diff_relu_impl(llvm_state &s, llvm::Type *, const relu_impl &, const std::vector<std::uint32_t> &,
                                    const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *,
-                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t)
+                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t,
+                                   double slope)
 {
     const auto u_idx = uname_to_index(var.name());
 
@@ -123,7 +189,13 @@ llvm::Value *taylor_diff_relu_impl(llvm_state &s, llvm::Type *, const relu_impl 
     auto *u_order = taylor_fetch_diff(arr, u_idx, order, n_uvars);
 
     auto *zero_c = llvm_constantfp(s, u_zero->getType(), 0.);
-    return s.builder().CreateSelect(llvm_fcmp_ogt(s, u_zero, zero_c), u_order, zero_c);
+
+    if (slope == 0) {
+        return s.builder().CreateSelect(llvm_fcmp_ogt(s, u_zero, zero_c), u_order, zero_c);
+    } else {
+        auto *slope_c = llvm_constantfp(s, u_zero->getType(), slope);
+        return s.builder().CreateSelect(llvm_fcmp_ogt(s, u_zero, zero_c), u_order, llvm_fmul(s, slope_c, u_order));
+    }
 }
 
 // LCOV_EXCL_START
@@ -132,7 +204,7 @@ llvm::Value *taylor_diff_relu_impl(llvm_state &s, llvm::Type *, const relu_impl 
 template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
 llvm::Value *taylor_diff_relu_impl(llvm_state &, llvm::Type *, const relu_impl &, const std::vector<std::uint32_t> &,
                                    const U &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
-                                   std::uint32_t, std::uint32_t, std::uint32_t)
+                                   std::uint32_t, std::uint32_t, std::uint32_t, double)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a relu");
@@ -140,12 +212,14 @@ llvm::Value *taylor_diff_relu_impl(llvm_state &, llvm::Type *, const relu_impl &
 
 // LCOV_EXCL_STOP
 
-llvm::Value *taylor_diff_relu(llvm_state &s, llvm::Type *fp_t, const relu_impl &f,
-                              const std::vector<std::uint32_t> &deps, const std::vector<llvm::Value *> &arr,
-                              llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                              std::uint32_t batch_size)
+} // namespace
+
+llvm::Value *relu_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                    const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                    std::uint32_t batch_size, bool) const
 {
-    assert(f.args().size() == 1u);
+    assert(args().size() == 1u);
 
     // LCOV_EXCL_START
     if (!deps.empty()) {
@@ -158,19 +232,10 @@ llvm::Value *taylor_diff_relu(llvm_state &s, llvm::Type *fp_t, const relu_impl &
 
     return std::visit(
         [&](const auto &v) {
-            return taylor_diff_relu_impl(s, fp_t, f, deps, v, arr, par_ptr, n_uvars, order, idx, batch_size);
+            return taylor_diff_relu_impl(s, fp_t, *this, deps, v, arr, par_ptr, n_uvars, order, idx, batch_size,
+                                         m_slope);
         },
-        f.args()[0].value());
-}
-
-} // namespace
-
-llvm::Value *relu_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
-                                    const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                    std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_relu(s, fp_t, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+        args()[0].value());
 }
 
 namespace
@@ -178,25 +243,27 @@ namespace
 
 // Derivative of relu(number).
 template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_relu_impl(llvm_state &s, llvm::Type *fp_t, const relu_impl &, const U &num,
-                                             std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_relu_impl(llvm_state &s, llvm::Type *fp_t, const relu_impl &r, const U &num,
+                                             // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                             std::uint32_t n_uvars, std::uint32_t batch_size, double slope)
 {
     return taylor_c_diff_func_numpar(
-        s, fp_t, n_uvars, batch_size, "relu", 0,
-        [&s](const auto &args) {
+        s, fp_t, n_uvars, batch_size, r.get_name(), 0,
+        [&](const auto &args) {
             // LCOV_EXCL_START
             assert(args.size() == 1u);
             assert(args[0] != nullptr);
             // LCOV_EXCL_STOP
 
-            return llvm_relu(s, args[0]);
+            return llvm_relu(s, args[0], slope);
         },
         num);
 }
 
 // Derivative of relu(variable).
-llvm::Function *taylor_c_diff_func_relu_impl(llvm_state &s, llvm::Type *fp_t, const relu_impl &, const variable &var,
-                                             std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_relu_impl(llvm_state &s, llvm::Type *fp_t, const relu_impl &r, const variable &var,
+                                             // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                             std::uint32_t n_uvars, std::uint32_t batch_size, double slope)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -206,7 +273,7 @@ llvm::Function *taylor_c_diff_func_relu_impl(llvm_state &s, llvm::Type *fp_t, co
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "relu", n_uvars, batch_size, {var});
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, r.get_name(), n_uvars, batch_size, {var});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -243,7 +310,12 @@ llvm::Function *taylor_c_diff_func_relu_impl(llvm_state &s, llvm::Type *fp_t, co
 
     auto *zero_c = llvm_constantfp(s, u_zero->getType(), 0.);
 
-    builder.CreateRet(builder.CreateSelect(llvm_fcmp_ogt(s, u_zero, zero_c), u_ord, zero_c));
+    if (slope == 0) {
+        builder.CreateRet(builder.CreateSelect(llvm_fcmp_ogt(s, u_zero, zero_c), u_ord, zero_c));
+    } else {
+        auto *slope_c = llvm_constantfp(s, u_zero->getType(), slope);
+        builder.CreateRet(builder.CreateSelect(llvm_fcmp_ogt(s, u_zero, zero_c), u_ord, llvm_fmul(s, slope_c, u_ord)));
+    }
 
     // Verify.
     s.verify_function(f);
@@ -259,7 +331,7 @@ llvm::Function *taylor_c_diff_func_relu_impl(llvm_state &s, llvm::Type *fp_t, co
 // All the other cases.
 template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_relu_impl(llvm_state &, llvm::Type *, const relu_impl &, const U &, std::uint32_t,
-                                             std::uint32_t)
+                                             std::uint32_t, double)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a relu in compact mode");
@@ -267,31 +339,50 @@ llvm::Function *taylor_c_diff_func_relu_impl(llvm_state &, llvm::Type *, const r
 
 // LCOV_EXCL_STOP
 
-llvm::Function *taylor_c_diff_func_relu(llvm_state &s, llvm::Type *fp_t, const relu_impl &fn, std::uint32_t n_uvars,
-                                        std::uint32_t batch_size)
-{
-    assert(fn.args().size() == 1u);
-
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_relu_impl(s, fp_t, fn, v, n_uvars, batch_size); },
-                      fn.args()[0].value());
-}
-
 } // namespace
 
 llvm::Function *relu_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
                                               std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_relu(s, fp_t, *this, n_uvars, batch_size);
+    assert(args().size() == 1u);
+
+    return std::visit(
+        [&](const auto &v) { return taylor_c_diff_func_relu_impl(s, fp_t, *this, v, n_uvars, batch_size, m_slope); },
+        args()[0].value());
 }
 
-relup_impl::relup_impl() : relup_impl(0_dbl) {}
+relup_impl::relup_impl() : relup_impl(0_dbl, 0.) {}
 
-relup_impl::relup_impl(expression ex) : func_base("relup", std::vector{std::move(ex)}) {}
+relup_impl::relup_impl(expression ex, double slope)
+    : func_base(relu_name("relup", slope), std::vector{std::move(ex)}), m_slope(slope)
+{
+    relu_slope_check(slope);
+}
+
+double relup_impl::get_slope() const noexcept
+{
+    return m_slope;
+}
+
+void relup_impl::to_stream(std::ostringstream &oss) const
+{
+    assert(args().size() == 1u);
+
+    if (m_slope == 0) {
+        oss << "relup(";
+        stream_expression(oss, args()[0]);
+        oss << ')';
+    } else {
+        oss << "leaky_relup(";
+        stream_expression(oss, args()[0]);
+        oss << fmt::format(", {})", m_slope);
+    }
+}
 
 [[nodiscard]] expression relup_impl::normalise() const
 {
     assert(args().size() == 1u);
-    return relup(args()[0]);
+    return relup(args()[0], m_slope);
 }
 
 [[nodiscard]] std::vector<expression> relup_impl::gradient() const
@@ -304,11 +395,17 @@ namespace
 {
 
 // LLVM implementation of relup.
-llvm::Value *llvm_relup(llvm_state &s, llvm::Value *x)
+llvm::Value *llvm_relup(llvm_state &s, llvm::Value *x, double slope)
 {
     auto *zero_c = llvm_constantfp(s, x->getType(), 0.);
     auto *one_c = llvm_constantfp(s, x->getType(), 1.);
-    return s.builder().CreateSelect(llvm_fcmp_ogt(s, x, zero_c), one_c, zero_c);
+
+    if (slope == 0) {
+        return s.builder().CreateSelect(llvm_fcmp_ogt(s, x, zero_c), one_c, zero_c);
+    } else {
+        auto *slope_c = llvm_constantfp(s, x->getType(), slope);
+        return s.builder().CreateSelect(llvm_fcmp_ogt(s, x, zero_c), one_c, slope_c);
+    }
 }
 
 } // namespace
@@ -319,9 +416,9 @@ llvm::Value *llvm_relup(llvm_state &s, llvm::Value *x)
                                                  bool high_accuracy) const
 {
     return llvm_eval_helper(
-        [&s](const std::vector<llvm::Value *> &args, bool) {
+        [&](const std::vector<llvm::Value *> &args, bool) {
             assert(args.size() == 1u);
-            return llvm_relup(s, args[0]);
+            return llvm_relup(s, args[0], m_slope);
         },
         *this, s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
@@ -330,10 +427,10 @@ llvm::Function *relup_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, st
                                              bool high_accuracy) const
 {
     return llvm_c_eval_func_helper(
-        "relup",
+        get_name(),
         [&](const std::vector<llvm::Value *> &args, bool) {
             assert(args.size() == 1u);
-            return llvm_relup(s, args[0]);
+            return llvm_relup(s, args[0], m_slope);
         },
         *this, s, fp_t, batch_size, high_accuracy);
 }
@@ -346,10 +443,10 @@ template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Value *taylor_diff_relup_impl(llvm_state &s, llvm::Type *fp_t, const relup_impl &,
                                     const std::vector<std::uint32_t> &, const U &num,
                                     const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
-                                    std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+                                    std::uint32_t order, std::uint32_t, std::uint32_t batch_size, double slope)
 {
     if (order == 0u) {
-        return llvm_relup(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size));
+        return llvm_relup(s, taylor_codegen_numparam(s, fp_t, num, par_ptr, batch_size), slope);
     } else {
         return vector_splat(s.builder(), llvm_constantfp(s, fp_t, 0.), batch_size);
     }
@@ -359,13 +456,14 @@ llvm::Value *taylor_diff_relup_impl(llvm_state &s, llvm::Type *fp_t, const relup
 llvm::Value *taylor_diff_relup_impl(llvm_state &s, llvm::Type *, const relup_impl &, const std::vector<std::uint32_t> &,
                                     const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *,
                                     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t)
+                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t,
+                                    double slope)
 {
     const auto u_idx = uname_to_index(var.name());
     auto *u_zero = taylor_fetch_diff(arr, u_idx, 0, n_uvars);
 
     if (order == 0u) {
-        return llvm_relup(s, u_zero);
+        return llvm_relup(s, u_zero, slope);
     } else {
         return llvm_constantfp(s, u_zero->getType(), 0.);
     }
@@ -377,7 +475,7 @@ llvm::Value *taylor_diff_relup_impl(llvm_state &s, llvm::Type *, const relup_imp
 template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
 llvm::Value *taylor_diff_relup_impl(llvm_state &, llvm::Type *, const relup_impl &, const std::vector<std::uint32_t> &,
                                     const U &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
-                                    std::uint32_t, std::uint32_t, std::uint32_t)
+                                    std::uint32_t, std::uint32_t, std::uint32_t, double)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a relup");
@@ -385,12 +483,14 @@ llvm::Value *taylor_diff_relup_impl(llvm_state &, llvm::Type *, const relup_impl
 
 // LCOV_EXCL_STOP
 
-llvm::Value *taylor_diff_relup(llvm_state &s, llvm::Type *fp_t, const relup_impl &f,
-                               const std::vector<std::uint32_t> &deps, const std::vector<llvm::Value *> &arr,
-                               llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                               std::uint32_t batch_size)
+} // namespace
+
+llvm::Value *relup_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                                     const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                     std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                     std::uint32_t batch_size, bool) const
 {
-    assert(f.args().size() == 1u);
+    assert(args().size() == 1u);
 
     // LCOV_EXCL_START
     if (!deps.empty()) {
@@ -403,19 +503,10 @@ llvm::Value *taylor_diff_relup(llvm_state &s, llvm::Type *fp_t, const relup_impl
 
     return std::visit(
         [&](const auto &v) {
-            return taylor_diff_relup_impl(s, fp_t, f, deps, v, arr, par_ptr, n_uvars, order, idx, batch_size);
+            return taylor_diff_relup_impl(s, fp_t, *this, deps, v, arr, par_ptr, n_uvars, order, idx, batch_size,
+                                          m_slope);
         },
-        f.args()[0].value());
-}
-
-} // namespace
-
-llvm::Value *relup_impl::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
-                                     const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                     std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                     std::uint32_t batch_size, bool) const
-{
-    return taylor_diff_relup(s, fp_t, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+        args()[0].value());
 }
 
 namespace
@@ -423,25 +514,27 @@ namespace
 
 // Derivative of relup(number).
 template <typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_relup_impl(llvm_state &s, llvm::Type *fp_t, const relup_impl &, const U &num,
-                                              std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_relup_impl(llvm_state &s, llvm::Type *fp_t, const relup_impl &r, const U &num,
+                                              // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                              std::uint32_t n_uvars, std::uint32_t batch_size, double slope)
 {
     return taylor_c_diff_func_numpar(
-        s, fp_t, n_uvars, batch_size, "relup", 0,
-        [&s](const auto &args) {
+        s, fp_t, n_uvars, batch_size, r.get_name(), 0,
+        [&](const auto &args) {
             // LCOV_EXCL_START
             assert(args.size() == 1u);
             assert(args[0] != nullptr);
             // LCOV_EXCL_STOP
 
-            return llvm_relup(s, args[0]);
+            return llvm_relup(s, args[0], slope);
         },
         num);
 }
 
 // Derivative of relup(variable).
-llvm::Function *taylor_c_diff_func_relup_impl(llvm_state &s, llvm::Type *fp_t, const relup_impl &, const variable &var,
-                                              std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_relup_impl(llvm_state &s, llvm::Type *fp_t, const relup_impl &r, const variable &var,
+                                              // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                              std::uint32_t n_uvars, std::uint32_t batch_size, double slope)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -451,7 +544,7 @@ llvm::Function *taylor_c_diff_func_relup_impl(llvm_state &s, llvm::Type *fp_t, c
     auto *val_t = make_vector_type(fp_t, batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, "relup", n_uvars, batch_size, {var});
+    const auto na_pair = taylor_c_diff_func_name_args(context, fp_t, r.get_name(), n_uvars, batch_size, {var});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -489,7 +582,8 @@ llvm::Function *taylor_c_diff_func_relup_impl(llvm_state &s, llvm::Type *fp_t, c
         s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
         [&]() {
             // For order 0, invoke the function on the order 0 of var_idx.
-            auto *ret = llvm_relup(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx));
+            auto *ret
+                = llvm_relup(s, taylor_c_load_diff(s, val_t, diff_ptr, n_uvars, builder.getInt32(0), var_idx), slope);
             // NOLINTNEXTLINE(readability-suspicious-call-argument)
             builder.CreateStore(ret, retval);
         },
@@ -515,7 +609,7 @@ llvm::Function *taylor_c_diff_func_relup_impl(llvm_state &s, llvm::Type *fp_t, c
 // All the other cases.
 template <typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_relup_impl(llvm_state &, llvm::Type *, const relup_impl &, const U &, std::uint32_t,
-                                              std::uint32_t)
+                                              std::uint32_t, double)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a relup in compact mode");
@@ -523,43 +617,62 @@ llvm::Function *taylor_c_diff_func_relup_impl(llvm_state &, llvm::Type *, const 
 
 // LCOV_EXCL_STOP
 
-llvm::Function *taylor_c_diff_func_relup(llvm_state &s, llvm::Type *fp_t, const relup_impl &fn, std::uint32_t n_uvars,
-                                         std::uint32_t batch_size)
-{
-    assert(fn.args().size() == 1u);
-
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_relup_impl(s, fp_t, fn, v, n_uvars, batch_size); },
-                      fn.args()[0].value());
-}
-
 } // namespace
 
 llvm::Function *relup_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
                                                std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_relup(s, fp_t, *this, n_uvars, batch_size);
+    assert(args().size() == 1u);
+
+    return std::visit(
+        [&](const auto &v) { return taylor_c_diff_func_relup_impl(s, fp_t, *this, v, n_uvars, batch_size, m_slope); },
+        args()[0].value());
 }
 
 } // namespace detail
 
-expression relu(expression x)
+expression relu(expression x, double slope)
 {
+    detail::relu_slope_check(slope);
+
     // Fold relu(number) to its value.
     if (const auto *num_ptr = std::get_if<number>(&x.value())) {
-        return std::visit([](const auto &x) { return expression{x > 0 ? x : 0.}; }, num_ptr->value());
+        return std::visit([slope](const auto &x) { return expression{x > 0 ? x : slope * x}; }, num_ptr->value());
     } else {
-        return expression{func{detail::relu_impl{std::move(x)}}};
+        return expression{func{detail::relu_impl{std::move(x), slope}}};
     }
 }
 
-expression relup(expression x)
+expression relup(expression x, double slope)
 {
+    detail::relu_slope_check(slope);
+
     // Fold relup(number) to its value.
     if (const auto *num_ptr = std::get_if<number>(&x.value())) {
-        return std::visit([](const auto &x) { return expression{x > 0 ? 1. : 0.}; }, num_ptr->value());
+        return std::visit([slope](const auto &x) { return expression{x > 0 ? 1. : slope}; }, num_ptr->value());
     } else {
-        return expression{func{detail::relup_impl{std::move(x)}}};
+        return expression{func{detail::relup_impl{std::move(x), slope}}};
     }
+}
+
+leaky_relu::leaky_relu(double slope) : m_slope(slope)
+{
+    detail::relu_slope_check(slope);
+}
+
+expression leaky_relu::operator()(expression x) const
+{
+    return relu(std::move(x), m_slope);
+}
+
+leaky_relup::leaky_relup(double slope) : m_slope(slope)
+{
+    detail::relu_slope_check(slope);
+}
+
+expression leaky_relup::operator()(expression x) const
+{
+    return relup(std::move(x), m_slope);
 }
 
 HEYOKA_END_NAMESPACE
