@@ -41,6 +41,8 @@ public:
     relu_impl();
     explicit relu_impl(expression, double);
 
+    [[nodiscard]] double get_slope() const noexcept;
+
     void to_stream(std::ostringstream &) const;
 
     [[nodiscard]] expression normalise() const;
@@ -74,6 +76,8 @@ class HEYOKA_DLL_PUBLIC relup_impl : public func_base
 public:
     relup_impl();
     explicit relup_impl(expression, double);
+
+    [[nodiscard]] double get_slope() const noexcept;
 
     void to_stream(std::ostringstream &) const;
 

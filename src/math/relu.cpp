@@ -85,6 +85,11 @@ relu_impl::relu_impl(expression ex, double slope)
     relu_slope_check(slope);
 }
 
+double relu_impl::get_slope() const noexcept
+{
+    return m_slope;
+}
+
 void relu_impl::to_stream(std::ostringstream &oss) const
 {
     assert(args().size() == 1u);
@@ -352,6 +357,11 @@ relup_impl::relup_impl(expression ex, double slope)
     : func_base(relu_name("relup", slope), std::vector{std::move(ex)}), m_slope(slope)
 {
     relu_slope_check(slope);
+}
+
+double relup_impl::get_slope() const noexcept
+{
+    return m_slope;
 }
 
 void relup_impl::to_stream(std::ostringstream &oss) const

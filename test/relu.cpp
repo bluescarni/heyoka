@@ -88,6 +88,7 @@ TEST_CASE("def ctor")
         REQUIRE(k.args().size() == 1u);
         REQUIRE(k.args()[0] == 0_dbl);
         REQUIRE(k.get_name() == "relu");
+        REQUIRE(k.get_slope() == 0.);
     }
 
     {
@@ -96,6 +97,7 @@ TEST_CASE("def ctor")
         REQUIRE(k.args().size() == 1u);
         REQUIRE(k.args()[0] == 0_dbl);
         REQUIRE(k.get_name() == "relup");
+        REQUIRE(k.get_slope() == 0.);
     }
 }
 
@@ -154,12 +156,14 @@ TEST_CASE("names")
         auto ex = relu("x"_var, 1.);
         REQUIRE(std::get<func>(ex.value()).get_name() != "relu");
         REQUIRE(boost::starts_with(std::get<func>(ex.value()).get_name(), "relu_0x"));
+        REQUIRE(std::get<func>(ex.value()).extract<detail::relu_impl>()->get_slope() == 1);
     }
 
     {
         auto ex = relup("x"_var, 1.);
         REQUIRE(std::get<func>(ex.value()).get_name() != "relup");
         REQUIRE(boost::starts_with(std::get<func>(ex.value()).get_name(), "relup_0x"));
+        REQUIRE(std::get<func>(ex.value()).extract<detail::relup_impl>()->get_slope() == 1);
     }
 }
 
