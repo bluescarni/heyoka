@@ -632,7 +632,7 @@ bool operator!=(const func &a, const func &b)
 }
 
 // NOTE: this comparison has no mathematical meaning, it is used
-// only to impose a strict ordering functions. Like operator==(),
+// only to impose a strict ordering on functions. Like operator==(),
 // this comparison considers, in order:
 //
 // - the function name,
