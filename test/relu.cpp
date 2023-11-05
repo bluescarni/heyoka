@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <functional>
 #include <limits>
 #include <random>
 #include <sstream>
@@ -165,6 +166,32 @@ TEST_CASE("names")
         REQUIRE(boost::starts_with(std::get<func>(ex.value()).get_name(), "relup_0x"));
         REQUIRE(std::get<func>(ex.value()).extract<detail::relup_impl>()->get_slope() == 1);
     }
+}
+
+// Test to check that equality, hashing and less-than, which take into account
+// the function name, behave correctly when changing slope.
+TEST_CASE("hash eq lt")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(relu(x + y) != relu(x + y, 0.01));
+    REQUIRE(relup(x + y) != relup(x + y, 0.01));
+    REQUIRE(relu(x + y, 0.02) != relu(x + y, 0.01));
+    REQUIRE(relup(x + y, 0.02) != relup(x + y, 0.01));
+    REQUIRE((std::get<func>(relu(x + y).value()) < std::get<func>(relu(x + y, 0.01).value())
+             || std::get<func>(relu(x + y, 0.01).value()) < std::get<func>(relu(x + y).value())));
+    REQUIRE((std::get<func>(relup(x + y).value()) < std::get<func>(relup(x + y, 0.01).value())
+             || std::get<func>(relup(x + y, 0.01).value()) < std::get<func>(relup(x + y).value())));
+    REQUIRE((std::get<func>(relu(x + y, 0.02).value()) < std::get<func>(relu(x + y, 0.01).value())
+             || std::get<func>(relu(x + y, 0.01).value()) < std::get<func>(relu(x + y, 0.02).value())));
+    REQUIRE((std::get<func>(relup(x + y, 0.02).value()) < std::get<func>(relup(x + y, 0.01).value())
+             || std::get<func>(relup(x + y, 0.01).value()) < std::get<func>(relup(x + y, 0.02).value())));
+
+    // Of course, not 100% guaranteed but hopefully very likely.
+    REQUIRE(std::hash<expression>{}(relu(x + y)) != std::hash<expression>{}(relu(x + y, 0.01)));
+    REQUIRE(std::hash<expression>{}(relup(x + y)) != std::hash<expression>{}(relup(x + y, 0.01)));
+    REQUIRE(std::hash<expression>{}(relu(x + y, 0.02)) != std::hash<expression>{}(relu(x + y, 0.01)));
+    REQUIRE(std::hash<expression>{}(relup(x + y, 0.02)) != std::hash<expression>{}(relup(x + y, 0.01)));
 }
 
 TEST_CASE("invalid slopes")
