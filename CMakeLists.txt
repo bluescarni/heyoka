@@ -253,6 +253,12 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_4.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_5.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_6.cpp"
+    # ELP2000 details.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_1_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_4_9.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_10_15.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_16_21.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_22_36.cpp"
     # Models.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/pendulum.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/nbody.cpp"
