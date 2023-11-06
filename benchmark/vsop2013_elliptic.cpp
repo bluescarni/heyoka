@@ -13,6 +13,7 @@
 #include <boost/program_options.hpp>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/model/vsop2013.hpp>
 #include <heyoka/taylor.hpp>
 

@@ -23,13 +23,6 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-namespace kw
-{
-
-IGOR_MAKE_NAMED_ARGUMENT(thresh);
-
-} // namespace kw
-
 namespace model
 {
 
