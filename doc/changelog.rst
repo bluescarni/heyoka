@@ -150,7 +150,7 @@ Changes
 ~~~~~~~
 
 - The step callbacks are now copied in :ref:`ensemble propagations <tut_ensemble>`
-  rather then being shared among threads. The aim of this change
+  rather than being shared among threads. The aim of this change
   is to reduce the likelihood of data races
   (`#334 <https://github.com/bluescarni/heyoka/pull/334>`__).
 - Comprehensive overhaul of the expression system, including:

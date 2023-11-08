@@ -1114,7 +1114,7 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
 
         // NOTE: the derivatives we just added to diff_map are still expressed in terms of u variables.
         // We need to apply the substitution map subs_map in order to recover the expressions in terms
-        // of the original variables. It is important that we do this now (rather then when constructing
+        // of the original variables. It is important that we do this now (rather than when constructing
         // the derivatives in diff_tensors_*_impl()) because now we can do the substitution in a vectorised
         // fashion, which greatly reduces the internal redundancy of the resulting expressions.
 
