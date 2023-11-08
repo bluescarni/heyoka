@@ -1109,8 +1109,8 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
         auto *cur_end = diff_map.data() + diff_map.size();
 
         // Sort the derivatives for the current order.
-        tbb::parallel_sort(cur_begin, cur_end,
-                           [](const auto &p1, const auto &p2) { return dtens_v_idx_cmp{}(p1.first, p2.first); });
+        oneapi::tbb::parallel_sort(
+            cur_begin, cur_end, [](const auto &p1, const auto &p2) { return dtens_v_idx_cmp{}(p1.first, p2.first); });
 
         // NOTE: the derivatives we just added to diff_map are still expressed in terms of u variables.
         // We need to apply the substitution map subs_map in order to recover the expressions in terms
