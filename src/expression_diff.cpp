@@ -33,6 +33,8 @@
 #include <fmt/core.h>
 #include <fmt/ranges.h>
 
+#include <oneapi/tbb/parallel_sort.h>
+
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fast_unordered.hpp>
 #include <heyoka/detail/func_cache.hpp>
@@ -1107,8 +1109,8 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
         auto *cur_end = diff_map.data() + diff_map.size();
 
         // Sort the derivatives for the current order.
-        std::sort(cur_begin, cur_end,
-                  [](const auto &p1, const auto &p2) { return dtens_v_idx_cmp{}(p1.first, p2.first); });
+        tbb::parallel_sort(cur_begin, cur_end,
+                           [](const auto &p1, const auto &p2) { return dtens_v_idx_cmp{}(p1.first, p2.first); });
 
         // NOTE: the derivatives we just added to diff_map are still expressed in terms of u variables.
         // We need to apply the substitution map subs_map in order to recover the expressions in terms
