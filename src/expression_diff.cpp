@@ -492,13 +492,30 @@ void diff_tensors_forward_impl(
     const std::vector<expression> &args,
     // Iterator in diff_map pointing to the first
     // derivative for the previous order.
-    typename DiffMap::iterator prev_begin)
+    typename DiffMap::iterator prev_begin,
+    // The current derivative order.
+    std::uint32_t cur_order)
 {
     assert(dc.size() > nvars);
+    assert(cur_order > 0u);
 
-    // Local map used to temporarily store the derivatives.
-    // It will be merged into diff_map at the end.
-    fast_umap<dtens_v_idx_t, expression, diff_map_hasher> local_diff_map;
+    // Local data structures used to temporarily store the derivatives,
+    // which will eventually be added to diff_map.
+    // For derivative orders > 1, the algorithm we employ
+    // will produce several times the same derivative, and thus
+    // we need to store the derivatives in a dictionary in order
+    // to prevent duplicates. For order-1 derivatives, no duplicate
+    // derivatives will be produced and thus we can use a plain vector
+    // which can be quite a bit faster.
+    using diff_map_t = fast_umap<dtens_v_idx_t, expression, diff_map_hasher>;
+    using diff_vec_t = std::vector<std::pair<dtens_v_idx_t, expression>>;
+    using local_diff_t = std::variant<diff_map_t, diff_vec_t>;
+    auto local_diff = (cur_order == 1u) ? local_diff_t(diff_vec_t{}) : local_diff_t(diff_map_t{});
+
+    // Helpers to ease the access to the active member of the local_diff variant.
+    // NOTE: if used incorrectly, these will throw at runtime.
+    auto local_dmap = [&local_diff]() -> diff_map_t & { return std::get<diff_map_t>(local_diff); };
+    auto local_dvec = [&local_diff]() -> diff_vec_t & { return std::get<diff_vec_t>(local_diff); };
 
     // An indices vector used as temporary variable in several places below.
     std::vector<std::uint32_t> tmp_v_idx;
@@ -530,6 +547,7 @@ void diff_tensors_forward_impl(
     for (decltype(args.size()) diff_arg_idx = 0; diff_arg_idx < args.size(); ++diff_arg_idx) {
         const auto &cur_diff_arg = args[diff_arg_idx];
 
+        // Check if the current diff argument is one of the inputs.
         if (input_idx_map.count(cur_diff_arg) == 0u) {
             // The diff argument is not one of the inputs:
             // set the derivatives of all outputs wrt to the
@@ -543,9 +561,13 @@ void diff_tensors_forward_impl(
                 assert(diff_arg_idx + 1u < tmp_v_idx.size());
                 tmp_v_idx[diff_arg_idx + 1u] += 1u;
 
-                // Use try_emplace() so that if the derivative
-                // has already been computed, nothing happens.
-                local_diff_map.try_emplace(tmp_v_idx, 0_dbl);
+                if (cur_order == 1u) {
+                    local_dvec().emplace_back(tmp_v_idx, 0_dbl);
+                } else {
+                    // NOTE: use try_emplace() so that if the derivative
+                    // has already been computed, nothing happens.
+                    local_dmap().try_emplace(tmp_v_idx, 0_dbl);
+                }
             }
 
             // Move to the next diff argument.
@@ -647,7 +669,7 @@ void diff_tensors_forward_impl(
         }
 
         // Add the derivatives of all outputs wrt the current input
-        // to local_diff_map.
+        // to the local map.
         auto out_it = prev_begin;
 
         for (std::vector<expression>::size_type out_idx = 0; out_idx < cur_nouts; ++out_idx, ++out_it) {
@@ -657,19 +679,28 @@ void diff_tensors_forward_impl(
             assert(diff_arg_idx + 1u < tmp_v_idx.size());
             tmp_v_idx[diff_arg_idx + 1u] += 1u;
 
-            // Check if we already computed this derivative.
-            if (const auto it = local_diff_map.find(tmp_v_idx); it == local_diff_map.end()) {
-                // The derivative is new.
+            if (cur_order == 1u) {
                 auto cur_der = diffs[diffs.size() - cur_nouts + out_idx];
+                local_dvec().emplace_back(tmp_v_idx, std::move(cur_der));
+            } else {
+                // Check if we already computed this derivative.
+                if (const auto it = local_dmap().find(tmp_v_idx); it == local_dmap().end()) {
+                    // The derivative is new.
+                    auto cur_der = diffs[diffs.size() - cur_nouts + out_idx];
 
-                [[maybe_unused]] const auto [_, flag] = local_diff_map.try_emplace(tmp_v_idx, std::move(cur_der));
-                assert(flag);
+                    [[maybe_unused]] const auto [_, flag] = local_dmap().try_emplace(tmp_v_idx, std::move(cur_der));
+                    assert(flag);
+                }
             }
         }
     }
 
-    // Merge local_diff_map into diff_map.
-    diff_map.insert(diff_map.end(), local_diff_map.begin(), local_diff_map.end());
+    // Merge the local map into diff_map.
+    if (cur_order == 1u) {
+        diff_map.insert(diff_map.end(), local_dvec().begin(), local_dvec().end());
+    } else {
+        diff_map.insert(diff_map.end(), local_dmap().begin(), local_dmap().end());
+    }
 }
 
 // Reverse-mode implementation of diff_tensors().
@@ -696,13 +727,30 @@ void diff_tensors_reverse_impl(
     const std::vector<expression> &args,
     // Iterator in diff_map pointing to the first
     // derivative for the previous order.
-    typename DiffMap::iterator prev_begin)
+    typename DiffMap::iterator prev_begin,
+    // The current derivative order.
+    std::uint32_t cur_order)
 {
     assert(dc.size() > nvars);
+    assert(cur_order > 0u);
 
-    // Local map used to temporarily store the derivatives.
-    // It will be merged into diff_map at the end.
-    fast_umap<dtens_v_idx_t, expression, diff_map_hasher> local_diff_map;
+    // Local data structures used to temporarily store the derivatives,
+    // which will eventually be added to diff_map.
+    // For derivative orders > 1, the algorithm we employ
+    // will produce several times the same derivative, and thus
+    // we need to store the derivatives in a dictionary in order
+    // to prevent duplicates. For order-1 derivatives, no duplicate
+    // derivatives will be produced and thus we can use a plain vector
+    // which can be quite a bit faster.
+    using diff_map_t = fast_umap<dtens_v_idx_t, expression, diff_map_hasher>;
+    using diff_vec_t = std::vector<std::pair<dtens_v_idx_t, expression>>;
+    using local_diff_t = std::variant<diff_map_t, diff_vec_t>;
+    auto local_diff = (cur_order == 1u) ? local_diff_t(diff_vec_t{}) : local_diff_t(diff_map_t{});
+
+    // Helpers to ease the access to the active member of the local_diff variant.
+    // NOTE: if used incorrectly, these will throw at runtime.
+    auto local_dmap = [&local_diff]() -> diff_map_t & { return std::get<diff_map_t>(local_diff); };
+    auto local_dvec = [&local_diff]() -> diff_vec_t & { return std::get<diff_vec_t>(local_diff); };
 
     // Cache the number of diff arguments.
     const auto nargs = args.size();
@@ -842,7 +890,7 @@ void diff_tensors_reverse_impl(
             assert(flag);
         }
 
-        // Add the derivatives to local_diff_map.
+        // Add the derivatives to the local map.
         for (decltype(args.size()) j = 0; j < nargs; ++j) {
             // Compute the indices vector for the current derivative.
             tmp_v_idx = prev_begin->first;
@@ -852,10 +900,9 @@ void diff_tensors_reverse_impl(
             // is representable by std::uint32_t.
             tmp_v_idx[j + 1u] += 1u;
 
-            // Check if we already computed this derivative.
-            if (const auto it = local_diff_map.find(tmp_v_idx); it == local_diff_map.end()) {
-                // The derivative is new. If the diff argument is present in the
-                // decomposition, then we will calculate the derivative and add it.
+            if (cur_order == 1u) {
+                // Check if the diff argument is present in the
+                // decomposition: if it is, we will calculate the derivative and add it.
                 // Otherwise, we set the derivative to zero and add it.
                 expression cur_der = 0_dbl;
 
@@ -863,8 +910,22 @@ void diff_tensors_reverse_impl(
                     cur_der = it_dmap->second;
                 }
 
-                [[maybe_unused]] const auto [_, flag] = local_diff_map.try_emplace(tmp_v_idx, std::move(cur_der));
-                assert(flag);
+                local_dvec().emplace_back(tmp_v_idx, std::move(cur_der));
+            } else {
+                // Check if we already computed this derivative.
+                if (const auto it = local_dmap().find(tmp_v_idx); it == local_dmap().end()) {
+                    // The derivative is new. If the diff argument is present in the
+                    // decomposition, then we will calculate the derivative and add it.
+                    // Otherwise, we set the derivative to zero and add it.
+                    expression cur_der = 0_dbl;
+
+                    if (const auto it_dmap = dmap.find(args[j]); it_dmap != dmap.end()) {
+                        cur_der = it_dmap->second;
+                    }
+
+                    [[maybe_unused]] const auto [_, flag] = local_dmap().try_emplace(tmp_v_idx, std::move(cur_der));
+                    assert(flag);
+                }
             }
         }
 
@@ -873,8 +934,12 @@ void diff_tensors_reverse_impl(
         assert(prev_begin != diff_map.end() || i + 1u == cur_nouts);
     }
 
-    // Merge local_diff_map into diff_map.
-    diff_map.insert(diff_map.end(), local_diff_map.begin(), local_diff_map.end());
+    // Merge the local map into diff_map.
+    if (cur_order == 1u) {
+        diff_map.insert(diff_map.end(), local_dvec().begin(), local_dvec().end());
+    } else {
+        diff_map.insert(diff_map.end(), local_dmap().begin(), local_dmap().end());
+    }
 }
 
 } // namespace
@@ -1099,9 +1164,11 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
         // would be to do the computation in both modes (e.g., in parallel) and pick the mode which
         // results in the shortest decomposition. Perhaps we can consider this for a future extension.
         if (cur_nouts >= args.size()) {
-            diff_tensors_forward_impl(diff_map, cur_nouts, dc, dep, revdep, adj, nvars, args, prev_begin);
+            diff_tensors_forward_impl(diff_map, cur_nouts, dc, dep, revdep, adj, nvars, args, prev_begin,
+                                      cur_order + 1u);
         } else {
-            diff_tensors_reverse_impl(diff_map, cur_nouts, dc, dep, revdep, adj, nvars, args, prev_begin);
+            diff_tensors_reverse_impl(diff_map, cur_nouts, dc, dep, revdep, adj, nvars, args, prev_begin,
+                                      cur_order + 1u);
         }
 
         // Determine the range in diff_map for the current-order derivatives.
