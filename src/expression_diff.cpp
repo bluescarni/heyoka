@@ -336,7 +336,7 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
     // Do an initial pass to create the adjoints, the
     // vectors of direct and reverse dependencies,
     // and the substitution map.
-    std::vector<std::unordered_map<std::uint32_t, expression>> adj;
+    std::vector<fast_umap<std::uint32_t, expression>> adj;
     adj.resize(boost::numeric_cast<decltype(adj.size())>(dc.size()));
 
     std::vector<std::vector<std::uint32_t>> dep;
@@ -506,7 +506,7 @@ void diff_tensors_forward_impl(
     // to avoid iterating over those subexpressions which do not depend on
     // an input. We need two containers (with identical content)
     // because we need both ordered iteration AND fast lookup.
-    std::unordered_set<std::uint32_t> in_deps;
+    fast_uset<std::uint32_t> in_deps;
     std::vector<std::uint32_t> sorted_in_deps;
 
     // A stack to be used when filling up in_deps/sorted_in_deps.
@@ -515,7 +515,7 @@ void diff_tensors_forward_impl(
     // Create a dictionary mapping an input to its position
     // in the decomposition. This is used to locate diff arguments
     // in the decomposition.
-    std::unordered_map<expression, std::vector<expression>::size_type> input_idx_map;
+    fast_umap<expression, std::vector<expression>::size_type, std::hash<expression>> input_idx_map;
     for (std::vector<expression>::size_type i = 0; i < nvars; ++i) {
         const auto &cur_in = dc[i];
         assert(input_idx_map.count(cur_in) == 0u);
@@ -714,7 +714,7 @@ void diff_tensors_reverse_impl(
     // does not depend (recall that the decomposition contains the subexpressions
     // for ALL outputs). We need two containers (with identical content)
     // because we need both ordered iteration AND fast lookup.
-    std::unordered_set<std::uint32_t> out_deps;
+    fast_uset<std::uint32_t> out_deps;
     std::vector<std::uint32_t> sorted_out_deps;
 
     // A stack to be used when filling up out_deps/sorted_out_deps.
@@ -834,7 +834,7 @@ void diff_tensors_reverse_impl(
         // to fetch from diffs only the derivatives we are interested in
         // (since there may be vars/params in the decomposition wrt which
         // the derivatives are not requested).
-        std::unordered_map<expression, expression> dmap;
+        fast_umap<expression, expression, std::hash<expression>> dmap;
         for (std::vector<expression>::size_type j = 0; j < nvars; ++j) {
             [[maybe_unused]] const auto [_, flag] = dmap.try_emplace(dc[j], diffs[j]);
             assert(flag);
@@ -1225,7 +1225,7 @@ dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_
     }
 
     // Check if there are repeated entries in args.
-    const std::unordered_set args_set(args.begin(), args.end());
+    const fast_uset<expression, std::hash<expression>> args_set(args.begin(), args.end());
     if (args_set.size() != args.size()) {
         throw std::invalid_argument(
             fmt::format("Duplicate entries detected in the list of variables/parameters with respect to which the "
