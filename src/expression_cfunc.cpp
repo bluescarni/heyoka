@@ -1006,7 +1006,16 @@ auto cfunc_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vecto
         // will contain {f : [[a, b, c], [d, e, f]]}.
         // After construction, we have verified that for each function
         // in the map the sets of arguments have all the same size.
-        fast_umap<llvm::Function *, std::vector<std::vector<std::variant<std::uint32_t, number>>>> tmp_map;
+        // NOTE: again, here and below we use name-based ordered maps for the functions.
+        // This ensures that the invocations of cm_make_arg_gen_*(), which create several
+        // global variables, always happen in a well-defined order. If we used an unordered map instead,
+        // the variables would be created in a "random" order, which would result in a
+        // unnecessary miss for the in-memory cache machinery when two logically-identical
+        // LLVM modules are considered different because of the difference in the order
+        // of declaration of global variables.
+        std::map<llvm::Function *, std::vector<std::vector<std::variant<std::uint32_t, number>>>,
+                 llvm_func_name_compare>
+            tmp_map;
 
         for (const auto &ex : seg) {
             // Get the evaluation function.
@@ -1021,14 +1030,14 @@ auto cfunc_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vecto
             // element into a set of indices/constants.
             const auto c_args = udef_to_variants(ex, {});
 
+            // LCOV_EXCL_START
             if (!is_new_func && it->second.back().size() - 1u != c_args.size()) {
-                // LCOV_EXCL_START
                 throw std::invalid_argument(
                     fmt::format("Inconsistent arity detected in a compiled function in compact "
                                 "mode: the same function is being called with both {} and {} arguments",
                                 it->second.back().size() - 1u, c_args.size()));
-                // LCOV_EXCL_STOP
             }
+            // LCOV_EXCL_STOP
 
             // Add the new set of arguments.
             it->second.emplace_back();
@@ -1042,7 +1051,8 @@ auto cfunc_build_function_maps(llvm_state &s, llvm::Type *fp_t, const std::vecto
 
         // Now we build the transposition of tmp_map: from {f : [[a, b, c], [d, e, f]]}
         // to {f : [[a, d], [b, e], [c, f]]}.
-        fast_umap<llvm::Function *, std::vector<std::variant<std::vector<std::uint32_t>, std::vector<number>>>>
+        std::map<llvm::Function *, std::vector<std::variant<std::vector<std::uint32_t>, std::vector<number>>>,
+                 llvm_func_name_compare>
             tmp_map_transpose;
         for (const auto &[func, vv] : tmp_map) {
             assert(!vv.empty()); // LCOV_EXCL_LINE

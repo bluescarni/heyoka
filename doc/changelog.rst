@@ -29,6 +29,10 @@ Changes
 Fix
 ~~~
 
+- Fix global constants in an LLVM module being generated in unordered fashion
+  when compact mode is active. This would result in two logically-identical
+  modules being considered different by the in-memory cache
+  (`#359 <https://github.com/bluescarni/heyoka/pull/359>`__).
 - Fix compiler warning when building without SLEEF support
   (`#356 <https://github.com/bluescarni/heyoka/pull/356>`__).
 - Improve the numerical stability of the VSOP2013 model

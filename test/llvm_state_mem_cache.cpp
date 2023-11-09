@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/model/pendulum.hpp>
 #include <heyoka/taylor.hpp>
@@ -139,4 +140,49 @@ TEST_CASE("slp_vectorize test")
     ta = taylor_adaptive<double>{
         model::pendulum(), {1., 0.}, kw::tol = 1e-11, kw::slp_vectorize = true, kw::force_avx512 = true};
     REQUIRE(llvm_state::get_memcache_size() > new_size);
+}
+
+// Bug: in compact mode, global variables used to be created in random
+// order, which would lead to logically-identical modules considered
+// different by the cache machinery due to the different declaration order.
+TEST_CASE("bug cache miss compact mode")
+{
+    {
+        llvm_state::clear_memcache();
+        llvm_state::set_memcache_limit(2048ull * 1024u * 1024u);
+
+        auto ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11, kw::compact_mode = true};
+        const auto orig_size = llvm_state::get_memcache_size();
+
+        // Re-create the same ta several times and then check the cache size has not changed.
+        for (auto i = 0; i < 100; ++i) {
+            ta = taylor_adaptive<double>{model::pendulum(), {1., 0.}, kw::tol = 1e-11, kw::compact_mode = true};
+        }
+
+        REQUIRE(llvm_state::get_memcache_size() == orig_size);
+    }
+
+    {
+        llvm_state::clear_memcache();
+        llvm_state::set_memcache_limit(2048ull * 1024u * 1024u);
+
+        {
+            llvm_state s;
+            add_cfunc<double>(s, "func", {model::pendulum_energy()}, kw::compact_mode = true);
+            s.compile();
+            (void)s.jit_lookup("func");
+        }
+
+        const auto orig_size = llvm_state::get_memcache_size();
+
+        // Re-create the same cfunc several times and then check the cache size has not changed.
+        for (auto i = 0; i < 100; ++i) {
+            llvm_state s;
+            add_cfunc<double>(s, "func", {model::pendulum_energy()}, kw::compact_mode = true);
+            s.compile();
+            (void)s.jit_lookup("func");
+        }
+
+        REQUIRE(llvm_state::get_memcache_size() == orig_size);
+    }
 }
