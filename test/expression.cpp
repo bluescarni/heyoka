@@ -16,6 +16,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -331,8 +332,7 @@ TEST_CASE("get_param_size")
 
     REQUIRE(get_param_size(par[0]) == 1u);
     REQUIRE(get_param_size(par[123]) == 124u);
-    REQUIRE_THROWS_MATCHES(get_param_size(par[std::numeric_limits<std::uint32_t>::max()]), std::overflow_error,
-                           Message("Overflow dected in get_n_param()"));
+    REQUIRE_THROWS_AS(get_param_size(par[std::numeric_limits<std::uint32_t>::max()]), std::system_error);
     REQUIRE(get_param_size(par[123] + "x"_var) == 124u);
     REQUIRE(get_param_size("x"_var + par[123]) == 124u);
     REQUIRE(get_param_size(par[123] + 1_dbl) == 124u);
@@ -362,6 +362,15 @@ TEST_CASE("get_param_size")
     bar = par[23] + (foo - x) / (2. * foo) + par[92];
 
     REQUIRE(get_param_size(bar) == 93u);
+
+    // Tests with vectorisation.
+    REQUIRE(get_param_size({par[0], par[123]}) == 124u);
+    REQUIRE(get_param_size({par[123], par[0]}) == 124u);
+    REQUIRE(get_param_size({bar, bar + par[86]}) == 93u);
+    REQUIRE(get_param_size({bar, bar + par[186]}) == 187u);
+    REQUIRE(get_param_size({bar + par[86], bar}) == 93u);
+    REQUIRE(get_param_size({bar + par[186], bar}) == 187u);
+    REQUIRE(get_param_size({"x"_var, 2_dbl}) == 0u);
 }
 
 TEST_CASE("binary simpls")
@@ -557,6 +566,19 @@ TEST_CASE("is_time_dependent")
     bar = hy::time + (foo - x) / (2. * foo) + hy::time;
 
     REQUIRE(is_time_dependent(bar));
+
+    // Tests with vectorization.
+    REQUIRE(is_time_dependent({bar}));
+    REQUIRE(is_time_dependent({x, bar}));
+    REQUIRE(is_time_dependent({bar, x}));
+    REQUIRE(!is_time_dependent({2_dbl - par[0], x}));
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+    bar = (foo - x) / (2. * foo);
+    REQUIRE(!is_time_dependent({x, bar}));
+    REQUIRE(is_time_dependent({x, bar, hy::time}));
+    REQUIRE(is_time_dependent({x, hy::time, bar}));
+    REQUIRE(is_time_dependent({hy::time, x, bar}));
 }
 
 TEST_CASE("s11n")
