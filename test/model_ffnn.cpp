@@ -10,6 +10,7 @@
 #include <functional>
 #include <limits>
 #include <stdexcept>
+#include <system_error>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -19,7 +20,6 @@
 #include <heyoka/kw.hpp>
 #include <heyoka/math.hpp>
 #include <heyoka/model/ffnn.hpp>
-#include <system_error>
 
 #include "catch.hpp"
 

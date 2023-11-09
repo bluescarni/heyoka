@@ -1081,11 +1081,9 @@ std::uint32_t get_param_size(detail::funcptr_set &func_set, const expression &ex
             using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, param>) {
-                if (v.idx() == std::numeric_limits<std::uint32_t>::max()) {
-                    throw std::overflow_error("Overflow dected in get_n_param()");
-                }
+                using safe_uint32_t = boost::safe_numerics::safe<std::uint32_t>;
 
-                retval = std::max(static_cast<std::uint32_t>(v.idx() + 1u), retval);
+                retval = std::max(static_cast<std::uint32_t>(v.idx() + safe_uint32_t(1)), retval);
             } else if constexpr (std::is_same_v<type, func>) {
                 const auto f_id = v.get_ptr();
 
@@ -1122,6 +1120,19 @@ std::uint32_t get_param_size(const expression &ex)
     detail::funcptr_set func_set;
 
     return detail::get_param_size(func_set, ex);
+}
+
+std::uint32_t get_param_size(const std::vector<expression> &v_ex)
+{
+    std::uint32_t retval = 0;
+
+    detail::funcptr_set func_set;
+
+    for (const auto &ex : v_ex) {
+        retval = std::max(retval, detail::get_param_size(func_set, ex));
+    }
+
+    return retval;
 }
 
 namespace detail
@@ -1221,47 +1232,45 @@ namespace
 {
 
 // NOLINTNEXTLINE(misc-no-recursion)
-bool is_time_dependent(funcptr_map<bool> &func_map, const expression &ex)
+bool is_time_dependent(funcptr_set &func_set, const expression &ex)
 {
     // - If ex is a function, check if it is time-dependent, or
     //   if any of its arguments is time-dependent,
     // - otherwise, return false.
     return std::visit(
         // NOLINTNEXTLINE(misc-no-recursion)
-        [&func_map](const auto &v) {
+        [&func_set](const auto &v) {
             using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, func>) {
                 const auto f_id = v.get_ptr();
 
-                // Did we already determine if v is time-dependent?
-                if (const auto it = func_map.find(f_id); it != func_map.end()) {
-                    return it->second;
+                // Did we already determine that v is *not* time-dependent?
+                if (const auto it = func_set.find(f_id); it != func_set.end()) {
+                    return false;
                 }
 
                 // Check if the function is intrinsically time-dependent.
-                bool is_tm_dep = v.is_time_dependent();
-                if (!is_tm_dep) {
-                    // The function does **not** intrinsically depend on time.
-                    // Check its arguments.
-                    for (const auto &a : v.args()) {
-                        if (is_time_dependent(func_map, a)) {
-                            // A time-dependent argument was found. Update
-                            // is_tm_dep and break out, no point in checking
-                            // the other arguments.
-                            is_tm_dep = true;
-                            break;
-                        }
+                if (v.is_time_dependent()) {
+                    return true;
+                }
+
+                // The function does *not* intrinsically depend on time.
+                // Check its arguments.
+                for (const auto &a : v.args()) {
+                    if (is_time_dependent(func_set, a)) {
+                        // A time-dependent argument was found, return true.
+                        return true;
                     }
                 }
 
                 // Update the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, is_tm_dep);
+                [[maybe_unused]] const auto [_, flag] = func_set.emplace(f_id);
 
                 // An expression cannot contain itself.
                 assert(flag);
 
-                return is_tm_dep;
+                return false;
             } else {
                 return false;
             }
@@ -1276,9 +1285,24 @@ bool is_time_dependent(funcptr_map<bool> &func_map, const expression &ex)
 // Determine if an expression is time-dependent.
 bool is_time_dependent(const expression &ex)
 {
-    detail::funcptr_map<bool> func_map;
+    // NOTE: this will contain pointers to (sub)expressions
+    // which are *not* time-dependent.
+    detail::funcptr_set func_set;
 
-    return detail::is_time_dependent(func_map, ex);
+    return detail::is_time_dependent(func_set, ex);
+}
+
+bool is_time_dependent(const std::vector<expression> &v_ex)
+{
+    detail::funcptr_set func_set;
+
+    for (const auto &ex : v_ex) {
+        if (detail::is_time_dependent(func_set, ex)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 namespace detail
