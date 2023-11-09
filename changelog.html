@@ -564,6 +564,10 @@ of internal redundancy
 <section id="fix">
 <h3>Fix<a class="headerlink" href="#fix" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>Fix global constants in an LLVM module being generated in unordered fashion
+when compact mode is active. This would result in two logically-identical
+modules being considered different by the in-memory cache
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/359">#359</a>).</p></li>
 <li><p>Fix compiler warning when building without SLEEF support
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/356">#356</a>).</p></li>
 <li><p>Improve the numerical stability of the VSOP2013 model
