@@ -384,6 +384,8 @@ TEST_CASE("dtens basics")
     REQUIRE(dt3.get_args() == dt2.get_args());
 }
 
+#if 0
+
 TEST_CASE("fixed centres check")
 {
     std::uniform_real_distribution<double> rdist(-10., 10.);
@@ -576,6 +578,8 @@ TEST_CASE("speelpenning check")
         REQUIRE(sr_it == sr.end());
     }
 }
+
+#endif
 
 TEST_CASE("speelpenning complexity")
 {

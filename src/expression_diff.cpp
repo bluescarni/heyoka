@@ -1236,7 +1236,9 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
         // of the previous-order derivatives.
         tmp_v_idx.first = 0;
         tmp_v_idx.second.clear();
-        tmp_v_idx.second.emplace_back(0, cur_order);
+        if (cur_order != 0u) {
+            tmp_v_idx.second.emplace_back(0, cur_order);
+        }
 
         const auto prev_begin = search_diff_map(tmp_v_idx);
         assert(prev_begin != diff_map.end());
@@ -1477,8 +1479,12 @@ std::uint32_t dtens::get_order() const
     // in the map (specifically, it is
     // the last element in the indices
     // vector of the last derivative).
-    assert(!(end() - 1)->first.second.empty());
-    return (end() - 1)->first.second.back().second;
+    const auto &sv = (end() - 1)->first.second;
+    if (sv.empty()) {
+        return 0;
+    } else {
+        return sv.back().second;
+    }
 }
 
 dtens::iterator dtens::find(const v_idx_t &vidx) const
@@ -1490,6 +1496,12 @@ dtens::iterator dtens::find(const v_idx_t &vidx) const
 
     // vidx must at least contain the function component index.
     if (vidx.empty()) {
+        return end();
+    }
+
+    // The size of vidx must be consistent with the number
+    // of diff args.
+    if (vidx.size() - 1u != get_nvars()) {
         return end();
     }
 
@@ -1538,7 +1550,10 @@ dtens::subrange dtens::get_derivatives(std::uint32_t order) const
 
     // Create the indices vector corresponding to the first derivative
     // of component 0 for the given order in the map.
-    detail::dtens_sv_idx_t s_vidx{0, {{0, order}}};
+    detail::dtens_sv_idx_t s_vidx{0, {}};
+    if (order != 0u) {
+        s_vidx.second.emplace_back(0, order);
+    }
 
     // Locate the corresponding derivative in the map.
     // NOTE: this could be end() for invalid order.
@@ -1560,8 +1575,10 @@ dtens::subrange dtens::get_derivatives(std::uint32_t order) const
     // map is empty, and we handled this corner case earlier.
     assert(get_nouts() > 0u);
     s_vidx.first = get_nouts() - 1u;
-    assert(get_nvars() > 0u);
-    s_vidx.second[0].first = get_nvars() - 1u;
+    if (order != 0u) {
+        assert(get_nvars() > 0u);
+        s_vidx.second[0].first = get_nvars() - 1u;
+    }
 
     // NOTE: this could be end() for invalid order.
     auto e = p_impl->m_map.find(s_vidx);
@@ -1596,7 +1613,10 @@ dtens::subrange dtens::get_derivatives(std::uint32_t component, std::uint32_t or
 
     // Create the indices vector corresponding to the first derivative
     // for the given order and component in the map.
-    detail::dtens_sv_idx_t s_vidx{component, {{0, order}}};
+    detail::dtens_sv_idx_t s_vidx{component, {}};
+    if (order != 0u) {
+        s_vidx.second.emplace_back(0, order);
+    }
 
     // Locate the corresponding derivative in the map.
     // NOTE: this could be end() for invalid component/order.
@@ -1615,7 +1635,9 @@ dtens::subrange dtens::get_derivatives(std::uint32_t component, std::uint32_t or
     // Modify vidx so that it now refers to the last derivative
     // for the given order and component in the map.
     assert(get_nvars() > 0u);
-    s_vidx.second[0].first = get_nvars() - 1u;
+    if (order != 0u) {
+        s_vidx.second[0].first = get_nvars() - 1u;
+    }
 
     // NOTE: this could be end() for invalid component/order.
     auto e = p_impl->m_map.find(s_vidx);
@@ -1692,8 +1714,6 @@ std::uint32_t dtens::get_nvars() const
 
     if (p_impl->m_map.empty()) {
         assert(ret == 0u);
-    } else {
-        assert(!begin()->first.second.empty());
     }
 
 #endif
