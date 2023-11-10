@@ -419,21 +419,23 @@ IGOR_MAKE_NAMED_ARGUMENT(diff_order);
 namespace detail
 {
 
-// Private aliases/utilities needed in the implementation of dtens.
-using dtens_v_idx_t = std::vector<std::uint32_t>;
+// Sparse structure used to index derivatives in dtens:
+// the first element of the pair is the function component index,
+// the second element the vector of derivative orders in sparse form.
+using dtens_sv_idx_t = std::pair<std::uint32_t, std::vector<std::pair<std::uint32_t, std::uint32_t>>>;
 
-struct dtens_v_idx_cmp {
-    [[nodiscard]] bool operator()(const dtens_v_idx_t &, const dtens_v_idx_t &) const;
+struct dtens_sv_idx_cmp {
+    [[nodiscard]] bool operator()(const dtens_sv_idx_t &, const dtens_sv_idx_t &) const;
 };
 
-using dtens_map_t = boost::container::flat_map<dtens_v_idx_t, expression, dtens_v_idx_cmp>;
+using dtens_map_t = boost::container::flat_map<dtens_sv_idx_t, expression, dtens_sv_idx_cmp>;
 
 } // namespace detail
 
 class HEYOKA_DLL_PUBLIC dtens
 {
 public:
-    using v_idx_t = detail::dtens_v_idx_t;
+    using v_idx_t = std::vector<std::uint32_t>;
     using size_type = detail::dtens_map_t::size_type;
 
 private:
