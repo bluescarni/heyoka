@@ -749,7 +749,10 @@ void diff_tensors_reverse_impl(
 
     // Helpers to ease the access to the active member of the local_diff variant.
     // NOTE: if used incorrectly, these will throw at runtime.
-    auto local_dmap = [&local_diff]() -> diff_map_t & { return std::get<diff_map_t>(local_diff); };
+    // NOTE: currently local_dmap is never used because the heuristic
+    // for deciding between forward and reverse mode prevents reverse mode
+    // from being used for order > 1.
+    auto local_dmap = [&local_diff]() -> diff_map_t & { return std::get<diff_map_t>(local_diff); }; // LCOV_EXCL_LINE
     auto local_dvec = [&local_diff]() -> diff_vec_t & { return std::get<diff_vec_t>(local_diff); };
 
     // Cache the number of diff arguments.
@@ -912,6 +915,7 @@ void diff_tensors_reverse_impl(
 
                 local_dvec().emplace_back(tmp_v_idx, std::move(cur_der));
             } else {
+                // LCOV_EXCL_START
                 // Check if we already computed this derivative.
                 if (const auto it = local_dmap().find(tmp_v_idx); it == local_dmap().end()) {
                     // The derivative is new. If the diff argument is present in the
@@ -926,6 +930,7 @@ void diff_tensors_reverse_impl(
                     [[maybe_unused]] const auto [_, flag] = local_dmap().try_emplace(tmp_v_idx, std::move(cur_der));
                     assert(flag);
                 }
+                // LCOV_EXCL_STOP
             }
         }
 
@@ -938,7 +943,7 @@ void diff_tensors_reverse_impl(
     if (cur_order == 1u) {
         diff_map.insert(diff_map.end(), local_dvec().begin(), local_dvec().end());
     } else {
-        diff_map.insert(diff_map.end(), local_dmap().begin(), local_dmap().end());
+        diff_map.insert(diff_map.end(), local_dmap().begin(), local_dmap().end()); // LCOV_EXCL_LINE
     }
 }
 
