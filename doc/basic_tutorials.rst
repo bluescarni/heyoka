@@ -5,7 +5,7 @@ Basic tutorials
 
 .. important::
 
-   More :ref:`tutorials <hypy:basic_tutorials>` and :ref:`examples <hypy:examples>` are available in the documentation
+   More tutorials and examples are available in the documentation
    of heyoka's `Python bindings <https://bluescarni.github.io/heyoka.py>`__.
 
 The code snippets in these tutorials assume the inclusion of the

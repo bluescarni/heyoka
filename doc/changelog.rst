@@ -21,6 +21,9 @@ New
 Changes
 ~~~~~~~
 
+- Substantial speedups in the computation of first-order derivatives
+  with respect to many variables/parameters
+  (`#358 <https://github.com/bluescarni/heyoka/pull/358>`__).
 - Substantial performance improvements in the computation of
   derivative tensors of large expressions with a high degree
   of internal redundancy
@@ -154,7 +157,7 @@ Changes
 ~~~~~~~
 
 - The step callbacks are now copied in :ref:`ensemble propagations <tut_ensemble>`
-  rather then being shared among threads. The aim of this change
+  rather than being shared among threads. The aim of this change
   is to reduce the likelihood of data races
   (`#334 <https://github.com/bluescarni/heyoka/pull/334>`__).
 - Comprehensive overhaul of the expression system, including:

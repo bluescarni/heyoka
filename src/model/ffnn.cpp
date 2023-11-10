@@ -19,6 +19,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/model/ffnn.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -43,21 +44,28 @@ std::vector<expression> compute_layer(su32 layer_id, const std::vector<expressio
     auto n_neurons_prev_layer = su32(inputs.size());
     auto n_neurons_curr_layer = n_neurons[layer_id];
 
-    std::vector<expression> retval(static_cast<std::vector<expression>::size_type>(n_neurons_curr_layer), 0_dbl);
+    std::vector<expression> retval, tmp_sum;
+    retval.reserve(n_neurons_curr_layer);
+
     for (su32 i = 0; i < n_neurons_curr_layer; ++i) {
+        // Clear the summation terms.
+        tmp_sum.clear();
+
         for (su32 j = 0; j < n_neurons_prev_layer; ++j) {
 
             // Add the weight and update the weight counter.
-            retval[i] += nn_wb[wcounter] * inputs[j];
+            tmp_sum.push_back(nn_wb[wcounter] * inputs[j]);
             ++wcounter;
         }
 
         // Add the bias and update the counter.
-        retval[i] += nn_wb[bcounter + n_net_w];
+        tmp_sum.push_back(nn_wb[bcounter + n_net_w]);
         ++bcounter;
+
         // Activation function.
-        retval[i] = activation(retval[i]);
+        retval.push_back(activation(sum(tmp_sum)));
     }
+
     return retval;
 }
 
