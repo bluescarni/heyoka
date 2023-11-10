@@ -551,7 +551,7 @@ void diff_tensors_forward_impl(
     // will produce several times the same derivative, and thus
     // we need to store the derivatives in a dictionary in order
     // to prevent duplicates. For order-1 derivatives, no duplicate
-    // derivatives will be produced and thus we can use a plain vector
+    // derivatives will be produced and thus we can use a plain vector,
     // which can be quite a bit faster.
     using diff_map_t = fast_umap<dtens_ss_idx_t, expression, diff_map_hasher>;
     using diff_vec_t = std::vector<std::pair<dtens_ss_idx_t, expression>>;
@@ -788,7 +788,7 @@ void diff_tensors_reverse_impl(
     // will produce several times the same derivative, and thus
     // we need to store the derivatives in a dictionary in order
     // to prevent duplicates. For order-1 derivatives, no duplicate
-    // derivatives will be produced and thus we can use a plain vector
+    // derivatives will be produced and thus we can use a plain vector,
     // which can be quite a bit faster.
     using diff_map_t = fast_umap<dtens_ss_idx_t, expression, diff_map_hasher>;
     using diff_vec_t = std::vector<std::pair<dtens_ss_idx_t, expression>>;
