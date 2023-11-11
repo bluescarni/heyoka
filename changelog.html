@@ -555,6 +555,9 @@ Taylor derivatives are not implemented yet.</p></li>
 <section id="changes">
 <h3>Changes<a class="headerlink" href="#changes" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>Substantial speedups in the computation of first-order derivatives
+with respect to many variables/parameters
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/358">#358</a>).</p></li>
 <li><p>Substantial performance improvements in the computation of
 derivative tensors of large expressions with a high degree
 of internal redundancy
@@ -695,7 +698,7 @@ very large expressions
 <h3>Changes<a class="headerlink" href="#id9" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
 <li><p>The step callbacks are now copied in <a class="reference internal" href="tut_ensemble.html#tut-ensemble"><span class="std std-ref">ensemble propagations</span></a>
-rather then being shared among threads. The aim of this change
+rather than being shared among threads. The aim of this change
 is to reduce the likelihood of data races
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/334">#334</a>).</p></li>
 <li><p>Comprehensive overhaul of the expression system, including:
