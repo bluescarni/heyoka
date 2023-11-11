@@ -454,20 +454,9 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
     return std::tuple{std::move(adj), std::move(dep), std::move(revdep), std::move(subs_map)};
 }
 
-// Hasher for a pair of indices.
-struct idx_pair_hasher {
-    std::size_t operator()(const std::pair<std::uint32_t, std::uint32_t> &p) const noexcept
-    {
-        std::size_t seed = std::hash<std::uint32_t>{}(p.first);
-        boost::hash_combine(seed, std::hash<std::uint32_t>{}(p.second));
-
-        return seed;
-    }
-};
-
 // This is an alternative version of dtens_sv_idx_t that uses a dictionary
-// for storing the derivative orders instead of a sorted vector. Using a dictionary
-// allows for faster/easier manipulation of the derivative orders.
+// for storing the index/order pairs instead of a sorted vector. Using a dictionary
+// allows for faster/easier manipulation.
 using dtens_ss_idx_t = std::pair<std::uint32_t, fast_umap<std::uint32_t, std::uint32_t>>;
 
 // Helper to turn a dtens_sv_idx_t into a dtens_ss_idx_t.
@@ -476,7 +465,7 @@ void vidx_v2s(dtens_ss_idx_t &output, const dtens_sv_idx_t &input)
     // Assign the component.
     output.first = input.first;
 
-    // Assign the derivative indices.
+    // Assign the index/order pairs.
     output.second.clear();
     for (const auto &p : input.second) {
         [[maybe_unused]] auto [_, flag] = output.second.insert(p);
@@ -490,7 +479,7 @@ dtens_sv_idx_t vidx_s2v(const dtens_ss_idx_t &input)
     // Init retval.
     dtens_sv_idx_t retval{input.first, {input.second.begin(), input.second.end()}};
 
-    // Sort the derivative indices.
+    // Sort the index/order pairs.
     std::sort(retval.second.begin(), retval.second.end(),
               [](const auto &p1, const auto &p2) { return p1.first < p2.first; });
 
@@ -505,12 +494,15 @@ struct diff_map_hasher {
         // Use as seed the component index.
         std::size_t seed = std::hash<std::uint32_t>{}(s.first);
 
-        // Compose via additions the hashes of the derivative orders.
+        // Compose via additions the hashes of the index/order pairs.
         // NOTE: it is important that we use here a commutative operation
-        // so that the final hash is independent of the order in which
-        // the derivative orders are stored in the dictionary.
+        // for the composition so that the final hash is independent of the order
+        // in which the pairs are stored in the dictionary.
         for (const auto &p : s.second) {
-            seed += idx_pair_hasher{}(p);
+            std::size_t p_hash = std::hash<std::uint32_t>{}(p.first);
+            boost::hash_combine(p_hash, std::hash<std::uint32_t>{}(p.second));
+
+            seed += p_hash;
         }
 
         return seed;
@@ -566,7 +558,7 @@ void diff_tensors_forward_impl(
     auto local_dmap = [&local_diff]() -> diff_map_t & { return std::get<diff_map_t>(local_diff); };
     auto local_dvec = [&local_diff]() -> diff_vec_t & { return std::get<diff_vec_t>(local_diff); };
 
-    // An indices vector used as temporary variable in several places below.
+    // This is used as a temporary variable in several places below.
     dtens_ss_idx_t tmp_v_idx;
 
     // These two containers will be used to store the list of subexpressions
@@ -809,7 +801,7 @@ void diff_tensors_reverse_impl(
     // Cache the number of diff arguments.
     const auto nargs = args.size();
 
-    // An indices vector used as temporary variable in several places below.
+    // This is used as a temporary variable in several places below.
     dtens_ss_idx_t tmp_v_idx;
 
     // These two containers will be used to store the list of subexpressions
@@ -1001,35 +993,33 @@ void diff_tensors_reverse_impl(
     }
 }
 
-} // namespace
-
-bool dtens_sv_idx_cmp::operator()(const dtens_sv_idx_t &v1, const dtens_sv_idx_t &v2) const
+// Utility function to check that a dtens_sv_idx_t is well-formed.
+void sv_sanity_check([[maybe_unused]] const dtens_sv_idx_t &v)
 {
-#if !defined(NDEBUG)
-
-    // Sanity checks on the inputs.
-
-    // Check indices sorting.
+    // Check sorting according to the derivative indices.
     auto cmp = [](const auto &p1, const auto &p2) { return p1.first < p2.first; };
-    assert(std::is_sorted(v1.second.begin(), v1.second.end(), cmp));
-    assert(std::is_sorted(v2.second.begin(), v2.second.end(), cmp));
+    assert(std::is_sorted(v.second.begin(), v.second.end(), cmp));
 
-    // Check no duplicate indices.
+    // Check no duplicate derivative indices.
     auto no_dup = [](const auto &p1, const auto &p2) { return p1.first == p2.first; };
-    assert(std::adjacent_find(v1.second.begin(), v1.second.end(), no_dup) == v1.second.end());
-    assert(std::adjacent_find(v2.second.begin(), v2.second.end(), no_dup) == v2.second.end());
+    assert(std::adjacent_find(v.second.begin(), v.second.end(), no_dup) == v.second.end());
 
-    // Check no zero diff orders.
+    // Check no zero derivative orders.
     auto nz_order = [](const auto &p) { return p.second != 0u; };
-    assert(std::all_of(v1.second.begin(), v1.second.end(), nz_order));
-    assert(std::all_of(v2.second.begin(), v2.second.end(), nz_order));
+    assert(std::all_of(v.second.begin(), v.second.end(), nz_order));
+}
 
-#endif
+// Implementation of dtens_sv_idx_cmp::operator().
+bool dtens_sv_idx_cmp_impl(const dtens_sv_idx_t &v1, const dtens_sv_idx_t &v2)
+{
+    // Sanity checks on the inputs.
+    sv_sanity_check(v1);
+    sv_sanity_check(v2);
 
-    // Compute the total derivative order for both vectors.
+    // Compute the total derivative order for both v1 and v2.
     // NOTE: here we have to use safe_numerics because this comparison operator
-    // might end up being invoked on a user-supplied index vector, whose total degree
-    // may overflow. The indices vector in dtens, by contrast, are guaranteed to never
+    // might end up being invoked on a user-supplied dtens_sv_idx_t, whose total degree
+    // may overflow. The dtens_sv_idx_t in dtens, by contrast, are guaranteed to never
     // overflow when computing the total degree.
     using su32 = boost::safe_numerics::safe<std::uint32_t>;
 
@@ -1097,6 +1087,87 @@ bool dtens_sv_idx_cmp::operator()(const dtens_sv_idx_t &v1, const dtens_sv_idx_t
     assert(it2 == end2);
 
     return true;
+}
+
+#if !defined(NDEBUG)
+
+// Same comparison as the previous function, but in dense format.
+// Used only for debug.
+bool dtens_v_idx_cmp_impl(const dtens::v_idx_t &v1, const dtens::v_idx_t &v2)
+{
+    assert(v1.size() == v2.size());
+    assert(!v1.empty());
+
+    // Compute the total derivative order for both
+    // vectors.
+    boost::safe_numerics::safe<std::uint32_t> deg1 = 0, deg2 = 0;
+    const auto size = v1.size();
+    for (decltype(v1.size()) i = 1; i < size; ++i) {
+        deg1 += v1[i];
+        deg2 += v2[i];
+    }
+
+    if (deg1 < deg2) {
+        return true;
+    }
+
+    if (deg1 > deg2) {
+        return false;
+    }
+
+    // The total derivative order is the same, look at
+    // the component index next.
+    if (v1[0] < v2[0]) {
+        return true;
+    }
+
+    if (v1[0] > v2[0]) {
+        return false;
+    }
+
+    // Component and total derivative order are the same,
+    // resort to reverse lexicographical compare on the
+    // derivative orders.
+    return std::lexicographical_compare(v1.begin() + 1, v1.end(), v2.begin() + 1, v2.end(), std::greater{});
+}
+
+#endif
+
+} // namespace
+
+bool dtens_sv_idx_cmp::operator()(const dtens_sv_idx_t &v1, const dtens_sv_idx_t &v2) const
+{
+    auto ret = dtens_sv_idx_cmp_impl(v1, v2);
+
+#if !defined(NDEBUG)
+
+    // Convert to dense and re-run the same comparison.
+    auto to_dense = [](const dtens_sv_idx_t &v) {
+        dtens::v_idx_t dv{v.first};
+
+        std::uint32_t cur_d_idx = 0;
+        for (auto it = v.second.begin(); it != v.second.end(); ++cur_d_idx) {
+            if (cur_d_idx == it->first) {
+                dv.push_back(it->second);
+                ++it;
+            } else {
+                dv.push_back(0);
+            }
+        }
+
+        return dv;
+    };
+
+    auto dv1 = to_dense(v1);
+    auto dv2 = to_dense(v2);
+    dv1.resize(std::max(dv1.size(), dv2.size()));
+    dv2.resize(std::max(dv1.size(), dv2.size()));
+
+    assert(ret == dtens_v_idx_cmp_impl(dv1, dv2));
+
+#endif
+
+    return ret;
 }
 
 } // namespace detail
@@ -1198,17 +1269,12 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
     // in the dtens API get_nvars() can safely return std::uint32_t.
     (void)(boost::numeric_cast<std::uint32_t>(nargs));
 
-    // Map to associate a vector of indices to a derivative.
-    // The first index in each vector is the component index,
-    // the rest of the indices are the derivative orders for
-    // each diff args. E.g., with diff args = [x, y, z],
-    // then [0, 1, 2, 1] means d4f0/(dx dy**2 dz) (where f0 is the
-    // first component of the vector function f).
+    // Map to associate a dtens_sv_idx_t to a derivative.
     // This will be kept manually sorted according to dtens_v_idx_cmp
     // and it will be turned into a flat map at the end.
     dtens_map_t::sequence_type diff_map;
 
-    // Helper to locate the vector of indices v in diff_map. If not present,
+    // Helper to locate a dtens_sv_idx_t in diff_map. If not present,
     // diff_map.end() will be returned.
     auto search_diff_map = [&diff_map](const dtens_sv_idx_t &v) {
         auto it = std::lower_bound(diff_map.begin(), diff_map.end(), v, [](const auto &item, const auto &vec) {
@@ -1222,7 +1288,7 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
         }
     };
 
-    // An indices vector used as temporary variable in several places below.
+    // This is used as a temporary variable in several places below.
     dtens_sv_idx_t tmp_v_idx;
 
     // Vector that will store the previous-order derivatives in the loop below.
@@ -1340,7 +1406,7 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
     // Check sorting.
     assert(std::is_sorted(retval.begin(), retval.end(),
                           [](const auto &p1, const auto &p2) { return dtens_sv_idx_cmp{}(p1.first, p2.first); }));
-    // Check the number of elements in the indices vectors.
+    // Check the variable indices.
     assert(std::all_of(retval.begin(), retval.end(), [&nargs](const auto &p) {
         return p.first.second.empty() || p.first.second.back().first < nargs;
     }));
@@ -1478,6 +1544,7 @@ dtens::iterator dtens::end() const
 
 std::uint32_t dtens::get_order() const
 {
+    // First we handle the empty case.
     if (p_impl->m_map.empty()) {
         return 0;
     }
@@ -1489,6 +1556,11 @@ std::uint32_t dtens::get_order() const
     // vector of the last derivative).
     const auto &sv = (end() - 1)->first.second;
     if (sv.empty()) {
+        // NOTE: an empty index/order vector
+        // at the end means that the maximum
+        // diff order is zero and that we are
+        // only storing the original function
+        // components in the dtens object.
         return 0;
     } else {
         return sv.back().second;
@@ -1577,7 +1649,7 @@ dtens::subrange dtens::get_derivatives(std::uint32_t order) const
 
 #endif
 
-    // Modify vidx so that it now refers to the last derivative
+    // Modify s_vidx so that it now refers to the last derivative
     // for the last component at the given order in the map.
     // NOTE: get_nouts() can return zero only if the internal
     // map is empty, and we handled this corner case earlier.

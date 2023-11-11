@@ -420,8 +420,10 @@ namespace detail
 {
 
 // Sparse structure used to index derivatives in dtens:
-// the first element of the pair is the function component index,
-// the second element the vector of derivative orders in sparse form.
+// - the first element of the pair is the function component index,
+// - the second element is the vector of variable index/diff order pairs,
+//   which is kept sorted according to the variable index, and in which no
+//   diff order can be zero and no variable index can appear twice.
 using dtens_sv_idx_t = std::pair<std::uint32_t, std::vector<std::pair<std::uint32_t, std::uint32_t>>>;
 
 struct dtens_sv_idx_cmp {
@@ -435,7 +437,9 @@ using dtens_map_t = boost::container::flat_map<dtens_sv_idx_t, expression, dtens
 class HEYOKA_DLL_PUBLIC dtens
 {
 public:
+    // Derivative indexing vector in dense form.
     using v_idx_t = std::vector<std::uint32_t>;
+
     using size_type = detail::dtens_map_t::size_type;
 
 private:
