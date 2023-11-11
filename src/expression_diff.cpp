@@ -473,8 +473,10 @@ using dtens_ss_idx_t = std::pair<std::uint32_t, fast_umap<std::uint32_t, std::ui
 // Helper to turn a dtens_sv_idx_t into a dtens_ss_idx_t.
 void vidx_v2s(dtens_ss_idx_t &output, const dtens_sv_idx_t &input)
 {
+    // Assign the component.
     output.first = input.first;
 
+    // Assign the derivative indices.
     output.second.clear();
     for (const auto &p : input.second) {
         [[maybe_unused]] auto [_, flag] = output.second.insert(p);
@@ -485,9 +487,10 @@ void vidx_v2s(dtens_ss_idx_t &output, const dtens_sv_idx_t &input)
 // Helper to turn a dtens_ss_idx_t into a dtens_sv_idx_t.
 dtens_sv_idx_t vidx_s2v(const dtens_ss_idx_t &input)
 {
-    dtens_sv_idx_t retval{input.first, {}};
+    // Init retval.
+    dtens_sv_idx_t retval{input.first, {input.second.begin(), input.second.end()}};
 
-    std::copy(input.second.begin(), input.second.end(), std::back_inserter(retval.second));
+    // Sort the derivative indices.
     std::sort(retval.second.begin(), retval.second.end(),
               [](const auto &p1, const auto &p2) { return p1.first < p2.first; });
 
@@ -1726,18 +1729,31 @@ std::uint32_t dtens::get_nvars() const
     return ret;
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// The indices vector corresponding
+// to the first derivative of order 1
+// of the first component.
+// NOLINTNEXTLINE(cert-err58-cpp)
+const dtens_sv_idx_t s_vidx_001{0, {{0, 1}}};
+
+} // namespace
+
+} // namespace detail
+
 std::uint32_t dtens::get_nouts() const
 {
     if (p_impl->m_map.empty()) {
         return 0;
     }
 
-    // Construct the indices vector corresponding
+    // Try to find in the map the indices vector corresponding
     // to the first derivative of order 1 of the first component.
-    detail::dtens_sv_idx_t s_vidx{0, {{0, 1}}};
-
-    // Try to find it in the map.
-    const auto it = p_impl->m_map.find(s_vidx);
+    const auto it = p_impl->m_map.find(detail::s_vidx_001);
 
     // NOTE: the number of outputs is always representable by
     // std::uint32_t, otherwise we could not index the function
