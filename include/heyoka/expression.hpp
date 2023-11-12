@@ -419,21 +419,30 @@ IGOR_MAKE_NAMED_ARGUMENT(diff_order);
 namespace detail
 {
 
-// Private aliases/utilities needed in the implementation of dtens.
-using dtens_v_idx_t = std::vector<std::uint32_t>;
+// Sparse structure used to index derivatives in dtens:
+// - the first element of the pair is the function component index,
+// - the second element is the vector of variable index/diff order pairs,
+//   which is kept sorted according to the variable index, and in which no
+//   diff order can be zero and no variable index can appear twice.
+using dtens_sv_idx_t = std::pair<std::uint32_t, std::vector<std::pair<std::uint32_t, std::uint32_t>>>;
 
-struct dtens_v_idx_cmp {
-    [[nodiscard]] bool operator()(const dtens_v_idx_t &, const dtens_v_idx_t &) const;
+struct dtens_sv_idx_cmp {
+    [[nodiscard]] bool operator()(const dtens_sv_idx_t &, const dtens_sv_idx_t &) const;
 };
 
-using dtens_map_t = boost::container::flat_map<dtens_v_idx_t, expression, dtens_v_idx_cmp>;
+using dtens_map_t = boost::container::flat_map<dtens_sv_idx_t, expression, dtens_sv_idx_cmp>;
 
 } // namespace detail
 
 class HEYOKA_DLL_PUBLIC dtens
 {
 public:
-    using v_idx_t = detail::dtens_v_idx_t;
+    // Derivative indexing vector in dense form.
+    using v_idx_t = std::vector<std::uint32_t>;
+
+    // Derivative indexing vector in sparse form.
+    using sv_idx_t = detail::dtens_sv_idx_t;
+
     using size_type = detail::dtens_map_t::size_type;
 
 private:
@@ -508,6 +517,11 @@ public:
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const dtens &);
 
 HEYOKA_END_NAMESPACE
+
+// Version changelog:
+// - version 1: switched from dense to sparse
+//   format for the indices vectors.
+BOOST_CLASS_VERSION(heyoka::dtens::impl, 1)
 
 // fmt formatter for dtens, implemented
 // on top of the streaming operator.
@@ -632,11 +646,13 @@ HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *,
                                                      std::uint32_t, bool);
 
 HEYOKA_DLL_PUBLIC std::uint32_t get_param_size(const expression &);
+HEYOKA_DLL_PUBLIC std::uint32_t get_param_size(const std::vector<expression> &);
 
 HEYOKA_DLL_PUBLIC std::vector<expression> get_params(const expression &);
 HEYOKA_DLL_PUBLIC std::vector<expression> get_params(const std::vector<expression> &);
 
 HEYOKA_DLL_PUBLIC bool is_time_dependent(const expression &);
+HEYOKA_DLL_PUBLIC bool is_time_dependent(const std::vector<expression> &);
 
 namespace detail
 {
