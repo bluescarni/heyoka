@@ -384,8 +384,6 @@ TEST_CASE("dtens basics")
     REQUIRE(dt3.get_args() == dt2.get_args());
 }
 
-#if 0
-
 TEST_CASE("fixed centres check")
 {
     std::uniform_real_distribution<double> rdist(-10., 10.);
@@ -454,17 +452,13 @@ TEST_CASE("fixed centres check")
 
             const auto &v_idx = sr_it->first;
 
-            REQUIRE(v_idx.size() == diff_vars.size() + 1u);
-
             // Build the current derivative via repeated
             // invocations of diff().
-            auto ex = v_idx[0] == 0u ? fc_energy : fc_pot;
+            auto ex = v_idx.first == 0u ? fc_energy : fc_pot;
 
-            for (auto j = 1u; j < v_idx.size(); ++j) {
-                auto order = v_idx[j];
-
+            for (auto [var_idx, order] : v_idx.second) {
                 for (decltype(order) k = 0; k < order; ++k) {
-                    ex = diff(ex, diff_vars[j - 1u]);
+                    ex = diff(ex, diff_vars[var_idx]);
                 }
             }
 
@@ -545,18 +539,15 @@ TEST_CASE("speelpenning check")
 
             const auto &v_idx = sr_it->first;
 
-            REQUIRE(v_idx.size() == nvars + 1u);
-            REQUIRE(v_idx[0] == 0u);
+            REQUIRE(v_idx.first == 0u);
 
             // Build the current derivative via repeated
             // invocations of diff().
             auto ex = prod;
 
-            for (auto j = 1u; j < v_idx.size(); ++j) {
-                auto order = v_idx[j];
-
+            for (auto [var_idx, order] : v_idx.second) {
                 for (decltype(order) k = 0; k < order; ++k) {
-                    ex = diff(ex, vars[j - 1u]);
+                    ex = diff(ex, vars[var_idx]);
                 }
             }
 
@@ -578,8 +569,6 @@ TEST_CASE("speelpenning check")
         REQUIRE(sr_it == sr.end());
     }
 }
-
-#endif
 
 TEST_CASE("speelpenning complexity")
 {
