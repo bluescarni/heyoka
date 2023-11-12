@@ -23,7 +23,8 @@ Changes
 
 - Substantial speedups in the computation of first-order derivatives
   with respect to many variables/parameters
-  (`#358 <https://github.com/bluescarni/heyoka/pull/358>`__).
+  (`#360 <https://github.com/bluescarni/heyoka/pull/360>`__,
+  `#358 <https://github.com/bluescarni/heyoka/pull/358>`__).
 - Substantial performance improvements in the computation of
   derivative tensors of large expressions with a high degree
   of internal redundancy
