@@ -440,6 +440,9 @@ public:
     // Derivative indexing vector in dense form.
     using v_idx_t = std::vector<std::uint32_t>;
 
+    // Derivative indexing vector in sparse form.
+    using sv_idx_t = detail::dtens_sv_idx_t;
+
     using size_type = detail::dtens_map_t::size_type;
 
 private:
