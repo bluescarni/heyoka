@@ -515,6 +515,11 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const dtens &);
 
 HEYOKA_END_NAMESPACE
 
+// Version changelog:
+// - version 1: switched from dense to sparse
+//   format for the indices vectors.
+BOOST_CLASS_VERSION(heyoka::dtens::impl, 1)
+
 // fmt formatter for dtens, implemented
 // on top of the streaming operator.
 namespace fmt

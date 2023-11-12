@@ -1202,8 +1202,15 @@ struct dtens::impl {
     // NOTE: as usual, we assume here that the archive contains
     // a correctly-serialised instance. In particular, we are assuming
     // that the elements in ar are sorted correctly.
-    void load(boost::archive::binary_iarchive &ar, unsigned)
+    void load(boost::archive::binary_iarchive &ar, unsigned version)
     {
+        // LCOV_EXCL_START
+        if (version < static_cast<unsigned>(boost::serialization::version<dtens>::type::value)) {
+            throw std::invalid_argument(
+                fmt::format("Unable to load a dtens object: the archive version ({}) is too old", version));
+        }
+        // LCOV_EXCL_STOP
+
         try {
             // Reset m_map.
             m_map.clear();
