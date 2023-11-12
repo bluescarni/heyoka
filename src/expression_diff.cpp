@@ -1077,18 +1077,18 @@ bool dtens_sv_idx_cmp_impl(const dtens_sv_idx_t &v1, const dtens_sv_idx_t &v2)
         assert(std::equal(v1.second.begin(), it1 + 1, v2.second.begin()));
     }
 
-    if (it1 == end1 && it2 == end2) {
-        assert(v1.second == v2.second);
-        return false;
-    }
+    // NOTE: if we end up here, it means that:
+    // - component and diff order are the same, and
+    // - the two index/order lists share a common
+    //   (possibly empty) initial sequence.
+    // It follows then that both it1 and it2 must be
+    // end iterators, because if either index/order list
+    // had additional terms, then the diff orders
+    // could not possibly be equal.
+    assert(it1 == end1 && it2 == end2);
+    assert(v1.second == v2.second);
 
-    if (it1 == end1) {
-        return false;
-    }
-
-    assert(it2 == end2);
-
-    return true;
+    return false;
 }
 
 #if !defined(NDEBUG)
