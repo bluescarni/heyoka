@@ -25,6 +25,8 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/sum.hpp>
+#include <heyoka/math/tanh.hpp>
+#include <heyoka/model/ffnn.hpp>
 #include <heyoka/model/fixed_centres.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -699,4 +701,19 @@ TEST_CASE("jacobian")
         auto jac = dt.get_jacobian();
         REQUIRE(jac == std::vector{1_dbl, 1_dbl, 1_dbl, -1_dbl, -1_dbl, -1_dbl});
     }
+}
+
+// A test on a neural network. No REQUIREs,
+// for this test we rely on the internal assertions
+// in debug mode.
+TEST_CASE("nn test")
+{
+    const auto nn_layer = 50u;
+
+    auto [x, y] = make_vars("x", "y");
+    auto ffnn = model::ffnn(kw::inputs = {x, y}, kw::nn_hidden = {nn_layer, nn_layer, nn_layer}, kw::n_out = 2,
+                            kw::activations = {heyoka::tanh, heyoka::tanh, heyoka::tanh, heyoka::tanh});
+
+    auto dt = diff_tensors(ffnn, kw::diff_args = diff_args::params);
+    auto dNdtheta = dt.get_jacobian();
 }
