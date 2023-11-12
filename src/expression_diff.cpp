@@ -484,7 +484,7 @@ dtens_sv_idx_t vidx_s2v(const dtens_ss_idx_t &input)
               [](const auto &p1, const auto &p2) { return p1.first < p2.first; });
 
     return retval;
-}
+} // LCOV_EXCL_LINE
 
 // Hasher for the local maps of derivatives used in the
 // forward/reverse mode implementations.
@@ -987,9 +987,11 @@ void diff_tensors_reverse_impl(
             diff_map.emplace_back(vidx_s2v(p.first), std::move(p.second));
         }
     } else {
+        // LCOV_EXCL_START
         for (auto &p : local_dmap()) {
             diff_map.emplace_back(vidx_s2v(p.first), std::move(p.second));
         }
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -1156,7 +1158,7 @@ bool dtens_sv_idx_cmp::operator()(const dtens_sv_idx_t &v1, const dtens_sv_idx_t
         }
 
         return dv;
-    };
+    }; // LCOV_EXCL_LINE
 
     auto dv1 = to_dense(v1);
     auto dv2 = to_dense(v2);
