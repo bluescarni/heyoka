@@ -266,6 +266,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/rotating.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/mascon.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/vsop2013.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/elp2000.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/cr3bp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/ffnn.cpp"
     # Math functions.
