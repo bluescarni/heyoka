@@ -20,6 +20,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/elp2000/elp2000_1_3.hpp>
+#include <heyoka/detail/elp2000/elp2000_4_9.hpp>
 #include <heyoka/detail/fast_unordered.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
@@ -40,16 +41,26 @@ namespace
 constexpr std::array W1 = {3.8103444305883079, 8399.6847317739157, -2.8547283984772807e-05, 3.2017095500473753e-08,
                            -1.5363745554361197e-10};
 
+constexpr std::array zeta = {W1[0], W1[1] + 0.024381748353014515};
+
 constexpr std::array D = {5.1984667410274437, 7771.3771468120494, -2.8449351621188683e-05, 3.1973462269173901e-08,
                           -1.5436467606527627e-10};
 
+constexpr std::array D_lin = {D[0], D[1]};
+
 constexpr std::array lp = {6.2400601269714615, 628.30195516800313, -2.680534842854624e-06, 7.1267611123101784e-10};
+
+constexpr std::array lp_lin = {lp[0], lp[1]};
 
 constexpr std::array l
     = {2.3555558982657985, 8328.6914269553617, 0.00015702775761561094, 2.5041111442988642e-07, -1.1863390776750345e-09};
 
+constexpr std::array l_lin = {l[0], l[1]};
+
 constexpr std::array F
     = {1.6279052333714679, 8433.4661581308319, -5.9392100004323707e-05, -4.9499476841283623e-09, 2.021673050226765e-11};
+
+constexpr std::array F_lin = {F[0], F[1]};
 
 // Create the expression for the evaluation of the polynomial with coefficients
 // stored in dense form in cfs according to Horner's scheme.
@@ -180,10 +191,15 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
     // Evaluate the arguments.
     const auto W1_eval = horner_eval(W1, tm);
+    const auto zeta_eval = horner_eval(zeta, tm);
     const auto D_eval = horner_eval(D, tm);
+    const auto D_lin_eval = horner_eval(D_lin, tm);
     const auto lp_eval = horner_eval(lp, tm);
+    const auto lp_lin_eval = horner_eval(lp_lin, tm);
     const auto l_eval = horner_eval(l, tm);
+    const auto l_lin_eval = horner_eval(l_lin, tm);
     const auto F_eval = horner_eval(F, tm);
+    const auto F_lin_eval = horner_eval(F_lin, tm);
 
     // Seed the trig eval dictionary with powers of 0, 1 and -1 for each
     // trigonometric argument.
@@ -201,10 +217,15 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         pd[-1] = ex_cinv(c_arg);
     };
 
+    seed_trig_eval(zeta_eval);
     seed_trig_eval(D_eval);
+    seed_trig_eval(D_lin_eval);
     seed_trig_eval(lp_eval);
+    seed_trig_eval(lp_lin_eval);
     seed_trig_eval(l_eval);
+    seed_trig_eval(l_lin_eval);
     seed_trig_eval(F_eval);
+    seed_trig_eval(F_lin_eval);
 
     // Temporary accumulation list for complex products.
     std::vector<std::array<expression, 2>> tmp_cprod;
@@ -226,6 +247,33 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
                     if (cur_idx_v[j] != 0) {
                         tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
                     }
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                V_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP4.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        for (std::size_t i = 0; i < std::size(elp2000_idx_4); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_4[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_4[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
                 }
 
                 auto cprod = pairwise_cmul(tmp_cprod);
@@ -261,6 +309,33 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         }
     }
 
+    // ELP5.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        for (std::size_t i = 0; i < std::size(elp2000_idx_5); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_5[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_5[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                U_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
     // Distance.
     std::vector<expression> r_terms;
 
@@ -283,6 +358,33 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
                 auto cprod = pairwise_cmul(tmp_cprod);
 
                 r_terms.push_back(fix_nn(cur_A * cprod[0]));
+            }
+        }
+    }
+
+    // ELP6.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        for (std::size_t i = 0; i < std::size(elp2000_idx_6); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_6[i];
+
+            if (std::abs(cur_A / 384400.) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_6[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                r_terms.push_back(fix_nn(cur_A * cprod[1]));
             }
         }
     }
