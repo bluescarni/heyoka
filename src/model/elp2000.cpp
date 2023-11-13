@@ -36,22 +36,18 @@ namespace model::detail
 namespace
 {
 
+// Polynomial coefficients of the time-dependent arguments.
 constexpr std::array W1 = {3.8103444305883079, 8399.6847317739157, -2.8547283984772807e-05, 3.2017095500473753e-08,
                            -1.5363745554361197e-10};
-// constexpr std::array W2 = {1.4547885323225087, 70.993304818359618, -0.00018557504160038375, -2.1839401892941265e-07,
-//                            1.0327016221314225e-09};
-// constexpr std::array W3
-//     = {2.1824391972168398, -33.781426356625921, 3.08448160195509e-05, 3.6967043184602116e-08,
-//     -1.738541860458796e-10};
-// constexpr std::array T
-//     = {1.753470343150658, 628.30758496215537,
-//     -9.7932363584126268e-08, 4.3633231299858238e-11, 7.2722052166430391e-13};
 
 constexpr std::array D = {5.1984667410274437, 7771.3771468120494, -2.8449351621188683e-05, 3.1973462269173901e-08,
                           -1.5436467606527627e-10};
+
 constexpr std::array lp = {6.2400601269714615, 628.30195516800313, -2.680534842854624e-06, 7.1267611123101784e-10};
+
 constexpr std::array l
     = {2.3555558982657985, 8328.6914269553617, 0.00015702775761561094, 2.5041111442988642e-07, -1.1863390776750345e-09};
+
 constexpr std::array F
     = {1.6279052333714679, 8433.4661581308319, -5.9392100004323707e-05, -4.9499476841283623e-09, 2.021673050226765e-11};
 
@@ -173,6 +169,7 @@ std::array<expression, 2> pairwise_cmul(std::vector<std::array<expression, 2>> &
 
 } // namespace
 
+// Spherical coordinates, inertial mean ecliptic of date.
 std::vector<expression> elp2000_spherical_impl(const expression &tm, double thresh)
 {
     if (!std::isfinite(thresh) || thresh < 0.) {
@@ -181,7 +178,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
                                                 thresh));
     }
 
-    // Evaluate the arguments and time-dependent quantities.
+    // Evaluate the arguments.
     const auto W1_eval = horner_eval(W1, tm);
     const auto D_eval = horner_eval(D, tm);
     const auto lp_eval = horner_eval(lp, tm);
@@ -189,7 +186,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     const auto F_eval = horner_eval(F, tm);
 
     // Seed the trig eval dictionary with powers of 0, 1 and -1 for each
-    // argument.
+    // trigonometric argument.
     trig_eval_dict_t trig_eval;
 
     auto seed_trig_eval = [&trig_eval](const expression &arg) {
@@ -209,7 +206,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     seed_trig_eval(l_eval);
     seed_trig_eval(F_eval);
 
-    // Temporary accumulation list for products.
+    // Temporary accumulation list for complex products.
     std::vector<std::array<expression, 2>> tmp_cprod;
 
     // Longitude.
@@ -293,6 +290,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     return {sum(r_terms), sum(U_terms), sum(V_terms)};
 }
 
+// Cartesian coordinates, inertial mean ecliptic of date.
 std::vector<expression> elp2000_cartesian_impl(const expression &tm, double thresh)
 {
     const auto sph = elp2000_spherical_impl(tm, thresh);
@@ -307,7 +305,7 @@ std::vector<expression> elp2000_cartesian_impl(const expression &tm, double thre
     const auto cV = cos(V);
     const auto sV = sin(V);
 
-    const auto rcU = r * cU;
+    const auto rcU = fix_nn(r * cU);
 
     return {rcU * cV, rcU * sV, r * sU};
 }
@@ -321,6 +319,7 @@ constexpr std::array LQ = {0., -0.113469002e-3, 0.12372674e-6, 0.12654170e-8, -0
 
 } // namespace
 
+// Cartesian coordinates, inertial mean ecliptic and equinox of J2000.
 std::vector<expression> elp2000_cartesian_e2000_impl(const expression &tm, double thresh)
 {
     const auto cart = elp2000_cartesian_impl(tm, thresh);

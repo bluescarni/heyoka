@@ -34,11 +34,12 @@ TEST_CASE("basic")
     auto dc = add_cfunc<double>(s, "func", model::elp2000_cartesian_e2000(kw::thresh = 1e-5));
     s.compile();
 
+    fmt::println("{}", fmt::join(dc, "\n"));
+
     auto *cf_ptr
         = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("func"));
 
     double out[3]{};
-    // const double tm = (2449000.5 - 2451545.0) / (365.25 * 100);
     const double tm = (2469000.5 - 2451545.0) / (365.25 * 100);
 
     cf_ptr(out, nullptr, nullptr, &tm);
