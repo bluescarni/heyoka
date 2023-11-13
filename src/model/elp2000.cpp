@@ -24,6 +24,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/model/elp2000.hpp>
 
@@ -290,6 +291,58 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     }
 
     return {sum(r_terms), sum(U_terms), sum(V_terms)};
+}
+
+std::vector<expression> elp2000_cartesian_impl(const expression &tm, double thresh)
+{
+    const auto sph = elp2000_spherical_impl(tm, thresh);
+
+    const auto &r = sph[0];
+    const auto &U = sph[1];
+    const auto &V = sph[2];
+
+    const auto cU = cos(U);
+    const auto sU = sin(U);
+
+    const auto cV = cos(V);
+    const auto sV = sin(V);
+
+    const auto rcU = r * cU;
+
+    return {rcU * cV, rcU * sV, r * sU};
+}
+
+namespace
+{
+
+// Laskar's P and Q series' coefficients.
+constexpr std::array LP = {0., 0.10180391e-4, 0.47020439e-6, -0.5417367e-9, -0.2507948e-11, 0.463486e-14};
+constexpr std::array LQ = {0., -0.113469002e-3, 0.12372674e-6, 0.12654170e-8, -0.1371808e-11, -0.320334e-14};
+
+} // namespace
+
+std::vector<expression> elp2000_cartesian_e2000_impl(const expression &tm, double thresh)
+{
+    const auto cart = elp2000_cartesian_impl(tm, thresh);
+
+    const auto &x = cart[0];
+    const auto &y = cart[1];
+    const auto &z = cart[2];
+
+    // Evaluate Laskar's series.
+    const auto P = horner_eval(LP, tm);
+    const auto Q = horner_eval(LQ, tm);
+
+    const auto P2 = P * P;
+    const auto Q2 = Q * Q;
+    const auto PQ = P * Q;
+    const auto sqrP2Q2 = sqrt(1. - P2 - Q2);
+
+    const auto xe2000 = (1. - 2. * P2) * x + 2. * PQ * y + 2. * P * sqrP2Q2 * z;
+    const auto ye2000 = 2. * PQ * x + (1. - 2. * Q2) * y - 2. * Q * sqrP2Q2 * z;
+    const auto ze2000 = -2. * P * sqrP2Q2 * x + 2. * Q * sqrP2Q2 * y + (1. - 2. * P2 - 2. * Q2) * z;
+
+    return {xe2000, ye2000, ze2000};
 }
 
 } // namespace model::detail
