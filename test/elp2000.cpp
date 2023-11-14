@@ -19,6 +19,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/logging.hpp>
 #include <heyoka/model/elp2000.hpp>
 // #include <heyoka/taylor.hpp>
 
@@ -29,12 +30,14 @@ using namespace heyoka::model;
 
 TEST_CASE("basic")
 {
+    set_logger_level_trace();
+
     llvm_state s;
 
-    auto dc = add_cfunc<double>(s, "func", model::elp2000_cartesian_e2000(kw::thresh = 1e-7));
+    auto dc = add_cfunc<double>(s, "func", model::elp2000_cartesian_e2000(kw::thresh = 1e-7), kw::compact_mode = true);
     s.compile();
 
-    fmt::println("{}", fmt::join(dc, "\n"));
+    // fmt::println("{}", fmt::join(dc, "\n"));
 
     auto *cf_ptr
         = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("func"));

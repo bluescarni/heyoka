@@ -38,28 +38,27 @@ namespace
 {
 
 // Polynomial coefficients of the time-dependent arguments.
+
+// Mean mean longitude.
 constexpr std::array W1 = {3.8103444305883079, 8399.6847317739157, -2.8547283984772807e-05, 3.2017095500473753e-08,
                            -1.5363745554361197e-10};
 
 constexpr std::array zeta = {W1[0], W1[1] + 0.024381748353014515};
 
+// Delaunay arguments and their linear versions.
 constexpr std::array D = {5.1984667410274437, 7771.3771468120494, -2.8449351621188683e-05, 3.1973462269173901e-08,
                           -1.5436467606527627e-10};
-
 constexpr std::array D_lin = {D[0], D[1]};
 
 constexpr std::array lp = {6.2400601269714615, 628.30195516800313, -2.680534842854624e-06, 7.1267611123101784e-10};
-
 constexpr std::array lp_lin = {lp[0], lp[1]};
 
 constexpr std::array l
     = {2.3555558982657985, 8328.6914269553617, 0.00015702775761561094, 2.5041111442988642e-07, -1.1863390776750345e-09};
-
 constexpr std::array l_lin = {l[0], l[1]};
 
 constexpr std::array F
     = {1.6279052333714679, 8433.4661581308319, -5.9392100004323707e-05, -4.9499476841283623e-09, 2.021673050226765e-11};
-
 constexpr std::array F_lin = {F[0], F[1]};
 
 // Create the expression for the evaluation of the polynomial with coefficients
@@ -231,7 +230,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     std::vector<std::array<expression, 2>> tmp_cprod;
 
     // Longitude.
-    std::vector<expression> V_terms{W1_eval};
+    std::vector<expression> V_terms{W1_eval}, V_terms_t1;
 
     // ELP1.
     {
@@ -283,8 +282,35 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         }
     }
 
+    // ELP7.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        for (std::size_t i = 0; i < std::size(elp2000_idx_7); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_7[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_7[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                V_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
     // Latitude.
-    std::vector<expression> U_terms;
+    std::vector<expression> U_terms, U_terms_t1;
 
     // ELP2.
     {
@@ -336,8 +362,35 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         }
     }
 
+    // ELP8.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        for (std::size_t i = 0; i < std::size(elp2000_idx_8); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_8[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_8[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                U_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
     // Distance.
-    std::vector<expression> r_terms;
+    std::vector<expression> r_terms, r_terms_t1;
 
     // ELP3.
     {
@@ -389,7 +442,35 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         }
     }
 
-    return {sum(r_terms), sum(U_terms), sum(V_terms)};
+    // ELP9.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        for (std::size_t i = 0; i < std::size(elp2000_idx_9); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_9[i];
+
+            if (std::abs(cur_A / 384400.) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_9[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                r_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    return {sum(r_terms) + tm * sum(r_terms_t1), sum(U_terms) + tm * sum(U_terms_t1),
+            sum(V_terms) + tm * sum(V_terms_t1)};
 }
 
 // Cartesian coordinates, inertial mean ecliptic of date.
