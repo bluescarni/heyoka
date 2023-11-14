@@ -19,6 +19,7 @@
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/elp2000/elp2000_10_15.hpp>
 #include <heyoka/detail/elp2000/elp2000_1_3.hpp>
 #include <heyoka/detail/elp2000/elp2000_4_9.hpp>
 #include <heyoka/detail/fast_unordered.hpp>
@@ -43,6 +44,7 @@ namespace
 constexpr std::array W1 = {3.8103444305883079, 8399.6847317739157, -2.8547283984772807e-05, 3.2017095500473753e-08,
                            -1.5363745554361197e-10};
 
+// NOTE: this is the linear part of W1 plus the precession constant.
 constexpr std::array zeta = {W1[0], W1[1] + 0.024381748353014515};
 
 // Delaunay arguments and their linear versions.
@@ -60,6 +62,20 @@ constexpr std::array l_lin = {l[0], l[1]};
 constexpr std::array F
     = {1.6279052333714679, 8433.4661581308319, -5.9392100004323707e-05, -4.9499476841283623e-09, 2.021673050226765e-11};
 constexpr std::array F_lin = {F[0], F[1]};
+
+// Planetary longitudes and mean motions.
+constexpr std::array Me = {4.4026088424029615, 2608.7903141574106};
+constexpr std::array V_ = {3.1761466969075944, 1021.3285546211089};
+constexpr std::array Ma = {6.2034809133999449, 334.06124314922965};
+constexpr std::array J = {0.59954649738867349, 52.969096509472053};
+constexpr std::array S = {0.87401675651848076, 21.329909543800007};
+constexpr std::array U_ = {5.4812938716049908, 7.4781598567143535};
+constexpr std::array N = {5.3118862867834666, 3.8133035637584562};
+
+// Mean heliocentric mean longitude of the Earth-Moon barycenter
+// NOTE: this is needed only in the linear formulation to compute
+// the planetary perturbations.
+constexpr std::array T = {1.753470343150658, 628.30758496215537};
 
 // Create the expression for the evaluation of the polynomial with coefficients
 // stored in dense form in cfs according to Horner's scheme.
@@ -199,6 +215,14 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     const auto l_lin_eval = horner_eval(l_lin, tm);
     const auto F_eval = horner_eval(F, tm);
     const auto F_lin_eval = horner_eval(F_lin, tm);
+    const auto Me_eval = horner_eval(Me, tm);
+    const auto V_eval = horner_eval(V_, tm);
+    const auto Ma_eval = horner_eval(Ma, tm);
+    const auto J_eval = horner_eval(J, tm);
+    const auto S_eval = horner_eval(S, tm);
+    const auto U_eval = horner_eval(U_, tm);
+    const auto N_eval = horner_eval(N, tm);
+    const auto T_eval = horner_eval(T, tm);
 
     // Seed the trig eval dictionary with powers of 0, 1 and -1 for each
     // trigonometric argument.
@@ -225,6 +249,14 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     seed_trig_eval(l_lin_eval);
     seed_trig_eval(F_eval);
     seed_trig_eval(F_lin_eval);
+    seed_trig_eval(Me_eval);
+    seed_trig_eval(V_eval);
+    seed_trig_eval(Ma_eval);
+    seed_trig_eval(J_eval);
+    seed_trig_eval(S_eval);
+    seed_trig_eval(U_eval);
+    seed_trig_eval(N_eval);
+    seed_trig_eval(T_eval);
 
     // Temporary accumulation list for complex products.
     std::vector<std::array<expression, 2>> tmp_cprod;
@@ -309,6 +341,34 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         }
     }
 
+    // ELP10.
+    {
+        const std::array args
+            = {Me_eval, V_eval, T_eval, Ma_eval, J_eval, S_eval, U_eval, N_eval, D_lin_eval, l_lin_eval, F_lin_eval};
+        for (std::size_t i = 0; i < std::size(elp2000_idx_10); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_10[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_10[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                V_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
     // Latitude.
     std::vector<expression> U_terms, U_terms_t1;
 
@@ -389,6 +449,34 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         }
     }
 
+    // ELP11.
+    {
+        const std::array args
+            = {Me_eval, V_eval, T_eval, Ma_eval, J_eval, S_eval, U_eval, N_eval, D_lin_eval, l_lin_eval, F_lin_eval};
+        for (std::size_t i = 0; i < std::size(elp2000_idx_11); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_11[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_11[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                U_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
     // Distance.
     std::vector<expression> r_terms, r_terms_t1;
 
@@ -465,6 +553,34 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
                 auto cprod = pairwise_cmul(tmp_cprod);
 
                 r_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP12.
+    {
+        const std::array args
+            = {Me_eval, V_eval, T_eval, Ma_eval, J_eval, S_eval, U_eval, N_eval, D_lin_eval, l_lin_eval, F_lin_eval};
+        for (std::size_t i = 0; i < std::size(elp2000_idx_12); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_12[i];
+
+            if (std::abs(cur_A / 384400.) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_12[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                r_terms.push_back(fix_nn(cur_A * cprod[1]));
             }
         }
     }
