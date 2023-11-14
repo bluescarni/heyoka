@@ -14,6 +14,7 @@
 #include <iterator>
 #include <limits>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 
 #include <fmt/core.h>
@@ -23,6 +24,7 @@
 #include <heyoka/detail/elp2000/elp2000_1_3.hpp>
 #include <heyoka/detail/elp2000/elp2000_4_9.hpp>
 #include <heyoka/detail/fast_unordered.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
@@ -204,6 +206,8 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
                                                 thresh));
     }
 
+    using heyoka::detail::uncvref_t;
+
     // Evaluate the arguments.
     const auto W1_eval = horner_eval(W1, tm);
     const auto zeta_eval = horner_eval(zeta, tm);
@@ -267,6 +271,8 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     // ELP1.
     {
         const std::array args = {D_eval, lp_eval, l_eval, F_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_1)>, 1> == std::tuple_size_v<decltype(args)>);
+
         for (std::size_t i = 0; i < std::size(elp2000_idx_1); ++i) {
             const auto &[cur_A] = elp2000_A_1[i];
 
@@ -290,6 +296,8 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     // ELP4.
     {
         const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_4)>, 1> == std::tuple_size_v<decltype(args)>);
+
         for (std::size_t i = 0; i < std::size(elp2000_idx_4); ++i) {
             const auto &[cur_phi, cur_A] = elp2000_phi_A_4[i];
 
@@ -317,6 +325,8 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     // ELP7.
     {
         const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_7)>, 1> == std::tuple_size_v<decltype(args)>);
+
         for (std::size_t i = 0; i < std::size(elp2000_idx_7); ++i) {
             const auto &[cur_phi, cur_A] = elp2000_phi_A_7[i];
 
@@ -345,6 +355,8 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     {
         const std::array args
             = {Me_eval, V_eval, T_eval, Ma_eval, J_eval, S_eval, U_eval, N_eval, D_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_10)>, 1> == std::tuple_size_v<decltype(args)>);
+
         for (std::size_t i = 0; i < std::size(elp2000_idx_10); ++i) {
             const auto &[cur_phi, cur_A] = elp2000_phi_A_10[i];
 
@@ -375,6 +387,8 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     // ELP2.
     {
         const std::array args = {D_eval, lp_eval, l_eval, F_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_2)>, 1> == std::tuple_size_v<decltype(args)>);
+
         for (std::size_t i = 0; i < std::size(elp2000_idx_2); ++i) {
             const auto &[cur_A] = elp2000_A_2[i];
 
@@ -398,6 +412,8 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     // ELP5.
     {
         const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_5)>, 1> == std::tuple_size_v<decltype(args)>);
+
         for (std::size_t i = 0; i < std::size(elp2000_idx_5); ++i) {
             const auto &[cur_phi, cur_A] = elp2000_phi_A_5[i];
 
@@ -425,6 +441,8 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     // ELP8.
     {
         const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_8)>, 1> == std::tuple_size_v<decltype(args)>);
+
         for (std::size_t i = 0; i < std::size(elp2000_idx_8); ++i) {
             const auto &[cur_phi, cur_A] = elp2000_phi_A_8[i];
 
@@ -453,6 +471,8 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     {
         const std::array args
             = {Me_eval, V_eval, T_eval, Ma_eval, J_eval, S_eval, U_eval, N_eval, D_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_11)>, 1> == std::tuple_size_v<decltype(args)>);
+
         for (std::size_t i = 0; i < std::size(elp2000_idx_11); ++i) {
             const auto &[cur_phi, cur_A] = elp2000_phi_A_11[i];
 
@@ -483,6 +503,8 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     // ELP3.
     {
         const std::array args = {D_eval, lp_eval, l_eval, F_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_3)>, 1> == std::tuple_size_v<decltype(args)>);
+
         for (std::size_t i = 0; i < std::size(elp2000_idx_3); ++i) {
             const auto &[cur_A] = elp2000_A_3[i];
 
@@ -506,6 +528,8 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     // ELP6.
     {
         const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_6)>, 1> == std::tuple_size_v<decltype(args)>);
+
         for (std::size_t i = 0; i < std::size(elp2000_idx_6); ++i) {
             const auto &[cur_phi, cur_A] = elp2000_phi_A_6[i];
 
@@ -533,6 +557,8 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     // ELP9.
     {
         const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_9)>, 1> == std::tuple_size_v<decltype(args)>);
+
         for (std::size_t i = 0; i < std::size(elp2000_idx_9); ++i) {
             const auto &[cur_phi, cur_A] = elp2000_phi_A_9[i];
 
@@ -561,6 +587,8 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     {
         const std::array args
             = {Me_eval, V_eval, T_eval, Ma_eval, J_eval, S_eval, U_eval, N_eval, D_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_12)>, 1> == std::tuple_size_v<decltype(args)>);
+
         for (std::size_t i = 0; i < std::size(elp2000_idx_12); ++i) {
             const auto &[cur_phi, cur_A] = elp2000_phi_A_12[i];
 
