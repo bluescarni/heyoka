@@ -202,6 +202,7 @@ std::array<expression, 2> pairwise_cmul(std::vector<std::array<expression, 2>> &
 } // namespace
 
 // Spherical coordinates, inertial mean ecliptic of date.
+// NOLINTNEXTLINE(readability-function-size,hicpp-function-size,google-readability-function-size)
 std::vector<expression> elp2000_spherical_impl(const expression &tm, double thresh)
 {
     if (!std::isfinite(thresh) || thresh < 0.) {
@@ -278,7 +279,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_1)>, 1> == std::tuple_size_v<decltype(args)>);
 
         for (std::size_t i = 0; i < std::size(elp2000_idx_1); ++i) {
-            const auto &[cur_A] = elp2000_A_1[i];
+            const auto &cur_A = elp2000_A_B_1[i][0];
 
             if (std::abs(cur_A) > thresh) {
                 const auto &cur_idx_v = elp2000_idx_1[i];
@@ -629,7 +630,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_2)>, 1> == std::tuple_size_v<decltype(args)>);
 
         for (std::size_t i = 0; i < std::size(elp2000_idx_2); ++i) {
-            const auto &[cur_A] = elp2000_A_2[i];
+            const auto &cur_A = elp2000_A_B_2[i][0];
 
             if (std::abs(cur_A) > thresh) {
                 const auto &cur_idx_v = elp2000_idx_2[i];
@@ -984,7 +985,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_3)>, 1> == std::tuple_size_v<decltype(args)>);
 
         for (std::size_t i = 0; i < std::size(elp2000_idx_3); ++i) {
-            const auto &[cur_A] = elp2000_A_3[i];
+            const auto &cur_A = elp2000_A_B_3[i][0];
 
             if (std::abs(cur_A / a0) > thresh) {
                 const auto &cur_idx_v = elp2000_idx_3[i];

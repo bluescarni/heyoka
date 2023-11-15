@@ -19,13 +19,13 @@ namespace model::detail
 {
 
 extern const std::int8_t elp2000_idx_1[1023][4];
-extern const double elp2000_A_1[1023][1];
+extern const double elp2000_A_B_1[1023][6];
 
 extern const std::int8_t elp2000_idx_2[918][4];
-extern const double elp2000_A_2[918][1];
+extern const double elp2000_A_B_2[918][6];
 
 extern const std::int8_t elp2000_idx_3[704][4];
-extern const double elp2000_A_3[704][1];
+extern const double elp2000_A_B_3[704][6];
 
 } // namespace model::detail
 
