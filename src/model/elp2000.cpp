@@ -19,6 +19,8 @@
 
 #include <fmt/core.h>
 
+#include <oneapi/tbb/parallel_invoke.h>
+
 #include <heyoka/config.hpp>
 #include <heyoka/detail/elp2000/elp2000_10_15.hpp>
 #include <heyoka/detail/elp2000/elp2000_1_3.hpp>
@@ -613,8 +615,27 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         }
     }
 
-    return {sum(r_terms) + tm * sum(r_terms_t1), sum(U_terms) + tm * sum(U_terms_t1),
-            sum(V_terms) + tm * sum(V_terms_t1)};
+    std::vector<expression> retval;
+    retval.resize(3);
+
+    oneapi::tbb::parallel_invoke(
+        [&]() {
+            expression a, b;
+            oneapi::tbb::parallel_invoke([&]() { a = sum(r_terms); }, [&]() { b = tm * sum(r_terms_t1); });
+            retval[0] = a + b;
+        },
+        [&]() {
+            expression a, b;
+            oneapi::tbb::parallel_invoke([&]() { a = sum(U_terms); }, [&]() { b = tm * sum(U_terms_t1); });
+            retval[1] = a + b;
+        },
+        [&]() {
+            expression a, b;
+            oneapi::tbb::parallel_invoke([&]() { a = sum(V_terms); }, [&]() { b = tm * sum(V_terms_t1); });
+            retval[2] = a + b;
+        });
+
+    return retval;
 }
 
 // Cartesian coordinates, inertial mean ecliptic of date.
@@ -664,9 +685,9 @@ std::vector<expression> elp2000_cartesian_e2000_impl(const expression &tm, doubl
     const auto PQ = P * Q;
     const auto sqrP2Q2 = sqrt(1. - P2 - Q2);
 
-    const auto xe2000 = (1. - 2. * P2) * x + 2. * PQ * y + 2. * P * sqrP2Q2 * z;
-    const auto ye2000 = 2. * PQ * x + (1. - 2. * Q2) * y - 2. * Q * sqrP2Q2 * z;
-    const auto ze2000 = -2. * P * sqrP2Q2 * x + 2. * Q * sqrP2Q2 * y + (1. - 2. * P2 - 2. * Q2) * z;
+    const auto xe2000 = sum({(1. - 2. * P2) * x, 2. * PQ * y, 2. * P * sqrP2Q2 * z});
+    const auto ye2000 = sum({2. * PQ * x, (1. - 2. * Q2) * y, -2. * Q * sqrP2Q2 * z});
+    const auto ze2000 = sum({-2. * P * sqrP2Q2 * x, 2. * Q * sqrP2Q2 * y, (1. - 2. * P2 - 2. * Q2) * z});
 
     return {xe2000, ye2000, ze2000};
 }
