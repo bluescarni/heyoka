@@ -10,7 +10,7 @@
 #include <cassert>
 #include <cstdint>
 #include <functional>
-#include <map>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
@@ -19,6 +19,8 @@
 #include <vector>
 
 #include <fmt/core.h>
+
+#include <oneapi/tbb/parallel_sort.h>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -795,37 +797,54 @@ std::variant<std::vector<expression>, expression> prod_simplify_args(const std::
         }
     }
 
-    // Step 2: gather common bases with numerical exponents.
-    // NOTE: we use map instead of unordered_map because expression hashing always
-    // requires traversing the whole expression, while std::less<expression> can
-    // exit early.
-    std::map<expression, number> base_exp_map;
+    // Step 2: gather equal expressions and common bases with numerical exponents.
+    // NOTE: we perform this step using a flat map that is sorted manually after
+    // construction. This allows us to use the less-than operator, which, wrt to hashing,
+    // can be more performant because it can exit early. Additionally, doing the sort
+    // afterwards is more parallelisable wrt using a std::map.
+    std::vector<std::pair<expression, number>> base_exp_map;
+    base_exp_map.reserve(args.size());
 
-    for (const auto &arg : args) {
+    // NOTE: this does not seem to take long, we can always make it parallel if needed.
+    std::transform(args.begin(), args.end(), std::back_inserter(base_exp_map), [](const expression &arg) {
         if (const auto *fptr = std::get_if<func>(&arg.value());
             fptr != nullptr && fptr->extract<detail::pow_impl>() != nullptr
             && std::holds_alternative<number>(fptr->args()[1].value())) {
             // The current argument is of the form x**exp, where exp is a number.
             const auto &exp = std::get<number>(fptr->args()[1].value());
 
-            // Try to insert base and exponent into base_exp_map.
-            const auto [it, new_item] = base_exp_map.try_emplace(fptr->args()[0], exp);
-
-            if (!new_item) {
-                // The base already existed in base_exp_map, update the exponent.
-                it->second = it->second + exp;
-            }
+            return std::make_pair(fptr->args()[0], exp);
         } else {
-            // The current argument is *NOT* a power with a numerical exponent. Let's try to insert
-            // it into base_exp_map with an exponent of 1.
-            const auto [it, new_item] = base_exp_map.try_emplace(arg, 1.);
+            // The current arugment is *NOT* a base with numerical exponent,
+            // return it paired to an exponent of 1.
+            // NOTE: we are using double precision here, which guarantees a reasonable range
+            // of exactly-representable exponents (in case arg shows up many times).
+            return std::make_pair(arg, number{1.});
+        }
+    });
 
-            if (!new_item) {
-                // The current argument was already in the map, update its exponent.
-                it->second = it->second + number{1.};
-            }
+    // Sort the map.
+    oneapi::tbb::parallel_sort(base_exp_map.begin(), base_exp_map.end(), [](const auto &p1, const auto &p2) {
+        return std::less<expression>{}(p1.first, p2.first);
+    });
+
+    // Gather duplicate bases.
+    std::vector<std::pair<expression, number>> new_base_exp_map;
+    new_base_exp_map.reserve(base_exp_map.size());
+
+    for (auto it = base_exp_map.begin(); it != base_exp_map.end(); ++it) {
+        // Add the current base-exponent pair.
+        new_base_exp_map.push_back(*it);
+
+        // Look forward for duplicate bases and gather them.
+        while (it + 1 != base_exp_map.end() && (it + 1)->first == it->first) {
+            new_base_exp_map.back().second = new_base_exp_map.back().second + (it + 1)->second;
+            ++it;
         }
     }
+
+    // Swap in the gathered bases.
+    new_base_exp_map.swap(base_exp_map);
 
     // Reconstruct args from base_exp_map.
     args.clear();
@@ -884,7 +903,7 @@ std::variant<std::vector<expression>, expression> prod_simplify_args(const std::
     }
 
     // Sort the operands in canonical order.
-    std::stable_sort(args.begin(), args.end(), std::less<expression>{});
+    oneapi::tbb::parallel_sort(args.begin(), args.end(), std::less<expression>{});
 
     return args;
 }
