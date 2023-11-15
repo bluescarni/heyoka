@@ -23,7 +23,9 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/elp2000/elp2000_10_15.hpp>
+#include <heyoka/detail/elp2000/elp2000_16_21.hpp>
 #include <heyoka/detail/elp2000/elp2000_1_3.hpp>
+#include <heyoka/detail/elp2000/elp2000_22_36.hpp>
 #include <heyoka/detail/elp2000/elp2000_4_9.hpp>
 #include <heyoka/detail/fast_unordered.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -268,7 +270,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     std::vector<std::array<expression, 2>> tmp_cprod;
 
     // Longitude.
-    std::vector<expression> V_terms{W1_eval}, V_terms_t1;
+    std::vector<expression> V_terms{W1_eval}, V_terms_t1, V_terms_t2;
 
     // ELP1.
     {
@@ -383,8 +385,243 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         }
     }
 
+    // ELP13.
+    {
+        const std::array args
+            = {Me_eval, V_eval, T_eval, Ma_eval, J_eval, S_eval, U_eval, N_eval, D_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_13)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_13); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_13[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_13[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                V_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP16.
+    {
+        const std::array args = {Me_eval, V_eval,     T_eval,      Ma_eval,    J_eval,    S_eval,
+                                 U_eval,  D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_16)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_16); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_16[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_16[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                V_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP19.
+    {
+        const std::array args = {Me_eval, V_eval,     T_eval,      Ma_eval,    J_eval,    S_eval,
+                                 U_eval,  D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_19)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_19); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_19[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_19[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                V_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP22.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_22)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_22); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_22[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_22[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                V_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP25.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_25)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_25); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_25[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_25[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                V_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP28.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_28)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_28); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_28[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_28[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                V_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP31.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_31)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_31); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_31[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_31[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                V_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP34.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_34)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_34); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_34[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_34[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                V_terms_t2.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
     // Latitude.
-    std::vector<expression> U_terms, U_terms_t1;
+    std::vector<expression> U_terms, U_terms_t1, U_terms_t2;
 
     // ELP2.
     {
@@ -499,8 +736,247 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         }
     }
 
+    // ELP14.
+    {
+        const std::array args
+            = {Me_eval, V_eval, T_eval, Ma_eval, J_eval, S_eval, U_eval, N_eval, D_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_14)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_14); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_14[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_14[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                U_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP17.
+    {
+        const std::array args = {Me_eval, V_eval,     T_eval,      Ma_eval,    J_eval,    S_eval,
+                                 U_eval,  D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_17)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_17); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_17[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_17[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                U_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP20.
+    {
+        const std::array args = {Me_eval, V_eval,     T_eval,      Ma_eval,    J_eval,    S_eval,
+                                 U_eval,  D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_20)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_20); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_20[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_20[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                U_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP23.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_23)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_23); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_23[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_23[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                U_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP26.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_26)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_26); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_26[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_26[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                U_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP29.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_29)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_29); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_29[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_29[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                U_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP32.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_32)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_32); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_32[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_32[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                U_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP35.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_35)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_35); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_35[i];
+
+            if (std::abs(cur_A) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_35[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                U_terms_t2.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
     // Distance.
-    std::vector<expression> r_terms, r_terms_t1;
+    std::vector<expression> r_terms, r_terms_t1, r_terms_t2;
+
+    // Scaling factor for the coefficient threshold for
+    // the radial coordinate.
+    constexpr auto a0 = 384747.980674;
 
     // ELP3.
     {
@@ -510,7 +986,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         for (std::size_t i = 0; i < std::size(elp2000_idx_3); ++i) {
             const auto &[cur_A] = elp2000_A_3[i];
 
-            if (std::abs(cur_A / 384400.) > thresh) {
+            if (std::abs(cur_A / a0) > thresh) {
                 const auto &cur_idx_v = elp2000_idx_3[i];
                 tmp_cprod.clear();
 
@@ -535,7 +1011,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         for (std::size_t i = 0; i < std::size(elp2000_idx_6); ++i) {
             const auto &[cur_phi, cur_A] = elp2000_phi_A_6[i];
 
-            if (std::abs(cur_A / 384400.) > thresh) {
+            if (std::abs(cur_A / a0) > thresh) {
                 const auto &cur_idx_v = elp2000_idx_6[i];
                 tmp_cprod.clear();
 
@@ -564,7 +1040,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         for (std::size_t i = 0; i < std::size(elp2000_idx_9); ++i) {
             const auto &[cur_phi, cur_A] = elp2000_phi_A_9[i];
 
-            if (std::abs(cur_A / 384400.) > thresh) {
+            if (std::abs(cur_A / a0) > thresh) {
                 const auto &cur_idx_v = elp2000_idx_9[i];
                 tmp_cprod.clear();
 
@@ -594,7 +1070,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         for (std::size_t i = 0; i < std::size(elp2000_idx_12); ++i) {
             const auto &[cur_phi, cur_A] = elp2000_phi_A_12[i];
 
-            if (std::abs(cur_A / 384400.) > thresh) {
+            if (std::abs(cur_A / a0) > thresh) {
                 const auto &cur_idx_v = elp2000_idx_12[i];
                 tmp_cprod.clear();
 
@@ -615,24 +1091,262 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         }
     }
 
+    // ELP15.
+    {
+        const std::array args
+            = {Me_eval, V_eval, T_eval, Ma_eval, J_eval, S_eval, U_eval, N_eval, D_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_15)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_15); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_15[i];
+
+            if (std::abs(cur_A / a0) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_15[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                r_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP18.
+    {
+        const std::array args = {Me_eval, V_eval,     T_eval,      Ma_eval,    J_eval,    S_eval,
+                                 U_eval,  D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_18)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_18); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_18[i];
+
+            if (std::abs(cur_A / a0) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_18[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                r_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP21.
+    {
+        const std::array args = {Me_eval, V_eval,     T_eval,      Ma_eval,    J_eval,    S_eval,
+                                 U_eval,  D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_21)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_21); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_21[i];
+
+            if (std::abs(cur_A / a0) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_21[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                r_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP24.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_24)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_24); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_24[i];
+
+            if (std::abs(cur_A / a0) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_24[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                r_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP27.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_27)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_27); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_27[i];
+
+            if (std::abs(cur_A / a0) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_27[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                r_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP30.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_30)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_30); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_30[i];
+
+            if (std::abs(cur_A / a0) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_30[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                r_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP33.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_33)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_33); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_33[i];
+
+            if (std::abs(cur_A / a0) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_33[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                r_terms.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
+    // ELP36.
+    {
+        const std::array args = {zeta_eval, D_lin_eval, lp_lin_eval, l_lin_eval, F_lin_eval};
+        static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_36)>, 1> == std::tuple_size_v<decltype(args)>);
+
+        for (std::size_t i = 0; i < std::size(elp2000_idx_36); ++i) {
+            const auto &[cur_phi, cur_A] = elp2000_phi_A_36[i];
+
+            if (std::abs(cur_A / a0) > thresh) {
+                const auto &cur_idx_v = elp2000_idx_36[i];
+                tmp_cprod.clear();
+
+                for (std::size_t j = 0; j < std::size(cur_idx_v); ++j) {
+                    if (cur_idx_v[j] != 0) {
+                        tmp_cprod.push_back(ccpow(args[j], trig_eval, cur_idx_v[j]));
+                    }
+                }
+
+                if (cur_phi != 0.) {
+                    tmp_cprod.push_back({expression{std::cos(cur_phi)}, expression{std::sin(cur_phi)}});
+                }
+
+                auto cprod = pairwise_cmul(tmp_cprod);
+
+                r_terms_t2.push_back(fix_nn(cur_A * cprod[1]));
+            }
+        }
+    }
+
     std::vector<expression> retval;
     retval.resize(3);
 
     oneapi::tbb::parallel_invoke(
         [&]() {
-            expression a, b;
-            oneapi::tbb::parallel_invoke([&]() { a = sum(r_terms); }, [&]() { b = tm * sum(r_terms_t1); });
-            retval[0] = a + b;
+            expression a, b, c;
+            oneapi::tbb::parallel_invoke([&]() { a = sum(r_terms); }, [&]() { b = tm * sum(r_terms_t1); },
+                                         [&]() { c = tm * tm * sum(r_terms_t2); });
+            retval[0] = sum({a, b, c});
         },
         [&]() {
-            expression a, b;
-            oneapi::tbb::parallel_invoke([&]() { a = sum(U_terms); }, [&]() { b = tm * sum(U_terms_t1); });
-            retval[1] = a + b;
+            expression a, b, c;
+            oneapi::tbb::parallel_invoke([&]() { a = sum(U_terms); }, [&]() { b = tm * sum(U_terms_t1); },
+                                         [&]() { c = tm * tm * sum(U_terms_t2); });
+            retval[1] = sum({a, b, c});
         },
         [&]() {
-            expression a, b;
-            oneapi::tbb::parallel_invoke([&]() { a = sum(V_terms); }, [&]() { b = tm * sum(V_terms_t1); });
-            retval[2] = a + b;
+            expression a, b, c;
+            oneapi::tbb::parallel_invoke([&]() { a = sum(V_terms); }, [&]() { b = tm * sum(V_terms_t1); },
+                                         [&]() { c = tm * tm * sum(V_terms_t2); });
+            retval[2] = sum({a, b, c});
         });
 
     return retval;
