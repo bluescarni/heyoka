@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <initializer_list>
+#include <stdexcept>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -21,6 +22,13 @@ using namespace heyoka::model;
 
 TEST_CASE("basic")
 {
+    using Catch::Matchers::Message;
+
+    // Error modes.
+    REQUIRE_THROWS_MATCHES(model::elp2000_cartesian_e2000(kw::thresh = -1.), std::invalid_argument,
+                           Message("Invalid threshold value passed to elp2000_spherical(): "
+                                   "the value must be finite and non-negative, but it is -1 instead"));
+
     llvm_state s;
 
     auto dc = add_cfunc<double>(s, "func", model::elp2000_cartesian_e2000(kw::thresh = 1e-5), kw::compact_mode = true);
