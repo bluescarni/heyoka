@@ -270,6 +270,28 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     // Temporary accumulation list for complex products.
     std::vector<std::array<expression, 2>> tmp_cprod;
 
+    // Several constants used in the corrections to the A coefficients
+    // for the main problem.
+    // NOTE: these are all kept in the original units of measures,
+    // will be converting on-the-fly as needed after the computation of
+    // the correction.
+    // NOTE: in some of these numbers there seem to be slight differences
+    // or inconsistencies between the PDF and the Fortran code. We use the
+    // values from the PDF.
+    const auto a0 = 384747.980674;
+    const auto nu = 1732559343.18;
+    const auto np = 129597742.34;
+    const auto m = np / nu;
+    const auto dnu = 0.55604;
+    const auto dnp = -0.0642;
+    const auto alpha = std::cbrt(m * m * 3.040423956e-6);
+    const auto alpha2_m3 = (2 * alpha) / (3 * m);
+    const auto B15_fac = (dnp - m * dnu) / nu;
+    const auto B2_fac = -0.08066 / 206264.81;
+    const auto B3_fac = 0.01789 / 206264.81;
+    const auto B4_fac = -0.12879 / 206264.81;
+    const auto arcsec = 4.8481368110953598e-06;
+
     // Longitude.
     std::vector<expression> V_terms{W1_eval}, V_terms_t1, V_terms_t2;
 
@@ -279,7 +301,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_1)>, 1> == std::tuple_size_v<decltype(args)>);
 
         for (std::size_t i = 0; i < std::size(elp2000_idx_1); ++i) {
-            const auto &cur_A = elp2000_A_B_1[i][0];
+            const auto &[cur_A, B1, B2, B3, B4, B5] = elp2000_A_B_1[i];
 
             if (std::abs(cur_A) > thresh) {
                 const auto &cur_idx_v = elp2000_idx_1[i];
@@ -293,7 +315,11 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                V_terms.push_back(fix_nn(cur_A * cprod[1]));
+                // Compute the correction to A.
+                auto corr = (B1 + B5 * alpha2_m3) * B15_fac + B2_fac * B2 + B3_fac * B3 + B4_fac * B4;
+                corr *= arcsec;
+
+                V_terms.push_back(fix_nn((cur_A + corr) * cprod[1]));
             }
         }
     }
@@ -630,7 +656,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_2)>, 1> == std::tuple_size_v<decltype(args)>);
 
         for (std::size_t i = 0; i < std::size(elp2000_idx_2); ++i) {
-            const auto &cur_A = elp2000_A_B_2[i][0];
+            const auto &[cur_A, B1, B2, B3, B4, B5] = elp2000_A_B_2[i];
 
             if (std::abs(cur_A) > thresh) {
                 const auto &cur_idx_v = elp2000_idx_2[i];
@@ -644,7 +670,11 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                U_terms.push_back(fix_nn(cur_A * cprod[1]));
+                // Compute the correction to A.
+                auto corr = (B1 + B5 * alpha2_m3) * B15_fac + B2_fac * B2 + B3_fac * B3 + B4_fac * B4;
+                corr *= arcsec;
+
+                U_terms.push_back(fix_nn((cur_A + corr) * cprod[1]));
             }
         }
     }
@@ -975,17 +1005,13 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     // Distance.
     std::vector<expression> r_terms, r_terms_t1, r_terms_t2;
 
-    // Scaling factor for the coefficient threshold for
-    // the radial coordinate.
-    constexpr auto a0 = 384747.980674;
-
     // ELP3.
     {
         const std::array args = {D_eval, lp_eval, l_eval, F_eval};
         static_assert(std::extent_v<uncvref_t<decltype(elp2000_idx_3)>, 1> == std::tuple_size_v<decltype(args)>);
 
         for (std::size_t i = 0; i < std::size(elp2000_idx_3); ++i) {
-            const auto &cur_A = elp2000_A_B_3[i][0];
+            const auto &[cur_A, B1, B2, B3, B4, B5] = elp2000_A_B_3[i];
 
             if (std::abs(cur_A / a0) > thresh) {
                 const auto &cur_idx_v = elp2000_idx_3[i];
@@ -999,7 +1025,11 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                r_terms.push_back(fix_nn(cur_A * cprod[0]));
+                // Compute the correction to A.
+                auto corr = (B1 + B5 * alpha2_m3) * B15_fac + B2_fac * B2 + B3_fac * B3 + B4_fac * B4;
+                corr -= 2 * cur_A * dnu / (3 * nu);
+
+                r_terms.push_back(fix_nn((cur_A + corr) * cprod[0]));
             }
         }
     }
