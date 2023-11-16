@@ -271,7 +271,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
     std::vector<std::array<expression, 2>> tmp_cprod;
 
     // Several constants used in the corrections to the A coefficients
-    // for the main problem.
+    // for the main problem. See section 7 in the PDF.
     // NOTE: these are all kept in the original units of measures,
     // will be converting on-the-fly as needed after the computation of
     // the correction.
