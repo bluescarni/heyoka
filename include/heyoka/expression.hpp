@@ -81,6 +81,7 @@ private:
 public:
     expression();
 
+    explicit expression(float);
     explicit expression(double);
     explicit expression(long double);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -124,6 +125,9 @@ HEYOKA_DLL_PUBLIC bool is_fixed(const expression &);
 
 inline namespace literals
 {
+
+HEYOKA_DLL_PUBLIC expression operator""_flt(long double);
+HEYOKA_DLL_PUBLIC expression operator""_flt(unsigned long long);
 
 HEYOKA_DLL_PUBLIC expression operator""_dbl(long double);
 HEYOKA_DLL_PUBLIC expression operator""_dbl(unsigned long long);
@@ -257,6 +261,7 @@ HEYOKA_DLL_PUBLIC expression operator+(expression);
 HEYOKA_DLL_PUBLIC expression operator-(const expression &);
 
 HEYOKA_DLL_PUBLIC expression operator+(const expression &, const expression &);
+HEYOKA_DLL_PUBLIC expression operator+(const expression &, float);
 HEYOKA_DLL_PUBLIC expression operator+(const expression &, double);
 HEYOKA_DLL_PUBLIC expression operator+(const expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -265,6 +270,7 @@ HEYOKA_DLL_PUBLIC expression operator+(const expression &, mppp::real128);
 #if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression operator+(const expression &, mppp::real);
 #endif
+HEYOKA_DLL_PUBLIC expression operator+(float, const expression &);
 HEYOKA_DLL_PUBLIC expression operator+(double, const expression &);
 HEYOKA_DLL_PUBLIC expression operator+(long double, const expression &);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -276,6 +282,7 @@ HEYOKA_DLL_PUBLIC expression operator+(mppp::real, const expression &);
 
 HEYOKA_DLL_PUBLIC expression operator-(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression operator-(const expression &, double);
+HEYOKA_DLL_PUBLIC expression operator-(const expression &, float);
 HEYOKA_DLL_PUBLIC expression operator-(const expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator-(const expression &, mppp::real128);
@@ -283,6 +290,7 @@ HEYOKA_DLL_PUBLIC expression operator-(const expression &, mppp::real128);
 #if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression operator-(const expression &, mppp::real);
 #endif
+HEYOKA_DLL_PUBLIC expression operator-(float, const expression &);
 HEYOKA_DLL_PUBLIC expression operator-(double, const expression &);
 HEYOKA_DLL_PUBLIC expression operator-(long double, const expression &);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -294,6 +302,7 @@ HEYOKA_DLL_PUBLIC expression operator-(mppp::real, const expression &);
 
 HEYOKA_DLL_PUBLIC expression operator*(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression operator*(const expression &, double);
+HEYOKA_DLL_PUBLIC expression operator*(const expression &, float);
 HEYOKA_DLL_PUBLIC expression operator*(const expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC expression operator*(const expression &, mppp::real128);
@@ -301,6 +310,7 @@ HEYOKA_DLL_PUBLIC expression operator*(const expression &, mppp::real128);
 #if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression operator*(const expression &, mppp::real);
 #endif
+HEYOKA_DLL_PUBLIC expression operator*(float, const expression &);
 HEYOKA_DLL_PUBLIC expression operator*(double, const expression &);
 HEYOKA_DLL_PUBLIC expression operator*(long double, const expression &);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -311,6 +321,7 @@ HEYOKA_DLL_PUBLIC expression operator*(mppp::real, const expression &);
 #endif
 
 HEYOKA_DLL_PUBLIC expression operator/(const expression &, const expression &);
+HEYOKA_DLL_PUBLIC expression operator/(const expression &, float);
 HEYOKA_DLL_PUBLIC expression operator/(const expression &, double);
 HEYOKA_DLL_PUBLIC expression operator/(const expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -319,6 +330,7 @@ HEYOKA_DLL_PUBLIC expression operator/(const expression &, mppp::real128);
 #if defined(HEYOKA_HAVE_REAL)
 HEYOKA_DLL_PUBLIC expression operator/(const expression &, mppp::real);
 #endif
+HEYOKA_DLL_PUBLIC expression operator/(float, const expression &);
 HEYOKA_DLL_PUBLIC expression operator/(double, const expression &);
 HEYOKA_DLL_PUBLIC expression operator/(long double, const expression &);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -329,6 +341,7 @@ HEYOKA_DLL_PUBLIC expression operator/(mppp::real, const expression &);
 #endif
 
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, const expression &);
+HEYOKA_DLL_PUBLIC expression &operator+=(expression &, float);
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, double);
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -339,6 +352,7 @@ HEYOKA_DLL_PUBLIC expression &operator+=(expression &, mppp::real);
 #endif
 
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, const expression &);
+HEYOKA_DLL_PUBLIC expression &operator-=(expression &, float);
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, double);
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -349,6 +363,7 @@ HEYOKA_DLL_PUBLIC expression &operator-=(expression &, mppp::real);
 #endif
 
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, const expression &);
+HEYOKA_DLL_PUBLIC expression &operator*=(expression &, float);
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, double);
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -359,6 +374,7 @@ HEYOKA_DLL_PUBLIC expression &operator*=(expression &, mppp::real);
 #endif
 
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, const expression &);
+HEYOKA_DLL_PUBLIC expression &operator/=(expression &, float);
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, double);
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, long double);
 #if defined(HEYOKA_HAVE_REAL128)
