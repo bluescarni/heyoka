@@ -100,7 +100,7 @@ expression horner_eval(const std::array<T, N> &cfs, const expression &x)
     }
 
     return ret;
-}
+} // LCOV_EXCL_LINE
 
 // Complex multiplication.
 std::array<expression, 2> ex_cmul(const std::array<expression, 2> &c1, const std::array<expression, 2> &c2)
