@@ -10,6 +10,7 @@
 #define HEYOKA_MODELS_HPP
 
 #include <heyoka/model/cr3bp.hpp>
+#include <heyoka/model/elp2000.hpp>
 #include <heyoka/model/ffnn.hpp>
 #include <heyoka/model/fixed_centres.hpp>
 #include <heyoka/model/mascon.hpp>

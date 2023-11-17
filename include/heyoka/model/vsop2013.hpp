@@ -23,13 +23,6 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-namespace kw
-{
-
-IGOR_MAKE_NAMED_ARGUMENT(thresh);
-
-} // namespace kw
-
 namespace model
 {
 
@@ -38,7 +31,7 @@ namespace detail
 
 // Common options for the vsop2013 functions.
 template <typename... KwArgs>
-inline auto vsop2013_common_opts(KwArgs &&...kw_args)
+auto vsop2013_common_opts(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
@@ -70,25 +63,25 @@ HEYOKA_DLL_PUBLIC std::vector<expression> vsop2013_cartesian_icrf_impl(std::uint
 } // namespace detail
 
 template <typename... KwArgs>
-inline expression vsop2013_elliptic(std::uint32_t pl_idx, std::uint32_t var_idx, KwArgs &&...kw_args)
+expression vsop2013_elliptic(std::uint32_t pl_idx, std::uint32_t var_idx, const KwArgs &...kw_args)
 {
-    auto [time_expr, thresh] = detail::vsop2013_common_opts(std::forward<KwArgs>(kw_args)...);
+    auto [time_expr, thresh] = detail::vsop2013_common_opts(kw_args...);
 
     return detail::vsop2013_elliptic_impl(pl_idx, var_idx, std::move(time_expr), thresh);
 }
 
 template <typename... KwArgs>
-inline std::vector<expression> vsop2013_cartesian(std::uint32_t pl_idx, KwArgs &&...kw_args)
+std::vector<expression> vsop2013_cartesian(std::uint32_t pl_idx, const KwArgs &...kw_args)
 {
-    auto [time_expr, thresh] = detail::vsop2013_common_opts(std::forward<KwArgs>(kw_args)...);
+    auto [time_expr, thresh] = detail::vsop2013_common_opts(kw_args...);
 
     return detail::vsop2013_cartesian_impl(pl_idx, std::move(time_expr), thresh);
 }
 
 template <typename... KwArgs>
-inline std::vector<expression> vsop2013_cartesian_icrf(std::uint32_t pl_idx, KwArgs &&...kw_args)
+std::vector<expression> vsop2013_cartesian_icrf(std::uint32_t pl_idx, const KwArgs &...kw_args)
 {
-    auto [time_expr, thresh] = detail::vsop2013_common_opts(std::forward<KwArgs>(kw_args)...);
+    auto [time_expr, thresh] = detail::vsop2013_common_opts(kw_args...);
 
     return detail::vsop2013_cartesian_icrf_impl(pl_idx, std::move(time_expr), thresh);
 }

@@ -6,12 +6,11 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <heyoka/config.hpp>
-
 #include <algorithm>
 #include <cassert>
-#include <cstddef>
-#include <map>
+#include <cstdint>
+#include <functional>
+#include <iterator>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -20,7 +19,9 @@
 #include <variant>
 #include <vector>
 
-#include <fmt/format.h>
+#include <fmt/core.h>
+
+#include <oneapi/tbb/parallel_sort.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -32,12 +33,7 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
-#if defined(HEYOKA_HAVE_REAL128)
-
-#include <mp++/real128.hpp>
-
-#endif
-
+#include <heyoka/config.hpp>
 #include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -54,6 +50,8 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
+
+#include <heyoka/detail/logging_impl.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -567,38 +565,58 @@ std::variant<std::vector<expression>, expression> sum_simplify_args(const std::v
         }
     }
 
-    // Step 2: gather common products with numerical coefficients.
-    // NOTE: we use map instead of unordered_map because expression hashing always
-    // requires traversing the whole expression, while std::less<expression> can
-    // exit early.
-    std::map<expression, number> coeff_mul_map;
+    // Step 2: gather equal expressions and common products with numerical coefficients.
+    // NOTE: we perform this step using a flat map that is sorted manually after
+    // construction. This allows us to use the less-than operator, which, wrt to hashing,
+    // can be more performant because it can exit early. Additionally, doing the sort
+    // afterwards is more parallelisable wrt using a std::map.
+    std::vector<std::pair<expression, number>> coeff_mul_map;
+    coeff_mul_map.reserve(args.size());
 
-    for (const auto &arg : args) {
+    // NOTE: this does not seem to take long, we can always make it parallel if needed.
+    std::transform(args.begin(), args.end(), std::back_inserter(coeff_mul_map), [](const expression &arg) {
         if (const auto *fptr = std::get_if<func>(&arg.value());
             fptr != nullptr && fptr->extract<detail::prod_impl>() != nullptr && fptr->args().size() >= 2u
             && std::holds_alternative<number>(fptr->args()[0].value())) {
-            // The current argument is of the form cf*a*..., where cf is a number.
+            // The current argument is of the form cf*a*b*c*..., where cf is a number.
             const auto &cf = std::get<number>(fptr->args()[0].value());
 
-            // Try to insert cf and the rest of the product into coeff_mul_map.
-            const auto [it, new_item]
-                = coeff_mul_map.try_emplace(prod(std::vector(fptr->args().begin() + 1, fptr->args().end())), cf);
+            // Construct the new product without cf: a*b*c*....
+            auto new_prod = prod(std::vector(fptr->args().begin() + 1, fptr->args().end()));
 
-            if (!new_item) {
-                // The product already existed in coeff_mul_map, update the coefficient.
-                it->second = it->second + cf;
-            }
+            // Pair it to cf.
+            return std::make_pair(std::move(new_prod), cf);
         } else {
-            // The current argument is *NOT* a product with a numerical coefficient. Let's try to insert
-            // it into coeff_mul_map with a coefficient of 1.
-            const auto [it, new_item] = coeff_mul_map.try_emplace(arg, 1.);
+            // The current argument is *NOT* a product with a numerical coefficient, return
+            // it paired to a coefficient of 1.
+            // NOTE: we are using double precision here, which guarantees a reasonable range
+            // of exactly-representable coefficients (in case arg shows up many times).
+            return std::make_pair(arg, number{1.});
+        }
+    });
 
-            if (!new_item) {
-                // The current argument was already in the map, update its coefficient.
-                it->second = it->second + number{1.};
-            }
+    // Sort the map.
+    oneapi::tbb::parallel_sort(coeff_mul_map.begin(), coeff_mul_map.end(), [](const auto &p1, const auto &p2) {
+        return std::less<expression>{}(p1.first, p2.first);
+    });
+
+    // Gather duplicate products.
+    std::vector<std::pair<expression, number>> new_coeff_mul_map;
+    new_coeff_mul_map.reserve(coeff_mul_map.size());
+
+    for (auto it = coeff_mul_map.begin(); it != coeff_mul_map.end(); ++it) {
+        // Add the current product-coefficient pair.
+        new_coeff_mul_map.push_back(*it);
+
+        // Look forward for duplicate products and gather them.
+        while (it + 1 != coeff_mul_map.end() && (it + 1)->first == it->first) {
+            new_coeff_mul_map.back().second = new_coeff_mul_map.back().second + (it + 1)->second;
+            ++it;
         }
     }
+
+    // Swap in the gathered products.
+    new_coeff_mul_map.swap(coeff_mul_map);
 
     // Reconstruct args from coeff_mul_map.
     args.clear();
@@ -651,7 +669,7 @@ std::variant<std::vector<expression>, expression> sum_simplify_args(const std::v
     }
 
     // Sort the operands in canonical order.
-    std::stable_sort(args.begin(), args.end(), std::less<expression>{});
+    oneapi::tbb::parallel_sort(args.begin(), args.end(), std::less<expression>{});
 
     return args;
 }

@@ -15,7 +15,6 @@
 #include <exception>
 #include <functional>
 #include <iterator>
-#include <limits>
 #include <ostream>
 #include <sstream>
 #include <stdexcept>

@@ -18,8 +18,8 @@ conda config --add channels conda-forge
 conda config --set channel_priority strict
 conda create -y -q -p $deps_dir c-compiler cxx-compiler cmake \
     llvmdev tbb-devel tbb boost-cpp 'mppp>=0.27' sleef xtensor \
-    xtensor-blas blas blas-devel fmt spdlog sphinx \
-    'sphinxcontrib-bibtex<2.6' sphinx-book-theme
+    xtensor-blas blas blas-devel fmt spdlog \
+    'sphinxcontrib-bibtex=2.5.*' 'sphinx=6.*' 'sphinx-book-theme=1.*'
 source activate $deps_dir
 
 # Create the build dir and cd into it.
@@ -28,8 +28,8 @@ cd build
 
 # GCC build.
 cmake ../ -DCMAKE_PREFIX_PATH=$deps_dir -DCMAKE_BUILD_TYPE=Debug -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_WITH_MPPP=yes -DHEYOKA_WITH_SLEEF=yes -DCMAKE_CXX_FLAGS="-fsanitize=address" -DBoost_NO_BOOST_CMAKE=ON
-make -j2 VERBOSE=1
-ctest -V -j2 -E vsop2013
+make -j4 VERBOSE=1
+ctest -V -j4 -E vsop2013
 
 # Build the docs.
 cd ../doc

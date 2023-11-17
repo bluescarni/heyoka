@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 3.1.0 LANGUAGES CXX C)
+project(heyoka VERSION 3.2.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -253,6 +253,12 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_4.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_5.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_6.cpp"
+    # ELP2000 details.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_1_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_4_9.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_10_15.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_16_21.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/elp2000/elp2000_22_36.cpp"
     # Models.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/pendulum.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/nbody.cpp"
@@ -260,6 +266,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/rotating.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/mascon.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/vsop2013.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/elp2000.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/cr3bp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/ffnn.cpp"
     # Math functions.
@@ -306,7 +313,7 @@ if(HEYOKA_WITH_SLEEF)
 endif()
 
 # Setup the heyoka ABI version number.
-set(HEYOKA_ABI_VERSION 25)
+set(HEYOKA_ABI_VERSION 26)
 
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.

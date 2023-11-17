@@ -502,6 +502,9 @@ struct diff_map_hasher {
             std::size_t p_hash = std::hash<std::uint32_t>{}(p.first);
             boost::hash_combine(p_hash, std::hash<std::uint32_t>{}(p.second));
 
+            // NOTE: make sure there's not funny promotion business going
+            // on with std::size_t.
+            static_assert(std::is_same_v<std::size_t, std::common_type_t<std::size_t, std::size_t>>);
             seed += p_hash;
         }
 
