@@ -23,9 +23,9 @@ cd build
 
 # GCC build.
 cmake ../ -DCMAKE_PREFIX_PATH=$deps_dir -DCMAKE_BUILD_TYPE=Debug -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_MPPP=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_WITH_SLEEF=yes -DCMAKE_CXX_FLAGS="--coverage" -DBoost_NO_BOOST_CMAKE=ON
-make -j2 VERBOSE=1
+make -j4 VERBOSE=1
 # Run the tests.
-ctest -V -j2
+ctest -V -j4
 
 # Upload coverage data.
 bash <(curl -s https://codecov.io/bash) -x $deps_dir/bin/gcov
