@@ -204,6 +204,11 @@ std::array<expression, 2> pairwise_cmul(std::vector<std::array<expression, 2>> &
 
 } // namespace
 
+// NOTE: don't check for coverage here as in order to hit all branches
+// we would need very low threshold level, which is not feasible
+// in debug mode.
+// LCOV_EXCL_START
+
 // Spherical coordinates, inertial mean ecliptic of date.
 // NOLINTNEXTLINE(readability-function-size,hicpp-function-size,google-readability-function-size)
 std::vector<expression> elp2000_spherical_impl(const expression &tm, double thresh)
@@ -1385,6 +1390,8 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
     return retval;
 }
+
+// LCOV_EXCL_STOP
 
 // Cartesian coordinates, inertial mean ecliptic of date.
 std::vector<expression> elp2000_cartesian_impl(const expression &tm, double thresh)
