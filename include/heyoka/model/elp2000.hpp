@@ -31,6 +31,7 @@ namespace detail
 HEYOKA_DLL_PUBLIC std::vector<expression> elp2000_spherical_impl(const expression &, double);
 HEYOKA_DLL_PUBLIC std::vector<expression> elp2000_cartesian_impl(const expression &, double);
 HEYOKA_DLL_PUBLIC std::vector<expression> elp2000_cartesian_e2000_impl(const expression &, double);
+HEYOKA_DLL_PUBLIC std::vector<expression> elp2000_cartesian_fk5_impl(const expression &, double);
 
 } // namespace detail
 
@@ -52,6 +53,12 @@ template <typename... KwArgs>
 std::vector<expression> elp2000_cartesian_e2000(const KwArgs &...kw_args)
 {
     return std::apply(detail::elp2000_cartesian_e2000_impl, detail::vsop2013_common_opts(kw_args...));
+}
+
+template <typename... KwArgs>
+std::vector<expression> elp2000_cartesian_fk5(const KwArgs &...kw_args)
+{
+    return std::apply(detail::elp2000_cartesian_fk5_impl, detail::vsop2013_common_opts(kw_args...));
 }
 
 } // namespace model

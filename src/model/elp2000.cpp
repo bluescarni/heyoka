@@ -1437,6 +1437,22 @@ std::vector<expression> elp2000_cartesian_e2000_impl(const expression &tm, doubl
     return {xe2000, ye2000, ze2000};
 }
 
+// Cartesian coordinates, FK5 (i.e., mean equator and rotational mean equinox of J2000).
+std::vector<expression> elp2000_cartesian_fk5_impl(const expression &tm, double thresh)
+{
+    const auto cart_e2000 = elp2000_cartesian_e2000_impl(tm, thresh);
+
+    const auto &xe2000 = cart_e2000[0];
+    const auto &ye2000 = cart_e2000[1];
+    const auto &ze2000 = cart_e2000[2];
+
+    const auto xq2000 = sum({xe2000, 0.000000437913 * ye2000, -0.000000189859 * ze2000});
+    const auto yq2000 = sum({-0.000000477299 * xe2000, 0.917482137607 * ye2000, -0.397776981701 * ze2000});
+    const auto zq2000 = sum({0.397776981701 * ye2000, 0.917482137607 * ze2000});
+
+    return {xq2000, yq2000, zq2000};
+}
+
 } // namespace model::detail
 
 HEYOKA_END_NAMESPACE

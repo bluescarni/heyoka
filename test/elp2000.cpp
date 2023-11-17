@@ -61,3 +61,38 @@ TEST_CASE("basic")
         REQUIRE(std::abs(out[2] - ref[i][2]) < 1e-10);
     }
 }
+
+TEST_CASE("fk5")
+{
+    llvm_state s;
+
+    auto dc = add_cfunc<double>(s, "func", model::elp2000_cartesian_fk5(kw::thresh = 1e-5), kw::compact_mode = true);
+    s.compile();
+
+    auto *cf_ptr
+        = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("func"));
+
+    double out[3]{};
+
+    // NOTE: these values have been computed after having checked
+    // that the full solution coincides with the values provided
+    // in the README up to ~10cm of precision.
+    const double ref[5][3] = {{-361605.7668217605, 53478.5213637333, -10268.031869046572},
+                              {-363123.47438569955, 46120.95310114934, -16184.405034550497},
+                              {-371572.7610274249, 81885.74936963388, 375.81720668396883},
+                              {-373885.79704606906, 128834.36921194941, 23114.840618194867},
+                              {-346323.69189499883, 200680.7585896227, 55946.154455589574}};
+
+    const auto dates = {2469000.5, 2449000.5, 2429000.5, 2409000.5, 2389000.5};
+
+    for (auto i = 0u; i < 5u; ++i) {
+        const auto date = *(dates.begin() + i);
+
+        const double tm = (date - 2451545.0) / (36525);
+        cf_ptr(out, nullptr, nullptr, &tm);
+
+        REQUIRE(std::abs(out[0] - ref[i][0]) < 1e-10);
+        REQUIRE(std::abs(out[1] - ref[i][1]) < 1e-10);
+        REQUIRE(std::abs(out[2] - ref[i][2]) < 1e-10);
+    }
+}
