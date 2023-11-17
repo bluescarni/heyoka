@@ -38,7 +38,10 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-namespace model::detail
+namespace model
+{
+
+namespace detail
 {
 
 namespace
@@ -1453,6 +1456,13 @@ std::vector<expression> elp2000_cartesian_fk5_impl(const expression &tm, double 
     return {xq2000, yq2000, zq2000};
 }
 
-} // namespace model::detail
+} // namespace detail
+
+std::array<double, 2> get_elp2000_mus()
+{
+    return {3.986005e14, 4902794214578.239};
+}
+
+} // namespace model
 
 HEYOKA_END_NAMESPACE

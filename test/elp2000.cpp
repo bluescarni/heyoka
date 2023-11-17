@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <array>
 #include <cmath>
 #include <initializer_list>
 #include <stdexcept>
@@ -95,4 +96,9 @@ TEST_CASE("fk5")
         REQUIRE(std::abs(out[1] - ref[i][1]) < 1e-10);
         REQUIRE(std::abs(out[2] - ref[i][2]) < 1e-10);
     }
+}
+
+TEST_CASE("mus")
+{
+    REQUIRE(get_elp2000_mus() == std::array{3.986005e14, 4902794214578.239});
 }

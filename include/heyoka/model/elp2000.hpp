@@ -9,6 +9,7 @@
 #ifndef HEYOKA_MODEL_ELP2000_HPP
 #define HEYOKA_MODEL_ELP2000_HPP
 
+#include <array>
 #include <tuple>
 #include <vector>
 
@@ -60,6 +61,8 @@ std::vector<expression> elp2000_cartesian_fk5(const KwArgs &...kw_args)
 {
     return std::apply(detail::elp2000_cartesian_fk5_impl, detail::vsop2013_common_opts(kw_args...));
 }
+
+HEYOKA_DLL_PUBLIC std::array<double, 2> get_elp2000_mus();
 
 } // namespace model
 
