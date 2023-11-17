@@ -10,6 +10,13 @@ New
 - Add model implementing the ELP2000 analytical lunar theory
   (`#362 <https://github.com/bluescarni/heyoka/pull/362>`__).
 
+Changes
+~~~~~~~
+
+- Improve performance when creating symbolic expressions for
+  large sums and products
+  (`#362 <https://github.com/bluescarni/heyoka/pull/362>`__).
+
 3.1.0 (2023-11-13)
 ------------------
 
