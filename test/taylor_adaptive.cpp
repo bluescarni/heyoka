@@ -1929,7 +1929,7 @@ TEST_CASE("callback ste")
 
         using ev_t = typename taylor_adaptive<fp_t>::t_event_t;
         auto ta = taylor_adaptive<fp_t>{
-            {prime(x) = v, prime(v) = -9.8 * sin(x)}, {-0.0001, 0.025}, kw::t_events = {ev_t(x)}};
+            {prime(x) = v, prime(v) = -9.8 * sin(x)}, {fp_t(-0.0001), fp_t(0.025)}, kw::t_events = {ev_t(x)}};
 
         int n_invoked = 0;
         auto pcb = [&n_invoked](auto &) {
