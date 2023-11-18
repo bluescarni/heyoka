@@ -175,11 +175,13 @@ expression &operator/=(expression &x, const expression &e)
     return x = x / e;
 }
 
+// NOLINTBEGIN
 #define HEYOKA_EX_COMPOUND_OP(op, type)                                                                                \
     expression &operator op(expression & ex, type x)                                                                   \
     {                                                                                                                  \
         return ex op expression{std::move(x)};                                                                         \
     }
+// NOLINTEND
 
 HEYOKA_EX_COMPOUND_OP(+=, float)
 HEYOKA_EX_COMPOUND_OP(+=, double)
