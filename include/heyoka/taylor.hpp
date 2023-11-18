@@ -415,6 +415,11 @@ inline std::ostream &operator<<(std::ostream &os, const nt_event_impl<T, B> &)
 }
 
 template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<float, false> &);
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<float, true> &);
+
+template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<double, false> &);
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<double, true> &);
@@ -536,6 +541,11 @@ inline std::ostream &operator<<(std::ostream &os, const t_event_impl<T, B> &)
 }
 
 template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<float, false> &);
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<float, true> &);
+
+template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<double, false> &);
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<double, true> &);
@@ -642,6 +652,9 @@ inline std::ostream &operator<<(std::ostream &os, const continuous_output<T> &)
 }
 
 template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<float> &);
+
+template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<double> &);
 
 template <>
@@ -734,6 +747,9 @@ inline std::ostream &operator<<(std::ostream &os, const continuous_output_batch<
 
     return os;
 }
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output_batch<float> &);
 
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output_batch<double> &);
@@ -1732,6 +1748,9 @@ inline std::ostream &operator<<(std::ostream &os, const taylor_adaptive<T> &)
 }
 
 template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive<float> &);
+
+template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive<double> &);
 
 template <>
@@ -1758,6 +1777,9 @@ inline std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch<T>
 
     return os;
 }
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch<float> &);
 
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch<double> &);
@@ -1789,9 +1811,11 @@ inline constexpr int taylor_adaptive_batch_s11n_version = 1;
 HEYOKA_END_NAMESPACE
 
 // Set the Boost s11n class version for taylor_adaptive and taylor_adaptive_batch.
+BOOST_CLASS_VERSION(heyoka::taylor_adaptive<float>, heyoka::detail::taylor_adaptive_s11n_version);
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive<double>, heyoka::detail::taylor_adaptive_s11n_version);
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive<long double>, heyoka::detail::taylor_adaptive_s11n_version);
 
+BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<float>, heyoka::detail::taylor_adaptive_batch_s11n_version);
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<double>, heyoka::detail::taylor_adaptive_batch_s11n_version);
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<long double>, heyoka::detail::taylor_adaptive_batch_s11n_version);
 
