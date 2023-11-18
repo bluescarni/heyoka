@@ -42,6 +42,9 @@ inline T taylor_deduce_cooldown(T, T)
 }
 
 template <>
+float taylor_deduce_cooldown(float, float);
+
+template <>
 double taylor_deduce_cooldown(double, double);
 
 template <>

@@ -19,7 +19,6 @@
 #include <stdexcept>
 #include <tuple>
 #include <type_traits>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -195,12 +194,12 @@ auto poly_eval_1(InputIt a, T x, std::uint32_t n)
     assert(n >= 2u); // LCOV_EXCL_LINE
 
     // Init the return value.
-    auto ret1 = a[n] * n;
+    auto ret1 = a[n] * static_cast<T>(n);
 
     for (std::uint32_t i = 1; i < n; ++i) {
         // NOTE: possible optimisation for mppp::real here:
         // use fmma() directly, once exposed in mp++.
-        ret1 = a[n - i] * (n - i) + std::move(ret1) * x;
+        ret1 = a[n - i] * static_cast<T>(n - i) + std::move(ret1) * x;
     }
 
     return ret1;
@@ -494,6 +493,12 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
 }
 
 } // namespace
+
+template <>
+float taylor_deduce_cooldown(float g_eps, float abs_der)
+{
+    return taylor_deduce_cooldown_impl(g_eps, abs_der);
+}
 
 template <>
 double taylor_deduce_cooldown(double g_eps, double abs_der)
@@ -1051,8 +1056,7 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
             // detection altogether without a warning. This is ok,
             // and non-finite Taylor coefficients will be caught in the
             // step() implementations anyway.
-            // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
-            std::uint32_t fex_check_result;
+            std::uint32_t fex_check_result{};
             m_fex_check(ptr, &h, &back_int, &fex_check_result);
             if (fex_check_result) {
                 continue;
@@ -1295,8 +1299,7 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
 
                 // Reverse tmp into tmp1, translate tmp1 by 1 with output
                 // in tmp2, and count the sign changes in tmp2.
-                // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
-                std::uint32_t n_sc;
+                std::uint32_t n_sc{};
                 m_rtscc(tmp1.v.data(), tmp2.v.data(), &n_sc, tmp.v.data());
 
                 if (n_sc == 1u) {
@@ -1436,6 +1439,7 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
 
 // Instantiate the book-keeping structure for event detection
 // in the scalar integrator.
+template struct taylor_adaptive<float>::ed_data;
 template struct taylor_adaptive<double>::ed_data;
 template struct taylor_adaptive<long double>::ed_data;
 
@@ -1985,8 +1989,7 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
 
                     // Reverse tmp into tmp1, translate tmp1 by 1 with output
                     // in tmp2, and count the sign changes in tmp2.
-                    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
-                    std::uint32_t n_sc;
+                    std::uint32_t n_sc{};
                     m_rtscc(tmp1.v.data(), tmp2.v.data(), &n_sc, tmp.v.data());
 
                     if (n_sc == 1u) {
@@ -2137,6 +2140,7 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
 
 // Instantiate the book-keeping structure for event detection
 // in the batch integrator.
+template struct taylor_adaptive_batch<float>::ed_data;
 template struct taylor_adaptive_batch<double>::ed_data;
 template struct taylor_adaptive_batch<long double>::ed_data;
 

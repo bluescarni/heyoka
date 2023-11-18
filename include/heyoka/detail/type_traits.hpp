@@ -77,6 +77,10 @@ struct is_supported_fp : std::false_type {
 };
 
 template <>
+struct is_supported_fp<float> : std::true_type {
+};
+
+template <>
 struct is_supported_fp<double> : std::true_type {
 };
 

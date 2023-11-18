@@ -46,6 +46,8 @@ T num_zero_like([[maybe_unused]] const T &x)
 #endif
 }
 
+template float num_zero_like(const float &);
+
 template double num_zero_like(const double &);
 
 template long double num_zero_like(const long double &);
@@ -75,6 +77,8 @@ T num_one_like([[maybe_unused]] const T &x)
     }
 #endif
 }
+
+template float num_one_like(const float &);
 
 template double num_one_like(const double &);
 
@@ -106,6 +110,8 @@ T num_eps_like([[maybe_unused]] const T &x)
 #endif
 }
 
+template float num_eps_like(const float &);
+
 template double num_eps_like(const double &);
 
 template long double num_eps_like(const long double &);
@@ -135,6 +141,8 @@ T num_inf_like([[maybe_unused]] const T &x)
     }
 #endif
 }
+
+template float num_inf_like(const float &);
 
 template double num_inf_like(const double &);
 

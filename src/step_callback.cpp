@@ -110,6 +110,10 @@ void swap(step_callback_impl<TA> &a, step_callback_impl<TA> &b) noexcept
 }
 
 // Explicit instantiations.
+template class step_callback_impl<taylor_adaptive<float>>;
+template HEYOKA_DLL_PUBLIC void swap(step_callback_impl<taylor_adaptive<float>> &,
+                                     step_callback_impl<taylor_adaptive<float>> &);
+
 template class step_callback_impl<taylor_adaptive<double>>;
 template HEYOKA_DLL_PUBLIC void swap(step_callback_impl<taylor_adaptive<double>> &,
                                      step_callback_impl<taylor_adaptive<double>> &);
@@ -133,6 +137,10 @@ template HEYOKA_DLL_PUBLIC void swap(step_callback_impl<taylor_adaptive<mppp::re
                                      step_callback_impl<taylor_adaptive<mppp::real>> &);
 
 #endif
+
+template class step_callback_impl<taylor_adaptive_batch<float>>;
+template HEYOKA_DLL_PUBLIC void swap(step_callback_impl<taylor_adaptive_batch<float>> &,
+                                     step_callback_impl<taylor_adaptive_batch<float>> &);
 
 template class step_callback_impl<taylor_adaptive_batch<double>>;
 template HEYOKA_DLL_PUBLIC void swap(step_callback_impl<taylor_adaptive_batch<double>> &,

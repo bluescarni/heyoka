@@ -1349,6 +1349,12 @@ std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_a
 } // namespace detail
 
 template <>
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive<float> &ta)
+{
+    return detail::taylor_adaptive_stream_impl(os, ta);
+}
+
+template <>
 std::ostream &operator<<(std::ostream &os, const taylor_adaptive<double> &ta)
 {
     return detail::taylor_adaptive_stream_impl(os, ta);
@@ -1379,6 +1385,12 @@ std::ostream &operator<<(std::ostream &os, const taylor_adaptive<mppp::real> &ta
 }
 
 #endif
+
+template <>
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch<float> &ta)
+{
+    return detail::taylor_adaptive_batch_stream_impl(os, ta);
+}
 
 template <>
 std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch<double> &ta)
@@ -1624,6 +1636,18 @@ std::ostream &t_event_impl_stream_impl(std::ostream &os, const expression &eq, e
 } // namespace
 
 template <>
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<float, false> &e)
+{
+    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<float, true> &e)
+{
+    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+}
+
+template <>
 std::ostream &operator<<(std::ostream &os, const nt_event_impl<double, false> &e)
 {
     return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
@@ -1672,6 +1696,18 @@ std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real, false
 }
 
 #endif
+
+template <>
+std::ostream &operator<<(std::ostream &os, const t_event_impl<float, false> &e)
+{
+    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const t_event_impl<float, true> &e)
+{
+    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
+}
 
 template <>
 std::ostream &operator<<(std::ostream &os, const t_event_impl<double, false> &e)
@@ -1724,6 +1760,12 @@ std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real, false>
 #endif
 
 // Explicit instantiation of the implementation classes/functions.
+template class nt_event_impl<float, false>;
+template class t_event_impl<float, false>;
+
+template class nt_event_impl<float, true>;
+template class t_event_impl<float, true>;
+
 template class nt_event_impl<double, false>;
 template class t_event_impl<double, false>;
 
@@ -2350,6 +2392,7 @@ std::size_t continuous_output<T>::get_n_steps() const
 }
 
 // Explicit instantiations.
+template class continuous_output<float>;
 template class continuous_output<double>;
 template class continuous_output<long double>;
 
@@ -2396,6 +2439,12 @@ std::ostream &c_out_stream_impl(std::ostream &os, const continuous_output<T> &co
 }
 
 } // namespace detail
+
+template <>
+std::ostream &operator<<(std::ostream &os, const continuous_output<float> &co)
+{
+    return detail::c_out_stream_impl(os, co);
+}
 
 template <>
 std::ostream &operator<<(std::ostream &os, const continuous_output<double> &co)
@@ -3096,6 +3145,7 @@ std::size_t continuous_output_batch<T>::get_n_steps() const
 }
 
 // Explicit instantiations.
+template class continuous_output_batch<float>;
 template class continuous_output_batch<double>;
 template class continuous_output_batch<long double>;
 
@@ -3159,6 +3209,12 @@ std::ostream &c_out_batch_stream_impl(std::ostream &os, const continuous_output_
 }
 
 } // namespace detail
+
+template <>
+std::ostream &operator<<(std::ostream &os, const continuous_output_batch<float> &co)
+{
+    return detail::c_out_batch_stream_impl(os, co);
+}
 
 template <>
 std::ostream &operator<<(std::ostream &os, const continuous_output_batch<double> &co)

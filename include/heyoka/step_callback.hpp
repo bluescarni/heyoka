@@ -121,7 +121,7 @@ private:
     void serialize(Archive &ar, unsigned)
     {
         ar &boost::serialization::base_object<step_callback_inner_base<TA>>(*this);
-        ar &m_value;
+        ar & m_value;
     }
 };
 
@@ -135,7 +135,7 @@ class HEYOKA_DLL_PUBLIC step_callback_impl
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &m_ptr;
+        ar & m_ptr;
     }
 
     // Meta-programming for the generic ctor.
@@ -226,6 +226,9 @@ using step_callback_batch = detail::step_callback_impl<taylor_adaptive_batch<T>>
 HEYOKA_END_NAMESPACE
 
 // Disable Boost.Serialization tracking for the implementation details of step_callback.
+BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_adaptive<float>>,
+                     boost::serialization::track_never)
+
 BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_adaptive<double>>,
                      boost::serialization::track_never)
 
@@ -245,6 +248,9 @@ BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_ada
                      boost::serialization::track_never)
 
 #endif
+
+BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_adaptive_batch<float>>,
+                     boost::serialization::track_never)
 
 BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_adaptive_batch<double>>,
                      boost::serialization::track_never)
