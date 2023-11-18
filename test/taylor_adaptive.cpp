@@ -72,7 +72,7 @@ auto &horner_eval(Out &ret, const P &p, int order, const T &eval)
     return ret;
 }
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
