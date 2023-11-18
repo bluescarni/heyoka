@@ -1749,6 +1749,14 @@ std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const 
 }
 
 // Explicit instantiations.
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<float>(llvm_state &, const std::string &,
+                                                                    const std::vector<expression> &, std::uint32_t,
+                                                                    bool, bool, bool, long long);
+template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<float>(llvm_state &, const std::string &,
+                                                                    const std::vector<expression> &,
+                                                                    const std::vector<expression> &, std::uint32_t,
+                                                                    bool, bool, bool, long long);
+
 template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<double>(llvm_state &, const std::string &,
                                                                      const std::vector<expression> &, std::uint32_t,
                                                                      bool, bool, bool, long long);
