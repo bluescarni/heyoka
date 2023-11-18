@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -49,9 +50,10 @@ auto make_vfinfo(const char *s_name, std::string v_name, std::uint32_t width, st
 #if defined(HEYOKA_WITH_SLEEF)
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-auto add_vfinfo_sleef(vf_map_t &retval, const char *scalar_name, const char *sleef_base_name, const char *sleef_tp,
+auto add_vfinfo_sleef(vf_map_t &retval, const char *scalar_name, const char *sleef_base_name, std::string_view sleef_tp,
                       std::uint32_t nargs = 1)
 {
+    assert(sleef_tp == "d" || sleef_tp == "f");
     assert(retval.find(scalar_name) == retval.end());
     assert(nargs > 0u);
 
@@ -62,22 +64,31 @@ auto add_vfinfo_sleef(vf_map_t &retval, const char *scalar_name, const char *sle
 
     const auto &features = get_target_features();
 
+    // NOTE: we need to select the SIMD width(s) based on the floating-point type (sleef_tp).
+    // All supported SIMD extensions start with a minimum width of 2 for double-precision
+    // and 4 for single-precision, possibly supporting larger widths. So we use these two
+    // values for the computation.
+    const std::uint32_t base_simd_width = sleef_tp == "d" ? 2 : 4;
+
     if (features.avx512f) {
         retval[scalar_name]
-            = {make_sleef_vfinfo(2, "avx2128"), make_sleef_vfinfo(4, "avx2"), make_sleef_vfinfo(8, "avx512f")};
+            = {make_sleef_vfinfo(base_simd_width, "avx2128"), make_sleef_vfinfo(base_simd_width * 2u, "avx2"),
+               make_sleef_vfinfo(base_simd_width * 4u, "avx512f")};
     } else if (features.avx2) {
-        retval[scalar_name] = {make_sleef_vfinfo(2, "avx2128"), make_sleef_vfinfo(4, "avx2")};
+        retval[scalar_name]
+            = {make_sleef_vfinfo(base_simd_width, "avx2128"), make_sleef_vfinfo(base_simd_width * 2u, "avx2")};
     } else if (features.avx) {
-        retval[scalar_name] = {make_sleef_vfinfo(2, "sse4"), make_sleef_vfinfo(4, "avx")};
+        retval[scalar_name]
+            = {make_sleef_vfinfo(base_simd_width, "sse4"), make_sleef_vfinfo(base_simd_width * 2u, "avx")};
     } else if (features.sse2) {
-        retval[scalar_name] = {make_sleef_vfinfo(2, "sse2")};
+        retval[scalar_name] = {make_sleef_vfinfo(base_simd_width, "sse2")};
     } else if (features.aarch64) {
-        retval[scalar_name] = {make_sleef_vfinfo(2, "advsimd")};
+        retval[scalar_name] = {make_sleef_vfinfo(base_simd_width, "advsimd")};
     } else if (features.vsx) {
         // NOTE: at this time the sleef conda package for PPC64 does not seem
         // to provide VSX3 functions. Thus, for now we use only the
         // VSX implementations.
-        retval[scalar_name] = {make_sleef_vfinfo(2, "vsx")};
+        retval[scalar_name] = {make_sleef_vfinfo(base_simd_width, "vsx")};
     }
 }
 
@@ -95,6 +106,25 @@ auto make_vf_map()
     // and thus there's no need to go through sleef. This is certainly true for x86,
     // but I am not 100% sure for the other archs. Let's keep this in mind.
     // NOTE: the same holds for things like abs() and floor().
+
+    // Single-precision.
+    add_vfinfo_sleef(retval, "llvm.sin.f32", "sin", "f");
+    add_vfinfo_sleef(retval, "llvm.cos.f32", "cos", "f");
+    add_vfinfo_sleef(retval, "llvm.log.f32", "log", "f");
+    add_vfinfo_sleef(retval, "llvm.exp.f32", "exp", "f");
+    add_vfinfo_sleef(retval, "llvm.pow.f32", "pow", "f", 2);
+    add_vfinfo_sleef(retval, "sinhf", "sinh", "f");
+    add_vfinfo_sleef(retval, "coshf", "cosh", "f");
+    add_vfinfo_sleef(retval, "asinf", "asin", "f");
+    add_vfinfo_sleef(retval, "acosf", "acos", "f");
+    add_vfinfo_sleef(retval, "asinhf", "asinh", "f");
+    add_vfinfo_sleef(retval, "acoshf", "acosh", "f");
+    add_vfinfo_sleef(retval, "tanf", "tan", "f");
+    add_vfinfo_sleef(retval, "tanhf", "tanh", "f");
+    add_vfinfo_sleef(retval, "atanf", "atan", "f");
+    add_vfinfo_sleef(retval, "atanhf", "atanh", "f");
+    add_vfinfo_sleef(retval, "atan2f", "atan2", "f", 2);
+    add_vfinfo_sleef(retval, "erff", "erf", "f");
 
     // Double-precision.
     add_vfinfo_sleef(retval, "llvm.sin.f64", "sin", "d");
