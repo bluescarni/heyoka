@@ -1785,6 +1785,7 @@ expression kepF(expression h, expression k, expression lam)
         return kepF(expression{std::move(h)}, std::move(k), std::move(lam));                                           \
     }
 
+HEYOKA_DEFINE_KEPF_OVERLOADS(float)
 HEYOKA_DEFINE_KEPF_OVERLOADS(double)
 HEYOKA_DEFINE_KEPF_OVERLOADS(long double)
 

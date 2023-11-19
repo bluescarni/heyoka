@@ -114,6 +114,7 @@ pow_eval_algo get_pow_eval_algo(const pow_impl &);
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression pow(expression, expression);
+HEYOKA_DLL_PUBLIC expression pow(expression, float);
 HEYOKA_DLL_PUBLIC expression pow(expression, double);
 HEYOKA_DLL_PUBLIC expression pow(expression, long double);
 

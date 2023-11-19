@@ -81,6 +81,7 @@ HEYOKA_DLL_PUBLIC expression kepF(expression, expression, expression);
     HEYOKA_DLL_PUBLIC expression kepF(expression, type, expression);                                                   \
     HEYOKA_DLL_PUBLIC expression kepF(type, expression, expression)
 
+HEYOKA_DECLARE_KEPF_OVERLOADS(float);
 HEYOKA_DECLARE_KEPF_OVERLOADS(double);
 HEYOKA_DECLARE_KEPF_OVERLOADS(long double);
 

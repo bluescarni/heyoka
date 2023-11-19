@@ -868,6 +868,7 @@ expression kepE(expression e, expression M)
         return kepE(expression{std::move(e)}, std::move(M));                                                           \
     }
 
+HEYOKA_DEFINE_KEPE_OVERLOADS(float)
 HEYOKA_DEFINE_KEPE_OVERLOADS(double)
 HEYOKA_DEFINE_KEPE_OVERLOADS(long double)
 
