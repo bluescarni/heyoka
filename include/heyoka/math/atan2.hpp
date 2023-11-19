@@ -75,6 +75,7 @@ public:
 
 HEYOKA_DLL_PUBLIC expression atan2(expression, expression);
 
+HEYOKA_DLL_PUBLIC expression atan2(expression, float);
 HEYOKA_DLL_PUBLIC expression atan2(expression, double);
 HEYOKA_DLL_PUBLIC expression atan2(expression, long double);
 
@@ -90,6 +91,7 @@ HEYOKA_DLL_PUBLIC expression atan2(expression, mppp::real);
 
 #endif
 
+HEYOKA_DLL_PUBLIC expression atan2(float, expression);
 HEYOKA_DLL_PUBLIC expression atan2(double, expression);
 HEYOKA_DLL_PUBLIC expression atan2(long double, expression);
 
