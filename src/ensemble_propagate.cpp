@@ -216,6 +216,7 @@ ensemble_propagate_grid_impl(const taylor_adaptive<T> &ta, std::vector<T> grid, 
                                         std::size_t, T, step_callback<T> &);
 // NOLINTEND
 
+HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(float)
 HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(double)
 HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(long double)
 
@@ -406,6 +407,7 @@ std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>> ensemble_propa
         const std::vector<T> &, step_callback_batch<T> &);
 // NOLINTEND
 
+HEYOKA_ENSEMBLE_PROPAGATE_BATCH_INST(float)
 HEYOKA_ENSEMBLE_PROPAGATE_BATCH_INST(double)
 HEYOKA_ENSEMBLE_PROPAGATE_BATCH_INST(long double)
 
