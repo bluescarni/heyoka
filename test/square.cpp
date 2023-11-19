@@ -55,7 +55,7 @@ auto square_wrapper(const heyoka::expression &x)
     return pow(x, 2.);
 }
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -154,7 +154,7 @@ TEST_CASE("cfunc")
 
             for (auto i = 0u; i < batch_size; ++i) {
                 REQUIRE(outs[i] == approximately(ins[i] * ins[i], fp_t(100)));
-                REQUIRE(outs[i + batch_size] == approximately(static_cast<fp_t>(.5) * .5, fp_t(100)));
+                REQUIRE(outs[i + batch_size] == approximately(static_cast<fp_t>(.5) * fp_t(.5), fp_t(100)));
                 REQUIRE(outs[i + 2u * batch_size] == approximately(pars[i] * pars[i], fp_t(100)));
             }
         }

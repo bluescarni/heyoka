@@ -49,7 +49,7 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -219,8 +219,8 @@ TEST_CASE("normalise")
     REQUIRE(normalise(subs(tan(x), {{x, .1_dbl}})) == tan(.1_dbl));
 }
 
-// Test to check vectorisation via the vector-function-abi-variant machinery.
-TEST_CASE("vfabi")
+// Tests to check vectorisation via the vector-function-abi-variant machinery.
+TEST_CASE("vfabi double")
 {
     llvm_state s{kw::slp_vectorize = true};
 
@@ -276,6 +276,69 @@ TEST_CASE("vfabi")
 
     // if (tf.vsx) {
     //     REQUIRE(count == 3u);
+    // }
+
+#endif
+}
+
+TEST_CASE("vfabi float")
+{
+    llvm_state s{kw::slp_vectorize = true};
+
+    auto [a, b, c, d] = make_vars("a", "b", "c", "d");
+
+    add_cfunc<float>(s, "cfunc", {tan(a), tan(b), tan(c), tan(d)});
+
+    s.compile();
+
+    auto *cf_ptr
+        = reinterpret_cast<void (*)(float *, const float *, const float *, const float *)>(s.jit_lookup("cfunc"));
+
+    const std::vector<float> ins{1., 2., 3., 4.};
+    std::vector<float> outs(4u, 0.);
+
+    cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+
+    REQUIRE(outs[0] == approximately(std::tan(1.f)));
+    REQUIRE(outs[1] == approximately(std::tan(2.f)));
+    REQUIRE(outs[2] == approximately(std::tan(3.f)));
+    REQUIRE(outs[3] == approximately(std::tan(4.f)));
+
+    // NOTE: autovec with external scalar functions seems to work
+    // only since LLVM 16.
+#if defined(HEYOKA_WITH_SLEEF) && LLVM_VERSION_MAJOR >= 16
+
+    const auto &tf = detail::get_target_features();
+
+    auto ir = s.get_ir();
+
+    using string_find_iterator = boost::find_iterator<std::string::iterator>;
+
+    auto count = 0u;
+    for (auto it = boost::make_find_iterator(ir, boost::first_finder("@tanf", boost::is_iequal()));
+         it != string_find_iterator(); ++it) {
+        ++count;
+    }
+
+    // NOTE: at the moment we have comprehensive coverage of LLVM versions
+    // in the CI only for x86_64.
+    if (tf.sse2) {
+        // NOTE: occurrences of the scalar version:
+        // - 4 calls in the strided cfunc,
+        // - 1 declaration.
+        REQUIRE(count == 5u);
+    }
+
+    if (tf.aarch64) {
+        REQUIRE(count == 5u);
+    }
+
+    // NOTE: currently no auto-vectorization happens on ppc64 due apparently
+    // to the way the target machine is being set up by orc/lljit (it works
+    // fine with the opt tool). When this is resolved, we can test ppc64 too.
+
+    // if (tf.vsx) {
+    //     REQUIRE(count == 5u);
     // }
 
 #endif

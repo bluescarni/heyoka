@@ -67,7 +67,7 @@ auto sum_sq(const std::vector<expression> &args)
     return sum(new_args);
 }
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -238,7 +238,7 @@ TEST_CASE("cfunc")
                 REQUIRE(outs[i]
                         == approximately(ins[i] * ins[i] + ins[i + batch_size] * ins[i + batch_size], fp_t(100)));
                 REQUIRE(outs[i + batch_size]
-                        == approximately(ins[i] * ins[i] + static_cast<fp_t>(.5) * 0.5, fp_t(100)));
+                        == approximately(ins[i] * ins[i] + static_cast<fp_t>(.5) * fp_t(0.5), fp_t(100)));
                 REQUIRE(outs[i + 2u * batch_size]
                         == approximately(pars[i] * pars[i] + ins[i + batch_size] * ins[i + batch_size], fp_t(100)));
             }

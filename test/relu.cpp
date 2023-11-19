@@ -50,7 +50,7 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -412,11 +412,11 @@ TEST_CASE("cfunc")
             for (auto niter = 0; niter < 100; ++niter) {
                 for (auto i = 0u; i < batch_size; ++i) {
                     // Generate the xs.
-                    ins[i] = x_dist(rng);
+                    ins[i] = static_cast<fp_t>(x_dist(rng));
 
                     // Generate the pars.
-                    pars[i] = x_dist(rng);
-                    pars[i + batch_size] = x_dist(rng);
+                    pars[i] = static_cast<fp_t>(x_dist(rng));
+                    pars[i + batch_size] = static_cast<fp_t>(x_dist(rng));
                 }
 
                 cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
@@ -480,11 +480,11 @@ TEST_CASE("cfunc leaky")
             for (auto niter = 0; niter < 100; ++niter) {
                 for (auto i = 0u; i < batch_size; ++i) {
                     // Generate the xs.
-                    ins[i] = x_dist(rng);
+                    ins[i] = static_cast<fp_t>(x_dist(rng));
 
                     // Generate the pars.
-                    pars[i] = x_dist(rng);
-                    pars[i + batch_size] = x_dist(rng);
+                    pars[i] = static_cast<fp_t>(x_dist(rng));
+                    pars[i + batch_size] = static_cast<fp_t>(x_dist(rng));
                 }
 
                 cf_ptr(outs.data(), ins.data(), pars.data(), nullptr);
