@@ -67,7 +67,7 @@ using namespace mppp::literals;
 
 #endif
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double

@@ -49,7 +49,7 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -348,7 +348,7 @@ TEST_CASE("cfunc")
 
                     ins[i] = hval;
                     ins[i + batch_size] = kval;
-                    ins[i + 2u * batch_size] = lamval;
+                    ins[i + 2u * batch_size] = static_cast<fp_t>(lamval);
 
                     // Generate another pair of hs and ks for the pars.
                     std::tie(hval, kval) = generate_hk();
@@ -383,8 +383,8 @@ TEST_CASE("cfunc")
                     // Third output.
                     REQUIRE(!isnan(outs[i + batch_size * 2u]));
                     Fval = outs[i + batch_size * 2u];
-                    hval = .5;
-                    kval = .3;
+                    hval = fp_t(.5);
+                    kval = fp_t(.3);
                     lamval = ins[i + 2u * batch_size];
                     REQUIRE(eps_close(cos(lamval), cos(Fval + hval * cos(Fval) - kval * sin(Fval))));
                     REQUIRE(eps_close(sin(lamval), sin(Fval + hval * cos(Fval) - kval * sin(Fval))));
