@@ -14,7 +14,7 @@ wget https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforg
 export deps_dir=$HOME/local
 export PATH="$HOME/mambaforge/bin:$PATH"
 bash mambaforge.sh -b -p $HOME/mambaforge
-mamba create -y -q -p $deps_dir c-compiler cxx-compiler cmake 'llvmdev=14.*' tbb-devel tbb boost-cpp 'mppp>=0.27' sleef xtensor xtensor-blas blas blas-devel 'fmt=9.*' spdlog
+mamba create -y -q -p $deps_dir c-compiler cxx-compiler cmake 'llvmdev=14.*' tbb-devel tbb boost-cpp 'mppp>=0.27' sleef xtensor xtensor-blas blas blas-devel fmt spdlog
 source activate $deps_dir
 
 # Create the build dir and cd into it.
