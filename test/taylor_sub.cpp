@@ -38,7 +38,7 @@ auto sub_wrapper(expression a, expression b)
     return detail::sub(std::move(a), std::move(b));
 }
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -260,8 +260,8 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[7] == approximately(-fp_t{5}));
             REQUIRE(jet[8] == 0);
             REQUIRE(jet[9] == 0);
-            REQUIRE(jet[10] == approximately(.5 * (jet[4] + jet[6])));
-            REQUIRE(jet[11] == approximately(.5 * (jet[5] + jet[7])));
+            REQUIRE(jet[10] == approximately(fp_t(.5) * (jet[4] + jet[6])));
+            REQUIRE(jet[11] == approximately(fp_t(.5) * (jet[5] + jet[7])));
         }
 
         {
@@ -471,8 +471,8 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[1] == 3);
             REQUIRE(jet[2] == approximately(jet[1] - 2));
             REQUIRE(jet[3] == approximately(jet[0] + 4));
-            REQUIRE(jet[4] == approximately(.5 * jet[3]));
-            REQUIRE(jet[5] == approximately(.5 * jet[2]));
+            REQUIRE(jet[4] == approximately(fp_t(.5) * jet[3]));
+            REQUIRE(jet[5] == approximately(fp_t(.5) * jet[2]));
         }
 
         {
@@ -498,10 +498,10 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[5] == approximately(jet[3] - 2));
             REQUIRE(jet[6] == approximately(jet[0] + 4));
             REQUIRE(jet[7] == approximately(jet[1] + 4));
-            REQUIRE(jet[8] == approximately(.5 * jet[6]));
-            REQUIRE(jet[9] == approximately(.5 * jet[7]));
-            REQUIRE(jet[10] == approximately(.5 * jet[4]));
-            REQUIRE(jet[11] == approximately(.5 * jet[5]));
+            REQUIRE(jet[8] == approximately(fp_t(.5) * jet[6]));
+            REQUIRE(jet[9] == approximately(fp_t(.5) * jet[7]));
+            REQUIRE(jet[10] == approximately(fp_t(.5) * jet[4]));
+            REQUIRE(jet[11] == approximately(fp_t(.5) * jet[5]));
         }
 
         {
@@ -535,13 +535,13 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[10] == approximately(jet[1] + 4));
             REQUIRE(jet[11] == approximately(jet[2] + 4));
 
-            REQUIRE(jet[12] == approximately(.5 * jet[9]));
-            REQUIRE(jet[13] == approximately(.5 * jet[10]));
-            REQUIRE(jet[14] == approximately(.5 * jet[11]));
+            REQUIRE(jet[12] == approximately(fp_t(.5) * jet[9]));
+            REQUIRE(jet[13] == approximately(fp_t(.5) * jet[10]));
+            REQUIRE(jet[14] == approximately(fp_t(.5) * jet[11]));
 
-            REQUIRE(jet[15] == approximately(.5 * jet[6]));
-            REQUIRE(jet[16] == approximately(.5 * jet[7]));
-            REQUIRE(jet[17] == approximately(.5 * jet[8]));
+            REQUIRE(jet[15] == approximately(fp_t(.5) * jet[6]));
+            REQUIRE(jet[16] == approximately(fp_t(.5) * jet[7]));
+            REQUIRE(jet[17] == approximately(fp_t(.5) * jet[8]));
 
             REQUIRE(jet[18] == approximately(1 / fp_t{3} * jet[15]));
             REQUIRE(jet[19] == approximately(1 / fp_t{3} * jet[16]));
@@ -585,13 +585,13 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[10] == approximately(jet[1] + 4));
             REQUIRE(jet[11] == approximately(jet[2] + 4));
 
-            REQUIRE(jet[12] == approximately(.5 * jet[9]));
-            REQUIRE(jet[13] == approximately(.5 * jet[10]));
-            REQUIRE(jet[14] == approximately(.5 * jet[11]));
+            REQUIRE(jet[12] == approximately(fp_t(.5) * jet[9]));
+            REQUIRE(jet[13] == approximately(fp_t(.5) * jet[10]));
+            REQUIRE(jet[14] == approximately(fp_t(.5) * jet[11]));
 
-            REQUIRE(jet[15] == approximately(.5 * jet[6]));
-            REQUIRE(jet[16] == approximately(.5 * jet[7]));
-            REQUIRE(jet[17] == approximately(.5 * jet[8]));
+            REQUIRE(jet[15] == approximately(fp_t(.5) * jet[6]));
+            REQUIRE(jet[16] == approximately(fp_t(.5) * jet[7]));
+            REQUIRE(jet[17] == approximately(fp_t(.5) * jet[8]));
 
             REQUIRE(jet[18] == approximately(1 / fp_t{3} * jet[15]));
             REQUIRE(jet[19] == approximately(1 / fp_t{3} * jet[16]));
@@ -727,8 +727,8 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[1] == 3);
             REQUIRE(jet[2] == approximately(-jet[1] + 2));
             REQUIRE(jet[3] == approximately(-jet[0] - 4));
-            REQUIRE(jet[4] == approximately(-.5 * jet[3]));
-            REQUIRE(jet[5] == approximately(-.5 * jet[2]));
+            REQUIRE(jet[4] == approximately(-fp_t(.5) * jet[3]));
+            REQUIRE(jet[5] == approximately(-fp_t(.5) * jet[2]));
         }
 
         {
@@ -754,10 +754,10 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[5] == approximately(-jet[3] + 2));
             REQUIRE(jet[6] == approximately(-jet[0] - 4));
             REQUIRE(jet[7] == approximately(-jet[1] - 4));
-            REQUIRE(jet[8] == approximately(-.5 * jet[6]));
-            REQUIRE(jet[9] == approximately(-.5 * jet[7]));
-            REQUIRE(jet[10] == approximately(-.5 * jet[4]));
-            REQUIRE(jet[11] == approximately(-.5 * jet[5]));
+            REQUIRE(jet[8] == approximately(-fp_t(.5) * jet[6]));
+            REQUIRE(jet[9] == approximately(-fp_t(.5) * jet[7]));
+            REQUIRE(jet[10] == approximately(-fp_t(.5) * jet[4]));
+            REQUIRE(jet[11] == approximately(-fp_t(.5) * jet[5]));
         }
 
         {
@@ -791,13 +791,13 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[10] == approximately(-jet[1] - 4));
             REQUIRE(jet[11] == approximately(-jet[2] - 4));
 
-            REQUIRE(jet[12] == approximately(-.5 * jet[9]));
-            REQUIRE(jet[13] == approximately(-.5 * jet[10]));
-            REQUIRE(jet[14] == approximately(-.5 * jet[11]));
+            REQUIRE(jet[12] == approximately(-fp_t(.5) * jet[9]));
+            REQUIRE(jet[13] == approximately(-fp_t(.5) * jet[10]));
+            REQUIRE(jet[14] == approximately(-fp_t(.5) * jet[11]));
 
-            REQUIRE(jet[15] == approximately(-.5 * jet[6]));
-            REQUIRE(jet[16] == approximately(-.5 * jet[7]));
-            REQUIRE(jet[17] == approximately(-.5 * jet[8]));
+            REQUIRE(jet[15] == approximately(-fp_t(.5) * jet[6]));
+            REQUIRE(jet[16] == approximately(-fp_t(.5) * jet[7]));
+            REQUIRE(jet[17] == approximately(-fp_t(.5) * jet[8]));
 
             REQUIRE(jet[18] == approximately(-1 / fp_t{3} * jet[15]));
             REQUIRE(jet[19] == approximately(-1 / fp_t{3} * jet[16]));
@@ -841,13 +841,13 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[10] == approximately(-jet[1] - 4));
             REQUIRE(jet[11] == approximately(-jet[2] - 4));
 
-            REQUIRE(jet[12] == approximately(-.5 * jet[9]));
-            REQUIRE(jet[13] == approximately(-.5 * jet[10]));
-            REQUIRE(jet[14] == approximately(-.5 * jet[11]));
+            REQUIRE(jet[12] == approximately(-fp_t(.5) * jet[9]));
+            REQUIRE(jet[13] == approximately(-fp_t(.5) * jet[10]));
+            REQUIRE(jet[14] == approximately(-fp_t(.5) * jet[11]));
 
-            REQUIRE(jet[15] == approximately(-.5 * jet[6]));
-            REQUIRE(jet[16] == approximately(-.5 * jet[7]));
-            REQUIRE(jet[17] == approximately(-.5 * jet[8]));
+            REQUIRE(jet[15] == approximately(-fp_t(.5) * jet[6]));
+            REQUIRE(jet[16] == approximately(-fp_t(.5) * jet[7]));
+            REQUIRE(jet[17] == approximately(-fp_t(.5) * jet[8]));
 
             REQUIRE(jet[18] == approximately(-1 / fp_t{3} * jet[15]));
             REQUIRE(jet[19] == approximately(-1 / fp_t{3} * jet[16]));

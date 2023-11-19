@@ -42,7 +42,7 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -517,8 +517,8 @@ TEST_CASE("taylor erf")
             REQUIRE(jet[1] == 3);
             REQUIRE(jet[2] == approximately(erf(jet[1])));
             REQUIRE(jet[3] == approximately(erf(jet[0])));
-            REQUIRE(jet[4] == approximately(fp_t{1} / 2. * ((2. / sqrt(pi) * exp(-jet[1] * jet[1])) * jet[3])));
-            REQUIRE(jet[5] == approximately(fp_t{1} / 2. * ((2. / sqrt(pi) * exp(-jet[0] * jet[0])) * jet[2])));
+            REQUIRE(jet[4] == approximately(fp_t{1} / 2 * ((2 / sqrt(pi) * exp(-jet[1] * jet[1])) * jet[3])));
+            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * ((2 / sqrt(pi) * exp(-jet[0] * jet[0])) * jet[2])));
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
@@ -547,11 +547,11 @@ TEST_CASE("taylor erf")
             REQUIRE(jet[6] == approximately(erf(jet[0])));
             REQUIRE(jet[7] == approximately(erf(jet[1])));
 
-            REQUIRE(jet[8] == approximately(fp_t{1} / 2 * ((2. / sqrt(pi) * exp(-jet[2] * jet[2])) * jet[6])));
-            REQUIRE(jet[9] == approximately(fp_t{1} / 2 * ((2. / sqrt(pi) * exp(-jet[3] * jet[3])) * jet[7])));
+            REQUIRE(jet[8] == approximately(fp_t{1} / 2 * ((2 / sqrt(pi) * exp(-jet[2] * jet[2])) * jet[6])));
+            REQUIRE(jet[9] == approximately(fp_t{1} / 2 * ((2 / sqrt(pi) * exp(-jet[3] * jet[3])) * jet[7])));
 
-            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * ((2. / sqrt(pi) * exp(-jet[0] * jet[0])) * jet[4])));
-            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * ((2. / sqrt(pi) * exp(-jet[1] * jet[1])) * jet[5])));
+            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * ((2 / sqrt(pi) * exp(-jet[0] * jet[0])) * jet[4])));
+            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * ((2 / sqrt(pi) * exp(-jet[1] * jet[1])) * jet[5])));
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
@@ -584,39 +584,39 @@ TEST_CASE("taylor erf")
             REQUIRE(jet[10] == approximately(erf(jet[1])));
             REQUIRE(jet[11] == approximately(erf(jet[2])));
 
-            REQUIRE(jet[12] == approximately(fp_t{1} / 2 * (2. / sqrt(pi) * exp(-jet[3] * jet[3]) * jet[9])));
-            REQUIRE(jet[13] == approximately(fp_t{1} / 2 * (2. / sqrt(pi) * exp(-jet[4] * jet[4]) * jet[10])));
-            REQUIRE(jet[14] == approximately(fp_t{1} / 2 * (2. / sqrt(pi) * exp(-jet[5] * jet[5]) * jet[11])));
+            REQUIRE(jet[12] == approximately(fp_t{1} / 2 * (2 / sqrt(pi) * exp(-jet[3] * jet[3]) * jet[9])));
+            REQUIRE(jet[13] == approximately(fp_t{1} / 2 * (2 / sqrt(pi) * exp(-jet[4] * jet[4]) * jet[10])));
+            REQUIRE(jet[14] == approximately(fp_t{1} / 2 * (2 / sqrt(pi) * exp(-jet[5] * jet[5]) * jet[11])));
 
-            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * (2. / sqrt(pi) * exp(-jet[0] * jet[0]) * jet[6])));
-            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * (2. / sqrt(pi) * exp(-jet[1] * jet[1]) * jet[7])));
-            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * (2. / sqrt(pi) * exp(-jet[2] * jet[2]) * jet[8])));
+            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * (2 / sqrt(pi) * exp(-jet[0] * jet[0]) * jet[6])));
+            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * (2 / sqrt(pi) * exp(-jet[1] * jet[1]) * jet[7])));
+            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * (2 / sqrt(pi) * exp(-jet[2] * jet[2]) * jet[8])));
 
             REQUIRE(jet[18]
-                    == approximately(fp_t{1} / 6 * 2. / sqrt(pi)
-                                     * (-2. * exp(-jet[3] * jet[3]) * jet[3] * jet[9] * jet[9]
-                                        + exp(-jet[3] * jet[3]) * 2. / sqrt(pi) * exp(-jet[0] * jet[0]) * jet[6])));
+                    == approximately(fp_t{1} / 6 * 2 / sqrt(pi)
+                                     * (-2 * exp(-jet[3] * jet[3]) * jet[3] * jet[9] * jet[9]
+                                        + exp(-jet[3] * jet[3]) * 2 / sqrt(pi) * exp(-jet[0] * jet[0]) * jet[6])));
             REQUIRE(jet[19]
-                    == approximately(fp_t{1} / 6 * 2. / sqrt(pi)
-                                     * (-2. * exp(-jet[4] * jet[4]) * jet[4] * jet[10] * jet[10]
-                                        + exp(-jet[4] * jet[4]) * 2. / sqrt(pi) * exp(-jet[1] * jet[1]) * jet[7])));
+                    == approximately(fp_t{1} / 6 * 2 / sqrt(pi)
+                                     * (-2 * exp(-jet[4] * jet[4]) * jet[4] * jet[10] * jet[10]
+                                        + exp(-jet[4] * jet[4]) * 2 / sqrt(pi) * exp(-jet[1] * jet[1]) * jet[7])));
             REQUIRE(jet[20]
-                    == approximately(fp_t{1} / 6 * 2. / sqrt(pi)
-                                     * (-2. * exp(-jet[5] * jet[5]) * jet[5] * jet[11] * jet[11]
-                                        + exp(-jet[5] * jet[5]) * 2. / sqrt(pi) * exp(-jet[2] * jet[2]) * jet[8])));
+                    == approximately(fp_t{1} / 6 * 2 / sqrt(pi)
+                                     * (-2 * exp(-jet[5] * jet[5]) * jet[5] * jet[11] * jet[11]
+                                        + exp(-jet[5] * jet[5]) * 2 / sqrt(pi) * exp(-jet[2] * jet[2]) * jet[8])));
 
             REQUIRE(jet[21]
-                    == approximately(fp_t{1} / 6 * 2. / sqrt(pi)
-                                     * (-2. * exp(-jet[0] * jet[0]) * jet[0] * jet[6] * jet[6]
-                                        + exp(-jet[0] * jet[0]) * 2. / sqrt(pi) * exp(-jet[3] * jet[3]) * jet[9])));
+                    == approximately(fp_t{1} / 6 * 2 / sqrt(pi)
+                                     * (-2 * exp(-jet[0] * jet[0]) * jet[0] * jet[6] * jet[6]
+                                        + exp(-jet[0] * jet[0]) * 2 / sqrt(pi) * exp(-jet[3] * jet[3]) * jet[9])));
             REQUIRE(jet[22]
-                    == approximately(fp_t{1} / 6 * 2. / sqrt(pi)
-                                     * (-2. * exp(-jet[1] * jet[1]) * jet[1] * jet[7] * jet[7]
-                                        + exp(-jet[1] * jet[1]) * 2. / sqrt(pi) * exp(-jet[4] * jet[4]) * jet[10])));
+                    == approximately(fp_t{1} / 6 * 2 / sqrt(pi)
+                                     * (-2 * exp(-jet[1] * jet[1]) * jet[1] * jet[7] * jet[7]
+                                        + exp(-jet[1] * jet[1]) * 2 / sqrt(pi) * exp(-jet[4] * jet[4]) * jet[10])));
             REQUIRE(jet[23]
-                    == approximately(fp_t{1} / 6 * 2. / sqrt(pi)
-                                     * (-2. * exp(-jet[2] * jet[2]) * jet[2] * jet[8] * jet[8]
-                                        + exp(-jet[2] * jet[2]) * 2. / sqrt(pi) * exp(-jet[5] * jet[5]) * jet[11])));
+                    == approximately(fp_t{1} / 6 * 2 / sqrt(pi)
+                                     * (-2 * exp(-jet[2] * jet[2]) * jet[2] * jet[8] * jet[8]
+                                        + exp(-jet[2] * jet[2]) * 2 / sqrt(pi) * exp(-jet[5] * jet[5]) * jet[11])));
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {

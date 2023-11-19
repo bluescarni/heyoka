@@ -40,7 +40,7 @@ auto div_wrapper(expression a, expression b)
     return detail::div(std::move(a), std::move(b));
 }
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double

@@ -33,7 +33,7 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -163,8 +163,8 @@ TEST_CASE("taylor sum")
             REQUIRE(jet[1] == 3);
             REQUIRE(jet[2] == approximately(fp_t{2 + 2 + 2 + 3}));
             REQUIRE(jet[3] == approximately(fp_t{5}));
-            REQUIRE(jet[4] == approximately(.5 * (jet[2] + jet[3])));
-            REQUIRE(jet[5] == approximately(.5 * (jet[2] + jet[3])));
+            REQUIRE(jet[4] == approximately(fp_t(.5) * (jet[2] + jet[3])));
+            REQUIRE(jet[5] == approximately(fp_t(.5) * (jet[2] + jet[3])));
         }
 
         {
@@ -195,11 +195,11 @@ TEST_CASE("taylor sum")
             REQUIRE(jet[6] == 5);
             REQUIRE(jet[7] == -5);
 
-            REQUIRE(jet[8] == approximately(.5 * (jet[4] + jet[6])));
-            REQUIRE(jet[9] == approximately(.5 * (jet[5] + jet[7])));
+            REQUIRE(jet[8] == approximately(fp_t(.5) * (jet[4] + jet[6])));
+            REQUIRE(jet[9] == approximately(fp_t(.5) * (jet[5] + jet[7])));
 
-            REQUIRE(jet[10] == approximately(.5 * (jet[4] + jet[6])));
-            REQUIRE(jet[11] == approximately(.5 * (jet[5] + jet[7])));
+            REQUIRE(jet[10] == approximately(fp_t(.5) * (jet[4] + jet[6])));
+            REQUIRE(jet[11] == approximately(fp_t(.5) * (jet[5] + jet[7])));
         }
 
         {
@@ -234,13 +234,13 @@ TEST_CASE("taylor sum")
             REQUIRE(jet[10] == -5);
             REQUIRE(jet[11] == 3);
 
-            REQUIRE(jet[12] == approximately(.5 * (jet[6] + jet[9])));
-            REQUIRE(jet[13] == approximately(.5 * (jet[7] + jet[10])));
-            REQUIRE(jet[14] == approximately(.5 * (jet[8] + jet[11])));
+            REQUIRE(jet[12] == approximately(fp_t(.5) * (jet[6] + jet[9])));
+            REQUIRE(jet[13] == approximately(fp_t(.5) * (jet[7] + jet[10])));
+            REQUIRE(jet[14] == approximately(fp_t(.5) * (jet[8] + jet[11])));
 
-            REQUIRE(jet[15] == approximately(.5 * (jet[6] + jet[9])));
-            REQUIRE(jet[16] == approximately(.5 * (jet[7] + jet[10])));
-            REQUIRE(jet[17] == approximately(.5 * (jet[8] + jet[11])));
+            REQUIRE(jet[15] == approximately(fp_t(.5) * (jet[6] + jet[9])));
+            REQUIRE(jet[16] == approximately(fp_t(.5) * (jet[7] + jet[10])));
+            REQUIRE(jet[17] == approximately(fp_t(.5) * (jet[8] + jet[11])));
 
             REQUIRE(jet[18] == approximately((jet[12] + jet[15]) / 3));
             REQUIRE(jet[19] == approximately((jet[13] + jet[16]) / 3));
