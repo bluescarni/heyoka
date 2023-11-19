@@ -41,7 +41,7 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -166,7 +166,7 @@ TEST_CASE("taylor te")
 
             oss << ev_t(
                 v * v - 1e-10, kw::direction = event_direction::negative,
-                kw::callback = [](auto &, bool, int, auto...) { return true; }, kw::cooldown = -5);
+                kw::callback = [](auto &, bool, int, auto...) { return true; }, kw::cooldown = fp_t(-5));
             REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
             REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
             REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
@@ -175,7 +175,7 @@ TEST_CASE("taylor te")
 
             oss << ev_t(
                 v * v - 1e-10, kw::direction = event_direction::negative,
-                kw::callback = [](auto &, bool, int, auto...) { return true; }, kw::cooldown = 1);
+                kw::callback = [](auto &, bool, int, auto...) { return true; }, kw::cooldown = fp_t(1));
             REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
             REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
             REQUIRE(boost::algorithm::contains(oss.str(), " 1"));
@@ -235,6 +235,9 @@ TEST_CASE("taylor te basic")
         using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
         using nt_ev_t = typename taylor_adaptive<fp_t>::nt_event_t;
 
+        // NOTE: don't make the small delta too smal in single-precision.
+        const auto small_delta = std::is_same_v<fp_t, float> ? 1e-6 : 1e-10;
+
         // NOTE: test also sub-eps tolerance.
         for (auto cur_tol : {std::numeric_limits<fp_t>::epsilon(), std::numeric_limits<fp_t>::epsilon() / 100}) {
             auto counter_nt = 0u, counter_t = 0u;
@@ -248,24 +251,25 @@ TEST_CASE("taylor te basic")
                 kw::opt_level = opt_level,
                 kw::high_accuracy = high_accuracy,
                 kw::compact_mode = compact_mode,
-                kw::nt_events = {nt_ev_t(v * v - 1e-10,
-                                         [&counter_nt, &cur_time, &direction](taylor_adaptive<fp_t> &ta_, fp_t t, int) {
-                                             // Make sure the callbacks are called in order.
-                                             if (direction) {
-                                                 REQUIRE(t > cur_time);
-                                             } else {
-                                                 REQUIRE(t < cur_time);
-                                             }
+                kw::nt_events
+                = {nt_ev_t(v * v - small_delta,
+                           [&counter_nt, &cur_time, &direction, small_delta](taylor_adaptive<fp_t> &ta_, fp_t t, int) {
+                               // Make sure the callbacks are called in order.
+                               if (direction) {
+                                   REQUIRE(t > cur_time);
+                               } else {
+                                   REQUIRE(t < cur_time);
+                               }
 
-                                             ta_.update_d_output(t);
+                               ta_.update_d_output(t);
 
-                                             const auto vel = ta_.get_d_output()[1];
-                                             REQUIRE(abs(vel * vel - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+                               const auto vel = ta_.get_d_output()[1];
+                               REQUIRE(abs(vel * vel - small_delta) < std::numeric_limits<fp_t>::epsilon());
 
-                                             ++counter_nt;
+                               ++counter_nt;
 
-                                             cur_time = t;
-                                         })},
+                               cur_time = t;
+                           })},
                 kw::t_events = {t_ev_t(
                     v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta_, bool mr, int) {
                         const auto t = ta_.get_time();
@@ -994,7 +998,7 @@ TEST_CASE("taylor te boolean callback")
         // Some testing for propagate_grid() too.
         ta.reset_cooldowns();
         ta.set_time(fp_t{0});
-        ta.get_state_data()[0] = -0.1;
+        ta.get_state_data()[0] = fp_t(-0.1);
         ta.get_state_data()[1] = 0;
         cur_time = -1;
         direction = true;
@@ -1092,6 +1096,7 @@ private:
     }
 };
 
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<float> &, bool, int)
 HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<double> &, bool, int)
 HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<long double> &, bool, int)
 
