@@ -311,7 +311,9 @@ TEST_CASE("vfabi float")
     REQUIRE(outs[2] == approximately(std::acosh(1.3f)));
     REQUIRE(outs[3] == approximately(std::acosh(1.4f)));
 
-#if defined(HEYOKA_WITH_SLEEF)
+    // NOTE: autovec with external scalar functions seems to work
+    // only since LLVM 16.
+#if defined(HEYOKA_WITH_SLEEF) && LLVM_VERSION_MAJOR >= 16
 
     const auto &tf = detail::get_target_features();
 
@@ -334,14 +336,10 @@ TEST_CASE("vfabi float")
         REQUIRE(count == 5u);
     }
 
-#if LLVM_VERSION_MAJOR >= 16
-
     // NOTE: LLVM16 is currently the version tested in the CI on arm64.
     if (tf.aarch64) {
         REQUIRE(count == 5u);
     }
-
-#endif
 
     // NOTE: currently no auto-vectorization happens on ppc64 due apparently
     // to the way the target machine is being set up by orc/lljit (it works
