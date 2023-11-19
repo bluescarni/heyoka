@@ -38,7 +38,7 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -122,10 +122,10 @@ TEST_CASE("scalar")
         REQUIRE(d_out->get_n_steps() > 0u);
 
         // Try slightly outside the bounds.
-        (*d_out)(-.01);
+        (*d_out)(fp_t(-.01));
         REQUIRE(d_out->get_output()[0] == approximately(sin(fp_t(-0.01))));
         REQUIRE(d_out->get_output()[1] == approximately(cos(fp_t(-0.01))));
-        (*d_out)(10.01);
+        (*d_out)(fp_t(10.01));
         REQUIRE(d_out->get_output()[0] == approximately(sin(fp_t(10.01))));
         REQUIRE(d_out->get_output()[1] == approximately(cos(fp_t(10.01))));
 
@@ -200,10 +200,10 @@ TEST_CASE("scalar")
         REQUIRE(d_out->get_n_steps() > 0u);
 
         // Try slightly outside the bounds.
-        (*d_out)(.01);
+        (*d_out)(fp_t(.01));
         REQUIRE(d_out->get_output()[0] == approximately(sin(fp_t(0.01))));
         REQUIRE(d_out->get_output()[1] == approximately(cos(fp_t(0.01))));
-        (*d_out)(-10.01);
+        (*d_out)(fp_t(-10.01));
         REQUIRE(d_out->get_output()[0] == approximately(sin(fp_t(-10.01))));
         REQUIRE(d_out->get_output()[1] == approximately(cos(fp_t(-10.01))));
 
@@ -345,7 +345,7 @@ TEST_CASE("batch")
         // The vector of final times.
         std::vector<fp_t> final_tm;
         for (auto i = 0u; i < batch_size; ++i) {
-            final_tm.push_back(10. + fp_t(i) / 100);
+            final_tm.push_back(fp_t(10.) + fp_t(i) / 100);
         }
 
         // Create a random batch grid.
@@ -357,7 +357,7 @@ TEST_CASE("batch")
 
             std::uniform_real_distribution<double> rdist(1e-6, 10. + i / 100. - 1e-6);
             for (auto j = 0u; j < n_points - 2u; ++j) {
-                tmp[j] = rdist(rng);
+                tmp[j] = static_cast<fp_t>(rdist(rng));
             }
             std::sort(tmp.begin(), tmp.end());
 
@@ -424,7 +424,7 @@ TEST_CASE("batch")
 
         // Try slightly outside the bounds.
         for (auto j = 0u; j < batch_size; ++j) {
-            loc_time[j] = -0.01;
+            loc_time[j] = fp_t(-0.01);
         }
         (*d_out)(loc_time);
         for (auto j = 0u; j < batch_size; ++j) {
@@ -434,7 +434,7 @@ TEST_CASE("batch")
                     == approximately(-ic[j] * sin(loc_time[j]) + ic[batch_size + j] * cos(loc_time[j])));
         }
         for (auto j = 0u; j < batch_size; ++j) {
-            loc_time[j] = final_tm[j] + 0.01;
+            loc_time[j] = final_tm[j] + fp_t(0.01);
         }
         (*d_out)(loc_time);
         for (auto j = 0u; j < batch_size; ++j) {
@@ -560,7 +560,7 @@ TEST_CASE("batch")
 
         // Try slightly outside the bounds.
         for (auto j = 0u; j < batch_size; ++j) {
-            loc_time[j] = 0.01;
+            loc_time[j] = fp_t(0.01);
         }
         (*d_out)(loc_time);
         for (auto j = 0u; j < batch_size; ++j) {
@@ -570,7 +570,7 @@ TEST_CASE("batch")
                     == approximately(-ic[j] * sin(loc_time[j]) + ic[batch_size + j] * cos(loc_time[j])));
         }
         for (auto j = 0u; j < batch_size; ++j) {
-            loc_time[j] = final_tm[j] - 0.01;
+            loc_time[j] = final_tm[j] - fp_t(0.01);
         }
         (*d_out)(loc_time);
         for (auto j = 0u; j < batch_size; ++j) {
