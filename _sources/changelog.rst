@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add support for single-precision computations
+  (`#363 <https://github.com/bluescarni/heyoka/pull/363>`__).
 - Add model implementing the ELP2000 analytical lunar theory
   (`#362 <https://github.com/bluescarni/heyoka/pull/362>`__).
 

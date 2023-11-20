@@ -458,7 +458,8 @@ to the same {fmt} installation.</p>
 </div>
 <section id="support-for-extended-precision">
 <span id="ep-support"></span><h3>Support for extended precision<a class="headerlink" href="#support-for-extended-precision" title="Permalink to this heading">#</a></h3>
-<p>Whereas in heyoka double-precision computations are always supported, support for extended-precision
+<p>Whereas in heyoka single-precision and double-precision computations are always supported via the
+<code class="docutils literal notranslate"><span class="pre">float</span></code> and <code class="docutils literal notranslate"><span class="pre">double</span></code> types respectively, support for extended-precision
 computations varies depending on the software/hardware platform.</p>
 <section id="bit-precision">
 <h4>80-bit precision<a class="headerlink" href="#bit-precision" title="Permalink to this heading">#</a></h4>
@@ -472,7 +473,7 @@ heyoka (and all its dependencies) have been compiled with a compiler supporting 
 <section id="id2">
 <h4>128-bit precision<a class="headerlink" href="#id2" title="Permalink to this heading">#</a></h4>
 <p>On platforms where <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> is a quadruple-precision floating-point datatype (e.g., 64-bit ARM),
-quadruple-precision integrations are always supported. Otherwise,
+quadruple-precision integrations are always supported via <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code>. Otherwise,
 on platforms such as x86-64, quadruple-precision computations are supported if:</p>
 <ul class="simple">
 <li><p>the nonstandard <code class="docutils literal notranslate"><span class="pre">__float128</span></code> floating-point type is

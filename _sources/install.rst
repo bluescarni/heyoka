@@ -64,7 +64,8 @@ installing from source (the minimum required version is 3.18).
 Support for extended precision
 ``````````````````````````````
 
-Whereas in heyoka double-precision computations are always supported, support for extended-precision
+Whereas in heyoka single-precision and double-precision computations are always supported via the
+``float`` and ``double`` types respectively, support for extended-precision
 computations varies depending on the software/hardware platform.
 
 80-bit precision
@@ -81,7 +82,7 @@ heyoka (and all its dependencies) have been compiled with a compiler supporting 
 ^^^^^^^^^^^^^^^^^
 
 On platforms where ``long double`` is a quadruple-precision floating-point datatype (e.g., 64-bit ARM),
-quadruple-precision integrations are always supported. Otherwise,
+quadruple-precision integrations are always supported via ``long double``. Otherwise,
 on platforms such as x86-64, quadruple-precision computations are supported if:
 
 * the nonstandard ``__float128`` floating-point type is

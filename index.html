@@ -391,7 +391,7 @@ people around them.</p>
 on automatic differentiation techniques and aggressive just-in-time
 compilation via <a class="reference external" href="https://llvm.org/">LLVM</a>. Notable features include:</p>
 <ul class="simple">
-<li><p>support for double-precision, extended-precision (80-bit and 128-bit),
+<li><p>support for single-precision, double-precision, extended-precision (80-bit and 128-bit),
 and arbitrary-precision floating-point types,</p></li>
 <li><p>the ability to maintain machine precision accuracy over
 tens of billions of timesteps,</p></li>
@@ -496,108 +496,14 @@ license. The authors are Francesco Biscani and
 Dario Izzo (European Space Agency).</p>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="install.html#introduction">Introduction</a></li>
-<li class="toctree-l2"><a class="reference internal" href="install.html#packages">Packages</a></li>
-<li class="toctree-l2"><a class="reference internal" href="install.html#installation-from-source">Installation from source</a></li>
-<li class="toctree-l2"><a class="reference internal" href="install.html#including-heyoka-in-your-project-via-cmake">Including heyoka in your project via CMake</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="basic_tutorials.html">Basic tutorials</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="tut_taylor_method.html">Taylor’s method</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tut_expression_system.html">The expression system</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tut_adaptive.html">The adaptive integrator</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tut_adaptive_custom.html">Customising the adaptive integrator</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tut_param.html">Runtime parameters</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tut_nonauto.html">Non-autonomous systems</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tut_d_output.html">Dense &amp; continuous output</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tut_events.html">Event detection</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="advanced_tutorials.html">Advanced tutorials</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="tut_batch_mode.html">Batch mode</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tut_extended_precision.html">Computations in extended precision</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tut_arbitrary_precision.html">Computations in arbitrary precision</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tut_s11n.html">Serialisation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tut_ensemble.html">Ensemble propagations</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tut_parallel_mode.html">Parallel mode</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="api_reference.html">API Reference</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="definitions.html">Macros and definitions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="namespaces.html">Namespaces</a></li>
-<li class="toctree-l2"><a class="reference internal" href="kwargs.html">Keyword arguments</a></li>
-<li class="toctree-l2"><a class="reference internal" href="exceptions.html">Exceptions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="expression_system.html">Expression system</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="benchmarks.html#the-planetary-three-body-problem">The planetary three-body problem</a></li>
-<li class="toctree-l2"><a class="reference internal" href="benchmarks.html#the-outer-solar-system">The outer Solar System</a></li>
-<li class="toctree-l2"><a class="reference internal" href="benchmarks.html#event-detection">Event detection</a></li>
-<li class="toctree-l2"><a class="reference internal" href="benchmarks.html#back-forth">Back &amp; forth</a></li>
-<li class="toctree-l2"><a class="reference internal" href="benchmarks.html#extended-and-arbitrary-precision">Extended and arbitrary precision</a></li>
-<li class="toctree-l2"><a class="reference internal" href="benchmarks.html#dense-output-fidelity-and-stability">Dense output fidelity and stability</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="ad_notes.html">Notes on automatic differentiation</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="ad_notes.html#preliminaries">Preliminaries</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ad_notes.html#basic-arithmetic">Basic arithmetic</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ad_notes.html#squaring">Squaring</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ad_notes.html#square-root">Square root</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ad_notes.html#exponentiation">Exponentiation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ad_notes.html#exponentials">Exponentials</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ad_notes.html#logarithms">Logarithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ad_notes.html#trigonometric-functions">Trigonometric functions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ad_notes.html#inverse-trigonometric-functions">Inverse trigonometric functions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ad_notes.html#hyperbolic-functions">Hyperbolic functions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ad_notes.html#inverse-hyperbolic-functions">Inverse hyperbolic functions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ad_notes.html#special-functions">Special functions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ad_notes.html#celestial-mechanics">Celestial mechanics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="ad_notes.html#time-functions">Time functions</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#unreleased">3.2.0 (unreleased)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id1">3.1.0 (2023-11-13)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id4">3.0.0 (2023-10-07)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id6">2.0.0 (2023-09-22)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id10">1.0.0 (2023-08-10)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id14">0.21.0 (2023-02-16)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id16">0.20.1 (2023-01-05)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id18">0.20.0 (2022-12-17)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id22">0.19.0 (2022-09-18)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id26">0.18.0 (2022-05-11)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id30">0.17.1 (2022-02-13)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id33">0.17.0 (2022-01-20)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id37">0.16.0 (2021-11-20)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id41">0.15.0 (2021-09-28)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id45">0.14.0 (2021-08-03)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id49">0.12.0 (2021-07-21)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id52">0.11.0 (2021-07-06)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id55">0.10.1 (2021-07-02)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id57">0.10.0 (2021-06-09)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id60">0.9.0 (2021-05-25)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id63">0.8.0 (2021-04-28)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id67">0.7.0 (2021-04-21)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id71">0.6.1 (2021-04-08)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id74">0.6.0 (2021-04-06)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id78">0.5.0 (2021-02-25)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id80">0.4.0 (2021-02-20)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id83">0.3.0 (2021-02-11)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id87">0.2.0 (2021-01-13)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="changelog.html#id91">0.1.0 (2020-12-18)</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="breaking_changes.html">Breaking changes</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="breaking_changes.html#bchanges-2-0-0">2.0.0</a></li>
-<li class="toctree-l2"><a class="reference internal" href="breaking_changes.html#bchanges-1-0-0">1.0.0</a></li>
-<li class="toctree-l2"><a class="reference internal" href="breaking_changes.html#bchanges-0-16-0">0.16.0</a></li>
-<li class="toctree-l2"><a class="reference internal" href="breaking_changes.html#bchanges-0-15-0">0.15.0</a></li>
-<li class="toctree-l2"><a class="reference internal" href="breaking_changes.html#bchanges-0-10-0">0.10.0</a></li>
-<li class="toctree-l2"><a class="reference internal" href="breaking_changes.html#bchanges-0-8-0">0.8.0</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="basic_tutorials.html">Basic tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="advanced_tutorials.html">Advanced tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_reference.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ad_notes.html">Notes on automatic differentiation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="breaking_changes.html">Breaking changes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="known_issues.html">Known issues</a></li>
 <li class="toctree-l1"><a class="reference internal" href="acknowledgement.html">Acknowledgement</a></li>
 <li class="toctree-l1"><a class="reference internal" href="bibliography.html">Bibliography</a></li>

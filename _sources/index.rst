@@ -17,7 +17,7 @@ heyoka is a C++ library for the integration of ordinary differential equations
 on automatic differentiation techniques and aggressive just-in-time
 compilation via `LLVM <https://llvm.org/>`__. Notable features include:
 
-* support for double-precision, extended-precision (80-bit and 128-bit),
+* support for single-precision, double-precision, extended-precision (80-bit and 128-bit),
   and arbitrary-precision floating-point types,
 * the ability to maintain machine precision accuracy over
   tens of billions of timesteps,
@@ -110,7 +110,7 @@ license. The authors are Francesco Biscani and
 Dario Izzo (European Space Agency).
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    install.rst
    basic_tutorials.rst
