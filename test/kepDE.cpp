@@ -233,6 +233,7 @@ TEST_CASE("kepDE diff")
 
 TEST_CASE("kepDE overloads")
 {
+    HEYOKA_TEST_KEPDE_OVERLOAD(float);
     HEYOKA_TEST_KEPDE_OVERLOAD(double);
     HEYOKA_TEST_KEPDE_OVERLOAD(long double);
 

@@ -418,6 +418,33 @@ TEST_CASE("normalise")
     REQUIRE(normalise(subs(pow(x, y), {{x, x * y}, {y, -2_dbl}})) == pow(x, -2.) * pow(y, -2.));
 }
 
+TEST_CASE("pow overloads")
+{
+    auto k = pow("x"_var, 1.1f);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1f});
+
+    k = pow("x"_var, 1.1);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1});
+
+    k = pow("x"_var, 1.1l);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1l});
+
+#if defined(HEYOKA_HAVE_REAL128)
+    k = pow("x"_var, mppp::real128{"1.1"});
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{mppp::real128{"1.1"}});
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+    k = pow("x"_var, 1.1_r256);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1_r256});
+#endif
+}
+
 // Tests to check vectorisation via the vector-function-abi-variant machinery.
 TEST_CASE("vfabi double")
 {

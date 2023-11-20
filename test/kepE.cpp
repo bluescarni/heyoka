@@ -136,7 +136,11 @@ TEST_CASE("kepE diff")
 
 TEST_CASE("kepE overloads")
 {
-    auto k = kepE("x"_var, 1.1);
+    auto k = kepE("x"_var, 1.1f);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1f});
+
+    k = kepE("x"_var, 1.1);
     REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1});
 
@@ -150,11 +154,15 @@ TEST_CASE("kepE overloads")
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{mppp::real128{"1.1"}});
 #endif
 
-#if defined(HEYOKA_HAVE_REAL128)
+#if defined(HEYOKA_HAVE_REAL)
     k = kepE("x"_var, 1.1_r256);
     REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1_r256});
 #endif
+
+    k = kepE(1.1f, "x"_var);
+    REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{1.1f});
 
     k = kepE(1.1, "x"_var);
     REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);

@@ -109,7 +109,11 @@ TEST_CASE("atan2 diff")
 
 TEST_CASE("atan2 overloads")
 {
-    auto k = atan2("x"_var, 1.1);
+    auto k = atan2("x"_var, 1.1f);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1f});
+
+    k = atan2("x"_var, 1.1);
     REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1});
 
@@ -128,6 +132,10 @@ TEST_CASE("atan2 overloads")
     REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1_r256});
 #endif
+
+    k = atan2(1.1f, "x"_var);
+    REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{1.1f});
 
     k = atan2(1.1, "x"_var);
     REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);

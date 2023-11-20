@@ -230,6 +230,7 @@ TEST_CASE("kepF diff")
 
 TEST_CASE("kepF overloads")
 {
+    HEYOKA_TEST_KEPF_OVERLOAD(float);
     HEYOKA_TEST_KEPF_OVERLOAD(double);
     HEYOKA_TEST_KEPF_OVERLOAD(long double);
 
