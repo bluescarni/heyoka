@@ -31,7 +31,7 @@ namespace detail
 
 // Common options for the vsop2013 functions.
 template <typename... KwArgs>
-auto vsop2013_common_opts(const KwArgs &...kw_args)
+auto vsop2013_common_opts(double def_thresh, const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
@@ -44,12 +44,12 @@ auto vsop2013_common_opts(const KwArgs &...kw_args)
         }
     }();
 
-    // Threshold value (defaults to 1e-9).
-    auto thresh = [&p]() -> double {
+    // Threshold value.
+    auto thresh = [&p, def_thresh]() -> double {
         if constexpr (p.has(kw::thresh)) {
             return std::forward<decltype(p(kw::thresh))>(p(kw::thresh));
         } else {
-            return 1e-9;
+            return def_thresh;
         }
     }();
 
@@ -65,7 +65,7 @@ HEYOKA_DLL_PUBLIC std::vector<expression> vsop2013_cartesian_icrf_impl(std::uint
 template <typename... KwArgs>
 expression vsop2013_elliptic(std::uint32_t pl_idx, std::uint32_t var_idx, const KwArgs &...kw_args)
 {
-    auto [time_expr, thresh] = detail::vsop2013_common_opts(kw_args...);
+    auto [time_expr, thresh] = detail::vsop2013_common_opts(1e-9, kw_args...);
 
     return detail::vsop2013_elliptic_impl(pl_idx, var_idx, std::move(time_expr), thresh);
 }
@@ -73,7 +73,7 @@ expression vsop2013_elliptic(std::uint32_t pl_idx, std::uint32_t var_idx, const 
 template <typename... KwArgs>
 std::vector<expression> vsop2013_cartesian(std::uint32_t pl_idx, const KwArgs &...kw_args)
 {
-    auto [time_expr, thresh] = detail::vsop2013_common_opts(kw_args...);
+    auto [time_expr, thresh] = detail::vsop2013_common_opts(1e-9, kw_args...);
 
     return detail::vsop2013_cartesian_impl(pl_idx, std::move(time_expr), thresh);
 }
@@ -81,7 +81,7 @@ std::vector<expression> vsop2013_cartesian(std::uint32_t pl_idx, const KwArgs &.
 template <typename... KwArgs>
 std::vector<expression> vsop2013_cartesian_icrf(std::uint32_t pl_idx, const KwArgs &...kw_args)
 {
-    auto [time_expr, thresh] = detail::vsop2013_common_opts(kw_args...);
+    auto [time_expr, thresh] = detail::vsop2013_common_opts(1e-9, kw_args...);
 
     return detail::vsop2013_cartesian_icrf_impl(pl_idx, std::move(time_expr), thresh);
 }
