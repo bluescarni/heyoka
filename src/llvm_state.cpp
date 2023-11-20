@@ -253,12 +253,14 @@ target_features get_target_features_impl()
     // Compute the recommended SIMD sizes.
     if (retval.avx512f || retval.avx2 || retval.avx) {
         // NOTE: keep the recommended SIMD size to
-        // 4 also for AVX512 due to perf issues in early
+        // 4/8 also for AVX512 due to perf issues in early
         // implementations. Revisit this in the future, possibly
         // making it conditional on the specific CPU model
         // in use.
+        retval.simd_size_flt = 8;
         retval.simd_size_dbl = 4;
     } else if (retval.sse2 || retval.aarch64 || retval.vsx || retval.vsx3) {
+        retval.simd_size_flt = 4;
         retval.simd_size_dbl = 2;
     }
 
@@ -297,6 +299,12 @@ const target_features &get_target_features()
 }
 
 } // namespace detail
+
+template <>
+std::uint32_t recommended_simd_size<float>()
+{
+    return detail::get_target_features().simd_size_flt;
+}
 
 template <>
 std::uint32_t recommended_simd_size<double>()

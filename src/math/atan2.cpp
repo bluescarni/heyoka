@@ -833,6 +833,11 @@ expression atan2(expression y, expression x)
     }
 }
 
+expression atan2(expression y, float x)
+{
+    return atan2(std::move(y), expression(x));
+}
+
 expression atan2(expression y, double x)
 {
     return atan2(std::move(y), expression(x));
@@ -860,6 +865,11 @@ expression atan2(expression y, mppp::real x)
 }
 
 #endif
+
+expression atan2(float y, expression x)
+{
+    return atan2(expression(y), std::move(x));
+}
 
 expression atan2(double y, expression x)
 {

@@ -66,6 +66,8 @@ HEYOKA_BEGIN_NAMESPACE
 
 expression::expression() : expression(number{0.}) {}
 
+expression::expression(float x) : expression(number{x}) {}
+
 expression::expression(double x) : expression(number{x}) {}
 
 expression::expression(long double x) : expression(number{x}) {}
@@ -226,6 +228,16 @@ std::vector<expression> copy(const std::vector<expression> &v_ex)
 
 inline namespace literals
 {
+
+expression operator""_flt(long double x)
+{
+    return expression{static_cast<float>(x)};
+}
+
+expression operator""_flt(unsigned long long n)
+{
+    return expression{static_cast<float>(n)};
+}
 
 expression operator""_dbl(long double x)
 {

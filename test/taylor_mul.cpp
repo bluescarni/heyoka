@@ -34,7 +34,7 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -238,8 +238,8 @@ TEST_CASE("taylor mul")
             REQUIRE(jet[7] == approximately(-fp_t{5}));
             REQUIRE(jet[8] == 0);
             REQUIRE(jet[9] == 0);
-            REQUIRE(jet[10] == approximately(.5 * (fp_t{6} + jet[6])));
-            REQUIRE(jet[11] == approximately(.5 * (fp_t{6} + jet[7])));
+            REQUIRE(jet[10] == approximately(fp_t(.5) * (fp_t{6} + jet[6])));
+            REQUIRE(jet[11] == approximately(fp_t(.5) * (fp_t{6} + jet[7])));
         }
 
         {

@@ -2053,6 +2053,16 @@ taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name,
 }
 
 // Explicit instantiations.
+template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<float>(llvm_state &, const std::string &,
+                                                             const std::vector<expression> &, std::uint32_t,
+                                                             std::uint32_t, bool, bool, const std::vector<expression> &,
+                                                             bool, long long);
+
+template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<float>(llvm_state &, const std::string &,
+                                                             const std::vector<std::pair<expression, expression>> &,
+                                                             std::uint32_t, std::uint32_t, bool, bool,
+                                                             const std::vector<expression> &, bool, long long);
+
 template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<double>(llvm_state &, const std::string &,
                                                               const std::vector<expression> &, std::uint32_t,
                                                               std::uint32_t, bool, bool,
@@ -2121,6 +2131,8 @@ T taylor_default_max_delta_t()
 }
 
 // Explicit instantiations.
+template HEYOKA_DLL_PUBLIC float taylor_default_max_delta_t<float>();
+
 template HEYOKA_DLL_PUBLIC double taylor_default_max_delta_t<double>();
 
 template HEYOKA_DLL_PUBLIC long double taylor_default_max_delta_t<long double>();

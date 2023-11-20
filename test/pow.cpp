@@ -66,7 +66,7 @@ using namespace mppp::literals;
 
 #endif
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -418,8 +418,35 @@ TEST_CASE("normalise")
     REQUIRE(normalise(subs(pow(x, y), {{x, x * y}, {y, -2_dbl}})) == pow(x, -2.) * pow(y, -2.));
 }
 
-// Test to check vectorisation via the vector-function-abi-variant machinery.
-TEST_CASE("vfabi")
+TEST_CASE("pow overloads")
+{
+    auto k = pow("x"_var, 1.1f);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1f});
+
+    k = pow("x"_var, 1.1);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1});
+
+    k = pow("x"_var, 1.1l);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1l});
+
+#if defined(HEYOKA_HAVE_REAL128)
+    k = pow("x"_var, mppp::real128{"1.1"});
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{mppp::real128{"1.1"}});
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+    k = pow("x"_var, 1.1_r256);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1_r256});
+#endif
+}
+
+// Tests to check vectorisation via the vector-function-abi-variant machinery.
+TEST_CASE("vfabi double")
 {
     llvm_state s{kw::slp_vectorize = true};
 
@@ -478,6 +505,71 @@ TEST_CASE("vfabi")
 
     // if (tf.vsx) {
     //     REQUIRE(count == 3u);
+    // }
+
+#endif
+}
+
+TEST_CASE("vfabi float")
+{
+    llvm_state s{kw::slp_vectorize = true};
+
+    auto [a, b, c, d] = make_vars("a", "b", "c", "d");
+
+    add_cfunc<float>(s, "cfunc", {pow(a, .6f), pow(b, .7f), pow(c, .8f), pow(d, .9f)});
+
+    s.compile();
+
+    auto *cf_ptr
+        = reinterpret_cast<void (*)(float *, const float *, const float *, const float *)>(s.jit_lookup("cfunc"));
+
+    const std::vector<float> ins{.1f, .2f, .3f, .4f};
+    std::vector<float> outs(4u, 0.);
+
+    cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+
+    REQUIRE(outs[0] == approximately(std::pow(.1f, .6f)));
+    REQUIRE(outs[1] == approximately(std::pow(.2f, .7f)));
+    REQUIRE(outs[2] == approximately(std::pow(.3f, .8f)));
+    REQUIRE(outs[3] == approximately(std::pow(.4f, .9f)));
+
+#if defined(HEYOKA_WITH_SLEEF)
+
+    const auto &tf = detail::get_target_features();
+
+    auto ir = s.get_ir();
+
+    using string_find_iterator = boost::find_iterator<std::string::iterator>;
+
+    auto count = 0u;
+    for (auto it = boost::make_find_iterator(ir, boost::first_finder("@llvm.pow.f32", boost::is_iequal()));
+         it != string_find_iterator(); ++it) {
+        ++count;
+    }
+
+    // NOTE: at the moment we have comprehensive coverage of LLVM versions
+    // in the CI only for x86_64.
+    if (tf.sse2) {
+        // NOTE: occurrences of the scalar version:
+        // - 4 calls in the strided cfunc,
+        // - 1 declaration.
+        REQUIRE(count == 5u);
+    }
+
+#if LLVM_VERSION_MAJOR >= 16
+
+    if (tf.aarch64) {
+        REQUIRE(count == 5u);
+    }
+
+#endif
+
+    // NOTE: currently no auto-vectorization happens on ppc64 due apparently
+    // to the way the target machine is being set up by orc/lljit (it works
+    // fine with the opt tool). When this is resolved, we can test ppc64 too.
+
+    // if (tf.vsx) {
+    //     REQUIRE(count == 5u);
     // }
 
 #endif

@@ -37,7 +37,7 @@ const int ntrials = 100;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -71,7 +71,7 @@ TEST_CASE("scalar test")
         std::uniform_real_distribution rdist(-1e-9, 1e-9);
 
         for (auto i = 0; i < ntrials; ++i) {
-            const auto v0 = fp_t(1) + rdist(rng);
+            const auto v0 = fp_t(1) + static_cast<fp_t>(rdist(rng));
 
             ta.set_time(0);
             ta.get_state_data()[0] = 0;
@@ -93,7 +93,7 @@ TEST_CASE("scalar test")
         err = 0;
 
         for (auto i = 0; i < ntrials; ++i) {
-            const auto v0 = fp_t(1) + rdist(rng);
+            const auto v0 = fp_t(1) + static_cast<fp_t>(rdist(rng));
 
             ta.set_time(0);
             ta.get_state_data()[0] = 0;
@@ -115,7 +115,7 @@ TEST_CASE("scalar test")
         err = 0;
 
         for (auto i = 0; i < ntrials; ++i) {
-            const auto v0 = fp_t(1) + rdist(rng);
+            const auto v0 = fp_t(1) + static_cast<fp_t>(rdist(rng));
 
             ta.set_time(0);
             ta.get_state_data()[0] = 0;
@@ -139,7 +139,7 @@ TEST_CASE("scalar test")
         err = 0;
 
         for (auto i = 0; i < ntrials; ++i) {
-            const auto v0 = fp_t(1) + rdist(rng);
+            const auto v0 = fp_t(1) + static_cast<fp_t>(rdist(rng));
 
             ta.set_time(0);
             ta.get_state_data()[0] = 0;
@@ -182,8 +182,8 @@ TEST_CASE("batch test")
         std::uniform_real_distribution rdist(-1e-9, 1e-9);
 
         for (auto i = 0; i < ntrials; ++i) {
-            const auto v0 = fp_t(1) + rdist(rng);
-            const auto v1 = fp_t(1) + rdist(rng);
+            const auto v0 = fp_t(1) + static_cast<fp_t>(rdist(rng));
+            const auto v1 = fp_t(1) + static_cast<fp_t>(rdist(rng));
 
             ta.set_time({fp_t(0), 0});
             ta.get_state_data()[0] = 0;
@@ -212,8 +212,8 @@ TEST_CASE("batch test")
         final_time = std::vector{fp_t(-10000.), fp_t(-11000.)};
 
         for (auto i = 0; i < ntrials; ++i) {
-            const auto v0 = fp_t(1) + rdist(rng);
-            const auto v1 = fp_t(1) + rdist(rng);
+            const auto v0 = fp_t(1) + static_cast<fp_t>(rdist(rng));
+            const auto v1 = fp_t(1) + static_cast<fp_t>(rdist(rng));
 
             ta.set_time({fp_t(0), 0});
             ta.get_state_data()[0] = 0;
@@ -240,8 +240,8 @@ TEST_CASE("batch test")
         err = 0;
 
         for (auto i = 0; i < ntrials; ++i) {
-            const auto v0 = fp_t(1) + rdist(rng);
-            const auto v1 = fp_t(1) + rdist(rng);
+            const auto v0 = fp_t(1) + static_cast<fp_t>(rdist(rng));
+            const auto v1 = fp_t(1) + static_cast<fp_t>(rdist(rng));
 
             ta.set_time({fp_t(0), 0});
             ta.get_state_data()[0] = 0;
@@ -270,8 +270,8 @@ TEST_CASE("batch test")
         err = 0;
 
         for (auto i = 0; i < ntrials; ++i) {
-            const auto v0 = fp_t(1) + rdist(rng);
-            const auto v1 = fp_t(1) + rdist(rng);
+            const auto v0 = fp_t(1) + static_cast<fp_t>(rdist(rng));
+            const auto v1 = fp_t(1) + static_cast<fp_t>(rdist(rng));
 
             ta.set_time({fp_t(0), 0});
             ta.get_state_data()[0] = 0;

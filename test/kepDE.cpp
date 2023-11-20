@@ -48,7 +48,7 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -233,6 +233,7 @@ TEST_CASE("kepDE diff")
 
 TEST_CASE("kepDE overloads")
 {
+    HEYOKA_TEST_KEPDE_OVERLOAD(float);
     HEYOKA_TEST_KEPDE_OVERLOAD(double);
     HEYOKA_TEST_KEPDE_OVERLOAD(long double);
 
@@ -279,6 +280,8 @@ TEST_CASE("kepDE s11n")
 TEST_CASE("cfunc")
 {
     using std::isnan;
+    using std::nextafter;
+    using std::sqrt;
 
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using fp_t = decltype(fp_x);
@@ -294,11 +297,12 @@ TEST_CASE("cfunc")
 
         auto generate_hk = [&h_dist]() {
             // Generate h.
-            auto h_val = h_dist(rng);
+            auto h_val = static_cast<fp_t>(h_dist(rng));
 
             // Generate a k such that h**2+k**2<1.
-            const auto max_abs_k = std::sqrt(1. - h_val * h_val);
-            std::uniform_real_distribution<double> k_dist(std::nextafter(-max_abs_k, 0.), max_abs_k);
+            const auto max_abs_k = sqrt(fp_t(1) - h_val * h_val);
+            std::uniform_real_distribution<double> k_dist(static_cast<double>(nextafter(-max_abs_k, fp_t(0))),
+                                                          static_cast<double>(max_abs_k));
             auto k_val = static_cast<fp_t>(k_dist(rng));
 
             return std::make_pair(static_cast<fp_t>(h_val), std::move(k_val));
@@ -335,7 +339,7 @@ TEST_CASE("cfunc")
                     // Generate the hs and ks.
                     auto [hval, kval] = generate_hk();
                     // Generate the lam.
-                    auto lamval = lam_dist(rng);
+                    auto lamval = static_cast<fp_t>(lam_dist(rng));
 
                     ins[i] = hval;
                     ins[i + batch_size] = kval;
@@ -359,8 +363,8 @@ TEST_CASE("cfunc")
                     auto hval = ins[i];
                     auto kval = ins[i + batch_size];
                     auto lamval = ins[i + 2u * batch_size];
-                    REQUIRE(eps_close(cos(lamval), cos(Fval + hval * (1. - cos(Fval)) - kval * sin(Fval))));
-                    REQUIRE(eps_close(sin(lamval), sin(Fval + hval * (1. - cos(Fval)) - kval * sin(Fval))));
+                    REQUIRE(eps_close(cos(lamval), cos(Fval + hval * (fp_t(1) - cos(Fval)) - kval * sin(Fval))));
+                    REQUIRE(eps_close(sin(lamval), sin(Fval + hval * (fp_t(1) - cos(Fval)) - kval * sin(Fval))));
 
                     // Second output.
                     REQUIRE(!isnan(outs[i + batch_size]));
@@ -368,17 +372,17 @@ TEST_CASE("cfunc")
                     hval = pars[i];
                     kval = pars[i + batch_size];
                     lamval = ins[i + 2u * batch_size];
-                    REQUIRE(eps_close(cos(lamval), cos(Fval + hval * (1. - cos(Fval)) - kval * sin(Fval))));
-                    REQUIRE(eps_close(sin(lamval), sin(Fval + hval * (1. - cos(Fval)) - kval * sin(Fval))));
+                    REQUIRE(eps_close(cos(lamval), cos(Fval + hval * (fp_t(1) - cos(Fval)) - kval * sin(Fval))));
+                    REQUIRE(eps_close(sin(lamval), sin(Fval + hval * (fp_t(1) - cos(Fval)) - kval * sin(Fval))));
 
                     // Third output.
                     REQUIRE(!isnan(outs[i + batch_size * 2u]));
                     Fval = outs[i + batch_size * 2u];
-                    hval = .5;
-                    kval = .3;
+                    hval = fp_t(.5);
+                    kval = fp_t(.3);
                     lamval = ins[i + 2u * batch_size];
-                    REQUIRE(eps_close(cos(lamval), cos(Fval + hval * (1. - cos(Fval)) - kval * sin(Fval))));
-                    REQUIRE(eps_close(sin(lamval), sin(Fval + hval * (1. - cos(Fval)) - kval * sin(Fval))));
+                    REQUIRE(eps_close(cos(lamval), cos(Fval + hval * (fp_t(1) - cos(Fval)) - kval * sin(Fval))));
+                    REQUIRE(eps_close(sin(lamval), sin(Fval + hval * (fp_t(1) - cos(Fval)) - kval * sin(Fval))));
                 }
             }
         }

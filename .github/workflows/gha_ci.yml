@@ -38,7 +38,7 @@ jobs:
           mkdir build
           cd build
           cmake ../ -G "Visual Studio 16 2019" -A x64 -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_MPPP=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_WITH_SLEEF=yes -DMPPP_GMP_INCLUDE_DIR=C:\Miniconda\envs\test\Library\include -DMPPP_GMP_LIBRARY=C:\Miniconda\envs\test\Library\lib\mpir.lib
-          cmake --build . --config Release
+          cmake --build . --config Release -j2
           copy Release\heyoka.dll test\Release\
           ctest -j4 -V -C Release
   windows_2019_llvm13:
@@ -60,7 +60,7 @@ jobs:
           mkdir build
           cd build
           cmake ../ -G "Visual Studio 16 2019" -A x64 -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_MPPP=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_WITH_SLEEF=yes -DMPPP_GMP_INCLUDE_DIR=C:\Miniconda\envs\test\Library\include -DMPPP_GMP_LIBRARY=C:\Miniconda\envs\test\Library\lib\mpir.lib
-          cmake --build . --config Release
+          cmake --build . --config Release -j2
           copy Release\heyoka.dll test\Release\
           ctest -j4 -V -C Release
   windows_2019_llvm14:
@@ -82,7 +82,7 @@ jobs:
           mkdir build
           cd build
           cmake ../ -G "Visual Studio 16 2019" -A x64 -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_MPPP=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_WITH_SLEEF=yes -DMPPP_GMP_INCLUDE_DIR=C:\Miniconda\envs\test\Library\include -DMPPP_GMP_LIBRARY=C:\Miniconda\envs\test\Library\lib\mpir.lib
-          cmake --build . --config Release
+          cmake --build . --config Release -j2
           copy Release\heyoka.dll test\Release\
           ctest -j4 -V -C Release
   conda_release_static:

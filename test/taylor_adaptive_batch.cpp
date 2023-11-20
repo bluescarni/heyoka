@@ -55,7 +55,7 @@ using namespace heyoka;
 namespace hy = heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -1166,9 +1166,9 @@ TEST_CASE("stream output")
 
         {
             auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v - par[1], prime(v) = -9.8 * sin(x + par[0])},
-                                                  {0., 0.01, 0.5, 0.51},
+                                                  {fp_t(0.), fp_t(0.01), fp_t(0.5), fp_t(0.51)},
                                                   2u,
-                                                  kw::pars = std::vector<fp_t>{-1e-4, -1.1e-4}};
+                                                  kw::pars = std::vector{fp_t(-1e-4), fp_t(-1.1e-4)}};
 
             std::ostringstream oss;
 
@@ -1188,7 +1188,7 @@ TEST_CASE("stream output")
 
         {
             auto tad = taylor_adaptive_batch<fp_t>{{prime(x) = v - par[1], prime(v) = -9.8 * sin(x + par[0])},
-                                                   {0., 0.01, 0.5, 0.51},
+                                                   {fp_t(0.), fp_t(0.01), fp_t(0.5), fp_t(0.51)},
                                                    2u,
                                                    kw::t_events = {t_ev_t(x)}};
 
@@ -1205,7 +1205,7 @@ TEST_CASE("stream output")
         {
             auto tad
                 = taylor_adaptive_batch<fp_t>{{prime(x) = v - par[1], prime(v) = -9.8 * sin(x + par[0])},
-                                              {0., 0.01, 0.5, 0.51},
+                                              {fp_t(0.), fp_t(0.01), fp_t(0.5), fp_t(0.51)},
                                               2u,
                                               kw::nt_events = {nt_ev_t(x, [](auto &, fp_t, int, std::uint32_t) {})}};
 
@@ -1222,7 +1222,7 @@ TEST_CASE("stream output")
         {
             auto tad
                 = taylor_adaptive_batch<fp_t>{{prime(x) = v - par[1], prime(v) = -9.8 * sin(x + par[0])},
-                                              {0., 0.01, 0.5, 0.51},
+                                              {fp_t(0.), fp_t(0.01), fp_t(0.5), fp_t(0.51)},
                                               2u,
                                               kw::t_events = {t_ev_t(x)},
                                               kw::nt_events = {nt_ev_t(x, [](auto &, fp_t, int, std::uint32_t) {})}};
@@ -1816,10 +1816,11 @@ TEST_CASE("callback ste")
         auto [x, v] = make_vars("x", "v");
 
         using ev_t = typename taylor_adaptive_batch<fp_t>::t_event_t;
-        auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
-                                              {-1, -0.0001, -1, -1, 0.025, 0.026, 0.027, 0.028},
-                                              4,
-                                              kw::t_events = {ev_t(x)}};
+        auto ta = taylor_adaptive_batch<fp_t>{
+            {prime(x) = v, prime(v) = -9.8 * sin(x)},
+            {fp_t(-1), fp_t(-0.0001), fp_t(-1), fp_t(-1), fp_t(0.025), fp_t(0.026), fp_t(0.027), fp_t(0.028)},
+            4,
+            kw::t_events = {ev_t(x)}};
 
         int n_invoked = 0;
         auto pcb = [&n_invoked](auto &) {

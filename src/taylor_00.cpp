@@ -9,7 +9,6 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
-#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -2177,6 +2176,8 @@ const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
 namespace detail
 {
 
+template class taylor_adaptive_base<float, taylor_adaptive<float>>;
+
 template class taylor_adaptive_base<double, taylor_adaptive<double>>;
 
 template class taylor_adaptive_base<long double, taylor_adaptive<long double>>;
@@ -2194,6 +2195,19 @@ template class taylor_adaptive_base<mppp::real, taylor_adaptive<mppp::real>>;
 #endif
 
 } // namespace detail
+
+template class taylor_adaptive<float>;
+
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive<float>::finalise_ctor_impl(const std::vector<expression> &, std::vector<float>, std::optional<float>,
+                                           std::optional<float>, bool, bool, std::vector<float>, std::vector<t_event_t>,
+                                           std::vector<nt_event_t>, bool, std::optional<long long>);
+
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive<float>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &, std::vector<float>,
+                                           std::optional<float>, std::optional<float>, bool, bool, std::vector<float>,
+                                           std::vector<t_event_t>, std::vector<nt_event_t>, bool,
+                                           std::optional<long long>);
 
 template class taylor_adaptive<double>;
 
@@ -4274,6 +4288,16 @@ void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
 }
 
 // Explicit instantiation of the batch implementation classes.
+template class taylor_adaptive_batch<float>;
+
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<float>::finalise_ctor_impl(
+    const std::vector<expression> &, std::vector<float>, std::uint32_t, std::vector<float>, std::optional<float>, bool,
+    bool, std::vector<float>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<float>::finalise_ctor_impl(
+    const std::vector<std::pair<expression, expression>> &, std::vector<float>, std::uint32_t, std::vector<float>,
+    std::optional<float>, bool, bool, std::vector<float>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+
 template class taylor_adaptive_batch<double>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<double>::finalise_ctor_impl(

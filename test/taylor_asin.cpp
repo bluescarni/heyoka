@@ -40,7 +40,7 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -235,7 +235,7 @@ TEST_CASE("taylor asin")
             std::vector<fp_t> jet{fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}};
             jet.resize(8);
 
-            std::vector<fp_t> pars{fp_t{.5}, fp_t{.5}, fp_t{.3}, fp_t{.3}};
+            std::vector<fp_t> pars{fp_t{.5}, fp_t{.5}, fp_t(.3), fp_t(.3)};
 
             jptr(jet.data(), pars.data(), nullptr);
 
@@ -245,8 +245,8 @@ TEST_CASE("taylor asin")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == 5);
 
-            REQUIRE(jet[4] == approximately(asin(fp_t{.3})));
-            REQUIRE(jet[5] == approximately(asin(fp_t{.3})));
+            REQUIRE(jet[4] == approximately(asin(fp_t(.3))));
+            REQUIRE(jet[5] == approximately(asin(fp_t(.3))));
 
             REQUIRE(jet[6] == approximately(jet[0] + jet[2]));
             REQUIRE(jet[7] == approximately(jet[1] + jet[3]));
@@ -422,13 +422,13 @@ TEST_CASE("taylor asin")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.3}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
             jet.resize(4);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .3);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.3));
             REQUIRE(jet[2] == approximately(asin(jet[1])));
             REQUIRE(jet[3] == approximately(asin(jet[0])));
         }
@@ -442,16 +442,16 @@ TEST_CASE("taylor asin")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{-.1}, fp_t{.3}, fp_t{-.4}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t(-.1), fp_t(.3), fp_t(-.4)};
             jet.resize(8);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == -.1);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(-.1));
 
-            REQUIRE(jet[2] == .3);
-            REQUIRE(jet[3] == -.4);
+            REQUIRE(jet[2] == fp_t(.3));
+            REQUIRE(jet[3] == fp_t(-.4));
 
             REQUIRE(jet[4] == approximately(asin(jet[2])));
             REQUIRE(jet[5] == approximately(asin(jet[3])));
@@ -469,13 +469,13 @@ TEST_CASE("taylor asin")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.3}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
             jet.resize(6);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .3);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.3));
             REQUIRE(jet[2] == approximately(asin(jet[1])));
             REQUIRE(jet[3] == approximately(asin(jet[0])));
             REQUIRE(jet[4] == approximately(fp_t{1} / 2 * (1 / sqrt(1 - jet[1] * jet[1]) * jet[3])));
@@ -491,16 +491,16 @@ TEST_CASE("taylor asin")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{-.1}, fp_t{.3}, fp_t{-.4}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t(-.1), fp_t(.3), fp_t(-.4)};
             jet.resize(12);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == -.1);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(-.1));
 
-            REQUIRE(jet[2] == .3);
-            REQUIRE(jet[3] == -.4);
+            REQUIRE(jet[2] == fp_t(.3));
+            REQUIRE(jet[3] == fp_t(-.4));
 
             REQUIRE(jet[4] == approximately(asin(jet[2])));
             REQUIRE(jet[5] == approximately(asin(jet[3])));
@@ -524,18 +524,18 @@ TEST_CASE("taylor asin")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{-.1}, fp_t{-.5}, fp_t{.3}, fp_t{-.4}, fp_t{.6}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t(-.1), fp_t{-.5}, fp_t(.3), fp_t(-.4), fp_t(.6)};
             jet.resize(24);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == -.1);
-            REQUIRE(jet[2] == -.5);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(-.1));
+            REQUIRE(jet[2] == fp_t(-.5));
 
-            REQUIRE(jet[3] == .3);
-            REQUIRE(jet[4] == -.4);
-            REQUIRE(jet[5] == .6);
+            REQUIRE(jet[3] == fp_t(.3));
+            REQUIRE(jet[4] == fp_t(-.4));
+            REQUIRE(jet[5] == fp_t(.6));
 
             REQUIRE(jet[6] == approximately(asin(jet[3])));
             REQUIRE(jet[7] == approximately(asin(jet[4])));

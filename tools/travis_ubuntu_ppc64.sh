@@ -11,7 +11,7 @@ curl -L -o miniconda.sh https://github.com/conda-forge/miniforge/releases/latest
 export deps_dir=$HOME/local
 export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
-conda create -y -q -p $deps_dir cxx-compiler c-compiler cmake llvmdev tbb-devel tbb boost-cpp sleef xtensor xtensor-blas blas blas-devel 'fmt=9.*' spdlog make mppp
+conda create -y -q -p $deps_dir cxx-compiler c-compiler cmake llvmdev tbb-devel tbb boost-cpp sleef xtensor xtensor-blas blas blas-devel fmt spdlog make mppp
 source activate $deps_dir
 
 # Create the build dir and cd into it.

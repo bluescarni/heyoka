@@ -72,6 +72,7 @@ HEYOKA_DLL_PUBLIC expression kepDE(expression, expression, expression);
     HEYOKA_DLL_PUBLIC expression kepDE(expression, type, expression);                                                  \
     HEYOKA_DLL_PUBLIC expression kepDE(type, expression, expression)
 
+HEYOKA_DECLARE_KEPDE_OVERLOADS(float);
 HEYOKA_DECLARE_KEPDE_OVERLOADS(double);
 HEYOKA_DECLARE_KEPDE_OVERLOADS(long double);
 

@@ -42,7 +42,7 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -368,13 +368,13 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.3}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
             jet.resize(4);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == fp_t{.2});
-            REQUIRE(jet[1] == fp_t{.3});
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.3));
             REQUIRE(jet[2] == approximately(bmt_inv_kep_E(jet[1], a)));
             REQUIRE(jet[3] == approximately(bmt_inv_kep_E(jet[0], b)));
         }
@@ -389,15 +389,15 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.3}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
             jet.resize(4);
 
             std::vector<fp_t> pars{a};
 
             jptr(jet.data(), pars.data(), nullptr);
 
-            REQUIRE(jet[0] == fp_t{.2});
-            REQUIRE(jet[1] == fp_t{.3});
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.3));
             REQUIRE(jet[2] == approximately(bmt_inv_kep_E(jet[1], a)));
             REQUIRE(jet[3] == approximately(bmt_inv_kep_E(jet[0], b)));
         }
@@ -412,16 +412,16 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.5}, fp_t{.3}, fp_t{.4}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
             jet.resize(8);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .5);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.5));
 
-            REQUIRE(jet[2] == .3);
-            REQUIRE(jet[3] == .4);
+            REQUIRE(jet[2] == fp_t(.3));
+            REQUIRE(jet[3] == fp_t(.4));
 
             REQUIRE(jet[4] == approximately(bmt_inv_kep_E(jet[2], b)));
             REQUIRE(jet[5] == approximately(bmt_inv_kep_E(jet[3], b)));
@@ -440,18 +440,18 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.5}, fp_t{.3}, fp_t{.4}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
             jet.resize(8);
 
             std::vector<fp_t> pars{fp_t{0}, fp_t{0}, b, b};
 
             jptr(jet.data(), pars.data(), nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .5);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.5));
 
-            REQUIRE(jet[2] == .3);
-            REQUIRE(jet[3] == .4);
+            REQUIRE(jet[2] == fp_t(.3));
+            REQUIRE(jet[3] == fp_t(.4));
 
             REQUIRE(jet[4] == approximately(bmt_inv_kep_E(jet[2], b)));
             REQUIRE(jet[5] == approximately(bmt_inv_kep_E(jet[3], b)));
@@ -470,13 +470,13 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.3}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
             jet.resize(6);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .3);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.3));
             REQUIRE(jet[2] == approximately(bmt_inv_kep_E(jet[1], b)));
             REQUIRE(jet[3] == approximately(bmt_inv_kep_E(jet[0], b)));
             REQUIRE(jet[4] == approximately(fp_t{1} / 2 * jet[3] * sin(jet[2]) / (1 - jet[1] * cos(jet[2]))));
@@ -493,16 +493,16 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.5}, fp_t{.3}, fp_t{.4}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
             jet.resize(12);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .5);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.5));
 
-            REQUIRE(jet[2] == .3);
-            REQUIRE(jet[3] == .4);
+            REQUIRE(jet[2] == fp_t(.3));
+            REQUIRE(jet[3] == fp_t(.4));
 
             REQUIRE(jet[4] == approximately(bmt_inv_kep_E(jet[2], b)));
             REQUIRE(jet[5] == approximately(bmt_inv_kep_E(jet[3], b)));
@@ -527,18 +527,18 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.5}, fp_t{.1}, fp_t{.3}, fp_t{.4}, fp_t{.6}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)};
             jet.resize(24);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .5);
-            REQUIRE(jet[2] == .1);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.5));
+            REQUIRE(jet[2] == fp_t(.1));
 
-            REQUIRE(jet[3] == .3);
-            REQUIRE(jet[4] == .4);
-            REQUIRE(jet[5] == .6);
+            REQUIRE(jet[3] == fp_t(.3));
+            REQUIRE(jet[4] == fp_t(.4));
+            REQUIRE(jet[5] == fp_t(.6));
 
             REQUIRE(jet[6] == approximately(bmt_inv_kep_E(jet[3], b)));
             REQUIRE(jet[7] == approximately(bmt_inv_kep_E(jet[4], b)));
@@ -626,13 +626,13 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.3}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
             jet.resize(4);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == fp_t{.2});
-            REQUIRE(jet[1] == fp_t{.3});
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.3));
             REQUIRE(jet[2] == approximately(bmt_inv_kep_E(a, jet[1])));
             REQUIRE(jet[3] == approximately(bmt_inv_kep_E(c, jet[0])));
         }
@@ -647,15 +647,15 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.3}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
             jet.resize(4);
 
             std::vector<fp_t> pars{a};
 
             jptr(jet.data(), pars.data(), nullptr);
 
-            REQUIRE(jet[0] == fp_t{.2});
-            REQUIRE(jet[1] == fp_t{.3});
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.3));
             REQUIRE(jet[2] == approximately(bmt_inv_kep_E(a, jet[1])));
             REQUIRE(jet[3] == approximately(bmt_inv_kep_E(c, jet[0])));
         }
@@ -670,16 +670,16 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.5}, fp_t{.3}, fp_t{.4}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
             jet.resize(8);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .5);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.5));
 
-            REQUIRE(jet[2] == .3);
-            REQUIRE(jet[3] == .4);
+            REQUIRE(jet[2] == fp_t(.3));
+            REQUIRE(jet[3] == fp_t(.4));
 
             REQUIRE(jet[4] == approximately(bmt_inv_kep_E(a, jet[2])));
             REQUIRE(jet[5] == approximately(bmt_inv_kep_E(a, jet[3])));
@@ -698,18 +698,18 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.5}, fp_t{.3}, fp_t{.4}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
             jet.resize(8);
 
             std::vector<fp_t> pars{fp_t{0}, fp_t{0}, c, c};
 
             jptr(jet.data(), pars.data(), nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .5);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.5));
 
-            REQUIRE(jet[2] == .3);
-            REQUIRE(jet[3] == .4);
+            REQUIRE(jet[2] == fp_t(.3));
+            REQUIRE(jet[3] == fp_t(.4));
 
             REQUIRE(jet[4] == approximately(bmt_inv_kep_E(a, jet[2])));
             REQUIRE(jet[5] == approximately(bmt_inv_kep_E(a, jet[3])));
@@ -728,13 +728,13 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.3}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
             jet.resize(6);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .3);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.3));
             REQUIRE(jet[2] == approximately(bmt_inv_kep_E(a, jet[1])));
             REQUIRE(jet[3] == approximately(bmt_inv_kep_E(c, jet[0])));
             REQUIRE(jet[4] == approximately(fp_t{1} / 2 * jet[3] / (1 - a * cos(jet[2]))));
@@ -751,16 +751,16 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.5}, fp_t{.3}, fp_t{.4}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
             jet.resize(12);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .5);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.5));
 
-            REQUIRE(jet[2] == .3);
-            REQUIRE(jet[3] == .4);
+            REQUIRE(jet[2] == fp_t(.3));
+            REQUIRE(jet[3] == fp_t(.4));
 
             REQUIRE(jet[4] == approximately(bmt_inv_kep_E(a, jet[2])));
             REQUIRE(jet[5] == approximately(bmt_inv_kep_E(a, jet[3])));
@@ -785,18 +785,18 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.5}, fp_t{.1}, fp_t{.3}, fp_t{.4}, fp_t{.6}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)};
             jet.resize(24);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .5);
-            REQUIRE(jet[2] == .1);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.5));
+            REQUIRE(jet[2] == fp_t(.1));
 
-            REQUIRE(jet[3] == .3);
-            REQUIRE(jet[4] == .4);
-            REQUIRE(jet[5] == .6);
+            REQUIRE(jet[3] == fp_t(.3));
+            REQUIRE(jet[4] == fp_t(.4));
+            REQUIRE(jet[5] == fp_t(.6));
 
             REQUIRE(jet[6] == approximately(bmt_inv_kep_E(a, jet[3])));
             REQUIRE(jet[7] == approximately(bmt_inv_kep_E(a, jet[4])));
@@ -859,13 +859,13 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.3}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
             jet.resize(4);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == fp_t{.2});
-            REQUIRE(jet[1] == fp_t{.3});
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.3));
             REQUIRE(jet[2] == approximately(bmt_inv_kep_E(jet[0], jet[1])));
             REQUIRE(jet[3] == approximately(bmt_inv_kep_E(jet[1], jet[0])));
         }
@@ -879,16 +879,16 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.5}, fp_t{.3}, fp_t{.4}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
             jet.resize(8);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .5);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.5));
 
-            REQUIRE(jet[2] == .3);
-            REQUIRE(jet[3] == .4);
+            REQUIRE(jet[2] == fp_t(.3));
+            REQUIRE(jet[3] == fp_t(.4));
 
             REQUIRE(jet[4] == approximately(bmt_inv_kep_E(jet[0], jet[2])));
             REQUIRE(jet[5] == approximately(bmt_inv_kep_E(jet[1], jet[3])));
@@ -906,13 +906,13 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.3}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
             jet.resize(6);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .3);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.3));
             REQUIRE(jet[2] == approximately(bmt_inv_kep_E(jet[0], jet[1])));
             REQUIRE(jet[3] == approximately(bmt_inv_kep_E(jet[1], jet[0])));
             REQUIRE(jet[4]
@@ -930,16 +930,16 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.5}, fp_t{.3}, fp_t{.4}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
             jet.resize(12);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .5);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.5));
 
-            REQUIRE(jet[2] == .3);
-            REQUIRE(jet[3] == .4);
+            REQUIRE(jet[2] == fp_t(.3));
+            REQUIRE(jet[3] == fp_t(.4));
 
             REQUIRE(jet[4] == approximately(bmt_inv_kep_E(jet[0], jet[2])));
             REQUIRE(jet[5] == approximately(bmt_inv_kep_E(jet[1], jet[3])));
@@ -967,18 +967,18 @@ TEST_CASE("taylor kepE")
 
             auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{.2}, fp_t{.5}, fp_t{.1}, fp_t{.3}, fp_t{.4}, fp_t{.6}};
+            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)};
             jet.resize(24);
 
             jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == .2);
-            REQUIRE(jet[1] == .5);
-            REQUIRE(jet[2] == .1);
+            REQUIRE(jet[0] == fp_t(.2));
+            REQUIRE(jet[1] == fp_t(.5));
+            REQUIRE(jet[2] == fp_t(.1));
 
-            REQUIRE(jet[3] == .3);
-            REQUIRE(jet[4] == .4);
-            REQUIRE(jet[5] == .6);
+            REQUIRE(jet[3] == fp_t(.3));
+            REQUIRE(jet[4] == fp_t(.4));
+            REQUIRE(jet[5] == fp_t(.6));
 
             REQUIRE(jet[6] == approximately(bmt_inv_kep_E(jet[0], jet[3])));
             REQUIRE(jet[7] == approximately(bmt_inv_kep_E(jet[1], jet[4])));

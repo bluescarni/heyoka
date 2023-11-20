@@ -37,265 +37,136 @@ expression operator+(expression e)
     return e;
 }
 
+// NOTE: in these operators we check for number arguments
+// immediately, before forwarding to the underlying implementation.
+// We do this in order to avoid accidental promotions and incorrect
+// precision propagation due to the use of double-precision constants
+// in the implementations of the primitives.
 expression operator-(const expression &e)
 {
-    return prod({expression{number{-1.}}, e});
+    if (const auto *nptr = std::get_if<number>(&e.value())) {
+        return expression{-*nptr};
+    } else {
+        return prod({expression{number{-1.}}, e});
+    }
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
 expression operator+(const expression &e1, const expression &e2)
 {
-    return sum({e1, e2});
+    if (std::holds_alternative<number>(e1.value()) && std::holds_alternative<number>(e2.value())) {
+        return expression{std::get<number>(e1.value()) + std::get<number>(e2.value())};
+    } else {
+        return sum({e1, e2});
+    }
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
 expression operator-(const expression &e1, const expression &e2)
 {
-    return e1 + -e2;
+    if (std::holds_alternative<number>(e1.value()) && std::holds_alternative<number>(e2.value())) {
+        return expression{std::get<number>(e1.value()) - std::get<number>(e2.value())};
+    } else {
+        return e1 + -e2;
+    }
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
 expression operator*(const expression &e1, const expression &e2)
 {
-    return prod({e1, e2});
+    if (std::holds_alternative<number>(e1.value()) && std::holds_alternative<number>(e2.value())) {
+        return expression{std::get<number>(e1.value()) * std::get<number>(e2.value())};
+    } else {
+        return prod({e1, e2});
+    }
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
 expression operator/(const expression &e1, const expression &e2)
 {
     if (std::holds_alternative<number>(e1.value()) && std::holds_alternative<number>(e2.value())) {
-        // NOTE: if e1 and e2 are numbers, do immediately constant folding. Otherwise, constant folding
-        // is first done on pow(e2, -1_dbl) and then on the product, which leads to wrong precision
-        // propagation in case e1 and e2 have different precisions.
         return expression{std::get<number>(e1.value()) / std::get<number>(e2.value())};
     } else {
         return prod({e1, pow(e2, -1_dbl)});
     }
 }
 
-expression operator+(const expression &ex, double x)
-{
-    return ex + expression{x};
-}
+#define HEYOKA_EX_BINARY_OP_R(op, type)                                                                                \
+    expression operator op(const expression &ex, type x)                                                               \
+    {                                                                                                                  \
+        return ex op expression{std::move(x)};                                                                         \
+    }
 
-expression operator+(const expression &ex, long double x)
-{
-    return ex + expression{x};
-}
+#define HEYOKA_EX_BINARY_OP_L(op, type)                                                                                \
+    expression operator op(type x, const expression &ex)                                                               \
+    {                                                                                                                  \
+        return expression{std::move(x)} op ex;                                                                         \
+    }
+
+HEYOKA_EX_BINARY_OP_R(+, float)
+HEYOKA_EX_BINARY_OP_R(+, double)
+HEYOKA_EX_BINARY_OP_R(+, long double)
+HEYOKA_EX_BINARY_OP_R(-, float)
+HEYOKA_EX_BINARY_OP_R(-, double)
+HEYOKA_EX_BINARY_OP_R(-, long double)
+HEYOKA_EX_BINARY_OP_R(*, float)
+HEYOKA_EX_BINARY_OP_R(*, double)
+HEYOKA_EX_BINARY_OP_R(*, long double)
+HEYOKA_EX_BINARY_OP_R(/, float)
+HEYOKA_EX_BINARY_OP_R(/, double)
+HEYOKA_EX_BINARY_OP_R(/, long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-expression operator+(const expression &ex, mppp::real128 x)
-{
-    return ex + expression{x};
-}
+HEYOKA_EX_BINARY_OP_R(+, mppp::real128)
+HEYOKA_EX_BINARY_OP_R(-, mppp::real128)
+HEYOKA_EX_BINARY_OP_R(*, mppp::real128)
+HEYOKA_EX_BINARY_OP_R(/, mppp::real128)
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-expression operator+(const expression &ex, mppp::real x)
-{
-    return ex + expression{std::move(x)};
-}
+HEYOKA_EX_BINARY_OP_R(+, mppp::real)
+HEYOKA_EX_BINARY_OP_R(-, mppp::real)
+HEYOKA_EX_BINARY_OP_R(*, mppp::real)
+HEYOKA_EX_BINARY_OP_R(/, mppp::real)
 
 #endif
 
-expression operator+(double x, const expression &ex)
-{
-    return expression{x} + ex;
-}
-
-expression operator+(long double x, const expression &ex)
-{
-    return expression{x} + ex;
-}
+HEYOKA_EX_BINARY_OP_L(+, float)
+HEYOKA_EX_BINARY_OP_L(+, double)
+HEYOKA_EX_BINARY_OP_L(+, long double)
+HEYOKA_EX_BINARY_OP_L(-, float)
+HEYOKA_EX_BINARY_OP_L(-, double)
+HEYOKA_EX_BINARY_OP_L(-, long double)
+HEYOKA_EX_BINARY_OP_L(*, float)
+HEYOKA_EX_BINARY_OP_L(*, double)
+HEYOKA_EX_BINARY_OP_L(*, long double)
+HEYOKA_EX_BINARY_OP_L(/, float)
+HEYOKA_EX_BINARY_OP_L(/, double)
+HEYOKA_EX_BINARY_OP_L(/, long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-expression operator+(mppp::real128 x, const expression &ex)
-{
-    return expression{x} + ex;
-}
+HEYOKA_EX_BINARY_OP_L(+, mppp::real128)
+HEYOKA_EX_BINARY_OP_L(-, mppp::real128)
+HEYOKA_EX_BINARY_OP_L(*, mppp::real128)
+HEYOKA_EX_BINARY_OP_L(/, mppp::real128)
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-expression operator+(mppp::real x, const expression &ex)
-{
-    return expression{std::move(x)} + ex;
-}
+HEYOKA_EX_BINARY_OP_L(+, mppp::real)
+HEYOKA_EX_BINARY_OP_L(-, mppp::real)
+HEYOKA_EX_BINARY_OP_L(*, mppp::real)
+HEYOKA_EX_BINARY_OP_L(/, mppp::real)
 
 #endif
 
-expression operator-(const expression &ex, double x)
-{
-    return ex - expression{x};
-}
-
-expression operator-(const expression &ex, long double x)
-{
-    return ex - expression{x};
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-expression operator-(const expression &ex, mppp::real128 x)
-{
-    return ex - expression{x};
-}
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-expression operator-(const expression &ex, mppp::real x)
-{
-    return ex - expression{std::move(x)};
-}
-
-#endif
-
-expression operator-(double x, const expression &ex)
-{
-    return expression{x} - ex;
-}
-
-expression operator-(long double x, const expression &ex)
-{
-    return expression{x} - ex;
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-expression operator-(mppp::real128 x, const expression &ex)
-{
-    return expression{x} - ex;
-}
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-expression operator-(mppp::real x, const expression &ex)
-{
-    return expression{std::move(x)} - ex;
-}
-
-#endif
-
-expression operator*(const expression &ex, double x)
-{
-    return ex * expression{x};
-}
-
-expression operator*(const expression &ex, long double x)
-{
-    return ex * expression{x};
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-expression operator*(const expression &ex, mppp::real128 x)
-{
-    return ex * expression{x};
-}
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-expression operator*(const expression &ex, mppp::real x)
-{
-    return ex * expression{std::move(x)};
-}
-
-#endif
-
-expression operator*(double x, const expression &ex)
-{
-    return expression{x} * ex;
-}
-
-expression operator*(long double x, const expression &ex)
-{
-    return expression{x} * ex;
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-expression operator*(mppp::real128 x, const expression &ex)
-{
-    return expression{x} * ex;
-}
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-expression operator*(mppp::real x, const expression &ex)
-{
-    return expression{std::move(x)} * ex;
-}
-
-#endif
-
-expression operator/(const expression &ex, double x)
-{
-    return ex / expression{x};
-}
-
-expression operator/(const expression &ex, long double x)
-{
-    return ex / expression{x};
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-expression operator/(const expression &ex, mppp::real128 x)
-{
-    return ex / expression{x};
-}
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-expression operator/(const expression &ex, mppp::real x)
-{
-    return ex / expression{std::move(x)};
-}
-
-#endif
-
-expression operator/(double x, const expression &ex)
-{
-    return expression{x} / ex;
-}
-
-expression operator/(long double x, const expression &ex)
-{
-    return expression{x} / ex;
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-expression operator/(mppp::real128 x, const expression &ex)
-{
-    return expression{x} / ex;
-}
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-expression operator/(mppp::real x, const expression &ex)
-{
-    return expression{std::move(x)} / ex;
-}
-
-#endif
+#undef HEYOKA_EX_BINARY_OP_R
+#undef HEYOKA_EX_BINARY_OP_L
 
 expression &operator+=(expression &x, const expression &e)
 {
@@ -322,117 +193,46 @@ expression &operator/=(expression &x, const expression &e)
     return x = x / e;
 }
 
-expression &operator+=(expression &ex, double x)
-{
-    return ex += expression{x};
-}
+// NOLINTBEGIN
+#define HEYOKA_EX_COMPOUND_OP(op, type)                                                                                \
+    expression &operator op(expression & ex, type x)                                                                   \
+    {                                                                                                                  \
+        return ex op expression{std::move(x)};                                                                         \
+    }
+// NOLINTEND
 
-expression &operator+=(expression &ex, long double x)
-{
-    return ex += expression{x};
-}
+HEYOKA_EX_COMPOUND_OP(+=, float)
+HEYOKA_EX_COMPOUND_OP(+=, double)
+HEYOKA_EX_COMPOUND_OP(+=, long double)
+HEYOKA_EX_COMPOUND_OP(-=, float)
+HEYOKA_EX_COMPOUND_OP(-=, double)
+HEYOKA_EX_COMPOUND_OP(-=, long double)
+HEYOKA_EX_COMPOUND_OP(*=, float)
+HEYOKA_EX_COMPOUND_OP(*=, double)
+HEYOKA_EX_COMPOUND_OP(*=, long double)
+HEYOKA_EX_COMPOUND_OP(/=, float)
+HEYOKA_EX_COMPOUND_OP(/=, double)
+HEYOKA_EX_COMPOUND_OP(/=, long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-expression &operator+=(expression &ex, mppp::real128 x)
-{
-    return ex += expression{x};
-}
+HEYOKA_EX_COMPOUND_OP(+=, mppp::real128)
+HEYOKA_EX_COMPOUND_OP(-=, mppp::real128)
+HEYOKA_EX_COMPOUND_OP(*=, mppp::real128)
+HEYOKA_EX_COMPOUND_OP(/=, mppp::real128)
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-expression &operator+=(expression &ex, mppp::real x)
-{
-    return ex += expression{std::move(x)};
-}
+HEYOKA_EX_COMPOUND_OP(+=, mppp::real)
+HEYOKA_EX_COMPOUND_OP(-=, mppp::real)
+HEYOKA_EX_COMPOUND_OP(*=, mppp::real)
+HEYOKA_EX_COMPOUND_OP(/=, mppp::real)
 
 #endif
 
-expression &operator-=(expression &ex, double x)
-{
-    return ex -= expression{x};
-}
-
-expression &operator-=(expression &ex, long double x)
-{
-    return ex -= expression{x};
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-expression &operator-=(expression &ex, mppp::real128 x)
-{
-    return ex -= expression{x};
-}
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-expression &operator-=(expression &ex, mppp::real x)
-{
-    return ex -= expression{std::move(x)};
-}
-
-#endif
-
-expression &operator*=(expression &ex, double x)
-{
-    return ex *= expression{x};
-}
-
-expression &operator*=(expression &ex, long double x)
-{
-    return ex *= expression{x};
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-expression &operator*=(expression &ex, mppp::real128 x)
-{
-    return ex *= expression{x};
-}
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-expression &operator*=(expression &ex, mppp::real x)
-{
-    return ex *= expression{std::move(x)};
-}
-
-#endif
-
-expression &operator/=(expression &ex, double x)
-{
-    return ex /= expression{x};
-}
-
-expression &operator/=(expression &ex, long double x)
-{
-    return ex /= expression{x};
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-expression &operator/=(expression &ex, mppp::real128 x)
-{
-    return ex /= expression{x};
-}
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-expression &operator/=(expression &ex, mppp::real x)
-{
-    return ex /= expression{std::move(x)};
-}
-
-#endif
+#undef HEYOKA_EX_COMPOUND_OP
 
 bool operator==(const expression &e1, const expression &e2)
 {

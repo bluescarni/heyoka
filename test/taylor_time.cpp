@@ -39,7 +39,7 @@ using namespace heyoka;
 using namespace heyoka_test;
 namespace hy = heyoka;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double

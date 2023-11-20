@@ -1180,6 +1180,11 @@ expression pow(expression b, expression e)
     return detail::pow_wrapper_impl(std::move(b), std::move(e));
 }
 
+expression pow(expression b, float e)
+{
+    return pow(std::move(b), expression{e});
+}
+
 expression pow(expression b, double e)
 {
     return pow(std::move(b), expression{e});

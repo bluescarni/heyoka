@@ -54,7 +54,7 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -227,7 +227,7 @@ TEST_CASE("sgn batch")
 
                 std::uniform_real_distribution<double> rdist(-10., 10.);
                 std::vector<fp_t> values(batch_size);
-                std::generate(values.begin(), values.end(), [&rdist]() { return rdist(rng); });
+                std::generate(values.begin(), values.end(), [&rdist]() { return static_cast<fp_t>(rdist(rng)); });
                 std::vector<std::int32_t> signs(batch_size);
 
                 f_ptr(signs.data(), values.data());
@@ -360,7 +360,7 @@ TEST_CASE("sincos batch")
                 // Setup the argument and the output values.
                 std::vector<fp_t> x_vec(batch_size), s_vec(x_vec), c_vec(x_vec);
                 for (auto i = 0u; i < batch_size; ++i) {
-                    x_vec[i] = i + 1u;
+                    x_vec[i] = static_cast<fp_t>(i + 1u);
                 }
 
                 f_ptr(x_vec.data(), s_vec.data(), c_vec.data());
@@ -437,7 +437,6 @@ TEST_CASE("sincos mp")
 TEST_CASE("inv_kep_E_scalar")
 {
     using detail::llvm_add_inv_kep_E_wrapper;
-    namespace bmt = boost::math::tools;
     using std::cos;
     using std::isnan;
     using std::sin;
@@ -461,7 +460,7 @@ TEST_CASE("inv_kep_E_scalar")
 
             // First set of tests with zero eccentricity.
             for (auto i = 0; i < ntrials; ++i) {
-                const fp_t M = M_dist(rng);
+                const fp_t M = static_cast<fp_t>(M_dist(rng));
                 const fp_t e = 0;
                 fp_t E;
 
@@ -472,8 +471,8 @@ TEST_CASE("inv_kep_E_scalar")
 
             // Non-zero eccentricities.
             for (auto i = 0; i < ntrials * 10; ++i) {
-                const fp_t M = M_dist(rng);
-                const fp_t e = e_dist(rng);
+                const fp_t M = static_cast<fp_t>(M_dist(rng));
+                const fp_t e = static_cast<fp_t>(e_dist(rng));
                 fp_t E;
 
                 f_ptr(&E, &e, &M);
@@ -494,8 +493,8 @@ TEST_CASE("inv_kep_E_scalar")
 
             // Test invalid inputs.
             {
-                fp_t M = 1.23;
-                fp_t e = -.1;
+                fp_t M = static_cast<fp_t>(1.23);
+                fp_t e = static_cast<fp_t>(-.1);
                 fp_t E;
 
                 f_ptr(&E, &e, &M);
@@ -504,7 +503,7 @@ TEST_CASE("inv_kep_E_scalar")
             }
 
             {
-                fp_t M = 1.23;
+                fp_t M = static_cast<fp_t>(1.23);
                 fp_t e = 1.;
                 fp_t E;
 
@@ -514,7 +513,7 @@ TEST_CASE("inv_kep_E_scalar")
             }
 
             {
-                fp_t M = 1.23;
+                fp_t M = static_cast<fp_t>(1.23);
                 fp_t e = std::numeric_limits<fp_t>::infinity();
                 fp_t E;
 
@@ -524,7 +523,7 @@ TEST_CASE("inv_kep_E_scalar")
             }
 
             {
-                fp_t M = 1.23;
+                fp_t M = static_cast<fp_t>(1.23);
                 fp_t e = -std::numeric_limits<fp_t>::infinity();
                 fp_t E;
 
@@ -534,7 +533,7 @@ TEST_CASE("inv_kep_E_scalar")
             }
 
             {
-                fp_t M = 1.23;
+                fp_t M = static_cast<fp_t>(1.23);
                 fp_t e = std::numeric_limits<fp_t>::quiet_NaN();
                 fp_t E;
 
@@ -545,7 +544,7 @@ TEST_CASE("inv_kep_E_scalar")
 
             {
                 fp_t M = std::numeric_limits<fp_t>::infinity();
-                fp_t e = .1;
+                fp_t e = static_cast<fp_t>(.1);
                 fp_t E;
 
                 f_ptr(&E, &e, &M);
@@ -555,7 +554,7 @@ TEST_CASE("inv_kep_E_scalar")
 
             {
                 fp_t M = -std::numeric_limits<fp_t>::infinity();
-                fp_t e = .2;
+                fp_t e = static_cast<fp_t>(.2);
                 fp_t E;
 
                 f_ptr(&E, &e, &M);
@@ -565,7 +564,7 @@ TEST_CASE("inv_kep_E_scalar")
 
             {
                 fp_t M = std::numeric_limits<fp_t>::quiet_NaN();
-                fp_t e = .1;
+                fp_t e = static_cast<fp_t>(.1);
                 fp_t E;
 
                 f_ptr(&E, &e, &M);
@@ -581,7 +580,6 @@ TEST_CASE("inv_kep_E_scalar")
 TEST_CASE("inv_kep_E_batch")
 {
     using detail::llvm_add_inv_kep_E_wrapper;
-    namespace bmt = boost::math::tools;
     using std::cos;
     using std::isnan;
     using std::sin;
@@ -610,7 +608,7 @@ TEST_CASE("inv_kep_E_batch")
                 // First set of tests with zero eccentricity.
                 for (auto i = 0; i < ntrials; ++i) {
                     for (auto j = 0u; j < batch_size; ++j) {
-                        M_vec[j] = M_dist(rng);
+                        M_vec[j] = static_cast<fp_t>(M_dist(rng));
                     }
                     f_ptr(ret_vec.data(), e_vec.data(), M_vec.data());
 
@@ -622,8 +620,8 @@ TEST_CASE("inv_kep_E_batch")
                 // Non-zero eccentricities.
                 for (auto i = 0; i < ntrials * 10; ++i) {
                     for (auto j = 0u; j < batch_size; ++j) {
-                        M_vec[j] = M_dist(rng);
-                        e_vec[j] = e_dist(rng);
+                        M_vec[j] = static_cast<fp_t>(M_dist(rng));
+                        e_vec[j] = static_cast<fp_t>(e_dist(rng));
                     }
                     f_ptr(ret_vec.data(), e_vec.data(), M_vec.data());
 
@@ -635,12 +633,12 @@ TEST_CASE("inv_kep_E_batch")
                 // Test invalid inputs.
                 {
                     for (auto j = 0u; j < batch_size; ++j) {
-                        M_vec[j] = M_dist(rng);
+                        M_vec[j] = static_cast<fp_t>(M_dist(rng));
 
                         if (j == 1u) {
-                            e_vec[j] = -.1;
+                            e_vec[j] = static_cast<fp_t>(-.1);
                         } else {
-                            e_vec[j] = e_dist(rng);
+                            e_vec[j] = static_cast<fp_t>(e_dist(rng));
                         }
                     }
 
@@ -657,12 +655,12 @@ TEST_CASE("inv_kep_E_batch")
 
                 {
                     for (auto j = 0u; j < batch_size; ++j) {
-                        M_vec[j] = M_dist(rng);
+                        M_vec[j] = static_cast<fp_t>(M_dist(rng));
 
                         if (j == 1u) {
                             e_vec[j] = 1;
                         } else {
-                            e_vec[j] = e_dist(rng);
+                            e_vec[j] = static_cast<fp_t>(e_dist(rng));
                         }
                     }
 
@@ -679,12 +677,12 @@ TEST_CASE("inv_kep_E_batch")
 
                 {
                     for (auto j = 0u; j < batch_size; ++j) {
-                        M_vec[j] = M_dist(rng);
+                        M_vec[j] = static_cast<fp_t>(M_dist(rng));
 
                         if (j == 1u) {
                             e_vec[j] = std::numeric_limits<fp_t>::infinity();
                         } else {
-                            e_vec[j] = e_dist(rng);
+                            e_vec[j] = static_cast<fp_t>(e_dist(rng));
                         }
                     }
 
@@ -701,12 +699,12 @@ TEST_CASE("inv_kep_E_batch")
 
                 {
                     for (auto j = 0u; j < batch_size; ++j) {
-                        M_vec[j] = M_dist(rng);
+                        M_vec[j] = static_cast<fp_t>(M_dist(rng));
 
                         if (j == 1u) {
                             e_vec[j] = -std::numeric_limits<fp_t>::infinity();
                         } else {
-                            e_vec[j] = e_dist(rng);
+                            e_vec[j] = static_cast<fp_t>(e_dist(rng));
                         }
                     }
 
@@ -723,12 +721,12 @@ TEST_CASE("inv_kep_E_batch")
 
                 {
                     for (auto j = 0u; j < batch_size; ++j) {
-                        M_vec[j] = M_dist(rng);
+                        M_vec[j] = static_cast<fp_t>(M_dist(rng));
 
                         if (j == 1u) {
                             e_vec[j] = std::numeric_limits<fp_t>::quiet_NaN();
                         } else {
-                            e_vec[j] = e_dist(rng);
+                            e_vec[j] = static_cast<fp_t>(e_dist(rng));
                         }
                     }
 
@@ -745,12 +743,12 @@ TEST_CASE("inv_kep_E_batch")
 
                 {
                     for (auto j = 0u; j < batch_size; ++j) {
-                        e_vec[j] = e_dist(rng);
+                        e_vec[j] = static_cast<fp_t>(e_dist(rng));
 
                         if (j == 1u) {
                             M_vec[j] = std::numeric_limits<fp_t>::infinity();
                         } else {
-                            M_vec[j] = M_dist(rng);
+                            M_vec[j] = static_cast<fp_t>(M_dist(rng));
                         }
                     }
 
@@ -767,12 +765,12 @@ TEST_CASE("inv_kep_E_batch")
 
                 {
                     for (auto j = 0u; j < batch_size; ++j) {
-                        e_vec[j] = e_dist(rng);
+                        e_vec[j] = static_cast<fp_t>(e_dist(rng));
 
                         if (j == 1u) {
                             M_vec[j] = -std::numeric_limits<fp_t>::infinity();
                         } else {
-                            M_vec[j] = M_dist(rng);
+                            M_vec[j] = static_cast<fp_t>(M_dist(rng));
                         }
                     }
 
@@ -789,12 +787,12 @@ TEST_CASE("inv_kep_E_batch")
 
                 {
                     for (auto j = 0u; j < batch_size; ++j) {
-                        e_vec[j] = e_dist(rng);
+                        e_vec[j] = static_cast<fp_t>(e_dist(rng));
 
                         if (j == 1u) {
                             M_vec[j] = std::numeric_limits<fp_t>::quiet_NaN();
                         } else {
-                            M_vec[j] = M_dist(rng);
+                            M_vec[j] = static_cast<fp_t>(M_dist(rng));
                         }
                     }
 
@@ -1408,13 +1406,13 @@ TEST_CASE("minmax")
                         if (idist(rng) && idist(rng) && idist(rng)) {
                             av[j] = std::numeric_limits<fp_t>::quiet_NaN();
                         } else {
-                            av[j] = rdist(rng);
+                            av[j] = static_cast<fp_t>(rdist(rng));
                         }
 
                         if (idist(rng) && idist(rng) && idist(rng)) {
                             bv[j] = std::numeric_limits<fp_t>::quiet_NaN();
                         } else {
-                            bv[j] = rdist(rng);
+                            bv[j] = static_cast<fp_t>(rdist(rng));
                         }
                     }
 
@@ -1569,9 +1567,9 @@ TEST_CASE("fma batch")
                 // Setup the arguments and the output value.
                 std::vector<fp_t> ret_vec(batch_size), a_vec(ret_vec), b_vec(ret_vec), c_vec(ret_vec);
                 for (auto i = 0u; i < batch_size; ++i) {
-                    a_vec[i] = i + 1u;
-                    b_vec[i] = a_vec[i] * 10 * (i + 1u);
-                    c_vec[i] = b_vec[i] * 10 * (i + 1u);
+                    a_vec[i] = static_cast<fp_t>(i + 1u);
+                    b_vec[i] = a_vec[i] * 10 * static_cast<fp_t>(i + 1u);
+                    c_vec[i] = b_vec[i] * 10 * static_cast<fp_t>(i + 1u);
                 }
 
                 f_ptr(ret_vec.data(), a_vec.data(), b_vec.data(), c_vec.data());
@@ -2610,7 +2608,7 @@ TEST_CASE("dl modulus scalar")
                 using mp_fp_t
                     = bmp::number<bmp::cpp_bin_float<std::numeric_limits<fp_t>::digits * 2, bmp::digit_base_2>>;
 
-                std::uniform_real_distribution<fp_t> op_dist(-1e6, 1e6), quo_dist(.1, 10.);
+                std::uniform_real_distribution<fp_t> op_dist(fp_t(-1e6), fp_t(1e6)), quo_dist(fp_t(.1), fp_t(10.));
 
                 for (auto i = 0; i < ntrials; ++i) {
                     auto x = fp_t(op_dist(rng)), y = fp_t(quo_dist(rng));
@@ -2695,7 +2693,7 @@ TEST_CASE("dl modulus batch")
                     using mp_fp_t
                         = bmp::number<bmp::cpp_bin_float<std::numeric_limits<fp_t>::digits * 2, bmp::digit_base_2>>;
 
-                    std::uniform_real_distribution<fp_t> op_dist(-1e6, 1e6), quo_dist(.1, 10.);
+                    std::uniform_real_distribution<fp_t> op_dist(fp_t(-1e6), fp_t(1e6)), quo_dist(fp_t(.1), fp_t(10.));
 
                     std::vector<fp_t> x_vec(batch_size), y_vec(x_vec), a_hi_vec(x_vec), a_lo_vec(x_vec),
                         b_hi_vec(x_vec), b_lo_vec(x_vec);
@@ -2739,7 +2737,10 @@ TEST_CASE("get_alignment")
     auto &context = s.context();
     auto &builder = s.builder();
 
-    auto *tp = detail::to_llvm_type<double>(context);
+    auto *tp = detail::to_llvm_type<float>(context);
+    REQUIRE(detail::get_alignment(md, tp) == alignof(float));
+
+    tp = detail::to_llvm_type<double>(context);
     REQUIRE(detail::get_alignment(md, tp) == alignof(double));
 
 #if !defined(HEYOKA_ARCH_PPC)

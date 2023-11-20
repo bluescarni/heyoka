@@ -186,6 +186,7 @@ expression kepDE(expression s0, expression c0, expression DM)
         return kepDE(expression{std::move(s0)}, std::move(c0), std::move(DM));                                         \
     }
 
+HEYOKA_DEFINE_KEPDE_OVERLOADS(float)
 HEYOKA_DEFINE_KEPDE_OVERLOADS(double)
 HEYOKA_DEFINE_KEPDE_OVERLOADS(long double)
 

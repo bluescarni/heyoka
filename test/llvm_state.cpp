@@ -49,6 +49,7 @@ using namespace heyoka_test;
 
 TEST_CASE("simd size")
 {
+    REQUIRE(recommended_simd_size<float>() > 0u);
     REQUIRE(recommended_simd_size<double>() > 0u);
     REQUIRE(recommended_simd_size<long double>() > 0u);
 
@@ -63,6 +64,7 @@ TEST_CASE("simd size")
 #if defined(__GNUC__)
 
 #if defined(__amd64__) || defined(__aarch64__)
+    REQUIRE(recommended_simd_size<float>() >= 4u);
     REQUIRE(recommended_simd_size<double>() >= 2u);
 #endif
 

@@ -49,7 +49,7 @@ auto sum_sq(const std::vector<expression> &args)
     return sum(new_args);
 }
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double

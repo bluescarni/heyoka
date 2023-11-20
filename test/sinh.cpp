@@ -50,7 +50,7 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double
+const auto fp_types = std::tuple<float, double
 #if !defined(HEYOKA_ARCH_PPC)
                                  ,
                                  long double
@@ -220,8 +220,8 @@ TEST_CASE("normalise")
     REQUIRE(normalise(subs(sinh(x), {{x, 1.5_dbl}})) == sinh(1.5_dbl));
 }
 
-// Test to check vectorisation via the vector-function-abi-variant machinery.
-TEST_CASE("vfabi")
+// Tests to check vectorisation via the vector-function-abi-variant machinery.
+TEST_CASE("vfabi double")
 {
     llvm_state s{kw::slp_vectorize = true};
 
@@ -352,6 +352,168 @@ TEST_CASE("vfabi")
 
     count = 0u;
     for (auto it = boost::make_find_iterator(ir, boost::first_finder("@sinh", boost::is_iequal()));
+         it != string_find_iterator(); ++it) {
+        ++count;
+    }
+
+    if (tf.sse2) {
+        // NOTE: occurrences of the scalar version:
+        // - 1 call in the remainder of the unstrided cfunc,
+        // - 1 call in the remainder of the strided cfunc,
+        // - 1 declaration.
+        REQUIRE(count == 3u);
+    }
+
+    if (tf.aarch64) {
+        REQUIRE(count == 3u);
+    }
+
+#endif
+}
+
+TEST_CASE("vfabi float")
+{
+    llvm_state s{kw::slp_vectorize = true};
+
+    auto [a, b, c, d] = make_vars("a", "b", "c", "d");
+
+    add_cfunc<float>(s, "cfunc", {sinh(a), sinh(b), sinh(c), sinh(d)});
+
+    s.compile();
+
+    auto *cf_ptr
+        = reinterpret_cast<void (*)(float *, const float *, const float *, const float *)>(s.jit_lookup("cfunc"));
+
+    const std::vector<float> ins{1., 2., 3., 4.};
+    std::vector<float> outs(4u, 0.);
+
+    cf_ptr(outs.data(), ins.data(), nullptr, nullptr);
+
+    REQUIRE(outs[0] == approximately(std::sinh(1.f)));
+    REQUIRE(outs[1] == approximately(std::sinh(2.f)));
+    REQUIRE(outs[2] == approximately(std::sinh(3.f)));
+    REQUIRE(outs[3] == approximately(std::sinh(4.f)));
+
+    // NOTE: autovec with external scalar functions seems to work
+    // only since LLVM 16.
+#if defined(HEYOKA_WITH_SLEEF) && LLVM_VERSION_MAJOR >= 16
+
+    const auto &tf = detail::get_target_features();
+
+    auto ir = s.get_ir();
+
+    using string_find_iterator = boost::find_iterator<std::string::iterator>;
+
+    auto count = 0u;
+    for (auto it = boost::make_find_iterator(ir, boost::first_finder("@sinhf", boost::is_iequal()));
+         it != string_find_iterator(); ++it) {
+        ++count;
+    }
+
+    // NOTE: at the moment we have comprehensive coverage of LLVM versions
+    // in the CI only for x86_64.
+    if (tf.sse2) {
+        // NOTE: occurrences of the scalar version:
+        // - 4 calls in the strided cfunc,
+        // - 1 declaration.
+        REQUIRE(count == 5u);
+    }
+
+    if (tf.aarch64) {
+        REQUIRE(count == 5u);
+    }
+
+    // NOTE: currently no auto-vectorization happens on ppc64 due apparently
+    // to the way the target machine is being set up by orc/lljit (it works
+    // fine with the opt tool). When this is resolved, we can test ppc64 too.
+
+    // if (tf.vsx) {
+    //     REQUIRE(count == 3u);
+    // }
+
+    // Some more extensive testing specific to x86, only for this function.
+    auto [e, f, g, h, i] = make_vars("e", "f", "g", "h", "i");
+
+    llvm_state s2{kw::slp_vectorize = true};
+
+    add_cfunc<float>(s2, "cfunc1", {sinh(a), sinh(b), sinh(c), sinh(d), sinh(e), sinh(f), sinh(g), sinh(h)});
+    add_cfunc<float>(s2, "cfunc2", {sinh(a), sinh(b), sinh(c), sinh(d), sinh(e), sinh(f), sinh(g), sinh(h), sinh(i)});
+
+    s2.compile();
+
+    auto *cf1_ptr
+        = reinterpret_cast<void (*)(float *, const float *, const float *, const float *)>(s2.jit_lookup("cfunc1"));
+    auto *cf2_ptr
+        = reinterpret_cast<void (*)(float *, const float *, const float *, const float *)>(s2.jit_lookup("cfunc2"));
+
+    const std::vector<float> ins2{1., 2., 3., 4., 5., 6., 7., 8., 9.};
+    std::vector<float> outs2(9u, 0.);
+
+    cf1_ptr(outs2.data(), ins2.data(), nullptr, nullptr);
+
+    REQUIRE(outs2[0] == approximately(std::sinh(1.f)));
+    REQUIRE(outs2[1] == approximately(std::sinh(2.f)));
+    REQUIRE(outs2[2] == approximately(std::sinh(3.f)));
+    REQUIRE(outs2[3] == approximately(std::sinh(4.f)));
+    REQUIRE(outs2[4] == approximately(std::sinh(5.f)));
+    REQUIRE(outs2[5] == approximately(std::sinh(6.f)));
+    REQUIRE(outs2[6] == approximately(std::sinh(7.f)));
+    REQUIRE(outs2[7] == approximately(std::sinh(8.f)));
+
+    cf2_ptr(outs2.data(), ins2.data(), nullptr, nullptr);
+
+    REQUIRE(outs2[0] == approximately(std::sinh(1.f)));
+    REQUIRE(outs2[1] == approximately(std::sinh(2.f)));
+    REQUIRE(outs2[2] == approximately(std::sinh(3.f)));
+    REQUIRE(outs2[3] == approximately(std::sinh(4.f)));
+    REQUIRE(outs2[4] == approximately(std::sinh(5.f)));
+    REQUIRE(outs2[5] == approximately(std::sinh(6.f)));
+    REQUIRE(outs2[6] == approximately(std::sinh(7.f)));
+    REQUIRE(outs2[7] == approximately(std::sinh(8.f)));
+    REQUIRE(outs2[8] == approximately(std::sinh(9.f)));
+
+    ir = s2.get_ir();
+
+    count = 0u;
+    for (auto it = boost::make_find_iterator(ir, boost::first_finder("@sinhf", boost::is_iequal()));
+         it != string_find_iterator(); ++it) {
+        ++count;
+    }
+
+    if (tf.avx) {
+        // NOTE: occurrences of the scalar version:
+        // - 8 + 9 calls in the strided cfuncs,
+        // - 1 declaration,
+        // - 1 call to deal with the remainder in the
+        //   9-argument version.
+        REQUIRE(count == 19u);
+    }
+
+    // Check that the autovec works also on batch sizes which do not correspond
+    // exactly to an available vector width.
+    llvm_state s3{kw::slp_vectorize = true};
+
+    add_cfunc<float>(s3, "cfunc", {sinh(a)}, kw::batch_size = 5u);
+
+    s3.compile();
+
+    auto *cf3_ptr
+        = reinterpret_cast<void (*)(float *, const float *, const float *, const float *)>(s3.jit_lookup("cfunc"));
+
+    std::vector<float> ins3 = {1., 2., 3., 4., 5.}, outs3 = {0., 0., 0., 0., 0.};
+
+    cf3_ptr(outs3.data(), ins3.data(), nullptr, nullptr);
+
+    REQUIRE(outs3[0] == approximately(std::sinh(1.f)));
+    REQUIRE(outs3[1] == approximately(std::sinh(2.f)));
+    REQUIRE(outs3[2] == approximately(std::sinh(3.f)));
+    REQUIRE(outs3[3] == approximately(std::sinh(4.f)));
+    REQUIRE(outs3[4] == approximately(std::sinh(5.f)));
+
+    ir = s3.get_ir();
+
+    count = 0u;
+    for (auto it = boost::make_find_iterator(ir, boost::first_finder("@sinhf", boost::is_iequal()));
          it != string_find_iterator(); ++it) {
         ++count;
     }

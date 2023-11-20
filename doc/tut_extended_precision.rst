@@ -4,7 +4,7 @@ Computations in extended precision
 ==================================
 
 As hinted in the :ref:`installation instructions <ep_support>`, heyoka supports computations
-not only in double precision, but also in extended precision. Specifically, heyoka currently supports:
+not only in single and double precision, but also in extended precision. Specifically, heyoka currently supports:
 
 * the 80-bit IEEE `extended-precision format <https://en.wikipedia.org/wiki/Extended_precision>`__ (~21 decimal digits),
 * the 128-bit IEEE `quadruple-precision format <https://en.wikipedia.org/wiki/Quadruple-precision_floating-point_format>`__ (~36 decimal digits).
