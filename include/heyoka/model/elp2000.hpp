@@ -41,25 +41,25 @@ std::vector<expression> elp2000_spherical(const KwArgs &...kw_args)
 {
     // NOTE: we re-use detail::vsop2013_common_opts() here because the keyword options
     // for ELP2000 are the same.
-    return std::apply(detail::elp2000_spherical_impl, detail::vsop2013_common_opts(1e-5, kw_args...));
+    return std::apply(detail::elp2000_spherical_impl, detail::vsop2013_common_opts(1e-6, kw_args...));
 }
 
 template <typename... KwArgs>
 std::vector<expression> elp2000_cartesian(const KwArgs &...kw_args)
 {
-    return std::apply(detail::elp2000_cartesian_impl, detail::vsop2013_common_opts(1e-5, kw_args...));
+    return std::apply(detail::elp2000_cartesian_impl, detail::vsop2013_common_opts(1e-6, kw_args...));
 }
 
 template <typename... KwArgs>
 std::vector<expression> elp2000_cartesian_e2000(const KwArgs &...kw_args)
 {
-    return std::apply(detail::elp2000_cartesian_e2000_impl, detail::vsop2013_common_opts(1e-5, kw_args...));
+    return std::apply(detail::elp2000_cartesian_e2000_impl, detail::vsop2013_common_opts(1e-6, kw_args...));
 }
 
 template <typename... KwArgs>
 std::vector<expression> elp2000_cartesian_fk5(const KwArgs &...kw_args)
 {
-    return std::apply(detail::elp2000_cartesian_fk5_impl, detail::vsop2013_common_opts(1e-5, kw_args...));
+    return std::apply(detail::elp2000_cartesian_fk5_impl, detail::vsop2013_common_opts(1e-6, kw_args...));
 }
 
 HEYOKA_DLL_PUBLIC std::array<double, 2> get_elp2000_mus();

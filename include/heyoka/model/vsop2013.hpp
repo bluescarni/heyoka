@@ -45,7 +45,7 @@ auto vsop2013_common_opts(double def_thresh, const KwArgs &...kw_args)
     }();
 
     // Threshold value.
-    auto thresh = [&p, def_thresh]() -> double {
+    auto thresh = [&]() -> double {
         if constexpr (p.has(kw::thresh)) {
             return std::forward<decltype(p(kw::thresh))>(p(kw::thresh));
         } else {
