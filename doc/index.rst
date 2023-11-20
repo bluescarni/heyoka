@@ -110,7 +110,7 @@ license. The authors are Francesco Biscani and
 Dario Izzo (European Space Agency).
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    install.rst
    basic_tutorials.rst
