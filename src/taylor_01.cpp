@@ -26,6 +26,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <typeinfo>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -33,6 +34,7 @@
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/core/demangle.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/preprocessor/arithmetic/add.hpp>
@@ -1241,6 +1243,8 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
     oss.imbue(std::locale::classic());
     oss << std::boolalpha;
 
+    oss << "C++ datatype            : " << boost::core::demangle(typeid(T).name()) << '\n';
+
 #if defined(HEYOKA_HAVE_REAL)
 
     if constexpr (std::is_same_v<T, mppp::real>) {
@@ -1297,6 +1301,7 @@ std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_a
     oss.imbue(std::locale::classic());
     oss << std::boolalpha;
 
+    oss << "C++ datatype            : " << boost::core::demangle(typeid(T).name()) << '\n';
     oss << "Tolerance               : " << fp_to_string(ta.get_tol()) << '\n';
     oss << "High accuracy           : " << ta.get_high_accuracy() << '\n';
     oss << "Compact mode            : " << ta.get_compact_mode() << '\n';
@@ -1610,8 +1615,10 @@ namespace
 {
 
 // Implementation of stream insertion for the non-terminal event class.
+template <typename T>
 std::ostream &nt_event_impl_stream_impl(std::ostream &os, const expression &eq, event_direction dir)
 {
+    os << "C++ datatype   : " << boost::core::demangle(typeid(T).name()) << '\n';
     os << "Event type     : non-terminal\n";
     os << "Event equation : " << eq << '\n';
     os << "Event direction: " << dir << '\n';
@@ -1624,6 +1631,7 @@ template <typename C, typename T>
 std::ostream &t_event_impl_stream_impl(std::ostream &os, const expression &eq, event_direction dir, const C &callback,
                                        const T &cooldown)
 {
+    os << "C++ datatype   : " << boost::core::demangle(typeid(T).name()) << '\n';
     os << "Event type     : terminal\n";
     os << "Event equation : " << eq << '\n';
     os << "Event direction: " << dir << '\n';
@@ -1638,37 +1646,37 @@ std::ostream &t_event_impl_stream_impl(std::ostream &os, const expression &eq, e
 template <>
 std::ostream &operator<<(std::ostream &os, const nt_event_impl<float, false> &e)
 {
-    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+    return nt_event_impl_stream_impl<float>(os, e.get_expression(), e.get_direction());
 }
 
 template <>
 std::ostream &operator<<(std::ostream &os, const nt_event_impl<float, true> &e)
 {
-    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+    return nt_event_impl_stream_impl<float>(os, e.get_expression(), e.get_direction());
 }
 
 template <>
 std::ostream &operator<<(std::ostream &os, const nt_event_impl<double, false> &e)
 {
-    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+    return nt_event_impl_stream_impl<double>(os, e.get_expression(), e.get_direction());
 }
 
 template <>
 std::ostream &operator<<(std::ostream &os, const nt_event_impl<double, true> &e)
 {
-    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+    return nt_event_impl_stream_impl<double>(os, e.get_expression(), e.get_direction());
 }
 
 template <>
 std::ostream &operator<<(std::ostream &os, const nt_event_impl<long double, false> &e)
 {
-    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+    return nt_event_impl_stream_impl<long double>(os, e.get_expression(), e.get_direction());
 }
 
 template <>
 std::ostream &operator<<(std::ostream &os, const nt_event_impl<long double, true> &e)
 {
-    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+    return nt_event_impl_stream_impl<long double>(os, e.get_expression(), e.get_direction());
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -1676,13 +1684,13 @@ std::ostream &operator<<(std::ostream &os, const nt_event_impl<long double, true
 template <>
 std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128, false> &e)
 {
-    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+    return nt_event_impl_stream_impl<mppp::real128>(os, e.get_expression(), e.get_direction());
 }
 
 template <>
 std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128, true> &e)
 {
-    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+    return nt_event_impl_stream_impl<mppp::real128>(os, e.get_expression(), e.get_direction());
 }
 
 #endif
@@ -1692,7 +1700,7 @@ std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128, tr
 template <>
 std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real, false> &e)
 {
-    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+    return nt_event_impl_stream_impl<mppp::real>(os, e.get_expression(), e.get_direction());
 }
 
 #endif
@@ -2420,19 +2428,20 @@ std::ostream &c_out_stream_impl(std::ostream &os, const continuous_output<T> &co
     oss << std::showpoint;
     oss.precision(std::numeric_limits<T>::max_digits10);
 
+    oss << "C++ datatype: " << boost::core::demangle(typeid(T).name()) << '\n';
+
     if (co.get_output().empty()) {
         oss << "Default-constructed continuous_output";
     } else {
         const detail::dfloat<T> df_t_start(co.m_times_hi[0], co.m_times_lo[0]),
             df_t_end(co.m_times_hi.back(), co.m_times_lo.back());
         const auto dir = df_t_start < df_t_end;
-
-        oss << "Direction : " << (dir ? "forward" : "backward") << '\n';
-        oss << "Time range: "
+        oss << "Direction   : " << (dir ? "forward" : "backward") << '\n';
+        oss << "Time range  : "
             << (dir ? fmt::format("[{}, {})", fp_to_string(co.m_times_hi[0]), fp_to_string(co.m_times_hi.back()))
                     : fmt::format("({}, {}]", fp_to_string(co.m_times_hi.back()), fp_to_string(co.m_times_hi[0])))
             << '\n';
-        oss << "N of steps: " << (co.m_times_hi.size() - 1u) << '\n';
+        oss << "N of steps  : " << (co.m_times_hi.size() - 1u) << '\n';
     }
 
     return os << oss.str();
@@ -3167,12 +3176,14 @@ std::ostream &c_out_batch_stream_impl(std::ostream &os, const continuous_output_
     oss << std::showpoint;
     oss.precision(std::numeric_limits<T>::max_digits10);
 
+    oss << "C++ datatype: " << boost::core::demangle(typeid(T).name()) << '\n';
+
     if (co.get_output().empty()) {
         oss << "Default-constructed continuous_output_batch";
     } else {
         const auto batch_size = co.m_batch_size;
 
-        oss << "Directions : [";
+        oss << "Directions  : [";
         for (std::uint32_t i = 0; i < batch_size; ++i) {
             const detail::dfloat<T> df_t_start(co.m_times_hi[i], co.m_times_lo[i]),
                 df_t_end(co.m_times_hi[co.m_times_hi.size() - 2u * batch_size + i],
@@ -3187,7 +3198,7 @@ std::ostream &c_out_batch_stream_impl(std::ostream &os, const continuous_output_
         }
         oss << "]\n";
 
-        oss << "Time ranges: [";
+        oss << "Time ranges : [";
         for (std::uint32_t i = 0; i < batch_size; ++i) {
             const detail::dfloat<T> df_t_start(co.m_times_hi[i], co.m_times_lo[i]),
                 df_t_end(co.m_times_hi[co.m_times_hi.size() - 2u * batch_size + i],
@@ -3202,7 +3213,7 @@ std::ostream &c_out_batch_stream_impl(std::ostream &os, const continuous_output_
         }
         oss << "]\n";
 
-        oss << "N of steps : " << co.get_n_steps() << '\n';
+        oss << "N of steps  : " << co.get_n_steps() << '\n';
     }
 
     return os << oss.str();
