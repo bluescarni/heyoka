@@ -38,6 +38,7 @@
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
@@ -65,6 +66,7 @@
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/vector_math.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
@@ -234,6 +236,103 @@ number taylor_determine_h_rhofac(llvm_state &s, llvm::Type *fp_t, std::uint32_t 
     return exp(const_m7_10 / const_om1) / const_e2;
 }
 
+// Helper to compute rho_m during the determination of the integration timestep.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+llvm::Value *taylor_compute_rho_min(llvm_state &s, llvm::Value *max_abs_state, llvm::Value *max_abs_diff_o,
+                                    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                                    llvm::Value *max_abs_diff_om1, std::uint32_t order, std::uint32_t batch_size)
+{
+    auto &builder = s.builder();
+
+    // Fetch the floating-point type we are operating on.
+    auto *fp_t = max_abs_state->getType();
+
+    // Determine if we are in absolute or relative tolerance mode.
+    auto *abs_or_rel = llvm_fcmp_ole(s, max_abs_state, llvm_constantfp(s, fp_t, 1.));
+
+    // Compute the numerator in the formula for determining rho.
+    auto *num_rho = builder.CreateSelect(abs_or_rel, llvm_constantfp(s, fp_t, 1.), max_abs_state);
+
+    // Compute the LLVM versions of order and order - 1. These are always created as
+    // scalars, regardless of whether fp_t is a vector or scalar type.
+    // NOTE: it is fine here to static_cast<double>(order), as order is a 32-bit integer
+    // and double is a IEEE double-precision type (i.e., 53 bits).
+    auto *o_const = llvm_codegen(s, fp_t->getScalarType(),
+                                 number_like(s, fp_t->getScalarType(), 1.)
+                                     / number_like(s, fp_t->getScalarType(), static_cast<double>(order)));
+
+    auto *om1_const = llvm_codegen(s, fp_t->getScalarType(),
+                                   number_like(s, fp_t->getScalarType(), 1.)
+                                       / number_like(s, fp_t->getScalarType(), static_cast<double>(order - 1u)));
+
+    if (false && !fp_t->isVectorTy()) {
+        // We are operating with scalar values. We will try to manually vectorise
+        // the div/pow calls if possible.
+
+        // Fetch the intrinsic ID for llvm.pow.
+        const auto pow_ID = llvm::Function::lookupIntrinsicID("llvm.pow");
+        // LCOV_EXCL_START
+        if (pow_ID == llvm::Intrinsic::not_intrinsic) {
+            throw std::invalid_argument("Cannot fetch the ID of the llvm.pow intrinsic");
+        }
+        // LCOV_EXCL_STOP
+
+        // Get the intrinsic for the scalar type we are operating on.
+        auto *pow_f = llvm::Intrinsic::getDeclaration(builder.GetInsertBlock()->getModule(), pow_ID, {fp_t});
+        assert(pow_f != nullptr);
+
+        // Get the intrinsic name.
+        const std::string pow_name = pow_f->getName().str();
+
+        // Look it up in the vector math machinery.
+        const auto &vf = lookup_vf_info(pow_name);
+
+        // Search for a vector width of at least 2.
+        const auto vf_it
+            = std::lower_bound(vf.begin(), vf.end(), 2u, [](const auto &v, auto w) { return v.width < w; });
+
+        if (vf_it != vf.end()) {
+            // Fetch the actual width of the vector implementation.
+            const auto width = vf_it->width;
+            assert(width >= 2u);
+
+            // The vector type with which we will be working.
+            auto *vec_t = make_vector_type(fp_t, width);
+
+            // Assemble the vector of bases.
+            llvm::Value *bases = llvm::UndefValue::get(vec_t);
+            bases = builder.CreateInsertElement(bases, max_abs_diff_o, static_cast<std::uint64_t>(0));
+            bases = builder.CreateInsertElement(bases, max_abs_diff_om1, static_cast<std::uint64_t>(1));
+            for (std::uint32_t i = 2; i < width; ++i) {
+                bases = builder.CreateInsertElement(bases, max_abs_diff_om1, static_cast<std::uint64_t>(i));
+            }
+            bases = llvm_fdiv(s, vector_splat(builder, num_rho, width), bases);
+
+            // Assemble the vector of exponents.
+            llvm::Value *expos = llvm::UndefValue::get(vec_t);
+            expos = builder.CreateInsertElement(expos, o_const, static_cast<std::uint64_t>(0));
+            expos = builder.CreateInsertElement(expos, om1_const, static_cast<std::uint64_t>(1));
+            for (std::uint32_t i = 2; i < width; ++i) {
+                expos = builder.CreateInsertElement(expos, om1_const, static_cast<std::uint64_t>(i));
+            }
+
+            // Compute the exponentiation.
+            auto *rhos = llvm_pow(s, bases, expos);
+
+            // Return the minimum.
+            return builder.CreateFPMinimumReduce(rhos);
+        }
+
+        // NOTE: fall through to the default implementation if we don't have
+        // a suitable vector implementation.
+    }
+
+    auto *rho_o = llvm_pow(s, llvm_fdiv(s, num_rho, max_abs_diff_o), vector_splat(builder, o_const, batch_size));
+    auto *rho_om1 = llvm_pow(s, llvm_fdiv(s, num_rho, max_abs_diff_om1), vector_splat(builder, om1_const, batch_size));
+
+    return llvm_min(s, rho_o, rho_om1);
+}
+
 } // namespace
 
 // Helper to generate the LLVM code to determine the timestep in an adaptive Taylor integrator,
@@ -373,28 +472,8 @@ taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
         ext_store_vector_to_memory(s, max_abs_state_ptr, max_abs_state);
     }
 
-    // Determine if we are in absolute or relative tolerance mode.
-    auto *abs_or_rel = llvm_fcmp_ole(s, max_abs_state, llvm_constantfp(s, vec_t, 1.));
-
-    // Estimate rho at orders order - 1 and order.
-    auto *num_rho = builder.CreateSelect(abs_or_rel, llvm_constantfp(s, vec_t, 1.), max_abs_state);
-
-    // NOTE: it is fine here to static_cast<double>(order), as order is a 32-bit integer
-    // and double is a IEEE double-precision type (i.e., 53 bits).
-    auto *rho_o = llvm_pow(
-        s, llvm_fdiv(s, num_rho, max_abs_diff_o),
-        vector_splat(builder,
-                     llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, static_cast<double>(order))),
-                     batch_size));
-    auto *rho_om1 = llvm_pow(
-        s, llvm_fdiv(s, num_rho, max_abs_diff_om1),
-        vector_splat(
-            builder,
-            llvm_codegen(s, fp_t, number_like(s, fp_t, 1.) / number_like(s, fp_t, static_cast<double>(order - 1u))),
-            batch_size));
-
-    // Take the minimum.
-    auto *rho_m = llvm_min(s, rho_o, rho_om1);
+    // Compute rho_m.
+    auto *rho_m = taylor_compute_rho_min(s, max_abs_state, max_abs_diff_o, max_abs_diff_om1, order, batch_size);
 
     // Compute the scaling + safety factor.
     const auto rhofac = taylor_determine_h_rhofac(s, fp_t, order);
