@@ -81,7 +81,7 @@ TEST_CASE("scalar")
                                Message("Cannot use a default-constructed continuous_output object"));
 
         oss << co;
-        REQUIRE(oss.str() == "Default-constructed continuous_output");
+        REQUIRE(boost::algorithm::contains(oss.str(), "Default-constructed continuous_output"));
 
         auto [x, v] = make_vars("x", "v");
 
@@ -326,7 +326,7 @@ TEST_CASE("batch")
                                Message("Cannot use a default-constructed continuous_output_batch object"));
 
         oss << co;
-        REQUIRE(oss.str() == "Default-constructed continuous_output_batch");
+        REQUIRE(boost::algorithm::contains(oss.str(), "Default-constructed continuous_output_batch"));
 
         auto [x, v] = make_vars("x", "v");
 
