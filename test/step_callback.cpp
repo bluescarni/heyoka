@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <functional>
 #include <sstream>
 #include <stdexcept>
@@ -15,6 +17,12 @@
 #include <utility>
 #include <vector>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/expression.hpp>
 #include <heyoka/model/pendulum.hpp>
 #include <heyoka/s11n.hpp>
@@ -22,8 +30,21 @@
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
+
+const auto fp_types = std::tuple<float, double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
+#if defined(HEYOKA_HAVE_REAL128)
+                                 ,
+                                 mppp::real128
+#endif
+                                 >{};
 
 template <typename TA>
 bool cb0(TA &)
@@ -48,157 +69,163 @@ struct cb1 {
 
 TEST_CASE("step_callback basics")
 {
-    taylor_adaptive<double> ta;
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
 
-    {
-        step_callback<double> step_cb;
+        taylor_adaptive<fp_t> ta;
 
-        REQUIRE(!step_cb);
+        {
+            step_callback<fp_t> step_cb;
 
-        REQUIRE_THROWS_AS(step_cb(ta), std::bad_function_call);
-        REQUIRE_THROWS_AS(step_cb.pre_hook(ta), std::bad_function_call);
+            REQUIRE(!step_cb);
 
-        REQUIRE(std::is_nothrow_swappable_v<step_callback<double>>);
+            REQUIRE_THROWS_AS(step_cb(ta), std::bad_function_call);
+            REQUIRE_THROWS_AS(step_cb.pre_hook(ta), std::bad_function_call);
 
-        REQUIRE(!std::is_constructible_v<step_callback<double>, void>);
-        REQUIRE(!std::is_constructible_v<step_callback<double>, int, int>);
+            REQUIRE(std::is_nothrow_swappable_v<step_callback<fp_t>>);
 
-#if !defined(_MSC_VER) || defined(__clang__)
-
-        // NOTE: vanilla MSVC does not like these extraction.
-        REQUIRE(step_cb.extract<int>() == nullptr);
-        REQUIRE(std::as_const(step_cb).extract<int>() == nullptr);
-#endif
-
-        REQUIRE(step_cb.get_type_index() == typeid(void));
-
-        // Copy construction of empty callback.
-        auto step_cb2 = step_cb;
-        REQUIRE(!step_cb2);
-
-        // Move construction of empty callback.
-        auto step_cb3 = std::move(step_cb);
-        REQUIRE(!step_cb3);
-    }
-
-    {
-        auto lam = [](auto &) { return true; };
-
-        step_callback<double> step_cb(lam);
-
-        REQUIRE(static_cast<bool>(step_cb));
-
-        REQUIRE(step_cb(ta));
-        REQUIRE_NOTHROW(step_cb.pre_hook(ta));
+            REQUIRE(!std::is_constructible_v<step_callback<fp_t>, void>);
+            REQUIRE(!std::is_constructible_v<step_callback<fp_t>, int, int>);
 
 #if !defined(_MSC_VER) || defined(__clang__)
 
-        REQUIRE(step_cb.extract<int>() == nullptr);
-        REQUIRE(std::as_const(step_cb).extract<int>() == nullptr);
+            // NOTE: vanilla MSVC does not like these extraction.
+            REQUIRE(step_cb.template extract<int>() == nullptr);
+            REQUIRE(std::as_const(step_cb).template extract<int>() == nullptr);
+#endif
+
+            REQUIRE(step_cb.get_type_index() == typeid(void));
+
+            // Copy construction of empty callback.
+            auto step_cb2 = step_cb;
+            REQUIRE(!step_cb2);
+
+            // Move construction of empty callback.
+            auto step_cb3 = std::move(step_cb);
+            REQUIRE(!step_cb3);
+        }
+
+        {
+            auto lam = [](auto &) { return true; };
+
+            step_callback<fp_t> step_cb(lam);
+
+            REQUIRE(static_cast<bool>(step_cb));
+
+            REQUIRE(step_cb(ta));
+            REQUIRE_NOTHROW(step_cb.pre_hook(ta));
+
+#if !defined(_MSC_VER) || defined(__clang__)
+
+            REQUIRE(step_cb.template extract<int>() == nullptr);
+            REQUIRE(std::as_const(step_cb).template extract<int>() == nullptr);
 
 #endif
 
-        REQUIRE(step_cb.get_type_index() == typeid(decltype(lam)));
+            REQUIRE(step_cb.get_type_index() == typeid(decltype(lam)));
 
-        REQUIRE(step_cb.extract<decltype(lam)>() != nullptr);
-        REQUIRE(std::as_const(step_cb).extract<decltype(lam)>() != nullptr);
+            REQUIRE(step_cb.template extract<decltype(lam)>() != nullptr);
+            REQUIRE(std::as_const(step_cb).template extract<decltype(lam)>() != nullptr);
 
-        // Copy construction.
-        auto step_cb2 = step_cb;
-        REQUIRE(step_cb2);
-        REQUIRE(step_cb2.extract<decltype(lam)>() != nullptr);
-        REQUIRE(step_cb2.extract<decltype(lam)>() != step_cb.extract<decltype(lam)>());
+            // Copy construction.
+            auto step_cb2 = step_cb;
+            REQUIRE(step_cb2);
+            REQUIRE(step_cb2.template extract<decltype(lam)>() != nullptr);
+            REQUIRE(step_cb2.template extract<decltype(lam)>() != step_cb.template extract<decltype(lam)>());
 
-        // Move construction.
-        auto step_cb3 = std::move(step_cb);
-        REQUIRE(step_cb3);
-        REQUIRE(step_cb3.extract<decltype(lam)>() != nullptr);
-        REQUIRE(!step_cb);
+            // Move construction.
+            auto step_cb3 = std::move(step_cb);
+            REQUIRE(step_cb3);
+            REQUIRE(step_cb3.template extract<decltype(lam)>() != nullptr);
+            REQUIRE(!step_cb);
 
-        // Revive step_cb via copy assignment.
-        step_cb = step_cb3;
-        REQUIRE(step_cb);
-        REQUIRE(step_cb.extract<decltype(lam)>() != nullptr);
-        REQUIRE(step_cb.extract<decltype(lam)>() != step_cb3.extract<decltype(lam)>());
+            // Revive step_cb via copy assignment.
+            step_cb = step_cb3;
+            REQUIRE(step_cb);
+            REQUIRE(step_cb.template extract<decltype(lam)>() != nullptr);
+            REQUIRE(step_cb.template extract<decltype(lam)>() != step_cb3.template extract<decltype(lam)>());
 
-        // Revive step_cb via move assignment.
-        const auto *orig_ptr = step_cb.extract<decltype(lam)>();
-        auto step_cb4 = std::move(step_cb);
-        step_cb = std::move(step_cb4);
-        REQUIRE(!step_cb4);
-        REQUIRE(step_cb.extract<decltype(lam)>() != nullptr);
-        REQUIRE(step_cb.extract<decltype(lam)>() != step_cb3.extract<decltype(lam)>());
-        REQUIRE(step_cb.extract<decltype(lam)>() == orig_ptr);
-    }
+            // Revive step_cb via move assignment.
+            const auto *orig_ptr = step_cb.template extract<decltype(lam)>();
+            auto step_cb4 = std::move(step_cb);
+            step_cb = std::move(step_cb4);
+            REQUIRE(!step_cb4);
+            REQUIRE(step_cb.template extract<decltype(lam)>() != nullptr);
+            REQUIRE(step_cb.template extract<decltype(lam)>() != step_cb3.template extract<decltype(lam)>());
+            REQUIRE(step_cb.template extract<decltype(lam)>() == orig_ptr);
+        }
 
-    {
-        step_callback<double> step_cb(&cb0<taylor_adaptive<double>>);
+        {
+            step_callback<fp_t> step_cb(&cb0<taylor_adaptive<fp_t>>);
 
-        REQUIRE(static_cast<bool>(step_cb));
+            REQUIRE(static_cast<bool>(step_cb));
 
-        REQUIRE(step_cb.get_type_index() == typeid(decltype(&cb0<taylor_adaptive<double>>)));
+            REQUIRE(step_cb.get_type_index() == typeid(decltype(&cb0<taylor_adaptive<fp_t>>)));
 
-        REQUIRE(step_cb(ta));
-        REQUIRE_NOTHROW(step_cb.pre_hook(ta));
-    }
+            REQUIRE(step_cb(ta));
+            REQUIRE_NOTHROW(step_cb.pre_hook(ta));
+        }
 
-    {
-        step_callback<double> step_cb(cb0<taylor_adaptive<double>>);
+        {
+            step_callback<fp_t> step_cb(cb0<taylor_adaptive<fp_t>>);
 
-        REQUIRE(static_cast<bool>(step_cb));
+            REQUIRE(static_cast<bool>(step_cb));
 
-        REQUIRE(step_cb(ta));
-        REQUIRE_NOTHROW(step_cb.pre_hook(ta));
-    }
+            REQUIRE(step_cb(ta));
+            REQUIRE_NOTHROW(step_cb.pre_hook(ta));
+        }
 
-    {
-        step_callback<double> step_cb(cb1{});
+        {
+            step_callback<fp_t> step_cb(cb1{});
 
-        REQUIRE(ta.get_state()[0] == 0.);
+            REQUIRE(ta.get_state()[0] == 0.);
 
-        REQUIRE(static_cast<bool>(step_cb));
+            REQUIRE(static_cast<bool>(step_cb));
 
-        REQUIRE(!step_cb(ta));
-        REQUIRE(ta.get_state()[0] == 2.);
+            REQUIRE(!step_cb(ta));
+            REQUIRE(ta.get_state()[0] == 2.);
 
-        REQUIRE_NOTHROW(step_cb.pre_hook(ta));
-        REQUIRE(ta.get_state()[0] == 1.);
+            REQUIRE_NOTHROW(step_cb.pre_hook(ta));
+            REQUIRE(ta.get_state()[0] == 1.);
 
-        ta.get_state_data()[0] = 0;
-    }
+            ta.get_state_data()[0] = 0;
+        }
 
-    {
-        step_callback<double> step_cb([](auto &ta) {
-            ta.get_state_data()[0] = 3;
-            return true;
-        });
+        {
+            step_callback<fp_t> step_cb([](auto &ta) {
+                ta.get_state_data()[0] = 3;
+                return true;
+            });
 
-        REQUIRE(ta.get_state()[0] == 0.);
+            REQUIRE(ta.get_state()[0] == 0.);
 
-        REQUIRE(static_cast<bool>(step_cb));
+            REQUIRE(static_cast<bool>(step_cb));
 
-        REQUIRE(step_cb(ta));
-        REQUIRE(ta.get_state()[0] == 3.);
+            REQUIRE(step_cb(ta));
+            REQUIRE(ta.get_state()[0] == 3.);
 
-        REQUIRE_NOTHROW(step_cb.pre_hook(ta));
-        REQUIRE(ta.get_state()[0] == 3.);
+            REQUIRE_NOTHROW(step_cb.pre_hook(ta));
+            REQUIRE(ta.get_state()[0] == 3.);
 
-        ta.get_state_data()[0] = 0;
-    }
+            ta.get_state_data()[0] = 0;
+        }
 
-    {
-        using std::swap;
+        {
+            using std::swap;
 
-        step_callback<double> step_cb1(cb1{}), step_cb2;
+            step_callback<fp_t> step_cb1(cb1{}), step_cb2;
 
-        swap(step_cb1, step_cb2);
+            swap(step_cb1, step_cb2);
 
-        REQUIRE(static_cast<bool>(step_cb2));
-        REQUIRE(!static_cast<bool>(step_cb1));
+            REQUIRE(static_cast<bool>(step_cb2));
+            REQUIRE(!static_cast<bool>(step_cb1));
 
-        REQUIRE(step_cb2.extract<cb1>() != nullptr);
-        REQUIRE(step_cb1.extract<cb1>() == nullptr);
-    }
+            REQUIRE(step_cb2.template extract<cb1>() != nullptr);
+            REQUIRE(step_cb1.template extract<cb1>() == nullptr);
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
 }
 
 struct cb2 {
@@ -214,104 +241,127 @@ struct cb2 {
     }
 };
 
+HEYOKA_S11N_STEP_CALLBACK_EXPORT(cb2, float)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT(cb2, float)
+
 HEYOKA_S11N_STEP_CALLBACK_EXPORT(cb2, double)
 HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT(cb2, double)
 
+#if !defined(HEYOKA_ARCH_PPC)
+
+HEYOKA_S11N_STEP_CALLBACK_EXPORT(cb2, long double)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT(cb2, long double)
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_S11N_STEP_CALLBACK_EXPORT(cb2, mppp::real128)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT(cb2, mppp::real128)
+
+#endif
+
 TEST_CASE("step_callback s11n")
 {
-    {
-        step_callback<double> step_cb(cb2{});
-
-        std::stringstream ss;
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
 
         {
-            boost::archive::binary_oarchive oa(ss);
+            step_callback<fp_t> step_cb(cb2{});
 
-            oa << step_cb;
+            std::stringstream ss;
+
+            {
+                boost::archive::binary_oarchive oa(ss);
+
+                oa << step_cb;
+            }
+
+            step_cb = step_callback<fp_t>{};
+            REQUIRE(!step_cb);
+
+            {
+                boost::archive::binary_iarchive ia(ss);
+
+                ia >> step_cb;
+            }
+
+            REQUIRE(!!step_cb);
+            REQUIRE(step_cb.template extract<cb2>() != nullptr);
         }
-
-        step_cb = step_callback<double>{};
-        REQUIRE(!step_cb);
 
         {
-            boost::archive::binary_iarchive ia(ss);
+            step_callback<fp_t> step_cb;
 
-            ia >> step_cb;
+            std::stringstream ss;
+
+            {
+                boost::archive::binary_oarchive oa(ss);
+
+                oa << step_cb;
+            }
+
+            step_cb = step_callback<fp_t>{cb2{}};
+            REQUIRE(step_cb);
+
+            {
+                boost::archive::binary_iarchive ia(ss);
+
+                ia >> step_cb;
+            }
+
+            REQUIRE(!step_cb);
         }
-
-        REQUIRE(!!step_cb);
-        REQUIRE(step_cb.extract<cb2>() != nullptr);
-    }
-
-    {
-        step_callback<double> step_cb;
-
-        std::stringstream ss;
 
         {
-            boost::archive::binary_oarchive oa(ss);
+            step_callback_batch<fp_t> step_cb(cb2{});
 
-            oa << step_cb;
+            std::stringstream ss;
+
+            {
+                boost::archive::binary_oarchive oa(ss);
+
+                oa << step_cb;
+            }
+
+            step_cb = step_callback_batch<fp_t>{};
+            REQUIRE(!step_cb);
+
+            {
+                boost::archive::binary_iarchive ia(ss);
+
+                ia >> step_cb;
+            }
+
+            REQUIRE(!!step_cb);
+            REQUIRE(step_cb.template extract<cb2>() != nullptr);
         }
-
-        step_cb = step_callback<double>{cb2{}};
-        REQUIRE(step_cb);
 
         {
-            boost::archive::binary_iarchive ia(ss);
+            step_callback_batch<fp_t> step_cb;
 
-            ia >> step_cb;
+            std::stringstream ss;
+
+            {
+                boost::archive::binary_oarchive oa(ss);
+
+                oa << step_cb;
+            }
+
+            step_cb = step_callback_batch<fp_t>{cb2{}};
+            REQUIRE(step_cb);
+
+            {
+                boost::archive::binary_iarchive ia(ss);
+
+                ia >> step_cb;
+            }
+
+            REQUIRE(!step_cb);
         }
+    };
 
-        REQUIRE(!step_cb);
-    }
-
-    {
-        step_callback_batch<double> step_cb(cb2{});
-
-        std::stringstream ss;
-
-        {
-            boost::archive::binary_oarchive oa(ss);
-
-            oa << step_cb;
-        }
-
-        step_cb = step_callback_batch<double>{};
-        REQUIRE(!step_cb);
-
-        {
-            boost::archive::binary_iarchive ia(ss);
-
-            ia >> step_cb;
-        }
-
-        REQUIRE(!!step_cb);
-        REQUIRE(step_cb.extract<cb2>() != nullptr);
-    }
-
-    {
-        step_callback_batch<double> step_cb;
-
-        std::stringstream ss;
-
-        {
-            boost::archive::binary_oarchive oa(ss);
-
-            oa << step_cb;
-        }
-
-        step_cb = step_callback_batch<double>{cb2{}};
-        REQUIRE(step_cb);
-
-        {
-            boost::archive::binary_iarchive ia(ss);
-
-            ia >> step_cb;
-        }
-
-        REQUIRE(!step_cb);
-    }
+    tuple_for_each(fp_types, tester);
 }
 
 struct pend_cb {
@@ -443,217 +493,226 @@ TEST_CASE("step_callback_set")
 
     auto dyn = model::pendulum();
 
-    // Swappability.
-    REQUIRE(std::is_nothrow_swappable_v<step_callback_set<double>>);
-    REQUIRE(std::is_nothrow_swappable_v<step_callback_batch_set<double>>);
+    auto tester = [&](auto fp_x) {
+        using fp_t = decltype(fp_x);
 
-    // Basic API.
-    step_callback_set<double> scs;
-    REQUIRE(scs.size() == 0u);
-    REQUIRE_THROWS_MATCHES(scs[0], std::out_of_range,
-                           Message("Out of range index 0 when accessing a step callback set of size 0"));
-    REQUIRE_THROWS_MATCHES(std::as_const(scs[0]), std::out_of_range,
-                           Message("Out of range index 0 when accessing a step callback set of size 0"));
-    auto scs2 = step_callback_set<double>{[](const auto &) { return true; }};
-    REQUIRE(scs2.size() == 1u);
-    REQUIRE_NOTHROW(scs2[0]);
-    REQUIRE_NOTHROW(std::as_const(scs2)[0]);
-    REQUIRE_THROWS_MATCHES(scs2[10], std::out_of_range,
-                           Message("Out of range index 10 when accessing a step callback set of size 1"));
+        // Swappability.
+        REQUIRE(std::is_nothrow_swappable_v<step_callback_set<fp_t>>);
+        REQUIRE(std::is_nothrow_swappable_v<step_callback_batch_set<fp_t>>);
 
-    swap(scs, scs2);
-    REQUIRE(scs.size() == 1u);
-    REQUIRE(scs2.size() == 0u);
-    REQUIRE_NOTHROW(scs[0]);
-    REQUIRE_NOTHROW(std::as_const(scs)[0]);
-    REQUIRE_THROWS_MATCHES(scs[10], std::out_of_range,
-                           Message("Out of range index 10 when accessing a step callback set of size 1"));
+        // Basic API.
+        step_callback_set<fp_t> scs;
+        REQUIRE(scs.size() == 0u);
+        REQUIRE_THROWS_MATCHES(scs[0], std::out_of_range,
+                               Message("Out of range index 0 when accessing a step callback set of size 0"));
+        REQUIRE_THROWS_MATCHES(std::as_const(scs[0]), std::out_of_range,
+                               Message("Out of range index 0 when accessing a step callback set of size 0"));
+        auto scs2 = step_callback_set<fp_t>{[](const auto &) { return true; }};
+        REQUIRE(scs2.size() == 1u);
+        REQUIRE_NOTHROW(scs2[0]);
+        REQUIRE_NOTHROW(std::as_const(scs2)[0]);
+        REQUIRE_THROWS_MATCHES(scs2[10], std::out_of_range,
+                               Message("Out of range index 10 when accessing a step callback set of size 1"));
 
-    auto scs3 = scs;
-    REQUIRE(scs3.size() == 1u);
+        swap(scs, scs2);
+        REQUIRE(scs.size() == 1u);
+        REQUIRE(scs2.size() == 0u);
+        REQUIRE_NOTHROW(scs[0]);
+        REQUIRE_NOTHROW(std::as_const(scs)[0]);
+        REQUIRE_THROWS_MATCHES(scs[10], std::out_of_range,
+                               Message("Out of range index 10 when accessing a step callback set of size 1"));
 
-    auto scs4 = std::move(scs);
-    REQUIRE(scs4.size() == 1u);
+        auto scs3 = scs;
+        REQUIRE(scs3.size() == 1u);
 
-    scs = scs4;
-    REQUIRE(scs.size() == 1u);
+        auto scs4 = std::move(scs);
+        REQUIRE(scs4.size() == 1u);
 
-    scs2 = std::move(scs);
-    REQUIRE(scs2.size() == 1u);
+        scs = scs4;
+        REQUIRE(scs.size() == 1u);
 
-    // Empty set.
-    {
-        auto ta0 = taylor_adaptive<double>{dyn, {1., 0.}};
+        scs2 = std::move(scs);
+        REQUIRE(scs2.size() == 1u);
 
-        const auto oc = std::get<0>(ta0.propagate_until(10., kw::callback = step_callback_set<double>{}));
-
-        REQUIRE(oc == taylor_outcome::time_limit);
-    }
-
-    // Check sequencing of callback invocations.
-    {
-        int c1 = 0;
-        int c2 = 0;
-
-        auto ta0 = taylor_adaptive<double>{dyn, {1., 0.}};
-
-        const auto oc
-            = std::get<0>(ta0.propagate_until(10., kw::callback = step_callback_set<double>{[&c1, &c2](const auto &) {
-                                                                                                REQUIRE(c1 == c2);
-                                                                                                ++c1;
-                                                                                                return true;
-                                                                                            },
-                                                                                            [&c1, &c2](const auto &) {
-                                                                                                ++c2;
-                                                                                                REQUIRE(c1 == c2);
-                                                                                                return true;
-                                                                                            }}));
-
-        REQUIRE(oc == taylor_outcome::time_limit);
-        REQUIRE(c1 == c2);
-    }
-
-    // Check stopping.
-    {
-        int c1 = 0;
-        int c2 = 0;
-
-        auto ta0 = taylor_adaptive<double>{dyn, {1., 0.}};
-
-        const auto oc
-            = std::get<0>(ta0.propagate_until(10., kw::callback = step_callback_set<double>{[&c1, &c2](const auto &) {
-                                                                                                REQUIRE(c1 == c2);
-                                                                                                ++c1;
-                                                                                                return false;
-                                                                                            },
-                                                                                            [&c1, &c2](const auto &) {
-                                                                                                ++c2;
-                                                                                                REQUIRE(c1 == c2);
-                                                                                                return true;
-                                                                                            }}));
-
-        REQUIRE(oc == taylor_outcome::cb_stop);
-        REQUIRE(c1 == c2);
-    }
-
-    {
-        int c1 = 0;
-        int c2 = 0;
-
-        auto ta0 = taylor_adaptive<double>{dyn, {1., 0.}};
-
-        const auto oc
-            = std::get<0>(ta0.propagate_until(10., kw::callback = step_callback_set<double>{[&c1, &c2](const auto &) {
-                                                                                                REQUIRE(c1 == c2);
-                                                                                                ++c1;
-                                                                                                return true;
-                                                                                            },
-                                                                                            [&c1, &c2](const auto &) {
-                                                                                                ++c2;
-                                                                                                REQUIRE(c1 == c2);
-                                                                                                return false;
-                                                                                            }}));
-
-        REQUIRE(oc == taylor_outcome::cb_stop);
-        REQUIRE(c1 == c2);
-    }
-
-    // Pre-hook invocation.
-    {
-        int a = 0;
-        int b = 0;
-
-        int h1 = 0;
-        int h2 = 0;
-
-        struct my_cb1 {
-            int &c1;
-            int &c2;
-            int &h;
-
-            bool operator()(taylor_adaptive<double> &)
-            {
-                REQUIRE(c1 == c2);
-                ++c1;
-                return true;
-            }
-
-            void pre_hook(taylor_adaptive<double> &)
-            {
-                REQUIRE(h == 0);
-                ++h;
-            }
-        };
-
-        struct my_cb2 {
-            int &c1;
-            int &c2;
-            int &h;
-
-            bool operator()(taylor_adaptive<double> &)
-            {
-                ++c2;
-                REQUIRE(c1 == c2);
-                return true;
-            }
-
-            void pre_hook(taylor_adaptive<double> &)
-            {
-                REQUIRE(h == 0);
-                ++h;
-            }
-        };
-
-        auto ta0 = taylor_adaptive<double>{dyn, {1., 0.}};
-
-        const auto oc = std::get<0>(
-            ta0.propagate_until(10., kw::callback = step_callback_set<double>{my_cb1{a, b, h1}, my_cb2{a, b, h2}}));
-
-        REQUIRE(oc == taylor_outcome::time_limit);
-        REQUIRE(a == b);
-        REQUIRE(h1 == 1);
-        REQUIRE(h2 == 1);
-    }
-
-    // Error handling.
-    {
-        auto ta0 = taylor_adaptive<double>{dyn, {1., 0.}};
-
-        REQUIRE_THROWS_MATCHES(
-            ta0.propagate_until(6., kw::callback = step_callback_set<double>{step_callback<double>{}}),
-            std::invalid_argument, Message("Cannot construct a callback set containing one or more empty callbacks"));
-        REQUIRE_THROWS_MATCHES(
-            ta0.propagate_until(6., kw::callback = step_callback_set<double>{step_callback<double>{},
-                                                                             [](const auto &) { return true; }}),
-            std::invalid_argument, Message("Cannot construct a callback set containing one or more empty callbacks"));
-        REQUIRE_THROWS_MATCHES(
-            ta0.propagate_until(6., kw::callback = step_callback_set<double>{[](const auto &) { return true; },
-                                                                             step_callback<double>{}}),
-            std::invalid_argument, Message("Cannot construct a callback set containing one or more empty callbacks"));
-    }
-
-    // Serialisation.
-    {
-        step_callback<double> scs{step_callback_set<double>{cb2{}}};
-
-        std::stringstream ss;
-
+        // Empty set.
         {
-            boost::archive::binary_oarchive oa(ss);
+            auto ta0 = taylor_adaptive<fp_t>{dyn, {1., 0.}};
 
-            oa << scs;
+            const auto oc = std::get<0>(ta0.propagate_until(10., kw::callback = step_callback_set<fp_t>{}));
+
+            REQUIRE(oc == taylor_outcome::time_limit);
         }
 
-        scs = step_callback<double>{};
-        REQUIRE(!scs);
-
+        // Check sequencing of callback invocations.
         {
-            boost::archive::binary_iarchive ia(ss);
+            int c1 = 0;
+            int c2 = 0;
 
-            ia >> scs;
+            auto ta0 = taylor_adaptive<fp_t>{dyn, {1., 0.}};
+
+            const auto oc
+                = std::get<0>(ta0.propagate_until(10., kw::callback = step_callback_set<fp_t>{[&c1, &c2](const auto &) {
+                                                                                                  REQUIRE(c1 == c2);
+                                                                                                  ++c1;
+                                                                                                  return true;
+                                                                                              },
+                                                                                              [&c1, &c2](const auto &) {
+                                                                                                  ++c2;
+                                                                                                  REQUIRE(c1 == c2);
+                                                                                                  return true;
+                                                                                              }}));
+
+            REQUIRE(oc == taylor_outcome::time_limit);
+            REQUIRE(c1 == c2);
         }
 
-        REQUIRE(static_cast<bool>(scs));
-        REQUIRE(scs.extract<step_callback_set<double>>() != nullptr);
-    }
+        // Check stopping.
+        {
+            int c1 = 0;
+            int c2 = 0;
+
+            auto ta0 = taylor_adaptive<fp_t>{dyn, {1., 0.}};
+
+            const auto oc
+                = std::get<0>(ta0.propagate_until(10., kw::callback = step_callback_set<fp_t>{[&c1, &c2](const auto &) {
+                                                                                                  REQUIRE(c1 == c2);
+                                                                                                  ++c1;
+                                                                                                  return false;
+                                                                                              },
+                                                                                              [&c1, &c2](const auto &) {
+                                                                                                  ++c2;
+                                                                                                  REQUIRE(c1 == c2);
+                                                                                                  return true;
+                                                                                              }}));
+
+            REQUIRE(oc == taylor_outcome::cb_stop);
+            REQUIRE(c1 == c2);
+        }
+
+        {
+            int c1 = 0;
+            int c2 = 0;
+
+            auto ta0 = taylor_adaptive<fp_t>{dyn, {1., 0.}};
+
+            const auto oc
+                = std::get<0>(ta0.propagate_until(10., kw::callback = step_callback_set<fp_t>{[&c1, &c2](const auto &) {
+                                                                                                  REQUIRE(c1 == c2);
+                                                                                                  ++c1;
+                                                                                                  return true;
+                                                                                              },
+                                                                                              [&c1, &c2](const auto &) {
+                                                                                                  ++c2;
+                                                                                                  REQUIRE(c1 == c2);
+                                                                                                  return false;
+                                                                                              }}));
+
+            REQUIRE(oc == taylor_outcome::cb_stop);
+            REQUIRE(c1 == c2);
+        }
+
+        // Pre-hook invocation.
+        {
+            int a = 0;
+            int b = 0;
+
+            int h1 = 0;
+            int h2 = 0;
+
+            struct my_cb1 {
+                int &c1;
+                int &c2;
+                int &h;
+
+                bool operator()(taylor_adaptive<fp_t> &)
+                {
+                    REQUIRE(c1 == c2);
+                    ++c1;
+                    return true;
+                }
+
+                void pre_hook(taylor_adaptive<fp_t> &)
+                {
+                    REQUIRE(h == 0);
+                    ++h;
+                }
+            };
+
+            struct my_cb2 {
+                int &c1;
+                int &c2;
+                int &h;
+
+                bool operator()(taylor_adaptive<fp_t> &)
+                {
+                    ++c2;
+                    REQUIRE(c1 == c2);
+                    return true;
+                }
+
+                void pre_hook(taylor_adaptive<fp_t> &)
+                {
+                    REQUIRE(h == 0);
+                    ++h;
+                }
+            };
+
+            auto ta0 = taylor_adaptive<fp_t>{dyn, {1., 0.}};
+
+            const auto oc = std::get<0>(
+                ta0.propagate_until(10., kw::callback = step_callback_set<fp_t>{my_cb1{a, b, h1}, my_cb2{a, b, h2}}));
+
+            REQUIRE(oc == taylor_outcome::time_limit);
+            REQUIRE(a == b);
+            REQUIRE(h1 == 1);
+            REQUIRE(h2 == 1);
+        }
+
+        // Error handling.
+        {
+            auto ta0 = taylor_adaptive<fp_t>{dyn, {1., 0.}};
+
+            REQUIRE_THROWS_MATCHES(
+                ta0.propagate_until(6., kw::callback = step_callback_set<fp_t>{step_callback<fp_t>{}}),
+                std::invalid_argument,
+                Message("Cannot construct a callback set containing one or more empty callbacks"));
+            REQUIRE_THROWS_MATCHES(
+                ta0.propagate_until(6., kw::callback = step_callback_set<fp_t>{step_callback<fp_t>{},
+                                                                               [](const auto &) { return true; }}),
+                std::invalid_argument,
+                Message("Cannot construct a callback set containing one or more empty callbacks"));
+            REQUIRE_THROWS_MATCHES(
+                ta0.propagate_until(6., kw::callback = step_callback_set<fp_t>{[](const auto &) { return true; },
+                                                                               step_callback<fp_t>{}}),
+                std::invalid_argument,
+                Message("Cannot construct a callback set containing one or more empty callbacks"));
+        }
+
+        // Serialisation.
+        {
+            step_callback<fp_t> scs{step_callback_set<fp_t>{cb2{}}};
+
+            std::stringstream ss;
+
+            {
+                boost::archive::binary_oarchive oa(ss);
+
+                oa << scs;
+            }
+
+            scs = step_callback<fp_t>{};
+            REQUIRE(!scs);
+
+            {
+                boost::archive::binary_iarchive ia(ss);
+
+                ia >> scs;
+            }
+
+            REQUIRE(static_cast<bool>(scs));
+            REQUIRE(scs.template extract<step_callback_set<fp_t>>() != nullptr);
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
 }
