@@ -505,7 +505,7 @@ TEST_CASE("step_callback_set")
         REQUIRE(scs.size() == 0u);
         REQUIRE_THROWS_MATCHES(scs[0], std::out_of_range,
                                Message("Out of range index 0 when accessing a step callback set of size 0"));
-        REQUIRE_THROWS_MATCHES(std::as_const(scs[0]), std::out_of_range,
+        REQUIRE_THROWS_MATCHES(std::as_const(scs)[0], std::out_of_range,
                                Message("Out of range index 0 when accessing a step callback set of size 0"));
         auto scs2 = step_callback_set<fp_t>{[](const auto &) { return true; }};
         REQUIRE(scs2.size() == 1u);
