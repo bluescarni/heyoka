@@ -435,3 +435,225 @@ TEST_CASE("step_callback pre_hook")
                     "time coordinate of the integrator - this is not supported"));
     }
 }
+
+TEST_CASE("step_callback_set")
+{
+    using Catch::Matchers::Message;
+    using std::swap;
+
+    auto dyn = model::pendulum();
+
+    // Swappability.
+    REQUIRE(std::is_nothrow_swappable_v<step_callback_set<double>>);
+    REQUIRE(std::is_nothrow_swappable_v<step_callback_batch_set<double>>);
+
+    // Basic API.
+    step_callback_set<double> scs;
+    REQUIRE(scs.size() == 0u);
+    REQUIRE_THROWS_MATCHES(scs[0], std::out_of_range,
+                           Message("Out of range index 0 when accessing a step callback set of size 0"));
+    REQUIRE_THROWS_MATCHES(std::as_const(scs[0]), std::out_of_range,
+                           Message("Out of range index 0 when accessing a step callback set of size 0"));
+    auto scs2 = step_callback_set<double>{[](const auto &) { return true; }};
+    REQUIRE(scs2.size() == 1u);
+    REQUIRE_NOTHROW(scs2[0]);
+    REQUIRE_NOTHROW(std::as_const(scs2)[0]);
+    REQUIRE_THROWS_MATCHES(scs2[10], std::out_of_range,
+                           Message("Out of range index 10 when accessing a step callback set of size 1"));
+
+    swap(scs, scs2);
+    REQUIRE(scs.size() == 1u);
+    REQUIRE(scs2.size() == 0u);
+    REQUIRE_NOTHROW(scs[0]);
+    REQUIRE_NOTHROW(std::as_const(scs)[0]);
+    REQUIRE_THROWS_MATCHES(scs[10], std::out_of_range,
+                           Message("Out of range index 10 when accessing a step callback set of size 1"));
+
+    auto scs3 = scs;
+    REQUIRE(scs3.size() == 1u);
+
+    auto scs4 = std::move(scs);
+    REQUIRE(scs4.size() == 1u);
+
+    scs = scs4;
+    REQUIRE(scs.size() == 1u);
+
+    scs2 = std::move(scs);
+    REQUIRE(scs2.size() == 1u);
+
+    // Empty set.
+    {
+        auto ta0 = taylor_adaptive<double>{dyn, {1., 0.}};
+
+        const auto oc = std::get<0>(ta0.propagate_until(10., kw::callback = step_callback_set<double>{}));
+
+        REQUIRE(oc == taylor_outcome::time_limit);
+    }
+
+    // Check sequencing of callback invocations.
+    {
+        int c1 = 0;
+        int c2 = 0;
+
+        auto ta0 = taylor_adaptive<double>{dyn, {1., 0.}};
+
+        const auto oc
+            = std::get<0>(ta0.propagate_until(10., kw::callback = step_callback_set<double>{[&c1, &c2](const auto &) {
+                                                                                                REQUIRE(c1 == c2);
+                                                                                                ++c1;
+                                                                                                return true;
+                                                                                            },
+                                                                                            [&c1, &c2](const auto &) {
+                                                                                                ++c2;
+                                                                                                REQUIRE(c1 == c2);
+                                                                                                return true;
+                                                                                            }}));
+
+        REQUIRE(oc == taylor_outcome::time_limit);
+        REQUIRE(c1 == c2);
+    }
+
+    // Check stopping.
+    {
+        int c1 = 0;
+        int c2 = 0;
+
+        auto ta0 = taylor_adaptive<double>{dyn, {1., 0.}};
+
+        const auto oc
+            = std::get<0>(ta0.propagate_until(10., kw::callback = step_callback_set<double>{[&c1, &c2](const auto &) {
+                                                                                                REQUIRE(c1 == c2);
+                                                                                                ++c1;
+                                                                                                return false;
+                                                                                            },
+                                                                                            [&c1, &c2](const auto &) {
+                                                                                                ++c2;
+                                                                                                REQUIRE(c1 == c2);
+                                                                                                return true;
+                                                                                            }}));
+
+        REQUIRE(oc == taylor_outcome::cb_stop);
+        REQUIRE(c1 == c2);
+    }
+
+    {
+        int c1 = 0;
+        int c2 = 0;
+
+        auto ta0 = taylor_adaptive<double>{dyn, {1., 0.}};
+
+        const auto oc
+            = std::get<0>(ta0.propagate_until(10., kw::callback = step_callback_set<double>{[&c1, &c2](const auto &) {
+                                                                                                REQUIRE(c1 == c2);
+                                                                                                ++c1;
+                                                                                                return true;
+                                                                                            },
+                                                                                            [&c1, &c2](const auto &) {
+                                                                                                ++c2;
+                                                                                                REQUIRE(c1 == c2);
+                                                                                                return false;
+                                                                                            }}));
+
+        REQUIRE(oc == taylor_outcome::cb_stop);
+        REQUIRE(c1 == c2);
+    }
+
+    // Pre-hook invocation.
+    {
+        int a = 0;
+        int b = 0;
+
+        int h1 = 0;
+        int h2 = 0;
+
+        struct my_cb1 {
+            int &c1;
+            int &c2;
+            int &h;
+
+            bool operator()(taylor_adaptive<double> &)
+            {
+                REQUIRE(c1 == c2);
+                ++c1;
+                return true;
+            }
+
+            void pre_hook(taylor_adaptive<double> &)
+            {
+                REQUIRE(h == 0);
+                ++h;
+            }
+        };
+
+        struct my_cb2 {
+            int &c1;
+            int &c2;
+            int &h;
+
+            bool operator()(taylor_adaptive<double> &)
+            {
+                ++c2;
+                REQUIRE(c1 == c2);
+                return true;
+            }
+
+            void pre_hook(taylor_adaptive<double> &)
+            {
+                REQUIRE(h == 0);
+                ++h;
+            }
+        };
+
+        auto ta0 = taylor_adaptive<double>{dyn, {1., 0.}};
+
+        const auto oc = std::get<0>(
+            ta0.propagate_until(10., kw::callback = step_callback_set<double>{my_cb1{a, b, h1}, my_cb2{a, b, h2}}));
+
+        REQUIRE(oc == taylor_outcome::time_limit);
+        REQUIRE(a == b);
+        REQUIRE(h1 == 1);
+        REQUIRE(h2 == 1);
+    }
+
+    // Error handling.
+    {
+        auto ta0 = taylor_adaptive<double>{dyn, {1., 0.}};
+
+        REQUIRE_THROWS_MATCHES(
+            ta0.propagate_until(6., kw::callback = step_callback_set<double>{step_callback<double>{}}),
+            std::invalid_argument, Message("Cannot construct a callback set containing one or more empty callbacks"));
+        REQUIRE_THROWS_MATCHES(
+            ta0.propagate_until(6., kw::callback = step_callback_set<double>{step_callback<double>{},
+                                                                             [](const auto &) { return true; }}),
+            std::invalid_argument, Message("Cannot construct a callback set containing one or more empty callbacks"));
+        REQUIRE_THROWS_MATCHES(
+            ta0.propagate_until(6., kw::callback = step_callback_set<double>{[](const auto &) { return true; },
+                                                                             step_callback<double>{}}),
+            std::invalid_argument, Message("Cannot construct a callback set containing one or more empty callbacks"));
+    }
+
+    // Serialisation.
+    {
+        step_callback<double> scs{step_callback_set<double>{cb2{}}};
+
+        std::stringstream ss;
+
+        {
+            boost::archive::binary_oarchive oa(ss);
+
+            oa << scs;
+        }
+
+        scs = step_callback<double>{};
+        REQUIRE(!scs);
+
+        {
+            boost::archive::binary_iarchive ia(ss);
+
+            ia >> scs;
+        }
+
+        REQUIRE(static_cast<bool>(scs));
+        REQUIRE(scs.extract<step_callback_set<double>>() != nullptr);
+    }
+}
