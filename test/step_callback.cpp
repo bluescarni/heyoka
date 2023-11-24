@@ -496,43 +496,45 @@ TEST_CASE("step_callback_set")
     auto tester = [&](auto fp_x) {
         using fp_t = decltype(fp_x);
 
-        // Swappability.
-        REQUIRE(std::is_nothrow_swappable_v<step_callback_set<fp_t>>);
-        REQUIRE(std::is_nothrow_swappable_v<step_callback_batch_set<fp_t>>);
+        {
+            // Swappability.
+            REQUIRE(std::is_nothrow_swappable_v<step_callback_set<fp_t>>);
+            REQUIRE(std::is_nothrow_swappable_v<step_callback_batch_set<fp_t>>);
 
-        // Basic API.
-        step_callback_set<fp_t> scs;
-        REQUIRE(scs.size() == 0u);
-        REQUIRE_THROWS_MATCHES(scs[0], std::out_of_range,
-                               Message("Out of range index 0 when accessing a step callback set of size 0"));
-        REQUIRE_THROWS_MATCHES(std::as_const(scs)[0], std::out_of_range,
-                               Message("Out of range index 0 when accessing a step callback set of size 0"));
-        auto scs2 = step_callback_set<fp_t>{[](const auto &) { return true; }};
-        REQUIRE(scs2.size() == 1u);
-        REQUIRE_NOTHROW(scs2[0]);
-        REQUIRE_NOTHROW(std::as_const(scs2)[0]);
-        REQUIRE_THROWS_MATCHES(scs2[10], std::out_of_range,
-                               Message("Out of range index 10 when accessing a step callback set of size 1"));
+            // Basic API.
+            step_callback_set<fp_t> scs;
+            REQUIRE(scs.size() == 0u);
+            REQUIRE_THROWS_MATCHES(scs[0], std::out_of_range,
+                                   Message("Out of range index 0 when accessing a step callback set of size 0"));
+            REQUIRE_THROWS_MATCHES(std::as_const(scs)[0], std::out_of_range,
+                                   Message("Out of range index 0 when accessing a step callback set of size 0"));
+            auto scs2 = step_callback_set<fp_t>{[](const auto &) { return true; }};
+            REQUIRE(scs2.size() == 1u);
+            REQUIRE_NOTHROW(scs2[0]);
+            REQUIRE_NOTHROW(std::as_const(scs2)[0]);
+            REQUIRE_THROWS_MATCHES(scs2[10], std::out_of_range,
+                                   Message("Out of range index 10 when accessing a step callback set of size 1"));
 
-        swap(scs, scs2);
-        REQUIRE(scs.size() == 1u);
-        REQUIRE(scs2.size() == 0u);
-        REQUIRE_NOTHROW(scs[0]);
-        REQUIRE_NOTHROW(std::as_const(scs)[0]);
-        REQUIRE_THROWS_MATCHES(scs[10], std::out_of_range,
-                               Message("Out of range index 10 when accessing a step callback set of size 1"));
+            swap(scs, scs2);
+            REQUIRE(scs.size() == 1u);
+            REQUIRE(scs2.size() == 0u);
+            REQUIRE_NOTHROW(scs[0]);
+            REQUIRE_NOTHROW(std::as_const(scs)[0]);
+            REQUIRE_THROWS_MATCHES(scs[10], std::out_of_range,
+                                   Message("Out of range index 10 when accessing a step callback set of size 1"));
 
-        auto scs3 = scs;
-        REQUIRE(scs3.size() == 1u);
+            auto scs3 = scs;
+            REQUIRE(scs3.size() == 1u);
 
-        auto scs4 = std::move(scs);
-        REQUIRE(scs4.size() == 1u);
+            auto scs4 = std::move(scs);
+            REQUIRE(scs4.size() == 1u);
 
-        scs = scs4;
-        REQUIRE(scs.size() == 1u);
+            scs = scs4;
+            REQUIRE(scs.size() == 1u);
 
-        scs2 = std::move(scs);
-        REQUIRE(scs2.size() == 1u);
+            scs2 = std::move(scs);
+            REQUIRE(scs2.size() == 1u);
+        }
 
         // Empty set.
         {
