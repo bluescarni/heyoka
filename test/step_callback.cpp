@@ -23,6 +23,7 @@
 
 #endif
 
+#include <heyoka/callable.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/model/pendulum.hpp>
 #include <heyoka/s11n.hpp>
@@ -103,6 +104,18 @@ TEST_CASE("step_callback basics")
             // Move construction of empty callback.
             auto step_cb3 = std::move(step_cb);
             REQUIRE(!step_cb3);
+
+            // Empty init from nullptr.
+            step_callback<fp_t> c6 = static_cast<bool (*)(taylor_adaptive<fp_t> &)>(nullptr);
+            REQUIRE(!c6);
+
+            // Empty init from empty std::function.
+            step_callback<fp_t> c7 = std::function<bool(taylor_adaptive<fp_t> &)>{};
+            REQUIRE(!c7);
+
+            // Empty init from empty callable.
+            step_callback<fp_t> c8 = callable<bool(taylor_adaptive<fp_t> &)>{};
+            REQUIRE(!c8);
         }
 
         {

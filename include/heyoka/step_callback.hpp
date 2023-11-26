@@ -31,6 +31,7 @@
 
 #endif
 
+#include <heyoka/callable.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -168,14 +169,27 @@ public:
 
     step_callback_impl();
 
-    // NOTE: unlike std::function, if f is a nullptr or an empty std::function
-    // the constructed step_callback_impl will *NOT* be empty. If we need this,
-    // we can implement it with some meta-programming.
     template <typename T, generic_ctor_enabler<T &&> = 0>
     // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     step_callback_impl(T &&f)
-        : m_ptr(std::make_unique<step_callback_inner<internal_type<T &&>, TA>>(std::forward<T>(f)))
     {
+        using uT = detail::uncvref_t<T>;
+
+        // NOTE: if f is a nullptr or an empty callable or
+        // std::function, leave this empty.
+        if constexpr (detail::is_any_std_func_v<uT> || is_any_callable<uT>::value) {
+            if (!f) {
+                return;
+            }
+        }
+
+        if constexpr (std::is_pointer_v<uT> || std::is_member_object_pointer_v<uT>) {
+            if (f == nullptr) {
+                return;
+            }
+        }
+
+        m_ptr = std::make_unique<step_callback_inner<internal_type<T &&>, TA>>(std::forward<T>(f));
     }
 
     step_callback_impl(const step_callback_impl &);
