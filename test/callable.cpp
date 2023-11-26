@@ -82,6 +82,18 @@ TEST_CASE("callable basics")
 
     REQUIRE(std::is_nothrow_move_constructible_v<callable<void()>>);
     REQUIRE(std::is_nothrow_move_assignable_v<callable<void()>>);
+
+    // Empty init from nullptr.
+    callable<void()> c6 = static_cast<void (*)()>(nullptr);
+    REQUIRE(!c6);
+
+    // Empty init from empty std::function.
+    callable<void()> c7 = std::function<void()>{};
+    REQUIRE(!c7);
+
+    // Empty init from empty callable.
+    callable<int(int)> c8 = callable<int(double)>{};
+    REQUIRE(!c8);
 }
 
 TEST_CASE("callable call")
@@ -186,7 +198,7 @@ struct foo_s11n {
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &addval;
+        ar & addval;
     }
 };
 

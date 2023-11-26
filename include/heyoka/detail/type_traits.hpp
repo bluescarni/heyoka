@@ -11,6 +11,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <functional>
 #include <initializer_list>
 #include <limits>
 #include <type_traits>
@@ -164,6 +165,18 @@ inline constexpr bool is_x86_fp80 = is_ieee754_binaryN<T, 64>();
 
 template <typename T>
 inline constexpr bool is_ieee754_binary128 = is_ieee754_binaryN<T, 113>();
+
+// Machinery to detect std::function.
+template <typename>
+struct is_any_std_func : std::false_type {
+};
+
+template <typename R, typename... Args>
+struct is_any_std_func<std::function<R(Args...)>> : std::true_type {
+};
+
+template <typename T>
+inline constexpr bool is_any_std_func_v = is_any_std_func<T>::value;
 
 } // namespace detail
 
