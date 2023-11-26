@@ -177,6 +177,13 @@ public:
 
         // NOTE: if f is a nullptr or an empty callable or
         // std::function, leave this empty.
+        // NOTE: I do not think that we need to guard against uT being
+        // an empty step_callback here, since:
+        // - if we try to construct from a step_callback with the same signature
+        //   as this, then we end up in the copy/move ctor (and not here), and
+        // - if we try to construct from a step_callback with a different signature
+        //   (meaning a different TA), then the check on step_callback_call_t would
+        //   fail due to the lack of implicit conversions between TAs.
         if constexpr (detail::is_any_std_func_v<uT> || is_any_callable<uT>::value) {
             if (!f) {
                 return;
