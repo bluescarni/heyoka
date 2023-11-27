@@ -111,10 +111,6 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS callable
     static_assert(detail::always_false_v<T>);
 };
 
-// Fwd declaration.
-template <typename R, typename... Args>
-class HEYOKA_DLL_PUBLIC_INLINE_CLASS callable<R(Args...)>;
-
 // Detect callable instances.
 template <typename>
 struct is_any_callable : std::false_type {
