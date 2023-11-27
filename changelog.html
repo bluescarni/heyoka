@@ -545,6 +545,9 @@ document.write(`
 <section id="new">
 <h3>New<a class="headerlink" href="#new" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>Add the step callback (batch) set classes to compose
+step callbacks
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/366">#366</a>).</p></li>
 <li><p>Add support for single-precision computations
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/363">#363</a>).</p></li>
 <li><p>Add model implementing the ELP2000 analytical lunar theory
@@ -554,6 +557,10 @@ document.write(`
 <section id="changes">
 <h3>Changes<a class="headerlink" href="#changes" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p>Initialising a step callback or a callable from an empty
+function object (e.g., a null pointer, an empty <code class="docutils literal notranslate"><span class="pre">std::function</span></code>, etc.)
+now results in an empty object
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/366">#366</a>).</p></li>
 <li><p>Improve performance when creating symbolic expressions for
 large sums and products
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/362">#362</a>).</p></li>

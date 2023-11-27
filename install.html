@@ -438,7 +438,7 @@ and for quadruple-precision integrations on platforms
 supporting the non-standard <code class="docutils literal notranslate"><span class="pre">__float128</span></code> type. heyoka requires
 an mp++ installation with support for Boost.serialization and for the
 {fmt} library
-(see the <a class="reference external" href="https://bluescarni.github.io/mppp/installation.html#installation" title="(in mp++ v0.27)"><span class="xref std std-ref">mp++ installation instructions</span></a>).
+(see the <a class="reference external" href="https://bluescarni.github.io/mppp/installation.html#installation" title="(in mp++ v1.0.0)"><span class="xref std std-ref">mp++ installation instructions</span></a>).
 The minimum required version of mp++ is 0.27;</p></li>
 <li><p>the <a class="reference external" href="https://sleef.org/">SLEEF</a> vectorized math library (improves the performance
 of integrations in batch mode),</p></li>
@@ -479,12 +479,12 @@ on platforms such as x86-64, quadruple-precision computations are supported if:<
 <li><p>the nonstandard <code class="docutils literal notranslate"><span class="pre">__float128</span></code> floating-point type is
 available and supported, and</p></li>
 <li><p>an installation of the <a class="reference external" href="https://bluescarni.github.io/mppp/">mp++</a> library with support
-for the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> class is available (see the <a class="reference external" href="https://bluescarni.github.io/mppp/installation.html#installation" title="(in mp++ v0.27)"><span class="xref std std-ref">mp++ installation instructions</span></a>),
+for the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.0)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> class is available (see the <a class="reference external" href="https://bluescarni.github.io/mppp/installation.html#installation" title="(in mp++ v1.0.0)"><span class="xref std std-ref">mp++ installation instructions</span></a>),
 and</p></li>
 <li><p>heyoka is compiled with the <code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_MPPP</span></code> option enabled (see <a class="reference internal" href="#installation-from-source"><span class="std std-ref">below</span></a>).</p></li>
 </ul>
 <p>If these conditions are satisfied, then quadruple-precision computations are supported in heyoka
-via the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> type.</p>
+via the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.0)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> type.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>The non-IEEE <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> type available on some PowerPC platforms
@@ -497,7 +497,7 @@ significant bits) is <strong>not</strong> supported by heyoka at this time.</p>
 <p>Arbitrary-precision integrations are supported on all platforms, provided that heyoka
 is compiled with the <code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_MPPP</span></code> option enabled (see <a class="reference internal" href="#installation-from-source"><span class="std std-ref">below</span></a>)
 and that the mp++ library is compiled with the <code class="docutils literal notranslate"><span class="pre">MPPP_WITH_MPFR</span></code> option enabled
-(see the <a class="reference external" href="https://bluescarni.github.io/mppp/installation.html#installation" title="(in mp++ v0.27)"><span class="xref std std-ref">mp++ installation instructions</span></a>).</p>
+(see the <a class="reference external" href="https://bluescarni.github.io/mppp/installation.html#installation" title="(in mp++ v1.0.0)"><span class="xref std std-ref">mp++ installation instructions</span></a>).</p>
 </section>
 </section>
 </section>
@@ -646,9 +646,9 @@ dependencies heyoka was compiled:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">heyoka_WITH_SLEEF</span></code> if SLEEF support was enabled,</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">heyoka_WITH_MPPP</span></code> if mp++ support was enabled,</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">heyoka_WITH_REAL128</span></code> (new in version 0.19) if quadruple-precision
-computations via the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> type are supported,</p></li>
+computations via the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.0)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> type are supported,</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">heyoka_WITH_REAL</span></code> (new in version 0.20) if arbitrary-precision
-computations via the <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v0.27)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a> type are supported.</p></li>
+computations via the <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v1.0.0)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a> type are supported.</p></li>
 </ul>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 0.17.0.</span></p>
