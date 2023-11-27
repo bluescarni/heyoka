@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- Add the step callback (batch) set classes to compose
+  step callbacks
+  (`#366 <https://github.com/bluescarni/heyoka/pull/366>`__).
 - Add support for single-precision computations
   (`#363 <https://github.com/bluescarni/heyoka/pull/363>`__).
 - Add model implementing the ELP2000 analytical lunar theory
