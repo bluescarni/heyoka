@@ -111,6 +111,15 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS callable
     static_assert(detail::always_false_v<T>);
 };
 
+// Detect callable instances.
+template <typename>
+struct is_any_callable : std::false_type {
+};
+
+template <typename R, typename... Args>
+struct is_any_callable<callable<R(Args...)>> : std::true_type {
+};
+
 template <typename R, typename... Args>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS callable<R(Args...)>
 {
@@ -124,18 +133,10 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS callable<R(Args...)>
         ar & m_ptr;
     }
 
-    // Dispatching of the generic constructor with specialisation
-    // for construction from a function (second overload).
+    // Detection of the candidate internal type from a generic T.
     template <typename T>
-    explicit callable(T &&f, std::false_type)
-        : m_ptr(std::make_unique<detail::callable_inner<detail::uncvref_t<T>, R, Args...>>(std::forward<T>(f)))
-    {
-    }
-    template <typename T>
-    explicit callable(T &&f, std::true_type)
-        : callable(static_cast<R (*)(Args...)>(std::forward<T>(f)), std::false_type{})
-    {
-    }
+    using internal_type
+        = std::conditional_t<std::is_function_v<detail::uncvref_t<T>>, std::decay_t<T>, detail::uncvref_t<T>>;
 
 public:
     // NOTE: default construction builds an empty callable.
@@ -145,13 +146,27 @@ public:
 
     // NOTE: generic ctor is enabled only if it does not
     // compete with copy/move ctors.
-    // NOTE: unlike std::function, if f is a nullptr or an empty std::function/callable
-    // the constructed callable will *NOT* be empty. If we need this,
-    // we can implement it with some meta-programming.
     template <typename T, std::enable_if_t<std::negation_v<std::is_same<callable, detail::uncvref_t<T>>>, int> = 0>
     // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
-    callable(T &&f) : callable(std::forward<T>(f), std::is_same<R(Args...), detail::uncvref_t<T>>{})
+    callable(T &&f)
     {
+        using uT = detail::uncvref_t<T>;
+
+        // NOTE: if f is a nullptr or an empty callable or
+        // std::function, leave this empty.
+        if constexpr (detail::is_any_std_func_v<uT> || is_any_callable<uT>::value) {
+            if (!f) {
+                return;
+            }
+        }
+
+        if constexpr (std::is_pointer_v<uT> || std::is_member_object_pointer_v<uT>) {
+            if (f == nullptr) {
+                return;
+            }
+        }
+
+        m_ptr = std::make_unique<detail::callable_inner<internal_type<T &&>, R, Args...>>(std::forward<T>(f));
     }
 
     ~callable() = default;

@@ -11,11 +11,13 @@
 
 #include <heyoka/config.hpp>
 
+#include <initializer_list>
 #include <memory>
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
 #include <utility>
+#include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -29,6 +31,7 @@
 
 #endif
 
+#include <heyoka/callable.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -162,16 +165,38 @@ class HEYOKA_DLL_PUBLIC step_callback_impl
         int>;
 
 public:
+    using ta_t = TA;
+
     step_callback_impl();
 
-    // NOTE: unlike std::function, if f is a nullptr or an empty std::function
-    // the constructed step_callback_impl will *NOT* be empty. If we need this,
-    // we can implement it with some meta-programming.
     template <typename T, generic_ctor_enabler<T &&> = 0>
     // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
     step_callback_impl(T &&f)
-        : m_ptr(std::make_unique<step_callback_inner<internal_type<T &&>, TA>>(std::forward<T>(f)))
     {
+        using uT = detail::uncvref_t<T>;
+
+        // NOTE: if f is a nullptr or an empty callable or
+        // std::function, leave this empty.
+        // NOTE: I do not think that we need to guard against uT being
+        // an empty step_callback here, since:
+        // - if we try to construct from a step_callback with the same signature
+        //   as this, then we end up in the copy/move ctor (and not here), and
+        // - if we try to construct from a step_callback with a different signature
+        //   (meaning a different TA), then the check on step_callback_call_t would
+        //   fail due to the lack of implicit conversions between TAs.
+        if constexpr (detail::is_any_std_func_v<uT> || is_any_callable<uT>::value) {
+            if (!f) {
+                return;
+            }
+        }
+
+        if constexpr (std::is_pointer_v<uT> || std::is_member_object_pointer_v<uT>) {
+            if (f == nullptr) {
+                return;
+            }
+        }
+
+        m_ptr = std::make_unique<step_callback_inner<internal_type<T &&>, TA>>(std::forward<T>(f));
     }
 
     step_callback_impl(const step_callback_impl &);
@@ -222,6 +247,64 @@ using step_callback = detail::step_callback_impl<taylor_adaptive<T>>;
 
 template <typename T>
 using step_callback_batch = detail::step_callback_impl<taylor_adaptive_batch<T>>;
+
+namespace detail
+{
+
+template <typename, bool>
+class HEYOKA_DLL_PUBLIC step_callback_set_impl;
+
+template <typename T, bool Batch>
+HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<T, Batch> &, step_callback_set_impl<T, Batch> &) noexcept;
+
+template <typename T, bool Batch>
+class HEYOKA_DLL_PUBLIC step_callback_set_impl
+{
+    template <typename T2, bool Batch2>
+    friend HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<T2, Batch2> &,
+                                       step_callback_set_impl<T2, Batch2> &) noexcept;
+
+public:
+    using step_cb_t = std::conditional_t<Batch, step_callback_batch<T>, step_callback<T>>;
+    using ta_t = typename step_cb_t::ta_t;
+    using size_type = typename std::vector<step_cb_t>::size_type;
+
+private:
+    std::vector<step_cb_t> m_cbs;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar & m_cbs;
+    }
+
+public:
+    step_callback_set_impl() noexcept;
+    explicit step_callback_set_impl(std::vector<step_cb_t>);
+    step_callback_set_impl(std::initializer_list<step_cb_t>);
+    step_callback_set_impl(const step_callback_set_impl &);
+    step_callback_set_impl(step_callback_set_impl &&) noexcept;
+    step_callback_set_impl &operator=(const step_callback_set_impl &);
+    step_callback_set_impl &operator=(step_callback_set_impl &&) noexcept;
+    ~step_callback_set_impl();
+
+    size_type size() const noexcept;
+    const step_cb_t &operator[](size_type) const;
+    step_cb_t &operator[](size_type);
+
+    bool operator()(ta_t &);
+    void pre_hook(ta_t &);
+};
+
+} // namespace detail
+
+template <typename T>
+using step_callback_set = detail::step_callback_set_impl<T, false>;
+
+template <typename T>
+using step_callback_batch_set = detail::step_callback_set_impl<T, true>;
 
 HEYOKA_END_NAMESPACE
 
@@ -335,5 +418,26 @@ BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_ada
 #define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT(T, F)                                                                   \
     HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(T, F)                                                                   \
     HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_IMPLEMENT(T, F)
+
+// Enable serialisation support for step_callback_set.
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<float>, float)
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<double>, double)
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<long double>, long double)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<float>, float)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<double>, double)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<long double>, long double)
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<mppp::real128>, mppp::real128)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<mppp::real128>, mppp::real128)
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<mppp::real>, mppp::real)
+
+#endif
 
 #endif

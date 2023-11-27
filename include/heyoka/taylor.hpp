@@ -816,6 +816,9 @@ inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
         // Callback (defaults to empty). If a step_callback with the correct
         // signature is passed as argument, return a reference wrapper to it
         // in order to avoid a useless copy.
+        // NOTE: eventually here we could check if the user passed in a range
+        // of elements which are (convertible to) step_callback, and automatically
+        // build a step_callback_set from them.
         auto cb = [&p]() {
             using cb_func_t = step_callback<T>;
 
