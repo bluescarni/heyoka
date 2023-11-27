@@ -18,6 +18,10 @@ New
 Changes
 ~~~~~~~
 
+- Initialising a step callback or a callable from an empty
+  function object (e.g., a null pointer, an empty ``std::function``, etc.)
+  now results in an empty object
+  (`#366 <https://github.com/bluescarni/heyoka/pull/366>`__).
 - Improve performance when creating symbolic expressions for
   large sums and products
   (`#362 <https://github.com/bluescarni/heyoka/pull/362>`__).
