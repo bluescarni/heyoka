@@ -27,6 +27,12 @@ struct vf_info {
     // The vfabi attribute corresponding
     // to the vector function.
     std::string vf_abi_attr;
+    // The corresponding low-precision versions
+    // of the above. These will be empty if
+    // the low-precision counterpart is
+    // not available.
+    std::string lp_name;
+    std::string lp_vf_abi_attr;
     // Number of SIMD lanes.
     std::uint32_t width = 0;
     // Number of arguments.
