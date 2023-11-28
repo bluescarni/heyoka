@@ -18,6 +18,10 @@ New
 Changes
 ~~~~~~~
 
+- When the ``fast_math`` mode is active, the SIMD-vectorised
+  mathematical functions now use low-precision implementations.
+  This can lead to substantial performance increases in batch mode
+  (`#367 <https://github.com/bluescarni/heyoka/pull/367>`__).
 - Initialising a step callback or a callable from an empty
   function object (e.g., a null pointer, an empty ``std::function``, etc.)
   now results in an empty object
