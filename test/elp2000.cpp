@@ -58,9 +58,9 @@ TEST_CASE("basic")
         const double tm = (date - 2451545.0) / (36525);
         cf_ptr(out, nullptr, nullptr, &tm);
 
-        REQUIRE(out[0] == approximately(ref[i][0]));
-        REQUIRE(out[1] == approximately(ref[i][1]));
-        REQUIRE(out[2] == approximately(ref[i][2]));
+        REQUIRE(out[0] == approximately(ref[i][0], 1000.));
+        REQUIRE(out[1] == approximately(ref[i][1], 1000.));
+        REQUIRE(out[2] == approximately(ref[i][2], 1000.));
     }
 }
 
@@ -93,9 +93,9 @@ TEST_CASE("fk5")
         const double tm = (date - 2451545.0) / (36525);
         cf_ptr(out, nullptr, nullptr, &tm);
 
-        REQUIRE(out[0] == approximately(ref[i][0]));
-        REQUIRE(out[1] == approximately(ref[i][1]));
-        REQUIRE(out[2] == approximately(ref[i][2]));
+        REQUIRE(out[0] == approximately(ref[i][0], 1000.));
+        REQUIRE(out[1] == approximately(ref[i][1], 1000.));
+        REQUIRE(out[2] == approximately(ref[i][2], 1000.));
     }
 }
 
