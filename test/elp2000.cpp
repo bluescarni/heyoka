@@ -7,7 +7,6 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <array>
-#include <cmath>
 #include <initializer_list>
 #include <stdexcept>
 
@@ -17,8 +16,10 @@
 #include <heyoka/model/elp2000.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
 using namespace heyoka::model;
 
 TEST_CASE("basic")
@@ -57,9 +58,9 @@ TEST_CASE("basic")
         const double tm = (date - 2451545.0) / (36525);
         cf_ptr(out, nullptr, nullptr, &tm);
 
-        REQUIRE(std::abs(out[0] - ref[i][0]) < 1e-10);
-        REQUIRE(std::abs(out[1] - ref[i][1]) < 1e-10);
-        REQUIRE(std::abs(out[2] - ref[i][2]) < 1e-10);
+        REQUIRE(out[0] == approximately(ref[i][0]));
+        REQUIRE(out[1] == approximately(ref[i][1]));
+        REQUIRE(out[2] == approximately(ref[i][2]));
     }
 }
 
@@ -92,9 +93,9 @@ TEST_CASE("fk5")
         const double tm = (date - 2451545.0) / (36525);
         cf_ptr(out, nullptr, nullptr, &tm);
 
-        REQUIRE(std::abs(out[0] - ref[i][0]) < 1e-10);
-        REQUIRE(std::abs(out[1] - ref[i][1]) < 1e-10);
-        REQUIRE(std::abs(out[2] - ref[i][2]) < 1e-10);
+        REQUIRE(out[0] == approximately(ref[i][0]));
+        REQUIRE(out[1] == approximately(ref[i][1]));
+        REQUIRE(out[2] == approximately(ref[i][2]));
     }
 }
 
