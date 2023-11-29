@@ -47,10 +47,11 @@ const auto fp_types = std::tuple<float, double
                                  >{};
 
 template <typename T, typename U>
-void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
+void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode,
+                          bool fast_math)
 {
     for (auto batch_size : {2u, 4u, 8u, 5u}) {
-        llvm_state s{kw::opt_level = opt_level};
+        llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
 
         taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy, compact_mode);
         taylor_add_jet<T>(s, "jet_scalar", sys, 3, 1, high_accuracy, compact_mode);
@@ -98,7 +99,7 @@ TEST_CASE("taylor sincos decompose bug 00")
 
 TEST_CASE("taylor sincos")
 {
-    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode, bool fast_math) {
         using std::sin;
         using std::cos;
 
@@ -108,7 +109,7 @@ TEST_CASE("taylor sincos")
 
         // Number-number tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
+            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
 
             taylor_add_jet<fp_t>(s, "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y},
                                  1, 1, high_accuracy, compact_mode);
@@ -129,7 +130,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
 
             taylor_add_jet<fp_t>(s, "jet", {sin(par[0]) + cos(par[1]), x + y}, 1, 1, high_accuracy, compact_mode);
 
@@ -151,7 +152,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
 
             taylor_add_jet<fp_t>(s, "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y},
                                  1, 2, high_accuracy, compact_mode);
@@ -179,7 +180,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
 
             taylor_add_jet<fp_t>(s, "jet", {sin(par[0]) + cos(par[1]), x + y}, 1, 2, high_accuracy, compact_mode);
 
@@ -208,7 +209,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
 
             taylor_add_jet<fp_t>(s, "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y},
                                  2, 1, high_accuracy, compact_mode);
@@ -231,7 +232,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
 
             taylor_add_jet<fp_t>(s, "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y},
                                  2, 2, high_accuracy, compact_mode);
@@ -265,7 +266,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
 
             taylor_add_jet<fp_t>(s, "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y},
                                  3, 3, high_accuracy, compact_mode);
@@ -313,7 +314,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
 
             taylor_add_jet<fp_t>(s, "jet", {sin(par[0]) + cos(par[1]), x + y}, 3, 3, high_accuracy, compact_mode);
 
@@ -363,11 +364,11 @@ TEST_CASE("taylor sincos")
 
         // Do the batch/scalar comparison.
         compare_batch_scalar<fp_t>({sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y},
-                                   opt_level, high_accuracy, compact_mode);
+                                   opt_level, high_accuracy, compact_mode, fast_math);
 
         // Variable tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
+            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
 
             taylor_add_jet<fp_t>(s, "jet", {sin(y + 1_dbl), cos(x + 1_dbl)}, 1, 1, high_accuracy, compact_mode);
 
@@ -387,7 +388,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
 
             taylor_add_jet<fp_t>(s, "jet", {sin(y + 1_dbl), cos(x + 1_dbl)}, 1, 2, high_accuracy, compact_mode);
 
@@ -414,7 +415,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
 
             taylor_add_jet<fp_t>(s, "jet", {sin(y + 1_dbl), cos(x + 1_dbl)}, 2, 1, high_accuracy, compact_mode);
 
@@ -436,7 +437,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
 
             taylor_add_jet<fp_t>(s, "jet", {sin(y), cos(x)}, 2, 2, high_accuracy, compact_mode);
 
@@ -469,7 +470,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
 
             taylor_add_jet<fp_t>(s, "jet", {sin(y), cos(x)}, 3, 3, high_accuracy, compact_mode);
 
@@ -522,15 +523,17 @@ TEST_CASE("taylor sincos")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({sin(y), cos(x)}, opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({sin(y), cos(x)}, opt_level, high_accuracy, compact_mode, fast_math);
     };
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+            for (auto fm : {false, true}) {
+                tuple_for_each(fp_types, [&tester, f, cm, fm](auto x) { tester(x, 0, f, cm, fm); });
+                tuple_for_each(fp_types, [&tester, f, cm, fm](auto x) { tester(x, 1, f, cm, fm); });
+                tuple_for_each(fp_types, [&tester, f, cm, fm](auto x) { tester(x, 2, f, cm, fm); });
+                tuple_for_each(fp_types, [&tester, f, cm, fm](auto x) { tester(x, 3, f, cm, fm); });
+            }
         }
     }
 }
