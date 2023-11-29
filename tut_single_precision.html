@@ -9,7 +9,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
-    <title>Computations in extended precision &#8212; heyoka 3.2.0 documentation</title>
+    <title>Computations in single precision &#8212; heyoka 3.2.0 documentation</title>
   
   
   
@@ -42,11 +42,11 @@
     <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/scripts/sphinx-book-theme.js?digest=5a5c038af52cf7bc1a1ec88eea08e6366ee68824"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'tut_extended_precision';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tut_single_precision';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Computations in arbitrary precision" href="tut_arbitrary_precision.html" />
-    <link rel="prev" title="Batch mode" href="tut_batch_mode.html" />
+    <link rel="next" title="Serialisation" href="tut_s11n.html" />
+    <link rel="prev" title="Computations in arbitrary precision" href="tut_arbitrary_precision.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -155,9 +155,9 @@
 </li>
 <li class="toctree-l1 current active has-children"><a class="reference internal" href="advanced_tutorials.html">Advanced tutorials</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-2"><i class="fa-solid fa-chevron-down"></i></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="tut_batch_mode.html">Batch mode</a></li>
-<li class="toctree-l2 current active"><a class="current reference internal" href="#">Computations in extended precision</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_extended_precision.html">Computations in extended precision</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_arbitrary_precision.html">Computations in arbitrary precision</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tut_single_precision.html">Computations in single precision</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Computations in single precision</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_s11n.html">Serialisation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_ensemble.html">Ensemble propagations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_parallel_mode.html">Parallel mode</a></li>
@@ -256,7 +256,7 @@
       
       
       
-      <li><a href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Ftut_extended_precision.html&body=Your%20issue%20content%20here." target="_blank"
+      <li><a href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Ftut_single_precision.html&body=Your%20issue%20content%20here." target="_blank"
    class="btn btn-sm btn-source-issues-button dropdown-item"
    title="Open an issue"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -286,7 +286,7 @@
       
       
       
-      <li><a href="_sources/tut_extended_precision.rst" target="_blank"
+      <li><a href="_sources/tut_single_precision.rst" target="_blank"
    class="btn btn-sm btn-download-source-button dropdown-item"
    title="Download source file"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -370,7 +370,7 @@ document.write(`
               
 
 <div id="jb-print-docs-body" class="onlyprint">
-    <h1>Computations in extended precision</h1>
+    <h1>Computations in single precision</h1>
     <!-- Table of contents -->
     <div id="print-main-content">
         <div id="jb-print-toc">
@@ -394,46 +394,52 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article" role="main">
                   
-  <section id="computations-in-extended-precision">
-<span id="tut-extended-precision"></span><h1>Computations in extended precision<a class="headerlink" href="#computations-in-extended-precision" title="Permalink to this heading">#</a></h1>
-<p>As hinted in the <a class="reference internal" href="install.html#ep-support"><span class="std std-ref">installation instructions</span></a>, heyoka supports computations
-not only in single and double precision, but also in extended precision. Specifically, heyoka currently supports:</p>
-<ul class="simple">
-<li><p>the 80-bit IEEE <a class="reference external" href="https://en.wikipedia.org/wiki/Extended_precision">extended-precision format</a> (~21 decimal digits),</p></li>
-<li><p>the 128-bit IEEE <a class="reference external" href="https://en.wikipedia.org/wiki/Quadruple-precision_floating-point_format">quadruple-precision format</a> (~36 decimal digits).</p></li>
-</ul>
-<p>How these extended precision floating-point types can be accessed and used from C++ varies depending on the platform. The 80-bit
-extended-precision format is available as the C++ <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> type on most platforms based on Intel x86 processors. Quadruple-precision
-computations are supported either via the <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> type (e.g., on 64-bit ARM processors) or via the the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.0)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> type
-(provided that the platform supports the nonstandard <code class="docutils literal notranslate"><span class="pre">__float128</span></code> floating-point type and that heyoka was compiled with support
-for the mp++ library - see the <a class="reference internal" href="install.html#installation"><span class="std std-ref">installation instructions</span></a>).</p>
+  <section id="computations-in-single-precision">
+<span id="tut-single-precision"></span><h1>Computations in single precision<a class="headerlink" href="#computations-in-single-precision" title="Permalink to this heading">#</a></h1>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 3.2.0.</span></p>
+</div>
+<p>In previous tutorials we saw how heyoka, in addition to the standard
+<a class="reference external" href="https://en.wikipedia.org/wiki/Double-precision_floating-point_format">double precision</a>,
+also supports computations in <a class="reference internal" href="tut_extended_precision.html#tut-extended-precision"><span class="std std-ref">extended precision</span></a> and
+<a class="reference internal" href="tut_arbitrary_precision.html#tut-arbitrary-precision"><span class="std std-ref">arbitrary precision</span></a>. Starting with version 3.2.0, heyoka
+supports also computations in <a class="reference external" href="https://en.wikipedia.org/wiki/Single-precision_floating-point_format">single precision</a>.</p>
+<p>Single-precision computations can lead to substantial performance benefits when high accuracy is not required.
+In particular, single-precision <a class="reference internal" href="tut_batch_mode.html#tut-batch-mode"><span class="std std-ref">batch mode</span></a> can use a SIMD width twice larger
+than double precision, leading to an increase by a factor of 2 of the computational throughput.
+In scalar computations, the use of single precision reduces by half the memory usage with respect to double precision,
+which can help alleviating performance issues in large ODE systems. This can be particularly noticeable in applications such as
+<a class="reference external" href="https://bluescarni.github.io/heyoka.py/notebooks/NeuralODEs.html#tut-neural-ode" title="(in heyoka.py)"><span class="xref std std-ref">neural ODEs</span></a>.</p>
+<p>In C++, single-precision values are usually represented via the standard floating-point type <code class="docutils literal notranslate"><span class="pre">float</span></code>.
+Correspondingly, and similarly to what explained in the <a class="reference internal" href="tut_extended_precision.html#tut-extended-precision"><span class="std std-ref">extended precision</span></a>
+tutorial, single-precision computations are activated by passing the <code class="docutils literal notranslate"><span class="pre">float</span></code> template parameter to functions
+and classes in the heyoka API.</p>
 <section id="a-simple-example">
 <h2>A simple example<a class="headerlink" href="#a-simple-example" title="Permalink to this heading">#</a></h2>
-<p>We will be assuming here that <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> implements the 80-bit extended-precision floating-point format.
-In order to verify that heyoka indeed is able to work in extended precision, we will be monitoring the evolution of the energy constant
-in a high-precision numerical integration of the simple pendulum.</p>
+<p>In order to verify that heyoka indeed is able to work in single precision, we will be monitoring the evolution of the energy constant
+in a low-precision numerical integration of the simple pendulum.</p>
 <p>Let us begin as usual with the definition of the dynamical equations and the creation of the integrator object:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create the symbolic variables x and v.</span>
 <span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;v&quot;</span><span class="p">);</span>
 
 <span class="w">    </span><span class="c1">// Create the integrator object</span>
-<span class="w">    </span><span class="c1">// in extended precision.</span>
-<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
-<span class="w">                                           </span><span class="c1">// x&#39; = v</span>
-<span class="w">                                           </span><span class="c1">// v&#39; = -9.8 * sin(x)</span>
-<span class="w">                                           </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
-<span class="w">                                           </span><span class="c1">// Initial conditions</span>
-<span class="w">                                           </span><span class="c1">// for x and v.</span>
-<span class="w">                                           </span><span class="p">{</span><span class="mf">-1.</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">}};</span>
+<span class="w">    </span><span class="c1">// in single precision.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+<span class="w">                                     </span><span class="c1">// x&#39; = v</span>
+<span class="w">                                     </span><span class="c1">// v&#39; = -9.8 * sin(x)</span>
+<span class="w">                                     </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
+<span class="w">                                     </span><span class="c1">// Initial conditions</span>
+<span class="w">                                     </span><span class="c1">// for x and v.</span>
+<span class="w">                                     </span><span class="p">{</span><span class="mf">-1.f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.f</span><span class="p">}};</span>
 </pre></div>
 </div>
-<p>In order to activate extended precision, we created an integrator object of type <code class="docutils literal notranslate"><span class="pre">taylor_adaptive&lt;long</span> <span class="pre">double&gt;</span></code> - that is,
-we specified <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code>, instead of the usual <code class="docutils literal notranslate"><span class="pre">double</span></code>, as the (only) template parameter for the <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> class template.
-Note that, for simplicity, we still used double-precision values for the initial state: these values are automatically
-converted to <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> by the integrator’s constructor. Note also that, when operating in extended precision,
-<em>all</em> numerical values encapsulated in an integrator are represented in extended precision - this includes not only the state vector,
+<p>In order to activate single precision, we created an integrator object of type <code class="docutils literal notranslate"><span class="pre">taylor_adaptive&lt;float&gt;</span></code> - that is,
+we specified <code class="docutils literal notranslate"><span class="pre">float</span></code>, instead of the usual <code class="docutils literal notranslate"><span class="pre">double</span></code>, as the (only) template parameter for the <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> class template.
+Note that we specified a single-precision initial state via the use of the <code class="docutils literal notranslate"><span class="pre">f</span></code> suffix for the numerical constants.
+Note also that, when operating in single precision,
+<em>all</em> numerical values encapsulated in an integrator are represented in single precision - this includes not only the state vector,
 but also the time coordinate, the tolerance, the Taylor coefficients, etc. Similarly to double-precision integrators, the default value
-of the tolerance is the machine epsilon of <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code>.</p>
+of the tolerance is the machine epsilon of <code class="docutils literal notranslate"><span class="pre">float</span></code>.</p>
 <p>Next, we define a small helper function that will allow us to monitor the evolution of the energy constant
 throughout the integration:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create a small helper to compute the energy constant</span>
@@ -462,44 +468,43 @@ and printing to screen the relative energy error:</p>
 <span class="w">    </span><span class="p">}</span>
 </pre></div>
 </div>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Relative energy error: 0</span>
-<span class="go">Relative energy error: 0</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 0</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 1.92532e-19</span>
-<span class="go">Relative energy error: 1.92532e-19</span>
-<span class="go">Relative energy error: 1.92532e-19</span>
-<span class="go">Relative energy error: 1.92532e-19</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 1.92532e-19</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
-<span class="go">Relative energy error: 0</span>
-<span class="go">Relative energy error: 9.62658e-20</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Relative energy error: 1.48183e-07</span>
+<span class="go">Relative energy error: 5.29227e-08</span>
+<span class="go">Relative energy error: 6.08611e-08</span>
+<span class="go">Relative energy error: 1.79937e-07</span>
+<span class="go">Relative energy error: 1.74645e-07</span>
+<span class="go">Relative energy error: 2.24921e-07</span>
+<span class="go">Relative energy error: 2.4609e-07</span>
+<span class="go">Relative energy error: 1.1643e-07</span>
+<span class="go">Relative energy error: 1.79937e-07</span>
+<span class="go">Relative energy error: 1.40245e-07</span>
+<span class="go">Relative energy error: 2.54029e-07</span>
+<span class="go">Relative energy error: 1.84899e-07</span>
+<span class="go">Relative energy error: 1.83245e-07</span>
+<span class="go">Relative energy error: 1.56122e-07</span>
+<span class="go">Relative energy error: 2.22275e-07</span>
+<span class="go">Relative energy error: 1.61414e-07</span>
+<span class="go">Relative energy error: 2.11691e-07</span>
+<span class="go">Relative energy error: 2.88428e-07</span>
+<span class="go">Relative energy error: 2.93721e-07</span>
+<span class="go">Relative energy error: 1.82583e-07</span>
 </pre></div>
 </div>
-<p>The console output indeed confirms that energy is conserved at the level of the epsilon of the 80-bit
-extended-precision format (that is, <span class="math notranslate nohighlight">\(\sim 10^{-19}\)</span>).</p>
-<p>Performing quadruple-precision integrations via the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.0)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> type follows exactly the same pattern. That is,
-one just needs to replace <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> with <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.0)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> when instantiating the integrator object.</p>
+<p>The console output indeed confirms that energy is conserved at the level of the epsilon of the
+single-precision format (that is, <span class="math notranslate nohighlight">\(\sim 10^{-7}\)</span>).</p>
 </section>
 <section id="other-classes-and-functions">
 <h2>Other classes and functions<a class="headerlink" href="#other-classes-and-functions" title="Permalink to this heading">#</a></h2>
-<p>Besides the adaptive integrator, several other classes and functions in heyoka can be used in extended precision.</p>
-<p>The <a class="reference internal" href="tut_events.html#tut-events"><span class="std std-ref">event classes</span></a>, for instance, can be constructed in extended precision by passing <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code>
-or <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.0)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> as the template parameter (instead of <code class="docutils literal notranslate"><span class="pre">double</span></code>). Note that the precision of an event
+<p>Besides the adaptive integrator, several other classes and functions in heyoka can be used in single precision.</p>
+<p>The <a class="reference internal" href="tut_events.html#tut-events"><span class="std std-ref">event classes</span></a>, for instance, can be constructed in single precision by passing <code class="docutils literal notranslate"><span class="pre">float</span></code>
+as the template parameter (instead of <code class="docutils literal notranslate"><span class="pre">double</span></code>). Note that the precision of an event
 must match the precision of the integrator object in which the event is used, otherwise an error will be produced
 at compilation time.</p>
 </section>
 <section id="full-code-listing">
 <h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this heading">#</a></h2>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cmath&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
 
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span>
 
@@ -507,21 +512,18 @@ at compilation time.</p>
 
 <span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span>
 <span class="p">{</span>
-
-<span class="cp">#if !defined(HEYOKA_ARCH_PPC)</span>
-
 <span class="w">    </span><span class="c1">// Create the symbolic variables x and v.</span>
 <span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;v&quot;</span><span class="p">);</span>
 
 <span class="w">    </span><span class="c1">// Create the integrator object</span>
-<span class="w">    </span><span class="c1">// in extended precision.</span>
-<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">long</span><span class="w"> </span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
-<span class="w">                                           </span><span class="c1">// x&#39; = v</span>
-<span class="w">                                           </span><span class="c1">// v&#39; = -9.8 * sin(x)</span>
-<span class="w">                                           </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
-<span class="w">                                           </span><span class="c1">// Initial conditions</span>
-<span class="w">                                           </span><span class="c1">// for x and v.</span>
-<span class="w">                                           </span><span class="p">{</span><span class="mf">-1.</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">}};</span>
+<span class="w">    </span><span class="c1">// in single precision.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">float</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+<span class="w">                                     </span><span class="c1">// x&#39; = v</span>
+<span class="w">                                     </span><span class="c1">// v&#39; = -9.8 * sin(x)</span>
+<span class="w">                                     </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
+<span class="w">                                     </span><span class="c1">// Initial conditions</span>
+<span class="w">                                     </span><span class="c1">// for x and v.</span>
+<span class="w">                                     </span><span class="p">{</span><span class="mf">-1.f</span><span class="p">,</span><span class="w"> </span><span class="mf">0.f</span><span class="p">}};</span>
 
 <span class="w">    </span><span class="c1">// Create a small helper to compute the energy constant</span>
 <span class="w">    </span><span class="c1">// from the state vector.</span>
@@ -542,8 +544,6 @@ at compilation time.</p>
 
 <span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Relative energy error: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">abs</span><span class="p">((</span><span class="n">orig_E</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">compute_energy</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()))</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">orig_E</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 <span class="w">    </span><span class="p">}</span>
-
-<span class="cp">#endif</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -562,20 +562,20 @@ at compilation time.</p>
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="tut_batch_mode.html"
+       href="tut_arbitrary_precision.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Batch mode</p>
+        <p class="prev-next-title">Computations in arbitrary precision</p>
       </div>
     </a>
     <a class="right-next"
-       href="tut_arbitrary_precision.html"
+       href="tut_s11n.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Computations in arbitrary precision</p>
+        <p class="prev-next-title">Serialisation</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
