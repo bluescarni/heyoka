@@ -29,6 +29,7 @@ ADD_HEYOKA_TUTORIAL(s11n_event)
 ADD_HEYOKA_TUTORIAL(ensemble)
 ADD_HEYOKA_TUTORIAL(par_mode)
 ADD_HEYOKA_TUTORIAL(extended_precision)
+ADD_HEYOKA_TUTORIAL(single_precision)
 
 if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
   ADD_HEYOKA_TUTORIAL(arbitrary_precision)

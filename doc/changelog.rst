@@ -7,8 +7,7 @@ Changelog
 New
 ~~~
 
-- Add the step callback (batch) set classes to compose
-  step callbacks
+- Add step callback set classes to compose step callbacks
   (`#366 <https://github.com/bluescarni/heyoka/pull/366>`__).
 - Add support for single-precision computations
   (`#363 <https://github.com/bluescarni/heyoka/pull/363>`__).
@@ -18,6 +17,10 @@ New
 Changes
 ~~~~~~~
 
+- When the ``fast_math`` mode is active, the SIMD-vectorised
+  mathematical functions now use low-precision implementations.
+  This can lead to substantial performance increases in batch mode
+  (`#367 <https://github.com/bluescarni/heyoka/pull/367>`__).
 - Initialising a step callback or a callable from an empty
   function object (e.g., a null pointer, an empty ``std::function``, etc.)
   now results in an empty object

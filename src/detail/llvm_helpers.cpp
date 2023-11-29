@@ -301,6 +301,9 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
     auto &context = s.context();
     auto &builder = s.builder();
 
+    // Are we in fast math mode?
+    const auto use_fast_math = builder.getFastMathFlags().isFast();
+
     if (!vfi.empty()) {
         // There exist vector variants of the scalar function.
         auto &md = s.module();
@@ -313,7 +316,11 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
         std::vector<std::string> vf_abi_strs;
         vf_abi_strs.reserve(vfi.size());
         for (const auto &el : vfi) {
-            vf_abi_strs.push_back(el.vf_abi_attr);
+            // Fetch the vf_abi attr string (either the low-precision
+            // or standard version).
+            const auto &vf_abi_attr
+                = (use_fast_math && !el.lp_vf_abi_attr.empty()) ? el.lp_vf_abi_attr : el.vf_abi_attr;
+            vf_abi_strs.push_back(vf_abi_attr);
         }
 #if LLVM_VERSION_MAJOR >= 14
         call->addFnAttr(llvm::Attribute::get(context, "vector-function-abi-variant",
@@ -341,6 +348,10 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
             assert(el.width > 0u);
             assert(el.nargs == num_args);
 
+            // Fetch the vector function name from el (either the low-precision
+            // or standard version).
+            const auto &el_name = (use_fast_math && !el.lp_name.empty()) ? el.lp_name : el.name;
+
             // The vector type for the current variant.
             auto *cur_vec_t = make_vector_type(scal_t, el.width);
 
@@ -352,11 +363,11 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
                 false);
 
             // Try to lookup the variant in the module.
-            auto *vf_ptr = md.getFunction(el.name);
+            auto *vf_ptr = md.getFunction(el_name);
 
             if (vf_ptr == nullptr) {
                 // The declaration of the variant is not there yet, create it.
-                vf_ptr = llvm_func_create(vec_ft, llvm::Function::ExternalLinkage, el.name, &md);
+                vf_ptr = llvm_func_create(vec_ft, llvm::Function::ExternalLinkage, el_name, &md);
 
                 // NOTE: setting the attributes on the vector variant is not strictly required
                 // for the auto-vectorizer to work. However, in other parts of the code, the vector
@@ -380,7 +391,7 @@ llvm::CallInst *llvm_add_vfabi_attrs(llvm_state &s, llvm::CallInst *call, const 
             //
             // https://llvm.org/docs/LangRef.html#the-llvm-used-global-variable
             // https://godbolt.org/z/1neaG4bYj
-            const auto dummy_name = fmt::format("heyoka.dummy_vector_call.{}", el.name);
+            const auto dummy_name = fmt::format("heyoka.dummy_vector_call.{}", el_name);
 
             if (auto *dummy_ptr = md.getFunction(dummy_name); dummy_ptr == nullptr) {
                 // The dummy function has not been defined yet, do it.
@@ -546,6 +557,9 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
 
     auto &builder = s.builder();
 
+    // Are we in fast math mode?
+    const auto use_fast_math = builder.getFastMathFlags().isFast();
+
     if (llvm_stype_can_use_math_intrinsics(s, scal_t)) {
         // We can use the LLVM intrinsics for the given scalar type.
 
@@ -567,10 +581,15 @@ llvm::Value *llvm_math_intr(llvm_state &s, const std::string &intr_name,
             if (vfi_it != vfi.end() && vfi_it->width == vector_width) {
                 // A vector implementation with precisely the correct width is available, use it.
                 assert(vfi_it->nargs == nargs);
+
+                // Fetch the vector function name (either the low-precision
+                // or standard version).
+                const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
+
                 // NOTE: make sure to use the same attributes as the scalar intrinsic for the vector
                 // call. This ensures that the vector variant is declared with the same attributes as those that would
                 // be declared by invoking llvm_add_vfabi_attrs() on the scalar invocation.
-                return llvm_invoke_external(s, vfi_it->name, vec_t, {args...}, s_intr->getAttributes());
+                return llvm_invoke_external(s, vf_name, vec_t, {args...}, s_intr->getAttributes());
             }
 
             if (!vfi.empty()) {
@@ -682,6 +701,11 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, Args *
     const std::array arg_types = {args->getType()...};
     assert(((args->getType() == arg_types[0]) && ...));
 
+    auto &builder = s.builder();
+
+    // Are we in fast math mode?
+    const auto use_fast_math = builder.getFastMathFlags().isFast();
+
     // Determine the type and scalar type of the arguments.
     auto *x_t = arg_types[0];
     auto *scal_t = x_t->getScalarType();
@@ -711,7 +735,12 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, Args *
             if (vfi_it != vfi.end() && vfi_it->width == vector_width) {
                 // A vector implementation with precisely the correct width is available, use it.
                 assert(vfi_it->nargs == nargs);
-                return llvm_invoke_external(s, vfi_it->name, vec_t, {args...}, attrs);
+
+                // Fetch the vector function name (either the low-precision
+                // or standard version).
+                const auto &vf_name = (use_fast_math && !vfi_it->lp_name.empty()) ? vfi_it->lp_name : vfi_it->name;
+
+                return llvm_invoke_external(s, vf_name, vec_t, {args...}, attrs);
             }
 
             // A vector implementation with the correct width is **not** available: scalarise the
@@ -732,7 +761,7 @@ llvm::Value *llvm_math_cmath(llvm_state &s, const std::string &base_name, Args *
     // NOTE: this handles only the scalar case.
     if (llvm_is_real(x_t) != 0) {
         auto *f = real_nary_op(s, x_t, "mpfr_" + base_name, boost::numeric_cast<unsigned>(nargs));
-        return s.builder().CreateCall(f, {args...});
+        return builder.CreateCall(f, {args...});
     }
 
 #endif
