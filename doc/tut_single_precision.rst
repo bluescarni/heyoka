@@ -16,7 +16,7 @@ In particular, single-precision :ref:`batch mode <tut_batch_mode>` can use a SIM
 than double precision, leading to an increase by a factor of 2 of the computational throughput.
 In scalar computations, the use of single precision reduces by half the memory usage with respect to double precision,
 which can help alleviating performance issues in large ODE systems. This can be particularly noticeable in applications such as
-neural ODEs.
+:external:ref:`neural ODEs <tut_neural_ode>`.
 
 In C++, single-precision values are usually represented via the standard floating-point type ``float``.
 Correspondingly, and similarly to what explained in the :ref:`extended precision <tut_extended_precision>`
