@@ -162,10 +162,6 @@ if(${LLVM_VERSION_MAJOR} LESS 11)
   message(FATAL_ERROR "LLVM >= 11 is required.")
 endif()
 
-# Mandatory dependency on fmt.
-find_package(fmt REQUIRED CONFIG)
-message(STATUS "fmt version: ${fmt_VERSION}")
-
 # List of source files.
 set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor_00.cpp"
@@ -461,6 +457,11 @@ if(_HEYOKA_LLVM_STATIC_LINK AND HEYOKA_HIDE_LLVM_SYMBOLS)
 endif()
 
 # Mandatory dependency on fmt.
+find_package(fmt REQUIRED CONFIG)
+if(${fmt_VERSION_MAJOR} LESS 9)
+    message(FATAL_ERROR "fmt version>=9 is required, but version ${fmt_VERSION_MAJOR} was found instead.")
+endif()
+message(STATUS "fmt version: ${fmt_VERSION}")
 target_link_libraries(heyoka PUBLIC fmt::fmt)
 
 # Mandatory dependency on spdlog.

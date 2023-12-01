@@ -27,7 +27,7 @@ heyoka has the following **mandatory** dependencies:
 
 * the `LLVM <https://llvm.org/>`__ compiler infrastructure library (version >= 11),
 * the `Boost <https://www.boost.org/>`__ C++ libraries (version >= 1.69),
-* the `{fmt} <https://fmt.dev/latest/index.html>`__ library,
+* the `{fmt} <https://fmt.dev/latest/index.html>`__ library (version >= 9),
 * the `spdlog <https://github.com/gabime/spdlog>`__ library,
 * the `TBB <https://github.com/oneapi-src/oneTBB>`__ library.
 

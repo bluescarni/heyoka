@@ -31,6 +31,7 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/core.h>
+#include <fmt/ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -46,7 +47,6 @@
 
 #include <heyoka/callable.hpp>
 #include <heyoka/detail/dfloat.hpp>
-#include <heyoka/detail/fmt_compat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -180,11 +180,11 @@ namespace fmt
 {
 
 template <>
-struct formatter<heyoka::taylor_outcome> : heyoka::detail::ostream_formatter {
+struct formatter<heyoka::taylor_outcome> : fmt::ostream_formatter {
 };
 
 template <>
-struct formatter<heyoka::event_direction> : heyoka::detail::ostream_formatter {
+struct formatter<heyoka::event_direction> : fmt::ostream_formatter {
 };
 
 } // namespace fmt
