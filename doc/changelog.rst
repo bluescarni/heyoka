@@ -1,6 +1,22 @@
 Changelog
 =========
 
+4.0.0 (unreleased)
+------------------
+
+Changes
+~~~~~~~
+
+- **BREAKING**: heyoka now requires C++20
+  (`#369 <https://github.com/bluescarni/heyoka/pull/369>`__).
+  This is a :ref:`breaking change <bchanges_4_0_0>`.
+- **BREAKING**: heyoka now requires fmt>=9
+  (`#369 <https://github.com/bluescarni/heyoka/pull/369>`__).
+  This is a :ref:`breaking change <bchanges_4_0_0>`.
+- **BREAKING**: heyoka now requires mp++ 1.x
+  (`#369 <https://github.com/bluescarni/heyoka/pull/369>`__).
+  This is a :ref:`breaking change <bchanges_4_0_0>`.
+
 3.2.0 (2023-11-29)
 ------------------
 
