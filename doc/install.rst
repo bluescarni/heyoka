@@ -9,7 +9,7 @@ Introduction
 heyoka is written in modern C++, and it requires a compiler able to understand
 at least C++20. The library is regularly tested on
 a continuous integration pipeline which currently includes several
-compilers (GCC, Clang MSVC) on several operating systems (Linux, OSX, Windows)
+compilers (GCC, Clang, MSVC) on several operating systems (Linux, OSX, Windows)
 and several CPU architectures (x86-64, 64-bit ARM and 64-bit PowerPC).
 
 heyoka has the following **mandatory** dependencies:
