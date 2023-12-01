@@ -1126,6 +1126,7 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
                 // Check if multiple roots are detected in the cooldown
                 // period for a terminal event. For non-terminal events,
                 // this will be unused.
+                // NOLINTNEXTLINE(misc-const-correctness)
                 [[maybe_unused]] bool has_multi_roots = false;
                 if constexpr (detail::is_terminal_event_v<ev_type>) {
                     // Establish the cooldown time.
@@ -1819,6 +1820,7 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
                     // Check if multiple roots are detected in the cooldown
                     // period for a terminal event. For non-terminal events,
                     // this will be unused.
+                    // NOLINTNEXTLINE(misc-const-correctness)
                     [[maybe_unused]] bool has_multi_roots = false;
                     if constexpr (detail::is_terminal_event_v<ev_type>) {
                         // Establish the cooldown time.
