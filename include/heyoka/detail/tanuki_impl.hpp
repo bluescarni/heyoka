@@ -152,7 +152,7 @@ struct is_reference_wrapper<std::reference_wrapper<T>> : std::true_type {
 // does enough memory shenanigans). Perhaps in the future
 // we can reconsider if we want to reduce binary bloat.
 template <typename IFace>
-struct value_iface {
+struct __attribute__((visibility("default"))) value_iface {
     value_iface() = default;
     value_iface(const value_iface &) = delete;
     value_iface(value_iface &&) noexcept = delete;
@@ -242,8 +242,8 @@ template <typename T, template <typename, typename, typename...> typename IFaceT
 // NOTE: it seems like "deducing this" may also help with the interface template
 // and with iface_impl_helper (no more Holder parameter?).
     requires valid_value_type<T>
-struct holder final : public value_iface<IFaceT<void, void, Args...>>,
-                      public IFaceT<holder<T, IFaceT, Args...>, T, Args...> {
+struct __attribute__((visibility("default"))) holder final : public value_iface<IFaceT<void, void, Args...>>,
+                                                             public IFaceT<holder<T, IFaceT, Args...>, T, Args...> {
     TANUKI_NO_UNIQUE_ADDRESS T m_value;
 
     // Make sure we don't end up accidentally copying/moving
@@ -427,7 +427,7 @@ private:
 
 // Implementation of basic storage for the wrap class.
 template <typename IFace, std::size_t StaticStorageSize, std::size_t StaticStorageAlignment>
-struct wrap_storage {
+struct __attribute__((visibility("default"))) wrap_storage {
     // NOTE: static storage optimisation enabled. The m_p_iface member is used as a flag:
     // if it is null, then the current storage type is dynamic and the interface pointer
     // (which may be null for the invalid state) is stored in static_storage. If m_p_iface
@@ -449,7 +449,7 @@ struct wrap_storage {
 };
 
 template <typename IFace, std::size_t StaticStorageAlignment>
-struct wrap_storage<IFace, 0, StaticStorageAlignment> {
+struct __attribute__((visibility("default"))) wrap_storage<IFace, 0, StaticStorageAlignment> {
     IFace *m_p_iface;
     value_iface<IFace> *m_pv_iface;
 };
@@ -629,11 +629,12 @@ concept same_or_ref_for = std::same_as<T, U> || detail::is_reference_wrapper_for
 template <template <typename, typename, typename...> typename IFaceT, auto Cfg = default_config, typename... Args>
     requires std::is_polymorphic_v<IFaceT<void, void, Args...>>
                  && std::has_virtual_destructor_v<IFaceT<void, void, Args...>> && detail::valid_config<Cfg>
-class wrap : private detail::wrap_storage<IFaceT<void, void, Args...>, Cfg.static_size, Cfg.static_alignment>,
-             // NOTE: the reference interface is not supposed to hold any data: it will always
-             // be def-inited (even when copying/moving a wrap object), its assignment operators
-             // will never be invoked, it will never be swapped, etc. This needs to be documented.
-             public ref_iface<wrap<IFaceT, Cfg, Args...>, IFaceT, Args...>
+class __attribute__((visibility("default"))) wrap
+    : private detail::wrap_storage<IFaceT<void, void, Args...>, Cfg.static_size, Cfg.static_alignment>,
+      // NOTE: the reference interface is not supposed to hold any data: it will always
+      // be def-inited (even when copying/moving a wrap object), its assignment operators
+      // will never be invoked, it will never be swapped, etc. This needs to be documented.
+      public ref_iface<wrap<IFaceT, Cfg, Args...>, IFaceT, Args...>
 {
     // Aliases for the two interfaces.
     using iface_t = IFaceT<void, void, Args...>;

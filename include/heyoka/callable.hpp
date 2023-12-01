@@ -15,6 +15,7 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/tanuki.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
 
 #if defined(__GNUC__)
@@ -34,13 +35,13 @@ namespace detail
 
 // Declaration of the callable interface template.
 template <typename, typename, typename...>
-struct callable_iface {
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface {
 };
 
 // Declaration of the callable interface.
 template <typename R, typename... Args>
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
-struct callable_iface<void, void, R, Args...> {
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<void, void, R, Args...> {
     virtual ~callable_iface() = default;
     virtual R operator()(Args... args) const = 0;
     virtual explicit operator bool() const noexcept = 0;
@@ -50,8 +51,8 @@ struct callable_iface<void, void, R, Args...> {
 // invocable objects.
 template <typename Holder, typename T, typename R, typename... Args>
     requires std::is_invocable_r_v<R, const std::remove_reference_t<std::unwrap_reference_t<T>> &, Args...>
-struct callable_iface<Holder, T, R, Args...> : callable_iface<void, void, R, Args...>,
-                                               tanuki::iface_impl_helper<Holder, T, callable_iface, R, Args...> {
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
+    : callable_iface<void, void, R, Args...>, tanuki::iface_impl_helper<Holder, T, callable_iface, R, Args...> {
     R operator()(Args... args) const final
     {
         using unrefT = std::remove_reference_t<std::unwrap_reference_t<T>>;
