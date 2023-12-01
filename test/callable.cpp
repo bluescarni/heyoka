@@ -74,7 +74,6 @@ TEST_CASE("callable basics")
     REQUIRE(!!c3);
     c = std::move(c4);
     REQUIRE(!!c);
-    REQUIRE(!c4);
 
     callable<void()> c5 = c;
     REQUIRE(!!c5);
@@ -146,7 +145,8 @@ TEST_CASE("callable call")
         REQUIRE(c0(3., 1.) == 9.);
         REQUIRE(c1(3., 1.) == 2.);
 
-        c0.swap(c1);
+        using std::swap;
+        swap(c0, c1);
 
         REQUIRE(c1(3., 1.) == 9.);
         REQUIRE(c0(3., 1.) == 2.);
@@ -162,23 +162,14 @@ TEST_CASE("callable call")
     }
 
     // Calling an empty callable.
-    {
-        REQUIRE_THROWS_AS(callable<void()>{}(), std::bad_function_call);
-
-        frob f{std::vector{1, 2, 3, 4, 5}};
-
-        callable<double(double, double)> c0 = std::move(f);
-        auto c1 = std::move(c0);
-
-        REQUIRE_THROWS_AS(c0(1, 2), std::bad_function_call);
-    }
+    REQUIRE_THROWS_AS(callable<void()>{}(), std::bad_function_call);
 }
 
 TEST_CASE("callable type idx")
 {
     callable<void()> c;
 
-    REQUIRE(c.get_type_index() == typeid(void));
+    REQUIRE(c.get_type_index() == typeid(void (*)()));
 
     auto f = []() {};
 
@@ -231,30 +222,6 @@ TEST_CASE("callable s11n")
         REQUIRE(!!c);
         REQUIRE(c(1) == 101);
     }
-
-    // Test an empty callable too.
-    {
-        callable<int(int)> c;
-
-        std::stringstream ss;
-
-        {
-            boost::archive::binary_oarchive oa(ss);
-
-            oa << c;
-        }
-
-        c = callable<int(int)>(foo_s11n{100});
-        REQUIRE(c);
-
-        {
-            boost::archive::binary_iarchive ia(ss);
-
-            ia >> c;
-        }
-
-        REQUIRE(!c);
-    }
 }
 
 struct vfunc {
@@ -265,8 +232,8 @@ struct vfunc {
 TEST_CASE("callable extract")
 {
     callable<void()> c;
-    REQUIRE(c.extract<void (*)()>() == nullptr);
-    REQUIRE(std::as_const(c).extract<void (*)()>() == nullptr);
+    REQUIRE(c.extract<void (*)()>() != nullptr);
+    REQUIRE(std::as_const(c).extract<void (*)()>() != nullptr);
 
     c = callable<void()>(blap);
     REQUIRE(c.extract<void (*)()>() != nullptr);

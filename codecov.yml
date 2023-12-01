@@ -4,5 +4,6 @@ coverage:
   - "tutorial/.*"
   - "src/detail/vsop2013/.*"
   - "src/detail/elp2000/.*"
+  - "include/heyoka/detail/tanuki*"
 
 comment: off

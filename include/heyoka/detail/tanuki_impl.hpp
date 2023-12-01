@@ -1459,38 +1459,56 @@ struct tracking_level<tanuki::detail::value_iface<IFace>> {
 
 } // namespace boost::serialization
 
-// NOTE: these are verbatim re-implementations of the BOOST_CLASS_EXPORT_KEY
+// NOTE: these are verbatim re-implementations of the BOOST_CLASS_EXPORT_KEY(2)
 // and BOOST_CLASS_EXPORT_IMPLEMENT macros, which do not work well with class templates.
-#define TANUKI_S11N_WRAP_EXPORT_KEY(...)                                                                               \
+#define TANUKI_S11N_WRAP_EXPORT_KEY(ud_type, ...)                                                                      \
     namespace boost::serialization                                                                                     \
     {                                                                                                                  \
     template <>                                                                                                        \
-    struct guid_defined<tanuki::detail::holder<__VA_ARGS__>> : boost::mpl::true_ {                                     \
+    struct guid_defined<tanuki::detail::holder<ud_type, __VA_ARGS__>> : boost::mpl::true_ {                            \
     };                                                                                                                 \
     template <>                                                                                                        \
-    inline const char *guid<tanuki::detail::holder<__VA_ARGS__>>()                                                     \
+    inline const char *guid<tanuki::detail::holder<ud_type, __VA_ARGS__>>()                                            \
     {                                                                                                                  \
         /* NOTE: the stringize here will produce a name enclosed by brackets. */                                       \
-        return BOOST_PP_STRINGIZE((tanuki::detail::holder<__VA_ARGS__>));                                              \
+        return BOOST_PP_STRINGIZE((tanuki::detail::holder<ud_type, __VA_ARGS__>));                                     \
     }                                                                                                                  \
     }
 
-#define TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(...)                                                                         \
+#define TANUKI_S11N_WRAP_EXPORT_KEY2(ud_type, gid, ...)                                                                \
+    namespace boost::serialization                                                                                     \
+    {                                                                                                                  \
+    template <>                                                                                                        \
+    struct guid_defined<tanuki::detail::holder<ud_type, __VA_ARGS__>> : boost::mpl::true_ {                            \
+    };                                                                                                                 \
+    template <>                                                                                                        \
+    inline const char *guid<tanuki::detail::holder<ud_type, __VA_ARGS__>>()                                            \
+    {                                                                                                                  \
+        return gid;                                                                                                    \
+    }                                                                                                                  \
+    }
+
+#define TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(ud_type, ...)                                                                \
     namespace boost::archive::detail::extra_detail                                                                     \
     {                                                                                                                  \
     template <>                                                                                                        \
-    struct init_guid<tanuki::detail::holder<__VA_ARGS__>> {                                                            \
-        static guid_initializer<tanuki::detail::holder<__VA_ARGS__>> const &g;                                         \
+    struct init_guid<tanuki::detail::holder<ud_type, __VA_ARGS__>> {                                                   \
+        static guid_initializer<tanuki::detail::holder<ud_type, __VA_ARGS__>> const &g;                                \
     };                                                                                                                 \
-    guid_initializer<tanuki::detail::holder<__VA_ARGS__>> const &init_guid<tanuki::detail::holder<__VA_ARGS__>>::g     \
+    guid_initializer<tanuki::detail::holder<ud_type, __VA_ARGS__>> const                                               \
+        &init_guid<tanuki::detail::holder<ud_type, __VA_ARGS__>>::g                                                    \
         = ::boost::serialization::singleton<                                                                           \
-              guid_initializer<tanuki::detail::holder<__VA_ARGS__>>>::get_mutable_instance()                           \
+              guid_initializer<tanuki::detail::holder<ud_type, __VA_ARGS__>>>::get_mutable_instance()                  \
               .export_guid();                                                                                          \
     }
 
-#define TANUKI_S11N_WRAP_EXPORT(...)                                                                                   \
-    TANUKI_S11N_WRAP_EXPORT_KEY(__VA_ARGS__)                                                                           \
-    TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(__VA_ARGS__)
+#define TANUKI_S11N_WRAP_EXPORT(ud_type, ...)                                                                          \
+    TANUKI_S11N_WRAP_EXPORT_KEY(ud_type, __VA_ARGS__)                                                                  \
+    TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(ud_type, __VA_ARGS__)
+
+#define TANUKI_S11N_WRAP_EXPORT2(ud_type, gid, ...)                                                                    \
+    TANUKI_S11N_WRAP_EXPORT_KEY2(ud_type, gid, __VA_ARGS__)                                                            \
+    TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(ud_type, __VA_ARGS__)
 
 #endif
 
