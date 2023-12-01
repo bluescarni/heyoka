@@ -160,7 +160,6 @@ const auto type_map = []() {
 #if defined(HEYOKA_HAVE_REAL)
 
     retval[typeid(mppp::real)] = [](llvm::LLVMContext &c) -> llvm::Type * {
-#if LLVM_VERSION_MAJOR >= 12
         if (auto *ptr = llvm::StructType::getTypeByName(c, "heyoka.real")) {
             return ptr;
         }
@@ -174,16 +173,6 @@ const auto type_map = []() {
         assert(llvm::StructType::getTypeByName(c, "heyoka.real") == ret);
 
         return ret;
-#else
-        // NOTE: in earlier LLVM versions, make this an unnamed struct.
-        auto *ret = llvm::StructType::get(c, {to_llvm_type<mpfr_prec_t>(c), to_llvm_type<mpfr_sign_t>(c),
-                                              to_llvm_type<mpfr_exp_t>(c),
-                                              llvm::PointerType::getUnqual(to_llvm_type<mp_limb_t>(c))});
-
-        assert(ret != nullptr);
-
-        return ret;
-#endif
     };
 
 #endif
@@ -845,14 +834,7 @@ std::uint64_t get_size(llvm::Module &md, llvm::Type *tp)
 {
     assert(!md.getDataLayout().getTypeAllocSize(tp).isScalable());
 
-    return boost::numeric_cast<std::uint64_t>(md.getDataLayout()
-                                                  .getTypeAllocSize(tp)
-#if LLVM_VERSION_MAJOR >= 12
-                                                  .getFixedValue()
-#else
-                                                  .getFixedSize()
-#endif
-    );
+    return boost::numeric_cast<std::uint64_t>(md.getDataLayout().getTypeAllocSize(tp).getFixedValue());
 }
 
 // Convert the input integral value n to the type std::size_t.
@@ -1122,13 +1104,7 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
         // Fetch the alignment of the scalar type.
         const auto align = get_alignment(*builder.GetInsertBlock()->getModule(), vec_tp->getScalarType());
 
-        return builder.CreateMaskedGather(
-#if LLVM_VERSION_MAJOR >= 13
-            // NOTE: new initial argument required since LLVM 13
-            // (the vector type to gather).
-            vec_tp,
-#endif
-            ptrs, llvm::Align(align));
+        return builder.CreateMaskedGather(vec_tp, ptrs, llvm::Align(align));
     } else {
         // LCOV_EXCL_START
         assert(!llvm::isa<llvm_vector_type>(ptrs->getType()));
@@ -3155,15 +3131,9 @@ llvm::Type *llvm_type_like(llvm_state &s, [[maybe_unused]] const T &x)
     if constexpr (std::is_same_v<T, mppp::real>) {
         const auto name = fmt::format("heyoka.real.{}", x.get_prec());
 
-#if LLVM_VERSION_MAJOR >= 12
         if (auto *ptr = llvm::StructType::getTypeByName(c, name)) {
             return ptr;
         }
-#else
-        if (auto *ptr = s.module().getTypeByName(name)) {
-            return ptr;
-        }
-#endif
 
         // Fetch the limb array type.
         auto *limb_arr_t
@@ -3173,11 +3143,7 @@ llvm::Type *llvm_type_like(llvm_state &s, [[maybe_unused]] const T &x)
             = llvm::StructType::create({to_llvm_type<mpfr_sign_t>(c), to_llvm_type<mpfr_exp_t>(c), limb_arr_t}, name);
 
         assert(ret != nullptr);
-#if LLVM_VERSION_MAJOR >= 12
         assert(llvm::StructType::getTypeByName(c, name) == ret);
-#else
-        assert(s.module().getTypeByName(name) == ret);
-#endif
 
         return ret;
     } else {

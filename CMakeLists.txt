@@ -158,8 +158,8 @@ endif()
 include(GNUInstallDirs)
 find_package(LLVM REQUIRED CONFIG)
 
-if(${LLVM_VERSION_MAJOR} LESS 11)
-  message(FATAL_ERROR "LLVM >= 11 is required.")
+if(${LLVM_VERSION_MAJOR} LESS 13)
+  message(FATAL_ERROR "LLVM >= 13 is required.")
 endif()
 
 # List of source files.

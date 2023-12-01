@@ -14,7 +14,7 @@ and several CPU architectures (x86-64, 64-bit ARM and 64-bit PowerPC).
 
 heyoka has the following **mandatory** dependencies:
 
-* the `LLVM <https://llvm.org/>`__ compiler infrastructure library (version >= 11),
+* the `LLVM <https://llvm.org/>`__ compiler infrastructure library (version >= 13),
 * the `Boost <https://www.boost.org/>`__ C++ libraries (version >= 1.69),
 * the `{fmt} <https://fmt.dev/latest/index.html>`__ library (version >= 9),
 * the `spdlog <https://github.com/gabime/spdlog>`__ library,
@@ -276,5 +276,5 @@ dependencies heyoka was compiled:
 heyoka's config-file package also exports a
 ``heyoka_LLVM_VERSION_MAJOR`` variable containing
 the major number of the LLVM version against which heyoka
-was compiled. E.g., if heyoka was compiled against LLVM 12.0.1,
-then ``heyoka_LLVM_VERSION_MAJOR`` is ``12``.
+was compiled. E.g., if heyoka was compiled against LLVM 13.0.1,
+then ``heyoka_LLVM_VERSION_MAJOR`` is ``13``.
