@@ -8,12 +8,22 @@ set(heyoka_ABI_VERSION @HEYOKA_ABI_VERSION@)
 # Mandatory public dependencies on Boost and fmt.
 find_package(Boost @_HEYOKA_MIN_BOOST_VERSION@ REQUIRED serialization)
 find_package(fmt REQUIRED CONFIG)
+if(${fmt_VERSION_MAJOR} LESS @_HEYOKA_MIN_FMT_VERSION@)
+    message(FATAL_ERROR "fmt version>=@_HEYOKA_MIN_FMT_VERSION@ is required, but version ${fmt_VERSION_MAJOR} was found instead.")
+endif()
 
 # Optional public dependency on mp++.
 if(${heyoka_WITH_MPPP})
-    find_package(mp++ REQUIRED CONFIG)
-    if(${mp++_VERSION} VERSION_LESS @_HEYOKA_MIN_MPPP_VERSION@)
-        message(FATAL_ERROR "mp++ >= @_HEYOKA_MIN_MPPP_VERSION@ is required.")
+    find_package(mp++ @_HEYOKA_MPPP_VERSION@ REQUIRED CONFIG)
+
+    # NOTE: this is necessary for the serialisation of several classes.
+    if(NOT mp++_WITH_BOOST_S11N)
+        message(FATAL_ERROR "mp++ must be installed with support for Boost.serialization.")
+    endif()
+
+    # NOTE: needed for formatting numbers.
+    if(NOT mp++_WITH_FMT)
+        message(FATAL_ERROR "mp++ must be installed with support for fmt.")
     endif()
 endif()
 

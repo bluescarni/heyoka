@@ -7,21 +7,10 @@ Introduction
 ------------
 
 heyoka is written in modern C++, and it requires a compiler able to understand
-at least C++17. The library is regularly tested on
-a continuous integration pipeline which currently includes:
-
-* GCC 9 on Linux,
-* Clang 11 on OSX,
-* MSVC 2019 and Clang 12 on Windows.
-
-.. note::
-
-   When using MSVC, heyoka currently requires MSVC>=2019. It is also possible
-   to compile heyoka using the standard library from MSVC 2017 in conjunction
-   with the ``clang-cl`` compiler.
-
-The tested and supported CPU architectures at this time are x86-64,
-64-bit ARM and 64-bit PowerPC.
+at least C++20. The library is regularly tested on
+a continuous integration pipeline which currently includes several
+compilers (GCC, Clang MSVC) on several operating systems (Linux, OSX, Windows)
+and several CPU architectures (x86-64, 64-bit ARM and 64-bit PowerPC).
 
 heyoka has the following **mandatory** dependencies:
 
@@ -40,7 +29,7 @@ Additionally, heyoka has the following **optional** dependencies:
   an mp++ installation with support for Boost.serialization and for the
   {fmt} library
   (see the :ref:`mp++ installation instructions <mppp:installation>`).
-  The minimum required version of mp++ is 0.27;
+  heyoka currently requires mp++ 1.x;
 * the `SLEEF <https://sleef.org/>`__ vectorized math library (improves the performance
   of integrations in batch mode),
 * the `xtensor and xtensor-blas <https://xtensor.readthedocs.io/en/latest/>`__
