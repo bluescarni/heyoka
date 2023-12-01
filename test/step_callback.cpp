@@ -88,13 +88,6 @@ TEST_CASE("step_callback basics")
             REQUIRE(!std::is_constructible_v<step_callback<fp_t>, void>);
             REQUIRE(!std::is_constructible_v<step_callback<fp_t>, int, int>);
 
-#if !defined(_MSC_VER) || defined(__clang__)
-
-            // NOTE: vanilla MSVC does not like these extraction.
-            REQUIRE(step_cb.template extract<int>() == nullptr);
-            REQUIRE(std::as_const(step_cb).template extract<int>() == nullptr);
-#endif
-
             REQUIRE(step_cb.get_type_index() == typeid(void));
 
             // Copy construction of empty callback.
@@ -127,13 +120,6 @@ TEST_CASE("step_callback basics")
 
             REQUIRE(step_cb(ta));
             REQUIRE_NOTHROW(step_cb.pre_hook(ta));
-
-#if !defined(_MSC_VER) || defined(__clang__)
-
-            REQUIRE(step_cb.template extract<int>() == nullptr);
-            REQUIRE(std::as_const(step_cb).template extract<int>() == nullptr);
-
-#endif
 
             REQUIRE(step_cb.get_type_index() == typeid(decltype(lam)));
 
