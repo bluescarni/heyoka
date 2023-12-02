@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <array>
 #include <functional>
 #include <initializer_list>
 #include <sstream>
@@ -163,6 +164,19 @@ TEST_CASE("callable call")
 
     // Calling an empty callable.
     REQUIRE_THROWS_AS(callable<void()>{}(), std::bad_function_call);
+    REQUIRE_THROWS_AS(callable<void()>{std::function<void()>{}}(), std::bad_function_call);
+
+    // Calling an invalid callable.
+    struct large_callable
+    {
+        std::array<int, 100> arr{};
+        void operator()() const
+        {}
+    };
+
+    callable<void()> clarge(large_callable{});
+    auto cl2 = std::move(clarge);
+    REQUIRE_THROWS_AS(clarge(), std::bad_function_call);
 }
 
 TEST_CASE("callable type idx")

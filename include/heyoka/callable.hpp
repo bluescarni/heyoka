@@ -68,11 +68,11 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
             if (this->value() == nullptr) {
                 throw std::bad_function_call{};
             }
-        } else if constexpr (is_any_callable<unrefT>::value || is_any_std_func_v<unrefT>) {
-            if (!this->value()) {
-                throw std::bad_function_call{};
-            }
         }
+
+        // NOTE: if T is an empty std::function or callable,
+        // the std::bad_function_call exception will be raised
+        // by the invocation.
 
         if constexpr (std::is_same_v<R, void>) {
             static_cast<void>(std::invoke(this->value(), std::forward<Args>(args)...));
