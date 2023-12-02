@@ -38,7 +38,7 @@ namespace detail
 {
 
 // Declaration of the callable interface template.
-template <typename, typename, typename...>
+template <typename, typename, typename, typename...>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface {
 };
 
