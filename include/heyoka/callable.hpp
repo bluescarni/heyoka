@@ -9,6 +9,7 @@
 #ifndef HEYOKA_CALLABLE_HPP
 #define HEYOKA_CALLABLE_HPP
 
+#include <functional>
 #include <type_traits>
 #include <utility>
 
@@ -27,6 +28,8 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
+// Fwd declaration of the detector
+// for any callable object.
 template <typename>
 struct is_any_callable;
 
@@ -94,6 +97,7 @@ HEYOKA_END_NAMESPACE
 namespace tanuki
 {
 
+// Implementation of the reference interface.
 template <typename Wrap, typename R, typename... Args>
 struct ref_iface<Wrap, heyoka::detail::callable_iface, R, Args...> {
     using result_type = R;
@@ -144,11 +148,24 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+// Similarly to std::function, ensure that callable can store
+// inline pointers and reference wrappers.
 template <typename R, typename... Args>
-using callable_wrap_t
-    = tanuki::wrap<callable_iface,
-                   tanuki::config<R (*)(Args...)>{.pointer_interface = false, .explicit_generic_ctor = false}, R,
-                   Args...>;
+constexpr auto callable_static_size()
+{
+    constexpr auto s1 = tanuki::holder_size<void *, callable_iface, R, Args...>;
+    constexpr auto s2 = tanuki::holder_size<std::reference_wrapper<void *>, callable_iface, R, Args...>;
+
+    return s1 >= s2 ? s1 : s2;
+}
+
+// Definition of the callable wrap.
+template <typename R, typename... Args>
+using callable_wrap_t = tanuki::wrap<callable_iface,
+                                     tanuki::config<R (*)(Args...)>{.static_size = callable_static_size<R, Args...>(),
+                                                                    .pointer_interface = false,
+                                                                    .explicit_generic_ctor = false},
+                                     R, Args...>;
 
 template <typename T>
 struct callable_impl {
@@ -182,6 +199,7 @@ HEYOKA_END_NAMESPACE
 
 #endif
 
+// Serialisation macros.
 #define HEYOKA_S11N_CALLABLE_EXPORT_KEY(udc, ...)                                                                      \
     TANUKI_S11N_WRAP_EXPORT_KEY(udc, heyoka::detail::callable_iface, __VA_ARGS__)
 
