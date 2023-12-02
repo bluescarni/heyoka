@@ -7,6 +7,9 @@ Changelog
 Changes
 ~~~~~~~
 
+- **BREAKING**: the minimum supported LLVM version is now 13
+  (`#369 <https://github.com/bluescarni/heyoka/pull/369>`__).
+  This is a :ref:`breaking change <bchanges_4_0_0>`.
 - **BREAKING**: heyoka now requires C++20
   (`#369 <https://github.com/bluescarni/heyoka/pull/369>`__).
   This is a :ref:`breaking change <bchanges_4_0_0>`.
