@@ -70,7 +70,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
             }
         }
 
-        // NOTE: if T is an empty std::function or callable,
+        // NOTE: if this->value() is an empty std::function or callable,
         // the std::bad_function_call exception will be raised
         // by the invocation.
 
@@ -152,23 +152,19 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// Similarly to std::function, ensure that callable can store
-// inline pointers and reference wrappers.
-template <typename R, typename... Args>
-constexpr auto callable_static_size()
-{
-    constexpr auto s1 = tanuki::holder_size<void *, callable_iface, R, Args...>;
-    constexpr auto s2 = tanuki::holder_size<std::reference_wrapper<void *>, callable_iface, R, Args...>;
-
-    return s1 >= s2 ? s1 : s2;
-}
-
 // Definition of the callable wrap.
 template <typename R, typename... Args>
 using callable_wrap_t = tanuki::wrap<callable_iface,
-                                     tanuki::config<R (*)(Args...)>{.static_size = callable_static_size<R, Args...>(),
-                                                                    .pointer_interface = false,
-                                                                    .explicit_generic_ctor = false},
+                                     tanuki::config<R (*)(Args...)>{
+                                         // Similarly to std::function, ensure that callable can store
+                                         // in static storage pointers and reference wrappers.
+                                         // NOTE: reference wrappers are not guaranteed to have the size
+                                         // of a pointer, but in practice that should always be the case.
+                                         // In case this is a concern, static asserts can be added
+                                         // in the callable interface implementation.
+                                         .static_size = tanuki::holder_size<R (*)(Args...), callable_iface, R, Args...>,
+                                         .pointer_interface = false,
+                                         .explicit_generic_ctor = false},
                                      R, Args...>;
 
 template <typename T>
