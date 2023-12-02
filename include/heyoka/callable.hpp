@@ -9,6 +9,7 @@
 #ifndef HEYOKA_CALLABLE_HPP
 #define HEYOKA_CALLABLE_HPP
 
+#include <concepts>
 #include <functional>
 #include <type_traits>
 #include <utility>
@@ -54,6 +55,9 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<void, void, R, Args...> {
 // invocable objects.
 template <typename Holder, typename T, typename R, typename... Args>
     requires std::is_invocable_r_v<R, const std::remove_reference_t<std::unwrap_reference_t<T>> &, Args...>
+                 // NOTE: also require copy constructability like
+                 // std::function does.
+                 && std::copy_constructible<T>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
     : callable_iface<void, void, R, Args...>, tanuki::iface_impl_helper<Holder, T, callable_iface, R, Args...> {
     R operator()(Args... args) const final
