@@ -167,11 +167,9 @@ TEST_CASE("callable call")
     REQUIRE_THROWS_AS(callable<void()>{std::function<void()>{}}(), std::bad_function_call);
 
     // Calling an invalid callable.
-    struct large_callable
-    {
+    struct large_callable {
         std::array<int, 100> arr{};
-        void operator()() const
-        {}
+        void operator()() const {}
     };
 
     callable<void()> clarge(large_callable{});
