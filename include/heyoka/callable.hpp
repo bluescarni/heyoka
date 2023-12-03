@@ -47,20 +47,20 @@ template <typename R, typename... Args>
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<void, void, R, Args...> {
     virtual ~callable_iface() = default;
-    virtual R operator()(Args... args) const = 0;
+    virtual R operator()(Args... args) = 0;
     virtual explicit operator bool() const noexcept = 0;
 };
 
 // Implementation of the callable interface for
 // invocable objects.
 template <typename Holder, typename T, typename R, typename... Args>
-    requires std::is_invocable_r_v<R, const std::remove_reference_t<std::unwrap_reference_t<T>> &, Args...>
+    requires std::is_invocable_r_v<R, std::remove_reference_t<std::unwrap_reference_t<T>> &, Args...>
                  // NOTE: also require copy constructability like
                  // std::function does.
                  && std::copy_constructible<T>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
     : callable_iface<void, void, R, Args...>, tanuki::iface_impl_helper<Holder, T, callable_iface, R, Args...> {
-    R operator()(Args... args) const final
+    R operator()(Args... args) final
     {
         using unrefT = std::remove_reference_t<std::unwrap_reference_t<T>>;
 
@@ -107,14 +107,14 @@ struct ref_iface<Wrap, heyoka::detail::callable_iface, R, Args...> {
     using result_type = R;
 
     template <typename JustWrap = Wrap, typename... FArgs>
-    auto operator()(FArgs &&...fargs) const
-        -> decltype(iface_ptr(*static_cast<const JustWrap *>(this))->operator()(std::forward<FArgs>(fargs)...))
+    auto operator()(FArgs &&...fargs)
+        -> decltype(iface_ptr(*static_cast<JustWrap *>(this))->operator()(std::forward<FArgs>(fargs)...))
     {
-        if (is_invalid(*static_cast<const Wrap *>(this))) {
+        if (is_invalid(*static_cast<Wrap *>(this))) {
             throw std::bad_function_call{};
         }
 
-        return iface_ptr(*static_cast<const Wrap *>(this))->operator()(std::forward<FArgs>(fargs)...);
+        return iface_ptr(*static_cast<Wrap *>(this))->operator()(std::forward<FArgs>(fargs)...);
     }
 
     explicit operator bool() const noexcept

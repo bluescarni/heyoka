@@ -71,7 +71,10 @@ public:
     using str_func_t = callable<std::string(unsigned)>;
 
 private:
-    str_func_t m_str_func;
+    // NOTE: this mutable is a bit unfortunate but we will
+    // have to live with this for the time being. Fixing this
+    // needs support for const qualified callables.
+    mutable str_func_t m_str_func;
     std::optional<std::string> m_repr;
 
     // Serialization.

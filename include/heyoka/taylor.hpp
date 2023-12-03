@@ -402,6 +402,7 @@ public:
     ~nt_event_impl();
 
     [[nodiscard]] const expression &get_expression() const;
+    callback_t &get_callback();
     const callback_t &get_callback() const;
     [[nodiscard]] event_direction get_direction() const;
 };
@@ -527,6 +528,7 @@ public:
     ~t_event_impl();
 
     [[nodiscard]] const expression &get_expression() const;
+    callback_t &get_callback();
     const callback_t &get_callback() const;
     [[nodiscard]] event_direction get_direction() const;
     T get_cooldown() const;
