@@ -13,7 +13,6 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
-#include <stdexcept>
 #include <tuple>
 #include <utility>
 #include <vector>
