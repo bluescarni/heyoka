@@ -59,7 +59,7 @@ template <typename Holder, typename T, typename R, typename... Args>
                  // std::function does.
                  && std::copy_constructible<T>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
-    : callable_iface<void, void, R, Args...>, tanuki::iface_impl_helper<Holder, T, callable_iface, R, Args...> {
+    : virtual callable_iface<void, void, R, Args...>, tanuki::iface_impl_helper<Holder, T, callable_iface, R, Args...> {
     R operator()(Args... args) final
     {
         using unrefT = std::remove_reference_t<std::unwrap_reference_t<T>>;
@@ -94,16 +94,9 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
     }
 };
 
-} // namespace detail
-
-HEYOKA_END_NAMESPACE
-
-namespace tanuki
-{
-
 // Implementation of the reference interface.
 template <typename Wrap, typename R, typename... Args>
-struct ref_iface<Wrap, heyoka::detail::callable_iface, R, Args...> {
+struct callable_ref_iface_impl {
     using result_type = R;
 
     template <typename JustWrap = Wrap, typename... FArgs>
@@ -145,17 +138,16 @@ struct ref_iface<Wrap, heyoka::detail::callable_iface, R, Args...> {
     }
 };
 
-} // namespace tanuki
-
-HEYOKA_BEGIN_NAMESPACE
-
-namespace detail
-{
+template <typename R, typename... Args>
+struct callable_ref_iface {
+    template <typename Wrap>
+    using type = callable_ref_iface_impl<Wrap, R, Args...>;
+};
 
 // Definition of the callable wrap.
 template <typename R, typename... Args>
 using callable_wrap_t = tanuki::wrap<callable_iface,
-                                     tanuki::config<R (*)(Args...)>{
+                                     tanuki::config<R (*)(Args...), callable_ref_iface<R, Args...>::template type>{
                                          // Similarly to std::function, ensure that callable can store
                                          // in static storage pointers and reference wrappers.
                                          // NOTE: reference wrappers are not guaranteed to have the size

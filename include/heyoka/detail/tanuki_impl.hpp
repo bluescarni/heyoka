@@ -90,6 +90,16 @@
 #endif
 
 // Visibility setup.
+// NOTE: the idea here is as follows:
+// - on Windows there is apparently no need to set up
+//   dllimport/dllexport on class templates;
+// - on non-Windows platforms with known compilers,
+//   we mark several class templates as visible. This is apparently
+//   necessary at least in some situations involving, for
+//   instance, the export/registration macros in Boost
+//   serialisation. libc++ also, for instance, usually marks
+//   public class templates as visible;
+// - otherwise, we do not implement any visibility attribute.
 #if defined(_WIN32) || defined(__CYGWIN__)
 
 #define TANUKI_VISIBLE
@@ -484,10 +494,15 @@ inline constexpr auto holder_size = sizeof(detail::holder<T, IFaceT, Args...>);
 template <typename T, template <typename, typename, typename...> typename IFaceT, typename... Args>
 inline constexpr auto holder_align = alignof(detail::holder<T, IFaceT, Args...>);
 
+// Default implementation of the reference interface.
+template <typename>
+struct no_ref_iface {
+};
+
 // Configuration settings for the wrap class.
 // NOTE: the DefaultValueType is subject to the constraints
 // for valid value types.
-template <typename DefaultValueType = void>
+template <typename DefaultValueType = void, template <typename> typename RefIFace = no_ref_iface>
     requires std::same_as<DefaultValueType, void> || detail::valid_value_type<DefaultValueType>
 struct config final : detail::config_base {
     using default_value_type = DefaultValueType;
@@ -527,13 +542,20 @@ concept valid_config =
     // The static alignment value must be a power of 2.
     power_of_two<Cfg.static_alignment>;
 
-} // namespace detail
-
-// Default reference interface implementation.
-template <typename, template <typename, typename, typename...> typename, typename...>
-struct ref_iface {
+// Machinery to infer the reference interface from a config instance.
+template <typename>
+struct cfg_ref_type {
 };
 
+template <typename DefaultValueType, template <typename> typename RefIFace>
+struct cfg_ref_type<config<DefaultValueType, RefIFace>> {
+    template <typename T>
+    using type = RefIFace<T>;
+};
+
+} // namespace detail
+
+// Helpers to ease the definition of a reference interface.
 #define TANUKI_REF_IFACE_MEMFUN(name)                                                                                  \
     template <typename JustWrap = Wrap, typename... MemFunArgs>                                                        \
     auto name(MemFunArgs &&...args) & noexcept(                                                                        \
@@ -649,14 +671,16 @@ class TANUKI_VISIBLE wrap
       // NOTE: the reference interface is not supposed to hold any data: it will always
       // be def-inited (even when copying/moving a wrap object), its assignment operators
       // will never be invoked, it will never be swapped, etc. This needs to be documented.
-      public ref_iface<wrap<IFaceT, Cfg, Args...>, IFaceT, Args...>
+      public detail::cfg_ref_type<std::remove_const_t<decltype(Cfg)>>::template type<wrap<IFaceT, Cfg, Args...>>
 {
     // Aliases for the two interfaces.
     using iface_t = IFaceT<void, void, Args...>;
     using value_iface_t = detail::value_iface<iface_t>;
 
     // Alias for the reference interface.
-    using ref_iface_t = ref_iface<wrap<IFaceT, Cfg, Args...>, IFaceT, Args...>;
+    using ref_iface_t =
+        // NOTE: clang 14 needs the typename here, hopefully this is not harmful to other compilers.
+        typename detail::cfg_ref_type<std::remove_const_t<decltype(Cfg)>>::template type<wrap<IFaceT, Cfg, Args...>>;
 
     // The default value type.
     using default_value_t = typename decltype(Cfg)::default_value_type;
@@ -1306,7 +1330,6 @@ concept any_wrap = detail::is_any_wrap_impl<T>::value;
 namespace detail
 {
 
-// Machinery to detect the interface of a wrap.
 template <typename>
 struct iface_from_wrap_impl {
 };
@@ -1316,6 +1339,7 @@ struct iface_from_wrap_impl<wrap<IFaceT, Cfg, Args...>> {
     using type = IFaceT<void, void, Args...>;
 };
 
+// Helper to detect the interface of a wrap.
 template <typename Wrap>
 using wrap_interface_t = typename detail::iface_from_wrap_impl<Wrap>::type;
 
@@ -1335,37 +1359,44 @@ using wrap_interface_impl_t = typename detail::iface_impl_from_wrap_impl<Wrap>::
 
 // Machinery for the definition of the composite wrap.
 template <typename, typename, typename, typename, typename...>
-struct composite_wrap_iface;
+struct TANUKI_VISIBLE composite_wrap_iface;
 
+// The composite interface.
 template <typename Wrap0, typename Wrap1, typename... WrapN>
-struct composite_wrap_iface<void, void, Wrap0, Wrap1, WrapN...> : virtual public wrap_interface_t<Wrap0>,
-                                                                  virtual public wrap_interface_t<Wrap1>,
-                                                                  virtual public wrap_interface_t<WrapN>... {
+struct TANUKI_VISIBLE composite_wrap_iface<void, void, Wrap0, Wrap1, WrapN...>
+    : virtual public wrap_interface_t<Wrap0>,
+      virtual public wrap_interface_t<Wrap1>,
+      virtual public wrap_interface_t<WrapN>... {
 };
 
+// The composite interface implementation.
 template <typename Holder, typename T, typename Wrap0, typename Wrap1, typename... WrapN>
-struct composite_wrap_iface : composite_wrap_iface<void, void, Wrap0, Wrap1, WrapN...>,
-                              public wrap_interface_impl_t<Wrap0, Holder, T>,
-                              public wrap_interface_impl_t<Wrap1, Holder, T>,
-                              public wrap_interface_impl_t<WrapN, Holder, T>... {
+struct TANUKI_VISIBLE composite_wrap_iface : composite_wrap_iface<void, void, Wrap0, Wrap1, WrapN...>,
+                                             public wrap_interface_impl_t<Wrap0, Holder, T>,
+                                             public wrap_interface_impl_t<Wrap1, Holder, T>,
+                                             public wrap_interface_impl_t<WrapN, Holder, T>... {
 };
 
 template <typename Wrap0, typename Wrap1, typename... WrapN>
-struct composite_wrap_iface_selector {
+struct composite_wrap_ifaceT_selector {
     template <typename Holder, typename T>
     using type = composite_wrap_iface<Holder, T, Wrap0, Wrap1, WrapN...>;
 };
 
 } // namespace detail
 
+// Helper to define the interface template of a composite wrap.
+template <any_wrap Wrap0, any_wrap Wrap1, any_wrap... WrapN>
+using composite_wrap_interfaceT = detail::composite_wrap_ifaceT_selector<Wrap0, Wrap1, WrapN...>;
+
 // Composite wrap.
 template <any_wrap Wrap0, any_wrap Wrap1, any_wrap... WrapN>
-using composite_wrap = wrap<detail::composite_wrap_iface_selector<Wrap0, Wrap1, WrapN...>::template type>;
+using composite_wrap = wrap<composite_wrap_interfaceT<Wrap0, Wrap1, WrapN...>::template type>;
 
 // Composite wrap with custom config.
 template <auto Cfg, any_wrap Wrap0, any_wrap Wrap1, any_wrap... WrapN>
     requires detail::valid_config<Cfg>
-using composite_cwrap = wrap<detail::composite_wrap_iface_selector<Wrap0, Wrap1, WrapN...>::template type, Cfg>;
+using composite_cwrap = wrap<composite_wrap_interfaceT<Wrap0, Wrap1, WrapN...>::template type, Cfg>;
 
 // Helper that can be used to reduce typing in an
 // interface implementation. This implements value()
