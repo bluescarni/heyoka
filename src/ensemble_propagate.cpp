@@ -199,21 +199,21 @@ ensemble_propagate_grid_impl(const taylor_adaptive<T> &ta, std::vector<T> grid, 
 #define HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(T)                                                                       \
     template HEYOKA_DLL_PUBLIC std::vector<                                                                            \
         std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>        \
-    ensemble_propagate_until_impl<T>(const taylor_adaptive<T> &, T, std::size_t,                                       \
-                                     const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,       \
-                                     std::size_t, T, step_callback<T> &, bool, bool);                                  \
+    ensemble_propagate_until_impl(const taylor_adaptive<T> &, T, std::size_t,                                          \
+                                  const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,          \
+                                  std::size_t, T, step_callback<T> &, bool, bool);                                     \
                                                                                                                        \
     template HEYOKA_DLL_PUBLIC std::vector<                                                                            \
         std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>        \
-    ensemble_propagate_for_impl<T>(const taylor_adaptive<T> &, T, std::size_t,                                         \
-                                   const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,         \
-                                   std::size_t, T, step_callback<T> &, bool, bool);                                    \
+    ensemble_propagate_for_impl(const taylor_adaptive<T> &, T, std::size_t,                                            \
+                                const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,            \
+                                std::size_t, T, step_callback<T> &, bool, bool);                                       \
                                                                                                                        \
     template HEYOKA_DLL_PUBLIC                                                                                         \
         std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::vector<T>>>                 \
-        ensemble_propagate_grid_impl<T>(const taylor_adaptive<T> &, std::vector<T>, std::size_t,                       \
-                                        const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,    \
-                                        std::size_t, T, step_callback<T> &);
+        ensemble_propagate_grid_impl(const taylor_adaptive<T> &, std::vector<T>, std::size_t,                          \
+                                     const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,       \
+                                     std::size_t, T, step_callback<T> &);
 // NOLINTEND
 
 HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(float)
@@ -388,20 +388,20 @@ std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>> ensemble_propa
 #define HEYOKA_ENSEMBLE_PROPAGATE_BATCH_INST(T)                                                                        \
     template HEYOKA_DLL_PUBLIC                                                                                         \
         std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>>>                   \
-        ensemble_propagate_until_batch_impl<T>(                                                                        \
+        ensemble_propagate_until_batch_impl(                                                                           \
             const taylor_adaptive_batch<T> &, T, std::size_t,                                                          \
             const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,       \
             const std::vector<T> &, step_callback_batch<T> &, bool, bool);                                             \
                                                                                                                        \
     template HEYOKA_DLL_PUBLIC                                                                                         \
         std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>>>                   \
-        ensemble_propagate_for_batch_impl<T>(                                                                          \
+        ensemble_propagate_for_batch_impl(                                                                             \
             const taylor_adaptive_batch<T> &, T, std::size_t,                                                          \
             const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,       \
             const std::vector<T> &, step_callback_batch<T> &, bool, bool);                                             \
                                                                                                                        \
     template HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>>                       \
-    ensemble_propagate_grid_batch_impl<T>(                                                                             \
+    ensemble_propagate_grid_batch_impl(                                                                                \
         const taylor_adaptive_batch<T> &, const std::vector<T> &, std::size_t,                                         \
         const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,           \
         const std::vector<T> &, step_callback_batch<T> &);
