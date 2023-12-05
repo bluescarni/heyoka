@@ -1240,6 +1240,23 @@ public:
     }
 };
 
+// Prevent implicit instantiations.
+extern template class taylor_adaptive<float>;
+extern template class taylor_adaptive<double>;
+extern template class taylor_adaptive<long double>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+extern template class taylor_adaptive<mppp::real128>;
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+extern template class taylor_adaptive<mppp::real>;
+
+#endif
+
 namespace detail
 {
 
@@ -1743,6 +1760,23 @@ public:
         return m_prop_res;
     }
 };
+
+// Prevent implicit instantiations.
+extern template class taylor_adaptive_batch<float>;
+extern template class taylor_adaptive_batch<double>;
+extern template class taylor_adaptive_batch<long double>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+extern template class taylor_adaptive_batch<mppp::real128>;
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+extern template class taylor_adaptive_batch<mppp::real>;
+
+#endif
 
 template <typename T>
 inline std::ostream &operator<<(std::ostream &os, const taylor_adaptive<T> &)

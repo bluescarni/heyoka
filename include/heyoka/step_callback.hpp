@@ -12,11 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <initializer_list>
-#include <memory>
 #include <type_traits>
-#include <typeindex>
-#include <typeinfo>
-#include <utility>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -33,12 +29,11 @@
 
 #include <heyoka/callable.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
-#include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/tanuki.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/s11n.hpp>
 
-// NOTE: the step callback needs its own class (rather
-// than using std::function directly) because we want to
+// NOTE: the step callback needs its own class because we want to
 // give the ability to (optionally) define additional member
 // functions in the callback object (beside the call operator).
 
@@ -47,206 +42,84 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-template <typename TA>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_callback_inner_base {
-    step_callback_inner_base() = default;
-    step_callback_inner_base(const step_callback_inner_base &) = delete;
-    step_callback_inner_base(step_callback_inner_base &&) = delete;
-    step_callback_inner_base &operator=(const step_callback_inner_base &) = delete;
-    step_callback_inner_base &operator=(step_callback_inner_base &&) = delete;
-    virtual ~step_callback_inner_base() = default;
-
-    [[nodiscard]] virtual std::unique_ptr<step_callback_inner_base> clone() const = 0;
-
-    virtual bool operator()(TA &) = 0;
-    virtual void pre_hook(TA &) = 0;
-
-    [[nodiscard]] virtual std::type_index get_type_index() const = 0;
-
-private:
-    // Serialization (empty, no data members).
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &, unsigned)
-    {
-    }
+// Declaration of the pre_hook interface template.
+template <typename, typename, typename>
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS pre_hook_iface {
 };
 
+// Declaration of the pre_hook interface.
+template <typename TA>
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS pre_hook_iface<void, void, TA> {
+    virtual ~pre_hook_iface() = default;
+    // Default implementation of pre_hook() is a no-op.
+    virtual void pre_hook(TA &) {}
+};
+
+// Concept checking for the presence of the
+// pre_hook() member function.
 template <typename T, typename TA>
-using step_callback_pre_hook_t = decltype(std::declval<std::add_lvalue_reference_t<T>>().pre_hook(
-    std::declval<std::add_lvalue_reference_t<TA>>()));
+concept with_pre_hook = requires(T &x, TA &ta) { static_cast<void>(x.pre_hook(ta)); };
 
-template <typename T, typename TA>
-inline constexpr bool step_callback_has_pre_hook_v = std::is_same_v<detected_t<step_callback_pre_hook_t, T, TA>, void>;
-
-template <typename T, typename TA>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_callback_inner final : step_callback_inner_base<TA> {
-    T m_value;
-
-    // We just need the def ctor, delete everything else.
-    step_callback_inner() = default;
-    step_callback_inner(const step_callback_inner &) = delete;
-    step_callback_inner(step_callback_inner &&) = delete;
-    step_callback_inner &operator=(const step_callback_inner &) = delete;
-    step_callback_inner &operator=(step_callback_inner &&) = delete;
-    ~step_callback_inner() final = default;
-
-    // Constructors from T (copy and move variants).
-    explicit step_callback_inner(const T &x) : m_value(x) {}
-    explicit step_callback_inner(T &&x) : m_value(std::move(x)) {}
-
-    // The clone method, used in the copy constructor.
-    std::unique_ptr<step_callback_inner_base<TA>> clone() const final
-    {
-        return std::make_unique<step_callback_inner>(m_value);
-    }
-
-    bool operator()(TA &ta) final
-    {
-        return m_value(ta);
-    }
+// Implementation of the pre_hook interface for
+// objects providing the pre_hook() member function.
+template <typename Holder, typename T, typename TA>
+    requires with_pre_hook<std::remove_reference_t<std::unwrap_reference_t<T>>, TA>
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS pre_hook_iface<Holder, T, TA>
+    : virtual pre_hook_iface<void, void, TA>, tanuki::iface_impl_helper<Holder, T, pre_hook_iface, TA> {
     void pre_hook(TA &ta) final
     {
-        if constexpr (step_callback_has_pre_hook_v<T, TA>) {
-            m_value.pre_hook(ta);
-        }
-    }
-
-    [[nodiscard]] std::type_index get_type_index() const final
-    {
-        return typeid(T);
-    }
-
-private:
-    // Serialization.
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar &boost::serialization::base_object<step_callback_inner_base<TA>>(*this);
-        ar & m_value;
+        static_cast<void>(this->value().pre_hook(ta));
     }
 };
 
+// Definition of the pre_hook wrap. This is defined only for convenience
+// and never used directly.
 template <typename TA>
-class HEYOKA_DLL_PUBLIC step_callback_impl
-{
-    std::unique_ptr<step_callback_inner_base<TA>> m_ptr;
+using pre_hook_wrap_t = tanuki::wrap<pre_hook_iface, tanuki::default_config, TA>;
 
-    // Serialization.
-    friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar & m_ptr;
-    }
-
-    // Meta-programming for the generic ctor.
-
-    // Detection of the call operator.
-    template <typename T>
-    using step_callback_call_t
-        = decltype(std::declval<std::add_lvalue_reference_t<T>>()(std::declval<std::add_lvalue_reference_t<TA>>()));
-
-    // Detection of the candidate internal type from a generic T.
-    template <typename T>
-    using internal_type = std::conditional_t<std::is_function_v<uncvref_t<T>>, std::decay_t<T>, uncvref_t<T>>;
-
-    template <typename T>
-    using generic_ctor_enabler = std::enable_if_t<
-        std::conjunction_v<
-            // Must not compete with copy/move ctors.
-            std::negation<std::is_same<uncvref_t<T>, step_callback_impl>>,
-            // The internal type must have the correct call operator.
-            std::is_same<bool, detected_t<step_callback_call_t, internal_type<T>>>,
-            // The internal type must be copy/move constructible and destructible.
-            std::conjunction<std::is_copy_constructible<internal_type<T>>, std::is_move_constructible<internal_type<T>>,
-                             std::is_destructible<internal_type<T>>>>,
-        int>;
-
-public:
+// Implementation of the reference interface.
+template <typename Wrap, typename TA>
+struct step_cb_ref_iface_impl : callable_ref_iface_impl<Wrap, bool, TA &> {
     using ta_t = TA;
-
-    step_callback_impl();
-
-    template <typename T, generic_ctor_enabler<T &&> = 0>
-    // NOLINTNEXTLINE(google-explicit-constructor, hicpp-explicit-conversions)
-    step_callback_impl(T &&f)
-    {
-        using uT = detail::uncvref_t<T>;
-
-        // NOTE: if f is a nullptr or an empty callable or
-        // std::function, leave this empty.
-        // NOTE: I do not think that we need to guard against uT being
-        // an empty step_callback here, since:
-        // - if we try to construct from a step_callback with the same signature
-        //   as this, then we end up in the copy/move ctor (and not here), and
-        // - if we try to construct from a step_callback with a different signature
-        //   (meaning a different TA), then the check on step_callback_call_t would
-        //   fail due to the lack of implicit conversions between TAs.
-        if constexpr (detail::is_any_std_func_v<uT> || is_any_callable<uT>::value) {
-            if (!f) {
-                return;
-            }
-        }
-
-        if constexpr (std::is_pointer_v<uT> || std::is_member_object_pointer_v<uT>) {
-            if (f == nullptr) {
-                return;
-            }
-        }
-
-        m_ptr = std::make_unique<step_callback_inner<internal_type<T &&>, TA>>(std::forward<T>(f));
-    }
-
-    step_callback_impl(const step_callback_impl &);
-    step_callback_impl(step_callback_impl &&) noexcept;
-    step_callback_impl &operator=(const step_callback_impl &);
-    step_callback_impl &operator=(step_callback_impl &&) noexcept;
-    ~step_callback_impl();
-
-    explicit operator bool() const noexcept;
-
-    bool operator()(TA &);
-    void pre_hook(TA &);
-
-    void swap(step_callback_impl &) noexcept;
-
-    [[nodiscard]] std::type_index get_type_index() const;
-
-    // Extraction.
-    template <typename T>
-    const T *extract() const noexcept
-    {
-        if (!m_ptr) {
-            return nullptr;
-        }
-
-        auto p = dynamic_cast<const step_callback_inner<T, TA> *>(m_ptr.get());
-        return p == nullptr ? nullptr : &(p->m_value);
-    }
-    template <typename T>
-    T *extract() noexcept
-    {
-        if (!m_ptr) {
-            return nullptr;
-        }
-
-        auto p = dynamic_cast<step_callback_inner<T, TA> *>(m_ptr.get());
-        return p == nullptr ? nullptr : &(p->m_value);
-    }
+    TANUKI_REF_IFACE_MEMFUN(pre_hook)
 };
 
 template <typename TA>
-HEYOKA_DLL_PUBLIC void swap(step_callback_impl<TA> &, step_callback_impl<TA> &) noexcept;
+struct step_cb_ref_iface {
+    template <typename Wrap>
+    using type = step_cb_ref_iface_impl<Wrap, TA>;
+};
+
+// Helper to shorten the definition of the step_cb interface template.
+template <typename TA>
+struct step_cb_ifaceT {
+    template <typename Holder, typename T>
+    using type = tanuki::composite_wrap_interfaceT<callable<bool(TA &)>, pre_hook_wrap_t<TA>>::template type<Holder, T>;
+};
+
+// Configuration.
+template <typename TA>
+constexpr auto step_cb_wrap_config = tanuki::config<bool (*)(TA &), step_cb_ref_iface<TA>::template type>{
+    // Similarly to std::function, ensure that callable can store
+    // in static storage pointers and reference wrappers.
+    // NOTE: reference wrappers are not guaranteed to have the size
+    // of a pointer, but in practice that should always be the case.
+    .static_size = tanuki::holder_size<bool (*)(TA &), step_cb_ifaceT<TA>::template type>,
+    .pointer_interface = false,
+    .explicit_generic_ctor = false};
+
+// Definition of the step_cb wrap.
+template <typename TA>
+using step_cb_wrap_t = tanuki::wrap<step_cb_ifaceT<TA>::template type, step_cb_wrap_config<TA>>;
 
 } // namespace detail
 
 template <typename T>
-using step_callback = detail::step_callback_impl<taylor_adaptive<T>>;
+using step_callback = detail::step_cb_wrap_t<taylor_adaptive<T>>;
 
 template <typename T>
-using step_callback_batch = detail::step_callback_impl<taylor_adaptive_batch<T>>;
+using step_callback_batch = detail::step_cb_wrap_t<taylor_adaptive_batch<T>>;
 
 namespace detail
 {
@@ -290,13 +163,38 @@ public:
     step_callback_set_impl &operator=(step_callback_set_impl &&) noexcept;
     ~step_callback_set_impl();
 
-    size_type size() const noexcept;
+    [[nodiscard]] size_type size() const noexcept;
     const step_cb_t &operator[](size_type) const;
     step_cb_t &operator[](size_type);
 
     bool operator()(ta_t &);
     void pre_hook(ta_t &);
 };
+
+// Prevent implicit instantiations.
+#define HEYOKA_SCS_EXTERN_TEMPLATE(T)                                                                                  \
+    extern template class step_callback_set_impl<T, true>;                                                             \
+    extern template class step_callback_set_impl<T, false>;                                                            \
+    extern template void swap(step_callback_set_impl<T, true> &, step_callback_set_impl<T, true> &) noexcept;          \
+    extern template void swap(step_callback_set_impl<T, false> &, step_callback_set_impl<T, false> &) noexcept;
+
+HEYOKA_SCS_EXTERN_TEMPLATE(float)
+HEYOKA_SCS_EXTERN_TEMPLATE(double)
+HEYOKA_SCS_EXTERN_TEMPLATE(long double)
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_SCS_EXTERN_TEMPLATE(mppp::real128)
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_SCS_EXTERN_TEMPLATE(mppp::real)
+
+#endif
+
+#undef HEYOKA_SCS_EXTERN_TEMPLATE
 
 } // namespace detail
 
@@ -308,135 +206,64 @@ using step_callback_batch_set = detail::step_callback_set_impl<T, true>;
 
 HEYOKA_END_NAMESPACE
 
-// Disable Boost.Serialization tracking for the implementation details of step_callback.
-BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_adaptive<float>>,
-                     boost::serialization::track_never)
-
-BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_adaptive<double>>,
-                     boost::serialization::track_never)
-
-BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_adaptive<long double>>,
-                     boost::serialization::track_never)
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_adaptive<mppp::real128>>,
-                     boost::serialization::track_never)
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_adaptive<mppp::real>>,
-                     boost::serialization::track_never)
-
-#endif
-
-BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_adaptive_batch<float>>,
-                     boost::serialization::track_never)
-
-BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_adaptive_batch<double>>,
-                     boost::serialization::track_never)
-
-BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_adaptive_batch<long double>>,
-                     boost::serialization::track_never)
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-BOOST_CLASS_TRACKING(heyoka::detail::step_callback_inner_base<heyoka::taylor_adaptive_batch<mppp::real128>>,
-                     boost::serialization::track_never)
-
-#endif
-
-// NOTE: these are verbatim re-implementations of the BOOST_CLASS_EXPORT_KEY
-// and BOOST_CLASS_EXPORT_IMPLEMENT macros, which do not work well with class templates.
+// Serialisation macros.
 // NOLINTBEGIN
-#define HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(T, F)                                                                     \
-    namespace boost::serialization                                                                                     \
-    {                                                                                                                  \
-    template <>                                                                                                        \
-    struct guid_defined<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive<F>>> : boost::mpl::true_ {      \
-    };                                                                                                                 \
-    template <>                                                                                                        \
-    inline const char *guid<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive<F>>>()                      \
-    {                                                                                                                  \
-        /* NOTE: the stringize here will produce a name enclosed by brackets. */                                       \
-        return BOOST_PP_STRINGIZE((heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive<F>>));               \
-    }                                                                                                                  \
-    }
+#define HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(udc, F)                                                                   \
+    TANUKI_S11N_WRAP_EXPORT_KEY(udc, heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive<F>>::type)
+#define HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY2(udc, gid, F)                                                             \
+    TANUKI_S11N_WRAP_EXPORT_KEY2(udc, gid, heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive<F>>::type)
+#define HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(udc, F)                                                             \
+    TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(udc, heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive<F>>::type)
 
-#define HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(T, F)                                                               \
-    namespace boost::archive::detail::extra_detail                                                                     \
-    {                                                                                                                  \
-    template <>                                                                                                        \
-    struct init_guid<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive<F>>> {                             \
-        static guid_initializer<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive<F>>> const &g;          \
-    };                                                                                                                 \
-    guid_initializer<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive<F>>> const                         \
-        &init_guid<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive<F>>>::g                              \
-        = ::boost::serialization::singleton<guid_initializer<                                                          \
-            heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive<F>>>>::get_mutable_instance()               \
-              .export_guid();                                                                                          \
-    }
+#define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(udc, F)                                                             \
+    TANUKI_S11N_WRAP_EXPORT_KEY(udc, heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive_batch<F>>::type)
+#define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY2(udc, gid, F)                                                       \
+    TANUKI_S11N_WRAP_EXPORT_KEY2(udc, gid, heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive_batch<F>>::type)
+#define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_IMPLEMENT(udc, F)                                                       \
+    TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(udc, heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive_batch<F>>::type)
 // NOLINTEND
 
 #define HEYOKA_S11N_STEP_CALLBACK_EXPORT(T, F)                                                                         \
     HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(T, F)                                                                         \
     HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(T, F)
 
-// NOLINTBEGIN
-#define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(T, F)                                                               \
-    namespace boost::serialization                                                                                     \
-    {                                                                                                                  \
-    template <>                                                                                                        \
-    struct guid_defined<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive_batch<F>>>                      \
-        : boost::mpl::true_ {                                                                                          \
-    };                                                                                                                 \
-    template <>                                                                                                        \
-    inline const char *guid<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive_batch<F>>>()                \
-    {                                                                                                                  \
-        /* NOTE: the stringize here will produce a name enclosed by brackets. */                                       \
-        return BOOST_PP_STRINGIZE((heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive_batch<F>>));         \
-    }                                                                                                                  \
-    }
-
-#define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_IMPLEMENT(T, F)                                                         \
-    namespace boost::archive::detail::extra_detail                                                                     \
-    {                                                                                                                  \
-    template <>                                                                                                        \
-    struct init_guid<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive_batch<F>>> {                       \
-        static guid_initializer<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive_batch<F>>> const &g;    \
-    };                                                                                                                 \
-    guid_initializer<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive_batch<F>>> const                   \
-        &init_guid<heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive_batch<F>>>::g                        \
-        = ::boost::serialization::singleton<guid_initializer<                                                          \
-            heyoka::detail::step_callback_inner<T, heyoka::taylor_adaptive_batch<F>>>>::get_mutable_instance()         \
-              .export_guid();                                                                                          \
-    }
-// NOLINTEND
+#define HEYOKA_S11N_STEP_CALLBACK_EXPORT2(T, gid, F)                                                                   \
+    HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY2(T, gid, F)                                                                   \
+    HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(T, F)
 
 #define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT(T, F)                                                                   \
     HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(T, F)                                                                   \
     HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_IMPLEMENT(T, F)
 
+#define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT2(T, gid, F)                                                             \
+    HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY2(T, gid, F)                                                             \
+    HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_IMPLEMENT(T, F)
+
 // Enable serialisation support for step_callback_set.
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<float>, float)
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<double>, double)
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<long double>, long double)
-HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<float>, float)
-HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<double>, double)
-HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<long double>, long double)
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY2(heyoka::step_callback_set<float>, "heyoka::step_callback_set<float>", float)
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY2(heyoka::step_callback_set<double>, "heyoka::step_callback_set<double>", double)
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY2(heyoka::step_callback_set<long double>, "heyoka::step_callback_set<long double>",
+                                      long double)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY2(heyoka::step_callback_batch_set<float>,
+                                            "heyoka::step_callback_batch_set<float>", float)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY2(heyoka::step_callback_batch_set<double>,
+                                            "heyoka::step_callback_batch_set<double>", double)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY2(heyoka::step_callback_batch_set<long double>,
+                                            "heyoka::step_callback_batch_set<long double>", long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<mppp::real128>, mppp::real128)
-HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<mppp::real128>, mppp::real128)
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY2(heyoka::step_callback_set<mppp::real128>,
+                                      "heyoka::step_callback_set<mppp::real128>", mppp::real128)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY2(heyoka::step_callback_batch_set<mppp::real128>,
+                                            "heyoka::step_callback_batch_set<mppp::real128>", mppp::real128)
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<mppp::real>, mppp::real)
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY2(heyoka::step_callback_set<mppp::real>, "heyoka::step_callback_set<mppp::real>",
+                                      mppp::real)
 
 #endif
 
