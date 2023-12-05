@@ -125,17 +125,16 @@ namespace detail
 {
 
 template <typename, bool>
-class HEYOKA_DLL_PUBLIC step_callback_set_impl;
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS step_callback_set_impl;
 
 template <typename T, bool Batch>
-HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<T, Batch> &, step_callback_set_impl<T, Batch> &) noexcept;
+void swap(step_callback_set_impl<T, Batch> &, step_callback_set_impl<T, Batch> &) noexcept;
 
 template <typename T, bool Batch>
-class HEYOKA_DLL_PUBLIC step_callback_set_impl
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS step_callback_set_impl
 {
     template <typename T2, bool Batch2>
-    friend HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<T2, Batch2> &,
-                                       step_callback_set_impl<T2, Batch2> &) noexcept;
+    friend void swap(step_callback_set_impl<T2, Batch2> &, step_callback_set_impl<T2, Batch2> &) noexcept;
 
 public:
     using step_cb_t = std::conditional_t<Batch, step_callback_batch<T>, step_callback<T>>;
