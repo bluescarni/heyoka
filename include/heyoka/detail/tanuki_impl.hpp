@@ -1378,7 +1378,7 @@ struct TANUKI_VISIBLE composite_wrap_iface : composite_wrap_iface<void, void, Wr
 };
 
 template <typename Wrap0, typename Wrap1, typename... WrapN>
-struct composite_wrap_ifaceT_selector {
+struct TANUKI_VISIBLE composite_wrap_ifaceT_selector {
     template <typename Holder, typename T>
     using type = composite_wrap_iface<Holder, T, Wrap0, Wrap1, WrapN...>;
 };
