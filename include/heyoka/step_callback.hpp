@@ -93,7 +93,7 @@ struct step_cb_ref_iface {
 
 // Helper to shorten the definition of the step_cb interface template.
 template <typename TA>
-struct step_cb_ifaceT {
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ifaceT {
     template <typename Holder, typename T>
     using type = tanuki::composite_wrap_interfaceT<callable<bool(TA &)>, pre_hook_wrap_t<TA>>::template type<Holder, T>;
 };
