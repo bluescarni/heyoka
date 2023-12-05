@@ -170,8 +170,6 @@ public:
     void pre_hook(ta_t &);
 };
 
-#if 0
-
 // Prevent implicit instantiations.
 #define HEYOKA_SCS_EXTERN_TEMPLATE(T)                                                                                  \
     extern template class step_callback_set_impl<T, true>;                                                             \
@@ -196,8 +194,6 @@ HEYOKA_SCS_EXTERN_TEMPLATE(mppp::real)
 #endif
 
 #undef HEYOKA_SCS_EXTERN_TEMPLATE
-
-#endif
 
 } // namespace detail
 

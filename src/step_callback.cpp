@@ -133,22 +133,22 @@ void swap(step_callback_set_impl<T, Batch> &c1, step_callback_set_impl<T, Batch>
 }
 
 // Explicit instantiations.
-template class step_callback_set_impl<float, true>;
-template class step_callback_set_impl<float, false>;
+template class HEYOKA_DLL_PUBLIC step_callback_set_impl<float, true>;
+template class HEYOKA_DLL_PUBLIC step_callback_set_impl<float, false>;
 template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<float, true> &,
                                      step_callback_set_impl<float, true> &) noexcept;
 template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<float, false> &,
                                      step_callback_set_impl<float, false> &) noexcept;
 
-template class step_callback_set_impl<double, true>;
-template class step_callback_set_impl<double, false>;
+template class HEYOKA_DLL_PUBLIC step_callback_set_impl<double, true>;
+template class HEYOKA_DLL_PUBLIC step_callback_set_impl<double, false>;
 template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<double, true> &,
                                      step_callback_set_impl<double, true> &) noexcept;
 template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<double, false> &,
                                      step_callback_set_impl<double, false> &) noexcept;
 
-template class step_callback_set_impl<long double, true>;
-template class step_callback_set_impl<long double, false>;
+template class HEYOKA_DLL_PUBLIC step_callback_set_impl<long double, true>;
+template class HEYOKA_DLL_PUBLIC step_callback_set_impl<long double, false>;
 template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<long double, true> &,
                                      step_callback_set_impl<long double, true> &) noexcept;
 template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<long double, false> &,
@@ -156,8 +156,8 @@ template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<long double, false> 
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template class step_callback_set_impl<mppp::real128, true>;
-template class step_callback_set_impl<mppp::real128, false>;
+template class HEYOKA_DLL_PUBLIC step_callback_set_impl<mppp::real128, true>;
+template class HEYOKA_DLL_PUBLIC step_callback_set_impl<mppp::real128, false>;
 template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<mppp::real128, true> &,
                                      step_callback_set_impl<mppp::real128, true> &) noexcept;
 template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<mppp::real128, false> &,
@@ -167,7 +167,7 @@ template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<mppp::real128, false
 
 #if defined(HEYOKA_HAVE_REAL)
 
-template class step_callback_set_impl<mppp::real, false>;
+template class HEYOKA_DLL_PUBLIC step_callback_set_impl<mppp::real, false>;
 template HEYOKA_DLL_PUBLIC void swap(step_callback_set_impl<mppp::real, false> &,
                                      step_callback_set_impl<mppp::real, false> &) noexcept;
 
