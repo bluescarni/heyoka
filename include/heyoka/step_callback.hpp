@@ -206,16 +206,21 @@ using step_callback_batch_set = detail::step_callback_set_impl<T, true>;
 HEYOKA_END_NAMESPACE
 
 // Serialisation macros.
+// NOTE: by default, we build a custom name and pass it to TANUKI_S11N_WRAP_EXPORT_KEY2.
+// This allows us to reduce the size of the final guid wrt to what TANUKI_S11N_WRAP_EXPORT_KEY
+// would synthesise, and thus to ameliorate the "class name too long" issue.
 // NOLINTBEGIN
 #define HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(udc, F)                                                                   \
-    TANUKI_S11N_WRAP_EXPORT_KEY(udc, heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive<F>>::type)
+    TANUKI_S11N_WRAP_EXPORT_KEY2(udc, "heyoka::step_callback<" #F ">@" #udc,                                           \
+                                 heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive<F>>::type)
 #define HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY2(udc, gid, F)                                                             \
     TANUKI_S11N_WRAP_EXPORT_KEY2(udc, gid, heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive<F>>::type)
 #define HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(udc, F)                                                             \
     TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(udc, heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive<F>>::type)
 
 #define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(udc, F)                                                             \
-    TANUKI_S11N_WRAP_EXPORT_KEY(udc, heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive_batch<F>>::type)
+    TANUKI_S11N_WRAP_EXPORT_KEY2(udc, "heyoka::step_callback_batch<" #F ">@" #udc,                                     \
+                                 heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive_batch<F>>::type)
 #define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY2(udc, gid, F)                                                       \
     TANUKI_S11N_WRAP_EXPORT_KEY2(udc, gid, heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive_batch<F>>::type)
 #define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_IMPLEMENT(udc, F)                                                       \
@@ -239,30 +244,23 @@ HEYOKA_END_NAMESPACE
     HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_IMPLEMENT(T, F)
 
 // Enable serialisation support for step_callback_set.
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY2(heyoka::step_callback_set<float>, "heyoka::step_callback_set<float>", float)
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY2(heyoka::step_callback_set<double>, "heyoka::step_callback_set<double>", double)
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY2(heyoka::step_callback_set<long double>, "heyoka::step_callback_set<long double>",
-                                      long double)
-HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY2(heyoka::step_callback_batch_set<float>,
-                                            "heyoka::step_callback_batch_set<float>", float)
-HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY2(heyoka::step_callback_batch_set<double>,
-                                            "heyoka::step_callback_batch_set<double>", double)
-HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY2(heyoka::step_callback_batch_set<long double>,
-                                            "heyoka::step_callback_batch_set<long double>", long double)
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<float>, float)
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<double>, double)
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<long double>, long double)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<float>, float)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<double>, double)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<long double>, long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY2(heyoka::step_callback_set<mppp::real128>,
-                                      "heyoka::step_callback_set<mppp::real128>", mppp::real128)
-HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY2(heyoka::step_callback_batch_set<mppp::real128>,
-                                            "heyoka::step_callback_batch_set<mppp::real128>", mppp::real128)
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<mppp::real128>, mppp::real128)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<mppp::real128>, mppp::real128)
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY2(heyoka::step_callback_set<mppp::real>, "heyoka::step_callback_set<mppp::real>",
-                                      mppp::real)
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<mppp::real>, mppp::real)
 
 #endif
 

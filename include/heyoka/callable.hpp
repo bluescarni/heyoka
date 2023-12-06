@@ -192,8 +192,12 @@ HEYOKA_END_NAMESPACE
 #endif
 
 // Serialisation macros.
+// NOTE: by default, we build a custom name and pass it to TANUKI_S11N_WRAP_EXPORT_KEY2.
+// This allows us to reduce the size of the final guid wrt to what TANUKI_S11N_WRAP_EXPORT_KEY
+// would synthesise, and thus to ameliorate the "class name too long" issue.
 #define HEYOKA_S11N_CALLABLE_EXPORT_KEY(udc, ...)                                                                      \
-    TANUKI_S11N_WRAP_EXPORT_KEY(udc, heyoka::detail::callable_iface, __VA_ARGS__)
+    TANUKI_S11N_WRAP_EXPORT_KEY2(udc, "heyoka::callable<" #__VA_ARGS__ ">@" #udc, heyoka::detail::callable_iface,      \
+                                 __VA_ARGS__)
 
 #define HEYOKA_S11N_CALLABLE_EXPORT_KEY2(udc, gid, ...)                                                                \
     TANUKI_S11N_WRAP_EXPORT_KEY2(udc, gid, heyoka::detail::callable_iface, __VA_ARGS__)
