@@ -1539,10 +1539,10 @@ struct tracking_level<tanuki::detail::value_iface<IFace>> {
     namespace boost::archive::detail::extra_detail                                                                     \
     {                                                                                                                  \
     template <>                                                                                                        \
-    struct init_guid<tanuki::detail::holder<ud_type, __VA_ARGS__>> {                                                   \
+    struct __attribute__((visibility("default"))) init_guid<tanuki::detail::holder<ud_type, __VA_ARGS__>> {            \
         static guid_initializer<tanuki::detail::holder<ud_type, __VA_ARGS__>> const &g;                                \
     };                                                                                                                 \
-    guid_initializer<tanuki::detail::holder<ud_type, __VA_ARGS__>> const                                               \
+    __attribute__((visibility("default"))) guid_initializer<tanuki::detail::holder<ud_type, __VA_ARGS__>> const        \
         &init_guid<tanuki::detail::holder<ud_type, __VA_ARGS__>>::g                                                    \
         = ::boost::serialization::singleton<                                                                           \
               guid_initializer<tanuki::detail::holder<ud_type, __VA_ARGS__>>>::get_mutable_instance()                  \
