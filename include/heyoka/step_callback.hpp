@@ -80,13 +80,13 @@ using pre_hook_wrap_t = tanuki::wrap<pre_hook_iface, tanuki::default_config, TA>
 
 // Implementation of the reference interface.
 template <typename Wrap, typename TA>
-struct step_cb_ref_iface_impl : callable_ref_iface_impl<Wrap, bool, TA &> {
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ref_iface_impl : callable_ref_iface_impl<Wrap, bool, TA &> {
     using ta_t = TA;
     TANUKI_REF_IFACE_MEMFUN(pre_hook)
 };
 
 template <typename TA>
-struct step_cb_ref_iface {
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ref_iface {
     template <typename Wrap>
     using type = step_cb_ref_iface_impl<Wrap, TA>;
 };

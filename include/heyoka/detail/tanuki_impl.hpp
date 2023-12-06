@@ -193,9 +193,9 @@ struct TANUKI_VISIBLE value_iface {
     // Methods to implement virtual copy/move primitives for the holder class.
     [[nodiscard]] virtual std::pair<IFace *, value_iface *> clone(vtag) const = 0;
     [[nodiscard]] virtual std::pair<IFace *, value_iface *> copy_init_holder(void *, vtag) const = 0;
-    [[nodiscard]] virtual std::pair<IFace *, value_iface *> move_init_holder(void *, vtag) && noexcept = 0;
+    [[nodiscard]] virtual std::pair<IFace *, value_iface *> move_init_holder(void *, vtag) &&noexcept = 0;
     virtual void copy_assign_value_to(value_iface *, vtag) const = 0;
-    virtual void move_assign_value_to(value_iface *, vtag) && noexcept = 0;
+    virtual void move_assign_value_to(value_iface *, vtag) &&noexcept = 0;
     virtual void copy_assign_value_from(const void *, vtag) = 0;
     virtual void move_assign_value_from(void *, vtag) noexcept = 0;
     virtual void swap_value(value_iface *, vtag) noexcept = 0;
@@ -215,9 +215,8 @@ private:
 
 // Concept to detect if a type is default initialisable without throwing.
 template <typename T>
-concept nothrow_default_initializable
-    = std::default_initializable<T> && noexcept(::new (static_cast<void *>(nullptr)) T)
-      && std::is_nothrow_constructible_v<T> && noexcept(T{});
+concept nothrow_default_initializable = std::default_initializable<T> && noexcept(::new(static_cast<void *>(nullptr)) T)
+                                        && std::is_nothrow_constructible_v<T> && noexcept(T{});
 
 // Concept to detect if T is an rvalue reference without cv qualifications.
 template <typename T>
@@ -226,7 +225,8 @@ concept noncv_rvalue_reference
 
 // NOTE: constrain value types to be non-cv qualified objects.
 template <typename T>
-concept valid_value_type = std::is_object_v<T> && (!std::is_const_v<T>)&&(!std::is_volatile_v<T>)&&std::destructible<T>;
+concept valid_value_type
+    = std::is_object_v<T> && (!std::is_const_v<T>) && (!std::is_volatile_v<T>) && std::destructible<T>;
 
 #if defined(__clang__)
 
@@ -296,7 +296,7 @@ struct TANUKI_VISIBLE holder final : public value_iface<IFaceT<void, void, Args.
                 && std::default_initializable<IFaceT<holder<T, IFaceT, Args...>, T, Args...>>
                 && std::destructible<IFaceT<holder<T, IFaceT, Args...>, T, Args...>>
     explicit holder(U &&x) noexcept(std::is_nothrow_constructible_v<T, U &&>
-                                    && nothrow_default_initializable<IFaceT<holder<T, IFaceT, Args...>, T, Args...>>)
+                                        &&nothrow_default_initializable<IFaceT<holder<T, IFaceT, Args...>, T, Args...>>)
         : m_value(std::forward<U>(x))
     {
     }
@@ -304,8 +304,9 @@ struct TANUKI_VISIBLE holder final : public value_iface<IFaceT<void, void, Args.
         requires(sizeof...(U) != 1u) && std::constructible_from<T, U &&...>
                 && std::default_initializable<IFaceT<holder<T, IFaceT, Args...>, T, Args...>>
                 && std::destructible<IFaceT<holder<T, IFaceT, Args...>, T, Args...>>
-    explicit holder(U &&...x) noexcept(std::is_nothrow_constructible_v<T, U &&...>
-                                       && nothrow_default_initializable<IFaceT<holder<T, IFaceT, Args...>, T, Args...>>)
+    explicit holder(U &&...x) noexcept(
+        std::is_nothrow_constructible_v<T, U &&...>
+            &&nothrow_default_initializable<IFaceT<holder<T, IFaceT, Args...>, T, Args...>>)
         : m_value(std::forward<U>(x)...)
     {
     }
@@ -358,7 +359,7 @@ private:
     // Then cast the result to the two bases and return.
     [[nodiscard]] std::pair<IFaceT<void, void, Args...> *, value_iface<IFaceT<void, void, Args...>> *>
     // NOLINTNEXTLINE(bugprone-exception-escape)
-    move_init_holder(void *ptr, vtag) && noexcept final
+    move_init_holder(void *ptr, vtag) &&noexcept final
     {
         if constexpr (std::move_constructible<T> && std::convertible_to<holder *, IFaceT<void, void, Args...> *>) {
             // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
@@ -385,7 +386,7 @@ private:
     }
     // Move-assign m_value into the m_value of v_iface.
     // NOLINTNEXTLINE(bugprone-exception-escape)
-    void move_assign_value_to(value_iface<IFaceT<void, void, Args...>> *v_iface, vtag) && noexcept final
+    void move_assign_value_to(value_iface<IFaceT<void, void, Args...>> *v_iface, vtag) &&noexcept final
     {
         if constexpr (std::is_move_assignable_v<T>) {
             assert(typeid(T) == v_iface->value_type_index(vtag{}));
@@ -434,7 +435,7 @@ private:
     void serialize(Archive &ar, unsigned)
     {
         ar &boost::serialization::base_object<value_iface<IFaceT<void, void, Args...>>>(*this);
-        ar & m_value;
+        ar &m_value;
     }
 
 #endif
@@ -496,7 +497,7 @@ inline constexpr auto holder_align = alignof(detail::holder<T, IFaceT, Args...>)
 
 // Default implementation of the reference interface.
 template <typename>
-struct no_ref_iface {
+struct TANUKI_VISIBLE no_ref_iface {
 };
 
 // Configuration settings for the wrap class.
@@ -504,7 +505,7 @@ struct no_ref_iface {
 // for valid value types.
 template <typename DefaultValueType = void, template <typename> typename RefIFace = no_ref_iface>
     requires std::same_as<DefaultValueType, void> || detail::valid_value_type<DefaultValueType>
-struct config final : detail::config_base {
+struct TANUKI_VISIBLE config final : detail::config_base {
     using default_value_type = DefaultValueType;
 
     // Size of the static storage.
@@ -558,31 +559,31 @@ struct cfg_ref_type<config<DefaultValueType, RefIFace>> {
 // Helpers to ease the definition of a reference interface.
 #define TANUKI_REF_IFACE_MEMFUN(name)                                                                                  \
     template <typename JustWrap = Wrap, typename... MemFunArgs>                                                        \
-    auto name(MemFunArgs &&...args) & noexcept(                                                                        \
+    auto name(MemFunArgs &&...args) &noexcept(                                                                         \
         noexcept(iface_ptr(*static_cast<JustWrap *>(this))->name(std::forward<MemFunArgs>(args)...)))                  \
-        -> decltype(iface_ptr(*static_cast<JustWrap *>(this))->name(std::forward<MemFunArgs>(args)...))                \
+        ->decltype(iface_ptr(*static_cast<JustWrap *>(this))->name(std::forward<MemFunArgs>(args)...))                 \
     {                                                                                                                  \
         return iface_ptr(*static_cast<Wrap *>(this))->name(std::forward<MemFunArgs>(args)...);                         \
     }                                                                                                                  \
     template <typename JustWrap = Wrap, typename... MemFunArgs>                                                        \
-    auto name(MemFunArgs &&...args) const & noexcept(                                                                  \
+    auto name(MemFunArgs &&...args) const &noexcept(                                                                   \
         noexcept(iface_ptr(*static_cast<const JustWrap *>(this))->name(std::forward<MemFunArgs>(args)...)))            \
-        -> decltype(iface_ptr(*static_cast<const JustWrap *>(this))->name(std::forward<MemFunArgs>(args)...))          \
+        ->decltype(iface_ptr(*static_cast<const JustWrap *>(this))->name(std::forward<MemFunArgs>(args)...))           \
     {                                                                                                                  \
         return iface_ptr(*static_cast<const Wrap *>(this))->name(std::forward<MemFunArgs>(args)...);                   \
     }                                                                                                                  \
     template <typename JustWrap = Wrap, typename... MemFunArgs>                                                        \
-    auto name(MemFunArgs &&...args) && noexcept(                                                                       \
+    auto name(MemFunArgs &&...args) &&noexcept(                                                                        \
         noexcept(std::move(*iface_ptr(*static_cast<JustWrap *>(this))).name(std::forward<MemFunArgs>(args)...)))       \
-        -> decltype(std::move(*iface_ptr(*static_cast<JustWrap *>(this))).name(std::forward<MemFunArgs>(args)...))     \
+        ->decltype(std::move(*iface_ptr(*static_cast<JustWrap *>(this))).name(std::forward<MemFunArgs>(args)...))      \
     {                                                                                                                  \
         return std::move(*iface_ptr(*static_cast<Wrap *>(this))).name(std::forward<MemFunArgs>(args)...);              \
     }                                                                                                                  \
     template <typename JustWrap = Wrap, typename... MemFunArgs>                                                        \
-    auto name(MemFunArgs &&...args) const && noexcept(                                                                 \
+    auto name(MemFunArgs &&...args) const &&noexcept(                                                                  \
         noexcept(std::move(*iface_ptr(*static_cast<const JustWrap *>(this))).name(std::forward<MemFunArgs>(args)...))) \
-        -> decltype(std::move(*iface_ptr(*static_cast<const JustWrap *>(this)))                                        \
-                        .name(std::forward<MemFunArgs>(args)...))                                                      \
+        ->decltype(std::move(*iface_ptr(*static_cast<const JustWrap *>(this)))                                         \
+                       .name(std::forward<MemFunArgs>(args)...))                                                       \
     {                                                                                                                  \
         return std::move(*iface_ptr(*static_cast<const Wrap *>(this))).name(std::forward<MemFunArgs>(args)...);        \
     }

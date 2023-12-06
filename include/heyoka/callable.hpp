@@ -96,7 +96,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
 
 // Implementation of the reference interface.
 template <typename Wrap, typename R, typename... Args>
-struct callable_ref_iface_impl {
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_ref_iface_impl {
     using result_type = R;
 
     template <typename JustWrap = Wrap, typename... FArgs>
@@ -139,7 +139,7 @@ struct callable_ref_iface_impl {
 };
 
 template <typename R, typename... Args>
-struct callable_ref_iface {
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_ref_iface {
     template <typename Wrap>
     using type = callable_ref_iface_impl<Wrap, R, Args...>;
 };
