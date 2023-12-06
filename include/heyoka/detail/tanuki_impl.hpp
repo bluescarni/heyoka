@@ -36,10 +36,16 @@
 #endif
 
 // Versioning.
-#define TANUKI_VERSION_STRING "1.0.0"
 #define TANUKI_VERSION_MAJOR 1
 #define TANUKI_VERSION_MINOR 0
 #define TANUKI_VERSION_PATCH 0
+#define TANUKI_ABI_VERSION 1
+
+// NOTE: indirection to allow token pasting/stringification:
+// https://stackoverflow.com/questions/24991208/expand-a-macro-in-a-macro
+#define TANUKI_VERSION_STRING__(maj, min, pat) #maj "." #min "." #pat
+#define TANUKI_VERSION_STRING_(maj, min, pat) TANUKI_VERSION_STRING__(maj, min, pat)
+#define TANUKI_VERSION_STRING TANUKI_VERSION_STRING_(TANUKI_VERSION_MAJOR, TANUKI_VERSION_MINOR, TANUKI_VERSION_PATCH)
 
 // No unique address setup.
 #if defined(_MSC_VER)
@@ -63,11 +69,15 @@
 
 #endif
 
-#define TANUKI_BEGIN_NAMESPACE                                                                                         \
+#define TANUKI_BEGIN_NAMESPACE__(abiver)                                                                               \
     namespace tanuki                                                                                                   \
     {                                                                                                                  \
-    inline namespace v1 TANUKI_ABI_TAG_ATTR                                                                            \
+    inline namespace v##abiver TANUKI_ABI_TAG_ATTR                                                                     \
     {
+
+#define TANUKI_BEGIN_NAMESPACE_(abiver) TANUKI_BEGIN_NAMESPACE__(abiver)
+
+#define TANUKI_BEGIN_NAMESPACE TANUKI_BEGIN_NAMESPACE_(TANUKI_ABI_VERSION)
 
 #define TANUKI_END_NAMESPACE                                                                                           \
     }                                                                                                                  \
@@ -1388,15 +1398,6 @@ struct TANUKI_VISIBLE composite_wrap_ifaceT_selector {
 // Helper to define the interface template of a composite wrap.
 template <any_wrap Wrap0, any_wrap Wrap1, any_wrap... WrapN>
 using composite_wrap_interfaceT = detail::composite_wrap_ifaceT_selector<Wrap0, Wrap1, WrapN...>;
-
-// Composite wrap.
-template <any_wrap Wrap0, any_wrap Wrap1, any_wrap... WrapN>
-using composite_wrap = wrap<composite_wrap_interfaceT<Wrap0, Wrap1, WrapN...>::template type>;
-
-// Composite wrap with custom config.
-template <auto Cfg, any_wrap Wrap0, any_wrap Wrap1, any_wrap... WrapN>
-    requires detail::valid_config<Cfg>
-using composite_cwrap = wrap<composite_wrap_interfaceT<Wrap0, Wrap1, WrapN...>::template type, Cfg>;
 
 // Helper that can be used to reduce typing in an
 // interface implementation. This implements value()
