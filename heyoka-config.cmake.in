@@ -8,8 +8,8 @@ set(heyoka_ABI_VERSION @HEYOKA_ABI_VERSION@)
 # Mandatory public dependencies on Boost and fmt.
 find_package(Boost @_HEYOKA_MIN_BOOST_VERSION@ REQUIRED serialization)
 find_package(fmt REQUIRED CONFIG)
-if(${fmt_VERSION_MAJOR} LESS @_HEYOKA_MIN_FMT_VERSION@)
-    message(FATAL_ERROR "fmt version>=@_HEYOKA_MIN_FMT_VERSION@ is required, but version ${fmt_VERSION_MAJOR} was found instead.")
+if(NOT ${fmt_VERSION_MAJOR} IN_LIST "@_HEYOKA_SUPPORTED_FMT_VERSIONS@")
+    message(FATAL_ERROR "The supported fmt versions are (@_HEYOKA_SUPPORTED_FMT_VERSIONS@), but version ${fmt_VERSION_MAJOR} was found instead.")
 endif()
 
 # Optional public dependency on mp++.

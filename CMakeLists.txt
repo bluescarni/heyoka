@@ -158,8 +158,8 @@ endif()
 include(GNUInstallDirs)
 find_package(LLVM REQUIRED CONFIG)
 
-if(${LLVM_VERSION_MAJOR} LESS 13)
-  message(FATAL_ERROR "LLVM >= 13 is required.")
+if(${LLVM_VERSION_MAJOR} LESS 13 OR ${LLVM_VERSION_MAJOR} GREATER 17)
+  message(FATAL_ERROR "LLVM >= 13 and <= 17 is required.")
 endif()
 
 # List of source files.
@@ -457,10 +457,10 @@ if(_HEYOKA_LLVM_STATIC_LINK AND HEYOKA_HIDE_LLVM_SYMBOLS)
 endif()
 
 # Mandatory dependency on fmt.
-set(_HEYOKA_MIN_FMT_VERSION "9")
+set(_HEYOKA_SUPPORTED_FMT_VERSIONS 9 10)
 find_package(fmt REQUIRED CONFIG)
-if(${fmt_VERSION_MAJOR} LESS ${_HEYOKA_MIN_FMT_VERSION})
-    message(FATAL_ERROR "fmt version>=${_HEYOKA_MIN_FMT_VERSION} is required, but version ${fmt_VERSION_MAJOR} was found instead.")
+if(NOT ${fmt_VERSION_MAJOR} IN_LIST _HEYOKA_SUPPORTED_FMT_VERSIONS)
+    message(FATAL_ERROR "The supported fmt versions are (${_HEYOKA_SUPPORTED_FMT_VERSIONS}), but version ${fmt_VERSION_MAJOR} was found instead.")
 endif()
 message(STATUS "fmt version: ${fmt_VERSION}")
 target_link_libraries(heyoka PUBLIC fmt::fmt)
@@ -565,7 +565,7 @@ unset(_HEYOKA_MPPP_VERSION)
 unset(_HEYOKA_WITH_REAL128)
 unset(_HEYOKA_WITH_REAL)
 unset(_HEYOKA_LLVM_STATIC_LINK)
-unset(_HEYOKA_MIN_FMT_VERSION)
+unset(_HEYOKA_SUPPORTED_FMT_VERSIONS)
 
 if(HEYOKA_BUILD_TESTS)
     enable_testing()
