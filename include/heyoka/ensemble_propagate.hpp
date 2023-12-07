@@ -192,6 +192,12 @@ HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_BATCH_INST(mppp::real128)
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_BATCH_INST(mppp::real)
+
+#endif
+
 } // namespace detail
 
 template <typename T, typename... KwArgs>
