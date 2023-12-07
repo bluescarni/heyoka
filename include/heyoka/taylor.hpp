@@ -1027,7 +1027,7 @@ public:
 
 private:
     // Struct implementing the data/logic for event detection.
-    struct HEYOKA_DLL_PUBLIC_INLINE_CLASS ed_data {
+    struct ed_data {
         // The working list type used during real root isolation.
         using wlist_t = std::vector<std::tuple<T, T, detail::taylor_pwrap<T>>>;
         // The type used to store the list of isolating intervals.
@@ -1351,7 +1351,6 @@ public:
 #define HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(F)                                                                          \
     extern template class detail::taylor_adaptive_base<F, taylor_adaptive<F>>;                                         \
     extern template class taylor_adaptive<F>;                                                                          \
-    extern template struct taylor_adaptive<F>::ed_data;                                                                \
     extern template void taylor_adaptive<F>::finalise_ctor_impl(                                                       \
         const std::vector<expression> &, std::vector<F>, std::optional<F>, std::optional<F>, bool, bool,               \
         std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);              \
@@ -1500,7 +1499,7 @@ public:
 
 private:
     // Struct implementing the data/logic for event detection.
-    struct HEYOKA_DLL_PUBLIC_INLINE_CLASS ed_data {
+    struct ed_data {
         // The working list type used during real root isolation.
         using wlist_t = std::vector<std::tuple<T, T, detail::taylor_pwrap<T>>>;
         // The type used to store the list of isolating intervals.
@@ -1884,7 +1883,6 @@ public:
 // Prevent implicit instantiations.
 #define HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(F)                                                                    \
     extern template class taylor_adaptive_batch<F>;                                                                    \
-    extern template struct taylor_adaptive_batch<F>::ed_data;                                                          \
     extern template void taylor_adaptive_batch<F>::finalise_ctor_impl(                                                 \
         const std::vector<expression> &, std::vector<F>, std::uint32_t, std::vector<F>, std::optional<F>, bool, bool,  \
         std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);                                        \

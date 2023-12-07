@@ -1434,9 +1434,9 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
 
 // Explicit instantiation of the book-keeping structures for event detection
 // in the scalar integrator.
-template HEYOKA_DLL_PUBLIC struct taylor_adaptive<float>::ed_data;
-template HEYOKA_DLL_PUBLIC struct taylor_adaptive<double>::ed_data;
-template HEYOKA_DLL_PUBLIC struct taylor_adaptive<long double>::ed_data;
+template struct taylor_adaptive<float>::ed_data;
+template struct taylor_adaptive<double>::ed_data;
+template struct taylor_adaptive<long double>::ed_data;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -2131,9 +2131,9 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
 
 // Explicit instantiation of the book-keeping structures for event detection
 // in the batch integrator.
-template HEYOKA_DLL_PUBLIC struct taylor_adaptive_batch<float>::ed_data;
-template HEYOKA_DLL_PUBLIC struct taylor_adaptive_batch<double>::ed_data;
-template HEYOKA_DLL_PUBLIC struct taylor_adaptive_batch<long double>::ed_data;
+template struct taylor_adaptive_batch<float>::ed_data;
+template struct taylor_adaptive_batch<double>::ed_data;
+template struct taylor_adaptive_batch<long double>::ed_data;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
