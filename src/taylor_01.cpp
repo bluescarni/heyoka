@@ -2410,19 +2410,19 @@ std::size_t continuous_output<T>::get_n_steps() const
 }
 
 // Explicit instantiations.
-template class continuous_output<float>;
-template class continuous_output<double>;
-template class continuous_output<long double>;
+template class HEYOKA_DLL_PUBLIC continuous_output<float>;
+template class HEYOKA_DLL_PUBLIC continuous_output<double>;
+template class HEYOKA_DLL_PUBLIC continuous_output<long double>;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template class continuous_output<mppp::real128>;
+template class HEYOKA_DLL_PUBLIC continuous_output<mppp::real128>;
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-template class continuous_output<mppp::real>;
+template class HEYOKA_DLL_PUBLIC continuous_output<mppp::real>;
 
 #endif
 
@@ -3164,13 +3164,13 @@ std::size_t continuous_output_batch<T>::get_n_steps() const
 }
 
 // Explicit instantiations.
-template class continuous_output_batch<float>;
-template class continuous_output_batch<double>;
-template class continuous_output_batch<long double>;
+template class HEYOKA_DLL_PUBLIC continuous_output_batch<float>;
+template class HEYOKA_DLL_PUBLIC continuous_output_batch<double>;
+template class HEYOKA_DLL_PUBLIC continuous_output_batch<long double>;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template class continuous_output_batch<mppp::real128>;
+template class HEYOKA_DLL_PUBLIC continuous_output_batch<mppp::real128>;
 
 #endif
 

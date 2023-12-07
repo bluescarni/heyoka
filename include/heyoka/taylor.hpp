@@ -635,7 +635,7 @@ template <typename T>
 using t_event_batch = detail::t_event_impl<T, true>;
 
 template <typename>
-class HEYOKA_DLL_PUBLIC continuous_output;
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS continuous_output;
 
 namespace detail
 {
@@ -646,7 +646,7 @@ std::ostream &c_out_stream_impl(std::ostream &, const continuous_output<T> &);
 } // namespace detail
 
 template <typename T>
-class HEYOKA_DLL_PUBLIC continuous_output
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS continuous_output
 {
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
 
@@ -692,6 +692,23 @@ public:
     [[nodiscard]] std::size_t get_n_steps() const;
 };
 
+// Prevent implicit instantiations.
+extern template class continuous_output<float>;
+extern template class continuous_output<double>;
+extern template class continuous_output<long double>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+extern template class continuous_output<mppp::real128>;
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+extern template class continuous_output<mppp::real>;
+
+#endif
+
 template <typename T>
 inline std::ostream &operator<<(std::ostream &os, const continuous_output<T> &)
 {
@@ -724,7 +741,7 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_outp
 #endif
 
 template <typename>
-class HEYOKA_DLL_PUBLIC continuous_output_batch;
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS continuous_output_batch;
 
 namespace detail
 {
@@ -735,7 +752,7 @@ std::ostream &c_out_batch_stream_impl(std::ostream &, const continuous_output_ba
 } // namespace detail
 
 template <typename T>
-class HEYOKA_DLL_PUBLIC continuous_output_batch
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS continuous_output_batch
 {
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
 
@@ -788,6 +805,23 @@ public:
     std::pair<std::vector<T>, std::vector<T>> get_bounds() const;
     [[nodiscard]] std::size_t get_n_steps() const;
 };
+
+// Prevent implicit instantiations.
+extern template class continuous_output_batch<float>;
+extern template class continuous_output_batch<double>;
+extern template class continuous_output_batch<long double>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+extern template class continuous_output_batch<mppp::real128>;
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+extern template class continuous_output_batch<mppp::real>;
+
+#endif
 
 template <typename T>
 inline std::ostream &operator<<(std::ostream &os, const continuous_output_batch<T> &)
