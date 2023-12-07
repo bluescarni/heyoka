@@ -341,7 +341,7 @@ inline auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
 }
 
 template <typename T, bool B>
-class HEYOKA_DLL_PUBLIC nt_event_impl
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS nt_event_impl
 {
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
@@ -408,6 +408,29 @@ public:
     [[nodiscard]] event_direction get_direction() const;
 };
 
+// Prevent implicit instantiations.
+#define HEYOKA_NT_EVENT_EXTERN_INST(F)                                                                                 \
+    extern template class nt_event_impl<F, true>;                                                                      \
+    extern template class nt_event_impl<F, false>;
+
+HEYOKA_NT_EVENT_EXTERN_INST(float)
+HEYOKA_NT_EVENT_EXTERN_INST(double)
+HEYOKA_NT_EVENT_EXTERN_INST(long double)
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_NT_EVENT_EXTERN_INST(mppp::real128)
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_NT_EVENT_EXTERN_INST(mppp::real)
+
+#endif
+
+#undef HEYOKA_NT_EVENT_EXTERN_INST
+
 template <typename T, bool B>
 inline std::ostream &operator<<(std::ostream &os, const nt_event_impl<T, B> &)
 {
@@ -448,7 +471,7 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<m
 #endif
 
 template <typename T, bool B>
-class HEYOKA_DLL_PUBLIC t_event_impl
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS t_event_impl
 {
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
@@ -534,6 +557,29 @@ public:
     [[nodiscard]] event_direction get_direction() const;
     T get_cooldown() const;
 };
+
+// Prevent implicit instantiations.
+#define HEYOKA_T_EVENT_EXTERN_INST(F)                                                                                  \
+    extern template class t_event_impl<F, true>;                                                                       \
+    extern template class t_event_impl<F, false>;
+
+HEYOKA_T_EVENT_EXTERN_INST(float)
+HEYOKA_T_EVENT_EXTERN_INST(double)
+HEYOKA_T_EVENT_EXTERN_INST(long double)
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_T_EVENT_EXTERN_INST(mppp::real128)
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_T_EVENT_EXTERN_INST(mppp::real)
+
+#endif
+
+#undef HEYOKA_T_EVENT_EXTERN_INST
 
 template <typename T, bool B>
 inline std::ostream &operator<<(std::ostream &os, const t_event_impl<T, B> &)

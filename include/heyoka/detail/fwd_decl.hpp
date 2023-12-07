@@ -37,10 +37,10 @@ namespace detail
 {
 
 template <typename, bool>
-class HEYOKA_DLL_PUBLIC nt_event_impl;
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS nt_event_impl;
 
 template <typename, bool>
-class HEYOKA_DLL_PUBLIC t_event_impl;
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS t_event_impl;
 
 } // namespace detail
 

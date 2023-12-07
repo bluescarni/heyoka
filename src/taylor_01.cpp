@@ -1779,41 +1779,39 @@ std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real, false>
 
 #endif
 
-// Explicit instantiation of the implementation classes/functions.
-template class nt_event_impl<float, false>;
-template class t_event_impl<float, false>;
+// Explicit instantiation of the event classes.
+#define HEYOKA_NT_EVENT_INST(F)                                                                                        \
+    template class HEYOKA_DLL_PUBLIC nt_event_impl<F, true>;                                                           \
+    template class HEYOKA_DLL_PUBLIC nt_event_impl<F, false>;
 
-template class nt_event_impl<float, true>;
-template class t_event_impl<float, true>;
+#define HEYOKA_T_EVENT_INST(F)                                                                                         \
+    template class HEYOKA_DLL_PUBLIC t_event_impl<F, true>;                                                            \
+    template class HEYOKA_DLL_PUBLIC t_event_impl<F, false>;
 
-template class nt_event_impl<double, false>;
-template class t_event_impl<double, false>;
+HEYOKA_NT_EVENT_INST(float)
+HEYOKA_NT_EVENT_INST(double)
+HEYOKA_NT_EVENT_INST(long double)
 
-template class nt_event_impl<double, true>;
-template class t_event_impl<double, true>;
-
-template class nt_event_impl<long double, false>;
-template class t_event_impl<long double, false>;
-
-template class nt_event_impl<long double, true>;
-template class t_event_impl<long double, true>;
+HEYOKA_T_EVENT_INST(float)
+HEYOKA_T_EVENT_INST(double)
+HEYOKA_T_EVENT_INST(long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template class nt_event_impl<mppp::real128, false>;
-template class t_event_impl<mppp::real128, false>;
-
-template class nt_event_impl<mppp::real128, true>;
-template class t_event_impl<mppp::real128, true>;
+HEYOKA_NT_EVENT_INST(mppp::real128)
+HEYOKA_T_EVENT_INST(mppp::real128)
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-template class nt_event_impl<mppp::real, false>;
-template class t_event_impl<mppp::real, false>;
+template class HEYOKA_DLL_PUBLIC nt_event_impl<mppp::real, false>;
+template class HEYOKA_DLL_PUBLIC t_event_impl<mppp::real, false>;
 
 #endif
+
+#undef HEYOKA_NT_EVENT_INST
+#undef HEYOKA_T_EVENT_INST
 
 // Add a function for computing the dense output
 // via polynomial evaluation.
