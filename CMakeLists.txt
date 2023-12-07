@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 3.2.0 LANGUAGES CXX C)
+project(heyoka VERSION 4.0.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -158,13 +158,9 @@ endif()
 include(GNUInstallDirs)
 find_package(LLVM REQUIRED CONFIG)
 
-if(${LLVM_VERSION_MAJOR} LESS 11)
-  message(FATAL_ERROR "LLVM >= 11 is required.")
+if(${LLVM_VERSION_MAJOR} LESS 13 OR ${LLVM_VERSION_MAJOR} GREATER 17)
+  message(FATAL_ERROR "LLVM >= 13 and <= 17 is required.")
 endif()
-
-# Mandatory dependency on fmt.
-find_package(fmt REQUIRED CONFIG)
-message(STATUS "fmt version: ${fmt_VERSION}")
 
 # List of source files.
 set(HEYOKA_SRC_FILES
@@ -313,7 +309,7 @@ if(HEYOKA_WITH_SLEEF)
 endif()
 
 # Setup the heyoka ABI version number.
-set(HEYOKA_ABI_VERSION 26)
+set(HEYOKA_ABI_VERSION 27)
 
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.
@@ -336,8 +332,8 @@ target_compile_options(heyoka PRIVATE
     "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
 )
 
-# Ensure that C++17 is employed when both compiling and consuming heyoka.
-target_compile_features(heyoka PUBLIC cxx_std_17)
+# Ensure that C++20 is employed when both compiling and consuming heyoka.
+target_compile_features(heyoka PUBLIC cxx_std_20)
 # Enforce vanilla C++17 when compiling heyoka.
 set_property(TARGET heyoka PROPERTY CXX_EXTENSIONS NO)
 
@@ -461,6 +457,12 @@ if(_HEYOKA_LLVM_STATIC_LINK AND HEYOKA_HIDE_LLVM_SYMBOLS)
 endif()
 
 # Mandatory dependency on fmt.
+set(_HEYOKA_SUPPORTED_FMT_VERSIONS 9 10)
+find_package(fmt REQUIRED CONFIG)
+if(NOT ${fmt_VERSION_MAJOR} IN_LIST _HEYOKA_SUPPORTED_FMT_VERSIONS)
+    message(FATAL_ERROR "The supported fmt versions are (${_HEYOKA_SUPPORTED_FMT_VERSIONS}), but version ${fmt_VERSION_MAJOR} was found instead.")
+endif()
+message(STATUS "fmt version: ${fmt_VERSION}")
 target_link_libraries(heyoka PUBLIC fmt::fmt)
 
 # Mandatory dependency on spdlog.
@@ -493,13 +495,10 @@ if(APPLE AND Boost_VERSION VERSION_LESS "1.81.0")
 endif()
 
 # Optional dependency on mp++.
-# NOTE: put this into a separate variable for reuse later.
-set(_HEYOKA_MIN_MPPP_VERSION "0.27")
+set(_HEYOKA_MPPP_VERSION "1.0.0")
 if(HEYOKA_WITH_MPPP)
-    find_package(mp++ REQUIRED CONFIG)
-    if(${mp++_VERSION} VERSION_LESS ${_HEYOKA_MIN_MPPP_VERSION})
-        message(FATAL_ERROR "mp++ >= ${_HEYOKA_MIN_MPPP_VERSION} is required, but version ${mp++_VERSION} was found instead.")
-    endif()
+    find_package(mp++ ${_HEYOKA_MPPP_VERSION} REQUIRED CONFIG)
+    message(STATUS "mp++ version: ${mp++_VERSION}")
 
     # NOTE: this is necessary for the serialisation of several classes.
     if(NOT mp++_WITH_BOOST_S11N)
@@ -562,10 +561,11 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" DESTINAT
 
 # Cleanup.
 unset(_HEYOKA_MIN_BOOST_VERSION)
-unset(_HEYOKA_MIN_MPPP_VERSION)
+unset(_HEYOKA_MPPP_VERSION)
 unset(_HEYOKA_WITH_REAL128)
 unset(_HEYOKA_WITH_REAL)
 unset(_HEYOKA_LLVM_STATIC_LINK)
+unset(_HEYOKA_SUPPORTED_FMT_VERSIONS)
 
 if(HEYOKA_BUILD_TESTS)
     enable_testing()

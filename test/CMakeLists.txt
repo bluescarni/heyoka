@@ -11,7 +11,7 @@ target_compile_options(heyoka_test PRIVATE
 )
 
 # Setup the C++ standard.
-target_compile_features(heyoka_test PRIVATE cxx_std_17)
+target_compile_features(heyoka_test PRIVATE cxx_std_20)
 set_property(TARGET heyoka_test PROPERTY CXX_EXTENSIONS NO)
 target_link_libraries(heyoka_test PRIVATE spdlog::spdlog heyoka)
 
@@ -26,7 +26,7 @@ function(ADD_HEYOKA_TESTCASE arg1)
     "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
   )
   # Setup the C++ standard.
-  target_compile_features(${arg1} PRIVATE cxx_std_17)
+  target_compile_features(${arg1} PRIVATE cxx_std_20)
   set_property(TARGET ${arg1} PROPERTY CXX_EXTENSIONS NO)
   add_test(${arg1} ${arg1})
 endfunction()

@@ -19,30 +19,8 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build
         run: bash tools/gha_osx_static.sh
-  windows_2019_llvm12:
-    runs-on: windows-2019
-    steps:
-      - uses: actions/checkout@v3
-      - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v1.1
-      - uses: conda-incubator/setup-miniconda@v2
-        with:
-          auto-update-conda: true
-          python-version: "3.10"
-          channels: conda-forge
-          channel-priority: strict
-      - name: Build
-        shell: pwsh
-        run: |
-          conda install -y cmake 'llvmdev=12.*' tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel fmt spdlog sleef zlib libzlib 'mppp>=0.27'
-          mkdir build
-          cd build
-          cmake ../ -G "Visual Studio 16 2019" -A x64 -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_MPPP=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_WITH_SLEEF=yes -DMPPP_GMP_INCLUDE_DIR=C:\Miniconda\envs\test\Library\include -DMPPP_GMP_LIBRARY=C:\Miniconda\envs\test\Library\lib\mpir.lib
-          cmake --build . --config Release -j2
-          copy Release\heyoka.dll test\Release\
-          ctest -j4 -V -C Release
-  windows_2019_llvm13:
-    runs-on: windows-2019
+  windows_2022_llvm13:
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v3
       - name: Add msbuild to PATH
@@ -59,12 +37,12 @@ jobs:
           conda install -y cmake 'llvmdev=13.*' tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel fmt spdlog sleef zlib libzlib 'mppp>=0.27'
           mkdir build
           cd build
-          cmake ../ -G "Visual Studio 16 2019" -A x64 -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_MPPP=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_WITH_SLEEF=yes -DMPPP_GMP_INCLUDE_DIR=C:\Miniconda\envs\test\Library\include -DMPPP_GMP_LIBRARY=C:\Miniconda\envs\test\Library\lib\mpir.lib
+          cmake ../ -G "Visual Studio 17 2022" -A x64 -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_MPPP=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_WITH_SLEEF=yes -DMPPP_GMP_INCLUDE_DIR=C:\Miniconda\envs\test\Library\include -DMPPP_GMP_LIBRARY=C:\Miniconda\envs\test\Library\lib\mpir.lib
           cmake --build . --config Release -j2
           copy Release\heyoka.dll test\Release\
           ctest -j4 -V -C Release
-  windows_2019_llvm14:
-    runs-on: windows-2019
+  windows_2022_llvm14:
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v3
       - name: Add msbuild to PATH
@@ -81,7 +59,7 @@ jobs:
           conda install -y cmake 'llvmdev=14.*' tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel fmt spdlog sleef zlib libzlib 'mppp>=0.27'
           mkdir build
           cd build
-          cmake ../ -G "Visual Studio 16 2019" -A x64 -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_MPPP=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_WITH_SLEEF=yes -DMPPP_GMP_INCLUDE_DIR=C:\Miniconda\envs\test\Library\include -DMPPP_GMP_LIBRARY=C:\Miniconda\envs\test\Library\lib\mpir.lib
+          cmake ../ -G "Visual Studio 17 2022" -A x64 -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_MPPP=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_WITH_SLEEF=yes -DMPPP_GMP_INCLUDE_DIR=C:\Miniconda\envs\test\Library\include -DMPPP_GMP_LIBRARY=C:\Miniconda\envs\test\Library\lib\mpir.lib
           cmake --build . --config Release -j2
           copy Release\heyoka.dll test\Release\
           ctest -j4 -V -C Release
@@ -138,15 +116,3 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build
         run: bash tools/gha_llvm13_conda_asan.sh
-  conda_llvm12_asan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Build
-        run: bash tools/gha_llvm12_conda_asan.sh
-  conda_llvm11_asan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Build
-        run: bash tools/gha_llvm11_conda_asan.sh

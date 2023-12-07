@@ -28,7 +28,6 @@
 #include <fmt/format.h>
 
 #include <llvm/ADT/APFloat.h>
-#include <llvm/Config/llvm-config.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
@@ -209,17 +208,7 @@ llvm::Constant *constant::make_llvm_const([[maybe_unused]] llvm_state &s, llvm::
     assert(tp != nullptr);
     assert(!tp->isVectorTy());
 
-    // NOTE: isIEEE() is only available since LLVM 13.
-    // For earlier versions of LLVM, we check that
-    // tp is not a double-double, all the other available
-    // FP types should be IEEE.
-    if (tp->isFloatingPointTy() &&
-#if LLVM_VERSION_MAJOR >= 13
-        tp->isIEEE()
-#else
-        !tp->isPPC_FP128Ty()
-#endif
-    ) {
+    if (tp->isFloatingPointTy() && tp->isIEEE()) {
         // Fetch the FP semantics and precision.
         const auto &sem = tp->getFltSemantics();
         const auto prec = llvm::APFloatBase::semanticsPrecision(sem);

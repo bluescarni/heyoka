@@ -64,7 +64,7 @@ const auto fp_types = std::tuple<float, double
                                  >{};
 
 constexpr bool skip_batch_ld =
-#if LLVM_VERSION_MAJOR >= 13 && LLVM_VERSION_MAJOR <= 17
+#if LLVM_VERSION_MAJOR <= 17
     std::numeric_limits<long double>::digits == 64
 #else
     false

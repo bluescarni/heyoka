@@ -1531,6 +1531,12 @@ const expression &nt_event_impl<T, B>::get_expression() const
 }
 
 template <typename T, bool B>
+typename nt_event_impl<T, B>::callback_t &nt_event_impl<T, B>::get_callback()
+{
+    return callback;
+}
+
+template <typename T, bool B>
 const typename nt_event_impl<T, B>::callback_t &nt_event_impl<T, B>::get_callback() const
 {
     return callback;
@@ -1591,6 +1597,12 @@ template <typename T, bool B>
 const expression &t_event_impl<T, B>::get_expression() const
 {
     return eq;
+}
+
+template <typename T, bool B>
+typename t_event_impl<T, B>::callback_t &t_event_impl<T, B>::get_callback()
+{
+    return callback;
 }
 
 template <typename T, bool B>

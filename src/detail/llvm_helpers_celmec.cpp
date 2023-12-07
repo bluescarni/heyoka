@@ -172,13 +172,7 @@ const auto dl_twopi_dict = make_dl_twopi_dict();
 
 std::pair<number, number> inv_kep_E_dl_twopi_like(llvm_state &s, llvm::Type *fp_t)
 {
-    if (fp_t->isFloatingPointTy() &&
-#if LLVM_VERSION_MAJOR >= 13
-        fp_t->isIEEE()
-#else
-        !fp_t->isPPC_FP128Ty()
-#endif
-    ) {
+    if (fp_t->isFloatingPointTy() && fp_t->isIEEE()) {
 #if !defined(NDEBUG)
         // Sanity check.
         const auto &sem = fp_t->getFltSemantics();

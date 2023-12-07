@@ -62,7 +62,7 @@ const auto fp_types = std::tuple<float, double
                                  >{};
 
 constexpr bool skip_batch_ld =
-#if LLVM_VERSION_MAJOR >= 13 && LLVM_VERSION_MAJOR <= 17
+#if LLVM_VERSION_MAJOR <= 17
     std::numeric_limits<long double>::digits == 64
 #else
     false
@@ -342,10 +342,6 @@ TEST_CASE("vfabi double")
             REQUIRE(count == 11u);
         }
 
-        // NOTE: this next test seems to work properly starting
-        // from LLVM 13.
-#if LLVM_VERSION_MAJOR >= 13
-
         // Check that the autovec works also on batch sizes which do not correspond
         // exactly to an available vector width.
         llvm_state s3{kw::slp_vectorize = true};
@@ -386,8 +382,6 @@ TEST_CASE("vfabi double")
         if (tf.aarch64) {
             REQUIRE(count == 3u);
         }
-
-#endif
 
 #endif
 
@@ -517,10 +511,6 @@ TEST_CASE("vfabi float")
             REQUIRE(count == 19u);
         }
 
-        // NOTE: this next test seems to work properly starting
-        // from LLVM 13.
-#if LLVM_VERSION_MAJOR >= 13
-
         // Check that the autovec works also on batch sizes which do not correspond
         // exactly to an available vector width.
         llvm_state s3{kw::slp_vectorize = true};
@@ -563,8 +553,6 @@ TEST_CASE("vfabi float")
         if (tf.aarch64) {
             REQUIRE(count == 3u);
         }
-
-#endif
 
 #endif
 

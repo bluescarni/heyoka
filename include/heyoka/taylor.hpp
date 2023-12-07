@@ -31,6 +31,7 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/core.h>
+#include <fmt/ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -46,7 +47,6 @@
 
 #include <heyoka/callable.hpp>
 #include <heyoka/detail/dfloat.hpp>
-#include <heyoka/detail/fmt_compat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -180,11 +180,11 @@ namespace fmt
 {
 
 template <>
-struct formatter<heyoka::taylor_outcome> : heyoka::detail::ostream_formatter {
+struct formatter<heyoka::taylor_outcome> : fmt::ostream_formatter {
 };
 
 template <>
-struct formatter<heyoka::event_direction> : heyoka::detail::ostream_formatter {
+struct formatter<heyoka::event_direction> : fmt::ostream_formatter {
 };
 
 } // namespace fmt
@@ -402,6 +402,7 @@ public:
     ~nt_event_impl();
 
     [[nodiscard]] const expression &get_expression() const;
+    callback_t &get_callback();
     const callback_t &get_callback() const;
     [[nodiscard]] event_direction get_direction() const;
 };
@@ -527,6 +528,7 @@ public:
     ~t_event_impl();
 
     [[nodiscard]] const expression &get_expression() const;
+    callback_t &get_callback();
     const callback_t &get_callback() const;
     [[nodiscard]] event_direction get_direction() const;
     T get_cooldown() const;
@@ -1238,6 +1240,23 @@ public:
     }
 };
 
+// Prevent implicit instantiations.
+extern template class taylor_adaptive<float>;
+extern template class taylor_adaptive<double>;
+extern template class taylor_adaptive<long double>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+extern template class taylor_adaptive<mppp::real128>;
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+extern template class taylor_adaptive<mppp::real>;
+
+#endif
+
 namespace detail
 {
 
@@ -1741,6 +1760,23 @@ public:
         return m_prop_res;
     }
 };
+
+// Prevent implicit instantiations.
+extern template class taylor_adaptive_batch<float>;
+extern template class taylor_adaptive_batch<double>;
+extern template class taylor_adaptive_batch<long double>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+extern template class taylor_adaptive_batch<mppp::real128>;
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+extern template class taylor_adaptive_batch<mppp::real>;
+
+#endif
 
 template <typename T>
 inline std::ostream &operator<<(std::ostream &os, const taylor_adaptive<T> &)
