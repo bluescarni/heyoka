@@ -231,6 +231,8 @@ HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST(mppp::real)
 
 #endif
 
+#undef HEYOKA_ENSEMBLE_PROPAGATE_SCALAR_INST
+
 template <typename T>
 std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>>>
 ensemble_propagate_until_batch_impl(
@@ -415,6 +417,8 @@ HEYOKA_ENSEMBLE_PROPAGATE_BATCH_INST(long double)
 HEYOKA_ENSEMBLE_PROPAGATE_BATCH_INST(mppp::real128)
 
 #endif
+
+#undef HEYOKA_ENSEMBLE_PROPAGATE_BATCH_INST
 
 } // namespace detail
 
