@@ -274,7 +274,7 @@ namespace detail
 
 // Helper for parsing common options for the Taylor integrators.
 template <typename T, typename... KwArgs>
-inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
+inline auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
@@ -370,7 +370,8 @@ public:
     nt_event_impl();
 
     template <typename... KwArgs>
-    explicit nt_event_impl(expression e, callback_t cb, KwArgs &&...kw_args) : eq(std::move(e)), callback(std::move(cb))
+    explicit nt_event_impl(expression e, callback_t cb, const KwArgs &...kw_args)
+        : eq(std::move(e)), callback(std::move(cb))
     {
         igor::parser p{kw_args...};
 
@@ -478,7 +479,7 @@ public:
     t_event_impl();
 
     template <typename... KwArgs>
-    explicit t_event_impl(expression e, KwArgs &&...kw_args) : eq(std::move(e))
+    explicit t_event_impl(expression e, const KwArgs &...kw_args) : eq(std::move(e))
     {
         igor::parser p{kw_args...};
 
@@ -788,7 +789,7 @@ HEYOKA_DLL_PUBLIC T taylor_default_max_delta_t();
 
 // Parser for the common kwargs options for the propagate_*() functions.
 template <typename T, bool Grid, typename... KwArgs>
-inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
+inline auto taylor_propagate_common_ops(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
