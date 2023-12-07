@@ -1432,7 +1432,7 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
     run_detection(m_d_ntes, m_ntes);
 }
 
-// Instantiate the book-keeping structure for event detection
+// Explicit instantiation of the book-keeping structures for event detection
 // in the scalar integrator.
 template struct taylor_adaptive<float>::ed_data;
 template struct taylor_adaptive<double>::ed_data;
@@ -2129,7 +2129,7 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
     run_detection(m_d_ntes, m_ntes);
 }
 
-// Instantiate the book-keeping structure for event detection
+// Explicit instantiation of the book-keeping structures for event detection
 // in the batch integrator.
 template struct taylor_adaptive_batch<float>::ed_data;
 template struct taylor_adaptive_batch<double>::ed_data;
