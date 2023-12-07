@@ -3,6 +3,21 @@
 Breaking changes
 ================
 
+.. _bchanges_4_0_0:
+
+4.0.0
+-----
+
+heyoka 4 includes several backwards-incompatible changes.
+
+General
+~~~~~~~
+
+- heyoka now requires LLVM>=13.
+- heyoka is now a C++20 project.
+- heyoka now requires fmt>=9.
+- heyoka now requires mp++ 1.x.
+
 .. _bchanges_2_0_0:
 
 2.0.0
