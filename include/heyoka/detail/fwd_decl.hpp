@@ -28,7 +28,7 @@ class HEYOKA_DLL_PUBLIC param;
 class HEYOKA_DLL_PUBLIC llvm_state;
 
 template <typename>
-class HEYOKA_DLL_PUBLIC taylor_adaptive;
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive;
 
 template <typename>
 class HEYOKA_DLL_PUBLIC taylor_adaptive_batch;

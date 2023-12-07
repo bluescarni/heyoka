@@ -605,7 +605,7 @@ class HEYOKA_DLL_PUBLIC continuous_output
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
 
     template <typename>
-    friend class HEYOKA_DLL_PUBLIC taylor_adaptive;
+    friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive;
 
     friend std::ostream &detail::c_out_stream_impl<T>(std::ostream &, const continuous_output<T> &);
 
@@ -868,7 +868,7 @@ inline auto taylor_propagate_common_ops(const KwArgs &...kw_args)
 // Base class to contain data specific to integrators of type
 // T. By default this is just an empty class.
 template <typename T, typename Derived>
-class HEYOKA_DLL_PUBLIC taylor_adaptive_base
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_base
 {
     friend class boost::serialization::access;
     template <typename Archive>
@@ -880,7 +880,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_base
 #if defined(HEYOKA_HAVE_REAL)
 
 template <typename Derived>
-class HEYOKA_DLL_PUBLIC taylor_adaptive_base<mppp::real, Derived>
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_base<mppp::real, Derived>
 {
     friend class boost::serialization::access;
     template <typename Archive>
@@ -907,10 +907,10 @@ void taylor_adaptive_setup_sv_rhs(TA &, const U &);
 } // namespace detail
 
 template <typename T>
-class HEYOKA_DLL_PUBLIC taylor_adaptive : public detail::taylor_adaptive_base<T, taylor_adaptive<T>>
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive : public detail::taylor_adaptive_base<T, taylor_adaptive<T>>
 {
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
-    friend class HEYOKA_DLL_PUBLIC detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
+    friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
     using base_t = detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
     template <typename TA, typename U>
     friend void detail::taylor_adaptive_setup_sv_rhs(TA &, const U &);
@@ -1242,21 +1242,35 @@ public:
 };
 
 // Prevent implicit instantiations.
-extern template class taylor_adaptive<float>;
-extern template class taylor_adaptive<double>;
-extern template class taylor_adaptive<long double>;
+// NOLINTBEGIN
+#define HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(F)                                                                          \
+    extern template class detail::taylor_adaptive_base<F, taylor_adaptive<F>>;                                         \
+    extern template class taylor_adaptive<F>;                                                                          \
+    extern template void taylor_adaptive<F>::finalise_ctor_impl(                                                       \
+        const std::vector<expression> &, std::vector<F>, std::optional<F>, std::optional<F>, bool, bool,               \
+        std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);              \
+    extern template void taylor_adaptive<F>::finalise_ctor_impl(                                                       \
+        const std::vector<std::pair<expression, expression>> &, std::vector<F>, std::optional<F>, std::optional<F>,    \
+        bool, bool, std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);
+// NOLINTEND
+
+HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(float)
+HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(double)
+HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-extern template class taylor_adaptive<mppp::real128>;
+HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(mppp::real128)
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-extern template class taylor_adaptive<mppp::real>;
+HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(mppp::real)
 
 #endif
+
+#undef HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST
 
 namespace detail
 {
