@@ -1027,7 +1027,7 @@ public:
 
 private:
     // Struct implementing the data/logic for event detection.
-    struct ed_data {
+    struct HEYOKA_DLL_PUBLIC ed_data {
         // The working list type used during real root isolation.
         using wlist_t = std::vector<std::tuple<T, T, detail::taylor_pwrap<T>>>;
         // The type used to store the list of isolating intervals.
@@ -1499,7 +1499,7 @@ public:
 
 private:
     // Struct implementing the data/logic for event detection.
-    struct ed_data {
+    struct HEYOKA_DLL_PUBLIC ed_data {
         // The working list type used during real root isolation.
         using wlist_t = std::vector<std::tuple<T, T, detail::taylor_pwrap<T>>>;
         // The type used to store the list of isolating intervals.
