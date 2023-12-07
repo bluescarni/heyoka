@@ -175,6 +175,7 @@ TEST_CASE("callable call")
     callable<void()> clarge(large_callable{});
     auto cl2 = std::move(clarge);
     REQUIRE_THROWS_AS(clarge(), std::bad_function_call);
+    REQUIRE(!clarge);
 }
 
 TEST_CASE("callable type idx")
