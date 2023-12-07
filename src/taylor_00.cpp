@@ -4219,7 +4219,7 @@ void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
     }
 }
 
-// Explicit instantiation of the batch implementation classes.
+// Explicit instantiation of the batch implementation classes/functions.
 #define HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(F)                                                                           \
     template class HEYOKA_DLL_PUBLIC taylor_adaptive_batch<F>;                                                         \
     template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<F>::finalise_ctor_impl(                                      \
