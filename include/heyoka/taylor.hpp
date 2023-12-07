@@ -694,7 +694,7 @@ class HEYOKA_DLL_PUBLIC continuous_output_batch
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
 
     template <typename>
-    friend class HEYOKA_DLL_PUBLIC taylor_adaptive_batch;
+    friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_batch;
 
     friend std::ostream &detail::c_out_batch_stream_impl<T>(std::ostream &, const continuous_output_batch<T> &);
 
@@ -1050,9 +1050,8 @@ private:
     // NOTE: apparently on Windows we need to re-iterate
     // here that this is going to be dll-exported.
     template <typename U>
-    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(const U &, std::vector<T>, std::optional<T>, std::optional<T>, bool, bool,
-                                              std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool,
-                                              std::optional<long long>);
+    void finalise_ctor_impl(const U &, std::vector<T>, std::optional<T>, std::optional<T>, bool, bool, std::vector<T>,
+                            std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);
     template <typename U, typename... KwArgs>
     void finalise_ctor(const U &sys, std::vector<T> state, KwArgs &&...kw_args)
     {
@@ -1278,7 +1277,7 @@ namespace detail
 // Parser for the common kwargs options for the propagate_*() functions
 // for the batch integrator.
 template <typename T, bool Grid, bool ForceScalarMaxDeltaT, typename... KwArgs>
-inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, KwArgs &&...kw_args)
+inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const KwArgs &...kw_args)
 {
     assert(batch_size > 0u); // LCOV_EXCL_LINE
 
@@ -1381,7 +1380,7 @@ inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, KwArgs &
 } // namespace detail
 
 template <typename T>
-class HEYOKA_DLL_PUBLIC taylor_adaptive_batch
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_batch
 {
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
 
@@ -1556,9 +1555,8 @@ private:
 
     // Private implementation-detail constructor machinery.
     template <typename U>
-    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(const U &, std::vector<T>, std::uint32_t, std::vector<T>,
-                                              std::optional<T>, bool, bool, std::vector<T>, std::vector<t_event_t>,
-                                              std::vector<nt_event_t>, bool);
+    void finalise_ctor_impl(const U &, std::vector<T>, std::uint32_t, std::vector<T>, std::optional<T>, bool, bool,
+                            std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
     template <typename U, typename... KwArgs>
     void finalise_ctor(const U &sys, std::vector<T> state, std::uint32_t batch_size, KwArgs &&...kw_args)
     {
@@ -1777,21 +1775,32 @@ public:
 };
 
 // Prevent implicit instantiations.
-extern template class taylor_adaptive_batch<float>;
-extern template class taylor_adaptive_batch<double>;
-extern template class taylor_adaptive_batch<long double>;
+#define HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(F)                                                                    \
+    extern template class taylor_adaptive_batch<F>;                                                                    \
+    extern template void taylor_adaptive_batch<F>::finalise_ctor_impl(                                                 \
+        const std::vector<expression> &, std::vector<F>, std::uint32_t, std::vector<F>, std::optional<F>, bool, bool,  \
+        std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);                                        \
+    extern template void taylor_adaptive_batch<F>::finalise_ctor_impl(                                                 \
+        const std::vector<std::pair<expression, expression>> &, std::vector<F>, std::uint32_t, std::vector<F>,         \
+        std::optional<F>, bool, bool, std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+
+HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(float)
+HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(double)
+HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-extern template class taylor_adaptive_batch<mppp::real128>;
+HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(mppp::real128)
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-extern template class taylor_adaptive_batch<mppp::real>;
+HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(mppp::real)
 
 #endif
+
+#undef HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST
 
 template <typename T>
 inline std::ostream &operator<<(std::ostream &os, const taylor_adaptive<T> &)
