@@ -2174,10 +2174,10 @@ const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
 #define HEYOKA_TAYLOR_ADAPTIVE_INST(F)                                                                                 \
     template class HEYOKA_DLL_PUBLIC detail::taylor_adaptive_base<F, taylor_adaptive<F>>;                              \
     template class HEYOKA_DLL_PUBLIC taylor_adaptive<F>;                                                               \
-    template HEYOKA_DLL_PUBLIC void taylor_adaptive<F>::finalise_ctor_impl(                                            \
+    template void taylor_adaptive<F>::finalise_ctor_impl(                                                              \
         const std::vector<expression> &, std::vector<F>, std::optional<F>, std::optional<F>, bool, bool,               \
         std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);              \
-    template HEYOKA_DLL_PUBLIC void taylor_adaptive<F>::finalise_ctor_impl(                                            \
+    template void taylor_adaptive<F>::finalise_ctor_impl(                                                              \
         const std::vector<std::pair<expression, expression>> &, std::vector<F>, std::optional<F>, std::optional<F>,    \
         bool, bool, std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);
 // NOLINTEND
