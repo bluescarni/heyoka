@@ -81,21 +81,13 @@ TEST_CASE("step_callback basics")
             REQUIRE(!step_cb);
 
             REQUIRE_THROWS_AS(step_cb(ta), std::bad_function_call);
-            REQUIRE_THROWS_AS(step_cb.pre_hook(ta), std::bad_function_call);
 
             REQUIRE(std::is_nothrow_swappable_v<step_callback<fp_t>>);
 
             REQUIRE(!std::is_constructible_v<step_callback<fp_t>, void>);
             REQUIRE(!std::is_constructible_v<step_callback<fp_t>, int, int>);
 
-#if !defined(_MSC_VER) || defined(__clang__)
-
-            // NOTE: vanilla MSVC does not like these extraction.
-            REQUIRE(step_cb.template extract<int>() == nullptr);
-            REQUIRE(std::as_const(step_cb).template extract<int>() == nullptr);
-#endif
-
-            REQUIRE(step_cb.get_type_index() == typeid(void));
+            REQUIRE(step_cb.get_type_index() == typeid(bool (*)(taylor_adaptive<fp_t> &)));
 
             // Copy construction of empty callback.
             auto step_cb2 = step_cb;
@@ -128,13 +120,6 @@ TEST_CASE("step_callback basics")
             REQUIRE(step_cb(ta));
             REQUIRE_NOTHROW(step_cb.pre_hook(ta));
 
-#if !defined(_MSC_VER) || defined(__clang__)
-
-            REQUIRE(step_cb.template extract<int>() == nullptr);
-            REQUIRE(std::as_const(step_cb).template extract<int>() == nullptr);
-
-#endif
-
             REQUIRE(step_cb.get_type_index() == typeid(decltype(lam)));
 
             REQUIRE(step_cb.template extract<decltype(lam)>() != nullptr);
@@ -150,7 +135,6 @@ TEST_CASE("step_callback basics")
             auto step_cb3 = std::move(step_cb);
             REQUIRE(step_cb3);
             REQUIRE(step_cb3.template extract<decltype(lam)>() != nullptr);
-            REQUIRE(!step_cb);
 
             // Revive step_cb via copy assignment.
             step_cb = step_cb3;
@@ -162,7 +146,6 @@ TEST_CASE("step_callback basics")
             const auto *orig_ptr = step_cb.template extract<decltype(lam)>();
             auto step_cb4 = std::move(step_cb);
             step_cb = std::move(step_cb4);
-            REQUIRE(!step_cb4);
             REQUIRE(step_cb.template extract<decltype(lam)>() != nullptr);
             REQUIRE(step_cb.template extract<decltype(lam)>() != step_cb3.template extract<decltype(lam)>());
             REQUIRE(step_cb.template extract<decltype(lam)>() == orig_ptr);
@@ -304,29 +287,6 @@ TEST_CASE("step_callback s11n")
         }
 
         {
-            step_callback<fp_t> step_cb;
-
-            std::stringstream ss;
-
-            {
-                boost::archive::binary_oarchive oa(ss);
-
-                oa << step_cb;
-            }
-
-            step_cb = step_callback<fp_t>{cb2{}};
-            REQUIRE(step_cb);
-
-            {
-                boost::archive::binary_iarchive ia(ss);
-
-                ia >> step_cb;
-            }
-
-            REQUIRE(!step_cb);
-        }
-
-        {
             step_callback_batch<fp_t> step_cb(cb2{});
 
             std::stringstream ss;
@@ -348,29 +308,6 @@ TEST_CASE("step_callback s11n")
 
             REQUIRE(!!step_cb);
             REQUIRE(step_cb.template extract<cb2>() != nullptr);
-        }
-
-        {
-            step_callback_batch<fp_t> step_cb;
-
-            std::stringstream ss;
-
-            {
-                boost::archive::binary_oarchive oa(ss);
-
-                oa << step_cb;
-            }
-
-            step_cb = step_callback_batch<fp_t>{cb2{}};
-            REQUIRE(step_cb);
-
-            {
-                boost::archive::binary_iarchive ia(ss);
-
-                ia >> step_cb;
-            }
-
-            REQUIRE(!step_cb);
         }
     };
 

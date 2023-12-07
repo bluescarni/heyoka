@@ -25,7 +25,6 @@
 #include <type_traits>
 #include <typeinfo>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -34,7 +33,6 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <llvm/ADT/APFloat.h>
-#include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -647,17 +645,7 @@ llvm::Value *llvm_codegen(llvm_state &s, llvm::Type *tp, const number &n)
         return detail::vector_splat(s.builder(), llvm_codegen(s, vector_t->getScalarType(), n), vec_size);
     }
 
-    // NOTE: isIEEE() is only available since LLVM 13.
-    // For earlier versions of LLVM, we check that
-    // tp is not a double-double, all the other available
-    // FP types should be IEEE.
-    if (tp->isFloatingPointTy() &&
-#if LLVM_VERSION_MAJOR >= 13
-        tp->isIEEE()
-#else
-        !tp->isPPC_FP128Ty()
-#endif
-    ) {
+    if (tp->isFloatingPointTy() && tp->isIEEE()) {
         // NOTE: for float and double we can construct
         // directly an APFloat.
         if (tp->isFloatTy() || tp->isDoubleTy()) {

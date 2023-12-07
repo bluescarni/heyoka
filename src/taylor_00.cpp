@@ -1172,7 +1172,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
         // to happen before the first terminal event.
         for (auto it = edd.m_d_ntes.begin(); it != ntes_end_it; ++it) {
             const auto &t = *it;
-            const auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
+            auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
             assert(cb); // LCOV_EXCL_LINE
 
             // NOTE: use new_time, instead of m_time, in order to prevent
@@ -1205,7 +1205,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
             // Fetch the first terminal event.
             const auto te_idx = std::get<0>(edd.m_d_tes[0]);
             assert(te_idx < edd.m_tes.size()); // LCOV_EXCL_LINE
-            const auto &te = edd.m_tes[te_idx];
+            auto &te = edd.m_tes[te_idx];
 
             // Set the corresponding cooldown.
             if (te.get_cooldown() >= 0) {
@@ -2962,7 +2962,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             // batch element and move to the next batch element instead).
             for (auto it = edd.m_d_ntes[i].begin(); it != ntes_end_it; ++it) {
                 const auto &t = *it;
-                const auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
+                auto &cb = edd.m_ntes[std::get<0>(t)].get_callback();
                 assert(cb); // LCOV_EXCL_LINE
                 try {
                     cb(*this, static_cast<T>(new_time - m_last_h[i] + std::get<1>(t)), std::get<2>(t), i);
@@ -2992,7 +2992,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                 // Fetch the first terminal event.
                 const auto te_idx = std::get<0>(edd.m_d_tes[i][0]);
                 assert(te_idx < edd.m_tes.size()); // LCOV_EXCL_LINE
-                const auto &te = edd.m_tes[te_idx];
+                auto &te = edd.m_tes[te_idx];
 
                 // Set the corresponding cooldown.
                 if (te.get_cooldown() >= 0) {
