@@ -28,6 +28,8 @@
 // NOTE: this file contains the code for registering default-constructed
 // event and step callbacks in the serialisation system.
 
+// NOLINTBEGIN(cert-err58-cpp)
+
 // Scalar and batch event callbacks.
 #define HEYOKA_S11N_IMPLEMENT_EVENT_CALLBACKS(T)                                                                       \
     HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::empty_callable, void, heyoka::taylor_adaptive<T> &, T, int)  \
@@ -84,3 +86,5 @@ HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_IMPLEMENT(heyoka::detail::empty_callable,
 HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(heyoka::detail::empty_callable, mppp::real)
 
 #endif
+
+// NOLINTEND(cert-err58-cpp)
