@@ -5,11 +5,23 @@ set(heyoka_WITH_REAL128 @_HEYOKA_WITH_REAL128@)
 set(heyoka_WITH_REAL @_HEYOKA_WITH_REAL@)
 set(heyoka_ABI_VERSION @HEYOKA_ABI_VERSION@)
 
+# Record the LLVM major version against which
+# heyoka was built.
+set(heyoka_LLVM_VERSION_MAJOR @LLVM_VERSION_MAJOR@)
+
+# Record also the versions of the public dependencies.
+set(heyoka_Boost_VERSION @Boost_VERSION@)
+set(heyoka_fmt_VERSION @fmt_VERSION@)
+if(${heyoka_WITH_MPPP})
+    set(heyoka_mp++_VERSION @mp++_VERSION@)
+endif()
+
 # Mandatory public dependencies on Boost and fmt.
 find_package(Boost @_HEYOKA_MIN_BOOST_VERSION@ REQUIRED serialization)
 find_package(fmt REQUIRED CONFIG)
-if(NOT ${fmt_VERSION_MAJOR} IN_LIST "@_HEYOKA_SUPPORTED_FMT_VERSIONS@")
-    message(FATAL_ERROR "The supported fmt versions are (@_HEYOKA_SUPPORTED_FMT_VERSIONS@), but version ${fmt_VERSION_MAJOR} was found instead.")
+if(${fmt_VERSION_MAJOR} VERSION_LESS @_HEYOKA_MIN_SUPPORTED_FMT_VERSION@ OR
+   ${fmt_VERSION_MAJOR} VERSION_GREATER @_HEYOKA_MAX_SUPPORTED_FMT_VERSION@)
+   message(FATAL_ERROR "The supported fmt versions are in the range [@_HEYOKA_MIN_SUPPORTED_FMT_VERSION@, @_HEYOKA_MAX_SUPPORTED_FMT_VERSION@], but version ${fmt_VERSION_MAJOR} was found instead.")
 endif()
 
 # Optional public dependency on mp++.
@@ -26,10 +38,6 @@ if(${heyoka_WITH_MPPP})
         message(FATAL_ERROR "mp++ must be installed with support for fmt.")
     endif()
 endif()
-
-# Record the LLVM major version against which
-# heyoka was built.
-set(heyoka_LLVM_VERSION_MAJOR @LLVM_VERSION_MAJOR@)
 
 # Get current dir.
 get_filename_component(_HEYOKA_CONFIG_SELF_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
