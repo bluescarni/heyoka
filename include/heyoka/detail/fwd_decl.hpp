@@ -28,19 +28,19 @@ class HEYOKA_DLL_PUBLIC param;
 class HEYOKA_DLL_PUBLIC llvm_state;
 
 template <typename>
-class HEYOKA_DLL_PUBLIC taylor_adaptive;
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive;
 
 template <typename>
-class HEYOKA_DLL_PUBLIC taylor_adaptive_batch;
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_batch;
 
 namespace detail
 {
 
 template <typename, bool>
-class HEYOKA_DLL_PUBLIC nt_event_impl;
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS nt_event_impl;
 
 template <typename, bool>
-class HEYOKA_DLL_PUBLIC t_event_impl;
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS t_event_impl;
 
 } // namespace detail
 

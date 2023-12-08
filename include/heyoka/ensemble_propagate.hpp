@@ -24,8 +24,13 @@
 
 #endif
 
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/type_traits.hpp>
-#include <heyoka/detail/visibility.hpp>
 #include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -35,24 +40,59 @@ namespace detail
 {
 
 template <typename T>
-HEYOKA_DLL_PUBLIC
-    std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
-    ensemble_propagate_until_impl(const taylor_adaptive<T> &, T, std::size_t,
-                                  const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,
-                                  std::size_t, T, step_callback<T> &, bool, bool);
+std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
+ensemble_propagate_until_impl(const taylor_adaptive<T> &, T, std::size_t,
+                              const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t,
+                              T, step_callback<T> &, bool, bool);
 
 template <typename T>
-HEYOKA_DLL_PUBLIC
-    std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
-    ensemble_propagate_for_impl(const taylor_adaptive<T> &, T, std::size_t,
-                                const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t,
-                                T, step_callback<T> &, bool, bool);
+std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
+ensemble_propagate_for_impl(const taylor_adaptive<T> &, T, std::size_t,
+                            const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t, T,
+                            step_callback<T> &, bool, bool);
 
 template <typename T>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::vector<T>>>
+std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::vector<T>>>
 ensemble_propagate_grid_impl(const taylor_adaptive<T> &, std::vector<T>, std::size_t,
                              const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t, T,
                              step_callback<T> &);
+
+// Prevent implicit instantiations.
+// NOLINTBEGIN
+#define HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_SCALAR_INST(T)                                                                \
+    extern template std::vector<                                                                                       \
+        std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>        \
+    ensemble_propagate_until_impl(const taylor_adaptive<T> &, T, std::size_t,                                          \
+                                  const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,          \
+                                  std::size_t, T, step_callback<T> &, bool, bool);                                     \
+                                                                                                                       \
+    extern template std::vector<                                                                                       \
+        std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>        \
+    ensemble_propagate_for_impl(const taylor_adaptive<T> &, T, std::size_t,                                            \
+                                const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,            \
+                                std::size_t, T, step_callback<T> &, bool, bool);                                       \
+                                                                                                                       \
+    extern template std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::vector<T>>>     \
+    ensemble_propagate_grid_impl(const taylor_adaptive<T> &, std::vector<T>, std::size_t,                              \
+                                 const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,           \
+                                 std::size_t, T, step_callback<T> &);
+// NOLINTEND
+
+HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_SCALAR_INST(float)
+HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_SCALAR_INST(double)
+HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_SCALAR_INST(long double)
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_SCALAR_INST(mppp::real128)
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_SCALAR_INST(mppp::real)
+
+#endif
 
 } // namespace detail
 
@@ -101,24 +141,62 @@ namespace detail
 {
 
 template <typename T>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>>>
+std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>>>
 ensemble_propagate_until_batch_impl(
     const taylor_adaptive_batch<T> &, T, std::size_t,
     const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,
     const std::vector<T> &, step_callback_batch<T> &, bool, bool);
 
 template <typename T>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>>>
+std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>>>
 ensemble_propagate_for_batch_impl(
     const taylor_adaptive_batch<T> &, T, std::size_t,
     const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,
     const std::vector<T> &, step_callback_batch<T> &, bool, bool);
 
 template <typename T>
-HEYOKA_DLL_PUBLIC std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>> ensemble_propagate_grid_batch_impl(
+std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>> ensemble_propagate_grid_batch_impl(
     const taylor_adaptive_batch<T> &, const std::vector<T> &, std::size_t,
     const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,
     const std::vector<T> &, step_callback_batch<T> &);
+
+// Prevent implicit instantiations.
+// NOLINTBEGIN
+#define HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_BATCH_INST(T)                                                                 \
+    extern template std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>>>       \
+    ensemble_propagate_until_batch_impl(                                                                               \
+        const taylor_adaptive_batch<T> &, T, std::size_t,                                                              \
+        const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,           \
+        const std::vector<T> &, step_callback_batch<T> &, bool, bool);                                                 \
+                                                                                                                       \
+    extern template std::vector<std::tuple<taylor_adaptive_batch<T>, std::optional<continuous_output_batch<T>>>>       \
+    ensemble_propagate_for_batch_impl(                                                                                 \
+        const taylor_adaptive_batch<T> &, T, std::size_t,                                                              \
+        const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,           \
+        const std::vector<T> &, step_callback_batch<T> &, bool, bool);                                                 \
+                                                                                                                       \
+    extern template std::vector<std::tuple<taylor_adaptive_batch<T>, std::vector<T>>>                                  \
+    ensemble_propagate_grid_batch_impl(                                                                                \
+        const taylor_adaptive_batch<T> &, const std::vector<T> &, std::size_t,                                         \
+        const std::function<taylor_adaptive_batch<T>(taylor_adaptive_batch<T>, std::size_t)> &, std::size_t,           \
+        const std::vector<T> &, step_callback_batch<T> &);
+// NOLINTEND
+
+HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_BATCH_INST(float)
+HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_BATCH_INST(double)
+HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_BATCH_INST(long double)
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_BATCH_INST(mppp::real128)
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_BATCH_INST(mppp::real)
+
+#endif
 
 } // namespace detail
 

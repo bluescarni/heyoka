@@ -2170,103 +2170,35 @@ const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
 }
 
 // Explicit instantiation of the implementation classes/functions.
-// NOTE: on Windows apparently it is necessary to declare that
-// these instantiations are meant to be dll-exported.
+// NOLINTBEGIN
+#define HEYOKA_TAYLOR_ADAPTIVE_INST(F)                                                                                 \
+    template class HEYOKA_DLL_PUBLIC detail::taylor_adaptive_base<F, taylor_adaptive<F>>;                              \
+    template class HEYOKA_DLL_PUBLIC taylor_adaptive<F>;                                                               \
+    template HEYOKA_DLL_PUBLIC void taylor_adaptive<F>::finalise_ctor_impl(                                            \
+        const std::vector<expression> &, std::vector<F>, std::optional<F>, std::optional<F>, bool, bool,               \
+        std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);              \
+    template HEYOKA_DLL_PUBLIC void taylor_adaptive<F>::finalise_ctor_impl(                                            \
+        const std::vector<std::pair<expression, expression>> &, std::vector<F>, std::optional<F>, std::optional<F>,    \
+        bool, bool, std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);
+// NOLINTEND
 
-namespace detail
-{
-
-template class taylor_adaptive_base<float, taylor_adaptive<float>>;
-
-template class taylor_adaptive_base<double, taylor_adaptive<double>>;
-
-template class taylor_adaptive_base<long double, taylor_adaptive<long double>>;
+HEYOKA_TAYLOR_ADAPTIVE_INST(float)
+HEYOKA_TAYLOR_ADAPTIVE_INST(double)
+HEYOKA_TAYLOR_ADAPTIVE_INST(long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template class taylor_adaptive_base<mppp::real128, taylor_adaptive<mppp::real128>>;
+HEYOKA_TAYLOR_ADAPTIVE_INST(mppp::real128)
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-template class taylor_adaptive_base<mppp::real, taylor_adaptive<mppp::real>>;
+HEYOKA_TAYLOR_ADAPTIVE_INST(mppp::real)
 
 #endif
 
-} // namespace detail
-
-template class taylor_adaptive<float>;
-
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive<float>::finalise_ctor_impl(const std::vector<expression> &, std::vector<float>, std::optional<float>,
-                                           std::optional<float>, bool, bool, std::vector<float>, std::vector<t_event_t>,
-                                           std::vector<nt_event_t>, bool, std::optional<long long>);
-
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive<float>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &, std::vector<float>,
-                                           std::optional<float>, std::optional<float>, bool, bool, std::vector<float>,
-                                           std::vector<t_event_t>, std::vector<nt_event_t>, bool,
-                                           std::optional<long long>);
-
-template class taylor_adaptive<double>;
-
-template HEYOKA_DLL_PUBLIC void taylor_adaptive<double>::finalise_ctor_impl(
-    const std::vector<expression> &, std::vector<double>, std::optional<double>, std::optional<double>, bool, bool,
-    std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);
-
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive<double>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &, std::vector<double>,
-                                            std::optional<double>, std::optional<double>, bool, bool,
-                                            std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool,
-                                            std::optional<long long>);
-
-template class taylor_adaptive<long double>;
-
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive<long double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<long double>,
-                                                 std::optional<long double>, std::optional<long double>, bool, bool,
-                                                 std::vector<long double>, std::vector<t_event_t>,
-                                                 std::vector<nt_event_t>, bool, std::optional<long long>);
-
-template HEYOKA_DLL_PUBLIC void taylor_adaptive<long double>::finalise_ctor_impl(
-    const std::vector<std::pair<expression, expression>> &, std::vector<long double>, std::optional<long double>,
-    std::optional<long double>, bool, bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>,
-    bool, std::optional<long long>);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template class taylor_adaptive<mppp::real128>;
-
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive<mppp::real128>::finalise_ctor_impl(const std::vector<expression> &, std::vector<mppp::real128>,
-                                                   std::optional<mppp::real128>, std::optional<mppp::real128>, bool,
-                                                   bool, std::vector<mppp::real128>, std::vector<t_event_t>,
-                                                   std::vector<nt_event_t>, bool, std::optional<long long>);
-
-template HEYOKA_DLL_PUBLIC void taylor_adaptive<mppp::real128>::finalise_ctor_impl(
-    const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, std::optional<mppp::real128>,
-    std::optional<mppp::real128>, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>,
-    std::vector<nt_event_t>, bool, std::optional<long long>);
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-template class taylor_adaptive<mppp::real>;
-
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive<mppp::real>::finalise_ctor_impl(const std::vector<expression> &, std::vector<mppp::real>,
-                                                std::optional<mppp::real>, std::optional<mppp::real>, bool, bool,
-                                                std::vector<mppp::real>, std::vector<t_event_t>,
-                                                std::vector<nt_event_t>, bool, std::optional<long long>);
-
-template HEYOKA_DLL_PUBLIC void taylor_adaptive<mppp::real>::finalise_ctor_impl(
-    const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real>, std::optional<mppp::real>,
-    std::optional<mppp::real>, bool, bool, std::vector<mppp::real>, std::vector<t_event_t>, std::vector<nt_event_t>,
-    bool, std::optional<long long>);
-
-#endif
+#undef HEYOKA_TAYLOR_ADAPTIVE_INST
 
 template <typename T>
 template <typename U>
@@ -4287,54 +4219,26 @@ void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
     }
 }
 
-// Explicit instantiation of the batch implementation classes.
-template class taylor_adaptive_batch<float>;
+// Explicit instantiation of the batch implementation classes/functions.
+#define HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(F)                                                                           \
+    template class HEYOKA_DLL_PUBLIC taylor_adaptive_batch<F>;                                                         \
+    template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<F>::finalise_ctor_impl(                                      \
+        const std::vector<expression> &, std::vector<F>, std::uint32_t, std::vector<F>, std::optional<F>, bool, bool,  \
+        std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);                                        \
+    template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<F>::finalise_ctor_impl(                                      \
+        const std::vector<std::pair<expression, expression>> &, std::vector<F>, std::uint32_t, std::vector<F>,         \
+        std::optional<F>, bool, bool, std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<float>::finalise_ctor_impl(
-    const std::vector<expression> &, std::vector<float>, std::uint32_t, std::vector<float>, std::optional<float>, bool,
-    bool, std::vector<float>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
-
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<float>::finalise_ctor_impl(
-    const std::vector<std::pair<expression, expression>> &, std::vector<float>, std::uint32_t, std::vector<float>,
-    std::optional<float>, bool, bool, std::vector<float>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
-
-template class taylor_adaptive_batch<double>;
-
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<double>::finalise_ctor_impl(
-    const std::vector<expression> &, std::vector<double>, std::uint32_t, std::vector<double>, std::optional<double>,
-    bool, bool, std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
-
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<double>::finalise_ctor_impl(
-    const std::vector<std::pair<expression, expression>> &, std::vector<double>, std::uint32_t, std::vector<double>,
-    std::optional<double>, bool, bool, std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
-
-template class taylor_adaptive_batch<long double>;
-
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_batch<long double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<long double>,
-                                                       std::uint32_t, std::vector<long double>,
-                                                       std::optional<long double>, bool, bool, std::vector<long double>,
-                                                       std::vector<t_event_t>, std::vector<nt_event_t>, bool);
-
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<long double>::finalise_ctor_impl(
-    const std::vector<std::pair<expression, expression>> &, std::vector<long double>, std::uint32_t,
-    std::vector<long double>, std::optional<long double>, bool, bool, std::vector<long double>, std::vector<t_event_t>,
-    std::vector<nt_event_t>, bool);
+HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(float)
+HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(double)
+HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template class taylor_adaptive_batch<mppp::real128>;
-
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<mppp::real128>::finalise_ctor_impl(
-    const std::vector<expression> &, std::vector<mppp::real128>, std::uint32_t, std::vector<mppp::real128>,
-    std::optional<mppp::real128>, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>,
-    std::vector<nt_event_t>, bool);
-
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<mppp::real128>::finalise_ctor_impl(
-    const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, std::uint32_t,
-    std::vector<mppp::real128>, std::optional<mppp::real128>, bool, bool, std::vector<mppp::real128>,
-    std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(mppp::real128)
 
 #endif
+
+#undef HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST
 
 HEYOKA_END_NAMESPACE

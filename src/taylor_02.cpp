@@ -2053,60 +2053,31 @@ taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name,
 }
 
 // Explicit instantiations.
-template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<float>(llvm_state &, const std::string &,
-                                                             const std::vector<expression> &, std::uint32_t,
-                                                             std::uint32_t, bool, bool, const std::vector<expression> &,
-                                                             bool, long long);
+#define HEYOKA_TAYLOR_ADD_JET_INST(F)                                                                                  \
+    template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<F>(                                                          \
+        llvm_state &, const std::string &, const std::vector<expression> &, std::uint32_t, std::uint32_t, bool, bool,  \
+        const std::vector<expression> &, bool, long long);                                                             \
+    template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<F>(                                                          \
+        llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &, std::uint32_t,      \
+        std::uint32_t, bool, bool, const std::vector<expression> &, bool, long long);
 
-template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<float>(llvm_state &, const std::string &,
-                                                             const std::vector<std::pair<expression, expression>> &,
-                                                             std::uint32_t, std::uint32_t, bool, bool,
-                                                             const std::vector<expression> &, bool, long long);
-
-template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<double>(llvm_state &, const std::string &,
-                                                              const std::vector<expression> &, std::uint32_t,
-                                                              std::uint32_t, bool, bool,
-                                                              const std::vector<expression> &, bool, long long);
-
-template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<double>(llvm_state &, const std::string &,
-                                                              const std::vector<std::pair<expression, expression>> &,
-                                                              std::uint32_t, std::uint32_t, bool, bool,
-                                                              const std::vector<expression> &, bool, long long);
-
-template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<long double>(llvm_state &, const std::string &,
-                                                                   const std::vector<expression> &, std::uint32_t,
-                                                                   std::uint32_t, bool, bool,
-                                                                   const std::vector<expression> &, bool, long long);
-
-template HEYOKA_DLL_PUBLIC taylor_dc_t
-taylor_add_jet<long double>(llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &,
-                            std::uint32_t, std::uint32_t, bool, bool, const std::vector<expression> &, bool, long long);
+HEYOKA_TAYLOR_ADD_JET_INST(float)
+HEYOKA_TAYLOR_ADD_JET_INST(double)
+HEYOKA_TAYLOR_ADD_JET_INST(long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<mppp::real128>(llvm_state &, const std::string &,
-                                                                     const std::vector<expression> &, std::uint32_t,
-                                                                     std::uint32_t, bool, bool,
-                                                                     const std::vector<expression> &, bool, long long);
-
-template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<mppp::real128>(
-    llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &, std::uint32_t,
-    std::uint32_t, bool, bool, const std::vector<expression> &, bool, long long);
+HEYOKA_TAYLOR_ADD_JET_INST(mppp::real128)
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-template HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet<mppp::real>(llvm_state &, const std::string &,
-                                                                  const std::vector<expression> &, std::uint32_t,
-                                                                  std::uint32_t, bool, bool,
-                                                                  const std::vector<expression> &, bool, long long);
-
-template HEYOKA_DLL_PUBLIC taylor_dc_t
-taylor_add_jet<mppp::real>(llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &,
-                           std::uint32_t, std::uint32_t, bool, bool, const std::vector<expression> &, bool, long long);
+HEYOKA_TAYLOR_ADD_JET_INST(mppp::real)
 
 #endif
+
+#undef HEYOKA_TAYLOR_ADD_JET_INST
 
 namespace detail
 {

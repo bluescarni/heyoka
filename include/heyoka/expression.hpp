@@ -725,13 +725,39 @@ namespace detail
 {
 
 template <typename>
-HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
-                                                    std::uint32_t, bool, bool, bool, long long);
+std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &, std::uint32_t,
+                                  bool, bool, bool, long long);
 
 template <typename>
-HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
-                                                    const std::vector<expression> &, std::uint32_t, bool, bool, bool,
-                                                    long long);
+std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
+                                  const std::vector<expression> &, std::uint32_t, bool, bool, bool, long long);
+
+// Prevent implicit instantiations.
+#define HEYOKA_CFUNC_EXTERN_INST(T)                                                                                    \
+    extern template std::vector<expression> add_cfunc<T>(llvm_state &, const std::string &,                            \
+                                                         const std::vector<expression> &, std::uint32_t, bool, bool,   \
+                                                         bool, long long);                                             \
+    extern template std::vector<expression> add_cfunc<T>(                                                              \
+        llvm_state &, const std::string &, const std::vector<expression> &, const std::vector<expression> &,           \
+        std::uint32_t, bool, bool, bool, long long);
+
+HEYOKA_CFUNC_EXTERN_INST(float)
+HEYOKA_CFUNC_EXTERN_INST(double)
+HEYOKA_CFUNC_EXTERN_INST(long double)
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_CFUNC_EXTERN_INST(mppp::real128)
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_CFUNC_EXTERN_INST(mppp::real)
+
+#endif
+
+#undef HEYOKA_CFUNC_EXTERN_INST
 
 } // namespace detail
 
