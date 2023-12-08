@@ -87,7 +87,7 @@ TEST_CASE("step_callback basics")
             REQUIRE(!std::is_constructible_v<step_callback<fp_t>, void>);
             REQUIRE(!std::is_constructible_v<step_callback<fp_t>, int, int>);
 
-            REQUIRE(step_cb.get_type_index() == typeid(bool (*)(taylor_adaptive<fp_t> &)));
+            REQUIRE(step_cb.get_type_index() == typeid(detail::empty_callable));
 
             // Copy construction of empty callback.
             auto step_cb2 = step_cb;
@@ -286,6 +286,30 @@ TEST_CASE("step_callback s11n")
             REQUIRE(step_cb.template extract<cb2>() != nullptr);
         }
 
+        // Empty step callback test.
+        {
+            step_callback<fp_t> step_cb;
+
+            std::stringstream ss;
+
+            {
+                boost::archive::binary_oarchive oa(ss);
+
+                oa << step_cb;
+            }
+
+            step_cb = step_callback<fp_t>{cb2{}};
+            REQUIRE(step_cb);
+
+            {
+                boost::archive::binary_iarchive ia(ss);
+
+                ia >> step_cb;
+            }
+
+            REQUIRE(!step_cb);
+        }
+
         {
             step_callback_batch<fp_t> step_cb(cb2{});
 
@@ -308,6 +332,30 @@ TEST_CASE("step_callback s11n")
 
             REQUIRE(!!step_cb);
             REQUIRE(step_cb.template extract<cb2>() != nullptr);
+        }
+
+        // Empty step callback test.
+        {
+            step_callback_batch<fp_t> step_cb;
+
+            std::stringstream ss;
+
+            {
+                boost::archive::binary_oarchive oa(ss);
+
+                oa << step_cb;
+            }
+
+            step_cb = step_callback_batch<fp_t>{cb2{}};
+            REQUIRE(step_cb);
+
+            {
+                boost::archive::binary_iarchive ia(ss);
+
+                ia >> step_cb;
+            }
+
+            REQUIRE(!step_cb);
         }
     };
 

@@ -37,6 +37,18 @@ struct is_any_callable;
 namespace detail
 {
 
+// An empty struct used in the default initialisation
+// of callable objects.
+// NOTE: we use this rather than, e.g., a null function
+// pointer so that we can enable serialisation of
+// default-constructed callables.
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS empty_callable {
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
+};
+
 // Declaration of the callable interface template.
 template <typename, typename, typename, typename...>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface {
@@ -60,26 +72,6 @@ template <typename Holder, typename T, typename R, typename... Args>
                  && std::copy_constructible<T>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
     : virtual callable_iface<void, void, R, Args...>, tanuki::iface_impl_helper<Holder, T, callable_iface, R, Args...> {
-    R operator()(Args... args) final
-    {
-        using unrefT = std::remove_reference_t<std::unwrap_reference_t<T>>;
-
-        if constexpr (std::is_pointer_v<unrefT> || std::is_member_pointer_v<unrefT>) {
-            if (this->value() == nullptr) {
-                throw std::bad_function_call{};
-            }
-        }
-
-        // NOTE: if this->value() is an empty std::function or callable,
-        // the std::bad_function_call exception will be raised
-        // by the invocation.
-
-        if constexpr (std::is_same_v<R, void>) {
-            static_cast<void>(std::invoke(this->value(), std::forward<Args>(args)...));
-        } else {
-            return std::invoke(this->value(), std::forward<Args>(args)...);
-        }
-    }
     explicit operator bool() const noexcept final
     {
         using unrefT = std::remove_reference_t<std::unwrap_reference_t<T>>;
@@ -92,6 +84,34 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
             return true;
         }
     }
+    R operator()(Args... args) final
+    {
+        // Check if this is empty before invoking the call operator.
+        if (!this->operator bool()) {
+            throw std::bad_function_call{};
+        }
+
+        if constexpr (std::is_same_v<R, void>) {
+            static_cast<void>(std::invoke(this->value(), std::forward<Args>(args)...));
+        } else {
+            return std::invoke(this->value(), std::forward<Args>(args)...);
+        }
+    }
+};
+
+// Implementation of the callable interface for the empty callable.
+template <typename Holder, typename T, typename R, typename... Args>
+    requires std::same_as<T, empty_callable>
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
+    : virtual callable_iface<void, void, R, Args...> {
+    explicit operator bool() const noexcept final
+    {
+        return false;
+    }
+    [[noreturn]] R operator()(Args...) final
+    {
+        throw std::bad_function_call{};
+    }
 };
 
 // Implementation of the reference interface.
@@ -103,6 +123,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_ref_iface_impl {
     auto operator()(FArgs &&...fargs)
         -> decltype(iface_ptr(*static_cast<JustWrap *>(this))->operator()(std::forward<FArgs>(fargs)...))
     {
+        // NOTE: a wrap in invalid state is considered empty.
         if (is_invalid(*static_cast<Wrap *>(this))) {
             throw std::bad_function_call{};
         }
@@ -112,6 +133,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_ref_iface_impl {
 
     explicit operator bool() const noexcept
     {
+        // NOTE: a wrap in invalid state is considered empty.
         if (is_invalid(*static_cast<const Wrap *>(this))) {
             return false;
         } else {
@@ -147,7 +169,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_ref_iface {
 // Definition of the callable wrap.
 template <typename R, typename... Args>
 using callable_wrap_t = tanuki::wrap<callable_iface,
-                                     tanuki::config<R (*)(Args...), callable_ref_iface<R, Args...>::template type>{
+                                     tanuki::config<empty_callable, callable_ref_iface<R, Args...>::template type>{
                                          // Similarly to std::function, ensure that callable can store
                                          // in static storage pointers and reference wrappers.
                                          // NOTE: reference wrappers are not guaranteed to have the size

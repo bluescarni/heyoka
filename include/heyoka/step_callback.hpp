@@ -100,7 +100,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ifaceT {
 
 // Configuration.
 template <typename TA>
-inline constexpr auto step_cb_wrap_config = tanuki::config<bool (*)(TA &), step_cb_ref_iface<TA>::template type>{
+inline constexpr auto step_cb_wrap_config = tanuki::config<empty_callable, step_cb_ref_iface<TA>::template type>{
     // Similarly to std::function, ensure that callable can store
     // in static storage pointers and reference wrappers.
     // NOTE: reference wrappers are not guaranteed to have the size
@@ -261,6 +261,28 @@ HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::step_callback_batch_set<mppp:
 #if defined(HEYOKA_HAVE_REAL)
 
 HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::step_callback_set<mppp::real>, mppp::real)
+
+#endif
+
+// Export the s11n keys for default-constructed step callbacks.
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::detail::empty_callable, float)
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::detail::empty_callable, double)
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::detail::empty_callable, long double)
+
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::detail::empty_callable, float)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::detail::empty_callable, double)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::detail::empty_callable, long double)
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::detail::empty_callable, mppp::real128)
+HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(heyoka::detail::empty_callable, mppp::real128)
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(heyoka::detail::empty_callable, mppp::real)
 
 #endif
 
