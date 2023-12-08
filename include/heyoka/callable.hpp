@@ -100,9 +100,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
 };
 
 // Implementation of the callable interface for the empty callable.
-template <typename Holder, typename T, typename R, typename... Args>
-    requires std::same_as<T, empty_callable>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
+template <typename Holder, typename R, typename... Args>
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, empty_callable, R, Args...>
     : virtual callable_iface<void, void, R, Args...> {
     explicit operator bool() const noexcept final
     {
