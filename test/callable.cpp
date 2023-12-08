@@ -182,7 +182,7 @@ TEST_CASE("callable type idx")
 {
     callable<void()> c;
 
-    REQUIRE(c.get_type_index() == typeid(void (*)()));
+    REQUIRE(c.get_type_index() == typeid(detail::empty_callable));
 
     auto f = []() {};
 
@@ -207,6 +207,7 @@ struct foo_s11n {
 };
 
 HEYOKA_S11N_CALLABLE_EXPORT(foo_s11n, int, int)
+HEYOKA_S11N_CALLABLE_EXPORT(heyoka::detail::empty_callable, int, int)
 
 TEST_CASE("callable s11n")
 {
@@ -235,6 +236,30 @@ TEST_CASE("callable s11n")
         REQUIRE(!!c);
         REQUIRE(c(1) == 101);
     }
+
+    // Test an empty callable too.
+    {
+        callable<int(int)> c;
+
+        std::stringstream ss;
+
+        {
+            boost::archive::binary_oarchive oa(ss);
+
+            oa << c;
+        }
+
+        c = callable<int(int)>(foo_s11n{100});
+        REQUIRE(c);
+
+        {
+            boost::archive::binary_iarchive ia(ss);
+
+            ia >> c;
+        }
+
+        REQUIRE(!c);
+    }
 }
 
 struct vfunc {
@@ -245,8 +270,9 @@ struct vfunc {
 TEST_CASE("callable extract")
 {
     callable<void()> c;
-    REQUIRE(c.extract<void (*)()>() != nullptr);
-    REQUIRE(std::as_const(c).extract<void (*)()>() != nullptr);
+    REQUIRE(c.extract<void (*)()>() == nullptr);
+    REQUIRE(c.extract<detail::empty_callable>() != nullptr);
+    REQUIRE(std::as_const(c).extract<void (*)()>() == nullptr);
 
     c = callable<void()>(blap);
     REQUIRE(c.extract<void (*)()>() != nullptr);

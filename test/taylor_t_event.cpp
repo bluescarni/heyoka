@@ -1113,29 +1113,57 @@ TEST_CASE("t s11n")
 
         auto [x, v] = make_vars("x", "v");
 
-        t_event<fp_t> ev(v, kw::callback = s11n_callback{}, kw::direction = event_direction::positive,
-                         kw::cooldown = fp_t(100));
-
-        std::stringstream ss;
-
         {
-            boost::archive::binary_oarchive oa(ss);
+            t_event<fp_t> ev(v, kw::callback = s11n_callback{}, kw::direction = event_direction::positive,
+                             kw::cooldown = fp_t(100));
 
-            oa << ev;
+            std::stringstream ss;
+
+            {
+                boost::archive::binary_oarchive oa(ss);
+
+                oa << ev;
+            }
+
+            ev = t_event<fp_t>(v + x);
+
+            {
+                boost::archive::binary_iarchive ia(ss);
+
+                ia >> ev;
+            }
+
+            REQUIRE(ev.get_expression() == v);
+            REQUIRE(ev.get_direction() == event_direction::positive);
+            REQUIRE(ev.get_callback().get_type_index() == typeid(s11n_callback));
+            REQUIRE(ev.get_cooldown() == fp_t(100));
         }
 
-        ev = t_event<fp_t>(v + x);
-
+        // Try also a terminal event with empty callback.
         {
-            boost::archive::binary_iarchive ia(ss);
+            t_event<fp_t> ev(v, kw::direction = event_direction::positive, kw::cooldown = fp_t(100));
 
-            ia >> ev;
+            std::stringstream ss;
+
+            {
+                boost::archive::binary_oarchive oa(ss);
+
+                oa << ev;
+            }
+
+            ev = t_event<fp_t>(v + x);
+
+            {
+                boost::archive::binary_iarchive ia(ss);
+
+                ia >> ev;
+            }
+
+            REQUIRE(ev.get_expression() == v);
+            REQUIRE(ev.get_direction() == event_direction::positive);
+            REQUIRE(!ev.get_callback());
+            REQUIRE(ev.get_cooldown() == fp_t(100));
         }
-
-        REQUIRE(ev.get_expression() == v);
-        REQUIRE(ev.get_direction() == event_direction::positive);
-        REQUIRE(ev.get_callback().get_type_index() == typeid(s11n_callback));
-        REQUIRE(ev.get_cooldown() == fp_t(100));
     };
 
     tuple_for_each(fp_types, tester);

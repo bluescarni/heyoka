@@ -178,6 +178,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/div.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sub.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vector_math.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/empty_callable_s11n.cpp"
     # NOTE: this will be an empty file in case we are not
     # building with support for real.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"
