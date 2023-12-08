@@ -86,9 +86,16 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
     }
     R operator()(Args... args) final
     {
+        using unrefT = std::remove_reference_t<std::unwrap_reference_t<T>>;
+
         // Check if this is empty before invoking the call operator.
-        if (!this->operator bool()) {
-            throw std::bad_function_call{};
+        // NOTE: no check needed here for std::function or callable: in case
+        // of an empty object, the std::bad_function_call exception will be
+        // thrown by the call operator of the object.
+        if constexpr (std::is_pointer_v<unrefT> || std::is_member_pointer_v<unrefT>) {
+            if (this->value() == nullptr) {
+                throw std::bad_function_call{};
+            }
         }
 
         if constexpr (std::is_same_v<R, void>) {
@@ -103,6 +110,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
 template <typename Holder, typename R, typename... Args>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, empty_callable, R, Args...>
     : virtual callable_iface<void, void, R, Args...> {
+    // NOTE: the empty callable is always empty and always results
+    // in an exception being thrown if called.
     explicit operator bool() const noexcept final
     {
         return false;
@@ -165,20 +174,23 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_ref_iface {
     using type = callable_ref_iface_impl<Wrap, R, Args...>;
 };
 
+// Configuration of the callable wrap.
+template <typename R, typename... Args>
+inline constexpr auto callable_wrap_config
+    = tanuki::config<empty_callable, callable_ref_iface<R, Args...>::template type>{
+        // Similarly to std::function, ensure that callable can store
+        // in static storage pointers and reference wrappers.
+        // NOTE: reference wrappers are not guaranteed to have the size
+        // of a pointer, but in practice that should always be the case.
+        // In case this is a concern, static asserts can be added
+        // in the callable interface implementation.
+        .static_size = tanuki::holder_size<R (*)(Args...), callable_iface, R, Args...>,
+        .pointer_interface = false,
+        .explicit_generic_ctor = false};
+
 // Definition of the callable wrap.
 template <typename R, typename... Args>
-using callable_wrap_t = tanuki::wrap<callable_iface,
-                                     tanuki::config<empty_callable, callable_ref_iface<R, Args...>::template type>{
-                                         // Similarly to std::function, ensure that callable can store
-                                         // in static storage pointers and reference wrappers.
-                                         // NOTE: reference wrappers are not guaranteed to have the size
-                                         // of a pointer, but in practice that should always be the case.
-                                         // In case this is a concern, static asserts can be added
-                                         // in the callable interface implementation.
-                                         .static_size = tanuki::holder_size<R (*)(Args...), callable_iface, R, Args...>,
-                                         .pointer_interface = false,
-                                         .explicit_generic_ctor = false},
-                                     R, Args...>;
+using callable_wrap_t = tanuki::wrap<callable_iface, callable_wrap_config<R, Args...>, R, Args...>;
 
 template <typename T>
 struct callable_impl {
