@@ -28,6 +28,7 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/erf.hpp>
 #include <heyoka/math/exp.hpp>

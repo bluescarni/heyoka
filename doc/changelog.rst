@@ -7,6 +7,9 @@ Changelog
 Changes
 ~~~~~~~
 
+- Move the declarations of all :ref:`keyword arguments <kwargs>`
+  into the ``kw.hpp`` header
+  (`#372 <https://github.com/bluescarni/heyoka/pull/372>`__).
 - The call operators of the event callbacks are not
   ``const`` any more
   (`#369 <https://github.com/bluescarni/heyoka/pull/369>`__).

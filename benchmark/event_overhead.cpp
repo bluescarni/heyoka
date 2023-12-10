@@ -12,6 +12,7 @@
 #include <iostream>
 #include <vector>
 
+#include <heyoka/kw.hpp>
 #include <heyoka/model/nbody.hpp>
 #include <heyoka/taylor.hpp>
 

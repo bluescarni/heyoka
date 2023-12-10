@@ -25,6 +25,7 @@
 
 #include <heyoka/callable.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/model/pendulum.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/step_callback.hpp>
@@ -403,7 +404,7 @@ TEST_CASE("step_callback pre_hook")
 {
     using Catch::Matchers::Message;
 
-    auto dyn = model::pendulum(kw::l = par[0]);
+    auto dyn = model::pendulum(kw::length = par[0]);
 
     {
         auto ta0 = taylor_adaptive<double>{dyn, {1., 0.}};

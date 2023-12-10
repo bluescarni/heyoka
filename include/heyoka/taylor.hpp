@@ -48,7 +48,6 @@
 #include <heyoka/callable.hpp>
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
-#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -272,28 +271,6 @@ inline void serialize(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &
 } // namespace boost::serialization
 
 HEYOKA_BEGIN_NAMESPACE
-
-namespace kw
-{
-
-IGOR_MAKE_NAMED_ARGUMENT(tol);
-IGOR_MAKE_NAMED_ARGUMENT(pars);
-IGOR_MAKE_NAMED_ARGUMENT(t_events);
-IGOR_MAKE_NAMED_ARGUMENT(nt_events);
-
-// NOTE: these are used for constructing events.
-IGOR_MAKE_NAMED_ARGUMENT(callback);
-IGOR_MAKE_NAMED_ARGUMENT(cooldown);
-IGOR_MAKE_NAMED_ARGUMENT(direction);
-
-// NOTE: these are used in the
-// propagate_*() functions.
-IGOR_MAKE_NAMED_ARGUMENT(max_steps);
-IGOR_MAKE_NAMED_ARGUMENT(max_delta_t);
-IGOR_MAKE_NAMED_ARGUMENT(write_tc);
-IGOR_MAKE_NAMED_ARGUMENT(c_output);
-
-} // namespace kw
 
 namespace detail
 {

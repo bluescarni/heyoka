@@ -20,6 +20,7 @@
 #include <spdlog/spdlog.h>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/logging.hpp>
 #include <heyoka/math/cos.hpp>

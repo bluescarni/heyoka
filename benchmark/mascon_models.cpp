@@ -14,7 +14,6 @@
 #include <iostream>
 #include <vector>
 
-#include <heyoka/detail/igor.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>

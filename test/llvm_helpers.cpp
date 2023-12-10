@@ -46,6 +46,7 @@
 
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 
 #include "catch.hpp"

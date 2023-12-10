@@ -12,6 +12,7 @@
 #include <iostream>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "benchmark_utils.hpp"

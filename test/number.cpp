@@ -46,6 +46,7 @@
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>

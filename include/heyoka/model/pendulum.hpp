@@ -14,19 +14,11 @@
 #include <vector>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
-
-namespace kw
-{
-
-IGOR_MAKE_NAMED_ARGUMENT(gconst);
-IGOR_MAKE_NAMED_ARGUMENT(l);
-
-} // namespace kw
 
 namespace model
 {
@@ -52,8 +44,8 @@ auto pendulum_common_opts(const KwArgs &...kw_args)
 
     // Length (defaults to 1).
     auto l = [&p]() {
-        if constexpr (p.has(kw::l)) {
-            return expression{p(kw::l)};
+        if constexpr (p.has(kw::length)) {
+            return expression{p(kw::length)};
         } else {
             return 1_dbl;
         }

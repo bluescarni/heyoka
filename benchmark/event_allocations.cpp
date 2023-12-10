@@ -15,6 +15,7 @@
 #include <boost/program_options.hpp>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/taylor.hpp>
 

@@ -17,11 +17,11 @@
 #include <heyoka/detail/real_helpers.hpp>
 #include <heyoka/ensemble_propagate.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
-#include "heyoka/kw.hpp"
-#include "heyoka/llvm_state.hpp"
 #include "test_utils.hpp"
 
 using namespace heyoka;

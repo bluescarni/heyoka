@@ -23,6 +23,7 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/math.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>

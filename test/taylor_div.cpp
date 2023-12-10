@@ -23,6 +23,7 @@
 
 #include <heyoka/detail/div.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
