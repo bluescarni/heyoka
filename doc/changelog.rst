@@ -7,6 +7,9 @@ Changelog
 Changes
 ~~~~~~~
 
+- The call operators of the event callbacks are not
+  ``const`` any more
+  (`#369 <https://github.com/bluescarni/heyoka/pull/369>`__).
 - **BREAKING**: the minimum supported LLVM version is now 13
   (`#369 <https://github.com/bluescarni/heyoka/pull/369>`__).
   This is a :ref:`breaking change <bchanges_4_0_0>`.
