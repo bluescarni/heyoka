@@ -7,6 +7,12 @@ Changelog
 Changes
 ~~~~~~~
 
+- Move the declarations of all :ref:`keyword arguments <kwargs>`
+  into the ``kw.hpp`` header
+  (`#372 <https://github.com/bluescarni/heyoka/pull/372>`__).
+- The call operators of the event callbacks are not
+  ``const`` any more
+  (`#369 <https://github.com/bluescarni/heyoka/pull/369>`__).
 - **BREAKING**: the minimum supported LLVM version is now 13
   (`#369 <https://github.com/bluescarni/heyoka/pull/369>`__).
   This is a :ref:`breaking change <bchanges_4_0_0>`.
