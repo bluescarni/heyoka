@@ -17,6 +17,7 @@
 #include <mp++/real.hpp>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/logging.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/taylor.hpp>

@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/logging.hpp>
 #include <heyoka/model/mascon.hpp>

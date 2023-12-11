@@ -37,6 +37,7 @@
 
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/ensemble_propagate.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
 

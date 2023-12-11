@@ -20,6 +20,7 @@
 
 #include <heyoka/detail/real_helpers.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>

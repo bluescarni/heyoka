@@ -19,7 +19,6 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
-#include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -34,10 +33,10 @@
 #endif
 
 #include <heyoka/detail/fwd_decl.hpp>
-#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/s11n.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -72,23 +71,6 @@ struct target_features {
 HEYOKA_DLL_PUBLIC const target_features &get_target_features();
 
 } // namespace detail
-
-namespace kw
-{
-
-IGOR_MAKE_NAMED_ARGUMENT(mname);
-IGOR_MAKE_NAMED_ARGUMENT(opt_level);
-IGOR_MAKE_NAMED_ARGUMENT(fast_math);
-// NOTE: this flag is used to force the use of 512-bit AVX512
-// registers (if the CPU supports them). At the time of this writing,
-// LLVM defaults to 256-bit registers due to CPU downclocking issues
-// which can lead to performance degradation. Hopefully we
-// can get rid of this in the future when AVX512 implementations improve
-// and LLVM learns to discriminate good and bad implementations.
-IGOR_MAKE_NAMED_ARGUMENT(force_avx512);
-IGOR_MAKE_NAMED_ARGUMENT(slp_vectorize);
-
-} // namespace kw
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
 

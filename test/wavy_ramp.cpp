@@ -15,6 +15,7 @@
 #include <boost/math/constants/constants.hpp>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/taylor.hpp>
 

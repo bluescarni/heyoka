@@ -29,6 +29,7 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 

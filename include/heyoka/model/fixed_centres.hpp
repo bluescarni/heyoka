@@ -14,19 +14,11 @@
 #include <vector>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
-
-namespace kw
-{
-
-IGOR_MAKE_NAMED_ARGUMENT(positions);
-
-} // namespace kw
 
 namespace model
 {

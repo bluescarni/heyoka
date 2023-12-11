@@ -47,7 +47,6 @@
 
 #include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
-#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -424,14 +423,6 @@ HEYOKA_DLL_PUBLIC expression diff(const expression &, const param &);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &);
 
-namespace kw
-{
-
-IGOR_MAKE_NAMED_ARGUMENT(diff_args);
-IGOR_MAKE_NAMED_ARGUMENT(diff_order);
-
-} // namespace kw
-
 namespace detail
 {
 
@@ -712,14 +703,6 @@ HEYOKA_DLL_PUBLIC std::pair<std::vector<expression>, std::vector<expression>::si
 function_decompose(const std::vector<expression> &);
 HEYOKA_DLL_PUBLIC std::vector<expression> function_decompose(const std::vector<expression> &,
                                                              const std::vector<expression> &);
-
-namespace kw
-{
-
-IGOR_MAKE_NAMED_ARGUMENT(vars);
-IGOR_MAKE_NAMED_ARGUMENT(batch_size);
-
-} // namespace kw
 
 namespace detail
 {

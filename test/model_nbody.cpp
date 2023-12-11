@@ -20,6 +20,7 @@
 #include <heyoka/detail/sum_sq.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/model/nbody.hpp>

@@ -16,7 +16,7 @@ export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 conda config --add channels conda-forge
 conda config --set channel_priority strict
-conda create -y -q -p $deps_dir cmake c-compiler cxx-compiler clang clangxx clang-tools llvmdev tbb-devel tbb boost-cpp 'mppp>=0.27' sleef fmt spdlog ninja
+conda create -y -q -p $deps_dir cmake c-compiler cxx-compiler clang clangxx clang-tools llvmdev tbb-devel tbb boost-cpp 'mppp=1.*' sleef fmt spdlog ninja
 source activate $deps_dir
 
 # Create the build dir and cd into it.

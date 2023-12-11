@@ -10,6 +10,7 @@
 #include <initializer_list>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/math.hpp>
 #include <heyoka/taylor.hpp>
 

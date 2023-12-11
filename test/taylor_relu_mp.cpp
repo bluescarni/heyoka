@@ -13,6 +13,7 @@
 
 #include <mp++/real.hpp>
 
+#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/relu.hpp>
 #include <heyoka/taylor.hpp>

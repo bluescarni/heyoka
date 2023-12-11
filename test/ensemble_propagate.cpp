@@ -23,6 +23,7 @@
 
 #include <heyoka/ensemble_propagate.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"

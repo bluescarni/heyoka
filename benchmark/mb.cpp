@@ -26,6 +26,7 @@
 #include <spdlog/stopwatch.h>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/logging.hpp>
 #include <heyoka/taylor.hpp>
 

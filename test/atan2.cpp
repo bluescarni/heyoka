@@ -39,6 +39,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/atan2.hpp>
 #include <heyoka/math/cos.hpp>

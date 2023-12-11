@@ -12,6 +12,7 @@
 #include <tuple>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/taylor.hpp>
 
