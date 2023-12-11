@@ -95,7 +95,10 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ref_iface {
 template <typename TA>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ifaceT {
     template <typename Holder, typename T>
-    using type = tanuki::composite_wrap_interfaceT<callable<bool(TA &)>, pre_hook_wrap_t<TA>>::template type<Holder, T>;
+    // NOTE: clang 14 requires typename here, hopefully it does
+    // not do any harm in other compilers.
+    using type =
+        typename tanuki::composite_wrap_interfaceT<callable<bool(TA &)>, pre_hook_wrap_t<TA>>::template type<Holder, T>;
 };
 
 // Configuration.
