@@ -103,7 +103,7 @@ inline std::pair<F, F> eft_add_dekker(F a, F b)
     auto x = a + b;
     auto y = (a - x) + b;
 
-    return {x, y};
+    return std::make_pair(std::move(x), std::move(y));
 }
 
 // Error-free transformation of the sum of two floating point numbers.
@@ -114,9 +114,9 @@ inline std::pair<F, F> eft_add_knuth(F a, F b)
 {
     auto x = a + b;
     auto z = x - a;
-    auto y = (a - (x - z)) + (b - z);
+    auto y = (a - (x - z)) + (std::move(b) - z);
 
-    return {x, y};
+    return std::make_pair(std::move(x), std::move(y));
 }
 
 // Normalise a double-length float.
@@ -124,7 +124,7 @@ inline std::pair<F, F> eft_add_knuth(F a, F b)
 // https://github.com/fhajji/ntl/blob/6918e6b80336cee34f2131fcf71a58c72b931174/src/quad_float.cpp#L125
 // NOTE: this is based on the error-free trasformation requiring abs(x.hi) >= abs(x.lo).
 template <typename F>
-inline dfloat<F> normalise(const dfloat<F> &x)
+inline dfloat<F> normalise(dfloat<F> x)
 {
     // LCOV_EXCL_START
 #if !defined(NDEBUG)
@@ -136,9 +136,9 @@ inline dfloat<F> normalise(const dfloat<F> &x)
 #endif
     // LCOV_EXCL_STOP
 
-    auto [u, v] = eft_add_dekker(x.hi, x.lo);
+    auto [u, v] = eft_add_dekker(std::move(x.hi), std::move(x.lo));
 
-    return dfloat<F>(u, v);
+    return dfloat<F>(std::move(u), std::move(v));
 }
 
 // NOTE: taken with minimal adaptations from NTL.
@@ -161,7 +161,7 @@ inline dfloat<F> operator+(const dfloat<F> &a, const dfloat<F> &b)
     auto [u, v] = eft_add_dekker(x_hi, y_hi + x_lo);
     std::tie(u, v) = eft_add_dekker(u, v + y_lo);
 
-    return dfloat<F>(u, v);
+    return dfloat<F>(std::move(u), std::move(v));
 }
 
 // Subtraction.
