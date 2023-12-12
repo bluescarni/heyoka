@@ -1645,6 +1645,7 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
 
 #if defined(HEYOKA_HAVE_REAL)
 
+    // Ensure all grid points have the correct precision for real.
     if constexpr (std::is_same_v<T, mppp::real>) {
         for (auto &val : grid) {
             val.prec_round(this->get_prec());
@@ -1678,15 +1679,19 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
         }
     }
 
+    // Require that the user provides a grid starting from the
+    // current integrator time, modulo the double-length correction.
+    if (m_time.hi != grid[0]) {
+        throw std::invalid_argument(
+            fmt::format("When invoking propagate_grid(), the first element of the time grid "
+                        "must match the current time coordinate - however, the first element of the time grid has a "
+                        "value of {}, while the current time coordinate is {}",
+                        grid[0], m_time.hi));
+    }
+
     // Pre-allocate the return value.
     std::vector<T> retval;
-    // LCOV_EXCL_START
-    if (get_dim() > std::numeric_limits<decltype(retval.size())>::max() / grid.size()) {
-        throw std::overflow_error("Overflow detected in the creation of the return value of propagate_grid() in an "
-                                  "adaptive Taylor integrator");
-    }
-    // LCOV_EXCL_STOP
-    retval.reserve(grid.size() * get_dim());
+    retval.reserve(boost::safe_numerics::safe<decltype(retval.size())>(grid.size()) * get_dim());
 
     // Initial values for the counters
     // and the min/max abs of the integration
@@ -1701,6 +1706,10 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
     T min_h = detail::num_inf_like(max_delta_t), max_h = detail::num_zero_like(max_delta_t);
 
     // Propagate the system up to the first grid point.
+    // This is necessary in order to account for the fact
+    // that the user cannot pass as starting point in the grid
+    // a time coordinate which is *exactly* equal to m_time,
+    // due to the usage of a double-length representation.
     // NOTE: we pass write_tc = true because some grid
     // points after the first one might end up being
     // calculated via dense output *before*
@@ -3572,17 +3581,25 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
         }
     }
 
+    // Require that the user provides a grid starting from the
+    // current integrator time, modulo the double-length correction.
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        if (m_time_hi[i] != grid_ptr[i]) {
+            throw std::invalid_argument(
+                fmt::format("When invoking propagate_grid(), the first element of the time grid "
+                            "must match the current time coordinate - however, the first element of the time grid at "
+                            "batch index {} has a "
+                            "value of {}, while the current time coordinate is {}",
+                            i, grid_ptr[i], m_time_hi[i]));
+        }
+    }
+
     // Pre-allocate the return value.
     std::vector<T> retval;
-    // LCOV_EXCL_START
-    if (get_dim() > std::numeric_limits<decltype(retval.size())>::max() / grid.size()) {
-        throw std::overflow_error("Overflow detected in the creation of the return value of propagate_grid() in an "
-                                  "adaptive Taylor integrator in batch mode");
-    }
-    // LCOV_EXCL_STOP
     // NOTE: fill with NaNs, so that the missing entries
     // are signalled with NaN if we exit early.
-    retval.resize(grid.size() * get_dim(), std::numeric_limits<T>::quiet_NaN());
+    retval.resize(boost::safe_numerics::safe<decltype(retval.size())>(grid.size()) * get_dim(),
+                  std::numeric_limits<T>::quiet_NaN());
 
     // NOTE: this is a buffer of size m_batch_size
     // that is used in various places as temp storage.
@@ -3590,6 +3607,10 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
     pgrid_tmp.resize(boost::numeric_cast<decltype(pgrid_tmp.size())>(m_batch_size));
 
     // Propagate the system up to the first batch of grid points.
+    // This is necessary in order to account for the fact
+    // that the user cannot pass as starting point in the grid
+    // a time coordinate which is *exactly* equal to m_time,
+    // due to the usage of a double-length representation.
     // NOTE: we pass write_tc = true because some grid
     // points after the first one might end up being
     // calculated via dense output *before*

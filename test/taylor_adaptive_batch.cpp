@@ -165,6 +165,12 @@ TEST_CASE("propagate grid")
         ta.propagate_grid({1., 2., 3., 4., 5.}), std::invalid_argument,
         Message("Invalid grid size detected in propagate_grid() for an adaptive Taylor integrator in batch mode: "
                 "the grid has a size of 5, which is not a multiple of the batch size (4)"));
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({0., 0., 1., 4.}), std::invalid_argument,
+        Message("When invoking propagate_grid(), the first element of the time grid "
+                "must match the current time coordinate - however, the first element of the time grid at "
+                "batch index 2 has a "
+                "value of 1, while the current time coordinate is 0"));
 
     ta.set_time({0., 0., std::numeric_limits<double>::infinity(), 0.});
 
@@ -209,7 +215,7 @@ TEST_CASE("propagate grid")
     // Set an infinity in the state.
     ta.get_state_data()[0] = std::numeric_limits<double>::infinity();
 
-    auto ret = ta.propagate_grid({.2, .2, .2, .2});
+    auto ret = ta.propagate_grid({.0, .0, .0, .0});
     REQUIRE(ret.size() == 8u);
     REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::err_nf_state);
     REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::time_limit);
@@ -241,7 +247,9 @@ TEST_CASE("propagate grid")
     for (auto i = 0u; i < 1000u; ++i) {
         for (auto j = 0; j < 4; ++j) {
             grid.push_back(i / 100.);
-            grid.back() += j / 10.;
+            if (i != 0u) {
+                grid.back() += j / 10.;
+            }
         }
     }
 
@@ -267,7 +275,9 @@ TEST_CASE("propagate grid")
     for (auto i = 0u; i < 1000u; ++i) {
         for (auto j = 0; j < 4; ++j) {
             grid.push_back(i / -100.);
-            grid.back() += j / -10.;
+            if (i != 0u) {
+                grid.back() += j / -10.;
+            }
         }
     }
 
@@ -339,47 +349,22 @@ TEST_CASE("propagate grid")
         }
     }
 
-    // A case in which the initial propagate_until() to bring the system
-    // to grid[0] interrupts the integration.
-    ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x},
-                                       {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03},
-                                       4,
-                                       kw::t_events = {t_event_batch<double>(v - 0.999)}};
-    auto out = ta.propagate_grid({10., 10., 10., 10., 100., 100., 100., 100.});
-    REQUIRE(out.size() == 16u);
-    REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &vel) { return std::isnan(vel); }));
-    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
-                        [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
-
-    ta = taylor_adaptive_batch<double>{
-        {prime(x) = v, prime(v) = -x},
-        {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03},
-        4,
-        kw::t_events = {t_event_batch<double>(
-            v - 0.999, kw::callback = [](auto &, bool, int, std::uint32_t) { return false; })},
-    };
-    out = ta.propagate_grid({10., 10., 10., 10., 100., 100., 100., 100.});
-    REQUIRE(out.size() == 16u);
-    REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &vel) { return std::isnan(vel); }));
-    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
-                        [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
-
     // Test the callback is not copied if it is already a step_callback.
     ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03}, 4};
     step_callback_batch<double> f_cb_grid(cb_functor_grid{});
     f_cb_grid.extract<cb_functor_grid>()->n_copies_after = f_cb_grid.extract<cb_functor_grid>()->n_copies;
-    ta.propagate_grid({10., 10., 10., 10., 100., 100., 100., 100.}, kw::callback = f_cb_grid);
+    ta.propagate_grid({0., 0., 0., 0., 10., 10., 10., 10., 100., 100., 100., 100.}, kw::callback = f_cb_grid);
 
     // Callback attempts to change the time coordinate.
     ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03}, 4};
     REQUIRE_THROWS_MATCHES(
         ta.propagate_grid(
-            {10., 10., 10., 10., 100., 100., 100., 100.}, kw::callback =
-                                                              [](auto &tint) {
-                                                                  tint.set_time(-100.);
+            {0., 0., 0., 0., 10., 10., 10., 10., 100., 100., 100., 100.}, kw::callback =
+                                                                              [](auto &tint) {
+                                                                                  tint.set_time(-100.);
 
-                                                                  return true;
-                                                              }),
+                                                                                  return true;
+                                                                              }),
         std::runtime_error,
         Message("The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
                 "time coordinate of the integrator - this is not supported"));
@@ -388,7 +373,7 @@ TEST_CASE("propagate grid")
     ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03}, 4};
     REQUIRE_THROWS_MATCHES(
         ta.propagate_grid(
-            {10., 10., 10., 10., 100., 100., 100., 100.},
+            {0., 0., 0., 0., 10., 10., 10., 10., 100., 100., 100., 100.},
             kw::callback =
                 [](auto &tint) {
                     tint.set_time({tint.get_time()[0], -100., tint.get_time()[2], tint.get_time()[3]});
@@ -416,7 +401,8 @@ TEST_CASE("propagate trivial")
     REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
                         [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
 
-    ta.propagate_grid({5, 6, 7, 8.});
+    ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = 1_dbl}, {0, 0, 0.1, 0.1}, 2};
+    ta.propagate_grid({0., 0., 5, 6, 7, 8.});
     REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
                         [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
 }
@@ -740,51 +726,29 @@ TEST_CASE("propagate grid 2")
     };
 
     auto out
-        = ta.propagate_grid({1., 1.5, 5., 5.6, 10., 11.}, kw::max_delta_t = std::vector{1e-4, 5e-5}, kw::callback = cb);
-    auto out_copy = ta_copy.propagate_grid({1., 1.5, 5., 5.6, 10., 11.});
+        = ta.propagate_grid({0., 0., 5., 5.6, 10., 11.}, kw::max_delta_t = std::vector{1e-4, 5e-5}, kw::callback = cb);
 
     REQUIRE(ta.get_time() == std::vector{10., 11.});
-    REQUIRE(counter0 == 90000ul);
-    REQUIRE(counter1 == 190000ul);
+    REQUIRE(counter0 == 100000ul);
+    REQUIRE(counter1 == 220000ul);
     REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
                         [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
-
-    REQUIRE(ta_copy.get_time() == std::vector{10., 11.});
-    REQUIRE(std::all_of(ta_copy.get_propagate_res().begin(), ta_copy.get_propagate_res().end(),
-                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
-
-    for (auto i = 0u; i < 3u; ++i) {
-        REQUIRE(out[4u * i + 0u] == approximately(out_copy[4u * i + 0u], 1000.));
-        REQUIRE(out[4u * i + 1u] == approximately(out_copy[4u * i + 1u], 1000.));
-        REQUIRE(out[4u * i + 2u] == approximately(out_copy[4u * i + 2u], 1000.));
-        REQUIRE(out[4u * i + 3u] == approximately(out_copy[4u * i + 3u], 1000.));
-    }
 
     // Do backward in time too.
     out = ta.propagate_grid({10., 11., 5., 5.6, 1., 1.5}, kw::max_delta_t = std::vector{1e-4, 5e-5}, kw::callback = cb);
-    out_copy = ta_copy.propagate_grid({10., 11., 5., 5.6, 1., 1.5});
 
     REQUIRE(ta.get_time() == std::vector{1., 1.5});
-    REQUIRE(counter0 == 180000ul);
-    REQUIRE(counter1 == 380000ul);
+    REQUIRE(counter0 == 190000ul);
+    REQUIRE(counter1 == 410000ul);
     REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
                         [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
 
-    REQUIRE(ta_copy.get_time() == std::vector{1., 1.5});
-    REQUIRE(std::all_of(ta_copy.get_propagate_res().begin(), ta_copy.get_propagate_res().end(),
-                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
-
-    for (auto i = 0u; i < 3u; ++i) {
-        REQUIRE(out[4u * i + 0u] == approximately(out_copy[4u * i + 0u], 1000.));
-        REQUIRE(out[4u * i + 1u] == approximately(out_copy[4u * i + 1u], 1000.));
-        REQUIRE(out[4u * i + 2u] == approximately(out_copy[4u * i + 2u], 1000.));
-        REQUIRE(out[4u * i + 3u] == approximately(out_copy[4u * i + 3u], 1000.));
-    }
-
     // Test also with scalar max_delta_t.
     ta_copy = ta;
-    out = ta.propagate_grid({1., 1.5, 5., 5.6, 10., 11.}, kw::max_delta_t = std::vector{1e-4, 1e-4});
-    out_copy = ta_copy.propagate_grid({1., 1.5, 5., 5.6, 10., 11.}, kw::max_delta_t = 1e-4);
+    ta.set_time(0.);
+    ta_copy.set_time(0.);
+    out = ta.propagate_grid({0., 0., 5., 5.6, 10., 11.}, kw::max_delta_t = std::vector{1e-4, 1e-4});
+    auto out_copy = ta_copy.propagate_grid({0., 0., 5., 5.6, 10., 11.}, kw::max_delta_t = 1e-4);
 
     REQUIRE(out == out_copy);
 }
@@ -794,10 +758,11 @@ TEST_CASE("cb interrupt")
 {
     auto [x, v] = make_vars("x", "v");
 
-    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2u};
-
     // propagate_for/until().
     {
+        auto ta
+            = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2u};
+
         ta.propagate_until(
             {1., 1.1}, kw::callback = [](auto &) { return false; });
 
@@ -826,8 +791,11 @@ TEST_CASE("cb interrupt")
 
     // propagate_grid().
     {
+        auto ta
+            = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2u};
+
         auto res = ta.propagate_grid(
-            {10., 10.1, 11., 11.1, 12., 12.1}, kw::callback = [](auto &) { return false; });
+            {0., 0., 11., 11.1, 12., 12.1}, kw::callback = [](auto &) { return false; });
 
         REQUIRE(std::all_of(res.begin() + 4, res.end(), [](double val) { return std::isnan(val); }));
 
@@ -842,7 +810,8 @@ TEST_CASE("cb interrupt")
 
         auto counter = 0u;
         res = ta.propagate_grid(
-            {20., 20.1, 21., 21.1, 32., 32.1}, kw::callback = [&counter](auto &) { return counter++ != 5u; });
+            {ta.get_time()[0], ta.get_time()[1], 21., 21.1, 32., 32.1},
+            kw::callback = [&counter](auto &) { return counter++ != 5u; });
 
         REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
         REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::cb_stop);
@@ -857,8 +826,11 @@ TEST_CASE("cb interrupt")
     // Check that stopping via cb still processes the grid points
     // within the last taken step.
     {
+        auto ta
+            = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2u};
+
         auto res = ta.propagate_grid(
-            {10., 10.1, 10. + 1e-6, 21.1, 10. + 2e-6, 32.1}, kw::callback = [](auto &) { return false; });
+            {0., 0., 1e-6, 21.1, 2e-6, 32.1}, kw::callback = [](auto &) { return false; });
 
         REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
         REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::cb_stop);
@@ -1856,6 +1828,7 @@ TEST_CASE("propagate_grid tc issue")
 
     auto ta = taylor_adaptive_batch<double>({prime(x) = v, prime(v) = -x}, {0., 0., 1., 1.}, 2);
 
+    ta.propagate_until({-.5, -.5});
     std::vector t_grid = {-.5, -.5, -.1, -.4999, .1, .1, .2, .2};
 
     auto out = ta.propagate_grid(t_grid);
