@@ -18,7 +18,7 @@ API/behaviour changes
 
 The ``propagate_grid()`` functions of the adaptive integrators now require the first element of the
 time grid to be equal to the current integrator time. Previously, in case of a difference between the
-integration time and the first grid point, heyoka would propagate the state of the system up to the
+integrator time and the first grid point, heyoka would propagate the state of the system up to the
 first grid point with ``propagate_until()``.
 
 If you want to recover the previous behaviour, you will have to invoke manually ``propagate_until(grid[0])``
