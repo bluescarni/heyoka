@@ -95,13 +95,16 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ref_iface {
 template <typename TA>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ifaceT {
     template <typename Holder, typename T>
-    using type = tanuki::composite_wrap_interfaceT<callable<bool(TA &)>, pre_hook_wrap_t<TA>>::template type<Holder, T>;
+    // NOTE: clang 14 requires typename here, hopefully it does
+    // not do any harm in other compilers.
+    using type =
+        typename tanuki::composite_wrap_interfaceT<callable<bool(TA &)>, pre_hook_wrap_t<TA>>::template type<Holder, T>;
 };
 
 // Configuration.
 template <typename TA>
 inline constexpr auto step_cb_wrap_config = tanuki::config<empty_callable, step_cb_ref_iface<TA>::template type>{
-    // Similarly to std::function, ensure that callable can store
+    // Similarly to std::function, ensure that step_callback can store
     // in static storage pointers and reference wrappers.
     // NOTE: reference wrappers are not guaranteed to have the size
     // of a pointer, but in practice that should always be the case.

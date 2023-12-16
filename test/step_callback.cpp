@@ -438,7 +438,7 @@ TEST_CASE("step_callback pre_hook")
         REQUIRE(ta0.get_pars()[0] == 1.5);
 
         REQUIRE_THROWS_MATCHES(
-            ta0.propagate_grid({3., 4.}, kw::callback = tm_cb{}), std::runtime_error,
+            ta0.propagate_grid({ta0.get_time(), ta0.get_time() + 1}, kw::callback = tm_cb{}), std::runtime_error,
             Message("The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
                     "time coordinate of the integrator - this is not supported"));
     }
@@ -479,7 +479,8 @@ TEST_CASE("step_callback pre_hook")
         REQUIRE(ta0.get_pars()[1] == 1.5);
 
         REQUIRE_THROWS_MATCHES(
-            ta0.propagate_grid({3., 3., 4., 4.}, kw::callback = tm_cb{}), std::runtime_error,
+            ta0.propagate_grid({ta0.get_time()[0], ta0.get_time()[1], 4., 4.}, kw::callback = tm_cb{}),
+            std::runtime_error,
             Message("The invocation of the callback passed to propagate_grid() resulted in the alteration of the "
                     "time coordinate of the integrator - this is not supported"));
     }

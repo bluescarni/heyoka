@@ -34,6 +34,8 @@
 #include "heyoka/kw.hpp"
 #include "test_utils.hpp"
 
+#include <fmt/ranges.h>
+
 using namespace heyoka;
 using namespace heyoka_test;
 
@@ -462,7 +464,7 @@ TEST_CASE("propagate trivial")
                                             kw::compact_mode = true};
 
             REQUIRE(std::get<0>(ta.propagate_for(fp_t(1.2, prec))) == taylor_outcome::time_limit);
-            REQUIRE(std::get<0>(ta.propagate_until(fp_t(2.3, prec))) == taylor_outcome::time_limit);
+            REQUIRE(std::get<0>(ta.propagate_until(fp_t(3, prec))) == taylor_outcome::time_limit);
             REQUIRE(std::get<0>(
                         ta.propagate_grid({fp_t(3, prec), fp_t(4, prec), fp_t(5, prec), fp_t(6, prec), fp_t(7., prec)}))
                     == taylor_outcome::time_limit);
@@ -750,7 +752,7 @@ TEST_CASE("propagate grid scalar")
             // Set an infinity in the state.
             ta.get_state_data()[0] = fp_t(std::numeric_limits<double>::infinity(), prec);
 
-            auto out = ta.propagate_grid({fp_t(.2, prec)});
+            auto out = ta.propagate_grid({fp_t(.0, prec)});
             REQUIRE(std::get<0>(out) == taylor_outcome::err_nf_state);
             REQUIRE(std::get<4>(out).empty());
 
@@ -773,7 +775,7 @@ TEST_CASE("propagate grid scalar")
             REQUIRE(ta.get_time() == 0.);
 
             REQUIRE_THROWS_MATCHES(
-                ta.propagate_grid({fp_t(2., prec), fp_t(std::numeric_limits<double>::infinity(), prec)}),
+                ta.propagate_grid({fp_t(0., prec), fp_t(std::numeric_limits<double>::infinity(), prec)}),
                 std::invalid_argument,
                 Message("A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator"));
 
@@ -818,6 +820,7 @@ TEST_CASE("propagate grid scalar")
             ta.set_time(fp_t(10., prec));
             ta.get_state_data()[0] = sin(fp_t(10., prec));
             ta.get_state_data()[1] = cos(fp_t(10., prec));
+            grid.back() = fp_t(10., prec);
             std::reverse(grid.begin(), grid.end());
 
             out = ta.propagate_grid(grid);
@@ -842,6 +845,10 @@ TEST_CASE("propagate grid scalar")
                 grid[i] = grid[i - 1u] + fp_t(rdist(rng), prec);
             }
 
+            ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -x},
+                                       {fp_t(0., prec), fp_t(1., prec)},
+                                       kw::opt_level = opt_level,
+                                       kw::compact_mode = true};
             out = ta.propagate_grid(grid);
 
             REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
@@ -864,6 +871,10 @@ TEST_CASE("propagate grid scalar")
                 grid[i] = grid[i - 1u] + fp_t(rdist(rng), prec);
             }
 
+            ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -x},
+                                       {fp_t(0., prec), fp_t(1., prec)},
+                                       kw::opt_level = opt_level,
+                                       kw::compact_mode = true};
             out = ta.propagate_grid(grid);
 
             REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
@@ -881,38 +892,16 @@ TEST_CASE("propagate grid scalar")
                                        kw::opt_level = opt_level,
                                        kw::compact_mode = true};
 
-            out = ta.propagate_grid({fp_t(.1, prec), fp_t(10., prec), fp_t(100., prec)});
+            out = ta.propagate_grid({fp_t(0., prec), fp_t(.1, prec), fp_t(10., prec), fp_t(100., prec)});
 
-            REQUIRE(std::get<4>(out).size() == 6u);
+            REQUIRE(std::get<4>(out).size() == 8u);
             REQUIRE(ta.get_time() == 100.);
-            REQUIRE(std::get<4>(out)[0] == approximately(sin(fp_t(.1, prec)), fp_t(100., prec)));
-            REQUIRE(std::get<4>(out)[1] == approximately(cos(fp_t(.1, prec)), fp_t(100., prec)));
-            REQUIRE(std::get<4>(out)[2] == approximately(sin(fp_t(10, prec)), fp_t(100., prec)));
-            REQUIRE(std::get<4>(out)[3] == approximately(cos(fp_t(10, prec)), fp_t(100, prec)));
-            REQUIRE(std::get<4>(out)[4] == approximately(sin(fp_t(100, prec)), fp_t(1000, prec)));
-            REQUIRE(std::get<4>(out)[5] == approximately(cos(fp_t(100, prec)), fp_t(1000, prec)));
-
-            // A case in which the initial propagate_until() to bring the system
-            // to grid[0] interrupts the integration.
-            ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -x},
-                                       {fp_t(0., prec), fp_t(1., prec)},
-                                       kw::opt_level = opt_level,
-                                       kw::compact_mode = true,
-                                       kw::t_events = {t_event<fp_t>(v - 0.999)}};
-            out = ta.propagate_grid({fp_t(10., prec), fp_t(100., prec)});
-            REQUIRE(std::get<0>(out) == taylor_outcome{-1});
-            REQUIRE(std::get<4>(out).empty());
-
-            ta = taylor_adaptive<fp_t>{
-                {prime(x) = v, prime(v) = -x},
-                {fp_t(0., prec), fp_t(1., prec)},
-                kw::opt_level = opt_level,
-                kw::compact_mode = true,
-                kw::t_events = {t_event<fp_t>(
-                    v - 0.999, kw::callback = [](taylor_adaptive<fp_t> &, bool, int) { return false; })}};
-            out = ta.propagate_grid({fp_t(10., prec), fp_t(100., prec)});
-            REQUIRE(std::get<0>(out) == taylor_outcome{-1});
-            REQUIRE(std::get<4>(out).empty());
+            REQUIRE(std::get<4>(out)[2] == approximately(sin(fp_t(.1, prec)), fp_t(100., prec)));
+            REQUIRE(std::get<4>(out)[3] == approximately(cos(fp_t(.1, prec)), fp_t(100., prec)));
+            REQUIRE(std::get<4>(out)[4] == approximately(sin(fp_t(10, prec)), fp_t(100., prec)));
+            REQUIRE(std::get<4>(out)[5] == approximately(cos(fp_t(10, prec)), fp_t(100, prec)));
+            REQUIRE(std::get<4>(out)[6] == approximately(sin(fp_t(100, prec)), fp_t(1000, prec)));
+            REQUIRE(std::get<4>(out)[7] == approximately(cos(fp_t(100, prec)), fp_t(1000, prec)));
 
             // A case in which we have a callback which never stops and a terminal event
             // which triggers.
@@ -924,7 +913,7 @@ TEST_CASE("propagate grid scalar")
                 kw::t_events = {t_event<fp_t>(
                     v - .1, kw::callback = [](taylor_adaptive<fp_t> &, bool, int) { return false; })}};
             out = ta.propagate_grid(
-                {fp_t(10., prec), fp_t(100., prec)}, kw::callback = [](const auto &) { return true; });
+                {fp_t(0., prec), fp_t(10., prec), fp_t(100., prec)}, kw::callback = [](const auto &) { return true; });
             REQUIRE(std::get<0>(out) == taylor_outcome{-1});
         }
     }

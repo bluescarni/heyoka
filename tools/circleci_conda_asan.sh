@@ -17,7 +17,7 @@ bash miniconda.sh -b -p $HOME/miniconda
 conda config --add channels conda-forge
 conda config --set channel_priority strict
 conda create -y -q -p $deps_dir c-compiler cxx-compiler cmake \
-    llvmdev tbb-devel tbb boost-cpp 'mppp=1.*' sleef xtensor \
+    llvmdev tbb-devel tbb libboost-devel 'mppp=1.*' sleef xtensor \
     xtensor-blas blas blas-devel fmt spdlog \
     'sphinxcontrib-bibtex=2.5.*' 'sphinx=6.*' 'sphinx-book-theme=1.*'
 source activate $deps_dir
