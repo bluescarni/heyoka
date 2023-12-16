@@ -168,12 +168,11 @@ example, again based on the simple pendulum:
 
 .. literalinclude:: ../tutorial/s11n_event.cpp
     :language: c++
-    :lines: 35-71
+    :lines: 35-69
 
 .. code-block:: console
 
    Number of events (original)    : 1
-   Number of events (after reset) : 0
    Number of events (from archive): 1
 
 The screen output indeed confirms that the event callback was correctly (de)serialised.

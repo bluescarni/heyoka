@@ -669,8 +669,6 @@ example, again based on the simple pendulum:</p>
 <span class="w">    </span><span class="c1">// Reset ta to an integrator without events.</span>
 <span class="w">    </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"> </span><span class="p">{</span><span class="mf">0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.025</span><span class="p">}};</span>
 
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Number of events (after reset) : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">get_nt_events</span><span class="p">().</span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-
 <span class="w">    </span><span class="c1">// Restore the serialised representation of ta.</span>
 <span class="w">    </span><span class="p">{</span>
 <span class="w">        </span><span class="n">boost</span><span class="o">::</span><span class="n">archive</span><span class="o">::</span><span class="n">binary_iarchive</span><span class="w"> </span><span class="nf">ia</span><span class="p">(</span><span class="n">ss</span><span class="p">);</span>
@@ -681,7 +679,6 @@ example, again based on the simple pendulum:</p>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Number of events (original)    : 1</span>
-<span class="go">Number of events (after reset) : 0</span>
 <span class="go">Number of events (from archive): 1</span>
 </pre></div>
 </div>
@@ -743,8 +740,6 @@ exception would have been raised during the serialisation of the integrator obje
 
 <span class="w">    </span><span class="c1">// Reset ta to an integrator without events.</span>
 <span class="w">    </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"> </span><span class="p">{</span><span class="mf">0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.025</span><span class="p">}};</span>
-
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Number of events (after reset) : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">get_nt_events</span><span class="p">().</span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 
 <span class="w">    </span><span class="c1">// Restore the serialised representation of ta.</span>
 <span class="w">    </span><span class="p">{</span>

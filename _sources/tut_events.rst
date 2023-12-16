@@ -380,7 +380,7 @@ execution of the callback:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 136-145
+    :lines: 136-146
 
 .. code-block:: console
 

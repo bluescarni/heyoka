@@ -306,8 +306,16 @@ contiguously in row-major order:
    x(0.4) = 0.0232578
    v(0.4) = -0.14078
 
-There are no special requirements on the time values in the grid (apart from the
-fact that they must be finite and ordered monotonically).
+There are a few requirements on the time values in the grid:
+
+- they must all be finite,
+- they must be ordered monotonically,
+- the first value in the grid must be equal to the current
+  time of the integrator.
+
+.. versionchanged:: 4.0.0
+
+   The requirement on the first value of the time grid.
 
 .. versionadded:: 0.7.0
 
