@@ -380,6 +380,10 @@ document.write(`
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bchanges-4-0-0">4.0.0</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#api-behaviour-changes">API/behaviour changes</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#propagate-grid"><code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code></a></li>
+</ul>
+</li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#general">General</a></li>
 </ul>
 </li>
@@ -405,6 +409,18 @@ document.write(`
 <section id="bchanges-4-0-0">
 <span id="id2"></span><h2>4.0.0<a class="headerlink" href="#bchanges-4-0-0" title="Permalink to this heading">#</a></h2>
 <p>heyoka 4 includes several backwards-incompatible changes.</p>
+<section id="api-behaviour-changes">
+<h3>API/behaviour changes<a class="headerlink" href="#api-behaviour-changes" title="Permalink to this heading">#</a></h3>
+<section id="propagate-grid">
+<h4><code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code><a class="headerlink" href="#propagate-grid" title="Permalink to this heading">#</a></h4>
+<p>The <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> functions of the adaptive integrators now require the first element of the
+time grid to be equal to the current integrator time. Previously, in case of a difference between the
+integrator time and the first grid point, heyoka would propagate the state of the system up to the
+first grid point with <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code>.</p>
+<p>If you want to recover the previous behaviour, you will have to invoke manually <code class="docutils literal notranslate"><span class="pre">propagate_until(grid[0])</span></code>
+before invoking <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code>.</p>
+</section>
+</section>
 <section id="general">
 <h3>General<a class="headerlink" href="#general" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
@@ -537,6 +553,10 @@ time, and its value will be -1 for negative derivative,
   <nav class="bd-toc-nav page-toc">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bchanges-4-0-0">4.0.0</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#api-behaviour-changes">API/behaviour changes</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#propagate-grid"><code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code></a></li>
+</ul>
+</li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#general">General</a></li>
 </ul>
 </li>

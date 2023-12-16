@@ -553,6 +553,11 @@ document.write(`
 <section id="changes">
 <h3>Changes<a class="headerlink" href="#changes" title="Permalink to this heading">#</a></h3>
 <ul class="simple">
+<li><p><strong>BREAKING</strong>: the <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> functions of the
+adaptive integrators now require the first element of the
+time grid to be equal to the current integrator time
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/373">#373</a>).
+This is a <a class="reference internal" href="breaking_changes.html#bchanges-4-0-0"><span class="std std-ref">breaking change</span></a>.</p></li>
 <li><p>Move the declarations of all <a class="reference internal" href="kwargs.html#kwargs"><span class="std std-ref">keyword arguments</span></a>
 into the <code class="docutils literal notranslate"><span class="pre">kw.hpp</span></code> header
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/372">#372</a>).</p></li>
