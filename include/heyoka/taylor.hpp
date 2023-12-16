@@ -1292,6 +1292,15 @@ public:
     // - continuous output, if requested (only for propagate_for/until()).
     // NOTE: the min/max timesteps are well-defined
     // only if at least 1-2 steps were taken successfully.
+    // NOTE: the propagate_*() functions are not guaranteed to bring
+    // the integrator time *exactly* to the requested final time. This
+    // ultimately stems from the fact that in floating-point arithmetics
+    // in general a + (b - a) != b, and this happens regardless of the
+    // use of a double-length time representation. This occurrence however
+    // seems to be pretty rare in practice, so for the time being we leave
+    // this as it is and just document the corner-case behaviour. Perhaps
+    // in the future we can offer a stronger guarantee, which however will
+    // result in a more complicated logic.
     template <typename... KwArgs>
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
     propagate_until(T t, KwArgs &&...kw_args)

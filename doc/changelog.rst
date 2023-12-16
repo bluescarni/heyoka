@@ -7,6 +7,11 @@ Changelog
 Changes
 ~~~~~~~
 
+- **BREAKING**: the ``propagate_grid()`` functions of the
+  adaptive integrators now require the first element of the
+  time grid to be equal to the current integrator time
+  (`#373 <https://github.com/bluescarni/heyoka/pull/373>`__).
+  This is a :ref:`breaking change <bchanges_4_0_0>`.
 - Move the declarations of all :ref:`keyword arguments <kwargs>`
   into the ``kw.hpp`` header
   (`#372 <https://github.com/bluescarni/heyoka/pull/372>`__).
