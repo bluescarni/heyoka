@@ -134,6 +134,7 @@ int main()
     std::cout << "Event index        : " << static_cast<std::int64_t>(oc) << '\n';
 
     // Integrate over a time grid.
+    ta.propagate_until(1.);
     auto out = ta.propagate_grid({1., 2., 3., 4., 5., 6., 7., 8., 9., 10.});
 
     // Let's print the values of the state vector

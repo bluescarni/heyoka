@@ -110,9 +110,9 @@ int main()
 
     // Propagate over a time grid from 0 to 1
     // at regular intervals.
-    auto out = ta.propagate_grid({0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0});
+    auto out = ta.propagate_grid({0., 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0});
 
-    // Print the state at t = 0.4 (index 3 in the time grid).
-    std::cout << "x(0.4) = " << std::get<4>(out)[2 * 3] << '\n';
-    std::cout << "v(0.4) = " << std::get<4>(out)[2 * 3 + 1] << '\n';
+    // Print the state at t = 0.4 (index 4 in the time grid).
+    std::cout << "x(0.4) = " << std::get<4>(out)[2 * 4] << '\n';
+    std::cout << "v(0.4) = " << std::get<4>(out)[2 * 4 + 1] << '\n';
 }

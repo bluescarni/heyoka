@@ -60,8 +60,6 @@ int main()
     // Reset ta to an integrator without events.
     ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}};
 
-    std::cout << "Number of events (after reset) : " << ta.get_nt_events().size() << '\n';
-
     // Restore the serialised representation of ta.
     {
         boost::archive::binary_iarchive ia(ss);
