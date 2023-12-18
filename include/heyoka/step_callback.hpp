@@ -42,18 +42,11 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// Declaration of the pre_hook interface template.
-template <typename, typename, typename>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS pre_hook_iface {
-};
-
-// Declaration of the pre_hook interface.
-template <typename TA>
-// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS pre_hook_iface<void, void, TA> {
-    virtual ~pre_hook_iface() = default;
-    // Default implementation of pre_hook() is a no-op.
-    virtual void pre_hook(TA &) {}
+// Default implementation of the step_cb interface: it inherits
+// the pre_hook() function from the default no-op implementation
+// in the interface (see below).
+template <typename Base, typename Holder, typename T, typename TA>
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface_impl : callable_iface_impl<Base, Holder, T, bool, TA &> {
 };
 
 // Concept checking for the presence of the
@@ -61,60 +54,54 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS pre_hook_iface<void, void, TA> {
 template <typename T, typename TA>
 concept with_pre_hook = requires(T &x, TA &ta) { static_cast<void>(x.pre_hook(ta)); };
 
-// Implementation of the pre_hook interface for
+// Implementation of the step_cb interface for
 // objects providing the pre_hook() member function.
-template <typename Holder, typename T, typename TA>
+template <typename Base, typename Holder, typename T, typename TA>
     requires with_pre_hook<std::remove_reference_t<std::unwrap_reference_t<T>>, TA>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS pre_hook_iface<Holder, T, TA>
-    : virtual pre_hook_iface<void, void, TA>, tanuki::iface_impl_helper<Holder, T, pre_hook_iface, TA> {
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface_impl<Base, Holder, T, TA>
+    : callable_iface_impl<Base, Holder, T, bool, TA &>,
+      tanuki::iface_impl_helper<callable_iface_impl<Base, Holder, T, bool, TA &>, Holder> {
     void pre_hook(TA &ta) final
     {
         static_cast<void>(this->value().pre_hook(ta));
     }
 };
 
-// Definition of the pre_hook wrap. This is defined only for convenience
-// and never used directly.
+// Definition of the step_cb interface.
 template <typename TA>
-using pre_hook_wrap_t = tanuki::wrap<pre_hook_iface, tanuki::default_config, TA>;
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface : callable_iface<bool, TA &> {
+    // Default implementation of pre_hook() is a no-op.
+    virtual void pre_hook(TA &) {}
 
-// Implementation of the reference interface.
-template <typename Wrap, typename TA>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ref_iface_impl : callable_ref_iface_impl<Wrap, bool, TA &> {
-    using ta_t = TA;
-    TANUKI_REF_IFACE_MEMFUN(pre_hook)
+    template <typename Base, typename Holder, typename T>
+    using impl = step_cb_iface_impl<Base, Holder, T, TA>;
 };
 
+// Implementation of the reference interface.
 template <typename TA>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ref_iface {
     template <typename Wrap>
-    using type = step_cb_ref_iface_impl<Wrap, TA>;
-};
-
-// Helper to shorten the definition of the step_cb interface template.
-template <typename TA>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_ifaceT {
-    template <typename Holder, typename T>
-    // NOTE: clang 14 requires typename here, hopefully it does
-    // not do any harm in other compilers.
-    using type =
-        typename tanuki::composite_wrap_interfaceT<callable<bool(TA &)>, pre_hook_wrap_t<TA>>::template type<Holder, T>;
+    struct impl : callable_ref_iface<bool, TA &>::template impl<Wrap> {
+        using ta_t = TA;
+        TANUKI_REF_IFACE_MEMFUN(pre_hook)
+    };
 };
 
 // Configuration.
 template <typename TA>
-inline constexpr auto step_cb_wrap_config = tanuki::config<empty_callable, step_cb_ref_iface<TA>::template type>{
+inline constexpr auto step_cb_wrap_config = tanuki::config<empty_callable, step_cb_ref_iface<TA>>{
     // Similarly to std::function, ensure that step_callback can store
     // in static storage pointers and reference wrappers.
     // NOTE: reference wrappers are not guaranteed to have the size
     // of a pointer, but in practice that should always be the case.
-    .static_size = tanuki::holder_size<bool (*)(TA &), step_cb_ifaceT<TA>::template type>,
+    .static_size = tanuki::holder_size<bool (*)(TA &), step_cb_iface<TA>>,
     .pointer_interface = false,
     .explicit_generic_ctor = false};
 
 // Definition of the step_cb wrap.
 template <typename TA>
-using step_cb_wrap_t = tanuki::wrap<step_cb_ifaceT<TA>::template type, step_cb_wrap_config<TA>>;
+using step_cb_wrap_t = tanuki::wrap<step_cb_iface<TA>, step_cb_wrap_config<TA>>;
 
 } // namespace detail
 
@@ -215,19 +202,19 @@ HEYOKA_END_NAMESPACE
 // NOLINTBEGIN
 #define HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY(udc, F)                                                                   \
     TANUKI_S11N_WRAP_EXPORT_KEY2(udc, "heyoka::step_callback<" #F ">@" #udc,                                           \
-                                 heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive<F>>::type)
+                                 heyoka::detail::step_cb_iface<heyoka::taylor_adaptive<F>>)
 #define HEYOKA_S11N_STEP_CALLBACK_EXPORT_KEY2(udc, gid, F)                                                             \
-    TANUKI_S11N_WRAP_EXPORT_KEY2(udc, gid, heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive<F>>::type)
+    TANUKI_S11N_WRAP_EXPORT_KEY2(udc, gid, heyoka::detail::step_cb_iface<heyoka::taylor_adaptive<F>>)
 #define HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(udc, F)                                                             \
-    TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(udc, heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive<F>>::type)
+    TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(udc, heyoka::detail::step_cb_iface<heyoka::taylor_adaptive<F>>)
 
 #define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY(udc, F)                                                             \
     TANUKI_S11N_WRAP_EXPORT_KEY2(udc, "heyoka::step_callback_batch<" #F ">@" #udc,                                     \
-                                 heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive_batch<F>>::type)
+                                 heyoka::detail::step_cb_iface<heyoka::taylor_adaptive_batch<F>>)
 #define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_KEY2(udc, gid, F)                                                       \
-    TANUKI_S11N_WRAP_EXPORT_KEY2(udc, gid, heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive_batch<F>>::type)
+    TANUKI_S11N_WRAP_EXPORT_KEY2(udc, gid, heyoka::detail::step_cb_iface<heyoka::taylor_adaptive_batch<F>>)
 #define HEYOKA_S11N_STEP_CALLBACK_BATCH_EXPORT_IMPLEMENT(udc, F)                                                       \
-    TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(udc, heyoka::detail::step_cb_ifaceT<heyoka::taylor_adaptive_batch<F>>::type)
+    TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(udc, heyoka::detail::step_cb_iface<heyoka::taylor_adaptive_batch<F>>)
 // NOLINTEND
 
 #define HEYOKA_S11N_STEP_CALLBACK_EXPORT(T, F)                                                                         \

@@ -181,7 +181,7 @@ struct is_reference_wrapper<std::reference_wrapper<T>> : std::true_type {
 // with the value in the holder class.
 // NOTE: templating this on IFace is not strictly necessary,
 // as we could just use void * instead of IFace * and then
-// cast back to Iface * as needed. However, templating
+// cast back to IFace * as needed. However, templating
 // gives a higher degree of type safety as there's no risk
 // of casting to the wrong type in the wrap class (which already
 // does enough memory shenanigans). Perhaps in the future
@@ -234,7 +234,7 @@ template <typename T>
 concept noncv_rvalue_reference
     = std::is_rvalue_reference_v<T> && std::same_as<std::remove_cvref_t<T>, std::remove_reference_t<T>>;
 
-// NOTE: constrain value types to be non-cv qualified objects.
+// NOTE: constrain value types to be non-cv qualified destructible objects.
 template <typename T>
 concept valid_value_type = std::is_object_v<T> && (!std::is_const_v<T>)&&(!std::is_volatile_v<T>)&&std::destructible<T>;
 
@@ -255,16 +255,119 @@ concept valid_value_type = std::is_object_v<T> && (!std::is_const_v<T>)&&(!std::
 
 #endif
 
-template <typename T, template <typename, typename, typename...> typename IFaceT, typename... Args>
-// NOTE: ideally, we would like to put here the checks about IFaceT, e.g.,
-// the interface implementation must derive from the interface, it must
-// be destructible, etc. However, because we are using the CRTP
+} // namespace detail
+
+// Composite interface.
+template <typename IFace0, typename IFace1, typename... IFaceN>
+struct TANUKI_VISIBLE composite_iface : public IFace0, public IFace1, public IFaceN... {
+};
+
+namespace detail
+{
+
+// Detection of a composite interface.
+template <typename>
+struct is_composite_interface : std::false_type {
+};
+
+template <typename IFace0, typename IFace1, typename... IFaceN>
+struct is_composite_interface<composite_iface<IFace0, IFace1, IFaceN...>> : std::true_type {
+};
+
+// Private base for the unspecialised iface_impl.
+struct iface_impl_base {
+};
+
+} // namespace detail
+
+// Definition of the external interface implementation
+// customisation point. Derives from detail::iface_impl_base
+// in order to detect specialisations.
+// NOTE: prohibit the definition of an external implementation
+// for the composite interface.
+template <typename IFace, typename Base, typename Holder, typename T>
+    requires(!detail::is_composite_interface<IFace>::value)
+struct iface_impl final : detail::iface_impl_base {
+};
+
+namespace detail
+{
+
+// Detect the presence of an external interface implementation.
+template <typename IFace, typename Base, typename Holder, typename T>
+concept iface_has_external_impl = !std::derived_from<iface_impl<IFace, Base, Holder, T>, iface_impl_base>;
+
+// Detect the presence of an intrusive interface implementation.
+template <typename IFace, typename Base, typename Holder, typename T>
+concept iface_has_intrusive_impl = requires() { typename IFace::template impl<Base, Holder, T>; };
+
+// Helper to fetch the interface implementation.
+template <typename, typename, typename, typename>
+struct get_iface_impl {
+};
+
+// External interface implementation.
+// NOTE: this will take the precedence in case an intrusive
+// implementation is also available.
+template <typename IFace, typename Base, typename Holder, typename T>
+    requires iface_has_external_impl<IFace, Base, Holder, T>
+struct get_iface_impl<IFace, Base, Holder, T> {
+    using type = iface_impl<IFace, Base, Holder, T>;
+};
+
+// Intrusive interface implementation.
+template <typename IFace, typename Base, typename Holder, typename T>
+    requires iface_has_intrusive_impl<IFace, Base, Holder, T> && (!iface_has_external_impl<IFace, Base, Holder, T>)
+struct get_iface_impl<IFace, Base, Holder, T> {
+    using type = typename IFace::template impl<Base, Holder, T>;
+};
+
+// Meta-programming to select the implementation of an interface.
+// By default, we select an implementation in which the
+// Base is the interface itself.
+template <typename IFace, typename Holder, typename T>
+struct impl_from_iface_impl : get_iface_impl<IFace, IFace, Holder, T> {
+};
+
+// For composite interfaces, we synthesize a class hierarchy in which every
+// implementation derives from the previous one, and the first implementation
+// derives from the composite interface.
+template <typename Holder, typename T, typename CurIFace, typename CurBase, typename NextIFace, typename... IFaceN>
+struct c_iface_assembler {
+    using cur_impl = typename get_iface_impl<CurIFace, CurBase, Holder, T>::type;
+    using type = typename c_iface_assembler<Holder, T, NextIFace, cur_impl, IFaceN...>::type;
+};
+
+template <typename Holder, typename T, typename CurIFace, typename CurBase, typename LastIFace>
+struct c_iface_assembler<Holder, T, CurIFace, CurBase, LastIFace> {
+    using cur_impl = typename get_iface_impl<CurIFace, CurBase, Holder, T>::type;
+    using type = typename get_iface_impl<LastIFace, cur_impl, Holder, T>::type;
+};
+
+// Specialisation for composite interfaces.
+template <typename Holder, typename T, typename IFace0, typename IFace1, typename... IFaceN>
+struct impl_from_iface_impl<composite_iface<IFace0, IFace1, IFaceN...>, Holder, T> {
+    using type = typename c_iface_assembler<Holder, T, IFace0, composite_iface<IFace0, IFace1, IFaceN...>, IFace1,
+                                            IFaceN...>::type;
+};
+
+template <typename IFace, typename Holder, typename T>
+using impl_from_iface = typename impl_from_iface_impl<IFace, Holder, T>::type;
+
+template <typename IFace, typename Holder, typename T>
+concept has_impl_from_iface = requires() { typename impl_from_iface<IFace, Holder, T>; };
+
+template <typename T, typename IFace>
+// NOTE: ideally, we would like to put here the checks about the interface
+// and its implementation, e.g., the interface implementation
+// must derive from the interface, it must be destructible, etc.
+// However, because we are using the CRTP
 // and passing the holder as a template parameter to the interface
 // impl, the checks cannot go here because holder
 // is still an incomplete type. Thus, the interface checks are placed in
 // the ctible_holder concept instead (defined elsewhere). As an unfortunate
-// consequence, a holder with an invalid IFaceT might end up being instantiated,
-// and we must thus take care of coping with an invalid IFaceT throughout
+// consequence, a holder with an invalid IFace might end up being instantiated,
+// and we must thus take care of coping with an invalid IFace throughout
 // the implementation of this class (see for instance the static checks
 // in clone() and friends). This is not 100% foolproof as we cannot put
 // static checks on the destructor (since it is virtual), thus a non-dtible
@@ -277,8 +380,7 @@ template <typename T, template <typename, typename, typename...> typename IFaceT
 // NOTE: it seems like "deducing this" may also help with the interface template
 // and with iface_impl_helper (no more Holder parameter?).
     requires valid_value_type<T>
-struct TANUKI_VISIBLE holder final : public value_iface<IFaceT<void, void, Args...>>,
-                                     public IFaceT<holder<T, IFaceT, Args...>, T, Args...> {
+struct TANUKI_VISIBLE holder final : public value_iface<IFace>, public impl_from_iface<IFace, holder<T, IFace>, T> {
     TANUKI_NO_UNIQUE_ADDRESS T m_value;
 
     // Make sure we don't end up accidentally copying/moving
@@ -303,19 +405,19 @@ struct TANUKI_VISIBLE holder final : public value_iface<IFaceT<void, void, Args.
                 // NOTE: we need the interface implementation to be:
                 // - default initable,
                 // - destructible.
-                && std::default_initializable<IFaceT<holder<T, IFaceT, Args...>, T, Args...>>
-                && std::destructible<IFaceT<holder<T, IFaceT, Args...>, T, Args...>>
+                && std::default_initializable<impl_from_iface<IFace, holder<T, IFace>, T>>
+                && std::destructible<impl_from_iface<IFace, holder<T, IFace>, T>>
     explicit holder(U &&x) noexcept(std::is_nothrow_constructible_v<T, U &&>
-                                    && nothrow_default_initializable<IFaceT<holder<T, IFaceT, Args...>, T, Args...>>)
+                                    && nothrow_default_initializable<impl_from_iface<IFace, holder<T, IFace>, T>>)
         : m_value(std::forward<U>(x))
     {
     }
     template <typename... U>
         requires(sizeof...(U) != 1u) && std::constructible_from<T, U &&...>
-                && std::default_initializable<IFaceT<holder<T, IFaceT, Args...>, T, Args...>>
-                && std::destructible<IFaceT<holder<T, IFaceT, Args...>, T, Args...>>
+                && std::default_initializable<impl_from_iface<IFace, holder<T, IFace>, T>>
+                && std::destructible<impl_from_iface<IFace, holder<T, IFace>, T>>
     explicit holder(U &&...x) noexcept(std::is_nothrow_constructible_v<T, U &&...>
-                                       && nothrow_default_initializable<IFaceT<holder<T, IFaceT, Args...>, T, Args...>>)
+                                       && nothrow_default_initializable<impl_from_iface<IFace, holder<T, IFace>, T>>)
         : m_value(std::forward<U>(x)...)
     {
     }
@@ -338,12 +440,11 @@ private:
     }
 
     // Clone this, and cast the result to the two bases.
-    [[nodiscard]] std::pair<IFaceT<void, void, Args...> *, value_iface<IFaceT<void, void, Args...>> *>
-    clone(vtag) const final
+    [[nodiscard]] std::pair<IFace *, value_iface<IFace> *> clone(vtag) const final
     {
         // NOTE: the std::convertible_to check is to avoid a hard error when instantiating a holder
         // with an invalid interface implementation.
-        if constexpr (std::copy_constructible<T> && std::convertible_to<holder *, IFaceT<void, void, Args...> *>) {
+        if constexpr (std::copy_constructible<T> && std::convertible_to<holder *, IFace *>) {
             // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
             auto *ret = new holder(m_value);
             return {ret, ret};
@@ -353,10 +454,9 @@ private:
     }
     // Copy-init a new holder into the storage beginning at ptr.
     // Then cast the result to the two bases and return.
-    [[nodiscard]] std::pair<IFaceT<void, void, Args...> *, value_iface<IFaceT<void, void, Args...>> *>
-    copy_init_holder(void *ptr, vtag) const final
+    [[nodiscard]] std::pair<IFace *, value_iface<IFace> *> copy_init_holder(void *ptr, vtag) const final
     {
-        if constexpr (std::copy_constructible<T> && std::convertible_to<holder *, IFaceT<void, void, Args...> *>) {
+        if constexpr (std::copy_constructible<T> && std::convertible_to<holder *, IFace *>) {
             // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
             auto *ret = ::new (ptr) holder(m_value);
             return {ret, ret};
@@ -366,11 +466,11 @@ private:
     }
     // Move-init a new holder into the storage beginning at ptr.
     // Then cast the result to the two bases and return.
-    [[nodiscard]] std::pair<IFaceT<void, void, Args...> *, value_iface<IFaceT<void, void, Args...>> *>
+    [[nodiscard]] std::pair<IFace *, value_iface<IFace> *>
     // NOLINTNEXTLINE(bugprone-exception-escape)
     move_init_holder(void *ptr, vtag) && noexcept final
     {
-        if constexpr (std::move_constructible<T> && std::convertible_to<holder *, IFaceT<void, void, Args...> *>) {
+        if constexpr (std::move_constructible<T> && std::convertible_to<holder *, IFace *>) {
             // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
             auto *ret = ::new (ptr) holder(std::move(m_value));
             return {ret, ret};
@@ -379,7 +479,7 @@ private:
         }
     }
     // Copy-assign m_value into the m_value of v_iface.
-    void copy_assign_value_to(value_iface<IFaceT<void, void, Args...>> *v_iface, vtag) const final
+    void copy_assign_value_to(value_iface<IFace> *v_iface, vtag) const final
     {
         if constexpr (std::is_copy_assignable_v<T>) {
             // NOTE: I don't think it is necessary to invoke launder here,
@@ -395,7 +495,7 @@ private:
     }
     // Move-assign m_value into the m_value of v_iface.
     // NOLINTNEXTLINE(bugprone-exception-escape)
-    void move_assign_value_to(value_iface<IFaceT<void, void, Args...>> *v_iface, vtag) && noexcept final
+    void move_assign_value_to(value_iface<IFace> *v_iface, vtag) && noexcept final
     {
         if constexpr (std::is_move_assignable_v<T>) {
             assert(typeid(T) == v_iface->value_type_index(vtag{}));
@@ -424,7 +524,7 @@ private:
     }
     // Swap m_value with the m_value of v_iface.
     // NOLINTNEXTLINE(bugprone-exception-escape)
-    void swap_value(value_iface<IFaceT<void, void, Args...>> *v_iface, vtag) noexcept final
+    void swap_value(value_iface<IFace> *v_iface, vtag) noexcept final
     {
         if constexpr (std::swappable<T>) {
             assert(typeid(T) == v_iface->value_type_index(vtag{}));
@@ -443,7 +543,7 @@ private:
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &boost::serialization::base_object<value_iface<IFaceT<void, void, Args...>>>(*this);
+        ar &boost::serialization::base_object<value_iface<IFace>>(*this);
         ar & m_value;
     }
 
@@ -459,6 +559,16 @@ private:
 #pragma warning(pop)
 
 #endif
+
+// Detection of the holder value type.
+template <typename>
+struct holder_value {
+};
+
+template <typename T, typename IFace>
+struct holder_value<holder<T, IFace>> {
+    using type = T;
+};
 
 // Implementation of basic storage for the wrap class.
 template <typename IFace, std::size_t StaticStorageSize, std::size_t StaticStorageAlignment>
@@ -497,22 +607,34 @@ struct config_base {
 } // namespace detail
 
 // Helpers to determine the size and alignment of a holder instance, given the value
-// type T, template interface IFaceT and arguments Args for IFaceT.
-template <typename T, template <typename, typename, typename...> typename IFaceT, typename... Args>
-inline constexpr auto holder_size = sizeof(detail::holder<T, IFaceT, Args...>);
+// type T and the interface IFace.
+template <typename T, typename IFace>
+inline constexpr auto holder_size = sizeof(detail::holder<T, IFace>);
 
-template <typename T, template <typename, typename, typename...> typename IFaceT, typename... Args>
-inline constexpr auto holder_align = alignof(detail::holder<T, IFaceT, Args...>);
+template <typename T, typename IFace>
+inline constexpr auto holder_align = alignof(detail::holder<T, IFace>);
 
 // Default implementation of the reference interface.
-template <typename>
 struct TANUKI_VISIBLE no_ref_iface {
+    template <typename>
+    struct impl {
+    };
+};
+
+// Composite reference interface.
+template <typename IFace0, typename IFace1, typename... IFaceN>
+struct TANUKI_VISIBLE composite_ref_iface {
+    template <typename Wrap>
+    struct impl : public IFace0::template impl<Wrap>,
+                  public IFace1::template impl<Wrap>,
+                  public IFaceN::template impl<Wrap>... {
+    };
 };
 
 // Configuration settings for the wrap class.
 // NOTE: the DefaultValueType is subject to the constraints
 // for valid value types.
-template <typename DefaultValueType = void, template <typename> typename RefIFace = no_ref_iface>
+template <typename DefaultValueType = void, typename RefIFace = no_ref_iface>
     requires std::same_as<DefaultValueType, void> || detail::valid_value_type<DefaultValueType>
 struct TANUKI_VISIBLE config final : detail::config_base {
     using default_value_type = DefaultValueType;
@@ -557,10 +679,9 @@ template <typename>
 struct cfg_ref_type {
 };
 
-template <typename DefaultValueType, template <typename> typename RefIFace>
+template <typename DefaultValueType, typename RefIFace>
 struct cfg_ref_type<config<DefaultValueType, RefIFace>> {
-    template <typename T>
-    using type = RefIFace<T>;
+    using type = RefIFace;
 };
 
 } // namespace detail
@@ -663,6 +784,33 @@ struct is_reference_wrapper_for<std::reference_wrapper<T>, U>
     : std::bool_constant<std::same_as<std::remove_cv_t<T>, U>> {
 };
 
+// Implementation of the pointer interface for the wrap
+// class, conditionally-enabled depending on the configuration.
+template <bool Enable, typename Wrap, typename IFace>
+struct wrap_pointer_iface {
+    const IFace *operator->() const noexcept
+    {
+        return iface_ptr(*static_cast<const Wrap *>(this));
+    }
+    IFace *operator->() noexcept
+    {
+        return iface_ptr(*static_cast<Wrap *>(this));
+    }
+
+    const IFace &operator*() const noexcept
+    {
+        return *iface_ptr(*static_cast<const Wrap *>(this));
+    }
+    IFace &operator*() noexcept
+    {
+        return *iface_ptr(*static_cast<Wrap *>(this));
+    }
+};
+
+template <typename Wrap, typename IFace>
+struct wrap_pointer_iface<false, Wrap, IFace> {
+};
+
 } // namespace detail
 
 // Concept to detect if either:
@@ -673,31 +821,31 @@ template <typename T, typename U>
 concept same_or_ref_for = std::same_as<T, U> || detail::is_reference_wrapper_for<T, U>::value;
 
 // The wrap class.
-template <template <typename, typename, typename...> typename IFaceT, auto Cfg = default_config, typename... Args>
-    requires std::is_polymorphic_v<IFaceT<void, void, Args...>>
-                 && std::has_virtual_destructor_v<IFaceT<void, void, Args...>> && detail::valid_config<Cfg>
+template <typename IFace, auto Cfg = default_config>
+    requires std::is_polymorphic_v<IFace> && std::has_virtual_destructor_v<IFace> && detail::valid_config<Cfg>
 class TANUKI_VISIBLE wrap
-    : private detail::wrap_storage<IFaceT<void, void, Args...>, Cfg.static_size, Cfg.static_alignment>,
+    : private detail::wrap_storage<IFace, Cfg.static_size, Cfg.static_alignment>,
       // NOTE: the reference interface is not supposed to hold any data: it will always
       // be def-inited (even when copying/moving a wrap object), its assignment operators
       // will never be invoked, it will never be swapped, etc. This needs to be documented.
-      public detail::cfg_ref_type<std::remove_const_t<decltype(Cfg)>>::template type<wrap<IFaceT, Cfg, Args...>>
+      public detail::cfg_ref_type<std::remove_const_t<decltype(Cfg)>>::type::template impl<wrap<IFace, Cfg>>,
+      public detail::wrap_pointer_iface<Cfg.pointer_interface, wrap<IFace, Cfg>, IFace>
 {
     // Aliases for the two interfaces.
-    using iface_t = IFaceT<void, void, Args...>;
+    using iface_t = IFace;
     using value_iface_t = detail::value_iface<iface_t>;
 
     // Alias for the reference interface.
     using ref_iface_t =
         // NOTE: clang 14 needs the typename here, hopefully this is not harmful to other compilers.
-        typename detail::cfg_ref_type<std::remove_const_t<decltype(Cfg)>>::template type<wrap<IFaceT, Cfg, Args...>>;
+        typename detail::cfg_ref_type<std::remove_const_t<decltype(Cfg)>>::type::template impl<wrap<IFace, Cfg>>;
 
     // The default value type.
     using default_value_t = typename decltype(Cfg)::default_value_type;
 
     // Shortcut for the holder type corresponding to the value type T.
     template <typename T>
-    using holder_t = detail::holder<T, IFaceT, Args...>;
+    using holder_t = detail::holder<T, IFace>;
 
     // Helpers to fetch the interface pointers and the storage type when
     // static storage is enabled.
@@ -887,6 +1035,10 @@ public:
                  (!detail::is_in_place_type<std::remove_cvref_t<T>>::value) &&
                  // Must not compete with copy/move.
                  (!std::same_as<std::remove_cvref_t<T>, wrap>) &&
+                 // Must have a valid interface implementation.
+                 detail::has_impl_from_iface<iface_t, holder_t<detail::value_t_from_arg<T &&>>,
+                                             detail::value_t_from_arg<T &&>>
+                 &&
                  // We must be able to construct a holder from x.
                  detail::ctible_holder<holder_t<detail::value_t_from_arg<T &&>>, iface_t, Cfg, T &&>
     explicit(Cfg.explicit_generic_ctor)
@@ -1159,28 +1311,6 @@ public:
         return *this;
     }
 
-    const iface_t *operator->() const noexcept
-        requires(Cfg.pointer_interface)
-    {
-        return iface_ptr(*this);
-    }
-    iface_t *operator->() noexcept
-        requires(Cfg.pointer_interface)
-    {
-        return iface_ptr(*this);
-    }
-
-    const iface_t &operator*() const noexcept
-        requires(Cfg.pointer_interface)
-    {
-        return *iface_ptr(*this);
-    }
-    iface_t &operator*() noexcept
-        requires(Cfg.pointer_interface)
-    {
-        return *iface_ptr(*this);
-    }
-
     // Free functions interface.
 
     // NOTE: w is invalid if either its storage type is dynamic and
@@ -1327,8 +1457,8 @@ template <typename>
 struct is_any_wrap_impl : std::false_type {
 };
 
-template <template <typename, typename, typename...> typename IFaceT, auto Cfg, typename... Args>
-struct is_any_wrap_impl<wrap<IFaceT, Cfg, Args...>> : std::true_type {
+template <typename IFace, auto Cfg>
+struct is_any_wrap_impl<wrap<IFace, Cfg>> : std::true_type {
 };
 
 } // namespace detail
@@ -1340,83 +1470,29 @@ concept any_wrap = detail::is_any_wrap_impl<T>::value;
 namespace detail
 {
 
-// Machinery to detect the interface of a wrap.
-template <typename>
-struct iface_from_wrap_impl {
-};
-
-template <template <typename, typename, typename...> typename IFaceT, auto Cfg, typename... Args>
-struct iface_from_wrap_impl<wrap<IFaceT, Cfg, Args...>> {
-    using type = IFaceT<void, void, Args...>;
-};
-
-template <typename Wrap>
-using wrap_interface_t = typename detail::iface_from_wrap_impl<Wrap>::type;
-
-// Machinery to detect the interface implementation of a wrap.
-template <typename>
-struct iface_impl_from_wrap_impl {
-};
-
-template <template <typename, typename, typename...> typename IFaceT, auto Cfg, typename... Args>
-struct iface_impl_from_wrap_impl<wrap<IFaceT, Cfg, Args...>> {
-    template <typename Holder, typename T>
-    using type = IFaceT<Holder, T, Args...>;
-};
-
-template <typename Wrap, typename Holder, typename T>
-using wrap_interface_impl_t = typename detail::iface_impl_from_wrap_impl<Wrap>::template type<Holder, T>;
-
-// Machinery for the definition of the composite wrap.
-template <typename, typename, typename, typename, typename...>
-struct TANUKI_VISIBLE composite_wrap_iface;
-
-// The composite interface.
-template <typename Wrap0, typename Wrap1, typename... WrapN>
-struct TANUKI_VISIBLE composite_wrap_iface<void, void, Wrap0, Wrap1, WrapN...>
-    : virtual public wrap_interface_t<Wrap0>,
-      virtual public wrap_interface_t<Wrap1>,
-      virtual public wrap_interface_t<WrapN>... {
-};
-
-// The composite interface implementation.
-template <typename Holder, typename T, typename Wrap0, typename Wrap1, typename... WrapN>
-struct TANUKI_VISIBLE composite_wrap_iface : composite_wrap_iface<void, void, Wrap0, Wrap1, WrapN...>,
-                                             public wrap_interface_impl_t<Wrap0, Holder, T>,
-                                             public wrap_interface_impl_t<Wrap1, Holder, T>,
-                                             public wrap_interface_impl_t<WrapN, Holder, T>... {
-};
-
-template <typename Wrap0, typename Wrap1, typename... WrapN>
-struct TANUKI_VISIBLE composite_wrap_ifaceT_selector {
-    template <typename Holder, typename T>
-    using type = composite_wrap_iface<Holder, T, Wrap0, Wrap1, WrapN...>;
+// Base class for iface_impl_helper.
+struct iface_impl_helper_base {
 };
 
 } // namespace detail
-
-// Helper to define the interface template of a composite wrap.
-template <any_wrap Wrap0, any_wrap Wrap1, any_wrap... WrapN>
-using composite_wrap_interfaceT = detail::composite_wrap_ifaceT_selector<Wrap0, Wrap1, WrapN...>;
 
 // Helper that can be used to reduce typing in an
 // interface implementation. This implements value()
 // helpers for fetching the value held in Holder,
 // automatically unwrapping it in case it is
 // a std::reference_wrapper.
-// NOTE: the IFaceT and Args... arguments are the interface
-// template and its arguments. They are unused in the implementation
-// of this class, but it is useful to have them because they
-// will allow to disambiguate iface_impl_helper bases when
-// implementing composite wrappers.
-template <typename Holder, typename T, template <typename, typename, typename...> typename IFaceT, typename... Args>
-struct iface_impl_helper {
+// NOTE: only Holder is strictly necessary here. However,
+// we require Base to be passed in as well, so that,
+// in composite interfaces:
+// - we don't end up inheriting the same class from
+//   mulitple places,
+// - we can detect if iface_impl_helper has already been
+//   used in an interface implementation.
+template <typename Base, typename Holder>
+struct iface_impl_helper : public detail::iface_impl_helper_base {
     auto &value() noexcept
     {
-        // NOTE: check to make sure that iface_impl_helper is used as a base of the
-        // interface implementation.
-        static_assert(std::is_base_of_v<iface_impl_helper, IFaceT<Holder, T, Args...>>,
-                      "iface_impl_helper must be used as a base for the interface implementation.");
+        using T = typename detail::holder_value<Holder>::type;
 
         auto &val = static_cast<Holder *>(this)->m_value;
 
@@ -1428,8 +1504,7 @@ struct iface_impl_helper {
     }
     const auto &value() const noexcept
     {
-        static_assert(std::is_base_of_v<iface_impl_helper, IFaceT<Holder, T, Args...>>,
-                      "iface_impl_helper must be used as a base for the interface implementation.");
+        using T = typename detail::holder_value<Holder>::type;
 
         const auto &val = static_cast<const Holder *>(this)->m_value;
 
@@ -1441,40 +1516,50 @@ struct iface_impl_helper {
     }
 };
 
-template <template <typename, typename, typename...> typename IFaceT, auto Cfg, typename... Args>
-bool has_dynamic_storage(const wrap<IFaceT, Cfg, Args...> &w) noexcept
+// Specialisation of iface_impl_helper if Base derives
+// from iface_impl_helper_base. This indicates that
+// we are in a composite interface situation, in which we want
+// to avoid defining another set of value() helpers (this would
+// lead to ambiguities).
+template <typename Base, typename Holder>
+    requires std::derived_from<Base, detail::iface_impl_helper_base>
+struct iface_impl_helper<Base, Holder> {
+};
+
+template <typename IFace, auto Cfg>
+bool has_dynamic_storage(const wrap<IFace, Cfg> &w) noexcept
 {
     return !has_static_storage(w);
 }
 
-template <typename T, template <typename, typename, typename...> typename IFaceT, auto Cfg, typename... Args>
-const T *value_ptr(const wrap<IFaceT, Cfg, Args...> &w) noexcept
+template <typename T, typename IFace, auto Cfg>
+const T *value_ptr(const wrap<IFace, Cfg> &w) noexcept
 {
     return value_type_index(w) == typeid(T) ? static_cast<const T *>(raw_ptr(w)) : nullptr;
 }
 
-template <typename T, template <typename, typename, typename...> typename IFaceT, auto Cfg, typename... Args>
-T *value_ptr(wrap<IFaceT, Cfg, Args...> &w) noexcept
+template <typename T, typename IFace, auto Cfg>
+T *value_ptr(wrap<IFace, Cfg> &w) noexcept
 {
     return value_type_index(w) == typeid(T) ? static_cast<T *>(raw_ptr(w)) : nullptr;
 }
 
-template <typename T, template <typename, typename, typename...> typename IFaceT, auto Cfg, typename... Args>
-const T &value_ref(const wrap<IFaceT, Cfg, Args...> &w)
+template <typename T, typename IFace, auto Cfg>
+const T &value_ref(const wrap<IFace, Cfg> &w)
 {
     const auto *ptr = value_ptr<T>(w);
     return ptr ? *ptr : throw std::bad_cast{};
 }
 
-template <typename T, template <typename, typename, typename...> typename IFaceT, auto Cfg, typename... Args>
-T &value_ref(wrap<IFaceT, Cfg, Args...> &w)
+template <typename T, typename IFace, auto Cfg>
+T &value_ref(wrap<IFace, Cfg> &w)
 {
     auto *ptr = value_ptr<T>(w);
     return ptr ? *ptr : throw std::bad_cast{};
 }
 
-template <typename T, template <typename, typename, typename...> typename IFaceT, auto Cfg, typename... Args>
-bool value_isa(const wrap<IFaceT, Cfg, Args...> &w) noexcept
+template <typename T, typename IFace, auto Cfg>
+bool value_isa(const wrap<IFace, Cfg> &w) noexcept
 {
     return value_ptr<T>(w) != nullptr;
 }
