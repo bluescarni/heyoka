@@ -407,7 +407,7 @@ public:
 
     [[nodiscard]] const expression &get_expression() const;
     callback_t &get_callback();
-    const callback_t &get_callback() const;
+    [[nodiscard]] const callback_t &get_callback() const;
     [[nodiscard]] event_direction get_direction() const;
 };
 
@@ -556,9 +556,9 @@ public:
 
     [[nodiscard]] const expression &get_expression() const;
     callback_t &get_callback();
-    const callback_t &get_callback() const;
+    [[nodiscard]] const callback_t &get_callback() const;
     [[nodiscard]] event_direction get_direction() const;
-    T get_cooldown() const;
+    [[nodiscard]] T get_cooldown() const;
 };
 
 // Prevent implicit instantiations.
@@ -687,11 +687,11 @@ public:
     [[nodiscard]] const llvm_state &get_llvm_state() const;
 
     const std::vector<T> &operator()(T);
-    const std::vector<T> &get_output() const;
-    const std::vector<T> &get_times() const;
-    const std::vector<T> &get_tcs() const;
+    [[nodiscard]] const std::vector<T> &get_output() const;
+    [[nodiscard]] const std::vector<T> &get_times() const;
+    [[nodiscard]] const std::vector<T> &get_tcs() const;
 
-    std::pair<T, T> get_bounds() const;
+    [[nodiscard]] std::pair<T, T> get_bounds() const;
     [[nodiscard]] std::size_t get_n_steps() const;
 };
 
@@ -798,14 +798,14 @@ public:
     const std::vector<T> &operator()(const std::vector<T> &);
     const std::vector<T> &operator()(T);
 
-    const std::vector<T> &get_output() const;
+    [[nodiscard]] const std::vector<T> &get_output() const;
     // NOTE: when documenting this function,
     // we need to warn about the padding.
-    const std::vector<T> &get_times() const;
-    const std::vector<T> &get_tcs() const;
+    [[nodiscard]] const std::vector<T> &get_times() const;
+    [[nodiscard]] const std::vector<T> &get_tcs() const;
     [[nodiscard]] std::uint32_t get_batch_size() const;
 
-    std::pair<std::vector<T>, std::vector<T>> get_bounds() const;
+    [[nodiscard]] std::pair<std::vector<T>, std::vector<T>> get_bounds() const;
     [[nodiscard]] std::size_t get_n_steps() const;
 };
 
@@ -1239,33 +1239,33 @@ public:
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] std::uint32_t get_dim() const;
 
-    T get_time() const;
+    [[nodiscard]] T get_time() const;
     void set_time(T);
 
     // Time set/get in double-length format.
-    std::pair<T, T> get_dtime() const;
+    [[nodiscard]] std::pair<T, T> get_dtime() const;
     void set_dtime(T, T);
 
-    const std::vector<T> &get_state() const;
-    const T *get_state_data() const;
+    [[nodiscard]] const std::vector<T> &get_state() const;
+    [[nodiscard]] const T *get_state_data() const;
     T *get_state_data();
 
-    const std::vector<T> &get_pars() const;
-    const T *get_pars_data() const;
+    [[nodiscard]] const std::vector<T> &get_pars() const;
+    [[nodiscard]] const T *get_pars_data() const;
     T *get_pars_data();
 
-    const std::vector<T> &get_tc() const;
+    [[nodiscard]] const std::vector<T> &get_tc() const;
 
-    T get_last_h() const;
+    [[nodiscard]] T get_last_h() const;
 
-    const std::vector<T> &get_d_output() const;
+    [[nodiscard]] const std::vector<T> &get_d_output() const;
     const std::vector<T> &update_d_output(T, bool = false);
 
     [[nodiscard]] bool with_events() const;
     void reset_cooldowns();
-    const std::vector<t_event_t> &get_t_events() const;
-    const std::vector<std::optional<std::pair<T, T>>> &get_te_cooldowns() const;
-    const std::vector<nt_event_t> &get_nt_events() const;
+    [[nodiscard]] const std::vector<t_event_t> &get_t_events() const;
+    [[nodiscard]] const std::vector<std::optional<std::pair<T, T>>> &get_te_cooldowns() const;
+    [[nodiscard]] const std::vector<nt_event_t> &get_nt_events() const;
 
     [[nodiscard]] const std::vector<expression> &get_state_vars() const;
     [[nodiscard]] const std::vector<expression> &get_rhs() const;
@@ -1738,44 +1738,44 @@ public:
 
     [[nodiscard]] std::uint32_t get_batch_size() const;
     [[nodiscard]] std::uint32_t get_order() const;
-    T get_tol() const;
+    [[nodiscard]] T get_tol() const;
     [[nodiscard]] bool get_high_accuracy() const;
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] std::uint32_t get_dim() const;
 
-    const std::vector<T> &get_time() const;
-    const T *get_time_data() const;
+    [[nodiscard]] const std::vector<T> &get_time() const;
+    [[nodiscard]] const T *get_time_data() const;
     void set_time(const std::vector<T> &);
     void set_time(T);
 
     // Time set/get in double-length format.
-    std::pair<const std::vector<T> &, const std::vector<T> &> get_dtime() const;
-    std::pair<const T *, const T *> get_dtime_data() const;
+    [[nodiscard]] std::pair<const std::vector<T> &, const std::vector<T> &> get_dtime() const;
+    [[nodiscard]] std::pair<const T *, const T *> get_dtime_data() const;
     void set_dtime(const std::vector<T> &, const std::vector<T> &);
     void set_dtime(T, T);
 
-    const std::vector<T> &get_state() const;
-    const T *get_state_data() const;
+    [[nodiscard]] const std::vector<T> &get_state() const;
+    [[nodiscard]] const T *get_state_data() const;
     T *get_state_data();
 
-    const std::vector<T> &get_pars() const;
-    const T *get_pars_data() const;
+    [[nodiscard]] const std::vector<T> &get_pars() const;
+    [[nodiscard]] const T *get_pars_data() const;
     T *get_pars_data();
 
-    const std::vector<T> &get_tc() const;
+    [[nodiscard]] const std::vector<T> &get_tc() const;
 
-    const std::vector<T> &get_last_h() const;
+    [[nodiscard]] const std::vector<T> &get_last_h() const;
 
-    const std::vector<T> &get_d_output() const;
+    [[nodiscard]] const std::vector<T> &get_d_output() const;
     const std::vector<T> &update_d_output(const std::vector<T> &, bool = false);
     const std::vector<T> &update_d_output(T, bool = false);
 
     [[nodiscard]] bool with_events() const;
     void reset_cooldowns();
     void reset_cooldowns(std::uint32_t);
-    const std::vector<t_event_t> &get_t_events() const;
-    const std::vector<std::vector<std::optional<std::pair<T, T>>>> &get_te_cooldowns() const;
-    const std::vector<nt_event_t> &get_nt_events() const;
+    [[nodiscard]] const std::vector<t_event_t> &get_t_events() const;
+    [[nodiscard]] const std::vector<std::vector<std::optional<std::pair<T, T>>>> &get_te_cooldowns() const;
+    [[nodiscard]] const std::vector<nt_event_t> &get_nt_events() const;
 
     [[nodiscard]] const std::vector<expression> &get_state_vars() const;
     [[nodiscard]] const std::vector<expression> &get_rhs() const;
@@ -1783,7 +1783,7 @@ public:
     void step(bool = false);
     void step_backward(bool = false);
     void step(const std::vector<T> &, bool = false);
-    const std::vector<std::tuple<taylor_outcome, T>> &get_step_res() const;
+    [[nodiscard]] const std::vector<std::tuple<taylor_outcome, T>> &get_step_res() const;
 
 private:
     // Implementations of the propagate_*() functions.
@@ -1860,7 +1860,7 @@ public:
 
         return propagate_grid_impl(grid, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb);
     }
-    const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &get_propagate_res() const
+    [[nodiscard]] const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &get_propagate_res() const
     {
         return m_prop_res;
     }
