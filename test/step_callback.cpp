@@ -69,6 +69,13 @@ struct cb1 {
     }
 };
 
+struct only_ph {
+    template <typename TA>
+    void pre_hook(TA &)
+    {
+    }
+};
+
 TEST_CASE("step_callback basics")
 {
     auto tester = [](auto fp_x) {
@@ -87,6 +94,7 @@ TEST_CASE("step_callback basics")
 
             REQUIRE(!std::is_constructible_v<step_callback<fp_t>, void>);
             REQUIRE(!std::is_constructible_v<step_callback<fp_t>, int, int>);
+            REQUIRE(!std::is_constructible_v<step_callback<fp_t>, only_ph>);
 
             REQUIRE(step_cb.get_type_index() == typeid(detail::empty_callable));
 
@@ -174,6 +182,25 @@ TEST_CASE("step_callback basics")
 
         {
             step_callback<fp_t> step_cb(cb1{});
+
+            REQUIRE(ta.get_state()[0] == 0.);
+
+            REQUIRE(static_cast<bool>(step_cb));
+
+            REQUIRE(!step_cb(ta));
+            REQUIRE(ta.get_state()[0] == 2.);
+
+            REQUIRE_NOTHROW(step_cb.pre_hook(ta));
+            REQUIRE(ta.get_state()[0] == 1.);
+
+            ta.get_state_data()[0] = 0;
+        }
+
+        // Same test as above, but using reference wrapper.
+        {
+            cb1 orig_cb1;
+
+            step_callback<fp_t> step_cb(std::ref(orig_cb1));
 
             REQUIRE(ta.get_state()[0] == 0.);
 

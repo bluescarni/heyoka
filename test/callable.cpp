@@ -153,6 +153,22 @@ TEST_CASE("callable call")
         REQUIRE(c0(3., 1.) == 2.);
     }
 
+    // Test with reference wrapper too.
+    {
+        foo f0{5}, f1{-2};
+
+        callable<double(double, double)> c0 = std::ref(f0), c1 = std::ref(f1);
+
+        REQUIRE(c0(3., 1.) == 9.);
+        REQUIRE(c1(3., 1.) == 2.);
+
+        using std::swap;
+        swap(c0, c1);
+
+        REQUIRE(c1(3., 1.) == 9.);
+        REQUIRE(c0(3., 1.) == 2.);
+    }
+
     // Test move construction from callable.
     {
         frob f{std::vector{1, 2, 3, 4, 5}};

@@ -29,13 +29,13 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-// Fwd declaration of the detector
-// for any callable object.
-template <typename>
-struct is_any_callable;
-
 namespace detail
 {
+
+// Detect callable instances.
+template <typename>
+struct is_any_callable : std::false_type {
+};
 
 // An empty struct used in the default initialisation
 // of callable objects.
@@ -49,29 +49,19 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS empty_callable {
     }
 };
 
-// Declaration of the callable interface template.
-template <typename, typename, typename, typename...>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface {
+// Default (empty) implementation of the callable interface.
+template <typename, typename, typename, typename, typename...>
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl {
 };
 
-// Declaration of the callable interface.
-template <typename R, typename... Args>
-// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<void, void, R, Args...> {
-    virtual ~callable_iface() = default;
-    virtual R operator()(Args... args) = 0;
-    virtual explicit operator bool() const noexcept = 0;
-};
-
-// Implementation of the callable interface for
-// invocable objects.
-template <typename Holder, typename T, typename R, typename... Args>
+// Implementation of the callable interface for invocable objects.
+template <typename Base, typename Holder, typename T, typename R, typename... Args>
     requires std::is_invocable_r_v<R, std::remove_reference_t<std::unwrap_reference_t<T>> &, Args...>
-                 // NOTE: also require copy constructability like
+                 // NOTE: also require copy constructibility like
                  // std::function does.
                  && std::copy_constructible<T>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
-    : virtual callable_iface<void, void, R, Args...>, tanuki::iface_impl_helper<Holder, T, callable_iface, R, Args...> {
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl<Base, Holder, T, R, Args...>
+    : public Base, tanuki::iface_impl_helper<Base, Holder> {
     explicit operator bool() const noexcept final
     {
         using unrefT = std::remove_reference_t<std::unwrap_reference_t<T>>;
@@ -107,9 +97,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, T, R, Args...>
 };
 
 // Implementation of the callable interface for the empty callable.
-template <typename Holder, typename R, typename... Args>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, empty_callable, R, Args...>
-    : virtual callable_iface<void, void, R, Args...> {
+template <typename Base, typename Holder, typename R, typename... Args>
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl<Base, Holder, empty_callable, R, Args...> : public Base {
     // NOTE: the empty callable is always empty and always results
     // in an exception being thrown if called.
     explicit operator bool() const noexcept final
@@ -122,79 +111,91 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface<Holder, empty_callable, R, 
     }
 };
 
-// Implementation of the reference interface.
-template <typename Wrap, typename R, typename... Args>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_ref_iface_impl {
-    using result_type = R;
+// Definition of the callable interface.
+template <typename R, typename... Args>
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface {
+    virtual ~callable_iface() = default;
+    virtual R operator()(Args... args) = 0;
+    virtual explicit operator bool() const noexcept = 0;
 
-    template <typename JustWrap = Wrap, typename... FArgs>
-    auto operator()(FArgs &&...fargs)
-        -> decltype(iface_ptr(*static_cast<JustWrap *>(this))->operator()(std::forward<FArgs>(fargs)...))
-    {
-        // NOTE: a wrap in invalid state is considered empty.
-        if (is_invalid(*static_cast<Wrap *>(this))) {
-            throw std::bad_function_call{};
-        }
-
-        return iface_ptr(*static_cast<Wrap *>(this))->operator()(std::forward<FArgs>(fargs)...);
-    }
-
-    explicit operator bool() const noexcept
-    {
-        // NOTE: a wrap in invalid state is considered empty.
-        if (is_invalid(*static_cast<const Wrap *>(this))) {
-            return false;
-        } else {
-            return static_cast<bool>(*iface_ptr(*static_cast<const Wrap *>(this)));
-        }
-    }
-
-    // NOTE: these are part of the old callable interface, and they are not
-    // strictly needed as there are equivalent functions in tanuki. Consider removing
-    // them in the future.
-    auto get_type_index() const noexcept
-    {
-        return value_type_index(*static_cast<const Wrap *>(this));
-    }
-    template <typename T>
-    T *extract() noexcept
-    {
-        return value_ptr<T>(*static_cast<Wrap *>(this));
-    }
-    template <typename T>
-    const T *extract() const noexcept
-    {
-        return value_ptr<T>(*static_cast<const Wrap *>(this));
-    }
+    template <typename Base, typename Holder, typename T>
+    using impl = callable_iface_impl<Base, Holder, T, R, Args...>;
 };
 
+// Implementation of the reference interface.
 template <typename R, typename... Args>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_ref_iface {
     template <typename Wrap>
-    using type = callable_ref_iface_impl<Wrap, R, Args...>;
+    struct impl {
+        using result_type = R;
+
+        template <typename JustWrap = Wrap, typename... FArgs>
+        auto operator()(FArgs &&...fargs)
+            -> decltype(iface_ptr(*static_cast<JustWrap *>(this))->operator()(std::forward<FArgs>(fargs)...))
+        {
+            // NOTE: a wrap in invalid state is considered empty.
+            if (is_invalid(*static_cast<Wrap *>(this))) {
+                throw std::bad_function_call{};
+            }
+
+            return iface_ptr(*static_cast<Wrap *>(this))->operator()(std::forward<FArgs>(fargs)...);
+        }
+
+        explicit operator bool() const noexcept
+        {
+            // NOTE: a wrap in invalid state is considered empty.
+            if (is_invalid(*static_cast<const Wrap *>(this))) {
+                return false;
+            } else {
+                return static_cast<bool>(*iface_ptr(*static_cast<const Wrap *>(this)));
+            }
+        }
+
+        // NOTE: these are part of the old callable interface, and they are not
+        // strictly needed as there are equivalent functions in tanuki. Consider removing
+        // them in the future.
+        auto get_type_index() const noexcept
+        {
+            return value_type_index(*static_cast<const Wrap *>(this));
+        }
+        template <typename T>
+        T *extract() noexcept
+        {
+            return value_ptr<T>(*static_cast<Wrap *>(this));
+        }
+        template <typename T>
+        const T *extract() const noexcept
+        {
+            return value_ptr<T>(*static_cast<const Wrap *>(this));
+        }
+    };
 };
 
 // Configuration of the callable wrap.
 template <typename R, typename... Args>
-inline constexpr auto callable_wrap_config
-    = tanuki::config<empty_callable, callable_ref_iface<R, Args...>::template type>{
-        // Similarly to std::function, ensure that callable can store
-        // in static storage pointers and reference wrappers.
-        // NOTE: reference wrappers are not guaranteed to have the size
-        // of a pointer, but in practice that should always be the case.
-        // In case this is a concern, static asserts can be added
-        // in the callable interface implementation.
-        .static_size = tanuki::holder_size<R (*)(Args...), callable_iface, R, Args...>,
-        .pointer_interface = false,
-        .explicit_generic_ctor = false};
+inline constexpr auto callable_wrap_config = tanuki::config<empty_callable, callable_ref_iface<R, Args...>>{
+    // Similarly to std::function, ensure that callable can store
+    // in static storage pointers and reference wrappers.
+    // NOTE: reference wrappers are not guaranteed to have the size
+    // of a pointer, but in practice that should always be the case.
+    // In case this is a concern, static asserts can be added
+    // in the callable interface implementation.
+    .static_size = tanuki::holder_size<R (*)(Args...), callable_iface<R, Args...>>,
+    .pointer_interface = false,
+    .explicit_generic_ctor = false};
 
 // Definition of the callable wrap.
 template <typename R, typename... Args>
-using callable_wrap_t = tanuki::wrap<callable_iface, callable_wrap_config<R, Args...>, R, Args...>;
+using callable_wrap_t = tanuki::wrap<callable_iface<R, Args...>, callable_wrap_config<R, Args...>>;
+
+// Specialise is_any_callable to detect callables.
+template <typename R, typename... Args>
+struct is_any_callable<detail::callable_wrap_t<R, Args...>> : std::true_type {
+};
 
 template <typename T>
 struct callable_impl {
-    static_assert(always_false_v<T>);
 };
 
 template <typename R, typename... Args>
@@ -205,16 +206,8 @@ struct callable_impl<R(Args...)> {
 } // namespace detail
 
 template <typename T>
+    requires(requires() { typename detail::callable_impl<T>::type; })
 using callable = typename detail::callable_impl<T>::type;
-
-// Detect callable instances.
-template <typename>
-struct is_any_callable : std::false_type {
-};
-
-template <typename R, typename... Args>
-struct is_any_callable<detail::callable_wrap_t<R, Args...>> : std::true_type {
-};
 
 HEYOKA_END_NAMESPACE
 
@@ -229,14 +222,14 @@ HEYOKA_END_NAMESPACE
 // This allows us to reduce the size of the final guid wrt to what TANUKI_S11N_WRAP_EXPORT_KEY
 // would synthesise, and thus to ameliorate the "class name too long" issue.
 #define HEYOKA_S11N_CALLABLE_EXPORT_KEY(udc, ...)                                                                      \
-    TANUKI_S11N_WRAP_EXPORT_KEY2(udc, "heyoka::callable<" #__VA_ARGS__ ">@" #udc, heyoka::detail::callable_iface,      \
-                                 __VA_ARGS__)
+    TANUKI_S11N_WRAP_EXPORT_KEY2(udc, "heyoka::callable<" #__VA_ARGS__ ">@" #udc,                                      \
+                                 heyoka::detail::callable_iface<__VA_ARGS__>)
 
 #define HEYOKA_S11N_CALLABLE_EXPORT_KEY2(udc, gid, ...)                                                                \
-    TANUKI_S11N_WRAP_EXPORT_KEY2(udc, gid, heyoka::detail::callable_iface, __VA_ARGS__)
+    TANUKI_S11N_WRAP_EXPORT_KEY2(udc, gid, heyoka::detail::callable_iface<__VA_ARGS__>)
 
 #define HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(udc, ...)                                                                \
-    TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(udc, heyoka::detail::callable_iface, __VA_ARGS__)
+    TANUKI_S11N_WRAP_EXPORT_IMPLEMENT(udc, heyoka::detail::callable_iface<__VA_ARGS__>)
 
 #define HEYOKA_S11N_CALLABLE_EXPORT(udc, ...)                                                                          \
     HEYOKA_S11N_CALLABLE_EXPORT_KEY(udc, __VA_ARGS__)                                                                  \
