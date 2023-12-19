@@ -196,6 +196,25 @@ TEST_CASE("step_callback basics")
             ta.get_state_data()[0] = 0;
         }
 
+        // Same test as above, but using reference wrapper.
+        {
+            cb1 orig_cb1;
+
+            step_callback<fp_t> step_cb(std::ref(orig_cb1));
+
+            REQUIRE(ta.get_state()[0] == 0.);
+
+            REQUIRE(static_cast<bool>(step_cb));
+
+            REQUIRE(!step_cb(ta));
+            REQUIRE(ta.get_state()[0] == 2.);
+
+            REQUIRE_NOTHROW(step_cb.pre_hook(ta));
+            REQUIRE(ta.get_state()[0] == 1.);
+
+            ta.get_state_data()[0] = 0;
+        }
+
         {
             step_callback<fp_t> step_cb([](auto &ta) {
                 ta.get_state_data()[0] = 3;
