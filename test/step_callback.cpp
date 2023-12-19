@@ -69,6 +69,13 @@ struct cb1 {
     }
 };
 
+struct only_ph {
+    template <typename TA>
+    void pre_hook(TA &)
+    {
+    }
+};
+
 TEST_CASE("step_callback basics")
 {
     auto tester = [](auto fp_x) {
@@ -87,6 +94,7 @@ TEST_CASE("step_callback basics")
 
             REQUIRE(!std::is_constructible_v<step_callback<fp_t>, void>);
             REQUIRE(!std::is_constructible_v<step_callback<fp_t>, int, int>);
+            REQUIRE(!std::is_constructible_v<step_callback<fp_t>, only_ph>);
 
             REQUIRE(step_cb.get_type_index() == typeid(detail::empty_callable));
 

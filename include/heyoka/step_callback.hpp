@@ -11,6 +11,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <concepts>
 #include <initializer_list>
 #include <type_traits>
 #include <vector>
@@ -42,9 +43,15 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// Default implementation of the step_cb interface: it inherits
-// the pre_hook() function from the default no-op implementation
-// in the interface (see below).
+// Forward declaration of the step_cb interface.
+template <typename>
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface;
+
+// Default implementation of the step_cb interface.
+// If T has an empty (i.e., invalid) callable_iface_impl, this class
+// will be empty too. Otherwise, it will inherit the call
+// operator from callable_iface_impl and the default (no-op)
+// pre_hook() implementation from step_cb_iface.
 template <typename Base, typename Holder, typename T, typename TA>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface_impl : callable_iface_impl<Base, Holder, T, bool, TA &> {
 };
@@ -57,10 +64,15 @@ concept with_pre_hook = requires(T &x, TA &ta) { static_cast<void>(x.pre_hook(ta
 // Implementation of the step_cb interface for
 // objects providing the pre_hook() member function.
 template <typename Base, typename Holder, typename T, typename TA>
-    requires with_pre_hook<std::remove_reference_t<std::unwrap_reference_t<T>>, TA>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface_impl<Base, Holder, T, TA>
+    requires
+    // NOTE: this first concept requirement is needed to prevent objects
+    // implementing pre_hook() *without* a valid callable_iface_impl
+    // triggering a hard error due to pre_hook() being marked final.
+    std::derived_from<callable_iface_impl<Base, Holder, T, bool, TA &>, step_cb_iface<TA>>
+        && with_pre_hook<std::remove_reference_t<std::unwrap_reference_t<T>>, TA>
+        struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface_impl<Base, Holder, T, TA>
     : callable_iface_impl<Base, Holder, T, bool, TA &>,
-      tanuki::iface_impl_helper<callable_iface_impl<Base, Holder, T, bool, TA &>, Holder> {
+    tanuki::iface_impl_helper<callable_iface_impl<Base, Holder, T, bool, TA &>, Holder> {
     void pre_hook(TA &ta) final
     {
         static_cast<void>(this->value().pre_hook(ta));
