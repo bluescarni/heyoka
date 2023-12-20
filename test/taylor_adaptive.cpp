@@ -1179,11 +1179,15 @@ TEST_CASE("propagate for_until")
     // Test the callback is moved.
     step_callback<double> f_cb_until(cb_functor_until{});
     f_cb_until.extract<cb_functor_until>()->n_copies_after = f_cb_until.extract<cb_functor_until>()->n_copies;
-    ta.propagate_until(10., kw::callback = std::move(f_cb_until));
+    auto out_cb = std::get<5>(ta.propagate_until(10., kw::callback = std::move(f_cb_until)));
+    // Invoke again the callback to ensure no copies have been made.
+    out_cb(ta);
 
     step_callback<double> f_cb_for(cb_functor_for{});
     f_cb_for.extract<cb_functor_for>()->n_copies_after = f_cb_for.extract<cb_functor_for>()->n_copies;
-    ta.propagate_for(10., kw::callback = std::move(f_cb_for));
+    out_cb = std::get<5>(ta.propagate_for(10., kw::callback = std::move(f_cb_for)));
+    // Invoke again the callback to ensure no copies have been made.
+    out_cb(ta);
 }
 
 TEST_CASE("propagate for_until write_tc")
@@ -1290,10 +1294,12 @@ TEST_CASE("propagate grid")
     REQUIRE(counter == 190000ul);
     REQUIRE(oc == taylor_outcome::time_limit);
 
-    // Test moving in the callback.
+    // Test the callback is moved.
     step_callback<double> f_cb_grid(cb_functor_grid{});
     f_cb_grid.extract<cb_functor_grid>()->n_copies_after = f_cb_grid.extract<cb_functor_grid>()->n_copies;
-    ta.propagate_grid({1., 5., 10.}, kw::callback = std::move(f_cb_grid));
+    auto out_cb = std::get<4>(ta.propagate_grid({1., 5., 10.}, kw::callback = std::move(f_cb_grid)));
+    // Invoke again the callback to ensure no copies have been made.
+    out_cb(ta);
 }
 
 // Test the stream operator of the outcome enum.
