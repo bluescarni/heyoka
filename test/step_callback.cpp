@@ -747,3 +747,76 @@ TEST_CASE("step_callback_set")
 
     tuple_for_each(fp_types, tester);
 }
+
+TEST_CASE("step_callback range")
+{
+    auto dyn = model::pendulum();
+
+    auto tester = [&](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        // Empty set.
+        {
+            auto ta0 = taylor_adaptive<fp_t>{dyn, {1., 0.}};
+
+            auto [oc, _1, _2, _3, _4, cb]
+                = ta0.propagate_until(10., kw::callback = std::initializer_list<step_callback<fp_t>>{});
+
+            REQUIRE(oc == taylor_outcome::time_limit);
+            REQUIRE(cb);
+            REQUIRE(value_isa<step_callback_set<fp_t>>(cb));
+        }
+
+        // Check sequencing of callback invocations.
+        {
+            int c1 = 0;
+            int c2 = 0;
+
+            auto ta0 = taylor_adaptive<fp_t>{dyn, {1., 0.}};
+
+            auto [oc, _1, _2, _3, _4, cb]
+                = ta0.propagate_until(10., kw::callback = {step_callback<fp_t>{[&c1, &c2](const auto &) {
+                                                               REQUIRE(c1 == c2);
+                                                               ++c1;
+                                                               return true;
+                                                           }},
+                                                           step_callback<fp_t>{[&c1, &c2](const auto &) {
+                                                               ++c2;
+                                                               REQUIRE(c1 == c2);
+                                                               return true;
+                                                           }}});
+
+            REQUIRE(oc == taylor_outcome::time_limit);
+            REQUIRE(c1 == c2);
+            REQUIRE(cb);
+            REQUIRE(value_isa<step_callback_set<fp_t>>(cb));
+        }
+
+        // Check stopping.
+        {
+            int c1 = 0;
+            int c2 = 0;
+
+            auto ta0 = taylor_adaptive<fp_t>{dyn, {1., 0.}};
+
+            auto [oc, _1, _2, _3, _4, cb]
+                = ta0.propagate_until(10., kw::callback = {step_callback<fp_t>{[&c1, &c2](const auto &) {
+                                                               REQUIRE(c1 == c2);
+                                                               ++c1;
+                                                               return false;
+                                                           }},
+                                                           step_callback<fp_t>{[&c1, &c2](const auto &) {
+                                                               ++c2;
+                                                               REQUIRE(c1 == c2);
+                                                               return true;
+                                                           }}});
+
+            REQUIRE(oc == taylor_outcome::cb_stop);
+            REQUIRE(c1 == c2);
+            REQUIRE(cb);
+            REQUIRE(value_isa<step_callback_set<fp_t>>(cb));
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
