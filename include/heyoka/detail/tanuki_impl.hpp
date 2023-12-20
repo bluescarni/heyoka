@@ -743,6 +743,10 @@ concept ctible_holder =
     // - all interface requirements have been implemented, and
     // - we can construct the value type from the variadic args, and
     // - the value type T satisfies the conditions to be stored in a holder.
+    // NOTE: we put the derived_from check first as this helps avoiding
+    // constructible_from triggering an infinite loop. This has been observed
+    // in certain situations involving wraps with an implicit generic constructor
+    // (see also the test_inf_loop_bug test).
     std::derived_from<Holder, IFace> && std::constructible_from<Holder, U...> &&
     // Alignment checks: if we are going to use dynamic storage, then no checks are needed
     // as new() takes care of proper alignment; otherwise, we need to ensure that the static
