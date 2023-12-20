@@ -743,7 +743,7 @@ concept ctible_holder =
     // - all interface requirements have been implemented, and
     // - we can construct the value type from the variadic args, and
     // - the value type T satisfies the conditions to be stored in a holder.
-    std::constructible_from<Holder, U...> && std::derived_from<Holder, IFace> &&
+    std::derived_from<Holder, IFace> && std::constructible_from<Holder, U...> &&
     // Alignment checks: if we are going to use dynamic storage, then no checks are needed
     // as new() takes care of proper alignment; otherwise, we need to ensure that the static
     // storage is sufficiently aligned.

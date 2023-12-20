@@ -75,7 +75,7 @@ int main()
     ta.get_state_data()[1] = 0.025;
 
     // Propagate for 5 time units.
-    auto [status, min_h, max_h, nsteps, _1] = ta.propagate_for(5.);
+    auto [status, min_h, max_h, nsteps, _1, _2] = ta.propagate_for(5.);
 
     std::cout << "Outcome      : " << status << '\n';
     std::cout << "Min. timestep: " << min_h << '\n';
@@ -84,7 +84,7 @@ int main()
     std::cout << "Current time : " << ta.get_time() << "\n\n";
 
     // Propagate until t = 20.
-    std::tie(status, min_h, max_h, nsteps, _1) = ta.propagate_until(20.);
+    std::tie(status, min_h, max_h, nsteps, _1, _2) = ta.propagate_until(20.);
 
     std::cout << "Outcome      : " << status << '\n';
     std::cout << "Min. timestep: " << min_h << '\n';
@@ -93,7 +93,7 @@ int main()
     std::cout << "Current time : " << ta.get_time() << "\n\n";
 
     // Propagate back to t = 0.
-    std::tie(status, min_h, max_h, nsteps, _1) = ta.propagate_until(0.);
+    std::tie(status, min_h, max_h, nsteps, _1, _2) = ta.propagate_until(0.);
 
     std::cout << "Outcome      : " << status << '\n';
     std::cout << "Min. timestep: " << min_h << '\n';
@@ -113,6 +113,6 @@ int main()
     auto out = ta.propagate_grid({0., 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0});
 
     // Print the state at t = 0.4 (index 4 in the time grid).
-    std::cout << "x(0.4) = " << std::get<4>(out)[2 * 4] << '\n';
-    std::cout << "v(0.4) = " << std::get<4>(out)[2 * 4 + 1] << '\n';
+    std::cout << "x(0.4) = " << std::get<5>(out)[2 * 4] << '\n';
+    std::cout << "v(0.4) = " << std::get<5>(out)[2 * 4 + 1] << '\n';
 }

@@ -40,42 +40,45 @@ namespace detail
 {
 
 template <typename T>
-std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
+std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>,
+                       step_callback<T>>>
 ensemble_propagate_until_impl(const taylor_adaptive<T> &, T, std::size_t,
                               const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t,
-                              T, step_callback<T> &, bool, bool);
+                              T, step_callback<T>, bool, bool);
 
 template <typename T>
-std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
+std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>,
+                       step_callback<T>>>
 ensemble_propagate_for_impl(const taylor_adaptive<T> &, T, std::size_t,
                             const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t, T,
-                            step_callback<T> &, bool, bool);
+                            step_callback<T>, bool, bool);
 
 template <typename T>
-std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::vector<T>>>
+std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>>
 ensemble_propagate_grid_impl(const taylor_adaptive<T> &, std::vector<T>, std::size_t,
                              const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &, std::size_t, T,
-                             step_callback<T> &);
+                             step_callback<T>);
 
 // Prevent implicit instantiations.
 // NOLINTBEGIN
 #define HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_SCALAR_INST(T)                                                                \
-    extern template std::vector<                                                                                       \
-        std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>        \
+    extern template std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t,                      \
+                                           std::optional<continuous_output<T>>, step_callback<T>>>                     \
     ensemble_propagate_until_impl(const taylor_adaptive<T> &, T, std::size_t,                                          \
                                   const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,          \
-                                  std::size_t, T, step_callback<T> &, bool, bool);                                     \
+                                  std::size_t, T, step_callback<T>, bool, bool);                                       \
                                                                                                                        \
-    extern template std::vector<                                                                                       \
-        std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>        \
+    extern template std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t,                      \
+                                           std::optional<continuous_output<T>>, step_callback<T>>>                     \
     ensemble_propagate_for_impl(const taylor_adaptive<T> &, T, std::size_t,                                            \
                                 const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,            \
-                                std::size_t, T, step_callback<T> &, bool, bool);                                       \
+                                std::size_t, T, step_callback<T>, bool, bool);                                         \
                                                                                                                        \
-    extern template std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::vector<T>>>     \
+    extern template std::vector<                                                                                       \
+        std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>>           \
     ensemble_propagate_grid_impl(const taylor_adaptive<T> &, std::vector<T>, std::size_t,                              \
                                  const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &,           \
-                                 std::size_t, T, step_callback<T> &);
+                                 std::size_t, T, step_callback<T>);
 // NOLINTEND
 
 HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_SCALAR_INST(float)
@@ -97,44 +100,41 @@ HEYOKA_ENSEMBLE_PROPAGATE_EXTERN_SCALAR_INST(mppp::real)
 } // namespace detail
 
 template <typename T, typename... KwArgs>
-inline std::vector<
-    std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
+std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>,
+                       step_callback<T>>>
 ensemble_propagate_until(const taylor_adaptive<T> &ta, T t, std::size_t n_iter,
                          const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &gen,
-                         KwArgs &&...kw_args)
+                         const KwArgs &...kw_args)
 {
-    auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
-        = detail::taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
+    auto [max_steps, max_delta_t, cb, write_tc, with_c_out] = detail::taylor_propagate_common_ops<T, false>(kw_args...);
 
-    return detail::ensemble_propagate_until_impl(ta, std::move(t), n_iter, gen, max_steps, std::move(max_delta_t), cb,
-                                                 write_tc, with_c_out);
+    return detail::ensemble_propagate_until_impl(ta, std::move(t), n_iter, gen, max_steps, std::move(max_delta_t),
+                                                 std::move(cb), write_tc, with_c_out);
 }
 
 template <typename T, typename... KwArgs>
-inline std::vector<
-    std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>>
+std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>,
+                       step_callback<T>>>
 ensemble_propagate_for(const taylor_adaptive<T> &ta, T delta_t, std::size_t n_iter,
                        const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &gen,
-                       KwArgs &&...kw_args)
+                       const KwArgs &...kw_args)
 {
-    auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
-        = detail::taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
+    auto [max_steps, max_delta_t, cb, write_tc, with_c_out] = detail::taylor_propagate_common_ops<T, false>(kw_args...);
 
     return detail::ensemble_propagate_for_impl(ta, std::move(delta_t), n_iter, gen, max_steps, std::move(max_delta_t),
-                                               cb, write_tc, with_c_out);
+                                               std::move(cb), write_tc, with_c_out);
 }
 
 template <typename T, typename... KwArgs>
-inline std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, std::vector<T>>>
+std::vector<std::tuple<taylor_adaptive<T>, taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>>
 ensemble_propagate_grid(const taylor_adaptive<T> &ta, std::vector<T> grid, std::size_t n_iter,
                         const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &gen,
-                        KwArgs &&...kw_args)
+                        const KwArgs &...kw_args)
 {
-    auto [max_steps, max_delta_t, cb, _]
-        = detail::taylor_propagate_common_ops<T, true>(std::forward<KwArgs>(kw_args)...);
+    auto [max_steps, max_delta_t, cb] = detail::taylor_propagate_common_ops<T, true>(kw_args...);
 
     return detail::ensemble_propagate_grid_impl(ta, std::move(grid), n_iter, gen, max_steps, std::move(max_delta_t),
-                                                cb);
+                                                std::move(cb));
 }
 
 namespace detail

@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -20,6 +21,7 @@
 #include <memory>
 #include <optional>
 #include <ostream>
+#include <ranges>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -870,21 +872,32 @@ class taylor_pwrap;
 template <typename T>
 HEYOKA_DLL_PUBLIC T taylor_default_max_delta_t();
 
+// Concept to detect a range R from whose reference type
+// a callback of type CB can be constructed.
+template <typename R, typename CB>
+concept input_cb_range = std::ranges::input_range<R> && std::constructible_from<CB, std::ranges::range_reference_t<R>>;
+
 // Parser for the common kwargs options for the propagate_*() functions.
 template <typename T, bool Grid, typename... KwArgs>
-inline auto taylor_propagate_common_ops(const KwArgs &...kw_args)
+auto taylor_propagate_common_ops(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
     if constexpr (p.has_unnamed_arguments()) {
-        static_assert(detail::always_false_v<KwArgs...>, "The variadic arguments to a propagate_*() function in an "
-                                                         "adaptive Taylor integrator contain unnamed arguments.");
+        // LCOV_EXCL_START
+        static_assert(detail::always_false_v<KwArgs...>,
+                      "The variadic arguments to a propagate_*() function in an "
+                      "adaptive Taylor integrator cannot contain unnamed arguments.");
         throw;
+        // LCOV_EXCL_STOP
     } else {
         // Max number of steps (defaults to zero).
         auto max_steps = [&p]() -> std::size_t {
             if constexpr (p.has(kw::max_steps)) {
-                return std::forward<decltype(p(kw::max_steps))>(p(kw::max_steps));
+                static_assert(std::integral<std::remove_cvref_t<decltype(p(kw::max_steps))>>,
+                              "The 'max_steps' keyword argument to a propagate_*() function must be of integral type.");
+
+                return boost::numeric_cast<std::size_t>(p(kw::max_steps));
             } else {
                 return 0;
             }
@@ -893,29 +906,48 @@ inline auto taylor_propagate_common_ops(const KwArgs &...kw_args)
         // Max delta_t (defaults to positive infinity).
         auto max_delta_t = [&p]() -> T {
             if constexpr (p.has(kw::max_delta_t)) {
+                static_assert(
+                    std::convertible_to<decltype(p(kw::max_delta_t)), T>,
+                    "A 'max_delta_t' keyword argument of an invalid type was passed to a propagate_*() function.");
+
                 return std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t));
             } else {
                 return taylor_default_max_delta_t<T>();
             }
         }();
 
-        // Callback (defaults to empty). If a step_callback with the correct
-        // signature is passed as argument, return a reference wrapper to it
-        // in order to avoid a useless copy.
-        // NOTE: eventually here we could check if the user passed in a range
-        // of elements which are (convertible to) step_callback, and automatically
-        // build a step_callback_set from them.
-        auto cb = [&p]() {
-            using cb_func_t = step_callback<T>;
+        // Callback (defaults to empty). If an object that can be used to construct
+        // a cb_func_t is provided, then use it. Otherwise, if a range of objects
+        // that can be used to construct a cb_func_t is provided, use them to assemble
+        // a step_callback_set. Otherwise, the call is malformed.
+        // NOTE: in any case, we end up creating a new object either by copying
+        // or moving the input argument(s).
+        using cb_func_t = step_callback<T>;
 
+        auto cb = [&p]() -> cb_func_t {
             if constexpr (p.has(kw::callback)) {
-                if constexpr (std::is_same_v<uncvref_t<decltype(p(kw::callback))>, cb_func_t>) {
-                    return std::ref(p(kw::callback));
+                using cb_arg_t = decltype(p(kw::callback));
+
+                if constexpr (std::convertible_to<cb_arg_t, cb_func_t>) {
+                    return std::forward<cb_arg_t>(p(kw::callback));
+                } else if constexpr (input_cb_range<cb_arg_t, cb_func_t>) {
+                    std::vector<cb_func_t> cb_vec;
+                    for (auto &&cb : p(kw::callback)) {
+                        cb_vec.emplace_back(std::forward<std::ranges::range_reference_t<cb_arg_t>>(cb));
+                    }
+
+                    return step_callback_set<T>(std::move(cb_vec));
                 } else {
-                    return cb_func_t(std::forward<decltype(p(kw::callback))>(p(kw::callback)));
+                    // LCOV_EXCL_START
+                    static_assert(
+                        detail::always_false_v<KwArgs...>,
+                        "A 'callback' keyword argument of an invalid type was passed to a propagate_*() function.");
+
+                    throw;
+                    // LCOV_EXCL_STOP
                 }
             } else {
-                return cb_func_t{};
+                return {};
             }
         }();
 
@@ -923,20 +955,26 @@ inline auto taylor_propagate_common_ops(const KwArgs &...kw_args)
         // NOTE: this won't be used in propagate_grid().
         auto write_tc = [&p]() -> bool {
             if constexpr (p.has(kw::write_tc)) {
+                static_assert(
+                    std::convertible_to<decltype(p(kw::write_tc)), bool>,
+                    "A 'write_tc' keyword argument of an invalid type was passed to a propagate_*() function.");
+
                 return std::forward<decltype(p(kw::write_tc))>(p(kw::write_tc));
             } else {
                 return false;
             }
         }();
 
-        // NOTE: use std::make_tuple() so that if cb is a reference wrapper, it is turned
-        // into a reference tuple element.
         if constexpr (Grid) {
-            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc);
+            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb));
         } else {
             // Continuous output (defaults to false).
             auto with_c_out = [&p]() -> bool {
                 if constexpr (p.has(kw::c_output)) {
+                    static_assert(
+                        std::convertible_to<decltype(p(kw::c_output)), bool>,
+                        "A 'c_output' keyword argument of an invalid type was passed to a propagate_*() function.");
+
                     return std::forward<decltype(p(kw::c_output))>(p(kw::c_output));
                 } else {
                     return false;
@@ -1276,10 +1314,10 @@ public:
 
 private:
     // Implementations of the propagate_*() functions.
-    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-    propagate_until_impl(detail::dfloat<T>, std::size_t, T, step_callback<T> &, bool, bool);
-    std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid_impl(std::vector<T>, std::size_t, T,
-                                                                                      step_callback<T> &);
+    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
+    propagate_until_impl(detail::dfloat<T>, std::size_t, T, step_callback<T>, bool, bool);
+    std::tuple<taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>
+        propagate_grid_impl(std::vector<T>, std::size_t, T, step_callback<T>);
 
 public:
     // NOTE: return values:
@@ -1288,8 +1326,9 @@ public:
     // - max abs(timestep),
     // - total number of nonzero steps
     //   successfully undertaken,
-    // - grid of state vectors (only for propagate_grid()),
-    // - continuous output, if requested (only for propagate_for/until()).
+    // - continuous output, if requested (only for propagate_for/until()),
+    // - step callback, if provided,
+    // - grid of state vectors (only for propagate_grid()).
     // NOTE: the min/max timesteps are well-defined
     // only if at least 1-2 steps were taken successfully.
     // NOTE: the propagate_*() functions are not guaranteed to bring
@@ -1302,33 +1341,32 @@ public:
     // in the future we can offer a stronger guarantee, which however will
     // result in a more complicated logic.
     template <typename... KwArgs>
-    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-    propagate_until(T t, KwArgs &&...kw_args)
+    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
+    propagate_until(T t, const KwArgs &...kw_args)
     {
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
-            = detail::taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
+            = detail::taylor_propagate_common_ops<T, false>(kw_args...);
 
-        return propagate_until_impl(detail::dfloat<T>(std::move(t)), max_steps, std::move(max_delta_t), cb, write_tc,
-                                    with_c_out);
+        return propagate_until_impl(detail::dfloat<T>(std::move(t)), max_steps, std::move(max_delta_t), std::move(cb),
+                                    write_tc, with_c_out);
     }
     template <typename... KwArgs>
-    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-    propagate_for(T delta_t, KwArgs &&...kw_args)
+    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
+    propagate_for(T delta_t, const KwArgs &...kw_args)
     {
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
-            = detail::taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
+            = detail::taylor_propagate_common_ops<T, false>(kw_args...);
 
-        return propagate_until_impl(m_time + std::move(delta_t), max_steps, std::move(max_delta_t), cb, write_tc,
-                                    with_c_out);
+        return propagate_until_impl(m_time + std::move(delta_t), max_steps, std::move(max_delta_t), std::move(cb),
+                                    write_tc, with_c_out);
     }
     template <typename... KwArgs>
-    std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid(std::vector<T> grid,
-                                                                                 KwArgs &&...kw_args)
+    std::tuple<taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>
+    propagate_grid(std::vector<T> grid, const KwArgs &...kw_args)
     {
-        auto [max_steps, max_delta_t, cb, _]
-            = detail::taylor_propagate_common_ops<T, true>(std::forward<KwArgs>(kw_args)...);
+        auto [max_steps, max_delta_t, cb] = detail::taylor_propagate_common_ops<T, true>(kw_args...);
 
-        return propagate_grid_impl(std::move(grid), max_steps, std::move(max_delta_t), cb);
+        return propagate_grid_impl(std::move(grid), max_steps, std::move(max_delta_t), std::move(cb));
     }
 };
 

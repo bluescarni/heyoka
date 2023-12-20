@@ -460,7 +460,9 @@ TEST_CASE("step_callback pre_hook")
         auto res0 = ta0.propagate_grid({0., 1., 2.}, kw::callback = pend_cb{});
         auto res1 = ta1.propagate_grid({0., 1., 2.});
 
-        REQUIRE(std::get<4>(res0)[0] == std::get<4>(res1)[0]);
+        REQUIRE(std::get<4>(res0));
+        REQUIRE(!std::get<4>(res1));
+        REQUIRE(std::get<5>(res0)[0] == std::get<5>(res1)[0]);
 
         REQUIRE(ta0.get_pars()[0] == 1.5);
 

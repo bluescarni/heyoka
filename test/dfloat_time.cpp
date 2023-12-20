@@ -124,7 +124,7 @@ TEST_CASE("scalar test")
             const auto grid = std::vector{fp_t{1.}, fp_t{10.}, final_time};
 
             ta.propagate_until(fp_t{1.});
-            const auto out = std::get<4>(ta.propagate_grid(grid));
+            const auto out = std::get<5>(ta.propagate_grid(grid));
 
             for (auto j = 0u; j < 3u; ++j) {
                 auto t = grid[j];
@@ -149,7 +149,7 @@ TEST_CASE("scalar test")
             const auto grid = std::vector{fp_t{-1.}, fp_t{-10.}, -final_time};
 
             ta.propagate_until(fp_t{-1.});
-            const auto out = std::get<4>(ta.propagate_grid(grid));
+            const auto out = std::get<5>(ta.propagate_grid(grid));
 
             for (auto j = 0u; j < 3u; ++j) {
                 auto t = grid[j];

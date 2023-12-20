@@ -290,7 +290,7 @@ TEST_CASE("scalar propagate grid")
             REQUIRE(std::get<2>(res[i]) == std::get<1>(loc_res));
             REQUIRE(std::get<3>(res[i]) == std::get<2>(loc_res));
             REQUIRE(std::get<4>(res[i]) == std::get<3>(loc_res));
-            REQUIRE(std::get<5>(res[i]) == std::get<4>(loc_res));
+            REQUIRE(std::get<6>(res[i]) == std::get<5>(loc_res));
         }
     };
 

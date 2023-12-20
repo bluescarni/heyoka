@@ -89,7 +89,7 @@ TEST_CASE("scalar")
         auto ta = taylor_adaptive<fp_t>{
             {prime(x) = v, prime(v) = -x}, {0., 1.}, kw::opt_level = opt_level, kw::high_accuracy = ha};
 
-        auto [_0, _1, _2, tot_steps, d_out] = ta.propagate_until(10., kw::c_output = true);
+        auto [_0, _1, _2, tot_steps, d_out, _3] = ta.propagate_until(10., kw::c_output = true);
 
         REQUIRE(d_out.has_value());
         REQUIRE(d_out->get_output().size() == 2u);
@@ -109,7 +109,7 @@ TEST_CASE("scalar")
 
         // Run a grid propagation.
         auto t_grid = std::vector<fp_t>{0., 1., 2., 3., 4., 5., 6., 7., 8., 9., 10.};
-        auto grid_out = std::get<4>(ta.propagate_grid(t_grid));
+        auto grid_out = std::get<5>(ta.propagate_grid(t_grid));
 
         // Compare the two.
         for (auto i = 0u; i < 11u; ++i) {
@@ -150,7 +150,7 @@ TEST_CASE("scalar")
         ta.get_state_data()[1] = 1;
         ta.set_time(0);
 
-        std::tie(_0, _1, _2, tot_steps, d_out) = ta.propagate_for(10., kw::c_output = true);
+        std::tie(_0, _1, _2, tot_steps, d_out, _3) = ta.propagate_for(10., kw::c_output = true);
 
         REQUIRE(d_out.has_value());
         REQUIRE(d_out->get_output().size() == 2u);
@@ -187,7 +187,7 @@ TEST_CASE("scalar")
 
         // Run a grid propagation.
         t_grid = std::vector<fp_t>{0., -1., -2., -3., -4., -5., -6., -7., -8., -9., -10.};
-        grid_out = std::get<4>(ta.propagate_grid(t_grid));
+        grid_out = std::get<5>(ta.propagate_grid(t_grid));
 
         // Compare the two.
         for (auto i = 0u; i < 11u; ++i) {
@@ -273,7 +273,7 @@ TEST_CASE("scalar")
         ta.get_state_data()[1] = 1;
         ta.set_time(0);
 
-        std::tie(_0, _1, _2, tot_steps, d_out) = ta.propagate_for(10., kw::c_output = false);
+        std::tie(_0, _1, _2, tot_steps, d_out, _3) = ta.propagate_for(10., kw::c_output = false);
 
         REQUIRE(!d_out.has_value());
     };
