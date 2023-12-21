@@ -885,7 +885,7 @@ concept input_rangeT = std::ranges::input_range<R> && std::constructible_from<T,
 template <typename Callback, typename CallbackSet, typename Parser>
 Callback parse_propagate_cb(Parser &p)
 {
-    if constexpr (p.has(kw::callback)) {
+    if constexpr (Parser::has(kw::callback)) {
         using cb_arg_t = decltype(p(kw::callback));
 
         if constexpr (std::convertible_to<cb_arg_t, Callback>) {
