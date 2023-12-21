@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <functional>
+#include <initializer_list>
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
@@ -800,16 +801,16 @@ TEST_CASE("step_callback range")
             auto ta0 = taylor_adaptive<fp_t>{dyn, {1., 0.}};
 
             auto [oc, _1, _2, _3, _4, cb]
-                = ta0.propagate_until(10., kw::callback = {step_callback<fp_t>{[&c1, &c2](const auto &) {
-                                                               REQUIRE(c1 == c2);
-                                                               ++c1;
-                                                               return false;
-                                                           }},
-                                                           step_callback<fp_t>{[&c1, &c2](const auto &) {
-                                                               ++c2;
-                                                               REQUIRE(c1 == c2);
-                                                               return true;
-                                                           }}});
+                = ta0.propagate_until(10., kw::callback = std::vector<step_callback<fp_t>>{[&c1, &c2](const auto &) {
+                                                                                               REQUIRE(c1 == c2);
+                                                                                               ++c1;
+                                                                                               return false;
+                                                                                           },
+                                                                                           [&c1, &c2](const auto &) {
+                                                                                               ++c2;
+                                                                                               REQUIRE(c1 == c2);
+                                                                                               return true;
+                                                                                           }});
 
             REQUIRE(oc == taylor_outcome::cb_stop);
             REQUIRE(c1 == c2);

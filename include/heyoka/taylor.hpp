@@ -872,7 +872,7 @@ class taylor_pwrap;
 template <typename T>
 HEYOKA_DLL_PUBLIC T taylor_default_max_delta_t();
 
-// Concept to detect a range R from whose reference type
+// Concept to detect if R is a range from whose reference type
 // a callback of type CB can be constructed.
 template <typename R, typename CB>
 concept input_cb_range = std::ranges::input_range<R> && std::constructible_from<CB, std::ranges::range_reference_t<R>>;

@@ -306,6 +306,7 @@ TEST_CASE("propagate grid scalar")
     out = ta.propagate_grid(
         {0., 10.}, kw::callback = [](const auto &) { return true; });
     REQUIRE(std::get<0>(out) == taylor_outcome{-1});
+    REQUIRE(std::get<4>(out));
 
     // Callback attempting the change the time coordinate.
     ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -x}, {0., 1.}};
@@ -1106,12 +1107,13 @@ TEST_CASE("propagate for_until")
     // Propagate forward in time limiting the timestep size and passing in a callback.
     auto counter = 0ul;
 
-    auto oc = std::get<0>(ta.propagate_until(
+    auto [oc, _1, _2, _3, _4, cb] = ta.propagate_until(
         10., kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) {
             ++counter;
             return true;
-        }));
+        });
     auto oc_copy = std::get<0>(ta_copy.propagate_until(10.));
+    REQUIRE(cb);
 
     REQUIRE(ta.get_time() == 10.);
     REQUIRE(counter == 100000ul);
@@ -1273,7 +1275,7 @@ TEST_CASE("propagate grid")
     // Propagate forward in time limiting the timestep size and passing in a callback.
     auto counter = 0ul;
 
-    auto [oc, _1, _2, _3, _4, out] = ta.propagate_grid(
+    auto [oc, _1, _2, _3, cb, out] = ta.propagate_grid(
         {0., 1., 5., 10.}, kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) {
             ++counter;
             return true;
@@ -1281,10 +1283,11 @@ TEST_CASE("propagate grid")
 
     REQUIRE(ta.get_time() == 10.);
     REQUIRE(counter == 100000ul);
+    REQUIRE(cb);
     REQUIRE(oc == taylor_outcome::time_limit);
 
     // Backwards.
-    std::tie(oc, _1, _2, _3, _4, out) = ta.propagate_grid(
+    std::tie(oc, _1, _2, _3, cb, out) = ta.propagate_grid(
         {10., 5., 1.}, kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) {
             ++counter;
             return true;
@@ -1292,6 +1295,7 @@ TEST_CASE("propagate grid")
 
     REQUIRE(ta.get_time() == 1);
     REQUIRE(counter == 190000ul);
+    REQUIRE(cb);
     REQUIRE(oc == taylor_outcome::time_limit);
 
     // Test the callback is moved.
