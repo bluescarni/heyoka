@@ -373,8 +373,9 @@ TEST_CASE("batch")
         auto ta = taylor_adaptive_batch<fp_t>{
             {prime(x) = v, prime(v) = -x}, ic, batch_size, kw::opt_level = opt_level, kw::high_accuracy = ha};
 
-        auto d_out = ta.propagate_until(final_tm, kw::c_output = true);
+        auto [d_out, cb] = ta.propagate_until(final_tm, kw::c_output = true);
 
+        REQUIRE(!cb);
         REQUIRE(d_out.has_value());
         REQUIRE(d_out->get_output().size() == 2u * batch_size);
         REQUIRE(d_out->get_times().size() == (d_out->get_n_steps() + 2u) * batch_size);
@@ -390,7 +391,8 @@ TEST_CASE("batch")
         ta.set_time(init_tm);
 
         // Run a grid propagation.
-        auto grid_out = ta.propagate_grid(grid);
+        auto [cb_grid, grid_out] = ta.propagate_grid(grid);
+        REQUIRE(!cb_grid);
 
         // Compare the two.
         for (auto i = 0u; i < n_points; ++i) {
@@ -467,7 +469,8 @@ TEST_CASE("batch")
         ta.set_time(init_tm);
         // Set the first velocity in the batch to infinity.
         ta.get_state_data()[batch_size] = std::numeric_limits<fp_t>::infinity();
-        d_out = ta.propagate_until(final_tm, kw::c_output = true);
+        std::tie(d_out, cb) = ta.propagate_until(final_tm, kw::c_output = true);
+        REQUIRE(!cb);
         REQUIRE(!d_out.has_value());
 
         // Try with propagate_for() too.
@@ -476,8 +479,9 @@ TEST_CASE("batch")
         std::copy(ic.begin(), ic.end(), ta.get_state_data());
         ta.set_time(init_tm);
 
-        d_out = ta.propagate_for(final_tm, kw::c_output = true);
+        std::tie(d_out, cb) = ta.propagate_for(final_tm, kw::c_output = true);
 
+        REQUIRE(!cb);
         REQUIRE(d_out.has_value());
         REQUIRE(d_out->get_output().size() == 2u * batch_size);
         REQUIRE(d_out->get_times().size() == (d_out->get_n_steps() + 2u) * batch_size);
@@ -521,8 +525,9 @@ TEST_CASE("batch")
         std::copy(ic.begin(), ic.end(), ta.get_state_data());
         ta.set_time(init_tm);
 
-        d_out = ta.propagate_until(final_tm, kw::c_output = true);
+        std::tie(d_out, cb) = ta.propagate_until(final_tm, kw::c_output = true);
 
+        REQUIRE(!cb);
         REQUIRE(d_out->get_times().size() == d_out->get_n_steps() * batch_size + 2u * batch_size);
         REQUIRE(d_out.has_value());
         REQUIRE(!d_out->get_tcs().empty());
@@ -535,7 +540,7 @@ TEST_CASE("batch")
         std::copy(ic.begin(), ic.end(), ta.get_state_data());
         ta.set_time(init_tm);
 
-        grid_out = ta.propagate_grid(grid);
+        std::tie(cb_grid, grid_out) = ta.propagate_grid(grid);
 
         for (auto i = 0u; i < n_points; ++i) {
             for (auto j = 0u; j < batch_size; ++j) {
@@ -619,7 +624,7 @@ TEST_CASE("batch")
         ta.set_time(init_tm);
         // Set the first velocity in the batch to infinity.
         ta.get_state_data()[batch_size] = std::numeric_limits<fp_t>::infinity();
-        d_out = ta.propagate_until(final_tm, kw::c_output = true);
+        std::tie(d_out, cb) = ta.propagate_until(final_tm, kw::c_output = true);
         REQUIRE(!d_out.has_value());
 
         // Try with non-finite time.
@@ -690,8 +695,9 @@ TEST_CASE("batch")
         std::copy(ic.begin(), ic.end(), ta.get_state_data());
         ta.set_time(init_tm);
 
-        d_out = ta.propagate_for(final_tm, kw::c_output = false);
+        std::tie(d_out, cb) = ta.propagate_for(final_tm, kw::c_output = false);
 
+        REQUIRE(!cb);
         REQUIRE(!d_out.has_value());
     };
 

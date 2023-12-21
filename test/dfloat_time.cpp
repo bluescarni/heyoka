@@ -254,7 +254,8 @@ TEST_CASE("batch test")
             const auto grid = std::vector{fp_t{1.}, fp_t{2.}, fp_t{10.}, fp_t{20.}, fp_t(10000.), fp_t(11000.)};
 
             ta.propagate_until({fp_t{1.}, fp_t{2}});
-            const auto out = ta.propagate_grid(grid);
+            auto [cb, out] = ta.propagate_grid(grid);
+            REQUIRE(!cb);
 
             for (auto j = 0u; j < 3u; ++j) {
                 auto t0 = grid[2u * j];
@@ -285,7 +286,8 @@ TEST_CASE("batch test")
             const auto grid = std::vector{fp_t{-1.}, fp_t{-2.}, fp_t{-10.}, fp_t{-20.}, fp_t(-10000.), fp_t(-11000.)};
 
             ta.propagate_until({fp_t{-1.}, fp_t{-2}});
-            const auto out = ta.propagate_grid(grid);
+            auto [cb, out] = ta.propagate_grid(grid);
+            REQUIRE(!cb);
 
             for (auto j = 0u; j < 3u; ++j) {
                 auto t0 = grid[2u * j];

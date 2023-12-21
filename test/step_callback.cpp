@@ -500,9 +500,11 @@ TEST_CASE("step_callback pre_hook")
         ta0.get_pars_data()[1] = 0.1;
         ta1.set_time(0.);
 
-        auto res0 = ta0.propagate_grid({0., 0., 1., 1., 2., 2.}, kw::callback = pend_cb{});
-        auto res1 = ta1.propagate_grid({0., 0., 1., 1., 2., 2.});
+        auto [cb0, res0] = ta0.propagate_grid({0., 0., 1., 1., 2., 2.}, kw::callback = pend_cb{});
+        auto [cb1, res1] = ta1.propagate_grid({0., 0., 1., 1., 2., 2.});
 
+        REQUIRE(cb0);
+        REQUIRE(!cb1);
         REQUIRE(res0 == res1);
 
         REQUIRE(ta0.get_pars()[0] == 1.5);

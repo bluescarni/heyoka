@@ -351,13 +351,14 @@ TEST_CASE("batch propagate until")
             ta.get_state_data()[2] = ics[i][2];
             ta.get_state_data()[3] = ics[i][3];
 
-            auto loc_res = ta.propagate_until(20);
+            auto [loc_res, loc_cb] = ta.propagate_until(20);
 
             REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
                                 [](fp_t t) { return t == approximately(fp_t(20), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
             REQUIRE(std::get<1>(res[i]).has_value() == loc_res.has_value());
+            REQUIRE(!std::get<2>(res[i]));
         }
 
         // Do it with continuous output too.
@@ -383,13 +384,14 @@ TEST_CASE("batch propagate until")
             ta.get_state_data()[2] = ics[i][2];
             ta.get_state_data()[3] = ics[i][3];
 
-            auto loc_res = ta.propagate_until(std::vector<fp_t>(batch_size, fp_t(20)), kw::c_output = true);
+            auto [loc_res, loc_cb] = ta.propagate_until(std::vector<fp_t>(batch_size, fp_t(20)), kw::c_output = true);
 
             REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
                                 [](fp_t t) { return t == approximately(fp_t(20), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
             REQUIRE((*std::get<1>(res[i]))(1.5) == (*(loc_res))(1.5));
+            REQUIRE(!std::get<2>(res[i]));
         }
     };
 
@@ -452,13 +454,14 @@ TEST_CASE("batch propagate for")
             ta.get_state_data()[2] = ics[i][2];
             ta.get_state_data()[3] = ics[i][3];
 
-            auto loc_res = ta.propagate_for(20);
+            auto [loc_res, loc_cb] = ta.propagate_for(20);
 
             REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
                                 [](fp_t t) { return t == approximately(fp_t(30), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
             REQUIRE(std::get<1>(res[i]).has_value() == loc_res.has_value());
+            REQUIRE(!std::get<2>(res[i]));
         }
 
         // Do it with continuous output too.
@@ -486,13 +489,14 @@ TEST_CASE("batch propagate for")
             ta.get_state_data()[2] = ics[i][2];
             ta.get_state_data()[3] = ics[i][3];
 
-            auto loc_res = ta.propagate_for(std::vector<fp_t>(batch_size, fp_t(20)), kw::c_output = true);
+            auto [loc_res, loc_cb] = ta.propagate_for(std::vector<fp_t>(batch_size, fp_t(20)), kw::c_output = true);
 
             REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
                                 [](fp_t t) { return t == approximately(fp_t(30), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
             REQUIRE((*std::get<1>(res[i]))(1.5) == (*(loc_res))(1.5));
+            REQUIRE(!std::get<2>(res[i]));
         }
     };
 
@@ -564,13 +568,14 @@ TEST_CASE("batch propagate grid")
             ta.get_state_data()[2] = ics[i][2];
             ta.get_state_data()[3] = ics[i][3];
 
-            auto loc_res = ta.propagate_grid(grid_splat);
+            auto [loc_cb, loc_res] = ta.propagate_grid(grid_splat);
 
             REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
                                 [](fp_t t) { return t == approximately(fp_t(20), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
-            REQUIRE(std::get<1>(res[i]) == loc_res);
+            REQUIRE(!std::get<1>(res[i]));
+            REQUIRE(std::get<2>(res[i]) == loc_res);
         }
     };
 

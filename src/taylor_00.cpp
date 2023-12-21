@@ -3087,9 +3087,9 @@ void taylor_adaptive_batch<T>::step(const std::vector<T> &max_delta_ts, bool wtc
 }
 
 template <typename T>
-std::optional<continuous_output_batch<T>>
+std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
 taylor_adaptive_batch<T>::propagate_for_impl(const std::vector<T> &delta_ts, std::size_t max_steps,
-                                             const std::vector<T> &max_delta_ts, step_callback_batch<T> &cb, bool wtc,
+                                             const std::vector<T> &max_delta_ts, step_callback_batch<T> cb, bool wtc,
                                              bool with_c_out)
 {
     // Check the dimensionality of delta_ts.
@@ -3105,7 +3105,7 @@ taylor_adaptive_batch<T>::propagate_for_impl(const std::vector<T> &delta_ts, std
     }
 
     // NOTE: max_delta_ts is checked in propagate_until_impl().
-    return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, cb, wtc, with_c_out);
+    return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb), wtc, with_c_out);
 }
 
 // NOTE: possible outcomes:
@@ -3124,9 +3124,9 @@ taylor_adaptive_batch<T>::propagate_for_impl(const std::vector<T> &delta_ts, std
 // The continuous output is always updated at the end of each timestep,
 // unless a non-finite state was detected in any batch element.
 template <typename T>
-std::optional<continuous_output_batch<T>>
+std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
 taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<detail::dfloat<T>> &ts, std::size_t max_steps,
-                                               const std::vector<T> &max_delta_ts, step_callback_batch<T> &cb, bool wtc,
+                                               const std::vector<T> &max_delta_ts, step_callback_batch<T> cb, bool wtc,
                                                bool with_c_out)
 {
     using std::abs;
@@ -3391,7 +3391,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<detail::dfloat<
             // At least 1 batch element generated a non-finite state. In this situation,
             // we do *not* want to execute the propagate() callback and we do *not* want
             // to update the continuous output. Just exit.
-            return make_c_out();
+            return std::make_tuple(make_c_out(), std::move(cb));
         }
 
         // Update the continuous output.
@@ -3425,7 +3425,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<detail::dfloat<
                     std::get<0>(m_prop_res[i]) = taylor_outcome::cb_stop;
                 }
 
-                return make_c_out();
+                return std::make_tuple(make_c_out(), std::move(cb));
             }
         }
 
@@ -3434,7 +3434,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<detail::dfloat<
         // terminal event. In either case, m_prop_res was already set up
         // in the loop where we checked the outcomes.
         if (n_done == m_batch_size || ste_detected) {
-            return make_c_out();
+            return std::make_tuple(make_c_out(), std::move(cb));
         }
 
         // Check the iteration limit.
@@ -3450,7 +3450,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<detail::dfloat<
                 std::get<0>(m_prop_res[i]) = taylor_outcome::step_limit;
             }
 
-            return make_c_out();
+            return std::make_tuple(make_c_out(), std::move(cb));
         }
     }
 
@@ -3462,9 +3462,9 @@ taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<detail::dfloat<
 }
 
 template <typename T>
-std::optional<continuous_output_batch<T>>
+std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
 taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<T> &ts, std::size_t max_steps,
-                                               const std::vector<T> &max_delta_ts, step_callback_batch<T> &cb, bool wtc,
+                                               const std::vector<T> &max_delta_ts, step_callback_batch<T> cb, bool wtc,
                                                bool with_c_out)
 {
     // Check the dimensionality of ts.
@@ -3482,7 +3482,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<T> &ts, std::si
     }
 
     // NOTE: max_delta_ts is checked in the other propagate_until_impl() overload.
-    return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, cb, wtc, with_c_out);
+    return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb), wtc, with_c_out);
 }
 
 // NOTE: possible outcomes:
@@ -3494,9 +3494,9 @@ taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<T> &ts, std::si
 // The callback is always executed at the end of each timestep, unless
 // a non-finite state was detected.
 template <typename T>
-std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
-                                                             const std::vector<T> &max_delta_ts,
-                                                             step_callback_batch<T> &cb)
+std::tuple<step_callback_batch<T>, std::vector<T>>
+taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
+                                              const std::vector<T> &max_delta_ts, step_callback_batch<T> cb)
 {
     using std::abs;
     using std::isnan;
@@ -3651,7 +3651,7 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
             ts_count = 0;
         }
 
-        return retval;
+        return std::make_tuple(std::move(cb), std::move(retval));
     }
 
     // Add the first result to retval.
@@ -3987,7 +3987,7 @@ std::vector<T> taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T
     //   is either cb_stop, step_limit or a stopping terminal event,
     // - the integration finished successfully, in which case we consumed
     //   all grid points and all outcomes are time_limit.
-    return retval;
+    return std::make_tuple(std::move(cb), std::move(retval));
 }
 
 template <typename T>

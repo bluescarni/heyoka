@@ -32,6 +32,18 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+// Machinery to detect std::function.
+template <typename>
+struct is_any_std_func : std::false_type {
+};
+
+template <typename R, typename... Args>
+struct is_any_std_func<std::function<R(Args...)>> : std::true_type {
+};
+
+template <typename T>
+inline constexpr bool is_any_std_func_v = is_any_std_func<T>::value;
+
 // Detect callable instances.
 template <typename>
 struct is_any_callable : std::false_type {
