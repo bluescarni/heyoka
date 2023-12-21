@@ -896,7 +896,7 @@ Callback parse_propagate_cb(Parser &p)
 
             std::vector<Callback> cb_vec;
             for (auto &&cb : r) {
-                cb_vec.emplace_back(std::forward<std::ranges::range_reference_t<cb_arg_t>>(cb));
+                cb_vec.emplace_back(std::forward<decltype(cb)>(cb));
             }
 
             return CallbackSet(std::move(cb_vec));
@@ -1461,7 +1461,7 @@ auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const KwArgs &.
 
                         std::vector<T> retval;
                         for (auto &&x : r) {
-                            retval.emplace_back(std::forward<std::ranges::range_reference_t<type>>(x));
+                            retval.emplace_back(std::forward<decltype(x)>(x));
                         }
 
                         return retval;
