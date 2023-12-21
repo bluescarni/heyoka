@@ -59,11 +59,14 @@ This will produce the following output:
 
 .. code-block:: console
 
-   Tolerance               : 2.2204460492503131e-16
+   C++ datatype            : double
+   Tolerance               : 2.220446049250313e-16
+   High accuracy           : false
+   Compact mode            : false
    Taylor order            : 20
    Dimension               : 2
-   Time                    : 0.0000000000000000
-   State                   : [0.050000000000000003, 0.025000000000000001]
+   Time                    : 0
+   State                   : [0.05, 0.025]
 
 By default, the error tolerance of an adaptive integrator is set to the
 machine epsilon, which, for ``double``, is :math:`\sim 2.2\times10^{-16}`.
@@ -92,12 +95,15 @@ The screen output will look something like this:
 
    Outcome : taylor_outcome::success
    Timestep: 0.216053
-   
-   Tolerance               : 2.2204460492503131e-16
+
+   C++ datatype            : double
+   Tolerance               : 2.220446049250313e-16
+   High accuracy           : false
+   Compact mode            : false
    Taylor order            : 20
    Dimension               : 2
    Time                    : 0.21605277478009474
-   State                   : [0.043996448369926382, -0.078442455470687983]
+   State                   : [0.04399644836992638, -0.07844245547068798]
 
 It is also possible to perform a single timestep backward in time
 via the ``step_backward()`` function:
@@ -195,7 +201,7 @@ Let us see a couple of usage examples:
    Current time : 20
 
 The time-limited propagation functions return
-a tuple of 5 values, which represent, respectively:
+a tuple of 6 values, which represent, respectively:
 
 * the outcome of the integration (which will usually be
   ``taylor_outcome::time_limit``),
@@ -203,7 +209,9 @@ a tuple of 5 values, which represent, respectively:
   that were used in the propagation,
 * the total number of steps that were taken,
 * the :ref:`continuous output <tut_c_output>` function object,
-  if requested (off by default).
+  if requested (off by default),
+* a copy of the step callback (see below for an explanation).
+  If no callback has been provided, an empty callback is returned.
 
 The time-limited propagation functions can be used
 to propagate both forward and backward in time:
@@ -220,11 +228,14 @@ to propagate both forward and backward in time:
    Num. of steps: 97
    Current time : 0
 
-   Tolerance               : 2.2204460492503131e-16
+   C++ datatype            : double
+   Tolerance               : 2.220446049250313e-16
+   High accuracy           : false
+   Compact mode            : false
    Taylor order            : 20
    Dimension               : 2
-   Time                    : 0.0000000000000000
-   State                   : [0.050000000000000044, 0.024999999999999991]
+   Time                    : 0
+   State                   : [0.050000000000000044, 0.02499999999999999]
 
 Note also that the time-limited propagation functions will stop
 integrating if a non-finite value is detected in the state vector
@@ -245,13 +256,13 @@ can be invoked with additional optional keyword arguments:
      bool (taylor_adaptive<double> &);
 
   which will be invoked at the end of each timestep, with the integrator
-  object as only argument. If the callback returns ``true`` then the integration
-  will continue after the invocation of the callback, otherwise the integration
-  will be interrupted.
+  object as only argument. This is known as a *step callback*. If the callback
+  returns ``true`` then the integration will continue after the invocation of the
+  callback, otherwise the integration will be interrupted.
 
   .. versionadded:: 1.0.0
 
-  Optionally, a function object callback can implement a ``pre_hook()`` member
+  Optionally, a step callback can implement a ``pre_hook()`` member
   function with signature
 
   .. code-block:: c++
@@ -261,6 +272,10 @@ can be invoked with additional optional keyword arguments:
 
   that will be invoked once *before* the first step is taken
   by the ``propagate_for()`` and ``propagate_until()`` functions.
+
+  Step callbacks are passed by value to ``propagate_for()`` and ``propagate_until()``,
+  and they are returned as the sixth member of the return tuple;
+
 - ``c_output``: a boolean flag that enables :ref:`continuous output <tut_c_output>`.
 
 
@@ -285,7 +300,7 @@ Let us see a simple usage example:
    :lines: 106-113
 
 ``propagate_grid()`` takes in input a grid of time points represented as a ``std::vector``,
-and returns a tuple of 5 values. The first 4 values are the same
+and returns a tuple of 6 values. The first 4 values are the same
 as in the other ``propagate_*()`` functions:
 
 * the outcome of the integration,
@@ -293,7 +308,10 @@ as in the other ``propagate_*()`` functions:
   that were used in the propagation,
 * the total number of steps that were taken.
 
-The fifth value returned by ``propagate_grid()`` is a ``std::vector`` containing
+The fifth value returned by ``propagate_grid()`` is the step callback, if provided
+by the user (see below). Otherwise, an empty callback is returned.
+
+The sixth value returned by ``propagate_grid()`` is a ``std::vector`` containing
 the state of the system at the time points in the grid. The state vectors are stored
 contiguously in row-major order:
 
@@ -331,13 +349,13 @@ can be invoked with additional optional keyword arguments:
      bool (taylor_adaptive<double> &);
 
   which will be invoked at the end of each timestep, with the integrator
-  object as only argument. If the callback returns ``true`` then the integration
-  will continue after the invocation of the callback, otherwise the integration
-  will be interrupted.
+  object as only argument. This is known as a *step callback*. If the callback
+  returns ``true`` then the integration will continue after the invocation of the
+  callback, otherwise the integration will be interrupted.
 
   .. versionadded:: 1.0.0
 
-  Optionally, a function object callback can implement a ``pre_hook()`` member
+  Optionally, a step callback can implement a ``pre_hook()`` member
   function with signature
 
   .. code-block:: c++
@@ -347,6 +365,9 @@ can be invoked with additional optional keyword arguments:
 
   that will be invoked once *before* the first step is taken
   by the ``propagate_grid()`` function.
+
+  Step callbacks are passed by value to ``propagate_grid()``
+  and they are returned as the fifth member of the return tuple.
 
 Full code listing
 -----------------
