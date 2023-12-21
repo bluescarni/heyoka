@@ -14,6 +14,7 @@
 #include <initializer_list>
 #include <limits>
 #include <random>
+#include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
@@ -364,6 +365,18 @@ TEST_CASE("propagate grid")
     // Invoke again the callback to ensure no copies have been made.
     out_cb(ta);
 
+    // Do the same test with the range overload, moving in the callbacks initially stored
+    // in a range. This will check that the logic that converts the input range into
+    // a step callback does proper forwarding.
+    std::vector cf_vec = {cb_functor_grid{}, cb_functor_grid{}};
+    cf_vec[0].n_copies_after = cf_vec[0].n_copies;
+    cf_vec[1].n_copies_after = cf_vec[1].n_copies;
+    std::tie(out_cb, _) = ta.propagate_grid(
+        {100., 100., 100., 100., 101., 101., 101., 101., 102., 102., 102., 102.},
+        kw::callback
+        = cf_vec | std::views::transform([](cb_functor_grid &c) -> cb_functor_grid && { return std::move(c); }));
+    out_cb(ta);
+
     // Callback attempts to change the time coordinate.
     ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03}, 4};
     REQUIRE_THROWS_MATCHES(
@@ -648,6 +661,30 @@ TEST_CASE("propagate for_until")
     f_cb_for.extract<cb_functor_for>()->n_copies_after = f_cb_for.extract<cb_functor_for>()->n_copies;
     std::tie(_, out_cb) = ta.propagate_for(10., kw::callback = std::move(f_cb_for));
     out_cb(ta);
+
+    // Do the same test with the range overload, moving in the callbacks initially stored
+    // in a range. This will check that the logic that converts the input range into
+    // a step callback does proper forwarding.
+    {
+        std::vector cf_vec = {cb_functor_for{}, cb_functor_for{}};
+        cf_vec[0].n_copies_after = cf_vec[0].n_copies;
+        cf_vec[1].n_copies_after = cf_vec[1].n_copies;
+        std::tie(_, out_cb) = ta.propagate_for(
+            10., kw::callback
+                 = cf_vec | std::views::transform([](cb_functor_for &c) -> cb_functor_for && { return std::move(c); }));
+        out_cb(ta);
+    }
+
+    {
+        std::vector cf_vec = {cb_functor_until{}, cb_functor_until{}};
+        cf_vec[0].n_copies_after = cf_vec[0].n_copies;
+        cf_vec[1].n_copies_after = cf_vec[1].n_copies;
+        std::tie(_, out_cb) = ta.propagate_until(
+            50., kw::callback = cf_vec | std::views::transform([](cb_functor_until &c) -> cb_functor_until && {
+                                    return std::move(c);
+                                }));
+        out_cb(ta);
+    }
 }
 
 TEST_CASE("propagate for_until write_tc")
