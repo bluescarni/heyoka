@@ -284,7 +284,7 @@ inline auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     // High accuracy mode (defaults to false).
     auto high_accuracy = [&p]() -> bool {
         if constexpr (p.has(kw::high_accuracy)) {
-            return std::forward<decltype(p(kw::high_accuracy))>(p(kw::high_accuracy));
+            return p(kw::high_accuracy);
         } else {
             return false;
         }
@@ -294,7 +294,7 @@ inline auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     // the same as undefined.
     auto tol = [&p]() -> std::optional<T> {
         if constexpr (p.has(kw::tol)) {
-            auto retval = static_cast<T>(std::forward<decltype(p(kw::tol))>(p(kw::tol)));
+            auto retval = static_cast<T>(p(kw::tol));
             if (retval != 0) {
                 // NOTE: this covers the NaN case as well.
                 return retval;
@@ -311,7 +311,7 @@ inline auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     // it defaults to true).
     auto compact_mode = [&p]() -> bool {
         if constexpr (p.has(kw::compact_mode)) {
-            return std::forward<decltype(p(kw::compact_mode))>(p(kw::compact_mode));
+            return p(kw::compact_mode);
         } else {
 #if defined(HEYOKA_HAVE_REAL)
             return std::is_same_v<T, mppp::real>;
@@ -325,7 +325,7 @@ inline auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     // Vector of parameters (defaults to empty vector).
     auto pars = [&p]() -> std::vector<T> {
         if constexpr (p.has(kw::pars)) {
-            return std::forward<decltype(p(kw::pars))>(p(kw::pars));
+            return p(kw::pars);
         } else {
             return {};
         }
@@ -334,7 +334,7 @@ inline auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     // Parallel mode (defaults to false).
     auto parallel_mode = [&p]() -> bool {
         if constexpr (p.has(kw::parallel_mode)) {
-            return std::forward<decltype(p(kw::parallel_mode))>(p(kw::parallel_mode));
+            return p(kw::parallel_mode);
         } else {
             return false;
         }
@@ -387,7 +387,7 @@ public:
             // Direction (defaults to any).
             auto d = [&p]() -> event_direction {
                 if constexpr (p.has(kw::direction)) {
-                    return std::forward<decltype(p(kw::direction))>(p(kw::direction));
+                    return p(kw::direction);
                 } else {
                     return event_direction::any;
                 }
@@ -518,7 +518,7 @@ public:
             // Callback (defaults to empty).
             auto cb = [&p]() -> callback_t {
                 if constexpr (p.has(kw::callback)) {
-                    return std::forward<decltype(p(kw::callback))>(p(kw::callback));
+                    return p(kw::callback);
                 } else {
                     return {};
                 }
@@ -527,7 +527,7 @@ public:
             // Cooldown (defaults to -1).
             auto cd = [&p]() -> T {
                 if constexpr (p.has(kw::cooldown)) {
-                    return std::forward<decltype(p(kw::cooldown))>(p(kw::cooldown));
+                    return p(kw::cooldown);
                 } else {
                     return T(-1);
                 }
@@ -536,7 +536,7 @@ public:
             // Direction (defaults to any).
             auto d = [&p]() -> event_direction {
                 if constexpr (p.has(kw::direction)) {
-                    return std::forward<decltype(p(kw::direction))>(p(kw::direction));
+                    return p(kw::direction);
                 } else {
                     return event_direction::any;
                 }
@@ -889,7 +889,7 @@ Callback parse_propagate_cb(Parser &p)
         using cb_arg_t = decltype(p(kw::callback));
 
         if constexpr (std::convertible_to<cb_arg_t, Callback>) {
-            return std::forward<cb_arg_t>(p(kw::callback));
+            return p(kw::callback);
         } else if constexpr (input_rangeT<cb_arg_t, Callback>) {
             std::vector<Callback> cb_vec;
             for (auto &&cb : p(kw::callback)) {
@@ -943,7 +943,7 @@ auto taylor_propagate_common_ops(const KwArgs &...kw_args)
                     std::convertible_to<decltype(p(kw::max_delta_t)), T>,
                     "A 'max_delta_t' keyword argument of an invalid type was passed to a propagate_*() function.");
 
-                return std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t));
+                return p(kw::max_delta_t);
             } else {
                 return taylor_default_max_delta_t<T>();
             }
@@ -960,7 +960,7 @@ auto taylor_propagate_common_ops(const KwArgs &...kw_args)
                     std::convertible_to<decltype(p(kw::write_tc)), bool>,
                     "A 'write_tc' keyword argument of an invalid type was passed to a propagate_*() function.");
 
-                return std::forward<decltype(p(kw::write_tc))>(p(kw::write_tc));
+                return p(kw::write_tc);
             } else {
                 return false;
             }
@@ -976,7 +976,7 @@ auto taylor_propagate_common_ops(const KwArgs &...kw_args)
                         std::convertible_to<decltype(p(kw::c_output)), bool>,
                         "A 'c_output' keyword argument of an invalid type was passed to a propagate_*() function.");
 
-                    return std::forward<decltype(p(kw::c_output))>(p(kw::c_output));
+                    return p(kw::c_output);
                 } else {
                     return false;
                 }
@@ -1187,7 +1187,7 @@ private:
             // Initial time (defaults to undefined).
             auto tm = [&p]() -> std::optional<T> {
                 if constexpr (p.has(kw::time)) {
-                    return std::forward<decltype(p(kw::time))>(p(kw::time));
+                    return p(kw::time);
                 } else {
                     return {};
                 }
@@ -1199,7 +1199,7 @@ private:
             // Extract the terminal events, if any.
             auto tes = [&p]() -> std::vector<t_event_t> {
                 if constexpr (p.has(kw::t_events)) {
-                    return std::forward<decltype(p(kw::t_events))>(p(kw::t_events));
+                    return p(kw::t_events);
                 } else {
                     return {};
                 }
@@ -1208,7 +1208,7 @@ private:
             // Extract the non-terminal events, if any.
             auto ntes = [&p]() -> std::vector<nt_event_t> {
                 if constexpr (p.has(kw::nt_events)) {
-                    return std::forward<decltype(p(kw::nt_events))>(p(kw::nt_events));
+                    return p(kw::nt_events);
                 } else {
                     return {};
                 }
@@ -1218,7 +1218,7 @@ private:
             // is considered the same as undefined.
             auto prec = [&p]() -> std::optional<long long> {
                 if constexpr (p.has(kw::prec)) {
-                    auto ret = static_cast<long long>(std::forward<decltype(p(kw::prec))>(p(kw::prec)));
+                    auto ret = static_cast<long long>(p(kw::prec));
                     if (ret != 0) {
                         return ret;
                     }
@@ -1467,7 +1467,7 @@ auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const KwArgs &.
                         "A 'max_delta_t' keyword argument of an invalid type was passed to a propagate_*() function.");
 
                     return std::vector<T>(boost::numeric_cast<typename std::vector<T>::size_type>(batch_size),
-                                          std::forward<type>(p(kw::max_delta_t)));
+                                          p(kw::max_delta_t));
                 }
             } else {
                 return {};
@@ -1485,7 +1485,7 @@ auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const KwArgs &.
                     std::convertible_to<decltype(p(kw::write_tc)), bool>,
                     "A 'write_tc' keyword argument of an invalid type was passed to a propagate_*() function.");
 
-                return std::forward<decltype(p(kw::write_tc))>(p(kw::write_tc));
+                return p(kw::write_tc);
             } else {
                 return false;
             }
@@ -1501,7 +1501,7 @@ auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const KwArgs &.
                         std::convertible_to<decltype(p(kw::c_output)), bool>,
                         "A 'c_output' keyword argument of an invalid type was passed to a propagate_*() function.");
 
-                    return std::forward<decltype(p(kw::c_output))>(p(kw::c_output));
+                    return p(kw::c_output);
                 } else {
                     return false;
                 }
@@ -1705,7 +1705,7 @@ private:
             // Initial times (defaults to a vector of zeroes).
             auto tm = [&p, batch_size]() -> std::vector<T> {
                 if constexpr (p.has(kw::time)) {
-                    return std::forward<decltype(p(kw::time))>(p(kw::time));
+                    return p(kw::time);
                 } else {
                     return std::vector<T>(static_cast<typename std::vector<T>::size_type>(batch_size), T(0));
                 }
@@ -1717,7 +1717,7 @@ private:
             // Extract the terminal events, if any.
             auto tes = [&p]() -> std::vector<t_event_t> {
                 if constexpr (p.has(kw::t_events)) {
-                    return std::forward<decltype(p(kw::t_events))>(p(kw::t_events));
+                    return p(kw::t_events);
                 } else {
                     return {};
                 }
@@ -1726,7 +1726,7 @@ private:
             // Extract the non-terminal events, if any.
             auto ntes = [&p]() -> std::vector<nt_event_t> {
                 if constexpr (p.has(kw::nt_events)) {
-                    return std::forward<decltype(p(kw::nt_events))>(p(kw::nt_events));
+                    return p(kw::nt_events);
                 } else {
                     return {};
                 }

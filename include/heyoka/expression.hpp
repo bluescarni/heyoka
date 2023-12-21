@@ -560,7 +560,7 @@ dtens diff_tensors(const std::vector<expression> &v_ex, KwArgs &&...kw_args)
         if constexpr (std::is_same_v<detail::uncvref_t<decltype(p(kw::diff_args))>, diff_args>) {
             d_args = p(kw::diff_args);
         } else if constexpr (std::is_constructible_v<std::vector<expression>, decltype(p(kw::diff_args))>) {
-            d_args = std::vector<expression>(std::forward<decltype(p(kw::diff_args))>(p(kw::diff_args)));
+            d_args = std::vector<expression>(p(kw::diff_args));
         } else {
             static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the diff_args keyword argument.");
         }
@@ -758,13 +758,13 @@ inline std::vector<expression> add_cfunc(llvm_state &s, const std::string &name,
         // provided explicitly.
         std::optional<std::vector<expression>> vars;
         if constexpr (p.has(kw::vars)) {
-            vars = std::forward<decltype(p(kw::vars))>(p(kw::vars));
+            vars = p(kw::vars);
         }
 
         // Batch size (defaults to 1).
         const auto batch_size = [&]() -> std::uint32_t {
             if constexpr (p.has(kw::batch_size)) {
-                return std::forward<decltype(p(kw::batch_size))>(p(kw::batch_size));
+                return p(kw::batch_size);
             } else {
                 return 1;
             }
@@ -773,7 +773,7 @@ inline std::vector<expression> add_cfunc(llvm_state &s, const std::string &name,
         // High accuracy mode (defaults to false).
         const auto high_accuracy = [&p]() -> bool {
             if constexpr (p.has(kw::high_accuracy)) {
-                return std::forward<decltype(p(kw::high_accuracy))>(p(kw::high_accuracy));
+                return p(kw::high_accuracy);
             } else {
                 return false;
             }
@@ -783,7 +783,7 @@ inline std::vector<expression> add_cfunc(llvm_state &s, const std::string &name,
         // it defaults to true).
         const auto compact_mode = [&p]() -> bool {
             if constexpr (p.has(kw::compact_mode)) {
-                return std::forward<decltype(p(kw::compact_mode))>(p(kw::compact_mode));
+                return p(kw::compact_mode);
             } else {
 #if defined(HEYOKA_HAVE_REAL)
                 return std::is_same_v<T, mppp::real>;
@@ -797,7 +797,7 @@ inline std::vector<expression> add_cfunc(llvm_state &s, const std::string &name,
         // Parallel mode (defaults to false).
         const auto parallel_mode = [&p]() -> bool {
             if constexpr (p.has(kw::parallel_mode)) {
-                return std::forward<decltype(p(kw::parallel_mode))>(p(kw::parallel_mode));
+                return p(kw::parallel_mode);
             } else {
                 return false;
             }
@@ -806,7 +806,7 @@ inline std::vector<expression> add_cfunc(llvm_state &s, const std::string &name,
         // Precision (defaults to zero).
         const auto prec = [&p]() -> long long {
             if constexpr (p.has(kw::prec)) {
-                return std::forward<decltype(p(kw::prec))>(p(kw::prec));
+                return p(kw::prec);
             } else {
                 return 0;
             }

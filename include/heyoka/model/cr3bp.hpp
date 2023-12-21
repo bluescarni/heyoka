@@ -35,7 +35,7 @@ auto cr3bp_common_opts(KwArgs &&...kw_args)
 
     expression mu{1e-3};
     if constexpr (p.has(kw::mu)) {
-        mu = expression{std::forward<decltype(p(kw::mu))>(p(kw::mu))};
+        mu = expression{p(kw::mu)};
     }
 
     return std::tuple{std::move(mu)};

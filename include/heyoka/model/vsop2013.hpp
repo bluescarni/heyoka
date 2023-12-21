@@ -37,7 +37,7 @@ auto vsop2013_common_opts(double def_thresh, const KwArgs &...kw_args)
     // Time expression (defaults to heyoka::time).
     auto time_expr = [&p]() -> expression {
         if constexpr (p.has(kw::time)) {
-            return std::forward<decltype(p(kw::time))>(p(kw::time));
+            return p(kw::time);
         } else {
             return heyoka::time;
         }
@@ -46,7 +46,7 @@ auto vsop2013_common_opts(double def_thresh, const KwArgs &...kw_args)
     // Threshold value.
     auto thresh = [&]() -> double {
         if constexpr (p.has(kw::thresh)) {
-            return std::forward<decltype(p(kw::thresh))>(p(kw::thresh));
+            return p(kw::thresh);
         } else {
             return def_thresh;
         }
