@@ -891,8 +891,11 @@ Callback parse_propagate_cb(Parser &p)
         if constexpr (std::convertible_to<cb_arg_t, Callback>) {
             return p(kw::callback);
         } else if constexpr (input_rangeT<cb_arg_t, Callback>) {
+            // Turn into an lvalue.
+            auto &&r = p(kw::callback);
+
             std::vector<Callback> cb_vec;
-            for (auto &&cb : p(kw::callback)) {
+            for (auto &&cb : r) {
                 cb_vec.emplace_back(std::forward<std::ranges::range_reference_t<cb_arg_t>>(cb));
             }
 
@@ -1453,8 +1456,11 @@ auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const KwArgs &.
                         throw;
                         // LCOV_EXCL_STOP
                     } else {
+                        // Turn into an lvalue.
+                        auto &&r = p(kw::max_delta_t);
+
                         std::vector<T> retval;
-                        for (auto &&x : p(kw::max_delta_t)) {
+                        for (auto &&x : r) {
                             retval.emplace_back(std::forward<std::ranges::range_reference_t<type>>(x));
                         }
 
