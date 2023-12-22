@@ -161,13 +161,6 @@ using detected_t = typename detector<nonesuch, void, Op, Args...>::type;
 
 #endif
 
-// NOTE: an argument of this tag type is appended
-// to the signature of all member functions in value_iface. The purpose
-// is to prevent the user from accidentally implementing
-// functions from value_iface in the interface implementations.
-struct vtag {
-};
-
 // Type-trait to detect instances of std::reference_wrapper.
 template <typename T>
 struct is_reference_wrapper : std::false_type {
@@ -196,19 +189,19 @@ struct TANUKI_VISIBLE value_iface {
     virtual ~value_iface() = default;
 
     // Access to the value and its type.
-    [[nodiscard]] virtual void *value_ptr(vtag) noexcept = 0;
-    [[nodiscard]] virtual std::type_index value_type_index(vtag) const noexcept = 0;
-    [[nodiscard]] virtual bool is_reference(vtag) const noexcept = 0;
+    [[nodiscard]] virtual void *_tanuki_value_ptr() noexcept = 0;
+    [[nodiscard]] virtual std::type_index _tanuki_value_type_index() const noexcept = 0;
+    [[nodiscard]] virtual bool _tanuki_is_reference() const noexcept = 0;
 
     // Methods to implement virtual copy/move primitives for the holder class.
-    [[nodiscard]] virtual std::pair<IFace *, value_iface *> clone(vtag) const = 0;
-    [[nodiscard]] virtual std::pair<IFace *, value_iface *> copy_init_holder(void *, vtag) const = 0;
-    [[nodiscard]] virtual std::pair<IFace *, value_iface *> move_init_holder(void *, vtag) && noexcept = 0;
-    virtual void copy_assign_value_to(value_iface *, vtag) const = 0;
-    virtual void move_assign_value_to(value_iface *, vtag) && noexcept = 0;
-    virtual void copy_assign_value_from(const void *, vtag) = 0;
-    virtual void move_assign_value_from(void *, vtag) noexcept = 0;
-    virtual void swap_value(value_iface *, vtag) noexcept = 0;
+    [[nodiscard]] virtual std::pair<IFace *, value_iface *> _tanuki_clone() const = 0;
+    [[nodiscard]] virtual std::pair<IFace *, value_iface *> _tanuki_copy_init_holder(void *) const = 0;
+    [[nodiscard]] virtual std::pair<IFace *, value_iface *> _tanuki_move_init_holder(void *) && noexcept = 0;
+    virtual void _tanuki_copy_assign_value_to(value_iface *) const = 0;
+    virtual void _tanuki_move_assign_value_to(value_iface *) && noexcept = 0;
+    virtual void _tanuki_copy_assign_value_from(const void *) = 0;
+    virtual void _tanuki_move_assign_value_from(void *) noexcept = 0;
+    virtual void _tanuki_swap_value(value_iface *) noexcept = 0;
 
 #if defined(TANUKI_WITH_BOOST_S11N)
 
@@ -425,22 +418,22 @@ struct TANUKI_VISIBLE holder final : public value_iface<IFace>, public impl_from
     // NOTE: mark everything else as private so that it is going to be
     // unreachable from the interface implementation.
 private:
-    [[nodiscard]] std::type_index value_type_index(vtag) const noexcept final
+    [[nodiscard]] std::type_index _tanuki_value_type_index() const noexcept final
     {
         return typeid(T);
     }
-    [[nodiscard]] void *value_ptr(vtag) noexcept final
+    [[nodiscard]] void *_tanuki_value_ptr() noexcept final
     {
         return std::addressof(m_value);
     }
 
-    [[nodiscard]] bool is_reference(vtag) const noexcept final
+    [[nodiscard]] bool _tanuki_is_reference() const noexcept final
     {
         return is_reference_wrapper<T>::value;
     }
 
     // Clone this, and cast the result to the two bases.
-    [[nodiscard]] std::pair<IFace *, value_iface<IFace> *> clone(vtag) const final
+    [[nodiscard]] std::pair<IFace *, value_iface<IFace> *> _tanuki_clone() const final
     {
         // NOTE: the std::convertible_to check is to avoid a hard error when instantiating a holder
         // with an invalid interface implementation.
@@ -454,7 +447,7 @@ private:
     }
     // Copy-init a new holder into the storage beginning at ptr.
     // Then cast the result to the two bases and return.
-    [[nodiscard]] std::pair<IFace *, value_iface<IFace> *> copy_init_holder(void *ptr, vtag) const final
+    [[nodiscard]] std::pair<IFace *, value_iface<IFace> *> _tanuki_copy_init_holder(void *ptr) const final
     {
         if constexpr (std::copy_constructible<T> && std::convertible_to<holder *, IFace *>) {
             // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
@@ -468,7 +461,7 @@ private:
     // Then cast the result to the two bases and return.
     [[nodiscard]] std::pair<IFace *, value_iface<IFace> *>
     // NOLINTNEXTLINE(bugprone-exception-escape)
-    move_init_holder(void *ptr, vtag) && noexcept final
+    _tanuki_move_init_holder(void *ptr) && noexcept final
     {
         if constexpr (std::move_constructible<T> && std::convertible_to<holder *, IFace *>) {
             // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
@@ -479,7 +472,7 @@ private:
         }
     }
     // Copy-assign m_value into the m_value of v_iface.
-    void copy_assign_value_to(value_iface<IFace> *v_iface, vtag) const final
+    void _tanuki_copy_assign_value_to(value_iface<IFace> *v_iface) const final
     {
         if constexpr (std::is_copy_assignable_v<T>) {
             // NOTE: I don't think it is necessary to invoke launder here,
@@ -487,25 +480,25 @@ private:
             // copy_assign_value_to() is called only when assigning holders containing
             // the same T, the conversion chain should boil down to T * -> void * -> T *, which
             // does not require laundering.
-            assert(typeid(T) == v_iface->value_type_index(vtag{}));
-            *static_cast<T *>(v_iface->value_ptr(vtag{})) = m_value;
+            assert(typeid(T) == v_iface->_tanuki_value_type_index());
+            *static_cast<T *>(v_iface->_tanuki_value_ptr()) = m_value;
         } else {
             throw std::invalid_argument("Attempting to copy-assign a non-copyable value type");
         }
     }
     // Move-assign m_value into the m_value of v_iface.
     // NOLINTNEXTLINE(bugprone-exception-escape)
-    void move_assign_value_to(value_iface<IFace> *v_iface, vtag) && noexcept final
+    void _tanuki_move_assign_value_to(value_iface<IFace> *v_iface) && noexcept final
     {
         if constexpr (std::is_move_assignable_v<T>) {
-            assert(typeid(T) == v_iface->value_type_index(vtag{}));
-            *static_cast<T *>(v_iface->value_ptr(vtag{})) = std::move(m_value);
+            assert(typeid(T) == v_iface->_tanuki_value_type_index());
+            *static_cast<T *>(v_iface->_tanuki_value_ptr()) = std::move(m_value);
         } else {
             throw std::invalid_argument("Attempting to move-assign a non-movable value type"); // LCOV_EXCL_LINE
         }
     }
     // Copy-assign the object of type T assumed to be stored in ptr into m_value.
-    void copy_assign_value_from(const void *ptr, vtag) final
+    void _tanuki_copy_assign_value_from(const void *ptr) final
     {
         if constexpr (std::is_copy_assignable_v<T>) {
             m_value = *static_cast<const T *>(ptr);
@@ -514,7 +507,7 @@ private:
         }
     }
     // NOLINTNEXTLINE(bugprone-exception-escape)
-    void move_assign_value_from(void *ptr, vtag) noexcept final
+    void _tanuki_move_assign_value_from(void *ptr) noexcept final
     {
         if constexpr (std::is_move_assignable_v<T>) {
             m_value = std::move(*static_cast<T *>(ptr));
@@ -524,13 +517,13 @@ private:
     }
     // Swap m_value with the m_value of v_iface.
     // NOLINTNEXTLINE(bugprone-exception-escape)
-    void swap_value(value_iface<IFace> *v_iface, vtag) noexcept final
+    void _tanuki_swap_value(value_iface<IFace> *v_iface) noexcept final
     {
         if constexpr (std::swappable<T>) {
-            assert(typeid(T) == v_iface->value_type_index(vtag{}));
+            assert(typeid(T) == v_iface->_tanuki_value_type_index());
 
             using std::swap;
-            swap(m_value, *static_cast<T *>(v_iface->value_ptr(vtag{})));
+            swap(m_value, *static_cast<T *>(v_iface->_tanuki_value_ptr()));
         } else {
             throw std::invalid_argument("Attempting to swap a non-swappable value type"); // LCOV_EXCL_LINE
         }
@@ -975,8 +968,7 @@ class TANUKI_VISIBLE wrap
 
             if (st) {
                 // Move-init the value from pv_iface.
-                auto [new_p_iface, new_pv_iface]
-                    = std::move(*pv_iface).move_init_holder(this->static_storage, detail::vtag{});
+                auto [new_p_iface, new_pv_iface] = std::move(*pv_iface)._tanuki_move_init_holder(this->static_storage);
                 this->m_p_iface = new_p_iface;
                 this->m_pv_iface = new_pv_iface;
 
@@ -1073,17 +1065,16 @@ public:
     {
         if constexpr (Cfg.static_size == 0u) {
             // Static storage disabled.
-            std::tie(this->m_p_iface, this->m_pv_iface) = other.m_pv_iface->clone(detail::vtag{});
+            std::tie(this->m_p_iface, this->m_pv_iface) = other.m_pv_iface->_tanuki_clone();
         } else {
             const auto [_, pv_iface, st] = other.stype();
 
             if (st) {
                 // Other has static storage.
-                std::tie(this->m_p_iface, this->m_pv_iface)
-                    = pv_iface->copy_init_holder(this->static_storage, detail::vtag{});
+                std::tie(this->m_p_iface, this->m_pv_iface) = pv_iface->_tanuki_copy_init_holder(this->static_storage);
             } else {
                 // Other has dynamic storage.
-                auto [new_p_iface, new_pv_iface] = pv_iface->clone(detail::vtag{});
+                auto [new_p_iface, new_pv_iface] = pv_iface->_tanuki_clone();
                 ::new (this->static_storage) iface_t *(new_p_iface);
                 this->m_p_iface = nullptr;
                 this->m_pv_iface = new_pv_iface;
@@ -1110,7 +1101,7 @@ private:
             if (st) {
                 // Other has static storage.
                 std::tie(this->m_p_iface, this->m_pv_iface)
-                    = std::move(*pv_iface).move_init_holder(this->static_storage, detail::vtag{});
+                    = std::move(*pv_iface)._tanuki_move_init_holder(this->static_storage);
             } else {
                 // Other has dynamic storage.
                 ::new (this->static_storage) iface_t *(p_iface);
@@ -1202,7 +1193,7 @@ public:
 
             if (st0) {
                 // For static storage, directly move assign the internal value.
-                std::move(*pv_iface1).move_assign_value_to(pv_iface0, detail::vtag{});
+                std::move(*pv_iface1)._tanuki_move_assign_value_to(pv_iface0);
             } else {
                 // For dynamic storage, swap the pointers.
                 assert(this->m_p_iface == nullptr);
@@ -1235,7 +1226,7 @@ public:
         // The internal types are the same.
         if constexpr (Cfg.static_size == 0u) {
             // Assign the internal value.
-            other.m_pv_iface->copy_assign_value_to(this->m_pv_iface, detail::vtag{});
+            other.m_pv_iface->_tanuki_copy_assign_value_to(this->m_pv_iface);
         } else {
             const auto [p_iface0, pv_iface0, st0] = stype();
             const auto [p_iface1, pv_iface1, st1] = other.stype();
@@ -1245,7 +1236,7 @@ public:
             assert(st0 == st1);
 
             // Assign the internal value.
-            pv_iface1->copy_assign_value_to(pv_iface0, detail::vtag{});
+            pv_iface1->_tanuki_copy_assign_value_to(pv_iface0);
         }
 
         return *this;
@@ -1302,13 +1293,13 @@ public:
             // Thus, we need to create a temporary pointer to the function and use its address
             // in copy/move_assign_value_from() instead.
             auto *fptr = std::addressof(x);
-            this->m_pv_iface->copy_assign_value_from(&fptr, detail::vtag{});
+            this->m_pv_iface->_tanuki_copy_assign_value_from(&fptr);
         } else {
             // The internal types are the same, do directly copy/move assignment.
             if constexpr (detail::noncv_rvalue_reference<T &&>) {
-                this->m_pv_iface->move_assign_value_from(std::addressof(x), detail::vtag{});
+                this->m_pv_iface->_tanuki_move_assign_value_from(std::addressof(x));
             } else {
-                this->m_pv_iface->copy_assign_value_from(std::addressof(x), detail::vtag{});
+                this->m_pv_iface->_tanuki_copy_assign_value_from(std::addressof(x));
             }
         }
 
@@ -1343,7 +1334,7 @@ public:
     {
         // NOTE: the value interface pointer can be accessed regardless of whether
         // or not static storage is enabled.
-        return w.m_pv_iface->value_type_index(detail::vtag{});
+        return w.m_pv_iface->_tanuki_value_type_index();
     }
 
     [[nodiscard]] friend const iface_t *iface_ptr(const wrap &w) noexcept
@@ -1417,7 +1408,7 @@ public:
 
             if (st1) {
                 // For static storage, directly swap the internal values.
-                pv_iface2->swap_value(pv_iface1, detail::vtag{});
+                pv_iface2->_tanuki_swap_value(pv_iface1);
             } else {
                 // For dynamic storage, swap the pointers.
                 assert(w1.m_p_iface == nullptr);
@@ -1441,16 +1432,16 @@ public:
 
     [[nodiscard]] friend const void *raw_ptr(const wrap &w) noexcept
     {
-        return w.m_pv_iface->value_ptr(detail::vtag{});
+        return w.m_pv_iface->_tanuki_value_ptr();
     }
     [[nodiscard]] friend void *raw_ptr(wrap &w) noexcept
     {
-        return w.m_pv_iface->value_ptr(detail::vtag{});
+        return w.m_pv_iface->_tanuki_value_ptr();
     }
 
     [[nodiscard]] friend bool contains_reference(const wrap &w) noexcept
     {
-        return w.m_pv_iface->is_reference(detail::vtag{});
+        return w.m_pv_iface->_tanuki_is_reference();
     }
 };
 
