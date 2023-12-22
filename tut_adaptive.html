@@ -449,11 +449,14 @@ of initial conditions for <code class="docutils literal notranslate"><span class
 </pre></div>
 </div>
 <p>This will produce the following output:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Tolerance               : 2.2204460492503131e-16</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">C++ datatype            : double</span>
+<span class="go">Tolerance               : 2.220446049250313e-16</span>
+<span class="go">High accuracy           : false</span>
+<span class="go">Compact mode            : false</span>
 <span class="go">Taylor order            : 20</span>
 <span class="go">Dimension               : 2</span>
-<span class="go">Time                    : 0.0000000000000000</span>
-<span class="go">State                   : [0.050000000000000003, 0.025000000000000001]</span>
+<span class="go">Time                    : 0</span>
+<span class="go">State                   : [0.05, 0.025]</span>
 </pre></div>
 </div>
 <p>By default, the error tolerance of an adaptive integrator is set to the
@@ -486,11 +489,14 @@ The screen output will look something like this:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome : taylor_outcome::success</span>
 <span class="go">Timestep: 0.216053</span>
 
-<span class="go">Tolerance               : 2.2204460492503131e-16</span>
+<span class="go">C++ datatype            : double</span>
+<span class="go">Tolerance               : 2.220446049250313e-16</span>
+<span class="go">High accuracy           : false</span>
+<span class="go">Compact mode            : false</span>
 <span class="go">Taylor order            : 20</span>
 <span class="go">Dimension               : 2</span>
 <span class="go">Time                    : 0.21605277478009474</span>
-<span class="go">State                   : [0.043996448369926382, -0.078442455470687983]</span>
+<span class="go">State                   : [0.04399644836992638, -0.07844245547068798]</span>
 </pre></div>
 </div>
 <p>It is also possible to perform a single timestep backward in time
@@ -583,7 +589,7 @@ the system for a specified amount of time, the latter
 propagates the state up to a specified epoch.</p>
 <p>Let us see a couple of usage examples:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Propagate for 5 time units.</span>
-<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">min_h</span><span class="p">,</span><span class="w"> </span><span class="n">max_h</span><span class="p">,</span><span class="w"> </span><span class="n">nsteps</span><span class="p">,</span><span class="w"> </span><span class="n">_1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_for</span><span class="p">(</span><span class="mf">5.</span><span class="p">);</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">min_h</span><span class="p">,</span><span class="w"> </span><span class="n">max_h</span><span class="p">,</span><span class="w"> </span><span class="n">nsteps</span><span class="p">,</span><span class="w"> </span><span class="n">_1</span><span class="p">,</span><span class="w"> </span><span class="n">_2</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_for</span><span class="p">(</span><span class="mf">5.</span><span class="p">);</span>
 
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Outcome      : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Min. timestep: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">min_h</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
@@ -592,7 +598,7 @@ propagates the state up to a specified epoch.</p>
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Current time : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
 
 <span class="w">    </span><span class="c1">// Propagate until t = 20.</span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">min_h</span><span class="p">,</span><span class="w"> </span><span class="n">max_h</span><span class="p">,</span><span class="w"> </span><span class="n">nsteps</span><span class="p">,</span><span class="w"> </span><span class="n">_1</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">20.</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">min_h</span><span class="p">,</span><span class="w"> </span><span class="n">max_h</span><span class="p">,</span><span class="w"> </span><span class="n">nsteps</span><span class="p">,</span><span class="w"> </span><span class="n">_1</span><span class="p">,</span><span class="w"> </span><span class="n">_2</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">20.</span><span class="p">);</span>
 
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Outcome      : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Min. timestep: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">min_h</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
@@ -615,7 +621,7 @@ propagates the state up to a specified epoch.</p>
 </pre></div>
 </div>
 <p>The time-limited propagation functions return
-a tuple of 5 values, which represent, respectively:</p>
+a tuple of 6 values, which represent, respectively:</p>
 <ul class="simple">
 <li><p>the outcome of the integration (which will usually be
 <code class="docutils literal notranslate"><span class="pre">taylor_outcome::time_limit</span></code>),</p></li>
@@ -623,12 +629,14 @@ a tuple of 5 values, which represent, respectively:</p>
 that were used in the propagation,</p></li>
 <li><p>the total number of steps that were taken,</p></li>
 <li><p>the <a class="reference internal" href="tut_d_output.html#tut-c-output"><span class="std std-ref">continuous output</span></a> function object,
-if requested (off by default).</p></li>
+if requested (off by default),</p></li>
+<li><p>a copy of the step callback (see below for an explanation).
+If no callback has been provided, an empty callback is returned.</p></li>
 </ul>
 <p>The time-limited propagation functions can be used
 to propagate both forward and backward in time:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Propagate back to t = 0.</span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">min_h</span><span class="p">,</span><span class="w"> </span><span class="n">max_h</span><span class="p">,</span><span class="w"> </span><span class="n">nsteps</span><span class="p">,</span><span class="w"> </span><span class="n">_1</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">min_h</span><span class="p">,</span><span class="w"> </span><span class="n">max_h</span><span class="p">,</span><span class="w"> </span><span class="n">nsteps</span><span class="p">,</span><span class="w"> </span><span class="n">_1</span><span class="p">,</span><span class="w"> </span><span class="n">_2</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
 
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Outcome      : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Min. timestep: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">min_h</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
@@ -645,11 +653,14 @@ to propagate both forward and backward in time:</p>
 <span class="go">Num. of steps: 97</span>
 <span class="go">Current time : 0</span>
 
-<span class="go">Tolerance               : 2.2204460492503131e-16</span>
+<span class="go">C++ datatype            : double</span>
+<span class="go">Tolerance               : 2.220446049250313e-16</span>
+<span class="go">High accuracy           : false</span>
+<span class="go">Compact mode            : false</span>
 <span class="go">Taylor order            : 20</span>
 <span class="go">Dimension               : 2</span>
-<span class="go">Time                    : 0.0000000000000000</span>
-<span class="go">State                   : [0.050000000000000044, 0.024999999999999991]</span>
+<span class="go">Time                    : 0</span>
+<span class="go">State                   : [0.050000000000000044, 0.02499999999999999]</span>
 </pre></div>
 </div>
 <p>Note also that the time-limited propagation functions will stop
@@ -669,19 +680,21 @@ represents the maximum timestep size in absolute value;</p></li>
 </pre></div>
 </div>
 <p>which will be invoked at the end of each timestep, with the integrator
-object as only argument. If the callback returns <code class="docutils literal notranslate"><span class="pre">true</span></code> then the integration
-will continue after the invocation of the callback, otherwise the integration
-will be interrupted.</p>
+object as only argument. This is known as a <em>step callback</em>. If the callback
+returns <code class="docutils literal notranslate"><span class="pre">true</span></code> then the integration will continue after the invocation of the
+callback, otherwise the integration will be interrupted.</p>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 1.0.0.</span></p>
 </div>
-<p>Optionally, a function object callback can implement a <code class="docutils literal notranslate"><span class="pre">pre_hook()</span></code> member
+<p>Optionally, a step callback can implement a <code class="docutils literal notranslate"><span class="pre">pre_hook()</span></code> member
 function with signature</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">pre_hook</span><span class="p">(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">);</span>
 </pre></div>
 </div>
 <p>that will be invoked once <em>before</em> the first step is taken
 by the <code class="docutils literal notranslate"><span class="pre">propagate_for()</span></code> and <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code> functions.</p>
+<p>Step callbacks are passed by value to <code class="docutils literal notranslate"><span class="pre">propagate_for()</span></code> and <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code>,
+and they are returned as the sixth member of the return tuple;</p>
 </li>
 <li><p><code class="docutils literal notranslate"><span class="pre">c_output</span></code>: a boolean flag that enables <a class="reference internal" href="tut_d_output.html#tut-c-output"><span class="std std-ref">continuous output</span></a>.</p></li>
 </ul>
@@ -711,7 +724,7 @@ a full integration step.</p>
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> takes in input a grid of time points represented as a <code class="docutils literal notranslate"><span class="pre">std::vector</span></code>,
-and returns a tuple of 5 values. The first 4 values are the same
+and returns a tuple of 6 values. The first 4 values are the same
 as in the other <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions:</p>
 <ul class="simple">
 <li><p>the outcome of the integration,</p></li>
@@ -719,12 +732,14 @@ as in the other <code class="docutils literal notranslate"><span class="pre">pro
 that were used in the propagation,</p></li>
 <li><p>the total number of steps that were taken.</p></li>
 </ul>
-<p>The fifth value returned by <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> is a <code class="docutils literal notranslate"><span class="pre">std::vector</span></code> containing
+<p>The fifth value returned by <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> is the step callback, if provided
+by the user (see below). Otherwise, an empty callback is returned.</p>
+<p>The sixth value returned by <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> is a <code class="docutils literal notranslate"><span class="pre">std::vector</span></code> containing
 the state of the system at the time points in the grid. The state vectors are stored
 contiguously in row-major order:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Print the state at t = 0.4 (index 4 in the time grid).</span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;x(0.4) = &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="mi">2</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;v(0.4) = &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="mi">2</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;x(0.4) = &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">5</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="mi">2</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;v(0.4) = &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">5</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="mi">2</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">x(0.4) = 0.0232578</span>
@@ -754,19 +769,21 @@ represents the maximum timestep size in absolute value;</p></li>
 </pre></div>
 </div>
 <p>which will be invoked at the end of each timestep, with the integrator
-object as only argument. If the callback returns <code class="docutils literal notranslate"><span class="pre">true</span></code> then the integration
-will continue after the invocation of the callback, otherwise the integration
-will be interrupted.</p>
+object as only argument. This is known as a <em>step callback</em>. If the callback
+returns <code class="docutils literal notranslate"><span class="pre">true</span></code> then the integration will continue after the invocation of the
+callback, otherwise the integration will be interrupted.</p>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 1.0.0.</span></p>
 </div>
-<p>Optionally, a function object callback can implement a <code class="docutils literal notranslate"><span class="pre">pre_hook()</span></code> member
+<p>Optionally, a step callback can implement a <code class="docutils literal notranslate"><span class="pre">pre_hook()</span></code> member
 function with signature</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">pre_hook</span><span class="p">(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">);</span>
 </pre></div>
 </div>
 <p>that will be invoked once <em>before</em> the first step is taken
 by the <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> function.</p>
+<p>Step callbacks are passed by value to <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code>
+and they are returned as the fifth member of the return tuple.</p>
 </li>
 </ul>
 </section>
@@ -841,7 +858,7 @@ by the <code class="docutils literal notranslate"><span class="pre">propagate_gr
 <span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.025</span><span class="p">;</span>
 
 <span class="w">    </span><span class="c1">// Propagate for 5 time units.</span>
-<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">min_h</span><span class="p">,</span><span class="w"> </span><span class="n">max_h</span><span class="p">,</span><span class="w"> </span><span class="n">nsteps</span><span class="p">,</span><span class="w"> </span><span class="n">_1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_for</span><span class="p">(</span><span class="mf">5.</span><span class="p">);</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">min_h</span><span class="p">,</span><span class="w"> </span><span class="n">max_h</span><span class="p">,</span><span class="w"> </span><span class="n">nsteps</span><span class="p">,</span><span class="w"> </span><span class="n">_1</span><span class="p">,</span><span class="w"> </span><span class="n">_2</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_for</span><span class="p">(</span><span class="mf">5.</span><span class="p">);</span>
 
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Outcome      : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Min. timestep: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">min_h</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
@@ -850,7 +867,7 @@ by the <code class="docutils literal notranslate"><span class="pre">propagate_gr
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Current time : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
 
 <span class="w">    </span><span class="c1">// Propagate until t = 20.</span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">min_h</span><span class="p">,</span><span class="w"> </span><span class="n">max_h</span><span class="p">,</span><span class="w"> </span><span class="n">nsteps</span><span class="p">,</span><span class="w"> </span><span class="n">_1</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">20.</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">min_h</span><span class="p">,</span><span class="w"> </span><span class="n">max_h</span><span class="p">,</span><span class="w"> </span><span class="n">nsteps</span><span class="p">,</span><span class="w"> </span><span class="n">_1</span><span class="p">,</span><span class="w"> </span><span class="n">_2</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">20.</span><span class="p">);</span>
 
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Outcome      : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Min. timestep: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">min_h</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
@@ -859,7 +876,7 @@ by the <code class="docutils literal notranslate"><span class="pre">propagate_gr
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Current time : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
 
 <span class="w">    </span><span class="c1">// Propagate back to t = 0.</span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">min_h</span><span class="p">,</span><span class="w"> </span><span class="n">max_h</span><span class="p">,</span><span class="w"> </span><span class="n">nsteps</span><span class="p">,</span><span class="w"> </span><span class="n">_1</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">min_h</span><span class="p">,</span><span class="w"> </span><span class="n">max_h</span><span class="p">,</span><span class="w"> </span><span class="n">nsteps</span><span class="p">,</span><span class="w"> </span><span class="n">_1</span><span class="p">,</span><span class="w"> </span><span class="n">_2</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
 
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Outcome      : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Min. timestep: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">min_h</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
@@ -879,8 +896,8 @@ by the <code class="docutils literal notranslate"><span class="pre">propagate_gr
 <span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_grid</span><span class="p">({</span><span class="mf">0.</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1</span><span class="p">,</span><span class="w"> </span><span class="mf">0.2</span><span class="p">,</span><span class="w"> </span><span class="mf">0.3</span><span class="p">,</span><span class="w"> </span><span class="mf">0.4</span><span class="p">,</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">0.6</span><span class="p">,</span><span class="w"> </span><span class="mf">0.7</span><span class="p">,</span><span class="w"> </span><span class="mf">0.8</span><span class="p">,</span><span class="w"> </span><span class="mf">0.9</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">});</span>
 
 <span class="w">    </span><span class="c1">// Print the state at t = 0.4 (index 4 in the time grid).</span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;x(0.4) = &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="mi">2</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;v(0.4) = &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="mi">2</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;x(0.4) = &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">5</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="mi">2</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;v(0.4) = &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">5</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="mi">2</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 <span class="p">}</span>
 </pre></div>
 </div>

@@ -540,7 +540,7 @@ error tolerance.</p>
 will internally invoke the <code class="docutils literal notranslate"><span class="pre">step()</span></code> function with the optional boolean
 flag set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, so that at the end of each timestep the Taylor coefficients
 will be available. The Taylor coefficients can be used, e.g., inside the
-optional callback that can be passed to the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions.</p>
+step callback that can be passed to the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions.</p>
 <p>Note that <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> always unconditionally writes the Taylor coefficients
 at the end of each timestep, and thus using the <code class="docutils literal notranslate"><span class="pre">write_tc</span></code> argument is not necessary.</p>
 </section>

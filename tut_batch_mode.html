@@ -633,10 +633,11 @@ functions are stored in internal vectors of tuples, with the tuple elements repr
 that were used in the propagation,</p></li>
 <li><p>the total number of steps that were taken.</p></li>
 </ul>
-<p>The <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code> functions in batch mode return the
+<p>The <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code> functions in batch mode return a tuple containing the
 <a class="reference internal" href="#tut-c-output-batch"><span class="std std-ref">continuous output</span></a> function object
-(if requested). The <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> function returns
-the result of the integration over a grid of time batches.</p>
+(if requested) and the step callback.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> function returns
+a tuple containing the step callback and the result of the integration over a grid of time batches.</p>
 <p>Let us see a couple of examples:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Propagate for different time intervals.</span>
 <span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_for</span><span class="p">({</span><span class="mf">10.</span><span class="p">,</span><span class="w"> </span><span class="mf">11.</span><span class="p">,</span><span class="w"> </span><span class="mf">12.</span><span class="p">,</span><span class="w"> </span><span class="mf">13.</span><span class="p">});</span>

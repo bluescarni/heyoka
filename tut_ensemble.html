@@ -550,11 +550,12 @@ concurrently by separate threads of execution:</p>
 <li><p>invocation of the generator’s call operator (that is, the generator is
 shared among multiple threads and must support concurrent invocations
 of its call operator);</p></li>
-<li><p>copy construction of the callback that can (optionally) be passed to
-the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions (that is, step callbacks are <strong>not</strong>
+<li><p>copy construction of the step callbacks and invocation of the call operator
+on the copies (that is, step callbacks are not
 shared among multiple threads of execution, and a new copy is created for each
 invocation of the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions);</p></li>
-<li><p>copy construction of the events callbacks (that is, each thread of execution
+<li><p>copy construction of the events callbacks and invocation of the call operator
+on the copies (that is, each thread of execution
 gets its own copy of the event callbacks thanks to the creation
 of a new integrator object via the generator).</p></li>
 </ul>

@@ -381,6 +381,7 @@ document.write(`
                 <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bchanges-4-0-0">4.0.0</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#api-behaviour-changes">API/behaviour changes</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#step-callbacks-and-propagate">Step callbacks and <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#propagate-grid"><code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code></a></li>
 </ul>
 </li>
@@ -411,6 +412,34 @@ document.write(`
 <p>heyoka 4 includes several backwards-incompatible changes.</p>
 <section id="api-behaviour-changes">
 <h3>API/behaviour changes<a class="headerlink" href="#api-behaviour-changes" title="Permalink to this heading">#</a></h3>
+<section id="step-callbacks-and-propagate">
+<h4>Step callbacks and <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code><a class="headerlink" href="#step-callbacks-and-propagate" title="Permalink to this heading">#</a></h4>
+<p>The way step callbacks interact with the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions has changed. Specifically:</p>
+<ul class="simple">
+<li><p>step callbacks are now passed by value into the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions (whereas previously
+they would be passed by reference), and</p></li>
+<li><p>step callbacks are now part of the return value. Specifically:</p>
+<ul>
+<li><p>for the scalar <code class="docutils literal notranslate"><span class="pre">propagate_for()</span></code> and <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code> functions, the step callback is
+the sixth element of the return tuple, while for the batch variants the step callback
+is the second element of the return tuple;</p></li>
+<li><p>for the scalar <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> function, the step callback is the fifth element of the return
+tuple, while for the batch variant the step callback is the first element of the return
+tuple.</p></li>
+</ul>
+</li>
+</ul>
+<p><a class="reference internal" href="tut_ensemble.html#tut-ensemble"><span class="std std-ref">The ensemble propagation</span></a> functions have been modified in an analogous way.</p>
+<p>Adapting existing code for the new API should be straightforward. In most cases it should be just
+a matter of:</p>
+<ul class="simple">
+<li><p>adapting strucuted bindings declarations to account for the new element in the return tuple
+of scalar propagations,</p></li>
+<li><p>adjusting the indexing into the return tuple when fetching a specific element,</p></li>
+<li><p>accounting for the fact that batch propagations now return a tuple of two elements
+rather than a single value.</p></li>
+</ul>
+</section>
 <section id="propagate-grid">
 <h4><code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code><a class="headerlink" href="#propagate-grid" title="Permalink to this heading">#</a></h4>
 <p>The <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> functions of the adaptive integrators now require the first element of the
@@ -554,6 +583,7 @@ time, and its value will be -1 for negative derivative,
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bchanges-4-0-0">4.0.0</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#api-behaviour-changes">API/behaviour changes</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#step-callbacks-and-propagate">Step callbacks and <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#propagate-grid"><code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code></a></li>
 </ul>
 </li>

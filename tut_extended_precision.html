@@ -404,7 +404,7 @@ not only in single and double precision, but also in extended precision. Specifi
 </ul>
 <p>How these extended precision floating-point types can be accessed and used from C++ varies depending on the platform. The 80-bit
 extended-precision format is available as the C++ <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> type on most platforms based on Intel x86 processors. Quadruple-precision
-computations are supported either via the <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> type (e.g., on 64-bit ARM processors) or via the the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.0)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> type
+computations are supported either via the <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> type (e.g., on 64-bit ARM processors) or via the the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.2)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> type
 (provided that the platform supports the nonstandard <code class="docutils literal notranslate"><span class="pre">__float128</span></code> floating-point type and that heyoka was compiled with support
 for the mp++ library - see the <a class="reference internal" href="install.html#installation"><span class="std std-ref">installation instructions</span></a>).</p>
 <section id="a-simple-example">
@@ -486,14 +486,14 @@ and printing to screen the relative energy error:</p>
 </div>
 <p>The console output indeed confirms that energy is conserved at the level of the epsilon of the 80-bit
 extended-precision format (that is, <span class="math notranslate nohighlight">\(\sim 10^{-19}\)</span>).</p>
-<p>Performing quadruple-precision integrations via the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.0)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> type follows exactly the same pattern. That is,
-one just needs to replace <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> with <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.0)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> when instantiating the integrator object.</p>
+<p>Performing quadruple-precision integrations via the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.2)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> type follows exactly the same pattern. That is,
+one just needs to replace <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> with <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.2)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> when instantiating the integrator object.</p>
 </section>
 <section id="other-classes-and-functions">
 <h2>Other classes and functions<a class="headerlink" href="#other-classes-and-functions" title="Permalink to this heading">#</a></h2>
 <p>Besides the adaptive integrator, several other classes and functions in heyoka can be used in extended precision.</p>
 <p>The <a class="reference internal" href="tut_events.html#tut-events"><span class="std std-ref">event classes</span></a>, for instance, can be constructed in extended precision by passing <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code>
-or <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.0)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> as the template parameter (instead of <code class="docutils literal notranslate"><span class="pre">double</span></code>). Note that the precision of an event
+or <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.2)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> as the template parameter (instead of <code class="docutils literal notranslate"><span class="pre">double</span></code>). Note that the precision of an event
 must match the precision of the integrator object in which the event is used, otherwise an error will be produced
 at compilation time.</p>
 </section>
