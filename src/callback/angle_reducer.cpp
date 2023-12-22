@@ -201,7 +201,7 @@ mppp::real get_twopi_const(const taylor_adaptive<mppp::real> &ta)
     mul_2ui(ret, ret, 1u);
 
     return ret;
-}
+} // LCOV_EXCL_LINE
 
 #endif
 
