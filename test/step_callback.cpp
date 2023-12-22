@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <functional>
+#include <initializer_list>
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
@@ -460,7 +461,9 @@ TEST_CASE("step_callback pre_hook")
         auto res0 = ta0.propagate_grid({0., 1., 2.}, kw::callback = pend_cb{});
         auto res1 = ta1.propagate_grid({0., 1., 2.});
 
-        REQUIRE(std::get<4>(res0)[0] == std::get<4>(res1)[0]);
+        REQUIRE(std::get<4>(res0));
+        REQUIRE(!std::get<4>(res1));
+        REQUIRE(std::get<5>(res0)[0] == std::get<5>(res1)[0]);
 
         REQUIRE(ta0.get_pars()[0] == 1.5);
 
@@ -497,9 +500,11 @@ TEST_CASE("step_callback pre_hook")
         ta0.get_pars_data()[1] = 0.1;
         ta1.set_time(0.);
 
-        auto res0 = ta0.propagate_grid({0., 0., 1., 1., 2., 2.}, kw::callback = pend_cb{});
-        auto res1 = ta1.propagate_grid({0., 0., 1., 1., 2., 2.});
+        auto [cb0, res0] = ta0.propagate_grid({0., 0., 1., 1., 2., 2.}, kw::callback = pend_cb{});
+        auto [cb1, res1] = ta1.propagate_grid({0., 0., 1., 1., 2., 2.});
 
+        REQUIRE(cb0);
+        REQUIRE(!cb1);
         REQUIRE(res0 == res1);
 
         REQUIRE(ta0.get_pars()[0] == 1.5);
@@ -740,6 +745,79 @@ TEST_CASE("step_callback_set")
 
             REQUIRE(static_cast<bool>(scs));
             REQUIRE(scs.template extract<step_callback_set<fp_t>>() != nullptr);
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("step_callback range")
+{
+    auto dyn = model::pendulum();
+
+    auto tester = [&](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        // Empty set.
+        {
+            auto ta0 = taylor_adaptive<fp_t>{dyn, {1., 0.}};
+
+            auto [oc, _1, _2, _3, _4, cb]
+                = ta0.propagate_until(10., kw::callback = std::initializer_list<step_callback<fp_t>>{});
+
+            REQUIRE(oc == taylor_outcome::time_limit);
+            REQUIRE(cb);
+            REQUIRE(value_isa<step_callback_set<fp_t>>(cb));
+        }
+
+        // Check sequencing of callback invocations.
+        {
+            int c1 = 0;
+            int c2 = 0;
+
+            auto ta0 = taylor_adaptive<fp_t>{dyn, {1., 0.}};
+
+            auto [oc, _1, _2, _3, _4, cb]
+                = ta0.propagate_until(10., kw::callback = {step_callback<fp_t>{[&c1, &c2](const auto &) {
+                                                               REQUIRE(c1 == c2);
+                                                               ++c1;
+                                                               return true;
+                                                           }},
+                                                           step_callback<fp_t>{[&c1, &c2](const auto &) {
+                                                               ++c2;
+                                                               REQUIRE(c1 == c2);
+                                                               return true;
+                                                           }}});
+
+            REQUIRE(oc == taylor_outcome::time_limit);
+            REQUIRE(c1 == c2);
+            REQUIRE(cb);
+            REQUIRE(value_isa<step_callback_set<fp_t>>(cb));
+        }
+
+        // Check stopping.
+        {
+            int c1 = 0;
+            int c2 = 0;
+
+            auto ta0 = taylor_adaptive<fp_t>{dyn, {1., 0.}};
+
+            auto [oc, _1, _2, _3, _4, cb]
+                = ta0.propagate_until(10., kw::callback = std::vector<step_callback<fp_t>>{[&c1, &c2](const auto &) {
+                                                                                               REQUIRE(c1 == c2);
+                                                                                               ++c1;
+                                                                                               return false;
+                                                                                           },
+                                                                                           [&c1, &c2](const auto &) {
+                                                                                               ++c2;
+                                                                                               REQUIRE(c1 == c2);
+                                                                                               return true;
+                                                                                           }});
+
+            REQUIRE(oc == taylor_outcome::cb_stop);
+            REQUIRE(c1 == c2);
+            REQUIRE(cb);
+            REQUIRE(value_isa<step_callback_set<fp_t>>(cb));
         }
     };
 

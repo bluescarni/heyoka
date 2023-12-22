@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -47,6 +48,21 @@ const auto fp_types = std::tuple<float, double
 
 static std::mt19937 rng;
 
+struct cb_functor {
+    cb_functor() = default;
+    cb_functor(cb_functor &&) noexcept = default;
+    cb_functor(const cb_functor &)
+    {
+        ++n_copies;
+    }
+    template <typename TA>
+    bool operator()(TA &) const
+    {
+        return true;
+    }
+    inline static std::atomic<unsigned long> n_copies = 0;
+};
+
 TEST_CASE("scalar propagate until")
 {
 
@@ -69,19 +85,32 @@ TEST_CASE("scalar propagate until")
             ic.push_back(fp_t(1) + rdist(rng));
         }
 
-        REQUIRE(ensemble_propagate_until<fp_t>(ta, 20, 0, [&ics](auto tint, std::size_t i) {
-                    tint.get_state_data()[0] = ics[i][0];
-                    tint.get_state_data()[1] = ics[i][1];
+        auto orig_cb_ncopies = cb_functor::n_copies.load();
 
-                    return tint;
-                }).empty());
+        REQUIRE(ensemble_propagate_until<fp_t>(
+                    ta, 20, 0,
+                    [&ics](auto tint, std::size_t i) {
+                        tint.get_state_data()[0] = ics[i][0];
+                        tint.get_state_data()[1] = ics[i][1];
 
-        auto res = ensemble_propagate_until<fp_t>(ta, 20, n_iter, [&ics](auto tint, std::size_t i) {
-            tint.get_state_data()[0] = ics[i][0];
-            tint.get_state_data()[1] = ics[i][1];
+                        return tint;
+                    },
+                    kw::callback = cb_functor{})
+                    .empty());
 
-            return tint;
-        });
+        REQUIRE(cb_functor::n_copies.load() == orig_cb_ncopies);
+
+        auto res = ensemble_propagate_until<fp_t>(
+            ta, 20, n_iter,
+            [&ics](auto tint, std::size_t i) {
+                tint.get_state_data()[0] = ics[i][0];
+                tint.get_state_data()[1] = ics[i][1];
+
+                return tint;
+            },
+            kw::callback = cb_functor{});
+
+        REQUIRE(cb_functor::n_copies.load() == orig_cb_ncopies + n_iter);
 
         REQUIRE(res.size() == n_iter);
 
@@ -160,20 +189,33 @@ TEST_CASE("scalar propagate for")
             ic.push_back(fp_t(1) + rdist(rng));
         }
 
-        REQUIRE(ensemble_propagate_for<fp_t>(ta, 20, 0, [&ics](auto tint, std::size_t i) {
-                    tint.get_state_data()[0] = ics[i][0];
-                    tint.get_state_data()[1] = ics[i][1];
+        auto orig_cb_ncopies = cb_functor::n_copies.load();
 
-                    return tint;
-                }).empty());
+        REQUIRE(ensemble_propagate_for<fp_t>(
+                    ta, 20, 0,
+                    [&ics](auto tint, std::size_t i) {
+                        tint.get_state_data()[0] = ics[i][0];
+                        tint.get_state_data()[1] = ics[i][1];
 
-        auto res = ensemble_propagate_for<fp_t>(ta, 20, n_iter, [&ics](auto tint, std::size_t i) {
-            tint.set_time(10);
-            tint.get_state_data()[0] = ics[i][0];
-            tint.get_state_data()[1] = ics[i][1];
+                        return tint;
+                    },
+                    kw::callback = cb_functor{})
+                    .empty());
 
-            return tint;
-        });
+        REQUIRE(cb_functor::n_copies.load() == orig_cb_ncopies);
+
+        auto res = ensemble_propagate_for<fp_t>(
+            ta, 20, n_iter,
+            [&ics](auto tint, std::size_t i) {
+                tint.set_time(10);
+                tint.get_state_data()[0] = ics[i][0];
+                tint.get_state_data()[1] = ics[i][1];
+
+                return tint;
+            },
+            kw::callback = cb_functor{});
+
+        REQUIRE(cb_functor::n_copies.load() == orig_cb_ncopies + n_iter);
 
         REQUIRE(res.size() == n_iter);
 
@@ -259,19 +301,32 @@ TEST_CASE("scalar propagate grid")
             grid.emplace_back(i);
         }
 
-        REQUIRE(ensemble_propagate_grid<fp_t>(ta, grid, 0, [&ics](auto tint, std::size_t i) {
-                    tint.get_state_data()[0] = ics[i][0];
-                    tint.get_state_data()[1] = ics[i][1];
+        auto orig_cb_ncopies = cb_functor::n_copies.load();
 
-                    return tint;
-                }).empty());
+        REQUIRE(ensemble_propagate_grid<fp_t>(
+                    ta, grid, 0,
+                    [&ics](auto tint, std::size_t i) {
+                        tint.get_state_data()[0] = ics[i][0];
+                        tint.get_state_data()[1] = ics[i][1];
 
-        auto res = ensemble_propagate_grid<fp_t>(ta, grid, n_iter, [&ics](auto tint, std::size_t i) {
-            tint.get_state_data()[0] = ics[i][0];
-            tint.get_state_data()[1] = ics[i][1];
+                        return tint;
+                    },
+                    kw::callback = cb_functor{})
+                    .empty());
 
-            return tint;
-        });
+        REQUIRE(cb_functor::n_copies.load() == orig_cb_ncopies);
+
+        auto res = ensemble_propagate_grid<fp_t>(
+            ta, grid, n_iter,
+            [&ics](auto tint, std::size_t i) {
+                tint.get_state_data()[0] = ics[i][0];
+                tint.get_state_data()[1] = ics[i][1];
+
+                return tint;
+            },
+            kw::callback = cb_functor{});
+
+        REQUIRE(cb_functor::n_copies.load() == orig_cb_ncopies + n_iter);
 
         REQUIRE(res.size() == n_iter);
 
@@ -290,7 +345,7 @@ TEST_CASE("scalar propagate grid")
             REQUIRE(std::get<2>(res[i]) == std::get<1>(loc_res));
             REQUIRE(std::get<3>(res[i]) == std::get<2>(loc_res));
             REQUIRE(std::get<4>(res[i]) == std::get<3>(loc_res));
-            REQUIRE(std::get<5>(res[i]) == std::get<4>(loc_res));
+            REQUIRE(std::get<6>(res[i]) == std::get<5>(loc_res));
         }
     };
 
@@ -322,23 +377,36 @@ TEST_CASE("batch propagate until")
             ic.push_back(fp_t(1) + rdist(rng));
         }
 
-        REQUIRE(ensemble_propagate_until_batch<fp_t>(ta, 20, 0, [&ics](auto tint, std::size_t i) {
-                    tint.get_state_data()[0] = ics[i][0];
-                    tint.get_state_data()[1] = ics[i][1];
-                    tint.get_state_data()[2] = ics[i][2];
-                    tint.get_state_data()[3] = ics[i][3];
+        auto orig_cb_ncopies = cb_functor::n_copies.load();
 
-                    return tint;
-                }).empty());
+        REQUIRE(ensemble_propagate_until_batch<fp_t>(
+                    ta, 20, 0,
+                    [&ics](auto tint, std::size_t i) {
+                        tint.get_state_data()[0] = ics[i][0];
+                        tint.get_state_data()[1] = ics[i][1];
+                        tint.get_state_data()[2] = ics[i][2];
+                        tint.get_state_data()[3] = ics[i][3];
 
-        auto res = ensemble_propagate_until_batch<fp_t>(ta, 20, n_iter, [&ics](auto tint, std::size_t i) {
-            tint.get_state_data()[0] = ics[i][0];
-            tint.get_state_data()[1] = ics[i][1];
-            tint.get_state_data()[2] = ics[i][2];
-            tint.get_state_data()[3] = ics[i][3];
+                        return tint;
+                    },
+                    kw::callback = cb_functor{})
+                    .empty());
 
-            return tint;
-        });
+        REQUIRE(cb_functor::n_copies.load() == orig_cb_ncopies);
+
+        auto res = ensemble_propagate_until_batch<fp_t>(
+            ta, 20, n_iter,
+            [&ics](auto tint, std::size_t i) {
+                tint.get_state_data()[0] = ics[i][0];
+                tint.get_state_data()[1] = ics[i][1];
+                tint.get_state_data()[2] = ics[i][2];
+                tint.get_state_data()[3] = ics[i][3];
+
+                return tint;
+            },
+            kw::callback = cb_functor{});
+
+        REQUIRE(cb_functor::n_copies.load() == orig_cb_ncopies + n_iter);
 
         REQUIRE(res.size() == n_iter);
 
@@ -351,13 +419,14 @@ TEST_CASE("batch propagate until")
             ta.get_state_data()[2] = ics[i][2];
             ta.get_state_data()[3] = ics[i][3];
 
-            auto loc_res = ta.propagate_until(20);
+            auto [loc_res, loc_cb] = ta.propagate_until(20);
 
             REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
                                 [](fp_t t) { return t == approximately(fp_t(20), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
             REQUIRE(std::get<1>(res[i]).has_value() == loc_res.has_value());
+            REQUIRE(std::get<2>(res[i]));
         }
 
         // Do it with continuous output too.
@@ -383,13 +452,14 @@ TEST_CASE("batch propagate until")
             ta.get_state_data()[2] = ics[i][2];
             ta.get_state_data()[3] = ics[i][3];
 
-            auto loc_res = ta.propagate_until(std::vector<fp_t>(batch_size, fp_t(20)), kw::c_output = true);
+            auto [loc_res, loc_cb] = ta.propagate_until(std::vector<fp_t>(batch_size, fp_t(20)), kw::c_output = true);
 
             REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
                                 [](fp_t t) { return t == approximately(fp_t(20), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
             REQUIRE((*std::get<1>(res[i]))(1.5) == (*(loc_res))(1.5));
+            REQUIRE(!std::get<2>(res[i]));
         }
     };
 
@@ -421,25 +491,38 @@ TEST_CASE("batch propagate for")
             ic.push_back(fp_t(1) + rdist(rng));
         }
 
-        REQUIRE(ensemble_propagate_for_batch<fp_t>(ta, 20, 0, [&ics](auto tint, std::size_t i) {
-                    tint.get_state_data()[0] = ics[i][0];
-                    tint.get_state_data()[1] = ics[i][1];
-                    tint.get_state_data()[2] = ics[i][2];
-                    tint.get_state_data()[3] = ics[i][3];
+        auto orig_cb_ncopies = cb_functor::n_copies.load();
 
-                    return tint;
-                }).empty());
+        REQUIRE(ensemble_propagate_for_batch<fp_t>(
+                    ta, 20, 0,
+                    [&ics](auto tint, std::size_t i) {
+                        tint.get_state_data()[0] = ics[i][0];
+                        tint.get_state_data()[1] = ics[i][1];
+                        tint.get_state_data()[2] = ics[i][2];
+                        tint.get_state_data()[3] = ics[i][3];
 
-        auto res = ensemble_propagate_for_batch<fp_t>(ta, 20, n_iter, [&ics](auto tint, std::size_t i) {
-            tint.set_time(fp_t(10));
+                        return tint;
+                    },
+                    kw::callback = cb_functor{})
+                    .empty());
 
-            tint.get_state_data()[0] = ics[i][0];
-            tint.get_state_data()[1] = ics[i][1];
-            tint.get_state_data()[2] = ics[i][2];
-            tint.get_state_data()[3] = ics[i][3];
+        REQUIRE(cb_functor::n_copies.load() == orig_cb_ncopies);
 
-            return tint;
-        });
+        auto res = ensemble_propagate_for_batch<fp_t>(
+            ta, 20, n_iter,
+            [&ics](auto tint, std::size_t i) {
+                tint.set_time(fp_t(10));
+
+                tint.get_state_data()[0] = ics[i][0];
+                tint.get_state_data()[1] = ics[i][1];
+                tint.get_state_data()[2] = ics[i][2];
+                tint.get_state_data()[3] = ics[i][3];
+
+                return tint;
+            },
+            kw::callback = cb_functor{});
+
+        REQUIRE(cb_functor::n_copies.load() == orig_cb_ncopies + n_iter);
 
         REQUIRE(res.size() == n_iter);
 
@@ -452,13 +535,14 @@ TEST_CASE("batch propagate for")
             ta.get_state_data()[2] = ics[i][2];
             ta.get_state_data()[3] = ics[i][3];
 
-            auto loc_res = ta.propagate_for(20);
+            auto [loc_res, loc_cb] = ta.propagate_for(20);
 
             REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
                                 [](fp_t t) { return t == approximately(fp_t(30), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
             REQUIRE(std::get<1>(res[i]).has_value() == loc_res.has_value());
+            REQUIRE(std::get<2>(res[i]));
         }
 
         // Do it with continuous output too.
@@ -486,13 +570,14 @@ TEST_CASE("batch propagate for")
             ta.get_state_data()[2] = ics[i][2];
             ta.get_state_data()[3] = ics[i][3];
 
-            auto loc_res = ta.propagate_for(std::vector<fp_t>(batch_size, fp_t(20)), kw::c_output = true);
+            auto [loc_res, loc_cb] = ta.propagate_for(std::vector<fp_t>(batch_size, fp_t(20)), kw::c_output = true);
 
             REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
                                 [](fp_t t) { return t == approximately(fp_t(30), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
             REQUIRE((*std::get<1>(res[i]))(1.5) == (*(loc_res))(1.5));
+            REQUIRE(!std::get<2>(res[i]));
         }
     };
 
@@ -535,23 +620,36 @@ TEST_CASE("batch propagate grid")
             }
         }
 
-        REQUIRE(ensemble_propagate_grid_batch<fp_t>(ta, grid, 0, [&ics](auto tint, std::size_t i) {
-                    tint.get_state_data()[0] = ics[i][0];
-                    tint.get_state_data()[1] = ics[i][1];
-                    tint.get_state_data()[2] = ics[i][2];
-                    tint.get_state_data()[3] = ics[i][3];
+        auto orig_cb_ncopies = cb_functor::n_copies.load();
 
-                    return tint;
-                }).empty());
+        REQUIRE(ensemble_propagate_grid_batch<fp_t>(
+                    ta, grid, 0,
+                    [&ics](auto tint, std::size_t i) {
+                        tint.get_state_data()[0] = ics[i][0];
+                        tint.get_state_data()[1] = ics[i][1];
+                        tint.get_state_data()[2] = ics[i][2];
+                        tint.get_state_data()[3] = ics[i][3];
 
-        auto res = ensemble_propagate_grid_batch<fp_t>(ta, grid, n_iter, [&ics](auto tint, std::size_t i) {
-            tint.get_state_data()[0] = ics[i][0];
-            tint.get_state_data()[1] = ics[i][1];
-            tint.get_state_data()[2] = ics[i][2];
-            tint.get_state_data()[3] = ics[i][3];
+                        return tint;
+                    },
+                    kw::callback = cb_functor{})
+                    .empty());
 
-            return tint;
-        });
+        REQUIRE(cb_functor::n_copies.load() == orig_cb_ncopies);
+
+        auto res = ensemble_propagate_grid_batch<fp_t>(
+            ta, grid, n_iter,
+            [&ics](auto tint, std::size_t i) {
+                tint.get_state_data()[0] = ics[i][0];
+                tint.get_state_data()[1] = ics[i][1];
+                tint.get_state_data()[2] = ics[i][2];
+                tint.get_state_data()[3] = ics[i][3];
+
+                return tint;
+            },
+            kw::callback = cb_functor{});
+
+        REQUIRE(cb_functor::n_copies.load() == orig_cb_ncopies + n_iter);
 
         REQUIRE(res.size() == n_iter);
 
@@ -564,13 +662,14 @@ TEST_CASE("batch propagate grid")
             ta.get_state_data()[2] = ics[i][2];
             ta.get_state_data()[3] = ics[i][3];
 
-            auto loc_res = ta.propagate_grid(grid_splat);
+            auto [loc_cb, loc_res] = ta.propagate_grid(grid_splat);
 
             REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
                                 [](fp_t t) { return t == approximately(fp_t(20), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
-            REQUIRE(std::get<1>(res[i]) == loc_res);
+            REQUIRE(std::get<1>(res[i]));
+            REQUIRE(std::get<2>(res[i]) == loc_res);
         }
     };
 

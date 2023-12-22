@@ -222,10 +222,12 @@ functions are stored in internal vectors of tuples, with the tuple elements repr
   that were used in the propagation,
 * the total number of steps that were taken.
 
-The ``propagate_for/until()`` functions in batch mode return the
+The ``propagate_for/until()`` functions in batch mode return a tuple containing the
 :ref:`continuous output <tut_c_output_batch>` function object
-(if requested). The ``propagate_grid()`` function returns
-the result of the integration over a grid of time batches.
+(if requested) and the step callback.
+
+The ``propagate_grid()`` function returns
+a tuple containing the step callback and the result of the integration over a grid of time batches.
 
 Let us see a couple of examples:
 

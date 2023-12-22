@@ -159,7 +159,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
             // Module name (defaults to empty string).
             auto mod_name = [&p]() -> std::string {
                 if constexpr (p.has(kw::mname)) {
-                    return std::forward<decltype(p(kw::mname))>(p(kw::mname));
+                    return p(kw::mname);
                 } else {
                     return "";
                 }
@@ -168,7 +168,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
             // Optimisation level (defaults to 3).
             auto opt_level = [&p]() -> unsigned {
                 if constexpr (p.has(kw::opt_level)) {
-                    return std::forward<decltype(p(kw::opt_level))>(p(kw::opt_level));
+                    return p(kw::opt_level);
                 } else {
                     return 3;
                 }
@@ -178,7 +178,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
             // Fast math flag (defaults to false).
             auto fmath = [&p]() -> bool {
                 if constexpr (p.has(kw::fast_math)) {
-                    return std::forward<decltype(p(kw::fast_math))>(p(kw::fast_math));
+                    return p(kw::fast_math);
                 } else {
                     return false;
                 }
@@ -187,7 +187,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
             // Force usage of AVX512 registers (defaults to false).
             auto force_avx512 = [&p]() -> bool {
                 if constexpr (p.has(kw::force_avx512)) {
-                    return std::forward<decltype(p(kw::force_avx512))>(p(kw::force_avx512));
+                    return p(kw::force_avx512);
                 } else {
                     return false;
                 }
@@ -196,7 +196,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
             // Enable SLP vectorization (defaults to false).
             auto slp_vectorize = [&p]() -> bool {
                 if constexpr (p.has(kw::slp_vectorize)) {
-                    return std::forward<decltype(p(kw::slp_vectorize))>(p(kw::slp_vectorize));
+                    return p(kw::slp_vectorize);
                 } else {
                     return false;
                 }

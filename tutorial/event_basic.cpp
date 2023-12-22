@@ -140,7 +140,7 @@ int main()
     // Let's print the values of the state vector
     // over the time grid.
     for (auto i = 0u; i < 10u; ++i) {
-        std::cout << "[" << std::get<4>(out)[i * 2u] << ", " << std::get<4>(out)[i * 2u + 1u] << "]\n";
+        std::cout << "[" << std::get<5>(out)[i * 2u] << ", " << std::get<5>(out)[i * 2u + 1u] << "]\n";
     }
 
     std::cout << "\nFinal time: " << ta.get_time() << '\n';

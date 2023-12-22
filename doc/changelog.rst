@@ -4,9 +4,24 @@ Changelog
 4.0.0 (unreleased)
 ------------------
 
+New
+~~~
+
+- It is now possible to pass a range of step callbacks to the
+  ``propagate_*()`` functions. The individual callbacks will be
+  automatically composed into a callback set
+  (`#376 <https://github.com/bluescarni/heyoka/pull/376>`__).
+- New ``angle_reducer`` step callback to automatically reduce
+  angular state variables to the :math:`\left[0, 2\pi\right)` range
+  (`#376 <https://github.com/bluescarni/heyoka/pull/376>`__).
+
 Changes
 ~~~~~~~
 
+- **BREAKING**: the way in which the ``propagate_*()`` functions
+  interact with step callbacks has changed
+  (`#376 <https://github.com/bluescarni/heyoka/pull/376>`__).
+  This is a :ref:`breaking change <bchanges_4_0_0>`.
 - **BREAKING**: the ``propagate_grid()`` functions of the
   adaptive integrators now require the first element of the
   time grid to be equal to the current integrator time

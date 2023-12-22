@@ -266,6 +266,8 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/elp2000.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/cr3bp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/ffnn.cpp"
+    # Callbacks.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/callback/angle_reducer.cpp"
     # Math functions.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepF.cpp"

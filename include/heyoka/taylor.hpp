@@ -13,17 +13,17 @@
 
 #include <algorithm>
 #include <cassert>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <initializer_list>
 #include <memory>
 #include <optional>
 #include <ostream>
+#include <ranges>
 #include <string>
 #include <tuple>
 #include <type_traits>
-#include <typeinfo>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -284,7 +284,7 @@ inline auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     // High accuracy mode (defaults to false).
     auto high_accuracy = [&p]() -> bool {
         if constexpr (p.has(kw::high_accuracy)) {
-            return std::forward<decltype(p(kw::high_accuracy))>(p(kw::high_accuracy));
+            return p(kw::high_accuracy);
         } else {
             return false;
         }
@@ -294,7 +294,7 @@ inline auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     // the same as undefined.
     auto tol = [&p]() -> std::optional<T> {
         if constexpr (p.has(kw::tol)) {
-            auto retval = static_cast<T>(std::forward<decltype(p(kw::tol))>(p(kw::tol)));
+            auto retval = static_cast<T>(p(kw::tol));
             if (retval != 0) {
                 // NOTE: this covers the NaN case as well.
                 return retval;
@@ -311,7 +311,7 @@ inline auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     // it defaults to true).
     auto compact_mode = [&p]() -> bool {
         if constexpr (p.has(kw::compact_mode)) {
-            return std::forward<decltype(p(kw::compact_mode))>(p(kw::compact_mode));
+            return p(kw::compact_mode);
         } else {
 #if defined(HEYOKA_HAVE_REAL)
             return std::is_same_v<T, mppp::real>;
@@ -325,7 +325,7 @@ inline auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     // Vector of parameters (defaults to empty vector).
     auto pars = [&p]() -> std::vector<T> {
         if constexpr (p.has(kw::pars)) {
-            return std::forward<decltype(p(kw::pars))>(p(kw::pars));
+            return p(kw::pars);
         } else {
             return {};
         }
@@ -334,7 +334,7 @@ inline auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     // Parallel mode (defaults to false).
     auto parallel_mode = [&p]() -> bool {
         if constexpr (p.has(kw::parallel_mode)) {
-            return std::forward<decltype(p(kw::parallel_mode))>(p(kw::parallel_mode));
+            return p(kw::parallel_mode);
         } else {
             return false;
         }
@@ -387,7 +387,7 @@ public:
             // Direction (defaults to any).
             auto d = [&p]() -> event_direction {
                 if constexpr (p.has(kw::direction)) {
-                    return std::forward<decltype(p(kw::direction))>(p(kw::direction));
+                    return p(kw::direction);
                 } else {
                     return event_direction::any;
                 }
@@ -407,7 +407,7 @@ public:
 
     [[nodiscard]] const expression &get_expression() const;
     callback_t &get_callback();
-    const callback_t &get_callback() const;
+    [[nodiscard]] const callback_t &get_callback() const;
     [[nodiscard]] event_direction get_direction() const;
 };
 
@@ -518,7 +518,7 @@ public:
             // Callback (defaults to empty).
             auto cb = [&p]() -> callback_t {
                 if constexpr (p.has(kw::callback)) {
-                    return std::forward<decltype(p(kw::callback))>(p(kw::callback));
+                    return p(kw::callback);
                 } else {
                     return {};
                 }
@@ -527,7 +527,7 @@ public:
             // Cooldown (defaults to -1).
             auto cd = [&p]() -> T {
                 if constexpr (p.has(kw::cooldown)) {
-                    return std::forward<decltype(p(kw::cooldown))>(p(kw::cooldown));
+                    return p(kw::cooldown);
                 } else {
                     return T(-1);
                 }
@@ -536,7 +536,7 @@ public:
             // Direction (defaults to any).
             auto d = [&p]() -> event_direction {
                 if constexpr (p.has(kw::direction)) {
-                    return std::forward<decltype(p(kw::direction))>(p(kw::direction));
+                    return p(kw::direction);
                 } else {
                     return event_direction::any;
                 }
@@ -556,9 +556,9 @@ public:
 
     [[nodiscard]] const expression &get_expression() const;
     callback_t &get_callback();
-    const callback_t &get_callback() const;
+    [[nodiscard]] const callback_t &get_callback() const;
     [[nodiscard]] event_direction get_direction() const;
-    T get_cooldown() const;
+    [[nodiscard]] T get_cooldown() const;
 };
 
 // Prevent implicit instantiations.
@@ -687,11 +687,11 @@ public:
     [[nodiscard]] const llvm_state &get_llvm_state() const;
 
     const std::vector<T> &operator()(T);
-    const std::vector<T> &get_output() const;
-    const std::vector<T> &get_times() const;
-    const std::vector<T> &get_tcs() const;
+    [[nodiscard]] const std::vector<T> &get_output() const;
+    [[nodiscard]] const std::vector<T> &get_times() const;
+    [[nodiscard]] const std::vector<T> &get_tcs() const;
 
-    std::pair<T, T> get_bounds() const;
+    [[nodiscard]] std::pair<T, T> get_bounds() const;
     [[nodiscard]] std::size_t get_n_steps() const;
 };
 
@@ -798,14 +798,14 @@ public:
     const std::vector<T> &operator()(const std::vector<T> &);
     const std::vector<T> &operator()(T);
 
-    const std::vector<T> &get_output() const;
+    [[nodiscard]] const std::vector<T> &get_output() const;
     // NOTE: when documenting this function,
     // we need to warn about the padding.
-    const std::vector<T> &get_times() const;
-    const std::vector<T> &get_tcs() const;
+    [[nodiscard]] const std::vector<T> &get_times() const;
+    [[nodiscard]] const std::vector<T> &get_tcs() const;
     [[nodiscard]] std::uint32_t get_batch_size() const;
 
-    std::pair<std::vector<T>, std::vector<T>> get_bounds() const;
+    [[nodiscard]] std::pair<std::vector<T>, std::vector<T>> get_bounds() const;
     [[nodiscard]] std::size_t get_n_steps() const;
 };
 
@@ -870,21 +870,67 @@ class taylor_pwrap;
 template <typename T>
 HEYOKA_DLL_PUBLIC T taylor_default_max_delta_t();
 
+// Concept to detect if R is an input range from whose reference type
+// instances of T can be constructed.
+template <typename R, typename T>
+concept input_rangeT = std::ranges::input_range<R> && std::constructible_from<T, std::ranges::range_reference_t<R>>;
+
+// Logic for parsing a step callback argument in a propagate_*() function.
+// The default return value is an empty callback. If an object that can be used to construct
+// a Callback is provided, then use it. Otherwise, if a range of objects
+// that can be used to construct a Callback is provided, use them to assemble
+// a CallbackSet. Otherwise, the call is malformed.
+// NOTE: in any case, we end up creating a new object either by copying
+// or moving the input argument(s).
+template <typename Callback, typename CallbackSet, typename Parser>
+Callback parse_propagate_cb(Parser &p)
+{
+    if constexpr (Parser::has(kw::callback)) {
+        using cb_arg_t = decltype(p(kw::callback));
+
+        if constexpr (std::convertible_to<cb_arg_t, Callback>) {
+            return p(kw::callback);
+        } else if constexpr (input_rangeT<cb_arg_t, Callback>) {
+            std::vector<Callback> cb_vec;
+            for (auto &&cb : p(kw::callback)) {
+                cb_vec.emplace_back(std::forward<decltype(cb)>(cb));
+            }
+
+            return CallbackSet(std::move(cb_vec));
+        } else {
+            // LCOV_EXCL_START
+            static_assert(detail::always_false_v<CallbackSet>,
+                          "A 'callback' keyword argument of an invalid type was passed to a propagate_*() function.");
+
+            throw;
+            // LCOV_EXCL_STOP
+        }
+    } else {
+        return {};
+    }
+}
+
 // Parser for the common kwargs options for the propagate_*() functions.
 template <typename T, bool Grid, typename... KwArgs>
-inline auto taylor_propagate_common_ops(const KwArgs &...kw_args)
+auto taylor_propagate_common_ops(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
     if constexpr (p.has_unnamed_arguments()) {
-        static_assert(detail::always_false_v<KwArgs...>, "The variadic arguments to a propagate_*() function in an "
-                                                         "adaptive Taylor integrator contain unnamed arguments.");
+        // LCOV_EXCL_START
+        static_assert(detail::always_false_v<KwArgs...>,
+                      "The variadic arguments to a propagate_*() function in an "
+                      "adaptive Taylor integrator cannot contain unnamed arguments.");
         throw;
+        // LCOV_EXCL_STOP
     } else {
         // Max number of steps (defaults to zero).
         auto max_steps = [&p]() -> std::size_t {
             if constexpr (p.has(kw::max_steps)) {
-                return std::forward<decltype(p(kw::max_steps))>(p(kw::max_steps));
+                static_assert(std::integral<std::remove_cvref_t<decltype(p(kw::max_steps))>>,
+                              "The 'max_steps' keyword argument to a propagate_*() function must be of integral type.");
+
+                return boost::numeric_cast<std::size_t>(p(kw::max_steps));
             } else {
                 return 0;
             }
@@ -893,51 +939,44 @@ inline auto taylor_propagate_common_ops(const KwArgs &...kw_args)
         // Max delta_t (defaults to positive infinity).
         auto max_delta_t = [&p]() -> T {
             if constexpr (p.has(kw::max_delta_t)) {
-                return std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t));
+                static_assert(
+                    std::convertible_to<decltype(p(kw::max_delta_t)), T>,
+                    "A 'max_delta_t' keyword argument of an invalid type was passed to a propagate_*() function.");
+
+                return p(kw::max_delta_t);
             } else {
                 return taylor_default_max_delta_t<T>();
             }
         }();
 
-        // Callback (defaults to empty). If a step_callback with the correct
-        // signature is passed as argument, return a reference wrapper to it
-        // in order to avoid a useless copy.
-        // NOTE: eventually here we could check if the user passed in a range
-        // of elements which are (convertible to) step_callback, and automatically
-        // build a step_callback_set from them.
-        auto cb = [&p]() {
-            using cb_func_t = step_callback<T>;
-
-            if constexpr (p.has(kw::callback)) {
-                if constexpr (std::is_same_v<uncvref_t<decltype(p(kw::callback))>, cb_func_t>) {
-                    return std::ref(p(kw::callback));
-                } else {
-                    return cb_func_t(std::forward<decltype(p(kw::callback))>(p(kw::callback)));
-                }
-            } else {
-                return cb_func_t{};
-            }
-        }();
+        // Parse the callback argument.
+        auto cb = parse_propagate_cb<step_callback<T>, step_callback_set<T>>(p);
 
         // Write the Taylor coefficients (defaults to false).
         // NOTE: this won't be used in propagate_grid().
         auto write_tc = [&p]() -> bool {
             if constexpr (p.has(kw::write_tc)) {
-                return std::forward<decltype(p(kw::write_tc))>(p(kw::write_tc));
+                static_assert(
+                    std::convertible_to<decltype(p(kw::write_tc)), bool>,
+                    "A 'write_tc' keyword argument of an invalid type was passed to a propagate_*() function.");
+
+                return p(kw::write_tc);
             } else {
                 return false;
             }
         }();
 
-        // NOTE: use std::make_tuple() so that if cb is a reference wrapper, it is turned
-        // into a reference tuple element.
         if constexpr (Grid) {
-            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc);
+            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb));
         } else {
             // Continuous output (defaults to false).
             auto with_c_out = [&p]() -> bool {
                 if constexpr (p.has(kw::c_output)) {
-                    return std::forward<decltype(p(kw::c_output))>(p(kw::c_output));
+                    static_assert(
+                        std::convertible_to<decltype(p(kw::c_output)), bool>,
+                        "A 'c_output' keyword argument of an invalid type was passed to a propagate_*() function.");
+
+                    return p(kw::c_output);
                 } else {
                     return false;
                 }
@@ -1148,7 +1187,7 @@ private:
             // Initial time (defaults to undefined).
             auto tm = [&p]() -> std::optional<T> {
                 if constexpr (p.has(kw::time)) {
-                    return std::forward<decltype(p(kw::time))>(p(kw::time));
+                    return p(kw::time);
                 } else {
                     return {};
                 }
@@ -1160,7 +1199,7 @@ private:
             // Extract the terminal events, if any.
             auto tes = [&p]() -> std::vector<t_event_t> {
                 if constexpr (p.has(kw::t_events)) {
-                    return std::forward<decltype(p(kw::t_events))>(p(kw::t_events));
+                    return p(kw::t_events);
                 } else {
                     return {};
                 }
@@ -1169,7 +1208,7 @@ private:
             // Extract the non-terminal events, if any.
             auto ntes = [&p]() -> std::vector<nt_event_t> {
                 if constexpr (p.has(kw::nt_events)) {
-                    return std::forward<decltype(p(kw::nt_events))>(p(kw::nt_events));
+                    return p(kw::nt_events);
                 } else {
                     return {};
                 }
@@ -1179,7 +1218,7 @@ private:
             // is considered the same as undefined.
             auto prec = [&p]() -> std::optional<long long> {
                 if constexpr (p.has(kw::prec)) {
-                    auto ret = static_cast<long long>(std::forward<decltype(p(kw::prec))>(p(kw::prec)));
+                    auto ret = static_cast<long long>(p(kw::prec));
                     if (ret != 0) {
                         return ret;
                     }
@@ -1239,33 +1278,33 @@ public:
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] std::uint32_t get_dim() const;
 
-    T get_time() const;
+    [[nodiscard]] T get_time() const;
     void set_time(T);
 
     // Time set/get in double-length format.
-    std::pair<T, T> get_dtime() const;
+    [[nodiscard]] std::pair<T, T> get_dtime() const;
     void set_dtime(T, T);
 
-    const std::vector<T> &get_state() const;
-    const T *get_state_data() const;
+    [[nodiscard]] const std::vector<T> &get_state() const;
+    [[nodiscard]] const T *get_state_data() const;
     T *get_state_data();
 
-    const std::vector<T> &get_pars() const;
-    const T *get_pars_data() const;
+    [[nodiscard]] const std::vector<T> &get_pars() const;
+    [[nodiscard]] const T *get_pars_data() const;
     T *get_pars_data();
 
-    const std::vector<T> &get_tc() const;
+    [[nodiscard]] const std::vector<T> &get_tc() const;
 
-    T get_last_h() const;
+    [[nodiscard]] T get_last_h() const;
 
-    const std::vector<T> &get_d_output() const;
+    [[nodiscard]] const std::vector<T> &get_d_output() const;
     const std::vector<T> &update_d_output(T, bool = false);
 
     [[nodiscard]] bool with_events() const;
     void reset_cooldowns();
-    const std::vector<t_event_t> &get_t_events() const;
-    const std::vector<std::optional<std::pair<T, T>>> &get_te_cooldowns() const;
-    const std::vector<nt_event_t> &get_nt_events() const;
+    [[nodiscard]] const std::vector<t_event_t> &get_t_events() const;
+    [[nodiscard]] const std::vector<std::optional<std::pair<T, T>>> &get_te_cooldowns() const;
+    [[nodiscard]] const std::vector<nt_event_t> &get_nt_events() const;
 
     [[nodiscard]] const std::vector<expression> &get_state_vars() const;
     [[nodiscard]] const std::vector<expression> &get_rhs() const;
@@ -1276,10 +1315,10 @@ public:
 
 private:
     // Implementations of the propagate_*() functions.
-    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-    propagate_until_impl(detail::dfloat<T>, std::size_t, T, step_callback<T> &, bool, bool);
-    std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid_impl(std::vector<T>, std::size_t, T,
-                                                                                      step_callback<T> &);
+    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
+    propagate_until_impl(detail::dfloat<T>, std::size_t, T, step_callback<T>, bool, bool);
+    std::tuple<taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>
+        propagate_grid_impl(std::vector<T>, std::size_t, T, step_callback<T>);
 
 public:
     // NOTE: return values:
@@ -1288,8 +1327,9 @@ public:
     // - max abs(timestep),
     // - total number of nonzero steps
     //   successfully undertaken,
-    // - grid of state vectors (only for propagate_grid()),
-    // - continuous output, if requested (only for propagate_for/until()).
+    // - continuous output, if requested (only for propagate_for/until()),
+    // - step callback, if provided,
+    // - grid of state vectors (only for propagate_grid()).
     // NOTE: the min/max timesteps are well-defined
     // only if at least 1-2 steps were taken successfully.
     // NOTE: the propagate_*() functions are not guaranteed to bring
@@ -1302,33 +1342,32 @@ public:
     // in the future we can offer a stronger guarantee, which however will
     // result in a more complicated logic.
     template <typename... KwArgs>
-    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-    propagate_until(T t, KwArgs &&...kw_args)
+    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
+    propagate_until(T t, const KwArgs &...kw_args)
     {
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
-            = detail::taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
+            = detail::taylor_propagate_common_ops<T, false>(kw_args...);
 
-        return propagate_until_impl(detail::dfloat<T>(std::move(t)), max_steps, std::move(max_delta_t), cb, write_tc,
-                                    with_c_out);
+        return propagate_until_impl(detail::dfloat<T>(std::move(t)), max_steps, std::move(max_delta_t), std::move(cb),
+                                    write_tc, with_c_out);
     }
     template <typename... KwArgs>
-    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-    propagate_for(T delta_t, KwArgs &&...kw_args)
+    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
+    propagate_for(T delta_t, const KwArgs &...kw_args)
     {
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
-            = detail::taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
+            = detail::taylor_propagate_common_ops<T, false>(kw_args...);
 
-        return propagate_until_impl(m_time + std::move(delta_t), max_steps, std::move(max_delta_t), cb, write_tc,
-                                    with_c_out);
+        return propagate_until_impl(m_time + std::move(delta_t), max_steps, std::move(max_delta_t), std::move(cb),
+                                    write_tc, with_c_out);
     }
     template <typename... KwArgs>
-    std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid(std::vector<T> grid,
-                                                                                 KwArgs &&...kw_args)
+    std::tuple<taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>
+    propagate_grid(std::vector<T> grid, const KwArgs &...kw_args)
     {
-        auto [max_steps, max_delta_t, cb, _]
-            = detail::taylor_propagate_common_ops<T, true>(std::forward<KwArgs>(kw_args)...);
+        auto [max_steps, max_delta_t, cb] = detail::taylor_propagate_common_ops<T, true>(kw_args...);
 
-        return propagate_grid_impl(std::move(grid), max_steps, std::move(max_delta_t), cb);
+        return propagate_grid_impl(std::move(grid), max_steps, std::move(max_delta_t), std::move(cb));
     }
 };
 
@@ -1369,7 +1408,7 @@ namespace detail
 // Parser for the common kwargs options for the propagate_*() functions
 // for the batch integrator.
 template <typename T, bool Grid, bool ForceScalarMaxDeltaT, typename... KwArgs>
-inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const KwArgs &...kw_args)
+auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const KwArgs &...kw_args)
 {
     assert(batch_size > 0u); // LCOV_EXCL_LINE
 
@@ -1383,7 +1422,10 @@ inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const Kw
         // Max number of steps (defaults to zero).
         auto max_steps = [&p]() -> std::size_t {
             if constexpr (p.has(kw::max_steps)) {
-                return std::forward<decltype(p(kw::max_steps))>(p(kw::max_steps));
+                static_assert(std::integral<std::remove_cvref_t<decltype(p(kw::max_steps))>>,
+                              "The 'max_steps' keyword argument to a propagate_*() function must be of integral type.");
+
+                return boost::numeric_cast<std::size_t>(p(kw::max_steps));
             } else {
                 return 0;
             }
@@ -1400,9 +1442,9 @@ inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const Kw
             (void)batch_size;
 
             if constexpr (p.has(kw::max_delta_t)) {
-                using type = uncvref_t<decltype(p(kw::max_delta_t))>;
+                using type = decltype(p(kw::max_delta_t));
 
-                if constexpr (is_any_vector_v<type> || is_any_ilist_v<type>) {
+                if constexpr (input_rangeT<type, T>) {
                     if constexpr (ForceScalarMaxDeltaT) {
                         // LCOV_EXCL_START
                         static_assert(always_false_v<T>,
@@ -1411,10 +1453,19 @@ inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const Kw
                         throw;
                         // LCOV_EXCL_STOP
                     } else {
-                        return std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t));
+                        std::vector<T> retval;
+                        for (auto &&x : p(kw::max_delta_t)) {
+                            retval.emplace_back(std::forward<decltype(x)>(x));
+                        }
+
+                        return retval;
                     }
                 } else {
                     // Interpret as a scalar to be splatted.
+                    static_assert(
+                        std::convertible_to<type, T>,
+                        "A 'max_delta_t' keyword argument of an invalid type was passed to a propagate_*() function.");
+
                     return std::vector<T>(boost::numeric_cast<typename std::vector<T>::size_type>(batch_size),
                                           p(kw::max_delta_t));
                 }
@@ -1423,42 +1474,34 @@ inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const Kw
             }
         }();
 
-        // Callback (defaults to empty). If a step_callback with the correct
-        // signature is passed as argument, return a reference wrapper to it
-        // in order to avoid a useless copy.
-        auto cb = [&p]() {
-            using cb_func_t = step_callback_batch<T>;
-
-            if constexpr (p.has(kw::callback)) {
-                if constexpr (std::is_same_v<uncvref_t<decltype(p(kw::callback))>, cb_func_t>) {
-                    return std::ref(p(kw::callback));
-                } else {
-                    return cb_func_t(std::forward<decltype(p(kw::callback))>(p(kw::callback)));
-                }
-            } else {
-                return cb_func_t{};
-            }
-        }();
+        // Parse the callback argument.
+        auto cb = parse_propagate_cb<step_callback_batch<T>, step_callback_batch_set<T>>(p);
 
         // Write the Taylor coefficients (defaults to false).
         // NOTE: this won't be used in propagate_grid().
         auto write_tc = [&p]() -> bool {
             if constexpr (p.has(kw::write_tc)) {
-                return std::forward<decltype(p(kw::write_tc))>(p(kw::write_tc));
+                static_assert(
+                    std::convertible_to<decltype(p(kw::write_tc)), bool>,
+                    "A 'write_tc' keyword argument of an invalid type was passed to a propagate_*() function.");
+
+                return p(kw::write_tc);
             } else {
                 return false;
             }
         }();
 
-        // NOTE: use std::make_tuple() so that if cb is a reference wrapper, it is turned
-        // into a reference tuple element.
         if constexpr (Grid) {
-            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc);
+            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb));
         } else {
             // Continuous output (defaults to false).
             auto with_c_out = [&p]() -> bool {
                 if constexpr (p.has(kw::c_output)) {
-                    return std::forward<decltype(p(kw::c_output))>(p(kw::c_output));
+                    static_assert(
+                        std::convertible_to<decltype(p(kw::c_output)), bool>,
+                        "A 'c_output' keyword argument of an invalid type was passed to a propagate_*() function.");
+
+                    return p(kw::c_output);
                 } else {
                     return false;
                 }
@@ -1662,7 +1705,7 @@ private:
             // Initial times (defaults to a vector of zeroes).
             auto tm = [&p, batch_size]() -> std::vector<T> {
                 if constexpr (p.has(kw::time)) {
-                    return std::forward<decltype(p(kw::time))>(p(kw::time));
+                    return p(kw::time);
                 } else {
                     return std::vector<T>(static_cast<typename std::vector<T>::size_type>(batch_size), T(0));
                 }
@@ -1674,7 +1717,7 @@ private:
             // Extract the terminal events, if any.
             auto tes = [&p]() -> std::vector<t_event_t> {
                 if constexpr (p.has(kw::t_events)) {
-                    return std::forward<decltype(p(kw::t_events))>(p(kw::t_events));
+                    return p(kw::t_events);
                 } else {
                     return {};
                 }
@@ -1683,7 +1726,7 @@ private:
             // Extract the non-terminal events, if any.
             auto ntes = [&p]() -> std::vector<nt_event_t> {
                 if constexpr (p.has(kw::nt_events)) {
-                    return std::forward<decltype(p(kw::nt_events))>(p(kw::nt_events));
+                    return p(kw::nt_events);
                 } else {
                     return {};
                 }
@@ -1738,44 +1781,44 @@ public:
 
     [[nodiscard]] std::uint32_t get_batch_size() const;
     [[nodiscard]] std::uint32_t get_order() const;
-    T get_tol() const;
+    [[nodiscard]] T get_tol() const;
     [[nodiscard]] bool get_high_accuracy() const;
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] std::uint32_t get_dim() const;
 
-    const std::vector<T> &get_time() const;
-    const T *get_time_data() const;
+    [[nodiscard]] const std::vector<T> &get_time() const;
+    [[nodiscard]] const T *get_time_data() const;
     void set_time(const std::vector<T> &);
     void set_time(T);
 
     // Time set/get in double-length format.
-    std::pair<const std::vector<T> &, const std::vector<T> &> get_dtime() const;
-    std::pair<const T *, const T *> get_dtime_data() const;
+    [[nodiscard]] std::pair<const std::vector<T> &, const std::vector<T> &> get_dtime() const;
+    [[nodiscard]] std::pair<const T *, const T *> get_dtime_data() const;
     void set_dtime(const std::vector<T> &, const std::vector<T> &);
     void set_dtime(T, T);
 
-    const std::vector<T> &get_state() const;
-    const T *get_state_data() const;
+    [[nodiscard]] const std::vector<T> &get_state() const;
+    [[nodiscard]] const T *get_state_data() const;
     T *get_state_data();
 
-    const std::vector<T> &get_pars() const;
-    const T *get_pars_data() const;
+    [[nodiscard]] const std::vector<T> &get_pars() const;
+    [[nodiscard]] const T *get_pars_data() const;
     T *get_pars_data();
 
-    const std::vector<T> &get_tc() const;
+    [[nodiscard]] const std::vector<T> &get_tc() const;
 
-    const std::vector<T> &get_last_h() const;
+    [[nodiscard]] const std::vector<T> &get_last_h() const;
 
-    const std::vector<T> &get_d_output() const;
+    [[nodiscard]] const std::vector<T> &get_d_output() const;
     const std::vector<T> &update_d_output(const std::vector<T> &, bool = false);
     const std::vector<T> &update_d_output(T, bool = false);
 
     [[nodiscard]] bool with_events() const;
     void reset_cooldowns();
     void reset_cooldowns(std::uint32_t);
-    const std::vector<t_event_t> &get_t_events() const;
-    const std::vector<std::vector<std::optional<std::pair<T, T>>>> &get_te_cooldowns() const;
-    const std::vector<nt_event_t> &get_nt_events() const;
+    [[nodiscard]] const std::vector<t_event_t> &get_t_events() const;
+    [[nodiscard]] const std::vector<std::vector<std::optional<std::pair<T, T>>>> &get_te_cooldowns() const;
+    [[nodiscard]] const std::vector<nt_event_t> &get_nt_events() const;
 
     [[nodiscard]] const std::vector<expression> &get_state_vars() const;
     [[nodiscard]] const std::vector<expression> &get_rhs() const;
@@ -1783,84 +1826,83 @@ public:
     void step(bool = false);
     void step_backward(bool = false);
     void step(const std::vector<T> &, bool = false);
-    const std::vector<std::tuple<taylor_outcome, T>> &get_step_res() const;
+    [[nodiscard]] const std::vector<std::tuple<taylor_outcome, T>> &get_step_res() const;
 
 private:
     // Implementations of the propagate_*() functions.
-    std::optional<continuous_output_batch<T>> propagate_until_impl(const std::vector<detail::dfloat<T>> &, std::size_t,
-                                                                   const std::vector<T> &, step_callback_batch<T> &,
-                                                                   bool, bool);
-    std::optional<continuous_output_batch<T>> propagate_until_impl(const std::vector<T> &, std::size_t,
-                                                                   const std::vector<T> &, step_callback_batch<T> &,
-                                                                   bool, bool);
-    std::optional<continuous_output_batch<T>> propagate_for_impl(const std::vector<T> &, std::size_t,
-                                                                 const std::vector<T> &, step_callback_batch<T> &, bool,
-                                                                 bool);
-    std::vector<T> propagate_grid_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
-                                       step_callback_batch<T> &);
+    std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
+    propagate_until_impl(const std::vector<detail::dfloat<T>> &, std::size_t, const std::vector<T> &,
+                         step_callback_batch<T>, bool, bool);
+    std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
+    propagate_until_impl(const std::vector<T> &, std::size_t, const std::vector<T> &, step_callback_batch<T>, bool,
+                         bool);
+    std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
+    propagate_for_impl(const std::vector<T> &, std::size_t, const std::vector<T> &, step_callback_batch<T>, bool, bool);
+    std::tuple<step_callback_batch<T>, std::vector<T>>
+    propagate_grid_impl(const std::vector<T> &, std::size_t, const std::vector<T> &, step_callback_batch<T>);
 
 public:
     // NOTE: in propagate_for/until(), we can take 'ts' as const reference because it is always
     // only and immediately used to set up the internal m_pfor_ts member (which is not visible
     // from outside). Hence, even if 'ts' aliases some public integrator data, it does not matter.
     template <typename... KwArgs>
-    std::optional<continuous_output_batch<T>> propagate_until(const std::vector<T> &ts, KwArgs &&...kw_args)
+    std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
+    propagate_until(const std::vector<T> &ts, const KwArgs &...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size,
-                                                                         std::forward<KwArgs>(kw_args)...);
+            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, kw_args...);
 
-        return propagate_until_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb, write_tc,
-                                    with_c_out); // LCOV_EXCL_LINE
+        return propagate_until_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
+                                    write_tc, with_c_out);
     }
     template <typename... KwArgs>
-    std::optional<continuous_output_batch<T>> propagate_until(T t, KwArgs &&...kw_args)
+    std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
+    propagate_until(T t, const KwArgs &...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size,
-                                                                         std::forward<KwArgs>(kw_args)...);
+            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, kw_args...);
 
         // NOTE: re-use m_pfor_ts as tmp storage, as the other overload does.
-        assert(m_pfor_ts.size() == m_batch_size); // LCOV_EXCL_LINE
+        assert(m_pfor_ts.size() == m_batch_size);
         std::fill(m_pfor_ts.begin(), m_pfor_ts.end(), detail::dfloat<T>(t));
-        return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb, write_tc,
-                                    with_c_out); // LCOV_EXCL_LINE
+        return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
+                                    write_tc, with_c_out);
     }
     template <typename... KwArgs>
-    std::optional<continuous_output_batch<T>> propagate_for(const std::vector<T> &delta_ts, KwArgs &&...kw_args)
+    std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
+    propagate_for(const std::vector<T> &delta_ts, const KwArgs &...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size,
-                                                                         std::forward<KwArgs>(kw_args)...);
+            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, kw_args...);
 
-        return propagate_for_impl(delta_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb, write_tc,
-                                  with_c_out); // LCOV_EXCL_LINE
+        return propagate_for_impl(delta_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
+                                  write_tc, with_c_out);
     }
     template <typename... KwArgs>
-    std::optional<continuous_output_batch<T>> propagate_for(T delta_t, KwArgs &&...kw_args)
+    std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
+    propagate_for(T delta_t, const KwArgs &...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size,
-                                                                         std::forward<KwArgs>(kw_args)...);
+            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, kw_args...);
 
         // NOTE: this is a slight repetition of the other overload's code.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             m_pfor_ts[i] = detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) + delta_t;
         }
-        return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb, write_tc,
-                                    with_c_out); // LCOV_EXCL_LINE
+        return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
+                                    write_tc, with_c_out);
     }
     // NOTE: grid is taken by copy because in the implementation loop we keep on reading from it.
     // Hence, we need to avoid any aliasing issue with other public integrator data.
     template <typename... KwArgs>
-    std::vector<T> propagate_grid(std::vector<T> grid, KwArgs &&...kw_args)
+    std::tuple<step_callback_batch<T>, std::vector<T>> propagate_grid(std::vector<T> grid, const KwArgs &...kw_args)
     {
-        auto [max_steps, max_delta_ts, cb, _]
-            = detail::taylor_propagate_common_ops_batch<T, true, false>(m_batch_size, std::forward<KwArgs>(kw_args)...);
+        auto [max_steps, max_delta_ts, cb]
+            = detail::taylor_propagate_common_ops_batch<T, true, false>(m_batch_size, kw_args...);
 
-        return propagate_grid_impl(grid, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb);
+        return propagate_grid_impl(grid, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb));
     }
-    const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &get_propagate_res() const
+    [[nodiscard]] const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &get_propagate_res() const
     {
         return m_prop_res;
     }

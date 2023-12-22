@@ -133,8 +133,8 @@ TEST_CASE("parallel consistency")
         taylor_adaptive<double> ta_parallel{
             sys, ic, kw::opt_level = opt_level, kw::compact_mode = true, kw::parallel_mode = true, kw::nt_events = evs};
 
-        auto out_serial = std::get<4>(ta_serial.propagate_grid(t_grid));
-        auto out_parallel = std::get<4>(ta_parallel.propagate_grid(t_grid));
+        auto out_serial = std::get<5>(ta_serial.propagate_grid(t_grid));
+        auto out_parallel = std::get<5>(ta_parallel.propagate_grid(t_grid));
 
         REQUIRE(check_close(out_serial, out_parallel));
     }
@@ -165,8 +165,8 @@ TEST_CASE("par time ptr")
                                             kw::pars = {.1},
                                             kw::parallel_mode = true};
 
-        auto out_serial = std::get<4>(ta_serial.propagate_grid(t_grid));
-        auto out_parallel = std::get<4>(ta_parallel.propagate_grid(t_grid));
+        auto out_serial = std::get<5>(ta_serial.propagate_grid(t_grid));
+        auto out_parallel = std::get<5>(ta_parallel.propagate_grid(t_grid));
 
         REQUIRE(check_close(out_serial, out_parallel));
     }

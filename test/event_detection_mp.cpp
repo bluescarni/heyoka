@@ -1145,7 +1145,7 @@ TEST_CASE("taylor te propagate_grid")
 
             taylor_outcome oc;
             {
-                auto [oc_, _1, _2, _3, out] = ta.propagate_grid(grid);
+                auto [oc_, _1, _2, _3, _4, out] = ta.propagate_grid(grid);
                 oc = oc_;
                 REQUIRE(out.size() == 202u);
             }
@@ -1163,7 +1163,7 @@ TEST_CASE("taylor te propagate_grid")
                                        kw::t_events = {ev1}};
 
             {
-                auto [oc_, _1, _2, _3, out] = ta.propagate_grid(grid);
+                auto [oc_, _1, _2, _3, _4, out] = ta.propagate_grid(grid);
                 oc = oc_;
                 REQUIRE(out.size() == 2u);
             }

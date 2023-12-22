@@ -132,8 +132,8 @@ TEST_CASE("parallel consistency")
                                               kw::parallel_mode = true,
                                               kw::nt_events = evs};
 
-            auto out_serial = std::get<4>(ta_serial.propagate_grid(t_grid));
-            auto out_parallel = std::get<4>(ta_parallel.propagate_grid(t_grid));
+            auto out_serial = std::get<5>(ta_serial.propagate_grid(t_grid));
+            auto out_parallel = std::get<5>(ta_parallel.propagate_grid(t_grid));
 
             REQUIRE(check_close(out_serial, out_parallel, prec));
         }
@@ -168,8 +168,8 @@ TEST_CASE("par time ptr")
                                               kw::pars = {fp_t(.1, prec)},
                                               kw::parallel_mode = true};
 
-            auto out_serial = std::get<4>(ta_serial.propagate_grid(t_grid));
-            auto out_parallel = std::get<4>(ta_parallel.propagate_grid(t_grid));
+            auto out_serial = std::get<5>(ta_serial.propagate_grid(t_grid));
+            auto out_parallel = std::get<5>(ta_parallel.propagate_grid(t_grid));
 
             REQUIRE(check_close(out_serial, out_parallel, prec));
         }

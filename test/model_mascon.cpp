@@ -136,7 +136,7 @@ inline std::vector<std::pair<expression, expression>> make_mascon_system(KwArgs 
         // G constant (defaults to 1).
         auto Gconst = [&p]() {
             if constexpr (p.has(kw::Gconst)) {
-                return expression{number{std::forward<decltype(p(kw::Gconst))>(p(kw::Gconst))}};
+                return expression{number{p(kw::Gconst)}};
             } else {
                 return expression{number{1.}};
             }
@@ -206,7 +206,7 @@ expression energy_mascon_system(KwArgs &&...kw_args)
         // G constant (defaults to 1).
         auto Gconst = [&p]() {
             if constexpr (p.has(kw::Gconst)) {
-                return expression{number{std::forward<decltype(p(kw::Gconst))>(p(kw::Gconst))}};
+                return expression{number{p(kw::Gconst)}};
             } else {
                 return expression{1.};
             }

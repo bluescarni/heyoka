@@ -117,6 +117,14 @@ using step_cb_wrap_t = tanuki::wrap<step_cb_iface<TA>, step_cb_wrap_config<TA>>;
 
 } // namespace detail
 
+// NOTE: ideally here we would want to prevent the implicit instantiations
+// of step callbacks via extern template and explicitly instantiate in the
+// .cpp as usual. However, I cannot get this to work on GCC, and it seems like
+// this is a known issue:
+// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=104634
+// Hopefully this will be fixed - in the meantime if necessary we could do
+// the explicit instantiation only on clang (where this seems to work without
+// issues) and MSVC.
 template <typename T>
 using step_callback = detail::step_cb_wrap_t<taylor_adaptive<T>>;
 

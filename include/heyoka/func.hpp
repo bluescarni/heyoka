@@ -11,6 +11,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -553,6 +554,11 @@ HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
 HEYOKA_DLL_PUBLIC bool operator!=(const func &, const func &);
 HEYOKA_DLL_PUBLIC bool operator<(const func &, const func &);
 
+// UDF concept.
+template <typename T>
+concept is_udf
+    = std::default_initializable<T> && std::movable<T> && std::copyable<T> && std::derived_from<T, func_base>;
+
 class HEYOKA_DLL_PUBLIC func
 {
     friend HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
@@ -588,16 +594,11 @@ class HEYOKA_DLL_PUBLIC func
     // diff() implementations.
     [[nodiscard]] HEYOKA_DLL_LOCAL std::vector<expression> fetch_gradient(const std::string &) const;
 
-    template <typename T>
-    using generic_ctor_enabler
-        = std::enable_if_t<std::conjunction_v<std::negation<std::is_same<func, detail::uncvref_t<T>>>,
-                                              detail::is_func<detail::uncvref_t<T>>>,
-                           int>;
-
 public:
     func();
 
-    template <typename T, generic_ctor_enabler<T &&> = 0>
+    template <typename T>
+        requires(!std::same_as<func, std::remove_cvref_t<T>>) && is_udf<std::remove_cvref_t<T>>
     explicit func(T &&x) : m_ptr(std::make_shared<detail::func_inner<detail::uncvref_t<T>>>(std::forward<T>(x)))
     {
     }

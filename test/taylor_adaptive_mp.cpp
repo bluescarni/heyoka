@@ -754,7 +754,8 @@ TEST_CASE("propagate grid scalar")
 
             auto out = ta.propagate_grid({fp_t(.0, prec)});
             REQUIRE(std::get<0>(out) == taylor_outcome::err_nf_state);
-            REQUIRE(std::get<4>(out).empty());
+            REQUIRE(!std::get<4>(out));
+            REQUIRE(std::get<5>(out).empty());
 
             // Error modes specific to mppp::real.
             ta.set_time(fp_t(0, prec));
@@ -771,7 +772,8 @@ TEST_CASE("propagate grid scalar")
             REQUIRE(std::get<1>(out) == std::numeric_limits<double>::infinity());
             REQUIRE(std::get<2>(out) == 0);
             REQUIRE(std::get<3>(out) == 0u);
-            REQUIRE(std::get<4>(out) == std::vector{fp_t(0.05, prec), fp_t(0.025, prec)});
+            REQUIRE(!std::get<4>(out));
+            REQUIRE(std::get<5>(out) == std::vector{fp_t(0.05, prec), fp_t(0.025, prec)});
             REQUIRE(ta.get_time() == 0.);
 
             REQUIRE_THROWS_MATCHES(
@@ -800,20 +802,24 @@ TEST_CASE("propagate grid scalar")
             auto out2 = ta_copy.propagate_grid(grid2, kw::max_delta_t = fp_t(0.03125, prec - 5));
 
             REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
-            REQUIRE(std::get<4>(out).size() == 2000u);
+            REQUIRE(std::get<5>(out).size() == 2000u);
             REQUIRE(ta.get_time() == grid.back());
             REQUIRE(std::get<0>(out2) == taylor_outcome::time_limit);
-            REQUIRE(std::get<4>(out2).size() == 2000u);
+            REQUIRE(std::get<5>(out2).size() == 2000u);
             REQUIRE(ta_copy.get_time() == grid.back());
-            REQUIRE(out == out2);
-            REQUIRE(std::all_of(std::get<4>(out).begin(), std::get<4>(out).end(),
+            REQUIRE(std::get<0>(out) == std::get<0>(out2));
+            REQUIRE(std::get<1>(out) == std::get<1>(out2));
+            REQUIRE(std::get<2>(out) == std::get<2>(out2));
+            REQUIRE(std::get<3>(out) == std::get<3>(out2));
+            REQUIRE(std::get<5>(out) == std::get<5>(out2));
+            REQUIRE(std::all_of(std::get<5>(out).begin(), std::get<5>(out).end(),
                                 [prec](const auto &val) { return val.get_prec() == prec; }));
-            REQUIRE(std::all_of(std::get<4>(out2).begin(), std::get<4>(out2).end(),
+            REQUIRE(std::all_of(std::get<5>(out2).begin(), std::get<5>(out2).end(),
                                 [prec](const auto &val) { return val.get_prec() == prec; }));
 
             for (auto i = 0u; i < 1000u; ++i) {
-                REQUIRE(std::get<4>(out)[2u * i] == approximately(sin(grid[i]), fp_t(10000., prec)));
-                REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(cos(grid[i]), fp_t(10000., prec)));
+                REQUIRE(std::get<5>(out)[2u * i] == approximately(sin(grid[i]), fp_t(10000., prec)));
+                REQUIRE(std::get<5>(out)[2u * i + 1u] == approximately(cos(grid[i]), fp_t(10000., prec)));
             }
 
             // Do the same backwards.
@@ -826,12 +832,12 @@ TEST_CASE("propagate grid scalar")
             out = ta.propagate_grid(grid);
 
             REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
-            REQUIRE(std::get<4>(out).size() == 2000u);
+            REQUIRE(std::get<5>(out).size() == 2000u);
             REQUIRE(ta.get_time() == grid.back());
 
             for (auto i = 0u; i < 1000u; ++i) {
-                REQUIRE(std::get<4>(out)[2u * i] == approximately(sin(grid[i]), fp_t(10000., prec)));
-                REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(cos(grid[i]), fp_t(10000., prec)));
+                REQUIRE(std::get<5>(out)[2u * i] == approximately(sin(grid[i]), fp_t(10000., prec)));
+                REQUIRE(std::get<5>(out)[2u * i + 1u] == approximately(cos(grid[i]), fp_t(10000., prec)));
             }
 
             // Random testing.
@@ -852,12 +858,12 @@ TEST_CASE("propagate grid scalar")
             out = ta.propagate_grid(grid);
 
             REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
-            REQUIRE(std::get<4>(out).size() == 2000u);
+            REQUIRE(std::get<5>(out).size() == 2000u);
             REQUIRE(ta.get_time() == grid.back());
 
             for (auto i = 0u; i < 1000u; ++i) {
-                REQUIRE(std::get<4>(out)[2u * i] == approximately(sin(grid[i]), fp_t(100000., prec)));
-                REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(cos(grid[i]), fp_t(100000., prec)));
+                REQUIRE(std::get<5>(out)[2u * i] == approximately(sin(grid[i]), fp_t(100000., prec)));
+                REQUIRE(std::get<5>(out)[2u * i + 1u] == approximately(cos(grid[i]), fp_t(100000., prec)));
             }
 
             // Do it also backwards.
@@ -878,12 +884,12 @@ TEST_CASE("propagate grid scalar")
             out = ta.propagate_grid(grid);
 
             REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
-            REQUIRE(std::get<4>(out).size() == 2000u);
+            REQUIRE(std::get<5>(out).size() == 2000u);
             REQUIRE(ta.get_time() == grid.back());
 
             for (auto i = 0u; i < 1000u; ++i) {
-                REQUIRE(std::get<4>(out)[2u * i] == approximately(sin(grid[i]), fp_t(100000., prec)));
-                REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(cos(grid[i]), fp_t(100000., prec)));
+                REQUIRE(std::get<5>(out)[2u * i] == approximately(sin(grid[i]), fp_t(100000., prec)));
+                REQUIRE(std::get<5>(out)[2u * i + 1u] == approximately(cos(grid[i]), fp_t(100000., prec)));
             }
 
             // A test with a sparse grid.
@@ -894,14 +900,14 @@ TEST_CASE("propagate grid scalar")
 
             out = ta.propagate_grid({fp_t(0., prec), fp_t(.1, prec), fp_t(10., prec), fp_t(100., prec)});
 
-            REQUIRE(std::get<4>(out).size() == 8u);
+            REQUIRE(std::get<5>(out).size() == 8u);
             REQUIRE(ta.get_time() == 100.);
-            REQUIRE(std::get<4>(out)[2] == approximately(sin(fp_t(.1, prec)), fp_t(100., prec)));
-            REQUIRE(std::get<4>(out)[3] == approximately(cos(fp_t(.1, prec)), fp_t(100., prec)));
-            REQUIRE(std::get<4>(out)[4] == approximately(sin(fp_t(10, prec)), fp_t(100., prec)));
-            REQUIRE(std::get<4>(out)[5] == approximately(cos(fp_t(10, prec)), fp_t(100, prec)));
-            REQUIRE(std::get<4>(out)[6] == approximately(sin(fp_t(100, prec)), fp_t(1000, prec)));
-            REQUIRE(std::get<4>(out)[7] == approximately(cos(fp_t(100, prec)), fp_t(1000, prec)));
+            REQUIRE(std::get<5>(out)[2] == approximately(sin(fp_t(.1, prec)), fp_t(100., prec)));
+            REQUIRE(std::get<5>(out)[3] == approximately(cos(fp_t(.1, prec)), fp_t(100., prec)));
+            REQUIRE(std::get<5>(out)[4] == approximately(sin(fp_t(10, prec)), fp_t(100., prec)));
+            REQUIRE(std::get<5>(out)[5] == approximately(cos(fp_t(10, prec)), fp_t(100, prec)));
+            REQUIRE(std::get<5>(out)[6] == approximately(sin(fp_t(100, prec)), fp_t(1000, prec)));
+            REQUIRE(std::get<5>(out)[7] == approximately(cos(fp_t(100, prec)), fp_t(1000, prec)));
 
             // A case in which we have a callback which never stops and a terminal event
             // which triggers.
@@ -939,7 +945,7 @@ TEST_CASE("continuous output")
                                             kw::opt_level = opt_level,
                                             kw::compact_mode = true};
 
-            auto [_0, _1, _2, tot_steps, d_out] = ta.propagate_until(fp_t(10., prec), kw::c_output = true);
+            auto [_0, _1, _2, tot_steps, d_out, _3] = ta.propagate_until(fp_t(10., prec), kw::c_output = true);
 
             REQUIRE(d_out.has_value());
             REQUIRE(d_out->get_output().size() == 2u);
@@ -958,7 +964,7 @@ TEST_CASE("continuous output")
             for (auto &vec : t_grid) {
                 vec.prec_round(prec);
             }
-            auto grid_out = std::get<4>(ta.propagate_grid(t_grid));
+            auto grid_out = std::get<5>(ta.propagate_grid(t_grid));
 
             // Compare the two.
             for (auto i = 0u; i < 11u; ++i) {
@@ -999,7 +1005,7 @@ TEST_CASE("continuous output")
             ta.get_state_data()[1] = fp_t(1, prec);
             ta.set_time(fp_t(0, prec));
 
-            std::tie(_0, _1, _2, tot_steps, d_out) = ta.propagate_for(fp_t(10., prec), kw::c_output = true);
+            std::tie(_0, _1, _2, tot_steps, d_out, _3) = ta.propagate_for(fp_t(10., prec), kw::c_output = true);
 
             REQUIRE(d_out.has_value());
             REQUIRE(d_out->get_output().size() == 2u);
@@ -1035,7 +1041,7 @@ TEST_CASE("continuous output")
             for (auto &vec : t_grid) {
                 vec.prec_round(prec);
             }
-            grid_out = std::get<4>(ta.propagate_grid(t_grid));
+            grid_out = std::get<5>(ta.propagate_grid(t_grid));
 
             // Compare the two.
             for (auto i = 0u; i < 11u; ++i) {

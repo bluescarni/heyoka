@@ -154,11 +154,12 @@ concurrently by separate threads of execution:
 * invocation of the generator's call operator (that is, the generator is
   shared among multiple threads and must support concurrent invocations
   of its call operator);
-* copy construction of the callback that can (optionally) be passed to
-  the ``propagate_*()`` functions (that is, step callbacks are **not**
+* copy construction of the step callbacks and invocation of the call operator
+  on the copies (that is, step callbacks are not
   shared among multiple threads of execution, and a new copy is created for each
   invocation of the ``propagate_*()`` functions);
-* copy construction of the events callbacks (that is, each thread of execution
+* copy construction of the events callbacks and invocation of the call operator
+  on the copies (that is, each thread of execution
   gets its own copy of the event callbacks thanks to the creation
   of a new integrator object via the generator).
 

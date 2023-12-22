@@ -1517,8 +1517,9 @@ TEST_CASE("te propagate_grid")
         }
     }
 
-    auto out = ta.propagate_grid(grid);
+    auto [cb, out] = ta.propagate_grid(grid);
 
+    REQUIRE(!cb);
     REQUIRE(out.size() == 202u * 4u);
     REQUIRE(std::all_of(out.begin() + 1, out.end(), [](const auto &val) { return val != 0; }));
 
@@ -1532,8 +1533,9 @@ TEST_CASE("te propagate_grid")
     ta = taylor_adaptive_batch<fp_t>{
         {prime(x) = v, prime(v) = -9.8 * sin(x)}, {0, 0.01, 0.02, 0.03, .25, .26, .27, .28}, 4, kw::t_events = {ev1}};
 
-    out = ta.propagate_grid(grid);
+    std::tie(cb, out) = ta.propagate_grid(grid);
 
+    REQUIRE(!cb);
     REQUIRE(std::all_of(out.begin() + 8, out.end(), [](const auto &val) { return std::isnan(val); }));
 
     for (std::uint32_t i = 0; i < 4u; ++i) {
@@ -1569,8 +1571,9 @@ TEST_CASE("te propagate_grid first step bug")
                                                 4,
                                                 kw::t_events = {ev}};
 
-        auto out = ta.propagate_grid(grid);
+        auto [cb, out] = ta.propagate_grid(grid);
 
+        REQUIRE(!cb);
         REQUIRE(out.size() == 200u * 4u);
         REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &val) { return val != 0; }));
     }
@@ -1583,8 +1586,9 @@ TEST_CASE("te propagate_grid first step bug")
                                                 4,
                                                 kw::t_events = {ev}};
 
-        auto out = ta.propagate_grid(grid);
+        auto [cb, out] = ta.propagate_grid(grid);
 
+        REQUIRE(!cb);
         REQUIRE(out.size() == 200u * 4u);
         REQUIRE(std::all_of(out.begin() + 32, out.end(), [](const auto &val) { return std::isnan(val); }));
     }

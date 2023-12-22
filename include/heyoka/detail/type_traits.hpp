@@ -11,11 +11,8 @@
 
 #include <heyoka/config.hpp>
 
-#include <functional>
-#include <initializer_list>
 #include <limits>
 #include <type_traits>
-#include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -108,30 +105,6 @@ struct is_supported_fp<mppp::real> : std::true_type {
 template <typename T>
 inline constexpr bool is_supported_fp_v = is_supported_fp<T>::value;
 
-// Detect vector type.
-template <typename>
-struct is_any_vector : std::false_type {
-};
-
-template <typename T>
-struct is_any_vector<std::vector<T>> : std::true_type {
-};
-
-template <typename T>
-inline constexpr bool is_any_vector_v = is_any_vector<T>::value;
-
-// Detect initializer_list type.
-template <typename>
-struct is_any_ilist : std::false_type {
-};
-
-template <typename T>
-struct is_any_ilist<std::initializer_list<T>> : std::true_type {
-};
-
-template <typename T>
-inline constexpr bool is_any_ilist_v = is_any_ilist<T>::value;
-
 // Detection of IEEE-style floating-point types.
 template <typename T, int N>
 constexpr bool is_ieee754_binaryN()
@@ -165,18 +138,6 @@ inline constexpr bool is_x86_fp80 = is_ieee754_binaryN<T, 64>();
 
 template <typename T>
 inline constexpr bool is_ieee754_binary128 = is_ieee754_binaryN<T, 113>();
-
-// Machinery to detect std::function.
-template <typename>
-struct is_any_std_func : std::false_type {
-};
-
-template <typename R, typename... Args>
-struct is_any_std_func<std::function<R(Args...)>> : std::true_type {
-};
-
-template <typename T>
-inline constexpr bool is_any_std_func_v = is_any_std_func<T>::value;
 
 } // namespace detail
 
