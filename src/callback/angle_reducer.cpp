@@ -219,11 +219,11 @@ bool angle_reducer::operator()(taylor_adaptive<T> &ta)
     // Validate m_ind against the integrator object.
     const auto &ind_v = m_impl->m_ind;
     assert(std::ranges::is_sorted(ind_v));
-    if (!ind_v.empty() && ind_v.back() >= ta.get_state().size()) {
+    if (!ind_v.empty() && ind_v.back() >= ta.get_state_vars().size()) {
         throw std::invalid_argument(
             fmt::format("Inconsistent state detected in angle_reducer: the last index in the indices vector has a "
-                        "value of {}, but the size of the state vector is only {}",
-                        ind_v.back(), ta.get_state().size()));
+                        "value of {}, but the number of state variables is only {}",
+                        ind_v.back(), ta.get_state_vars().size()));
     }
 
     // Fetch the 2pi constant.
@@ -246,22 +246,22 @@ bool angle_reducer::operator()(taylor_adaptive_batch<T> &ta)
         throw std::invalid_argument(detail::invalid_ar_msg);
     }
 
-    // Fetch the batch size.
-    const auto batch_size = ta.get_batch_size();
-    assert(batch_size != 0u);
-
     // Validate m_ind against the integrator object.
     const auto &ind_v = m_impl->m_ind;
     assert(std::ranges::is_sorted(ind_v));
-    if (!ind_v.empty() && ind_v.back() >= ta.get_state().size() / batch_size) {
+    if (!ind_v.empty() && ind_v.back() >= ta.get_state_vars().size()) {
         throw std::invalid_argument(
             fmt::format("Inconsistent state detected in angle_reducer: the last index in the indices vector has a "
-                        "value of {}, but the size of the state vector is only {}",
-                        ind_v.back(), ta.get_state().size() / batch_size));
+                        "value of {}, but the number of state variables is only {}",
+                        ind_v.back(), ta.get_state_vars().size()));
     }
 
     // Fetch the 2pi constant.
     const auto twopi_const = detail::get_twopi_const(ta);
+
+    // Fetch the batch size.
+    const auto batch_size = ta.get_batch_size();
+    assert(batch_size != 0u);
 
     // Run the reduction.
     auto *sptr = ta.get_state_data();
@@ -331,7 +331,7 @@ HEYOKA_CALLBACK_ANGLE_REDUCER_S11N_EXPORT_IMPLEMENT(mppp::real128)
 
 #if defined(HEYOKA_HAVE_REAL)
 
-HEYOKA_CALLBACK_ANGLE_REDUCER_S11N_EXPORT_IMPLEMENT(mppp::real)
+HEYOKA_S11N_STEP_CALLBACK_EXPORT_IMPLEMENT(heyoka::callback::angle_reducer, mppp::real)
 
 #endif
 

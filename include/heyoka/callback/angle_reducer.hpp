@@ -115,8 +115,8 @@ HEYOKA_CALLBACK_ANGLE_REDUCER_EXTERN_INST(mppp::real128)
 
 #if defined(HEYOKA_HAVE_REAL)
 
-// NOTE: prevent the instantiation for the batch version of mppp::real as well.
-HEYOKA_CALLBACK_ANGLE_REDUCER_EXTERN_INST(mppp::real)
+extern template bool angle_reducer::operator()<mppp::real>(taylor_adaptive<mppp::real> &);
+extern template void angle_reducer::pre_hook<mppp::real>(taylor_adaptive<mppp::real> &);
 
 #endif
 
