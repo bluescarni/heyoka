@@ -198,7 +198,7 @@ template <>
 mppp::real get_twopi_const(const taylor_adaptive<mppp::real> &ta)
 {
     auto ret = mppp::real_pi(ta.get_prec());
-    mul_2ui(ret, ret, 2u);
+    mul_2ui(ret, ret, 1u);
 
     return ret;
 }

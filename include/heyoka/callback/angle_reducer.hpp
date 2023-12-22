@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <concepts>
+#include <initializer_list>
 #include <iterator>
 #include <memory>
 #include <ranges>
@@ -61,6 +62,18 @@ class HEYOKA_DLL_PUBLIC angle_reducer
         ar & m_impl;
     }
 
+    template <typename B, typename E>
+    void construct_from_range(B begin, E end)
+    {
+        std::unordered_set<expression> var_set;
+        for (; begin != end; ++begin) {
+            auto &&x = *begin;
+            var_set.emplace(std::forward<decltype(x)>(x));
+        }
+
+        validate_and_construct(std::move(var_set));
+    }
+
 public:
     angle_reducer();
     angle_reducer(const angle_reducer &);
@@ -72,17 +85,18 @@ public:
     template <typename R>
         requires(!std::same_as<angle_reducer, std::remove_cvref_t<R>>) && std::ranges::input_range<R>
                 && std::constructible_from<expression, std::iter_reference_t<std::ranges::iterator_t<R>>>
-    explicit angle_reducer(R &&r)
+    explicit angle_reducer(R &&r) : angle_reducer()
     {
         // Turn into lvalue.
         auto &&rl = std::forward<R>(r);
 
-        std::unordered_set<expression> var_set;
-        for (auto &&x : rl) {
-            var_set.emplace(std::forward<decltype(x)>(x));
-        }
-
-        validate_and_construct(std::move(var_set));
+        construct_from_range(std::ranges::begin(rl), std::ranges::end(rl));
+    }
+    template <typename T>
+        requires std::constructible_from<expression, const T &>
+    angle_reducer(std::initializer_list<T> ilist) : angle_reducer()
+    {
+        construct_from_range(std::ranges::begin(ilist), std::ranges::end(ilist));
     }
 
     template <typename T>
