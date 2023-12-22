@@ -1352,6 +1352,11 @@ TEST_CASE("propagate grid")
                                         })));
     out_cb(ta);
     REQUIRE(value_isa<step_callback_set<double>>(out_cb));
+
+    // Test interruption via callback.
+    oc = std::get<0>(ta.propagate_grid(
+        {12., 13., 24.}, kw::callback = [n = 0](auto &) mutable { return n++ == 2; }));
+    REQUIRE(oc == taylor_outcome::cb_stop);
 }
 
 // Test the stream operator of the outcome enum.
