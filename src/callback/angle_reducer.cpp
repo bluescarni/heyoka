@@ -46,6 +46,15 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
+// NOTE: possible improvements:
+// - JIT compiled implementation (but how to deal
+//   with batch mode? recompile in pre-hook as needed?);
+// - double-length implementation to improve the accuracy
+//   of the reduction;
+// - clamp result to ensure with 100% certainty that
+//   the reduced angle falls within the range;
+// - allow for other ranges, such as [-pi / pi).
+
 HEYOKA_BEGIN_NAMESPACE
 
 namespace callback
