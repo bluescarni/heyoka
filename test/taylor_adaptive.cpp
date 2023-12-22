@@ -1191,6 +1191,7 @@ TEST_CASE("propagate for_until")
     out_cb = std::get<5>(ta.propagate_for(10., kw::callback = std::move(f_cb_for)));
     // Invoke again the callback to ensure no copies have been made.
     out_cb(ta);
+    REQUIRE(value_isa<cb_functor_for>(out_cb));
 
     // Do the same test with the range overload, moving in the callbacks initially stored
     // in a range. This will check that the logic that converts the input range into
@@ -1204,6 +1205,7 @@ TEST_CASE("propagate for_until")
                                     return std::move(c);
                                 })));
         out_cb(ta);
+        REQUIRE(value_isa<step_callback_set<double>>(out_cb));
     }
 
     {
@@ -1215,6 +1217,7 @@ TEST_CASE("propagate for_until")
                                     return std::move(c);
                                 })));
         out_cb(ta);
+        REQUIRE(value_isa<step_callback_set<double>>(out_cb));
     }
 }
 
@@ -1330,6 +1333,7 @@ TEST_CASE("propagate grid")
     auto out_cb = std::get<4>(ta.propagate_grid({1., 5., 10.}, kw::callback = std::move(f_cb_grid)));
     // Invoke again the callback to ensure no copies have been made.
     out_cb(ta);
+    REQUIRE(value_isa<cb_functor_grid>(out_cb));
 
     // Do the same test with the range overload, moving in the callbacks initially stored
     // in a range. This will check that the logic that converts the input range into
@@ -1342,6 +1346,7 @@ TEST_CASE("propagate grid")
                                             return std::move(c);
                                         })));
     out_cb(ta);
+    REQUIRE(value_isa<step_callback_set<double>>(out_cb));
 }
 
 // Test the stream operator of the outcome enum.

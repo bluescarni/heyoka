@@ -364,6 +364,7 @@ TEST_CASE("propagate grid")
                                          kw::callback = std::move(f_cb_grid));
     // Invoke again the callback to ensure no copies have been made.
     out_cb(ta);
+    REQUIRE(value_isa<cb_functor_grid>(out_cb));
 
     // Do the same test with the range overload, moving in the callbacks initially stored
     // in a range. This will check that the logic that converts the input range into
@@ -376,6 +377,7 @@ TEST_CASE("propagate grid")
         kw::callback
         = cf_vec | std::views::transform([](cb_functor_grid &c) -> cb_functor_grid && { return std::move(c); }));
     out_cb(ta);
+    REQUIRE(value_isa<step_callback_batch_set<double>>(out_cb));
 
     // Callback attempts to change the time coordinate.
     ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03}, 4};
@@ -661,6 +663,7 @@ TEST_CASE("propagate for_until")
     f_cb_for.extract<cb_functor_for>()->n_copies_after = f_cb_for.extract<cb_functor_for>()->n_copies;
     std::tie(_, out_cb) = ta.propagate_for(10., kw::callback = std::move(f_cb_for));
     out_cb(ta);
+    REQUIRE(value_isa<cb_functor_for>(out_cb));
 
     // Do the same test with the range overload, moving in the callbacks initially stored
     // in a range. This will check that the logic that converts the input range into
@@ -673,6 +676,7 @@ TEST_CASE("propagate for_until")
             10., kw::callback
                  = cf_vec | std::views::transform([](cb_functor_for &c) -> cb_functor_for && { return std::move(c); }));
         out_cb(ta);
+        REQUIRE(value_isa<step_callback_batch_set<double>>(out_cb));
     }
 
     {
@@ -684,6 +688,7 @@ TEST_CASE("propagate for_until")
                                     return std::move(c);
                                 }));
         out_cb(ta);
+        REQUIRE(value_isa<step_callback_batch_set<double>>(out_cb));
     }
 }
 
