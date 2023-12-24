@@ -104,6 +104,23 @@ angle_reducer &angle_reducer::operator=(angle_reducer &&) noexcept = default;
 
 angle_reducer::~angle_reducer() = default;
 
+void angle_reducer::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << m_impl;
+}
+
+void angle_reducer::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    try {
+        ar >> m_impl;
+    } catch (...) {
+        // LCOV_EXCL_START
+        *this = angle_reducer{};
+        throw;
+        // LCOV_EXCL_STOP
+    }
+}
+
 void angle_reducer::validate_and_construct(std::unordered_set<expression> var_set)
 {
     if (var_set.empty()) {

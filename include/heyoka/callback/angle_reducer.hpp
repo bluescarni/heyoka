@@ -56,11 +56,9 @@ class HEYOKA_DLL_PUBLIC angle_reducer
 
     // Serialisation.
     friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar & m_impl;
-    }
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     template <typename B, typename E>
     void construct_from_range(B begin, E end)
