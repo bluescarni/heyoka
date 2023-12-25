@@ -378,6 +378,7 @@ TEST_CASE("propagate grid")
         = cf_vec | std::views::transform([](cb_functor_grid &c) -> cb_functor_grid && { return std::move(c); }));
     out_cb(ta);
     REQUIRE(value_isa<step_callback_batch_set<double>>(out_cb));
+    REQUIRE(value_isa<cb_functor_grid>(value_ref<step_callback_batch_set<double>>(out_cb)[0]));
 
     // Callback attempts to change the time coordinate.
     ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03}, 4};

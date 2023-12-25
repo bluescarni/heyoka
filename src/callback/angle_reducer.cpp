@@ -115,12 +115,12 @@ void angle_reducer::load(boost::archive::binary_iarchive &ar, unsigned)
 {
     try {
         ar >> m_impl;
-    } catch (...) {
         // LCOV_EXCL_START
+    } catch (...) {
         *this = angle_reducer{};
         throw;
-        // LCOV_EXCL_STOP
     }
+    // LCOV_EXCL_STOP
 }
 
 void angle_reducer::validate_and_construct(std::unordered_set<expression> var_set)
