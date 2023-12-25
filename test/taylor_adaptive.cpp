@@ -1352,6 +1352,7 @@ TEST_CASE("propagate grid")
                                         })));
     out_cb(ta);
     REQUIRE(value_isa<step_callback_set<double>>(out_cb));
+    REQUIRE(value_isa<cb_functor_grid>(value_ref<step_callback_set<double>>(out_cb)[0]));
 
     // Test interruption via callback.
     oc = std::get<0>(ta.propagate_grid(

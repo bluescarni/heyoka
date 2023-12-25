@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <ostream>
 #include <stdexcept>
 #include <unordered_set>
 #include <utility>
@@ -25,6 +26,7 @@
 #include <boost/serialization/unordered_set.hpp>
 
 #include <fmt/core.h>
+#include <fmt/ranges.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -103,6 +105,23 @@ angle_reducer &angle_reducer::operator=(const angle_reducer &other)
 angle_reducer &angle_reducer::operator=(angle_reducer &&) noexcept = default;
 
 angle_reducer::~angle_reducer() = default;
+
+void angle_reducer::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << m_impl;
+}
+
+void angle_reducer::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    try {
+        ar >> m_impl;
+        // LCOV_EXCL_START
+    } catch (...) {
+        *this = angle_reducer{};
+        throw;
+    }
+    // LCOV_EXCL_STOP
+}
 
 void angle_reducer::validate_and_construct(std::unordered_set<expression> var_set)
 {
@@ -270,7 +289,6 @@ bool angle_reducer::operator()(taylor_adaptive_batch<T> &ta)
 
     // Fetch the batch size.
     const auto batch_size = ta.get_batch_size();
-    assert(batch_size != 0u);
 
     // Run the reduction.
     auto *sptr = ta.get_state_data();
@@ -284,6 +302,17 @@ bool angle_reducer::operator()(taylor_adaptive_batch<T> &ta)
     }
 
     return true;
+}
+
+std::ostream &operator<<(std::ostream &os, const angle_reducer &ar)
+{
+    if (ar.m_impl) {
+        os << fmt::format("Angle reducer: {}", ar.m_impl->m_var_set);
+    } else {
+        os << "Angle reducer (default constructed)";
+    }
+
+    return os;
 }
 
 // Explicit insantiations.
