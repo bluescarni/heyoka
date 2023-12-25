@@ -16,6 +16,8 @@
 #include <utility>
 #include <vector>
 
+#include <boost/algorithm/string/predicate.hpp>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -319,4 +321,24 @@ TEST_CASE("batch")
     };
 
     tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("stream operator")
+{
+    {
+        std::ostringstream oss;
+        oss << callback::angle_reducer{};
+
+        REQUIRE(oss.str() == "Angle reducer (default constructed)");
+    }
+
+    {
+        std::ostringstream oss;
+        oss << callback::angle_reducer{{"x"_var, "y"_var, "z"_var}};
+
+        REQUIRE(boost::algorithm::contains(oss.str(), "Angle reducer: "));
+        REQUIRE(boost::algorithm::contains(oss.str(), "x"));
+        REQUIRE(boost::algorithm::contains(oss.str(), "y"));
+        REQUIRE(boost::algorithm::contains(oss.str(), "z"));
+    }
 }

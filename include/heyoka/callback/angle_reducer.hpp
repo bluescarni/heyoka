@@ -15,6 +15,7 @@
 #include <initializer_list>
 #include <iterator>
 #include <memory>
+#include <ostream>
 #include <ranges>
 #include <type_traits>
 #include <unordered_set>
@@ -43,11 +44,17 @@ HEYOKA_BEGIN_NAMESPACE
 namespace callback
 {
 
+class HEYOKA_DLL_PUBLIC angle_reducer;
+
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const angle_reducer &);
+
 class HEYOKA_DLL_PUBLIC angle_reducer
 {
     class impl;
 
     std::unique_ptr<impl> m_impl;
+
+    friend HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const angle_reducer &);
 
     void validate_and_construct(std::unordered_set<expression>);
 
