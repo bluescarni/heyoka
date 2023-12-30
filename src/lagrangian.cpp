@@ -97,14 +97,6 @@ void lagrangian_impl_sanity_checks(const expression &L, const std::vector<expres
         }
     }
 
-    for (const auto &qdot : qdots) {
-        if (qs_set.contains(qdot)) {
-            throw std::invalid_argument(fmt::format("The list of generalised velocities contains the expression '{}' "
-                                                    "which also appears as a generalised coordinate",
-                                                    qdot));
-        }
-    }
-
     // Sanity checks on L.
     for (const auto &v : get_variables(L)) {
         if (!qs_set.contains(expression{v}) && !qdots_set.contains(expression{v})) {

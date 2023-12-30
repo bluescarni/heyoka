@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <stdexcept>
+
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/lagrangian.hpp>
@@ -133,4 +135,56 @@ TEST_CASE("two body problem")
     REQUIRE(ta1.get_state()[9] == approximately(ta2.get_state()[9]));
     REQUIRE(ta1.get_state()[10] == approximately(ta2.get_state()[10]));
     REQUIRE(ta1.get_state()[11] == approximately(ta2.get_state()[11]));
+}
+
+TEST_CASE("error handling")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    REQUIRE_THROWS_MATCHES(
+        lagrangian(x, {x}, {}), std::invalid_argument,
+        Message("The number of generalised coordinates (1) must be equal to the number of generalised velocities (0)"));
+    REQUIRE_THROWS_MATCHES(lagrangian(x, {}, {}), std::invalid_argument,
+                           Message("Cannot define a Lagrangian without state variables"));
+
+    REQUIRE_THROWS_MATCHES(
+        lagrangian(x, {x + v}, {v}), std::invalid_argument,
+        Message("The list of generalised coordinates contains the expression '(v + x)' which is not a variable"));
+    REQUIRE_THROWS_MATCHES(
+        lagrangian(x, {"__x"_var}, {v}), std::invalid_argument,
+        Message("The list of generalised coordinates contains a variable with the invalid name '__x': names "
+                "starting with '__' are reserved for internal use"));
+
+    REQUIRE_THROWS_MATCHES(
+        lagrangian(x, {v}, {x + v}), std::invalid_argument,
+        Message("The list of generalised velocities contains the expression '(v + x)' which is not a variable"));
+    REQUIRE_THROWS_MATCHES(
+        lagrangian(x, {v}, {"__x"_var}), std::invalid_argument,
+        Message("The list of generalised velocities contains a variable with the invalid name '__x': names "
+                "starting with '__' are reserved for internal use"));
+
+    REQUIRE_THROWS_MATCHES(lagrangian(x, {x, x}, {v, v}), std::invalid_argument,
+                           Message("The list of generalised coordinates contains duplicates"));
+    REQUIRE_THROWS_MATCHES(lagrangian(x, {x, v}, {v, v}), std::invalid_argument,
+                           Message("The list of generalised velocities contains duplicates"));
+
+    REQUIRE_THROWS_MATCHES(lagrangian(x, {x, v}, {x, v}), std::invalid_argument,
+                           Message("The list of generalised coordinates contains the expression 'x' "
+                                   "which also appears as a generalised velocity"));
+    REQUIRE_THROWS_MATCHES(lagrangian(x, {x, v}, {v, "v2"_var}), std::invalid_argument,
+                           Message("The list of generalised coordinates contains the expression 'v' "
+                                   "which also appears as a generalised velocity"));
+
+    REQUIRE_THROWS_MATCHES(
+        lagrangian(x + "v2"_var, {x}, {v}), std::invalid_argument,
+        Message("The Lagrangian contains the variable 'v2' which is not a generalised position or velocity"));
+
+    REQUIRE_THROWS_MATCHES(
+        lagrangian(x, {x}, {v}, x), std::invalid_argument,
+        Message("The dissipation function contains the variable 'x' which is not a generalised velocity"));
+    REQUIRE_THROWS_MATCHES(
+        lagrangian(x, {x}, {v}, "v2"_var), std::invalid_argument,
+        Message("The dissipation function contains the variable 'v2' which is not a generalised velocity"));
 }
