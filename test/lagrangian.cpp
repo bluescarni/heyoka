@@ -11,7 +11,9 @@
 #include <heyoka/lagrangian.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/model/nbody.hpp>
 #include <heyoka/model/pendulum.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -21,6 +23,7 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
+// Minimal test.
 TEST_CASE("pendulum")
 {
     auto [x, v] = make_vars("x", "v");
@@ -40,7 +43,8 @@ TEST_CASE("pendulum")
     REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
 }
 
-// Horizontally-driven pendulum.
+// Horizontally-driven pendulum - test time-dependent
+// Lagrangian.
 TEST_CASE("driven pendulum")
 {
     auto [x, v] = make_vars("x", "v");
@@ -68,4 +72,65 @@ TEST_CASE("driven pendulum")
 
     REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
     REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
+}
+
+// Damped harmonic oscillator - test for the dissipation function. See:
+// http://www.physics.hmc.edu/~saeta/courses/p111/uploads/Y2013/lec131023-DSHO.pdf
+TEST_CASE("damped oscillator")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto k = par[0];
+    auto b = par[1];
+    auto m = par[2];
+
+    const auto L = 0.5 * m * v * v - 0.5 * k * x * x;
+    const auto D = 0.5 * b * v * v;
+
+    const auto par_vals = {.1, .2, .3};
+
+    const auto sys1 = lagrangian(L, {x}, {v}, D);
+    auto ta1 = taylor_adaptive{sys1, {0.1, 0.2}, kw::pars = par_vals};
+    auto ta2 = taylor_adaptive{{prime(x) = v, prime(v) = (-k * x - b * v) / m}, {0.1, 0.2}, kw::pars = par_vals};
+
+    ta1.propagate_until(10.);
+    ta2.propagate_until(10.);
+
+    REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
+    REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
+}
+
+TEST_CASE("two body problem")
+{
+    auto [x0, y0, z0] = make_vars("x0", "y0", "z0");
+    auto [x1, y1, z1] = make_vars("x1", "y1", "z1");
+
+    auto [vx0, vy0, vz0] = make_vars("vx0", "vy0", "vz0");
+    auto [vx1, vy1, vz1] = make_vars("vx1", "vy1", "vz1");
+
+    const auto L = 0.5 * (vx0 * vx0 + vy0 * vy0 + vz0 * vz0 + vx1 * vx1 + vy1 * vy1 + vz1 * vz1)
+                   + 1. / sqrt((x0 - x1) * (x0 - x1) + (y0 - y1) * (y0 - y1) + (z0 - z1) * (z0 - z1));
+
+    const auto sys1 = lagrangian(L, {x0, y0, z0, x1, y1, z1}, {vx0, vy0, vz0, vx1, vy1, vz1});
+    auto ics1 = {-1., 0., 0., 1., 0., 0., 0., -.5, 0., 0., 0.5, 0.};
+    auto ics2 = {-1., 0., 0., 0., -.5, 0., 1., 0., 0., 0., 0.5, 0.};
+
+    auto ta1 = taylor_adaptive{sys1, ics1};
+    auto ta2 = taylor_adaptive{model::nbody(2), ics2};
+
+    ta1.propagate_until(5.);
+    ta2.propagate_until(5.);
+
+    REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
+    REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
+    REQUIRE(ta1.get_state()[2] == approximately(ta2.get_state()[2]));
+    REQUIRE(ta1.get_state()[3] == approximately(ta2.get_state()[6]));
+    REQUIRE(ta1.get_state()[4] == approximately(ta2.get_state()[7]));
+    REQUIRE(ta1.get_state()[5] == approximately(ta2.get_state()[8]));
+    REQUIRE(ta1.get_state()[6] == approximately(ta2.get_state()[3]));
+    REQUIRE(ta1.get_state()[7] == approximately(ta2.get_state()[4]));
+    REQUIRE(ta1.get_state()[8] == approximately(ta2.get_state()[5]));
+    REQUIRE(ta1.get_state()[9] == approximately(ta2.get_state()[9]));
+    REQUIRE(ta1.get_state()[10] == approximately(ta2.get_state()[10]));
+    REQUIRE(ta1.get_state()[11] == approximately(ta2.get_state()[11]));
 }
