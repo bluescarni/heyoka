@@ -14,6 +14,8 @@ New
 - New ``angle_reducer`` step callback to automatically reduce
   angular state variables to the :math:`\left[0, 2\pi\right)` range
   (`#376 <https://github.com/bluescarni/heyoka/pull/376>`__).
+- New ``callback`` module containing ready-made step and event callbacks
+  (`#376 <https://github.com/bluescarni/heyoka/pull/376>`__).
 
 Changes
 ~~~~~~~
