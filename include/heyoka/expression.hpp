@@ -547,7 +547,7 @@ HEYOKA_BEGIN_NAMESPACE
 // returned by this function are optimised for evaluation. The users
 // can always unfix() and normalise() these expressions if needed.
 template <typename... KwArgs>
-dtens diff_tensors(const std::vector<expression> &v_ex, KwArgs &&...kw_args)
+dtens diff_tensors(const std::vector<expression> &v_ex, const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
@@ -746,7 +746,7 @@ HEYOKA_CFUNC_EXTERN_INST(mppp::real)
 
 template <typename T, typename... KwArgs>
 inline std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &fn,
-                                         KwArgs &&...kw_args)
+                                         const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
