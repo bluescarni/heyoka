@@ -19,10 +19,13 @@ compilation via `LLVM <https://llvm.org/>`__. Notable features include:
 
 * support for single-precision, double-precision, extended-precision (80-bit and 128-bit),
   and arbitrary-precision floating-point types,
-* the ability to maintain machine precision accuracy over
-  tens of billions of timesteps,
 * high-precision zero-cost dense output,
 * accurate and reliable event detection,
+* builtin support for analytical mechanics - bring your own Lagrangians/Hamiltonians
+  and let heyoka formulate and solve the equations of motion,
+* builtin support for machine learning applications via neural network models,
+* the ability to maintain machine precision accuracy over
+  tens of billions of timesteps,
 * batch mode integration to harness the power of modern
   `SIMD <https://en.wikipedia.org/wiki/SIMD>`__ instruction sets
   (including AVX/AVX2/AVX-512/Neon/VSX),
