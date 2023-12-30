@@ -6,15 +6,16 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cmath>
 #include <stdexcept>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/hamiltonian.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/lagrangian.hpp>
 #include <heyoka/math/cos.hpp>
-// #include <heyoka/math/sin.hpp>
-// #include <heyoka/math/sqrt.hpp>
-// #include <heyoka/math/time.hpp>
+#include <heyoka/math/sqrt.hpp>
+#include <heyoka/math/time.hpp>
 #include <heyoka/model/nbody.hpp>
 #include <heyoka/model/pendulum.hpp>
 #include <heyoka/taylor.hpp>
@@ -54,13 +55,11 @@ TEST_CASE("pendulum")
     REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1] * m * lval * lval));
 }
 
-#if 0
-
 // Horizontally-driven pendulum - test time-dependent
-// Lagrangian.
+// Hamiltonian.
 TEST_CASE("driven pendulum")
 {
-    auto [x, v] = make_vars("x", "v");
+    auto [x, v, p] = make_vars("x", "v", "p");
 
     auto M = par[0];
     auto b = par[1];
@@ -68,49 +67,39 @@ TEST_CASE("driven pendulum")
     auto om = par[3];
     auto g = par[4];
 
+    auto Mval = .1;
+    auto bval = .2;
+    auto aval = .3;
+    auto omval = .4;
+
     const auto L = 0.5 * M * b * b * v * v + M * b * v * a * om * cos(x) * cos(om * heyoka::time)
                    + 0.5 * M * a * a * om * om * cos(om * heyoka::time) * cos(om * heyoka::time) + M * g * b * cos(x);
 
-    const auto par_vals = {.1, .2, .3, .4, .5};
+    const auto par_vals = {Mval, bval, aval, omval, .5};
 
     const auto sys1 = lagrangian(L, {x}, {v});
+
+    // v as a function of p.
+    auto v_p = (p - M * b * a * om * cos(x) * cos(om * heyoka::time)) / (M * b * b);
+
+    // Compute the Hamiltonian.
+    auto H = v_p * p - subs(L, {{v, v_p}});
+
+    const auto sys2 = hamiltonian(H, {x}, {p});
+
     auto ta1 = taylor_adaptive{sys1, {0.1, 0.2}, kw::pars = par_vals};
-    auto ta2
-        = taylor_adaptive{{prime(x) = v, prime(v) = a * om * om / b * cos(x) * sin(om * heyoka::time) - g / b * sin(x)},
-                          {0.1, 0.2},
-                          kw::pars = par_vals};
+    auto ta2 = taylor_adaptive{
+        sys2, {0.1, Mval * bval * bval * 0.2 + Mval * bval * aval * omval * std::cos(.1)}, kw::pars = par_vals};
 
     ta1.propagate_until(10.);
     ta2.propagate_until(10.);
 
     REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
-    REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
-}
-
-// Damped harmonic oscillator - test for the dissipation function. See:
-// http://www.physics.hmc.edu/~saeta/courses/p111/uploads/Y2013/lec131023-DSHO.pdf
-TEST_CASE("damped oscillator")
-{
-    auto [x, v] = make_vars("x", "v");
-
-    auto k = par[0];
-    auto b = par[1];
-    auto m = par[2];
-
-    const auto L = 0.5 * m * v * v - 0.5 * k * x * x;
-    const auto D = 0.5 * b * v * v;
-
-    const auto par_vals = {.1, .2, .3};
-
-    const auto sys1 = lagrangian(L, {x}, {v}, D);
-    auto ta1 = taylor_adaptive{sys1, {0.1, 0.2}, kw::pars = par_vals};
-    auto ta2 = taylor_adaptive{{prime(x) = v, prime(v) = (-k * x - b * v) / m}, {0.1, 0.2}, kw::pars = par_vals};
-
-    ta1.propagate_until(10.);
-    ta2.propagate_until(10.);
-
-    REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
-    REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
+    const auto xfin = ta2.get_state()[0];
+    const auto pfin = ta2.get_state()[1];
+    REQUIRE(ta1.get_state()[1]
+            == approximately((pfin - Mval * bval * aval * omval * std::cos(xfin) * std::cos(omval * 10.))
+                             / (Mval * bval * bval)));
 }
 
 TEST_CASE("two body problem")
@@ -121,15 +110,22 @@ TEST_CASE("two body problem")
     auto [vx0, vy0, vz0] = make_vars("vx0", "vy0", "vz0");
     auto [vx1, vy1, vz1] = make_vars("vx1", "vy1", "vz1");
 
+    auto [px0, py0, pz0] = make_vars("px0", "py0", "pz0");
+    auto [px1, py1, pz1] = make_vars("px1", "py1", "pz1");
+
     const auto L = 0.5 * (vx0 * vx0 + vy0 * vy0 + vz0 * vz0 + vx1 * vx1 + vy1 * vy1 + vz1 * vz1)
                    + 1. / sqrt((x0 - x1) * (x0 - x1) + (y0 - y1) * (y0 - y1) + (z0 - z1) * (z0 - z1));
 
     const auto sys1 = lagrangian(L, {x0, y0, z0, x1, y1, z1}, {vx0, vy0, vz0, vx1, vy1, vz1});
-    auto ics1 = {-1., 0., 0., 1., 0., 0., 0., -.5, 0., 0., 0.5, 0.};
-    auto ics2 = {-1., 0., 0., 0., -.5, 0., 1., 0., 0., 0., 0.5, 0.};
+    auto ics = {-1., 0., 0., 1., 0., 0., 0., -.5, 0., 0., 0.5, 0.};
 
-    auto ta1 = taylor_adaptive{sys1, ics1};
-    auto ta2 = taylor_adaptive{model::nbody(2), ics2};
+    auto H = px0 * px0 + py0 * py0 + pz0 * pz0 + px1 * px1 + py1 * py1 + pz1 * pz1
+             - subs(L, {{vx0, px0}, {vy0, py0}, {vz0, pz0}, {vx1, px1}, {vy1, py1}, {vz1, pz1}});
+
+    const auto sys2 = hamiltonian(H, {x0, y0, z0, x1, y1, z1}, {px0, py0, pz0, px1, py1, pz1});
+
+    auto ta1 = taylor_adaptive{sys1, ics};
+    auto ta2 = taylor_adaptive{sys2, ics};
 
     ta1.propagate_until(5.);
     ta2.propagate_until(5.);
@@ -137,12 +133,12 @@ TEST_CASE("two body problem")
     REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
     REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
     REQUIRE(ta1.get_state()[2] == approximately(ta2.get_state()[2]));
-    REQUIRE(ta1.get_state()[3] == approximately(ta2.get_state()[6]));
-    REQUIRE(ta1.get_state()[4] == approximately(ta2.get_state()[7]));
-    REQUIRE(ta1.get_state()[5] == approximately(ta2.get_state()[8]));
-    REQUIRE(ta1.get_state()[6] == approximately(ta2.get_state()[3]));
-    REQUIRE(ta1.get_state()[7] == approximately(ta2.get_state()[4]));
-    REQUIRE(ta1.get_state()[8] == approximately(ta2.get_state()[5]));
+    REQUIRE(ta1.get_state()[3] == approximately(ta2.get_state()[3]));
+    REQUIRE(ta1.get_state()[4] == approximately(ta2.get_state()[4]));
+    REQUIRE(ta1.get_state()[5] == approximately(ta2.get_state()[5]));
+    REQUIRE(ta1.get_state()[6] == approximately(ta2.get_state()[6]));
+    REQUIRE(ta1.get_state()[7] == approximately(ta2.get_state()[7]));
+    REQUIRE(ta1.get_state()[8] == approximately(ta2.get_state()[8]));
     REQUIRE(ta1.get_state()[9] == approximately(ta2.get_state()[9]));
     REQUIRE(ta1.get_state()[10] == approximately(ta2.get_state()[10]));
     REQUIRE(ta1.get_state()[11] == approximately(ta2.get_state()[11]));
@@ -155,49 +151,40 @@ TEST_CASE("error handling")
     auto [x, v] = make_vars("x", "v");
 
     REQUIRE_THROWS_MATCHES(
-        lagrangian(x, {x}, {}), std::invalid_argument,
-        Message("The number of generalised coordinates (1) must be equal to the number of generalised velocities (0)"));
-    REQUIRE_THROWS_MATCHES(lagrangian(x, {}, {}), std::invalid_argument,
-                           Message("Cannot define a Lagrangian without state variables"));
+        hamiltonian(x, {x}, {}), std::invalid_argument,
+        Message("The number of generalised coordinates (1) must be equal to the number of generalised momenta (0)"));
+    REQUIRE_THROWS_MATCHES(hamiltonian(x, {}, {}), std::invalid_argument,
+                           Message("Cannot define a Hamiltonian without state variables"));
 
     REQUIRE_THROWS_MATCHES(
-        lagrangian(x, {x + v}, {v}), std::invalid_argument,
+        hamiltonian(x, {x + v}, {v}), std::invalid_argument,
         Message("The list of generalised coordinates contains the expression '(v + x)' which is not a variable"));
     REQUIRE_THROWS_MATCHES(
-        lagrangian(x, {"__x"_var}, {v}), std::invalid_argument,
+        hamiltonian(x, {"__x"_var}, {v}), std::invalid_argument,
         Message("The list of generalised coordinates contains a variable with the invalid name '__x': names "
                 "starting with '__' are reserved for internal use"));
 
     REQUIRE_THROWS_MATCHES(
-        lagrangian(x, {v}, {x + v}), std::invalid_argument,
-        Message("The list of generalised velocities contains the expression '(v + x)' which is not a variable"));
+        hamiltonian(x, {v}, {x + v}), std::invalid_argument,
+        Message("The list of generalised momenta contains the expression '(v + x)' which is not a variable"));
     REQUIRE_THROWS_MATCHES(
-        lagrangian(x, {v}, {"__x"_var}), std::invalid_argument,
-        Message("The list of generalised velocities contains a variable with the invalid name '__x': names "
+        hamiltonian(x, {v}, {"__x"_var}), std::invalid_argument,
+        Message("The list of generalised momenta contains a variable with the invalid name '__x': names "
                 "starting with '__' are reserved for internal use"));
 
-    REQUIRE_THROWS_MATCHES(lagrangian(x, {x, x}, {v, v}), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(hamiltonian(x, {x, x}, {v, v}), std::invalid_argument,
                            Message("The list of generalised coordinates contains duplicates"));
-    REQUIRE_THROWS_MATCHES(lagrangian(x, {x, v}, {v, v}), std::invalid_argument,
-                           Message("The list of generalised velocities contains duplicates"));
+    REQUIRE_THROWS_MATCHES(hamiltonian(x, {x, v}, {v, v}), std::invalid_argument,
+                           Message("The list of generalised momenta contains duplicates"));
 
-    REQUIRE_THROWS_MATCHES(lagrangian(x, {x, v}, {x, v}), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(hamiltonian(x, {x, v}, {x, v}), std::invalid_argument,
                            Message("The list of generalised coordinates contains the expression 'x' "
-                                   "which also appears as a generalised velocity"));
-    REQUIRE_THROWS_MATCHES(lagrangian(x, {x, v}, {v, "v2"_var}), std::invalid_argument,
+                                   "which also appears as a generalised momentum"));
+    REQUIRE_THROWS_MATCHES(hamiltonian(x, {x, v}, {v, "v2"_var}), std::invalid_argument,
                            Message("The list of generalised coordinates contains the expression 'v' "
-                                   "which also appears as a generalised velocity"));
+                                   "which also appears as a generalised momentum"));
 
     REQUIRE_THROWS_MATCHES(
-        lagrangian(x + "v2"_var, {x}, {v}), std::invalid_argument,
-        Message("The Lagrangian contains the variable 'v2' which is not a generalised position or velocity"));
-
-    REQUIRE_THROWS_MATCHES(
-        lagrangian(x, {x}, {v}, x), std::invalid_argument,
-        Message("The dissipation function contains the variable 'x' which is not a generalised velocity"));
-    REQUIRE_THROWS_MATCHES(
-        lagrangian(x, {x}, {v}, "v2"_var), std::invalid_argument,
-        Message("The dissipation function contains the variable 'v2' which is not a generalised velocity"));
+        hamiltonian(x + "v2"_var, {x}, {v}), std::invalid_argument,
+        Message("The Hamiltonian contains the variable 'v2' which is not a generalised position or momentum"));
 }
-
-#endif
