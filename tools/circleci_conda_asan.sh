@@ -19,7 +19,7 @@ conda config --set channel_priority strict
 conda create -y -q -p $deps_dir c-compiler cxx-compiler cmake \
     llvmdev tbb-devel tbb libboost-devel 'mppp=1.*' sleef xtensor \
     xtensor-blas blas blas-devel fmt spdlog \
-    'sphinxcontrib-bibtex=2.5.*' 'sphinx=6.*' 'sphinx-book-theme=1.*'
+    'sphinxcontrib-bibtex=2.6.*' 'sphinx=7.*' 'sphinx-book-theme=1.*'
 source activate $deps_dir
 
 # Create the build dir and cd into it.

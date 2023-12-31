@@ -148,6 +148,8 @@ ADD_HEYOKA_TESTCASE(model_ffnn)
 ADD_HEYOKA_TESTCASE(step_callback)
 ADD_HEYOKA_TESTCASE(llvm_state_mem_cache)
 ADD_HEYOKA_TESTCASE(angle_reducer)
+ADD_HEYOKA_TESTCASE(lagrangian)
+ADD_HEYOKA_TESTCASE(hamiltonian)
 
 if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
   ADD_HEYOKA_TESTCASE(event_detection_mp)
