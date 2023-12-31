@@ -1,13 +1,12 @@
 
-
 <!DOCTYPE html>
 
 
-<html lang="en" data-content_root="" >
+<html lang="en" data-content_root="./" >
 
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>Computations in extended precision &#8212; heyoka 4.0.0 documentation</title>
   
@@ -29,18 +28,18 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
 
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=384b581d" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
   <script src="_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
 
-    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-    <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx_highlight.js"></script>
-    <script src="_static/scripts/sphinx-book-theme.js"></script>
+    <script src="_static/documentation_options.js?v=a1c85040"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'tut_extended_precision';</script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -406,7 +405,7 @@ document.write(`
                 <article class="bd-article" role="main">
                   
   <section id="computations-in-extended-precision">
-<span id="tut-extended-precision"></span><h1>Computations in extended precision<a class="headerlink" href="#computations-in-extended-precision" title="Permalink to this heading">#</a></h1>
+<span id="tut-extended-precision"></span><h1>Computations in extended precision<a class="headerlink" href="#computations-in-extended-precision" title="Link to this heading">#</a></h1>
 <p>As hinted in the <a class="reference internal" href="install.html#ep-support"><span class="std std-ref">installation instructions</span></a>, heyoka supports computations
 not only in single and double precision, but also in extended precision. Specifically, heyoka currently supports:</p>
 <ul class="simple">
@@ -419,7 +418,7 @@ computations are supported either via the <code class="docutils literal notransl
 (provided that the platform supports the nonstandard <code class="docutils literal notranslate"><span class="pre">__float128</span></code> floating-point type and that heyoka was compiled with support
 for the mp++ library - see the <a class="reference internal" href="install.html#installation"><span class="std std-ref">installation instructions</span></a>).</p>
 <section id="a-simple-example">
-<h2>A simple example<a class="headerlink" href="#a-simple-example" title="Permalink to this heading">#</a></h2>
+<h2>A simple example<a class="headerlink" href="#a-simple-example" title="Link to this heading">#</a></h2>
 <p>We will be assuming here that <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> implements the 80-bit extended-precision floating-point format.
 In order to verify that heyoka indeed is able to work in extended precision, we will be monitoring the evolution of the energy constant
 in a high-precision numerical integration of the simple pendulum.</p>
@@ -501,7 +500,7 @@ extended-precision format (that is, <span class="math notranslate nohighlight">\
 one just needs to replace <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> with <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.2)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> when instantiating the integrator object.</p>
 </section>
 <section id="other-classes-and-functions">
-<h2>Other classes and functions<a class="headerlink" href="#other-classes-and-functions" title="Permalink to this heading">#</a></h2>
+<h2>Other classes and functions<a class="headerlink" href="#other-classes-and-functions" title="Link to this heading">#</a></h2>
 <p>Besides the adaptive integrator, several other classes and functions in heyoka can be used in extended precision.</p>
 <p>The <a class="reference internal" href="tut_events.html#tut-events"><span class="std std-ref">event classes</span></a>, for instance, can be constructed in extended precision by passing <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code>
 or <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.2)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a> as the template parameter (instead of <code class="docutils literal notranslate"><span class="pre">double</span></code>). Note that the precision of an event
@@ -509,7 +508,7 @@ must match the precision of the integrator object in which the event is used, ot
 at compilation time.</p>
 </section>
 <section id="full-code-listing">
-<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this heading">#</a></h2>
+<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Link to this heading">#</a></h2>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
 
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span>

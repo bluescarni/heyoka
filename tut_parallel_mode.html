@@ -1,13 +1,12 @@
 
-
 <!DOCTYPE html>
 
 
-<html lang="en" data-content_root="" >
+<html lang="en" data-content_root="./" >
 
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>Parallel mode &#8212; heyoka 4.0.0 documentation</title>
   
@@ -29,18 +28,18 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
 
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=384b581d" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
   <script src="_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
 
-    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-    <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx_highlight.js"></script>
-    <script src="_static/scripts/sphinx-book-theme.js"></script>
+    <script src="_static/documentation_options.js?v=a1c85040"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'tut_parallel_mode';</script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -405,7 +404,7 @@ document.write(`
                 <article class="bd-article" role="main">
                   
   <section id="parallel-mode">
-<span id="tut-parallel-mode"></span><h1>Parallel mode<a class="headerlink" href="#parallel-mode" title="Permalink to this heading">#</a></h1>
+<span id="tut-parallel-mode"></span><h1>Parallel mode<a class="headerlink" href="#parallel-mode" title="Link to this heading">#</a></h1>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 0.18.0.</span></p>
 </div>
@@ -429,7 +428,7 @@ due to the fact that arithmetic operations on extended-precision operands
 are computationally heavier than on double-precision operands.</p>
 <p>With these caveats out of the way, let us see an example of parallel mode in action.</p>
 <section id="parallel-planetary-embryos">
-<h2>Parallel planetary embryos<a class="headerlink" href="#parallel-planetary-embryos" title="Permalink to this heading">#</a></h2>
+<h2>Parallel planetary embryos<a class="headerlink" href="#parallel-planetary-embryos" title="Link to this heading">#</a></h2>
 <p>In order to illustrate the effectiveness of parallel mode, we will setup
 an N-body system consisting of a large number (<span class="math notranslate nohighlight">\(N=400\)</span>) of
 <a class="reference external" href="https://en.wikipedia.org/wiki/Protoplanet">protoplanets</a> in orbit around
@@ -551,7 +550,7 @@ for large ODE systems. For double-precision computations the speedup is suboptim
 usage of Taylor integrators. For quadruple-precision computations, the speedup is close to optimal.</p>
 </section>
 <section id="full-code-listing">
-<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this heading">#</a></h2>
+<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Link to this heading">#</a></h2>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;chrono&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cmath&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>

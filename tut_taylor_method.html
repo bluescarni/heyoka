@@ -1,13 +1,12 @@
 
-
 <!DOCTYPE html>
 
 
-<html lang="en" data-content_root="" >
+<html lang="en" data-content_root="./" >
 
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>Taylor’s method &#8212; heyoka 4.0.0 documentation</title>
   
@@ -29,18 +28,18 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
 
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=384b581d" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
   <script src="_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
 
-    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-    <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx_highlight.js"></script>
-    <script src="_static/scripts/sphinx-book-theme.js"></script>
+    <script src="_static/documentation_options.js?v=a1c85040"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'tut_taylor_method';</script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -394,27 +393,27 @@ document.write(`
                 <article class="bd-article" role="main">
                   
   <section id="taylor-s-method">
-<span id="tut-taylor-method"></span><h1>Taylor’s method<a class="headerlink" href="#taylor-s-method" title="Permalink to this heading">#</a></h1>
+<span id="tut-taylor-method"></span><h1>Taylor’s method<a class="headerlink" href="#taylor-s-method" title="Link to this heading">#</a></h1>
 <p>Taylor’s method for solving systems of ordinary differential equations
 (ODEs) is conceptually simple. Given an ODE system in the general
 explicit from</p>
 <div class="math notranslate nohighlight" id="equation-ode-sys-00">
-<span class="eqno">(1)<a class="headerlink" href="#equation-ode-sys-00" title="Permalink to this equation">#</a></span>\[\frac{d \boldsymbol{x}\left( t \right)}{dt}=\boldsymbol{F}\left(t, \boldsymbol{x}\left( t \right) \right),\]</div>
+<span class="eqno">(1)<a class="headerlink" href="#equation-ode-sys-00" title="Link to this equation">#</a></span>\[\frac{d \boldsymbol{x}\left( t \right)}{dt}=\boldsymbol{F}\left(t, \boldsymbol{x}\left( t \right) \right),\]</div>
 <p>with initial conditions at <span class="math notranslate nohighlight">\(t=t_0\)</span></p>
 <div class="math notranslate nohighlight" id="equation-ic-00">
-<span class="eqno">(2)<a class="headerlink" href="#equation-ic-00" title="Permalink to this equation">#</a></span>\[\boldsymbol{x}_0=\boldsymbol{x}\left(t_0\right),\]</div>
+<span class="eqno">(2)<a class="headerlink" href="#equation-ic-00" title="Link to this equation">#</a></span>\[\boldsymbol{x}_0=\boldsymbol{x}\left(t_0\right),\]</div>
 <p>Taylor’s method approximates the value of the solution at <span class="math notranslate nohighlight">\(t=t_1\)</span> as the truncated Taylor series
 expansion of <span class="math notranslate nohighlight">\(\boldsymbol{x}\left( t \right)\)</span> around <span class="math notranslate nohighlight">\(t=t_0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-tts-00">
-<span class="eqno">(3)<a class="headerlink" href="#equation-tts-00" title="Permalink to this equation">#</a></span>\[\boldsymbol{x}\left( t_1 \right) = \boldsymbol{x}_0 + \boldsymbol{x}'\left(t_0\right)h
+<span class="eqno">(3)<a class="headerlink" href="#equation-tts-00" title="Link to this equation">#</a></span>\[\boldsymbol{x}\left( t_1 \right) = \boldsymbol{x}_0 + \boldsymbol{x}'\left(t_0\right)h
 +\frac{1}{2}\boldsymbol{x}''\left(t_0\right)h^2+\ldots+\frac{\boldsymbol{x}^{\left( p \right)}\left(t_0\right)}{p!}h^p.\]</div>
 <p>Here <span class="math notranslate nohighlight">\(h=t_1-t_0\)</span> is the integration timestep and <span class="math notranslate nohighlight">\(p\)</span> is the order of the Taylor method. Eq. <a class="reference internal" href="#equation-tts-00">(3)</a>
 can be rewritten in more compact form as</p>
 <div class="math notranslate nohighlight" id="equation-tts-01">
-<span class="eqno">(4)<a class="headerlink" href="#equation-tts-01" title="Permalink to this equation">#</a></span>\[\boldsymbol{x}\left( t_1 \right) = \sum_{n=0}^p \boldsymbol{x}^{\left[ n \right]} \left(t_0\right) h^n,\]</div>
+<span class="eqno">(4)<a class="headerlink" href="#equation-tts-01" title="Link to this equation">#</a></span>\[\boldsymbol{x}\left( t_1 \right) = \sum_{n=0}^p \boldsymbol{x}^{\left[ n \right]} \left(t_0\right) h^n,\]</div>
 <p>where we have defined</p>
 <div class="math notranslate nohighlight" id="equation-norm-d-00">
-<span class="eqno">(5)<a class="headerlink" href="#equation-norm-d-00" title="Permalink to this equation">#</a></span>\[\boldsymbol{x}^{\left[ n \right]}\left( t \right) = \frac{1}{n!}\boldsymbol{x}^{\left( n \right)}\left( t \right)\]</div>
+<span class="eqno">(5)<a class="headerlink" href="#equation-norm-d-00" title="Link to this equation">#</a></span>\[\boldsymbol{x}^{\left[ n \right]}\left( t \right) = \frac{1}{n!}\boldsymbol{x}^{\left( n \right)}\left( t \right)\]</div>
 <p>as the <em>normalised derivative</em> of order <span class="math notranslate nohighlight">\(n\)</span> of <span class="math notranslate nohighlight">\(\boldsymbol{x}\left( t \right)\)</span>.</p>
 <p>The derivatives appearing in the Taylor polynomial <a class="reference internal" href="#equation-tts-01">(4)</a> can be computed from the
 initial conditions <a class="reference internal" href="#equation-ic-00">(2)</a> and the right-hand side of the ODE system <a class="reference internal" href="#equation-ode-sys-00">(1)</a>.

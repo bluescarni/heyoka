@@ -1,13 +1,12 @@
 
-
 <!DOCTYPE html>
 
 
-<html lang="en" data-content_root="" >
+<html lang="en" data-content_root="./" >
 
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>Computations in arbitrary precision &#8212; heyoka 4.0.0 documentation</title>
   
@@ -29,18 +28,18 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
 
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=384b581d" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
   <script src="_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
 
-    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-    <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx_highlight.js"></script>
-    <script src="_static/scripts/sphinx-book-theme.js"></script>
+    <script src="_static/documentation_options.js?v=a1c85040"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'tut_arbitrary_precision';</script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -406,7 +405,7 @@ document.write(`
                 <article class="bd-article" role="main">
                   
   <section id="computations-in-arbitrary-precision">
-<span id="tut-arbitrary-precision"></span><h1>Computations in arbitrary precision<a class="headerlink" href="#computations-in-arbitrary-precision" title="Permalink to this heading">#</a></h1>
+<span id="tut-arbitrary-precision"></span><h1>Computations in arbitrary precision<a class="headerlink" href="#computations-in-arbitrary-precision" title="Link to this heading">#</a></h1>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 0.20.0.</span></p>
 </div>
@@ -425,7 +424,7 @@ of this class. For the purposes of this tutorial, it is sufficient to note how <
 behaves like a builtin floating-point type, the only difference being that the number of digits in the significand
 can be set at runtime.</p>
 <section id="a-simple-example">
-<h2>A simple example<a class="headerlink" href="#a-simple-example" title="Permalink to this heading">#</a></h2>
+<h2>A simple example<a class="headerlink" href="#a-simple-example" title="Link to this heading">#</a></h2>
 <p>In this tutorial, we will repeat the simple pendulum integration from the
 <a class="reference internal" href="tut_extended_precision.html#tut-extended-precision"><span class="std std-ref">extended-precision tutorial</span></a>, but this time
 in <a class="reference external" href="https://en.wikipedia.org/wiki/Octuple-precision_floating-point_format">octuple precision</a>.
@@ -561,14 +560,14 @@ and printing to screen the relative energy error:</p>
 format (that is, <span class="math notranslate nohighlight">\(\sim 10^{-71}\)</span>).</p>
 </section>
 <section id="other-classes-and-functions">
-<h2>Other classes and functions<a class="headerlink" href="#other-classes-and-functions" title="Permalink to this heading">#</a></h2>
+<h2>Other classes and functions<a class="headerlink" href="#other-classes-and-functions" title="Link to this heading">#</a></h2>
 <p>Besides the adaptive integrator, several other classes and functions in heyoka can be used in arbitrary precision.</p>
 <p>The <a class="reference internal" href="tut_events.html#tut-events"><span class="std std-ref">event classes</span></a>, for instance, can be constructed in arbitrary precision by passing <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v1.0.2)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a>
 as the template parameter (instead of <code class="docutils literal notranslate"><span class="pre">double</span></code>). Note that arbitrary-precision events <strong>must</strong> be used in an arbitrary-precision
 integrator, otherwise an error will be produced at compilation time.</p>
 </section>
 <section id="extended-vs-arbitrary-precision">
-<h2>Extended vs arbitrary precision<a class="headerlink" href="#extended-vs-arbitrary-precision" title="Permalink to this heading">#</a></h2>
+<h2>Extended vs arbitrary precision<a class="headerlink" href="#extended-vs-arbitrary-precision" title="Link to this heading">#</a></h2>
 <p>In general, if your architecture supports <a class="reference internal" href="tut_extended_precision.html#tut-extended-precision"><span class="std std-ref">extended-precision data types</span></a> and their precision
 is sufficient, you should prefer extended-precision integrations over arbitrary-precision integrations, as the former
 will provide better performance.</p>

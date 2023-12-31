@@ -1,13 +1,12 @@
 
-
 <!DOCTYPE html>
 
 
-<html lang="en" data-content_root="" >
+<html lang="en" data-content_root="./" >
 
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>Ensemble propagations &#8212; heyoka 4.0.0 documentation</title>
   
@@ -29,18 +28,18 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
 
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=384b581d" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
   <script src="_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
 
-    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-    <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx_highlight.js"></script>
-    <script src="_static/scripts/sphinx-book-theme.js"></script>
+    <script src="_static/documentation_options.js?v=a1c85040"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'tut_ensemble';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -404,7 +403,7 @@ document.write(`
                 <article class="bd-article" role="main">
                   
   <section id="ensemble-propagations">
-<span id="tut-ensemble"></span><h1>Ensemble propagations<a class="headerlink" href="#ensemble-propagations" title="Permalink to this heading">#</a></h1>
+<span id="tut-ensemble"></span><h1>Ensemble propagations<a class="headerlink" href="#ensemble-propagations" title="Link to this heading">#</a></h1>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 0.17.0.</span></p>
 </div>
@@ -435,7 +434,7 @@ should be straightforward.</p>
 of execution to achieve parallelisation. In the future, additional parallelisation
 modes (e.g., multiprocessing, distributed) may be added.</p>
 <section id="a-simple-example">
-<h2>A simple example<a class="headerlink" href="#a-simple-example" title="Permalink to this heading">#</a></h2>
+<h2>A simple example<a class="headerlink" href="#a-simple-example" title="Link to this heading">#</a></h2>
 <p>As usual, for this illustrative tutorial we will be using the ODEs of the simple pendulum.
 Thus, let us begin
 with the definition of the symbolic variables and of an integrator object:</p>
@@ -548,7 +547,7 @@ first object of the ninth tuple in the return value:</p>
 </div>
 </section>
 <section id="thread-safety-considerations">
-<h2>Thread safety considerations<a class="headerlink" href="#thread-safety-considerations" title="Permalink to this heading">#</a></h2>
+<h2>Thread safety considerations<a class="headerlink" href="#thread-safety-considerations" title="Link to this heading">#</a></h2>
 <p>Because currently ensemble propagations always use thread-based parallelism,
 it is important to ensure that all the objects involved in an ensemble propagation
 provide a certain degree of thread safety. This concerns

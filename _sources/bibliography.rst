@@ -1,4 +1,4 @@
-.. only:: html or text
+.. only:: html or text or linkcheck
 
    Bibliography
    ============

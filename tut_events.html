@@ -1,13 +1,12 @@
 
-
 <!DOCTYPE html>
 
 
-<html lang="en" data-content_root="" >
+<html lang="en" data-content_root="./" >
 
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>Event detection &#8212; heyoka 4.0.0 documentation</title>
   
@@ -29,18 +28,18 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
 
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=384b581d" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
   <script src="_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
 
-    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-    <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx_highlight.js"></script>
-    <script src="_static/scripts/sphinx-book-theme.js"></script>
+    <script src="_static/documentation_options.js?v=a1c85040"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'tut_events';</script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -418,7 +417,7 @@ document.write(`
                 <article class="bd-article" role="main">
                   
   <section id="event-detection">
-<span id="tut-events"></span><h1>Event detection<a class="headerlink" href="#event-detection" title="Permalink to this heading">#</a></h1>
+<span id="tut-events"></span><h1>Event detection<a class="headerlink" href="#event-detection" title="Link to this heading">#</a></h1>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 0.6.0.</span></p>
 </div>
@@ -447,7 +446,7 @@ on the Taylor series of the event equations to accurately locate the time of occ
 <p>Like many other ODE integration libraries, heyoka makes a fundamental distinction between two types of events, <em>terminal</em> and <em>non-terminal</em>.
 We will begin with non-terminal events, as they are conceptually simpler.</p>
 <section id="non-terminal-events">
-<h2>Non-terminal events<a class="headerlink" href="#non-terminal-events" title="Permalink to this heading">#</a></h2>
+<h2>Non-terminal events<a class="headerlink" href="#non-terminal-events" title="Link to this heading">#</a></h2>
 <p>Non-terminal events are events that do not modify the state of an ODE system. That is, the occurrence of a non-terminal event does not
 change the system’s dynamics and it does not alter the state vector of the system. A typical use of non-terminal events is to detect and log
 when the system reaches a particular state of interest (e.g., flagging close encounters between celestial bodies, detecting when
@@ -578,7 +577,7 @@ initial conditions of this example, <span class="math notranslate nohighlight">\
 we can see from the event times printed to screen
 how the event detection system was accurate to machine precision.</p>
 <section id="event-direction">
-<h3>Event direction<a class="headerlink" href="#event-direction" title="Permalink to this heading">#</a></h3>
+<h3>Event direction<a class="headerlink" href="#event-direction" title="Link to this heading">#</a></h3>
 <p>By default, heyoka will detect all zeroes of the event equations regardless
 of the <em>direction</em> of the zero crossing (i.e., the value of the time derivative
 of the event equation at the zero). However, it is sometimes useful to trigger the detection
@@ -624,7 +623,7 @@ that the event is detected only when <span class="math notranslate nohighlight">
 at <span class="math notranslate nohighlight">\(t=0\)</span>, <span class="math notranslate nohighlight">\(t=T\)</span> and <span class="math notranslate nohighlight">\(t=2T\)</span>.</p>
 </section>
 <section id="multiple-events">
-<h3>Multiple events<a class="headerlink" href="#multiple-events" title="Permalink to this heading">#</a></h3>
+<h3>Multiple events<a class="headerlink" href="#multiple-events" title="Link to this heading">#</a></h3>
 <p>When multiple events trigger within the same timestep (or if the same event triggers
 multiple times), heyoka will process the events in chronological order
 (or reverse chronological order when integrating backwards in time).</p>
@@ -680,7 +679,7 @@ successfully recognize the second event triggering twice in close succession.</p
 </section>
 </section>
 <section id="terminal-events">
-<h2>Terminal events<a class="headerlink" href="#terminal-events" title="Permalink to this heading">#</a></h2>
+<h2>Terminal events<a class="headerlink" href="#terminal-events" title="Link to this heading">#</a></h2>
 <p>The fundamental characteristic of terminal events is that, in contrast to non-terminal events,
 they alter the dynamics and/or the state of the system. A typical example of a terminal event is the
 <a class="reference external" href="https://en.wikipedia.org/wiki/Elastic_collision">elastic collision</a> of
@@ -838,7 +837,7 @@ execution of the callback:</p>
 of the angle and angular velocity throughout the integration show how the drag coefficient (which was on roughly
 for half of the total integration time) progressively slowed the bob down.</p>
 <section id="cooldown">
-<span id="tut-t-event-cooldown"></span><h3>Cooldown<a class="headerlink" href="#cooldown" title="Permalink to this heading">#</a></h3>
+<span id="tut-t-event-cooldown"></span><h3>Cooldown<a class="headerlink" href="#cooldown" title="Link to this heading">#</a></h3>
 <p>One notable complication when restarting an integration that was stopped in correspondence of a terminal event
 is the risk of immediately re-triggering the same event, which would lead to an endless loop without any progress
 being made in the integration. This phenomenon is sometimes called <em>discontinuity sticking</em> in the literature.</p>
@@ -868,9 +867,9 @@ all terminal events.</p>
 </section>
 </section>
 <section id="limitations-and-caveats">
-<h2>Limitations and caveats<a class="headerlink" href="#limitations-and-caveats" title="Permalink to this heading">#</a></h2>
+<h2>Limitations and caveats<a class="headerlink" href="#limitations-and-caveats" title="Link to this heading">#</a></h2>
 <section id="badly-conditioned-event-equations">
-<h3>Badly-conditioned event equations<a class="headerlink" href="#badly-conditioned-event-equations" title="Permalink to this heading">#</a></h3>
+<h3>Badly-conditioned event equations<a class="headerlink" href="#badly-conditioned-event-equations" title="Link to this heading">#</a></h3>
 <p>Because heyoka’s event detection system is based on polynomial root finding techniques, it will experience
 issues when the Taylor series of the event equations have roots of multiplicity greater than 1. This is usually
 not a problem in practice, unless the event equations are written in such a way to always generate polynomials
@@ -889,7 +888,7 @@ are stationary points.</p>
 <p>Note that missed events due to badly-conditioned polynomials will likely be flagged by heyoka’s logging system.</p>
 </section>
 <section id="event-equations-and-timestepping">
-<h3>Event equations and timestepping<a class="headerlink" href="#event-equations-and-timestepping" title="Permalink to this heading">#</a></h3>
+<h3>Event equations and timestepping<a class="headerlink" href="#event-equations-and-timestepping" title="Link to this heading">#</a></h3>
 <p>As explained earlier, the differential equations of the events are added to the ODE system and
 integrated together with the original equations. Because of this, event equations influence the
 selection of the adaptive timestep, even if no event is ever detected throughout the integration.</p>
@@ -903,7 +902,7 @@ will inevitably slow down also the propagation of the ODEs.</p>
 </section>
 </section>
 <section id="full-code-listing">
-<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this heading">#</a></h2>
+<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Link to this heading">#</a></h2>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
 
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span>

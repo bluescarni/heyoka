@@ -1,13 +1,12 @@
 
-
 <!DOCTYPE html>
 
 
-<html lang="en" data-content_root="" >
+<html lang="en" data-content_root="./" >
 
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>Serialisation &#8212; heyoka 4.0.0 documentation</title>
   
@@ -29,18 +28,18 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
 
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=384b581d" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
   <script src="_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
 
-    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-    <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx_highlight.js"></script>
-    <script src="_static/scripts/sphinx-book-theme.js"></script>
+    <script src="_static/documentation_options.js?v=a1c85040"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'tut_s11n';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -410,7 +409,7 @@ document.write(`
                 <article class="bd-article" role="main">
                   
   <section id="serialisation">
-<span id="tut-s11n"></span><h1>Serialisation<a class="headerlink" href="#serialisation" title="Permalink to this heading">#</a></h1>
+<span id="tut-s11n"></span><h1>Serialisation<a class="headerlink" href="#serialisation" title="Link to this heading">#</a></h1>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 0.12.0.</span></p>
 </div>
@@ -445,7 +444,7 @@ LLVM and Boost that you are currently using.</p>
 </div>
 <p>With these warnings out of the way, let us proceed to the code.</p>
 <section id="a-simple-example">
-<h2>A simple example<a class="headerlink" href="#a-simple-example" title="Permalink to this heading">#</a></h2>
+<h2>A simple example<a class="headerlink" href="#a-simple-example" title="Link to this heading">#</a></h2>
 <p>In order to illustrate the (de)serialisation workflow, we will be using
 our good old friend, the simple pendulum. We begin as usual with the definition
 of the symbolic variables and the integrator object:</p>
@@ -531,7 +530,7 @@ indeed, the previous state of <code class="docutils literal notranslate"><span c
 </pre></div>
 </div>
 <section id="full-code-listing">
-<h3>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this heading">#</a></h3>
+<h3>Full code listing<a class="headerlink" href="#full-code-listing" title="Link to this heading">#</a></h3>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;sstream&gt;</span>
 
@@ -593,7 +592,7 @@ indeed, the previous state of <code class="docutils literal notranslate"><span c
 </section>
 </section>
 <section id="serialising-event-callbacks">
-<h2>Serialising event callbacks<a class="headerlink" href="#serialising-event-callbacks" title="Permalink to this heading">#</a></h2>
+<h2>Serialising event callbacks<a class="headerlink" href="#serialising-event-callbacks" title="Link to this heading">#</a></h2>
 <p>The serialisation of integrator objects in the presence
 of <a class="reference internal" href="tut_events.html#tut-events"><span class="std std-ref">events</span></a> needs special attention, because
 the event callbacks are internally implemented as type-erased classes
@@ -697,7 +696,7 @@ example, again based on the simple pendulum:</p>
 If we had not used the <code class="docutils literal notranslate"><span class="pre">HEYOKA_S11N_CALLABLE_EXPORT()</span></code> macro to register the callback, a runtime
 exception would have been raised during the serialisation of the integrator object.</p>
 <section id="id1">
-<h3>Full code listing<a class="headerlink" href="#id1" title="Permalink to this heading">#</a></h3>
+<h3>Full code listing<a class="headerlink" href="#id1" title="Link to this heading">#</a></h3>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;sstream&gt;</span>
 

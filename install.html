@@ -1,13 +1,12 @@
 
-
 <!DOCTYPE html>
 
 
-<html lang="en" data-content_root="" >
+<html lang="en" data-content_root="./" >
 
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>Installation &#8212; heyoka 4.0.0 documentation</title>
   
@@ -29,18 +28,18 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
 
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=384b581d" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
   <script src="_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
 
-    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-    <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx_highlight.js"></script>
-    <script src="_static/scripts/sphinx-book-theme.js"></script>
+    <script src="_static/documentation_options.js?v=a1c85040"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'install';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -418,9 +417,9 @@ document.write(`
                 <article class="bd-article" role="main">
                   
   <section id="installation">
-<span id="id1"></span><h1>Installation<a class="headerlink" href="#installation" title="Permalink to this heading">#</a></h1>
+<span id="id1"></span><h1>Installation<a class="headerlink" href="#installation" title="Link to this heading">#</a></h1>
 <section id="introduction">
-<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading">#</a></h2>
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">#</a></h2>
 <p>heyoka is written in modern C++, and it requires a compiler able to understand
 at least C++20. Specifically, heyoka currently targets GCC&gt;=10, clang&gt;=14 and MSVC&gt;=2022.
 The library is regularly tested on a continuous integration pipeline
@@ -461,12 +460,12 @@ that may be present on the system. This situation can lead to build and/or runti
 to the same {fmt} installation.</p>
 </div>
 <section id="support-for-extended-precision">
-<span id="ep-support"></span><h3>Support for extended precision<a class="headerlink" href="#support-for-extended-precision" title="Permalink to this heading">#</a></h3>
+<span id="ep-support"></span><h3>Support for extended precision<a class="headerlink" href="#support-for-extended-precision" title="Link to this heading">#</a></h3>
 <p>Whereas in heyoka single-precision and double-precision computations are always supported via the
 <code class="docutils literal notranslate"><span class="pre">float</span></code> and <code class="docutils literal notranslate"><span class="pre">double</span></code> types respectively, support for extended-precision
 computations varies depending on the software/hardware platform.</p>
 <section id="bit-precision">
-<h4>80-bit precision<a class="headerlink" href="#bit-precision" title="Permalink to this heading">#</a></h4>
+<h4>80-bit precision<a class="headerlink" href="#bit-precision" title="Link to this heading">#</a></h4>
 <p>80-bit precision support requires an x86 processor. Additionally, the 80-bit floating-point
 type must be available in C++ as the <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> type. This is case for most compilers,
 with the notable exception of Microsoft Visual C++ (MSVC), where <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> is a synonym for <code class="docutils literal notranslate"><span class="pre">double</span></code>.
@@ -475,7 +474,7 @@ heyoka (and all its dependencies) have been compiled with a compiler supporting 
 80-bit floating-point type.</p>
 </section>
 <section id="id2">
-<h4>128-bit precision<a class="headerlink" href="#id2" title="Permalink to this heading">#</a></h4>
+<h4>128-bit precision<a class="headerlink" href="#id2" title="Link to this heading">#</a></h4>
 <p>On platforms where <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> is a quadruple-precision floating-point datatype (e.g., 64-bit ARM),
 quadruple-precision integrations are always supported via <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code>. Otherwise,
 on platforms such as x86-64, quadruple-precision computations are supported if:</p>
@@ -497,7 +496,7 @@ significant bits) is <strong>not</strong> supported by heyoka at this time.</p>
 </div>
 </section>
 <section id="arbitrary-precision">
-<h4>Arbitrary-precision<a class="headerlink" href="#arbitrary-precision" title="Permalink to this heading">#</a></h4>
+<h4>Arbitrary-precision<a class="headerlink" href="#arbitrary-precision" title="Link to this heading">#</a></h4>
 <p>Arbitrary-precision integrations are supported on all platforms, provided that heyoka
 is compiled with the <code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_MPPP</span></code> option enabled (see <a class="reference internal" href="#installation-from-source"><span class="std std-ref">below</span></a>)
 and that the mp++ library is compiled with the <code class="docutils literal notranslate"><span class="pre">MPPP_WITH_MPFR</span></code> option enabled
@@ -506,9 +505,9 @@ and that the mp++ library is compiled with the <code class="docutils literal not
 </section>
 </section>
 <section id="packages">
-<h2>Packages<a class="headerlink" href="#packages" title="Permalink to this heading">#</a></h2>
+<h2>Packages<a class="headerlink" href="#packages" title="Link to this heading">#</a></h2>
 <section id="conda">
-<h3>Conda<a class="headerlink" href="#conda" title="Permalink to this heading">#</a></h3>
+<h3>Conda<a class="headerlink" href="#conda" title="Link to this heading">#</a></h3>
 <p>heyoka is available via the <a class="reference external" href="https://docs.conda.io/en/latest/">conda</a> package manager for Linux, OSX and Windows
 thanks to the infrastructure provided by <a class="reference external" href="https://conda-forge.org/">conda-forge</a>.</p>
 <p>In order to install heyoka via conda, you just need to add <code class="docutils literal notranslate"><span class="pre">conda-forge</span></code>
@@ -534,7 +533,7 @@ on how to setup and manage
 your conda installation.</p>
 </section>
 <section id="freebsd">
-<h3>FreeBSD<a class="headerlink" href="#freebsd" title="Permalink to this heading">#</a></h3>
+<h3>FreeBSD<a class="headerlink" href="#freebsd" title="Link to this heading">#</a></h3>
 <p>A community-supported FreeBSD port via <a class="reference external" href="https://docs.freebsd.org/en/books/handbook/ports/#pkgng-intro">pkg</a> is available for
 heyoka. In order to install heyoka using pkg, execute the following command:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pkg<span class="w"> </span>install<span class="w"> </span>heyoka
@@ -543,7 +542,7 @@ heyoka. In order to install heyoka using pkg, execute the following command:</p>
 </section>
 </section>
 <section id="installation-from-source">
-<span id="id3"></span><h2>Installation from source<a class="headerlink" href="#installation-from-source" title="Permalink to this heading">#</a></h2>
+<span id="id3"></span><h2>Installation from source<a class="headerlink" href="#installation-from-source" title="Link to this heading">#</a></h2>
 <p>Source releases of heyoka can be downloaded from
 <a class="reference external" href="https://github.com/bluescarni/heyoka/releases">github</a>.
 Once in the source tree
@@ -613,7 +612,7 @@ DLL (otherwise the tests will fail to run).</p>
 </div>
 </section>
 <section id="including-heyoka-in-your-project-via-cmake">
-<h2>Including heyoka in your project via CMake<a class="headerlink" href="#including-heyoka-in-your-project-via-cmake" title="Permalink to this heading">#</a></h2>
+<h2>Including heyoka in your project via CMake<a class="headerlink" href="#including-heyoka-in-your-project-via-cmake" title="Link to this heading">#</a></h2>
 <p>As a part of the heyoka installation, a group of CMake files is installed into
 <code class="docutils literal notranslate"><span class="pre">CMAKE_INSTALL_PREFIX/lib/cmake/heyoka</span></code>.
 This bundle, which is known in the CMake lingo as a

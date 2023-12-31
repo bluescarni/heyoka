@@ -1,13 +1,12 @@
 
-
 <!DOCTYPE html>
 
 
-<html lang="en" data-content_root="" >
+<html lang="en" data-content_root="./" >
 
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>Macros and definitions &#8212; heyoka 4.0.0 documentation</title>
   
@@ -29,18 +28,18 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
 
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=384b581d" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
   <script src="_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
 
-    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-    <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx_highlight.js"></script>
-    <script src="_static/scripts/sphinx-book-theme.js"></script>
+    <script src="_static/documentation_options.js?v=a1c85040"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'definitions';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -393,57 +392,57 @@ document.write(`
                 <article class="bd-article" role="main">
                   
   <section id="macros-and-definitions">
-<h1>Macros and definitions<a class="headerlink" href="#macros-and-definitions" title="Permalink to this heading">#</a></h1>
+<h1>Macros and definitions<a class="headerlink" href="#macros-and-definitions" title="Link to this heading">#</a></h1>
 <p><em>#include &lt;heyoka/config.hpp&gt;</em></p>
 <dl class="c macro">
 <dt class="sig sig-object c" id="c.HEYOKA_VERSION_STRING">
-<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_VERSION_STRING</span></span></span><a class="headerlink" href="#c.HEYOKA_VERSION_STRING" title="Permalink to this definition">#</a><br /></dt>
+<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_VERSION_STRING</span></span></span><a class="headerlink" href="#c.HEYOKA_VERSION_STRING" title="Link to this definition">#</a><br /></dt>
 <dd><p>This definition expands to a string literal containing the full version of the heyoka library
 (e.g., for version 1.2.3 this macro expands to <code class="docutils literal notranslate"><span class="pre">&quot;1.2.3&quot;</span></code>).</p>
 </dd></dl>
 
 <dl class="c macro">
 <dt class="sig sig-object c" id="c.HEYOKA_VERSION_MAJOR">
-<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_VERSION_MAJOR</span></span></span><a class="headerlink" href="#c.HEYOKA_VERSION_MAJOR" title="Permalink to this definition">#</a><br /></dt>
+<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_VERSION_MAJOR</span></span></span><a class="headerlink" href="#c.HEYOKA_VERSION_MAJOR" title="Link to this definition">#</a><br /></dt>
 <dd><p>This definition expands to an integral literal corresponding to heyoka’s major version number (e.g.,
 for version 1.2.3, this macro expands to <code class="docutils literal notranslate"><span class="pre">1</span></code>).</p>
 </dd></dl>
 
 <dl class="c macro">
 <dt class="sig sig-object c" id="c.HEYOKA_VERSION_MINOR">
-<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_VERSION_MINOR</span></span></span><a class="headerlink" href="#c.HEYOKA_VERSION_MINOR" title="Permalink to this definition">#</a><br /></dt>
+<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_VERSION_MINOR</span></span></span><a class="headerlink" href="#c.HEYOKA_VERSION_MINOR" title="Link to this definition">#</a><br /></dt>
 <dd><p>This definition expands to an integral literal corresponding to heyoka’s minor version number (e.g.,
 for version 1.2.3, this macro expands to <code class="docutils literal notranslate"><span class="pre">2</span></code>).</p>
 </dd></dl>
 
 <dl class="c macro">
 <dt class="sig sig-object c" id="c.HEYOKA_VERSION_PATCH">
-<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_VERSION_PATCH</span></span></span><a class="headerlink" href="#c.HEYOKA_VERSION_PATCH" title="Permalink to this definition">#</a><br /></dt>
+<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_VERSION_PATCH</span></span></span><a class="headerlink" href="#c.HEYOKA_VERSION_PATCH" title="Link to this definition">#</a><br /></dt>
 <dd><p>This definition expands to an integral literal corresponding to heyoka’s patch version number (e.g.,
 for version 1.2.3, this macro expands to <code class="docutils literal notranslate"><span class="pre">3</span></code>).</p>
 </dd></dl>
 
 <dl class="c macro">
 <dt class="sig sig-object c" id="c.HEYOKA_WITH_MPPP">
-<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_WITH_MPPP</span></span></span><a class="headerlink" href="#c.HEYOKA_WITH_MPPP" title="Permalink to this definition">#</a><br /></dt>
+<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_WITH_MPPP</span></span></span><a class="headerlink" href="#c.HEYOKA_WITH_MPPP" title="Link to this definition">#</a><br /></dt>
 <dd><p>This name is defined if heyoka was built with support for the mp++ library (see the <a class="reference internal" href="install.html#installation"><span class="std std-ref">installation instructions</span></a>).</p>
 </dd></dl>
 
 <dl class="c macro">
 <dt class="sig sig-object c" id="c.HEYOKA_WITH_REAL128">
-<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_WITH_REAL128</span></span></span><a class="headerlink" href="#c.HEYOKA_WITH_REAL128" title="Permalink to this definition">#</a><br /></dt>
+<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_WITH_REAL128</span></span></span><a class="headerlink" href="#c.HEYOKA_WITH_REAL128" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
 
 <dl class="c macro">
 <dt class="sig sig-object c" id="c.HEYOKA_WITH_REAL">
-<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_WITH_REAL</span></span></span><a class="headerlink" href="#c.HEYOKA_WITH_REAL" title="Permalink to this definition">#</a><br /></dt>
+<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_WITH_REAL</span></span></span><a class="headerlink" href="#c.HEYOKA_WITH_REAL" title="Link to this definition">#</a><br /></dt>
 <dd><p>These names are defined if heyoka was built with support for, respectively, the <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.2)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">real128</span></code></a> and <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v1.0.2)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">real</span></code></a> classes from
 the mp++ library (see the <a class="reference internal" href="install.html#installation"><span class="std std-ref">installation instructions</span></a>).</p>
 </dd></dl>
 
 <dl class="c macro">
 <dt class="sig sig-object c" id="c.HEYOKA_WITH_SLEEF">
-<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_WITH_SLEEF</span></span></span><a class="headerlink" href="#c.HEYOKA_WITH_SLEEF" title="Permalink to this definition">#</a><br /></dt>
+<span class="sig-name descname"><span class="n"><span class="pre">HEYOKA_WITH_SLEEF</span></span></span><a class="headerlink" href="#c.HEYOKA_WITH_SLEEF" title="Link to this definition">#</a><br /></dt>
 <dd><p>This name is defined if heyoka was built with support for the SLEEF library (see the <a class="reference internal" href="install.html#installation"><span class="std std-ref">installation instructions</span></a>).</p>
 </dd></dl>
 

@@ -1,13 +1,12 @@
 
-
 <!DOCTYPE html>
 
 
-<html lang="en" data-content_root="" >
+<html lang="en" data-content_root="./" >
 
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>The adaptive integrator &#8212; heyoka 4.0.0 documentation</title>
   
@@ -29,18 +28,18 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
 
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=384b581d" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
   <script src="_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
 
-    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-    <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx_highlight.js"></script>
-    <script src="_static/scripts/sphinx-book-theme.js"></script>
+    <script src="_static/documentation_options.js?v=a1c85040"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'tut_adaptive';</script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -409,7 +408,7 @@ document.write(`
                 <article class="bd-article" role="main">
                   
   <section id="the-adaptive-integrator">
-<span id="tut-adaptive"></span><h1>The adaptive integrator<a class="headerlink" href="#the-adaptive-integrator" title="Permalink to this heading">#</a></h1>
+<span id="tut-adaptive"></span><h1>The adaptive integrator<a class="headerlink" href="#the-adaptive-integrator" title="Link to this heading">#</a></h1>
 <p>The <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> class provides an easy-to-use interface to heyoka’s
 main capabilities. Objects of this class can be constructed from a system
 of ODEs and a set of initial conditions (plus a number of optional configuration parameters
@@ -430,7 +429,7 @@ x\left( 0 \right) = 0.05 \\
 v\left( 0 \right) = 0.025
 \end{cases}\end{split}\]</div>
 <section id="construction">
-<h2>Construction<a class="headerlink" href="#construction" title="Permalink to this heading">#</a></h2>
+<h2>Construction<a class="headerlink" href="#construction" title="Link to this heading">#</a></h2>
 <p>Here’s the code:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create the symbolic variables x and v.</span>
 <span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;v&quot;</span><span class="p">);</span>
@@ -478,7 +477,7 @@ Both the state vector and the time variable are updated automatically by the tim
 functions. Note also how, by default, the time variable is initially set to zero.</p>
 </section>
 <section id="single-timestep">
-<h2>Single timestep<a class="headerlink" href="#single-timestep" title="Permalink to this heading">#</a></h2>
+<h2>Single timestep<a class="headerlink" href="#single-timestep" title="Link to this heading">#</a></h2>
 <p>Let us now try to perform a single integration timestep:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Perform a single step.</span>
 <span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">oc</span><span class="p">,</span><span class="w"> </span><span class="n">h</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">();</span>
@@ -568,7 +567,7 @@ are not affected by this issue.</p>
 </div>
 </section>
 <section id="accessing-state-and-time">
-<h2>Accessing state and time<a class="headerlink" href="#accessing-state-and-time" title="Permalink to this heading">#</a></h2>
+<h2>Accessing state and time<a class="headerlink" href="#accessing-state-and-time" title="Link to this heading">#</a></h2>
 <p>It is possible to read from and write to both the time variable and the state
 vector. The <code class="docutils literal notranslate"><span class="pre">get_time()</span></code>/<code class="docutils literal notranslate"><span class="pre">set_time()</span></code> functions can be used to access
 the time variable, while the <code class="docutils literal notranslate"><span class="pre">get_state()</span></code> and <code class="docutils literal notranslate"><span class="pre">get_state_data()</span></code>
@@ -590,7 +589,7 @@ holding the integrator state, while <code class="docutils literal notranslate"><
 to the state data. Only <code class="docutils literal notranslate"><span class="pre">get_state_data()</span></code> can be used to mutate the state.</p>
 </section>
 <section id="time-limited-propagation">
-<span id="tlimited-prop"></span><h2>Time-limited propagation<a class="headerlink" href="#time-limited-propagation" title="Permalink to this heading">#</a></h2>
+<span id="tlimited-prop"></span><h2>Time-limited propagation<a class="headerlink" href="#time-limited-propagation" title="Link to this heading">#</a></h2>
 <p>In addition to the step-by-step integration functions,
 <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> also provides functions to propagate
 the state of the system for a specified amount of time.
@@ -711,7 +710,7 @@ and they are returned as the sixth member of the return tuple;</p>
 </ul>
 </section>
 <section id="propagation-over-a-time-grid">
-<h2>Propagation over a time grid<a class="headerlink" href="#propagation-over-a-time-grid" title="Permalink to this heading">#</a></h2>
+<h2>Propagation over a time grid<a class="headerlink" href="#propagation-over-a-time-grid" title="Link to this heading">#</a></h2>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 0.4.0.</span></p>
 </div>
@@ -799,7 +798,7 @@ and they are returned as the fifth member of the return tuple.</p>
 </ul>
 </section>
 <section id="full-code-listing">
-<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this heading">#</a></h2>
+<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Link to this heading">#</a></h2>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
 
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span>

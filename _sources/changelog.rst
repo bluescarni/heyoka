@@ -7,12 +7,16 @@ Changelog
 New
 ~~~
 
+- Add support for Lagrangian and Hamiltonian mechanics
+  (`#379 <https://github.com/bluescarni/heyoka/pull/379>`__).
 - It is now possible to pass a range of step callbacks to the
   ``propagate_*()`` functions. The individual callbacks will be
   automatically composed into a callback set
   (`#376 <https://github.com/bluescarni/heyoka/pull/376>`__).
 - New ``angle_reducer`` step callback to automatically reduce
   angular state variables to the :math:`\left[0, 2\pi\right)` range
+  (`#376 <https://github.com/bluescarni/heyoka/pull/376>`__).
+- New ``callback`` module containing ready-made step and event callbacks
   (`#376 <https://github.com/bluescarni/heyoka/pull/376>`__).
 
 Changes

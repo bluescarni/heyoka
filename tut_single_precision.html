@@ -1,13 +1,12 @@
 
-
 <!DOCTYPE html>
 
 
-<html lang="en" data-content_root="" >
+<html lang="en" data-content_root="./" >
 
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>Computations in single precision &#8212; heyoka 4.0.0 documentation</title>
   
@@ -29,18 +28,18 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-brands-400.woff2" />
 <link rel="preload" as="font" type="font/woff2" crossorigin href="_static/vendor/fontawesome/6.1.2/webfonts/fa-regular-400.woff2" />
 
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=384b581d" />
   
   <!-- Pre-loaded scripts that we'll load fully later -->
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=5b4479735964841361fd" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=5b4479735964841361fd" />
   <script src="_static/vendor/fontawesome/6.1.2/js/all.min.js?digest=5b4479735964841361fd"></script>
 
-    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-    <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx_highlight.js"></script>
-    <script src="_static/scripts/sphinx-book-theme.js"></script>
+    <script src="_static/documentation_options.js?v=a1c85040"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'tut_single_precision';</script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -406,7 +405,7 @@ document.write(`
                 <article class="bd-article" role="main">
                   
   <section id="computations-in-single-precision">
-<span id="tut-single-precision"></span><h1>Computations in single precision<a class="headerlink" href="#computations-in-single-precision" title="Permalink to this heading">#</a></h1>
+<span id="tut-single-precision"></span><h1>Computations in single precision<a class="headerlink" href="#computations-in-single-precision" title="Link to this heading">#</a></h1>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 3.2.0.</span></p>
 </div>
@@ -426,7 +425,7 @@ Correspondingly, and similarly to what explained in the <a class="reference inte
 tutorial, single-precision computations are activated by passing the <code class="docutils literal notranslate"><span class="pre">float</span></code> template parameter to functions
 and classes in the heyoka API.</p>
 <section id="a-simple-example">
-<h2>A simple example<a class="headerlink" href="#a-simple-example" title="Permalink to this heading">#</a></h2>
+<h2>A simple example<a class="headerlink" href="#a-simple-example" title="Link to this heading">#</a></h2>
 <p>In order to verify that heyoka indeed is able to work in single precision, we will be monitoring the evolution of the energy constant
 in a low-precision numerical integration of the simple pendulum.</p>
 <p>Let us begin as usual with the definition of the dynamical equations and the creation of the integrator object:</p>
@@ -505,7 +504,7 @@ and printing to screen the relative energy error:</p>
 single-precision format (that is, <span class="math notranslate nohighlight">\(\sim 10^{-7}\)</span>).</p>
 </section>
 <section id="other-classes-and-functions">
-<h2>Other classes and functions<a class="headerlink" href="#other-classes-and-functions" title="Permalink to this heading">#</a></h2>
+<h2>Other classes and functions<a class="headerlink" href="#other-classes-and-functions" title="Link to this heading">#</a></h2>
 <p>Besides the adaptive integrator, several other classes and functions in heyoka can be used in single precision.</p>
 <p>The <a class="reference internal" href="tut_events.html#tut-events"><span class="std std-ref">event classes</span></a>, for instance, can be constructed in single precision by passing <code class="docutils literal notranslate"><span class="pre">float</span></code>
 as the template parameter (instead of <code class="docutils literal notranslate"><span class="pre">double</span></code>). Note that the precision of an event
@@ -513,7 +512,7 @@ must match the precision of the integrator object in which the event is used, ot
 at compilation time.</p>
 </section>
 <section id="full-code-listing">
-<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this heading">#</a></h2>
+<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Link to this heading">#</a></h2>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cmath&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
 
