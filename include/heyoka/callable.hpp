@@ -195,7 +195,7 @@ inline constexpr auto callable_wrap_config = tanuki::config<empty_callable, call
     // in the callable interface implementation.
     .static_size = tanuki::holder_size<R (*)(Args...), callable_iface<R, Args...>>,
     .pointer_interface = false,
-    .explicit_generic_ctor = false};
+    .explicit_ctor = tanuki::wrap_ctor::always_implicit};
 
 // Definition of the callable wrap.
 template <typename R, typename... Args>
