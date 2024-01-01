@@ -537,15 +537,6 @@ private:
     }
 };
 
-template <typename T>
-using is_func = std::conjunction<std::is_same<T, uncvref_t<T>>, std::is_default_constructible<T>,
-                                 std::is_copy_constructible<T>, std::is_move_constructible<T>, std::is_destructible<T>,
-                                 // https://en.cppreference.com/w/cpp/concepts/derived_from
-                                 // NOTE: use add_pointer/add_cv in order to avoid
-                                 // issues if invoked with problematic types (e.g., void).
-                                 std::is_base_of<func_base, T>,
-                                 std::is_convertible<std::add_pointer_t<std::add_cv_t<T>>, const volatile func_base *>>;
-
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
