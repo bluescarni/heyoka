@@ -109,7 +109,7 @@ inline constexpr auto step_cb_wrap_config = tanuki::config<empty_callable, step_
     // of a pointer, but in practice that should always be the case.
     .static_size = tanuki::holder_size<bool (*)(TA &), step_cb_iface<TA>>,
     .pointer_interface = false,
-    .explicit_generic_ctor = false};
+    .explicit_ctor = tanuki::wrap_ctor::always_implicit};
 
 // Definition of the step_cb wrap.
 template <typename TA>

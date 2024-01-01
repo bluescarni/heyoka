@@ -39,6 +39,7 @@
 #include <boost/serialization/access.hpp>
 #include <boost/serialization/base_object.hpp>
 #include <boost/serialization/export.hpp>
+#include <boost/serialization/shared_ptr.hpp>
 #include <boost/serialization/split_member.hpp>
 #include <boost/serialization/tracking.hpp>
 
@@ -126,6 +127,12 @@
 
 TANUKI_BEGIN_NAMESPACE
 
+// Semantics for the wrap class.
+// NOTE: this needs to be marked as visibile because
+// the value_iface class depends on it. If we do not, we have
+// the usual s11n-related visibility issues on OSX.
+enum class TANUKI_VISIBLE wrap_semantics { value, reference };
+
 namespace detail
 {
 
@@ -169,7 +176,12 @@ struct value_iface_base {
 
 // Interface containing methods to interact
 // with the value in the holder class.
-template <typename IFace>
+// NOTE: we need to template value_iface on the semantics
+// so that we can selectively disable address tracking
+// in Boost.serialisation when employing value semantics
+// (we do not want to disable it for reference semantics
+// since we need it for correct shared_ptr s11n).
+template <typename IFace, wrap_semantics Sem>
 struct TANUKI_VISIBLE value_iface : public IFace, value_iface_base {
     value_iface() = default;
     value_iface(const value_iface &) = delete;
@@ -355,8 +367,8 @@ struct get_iface_impl<IFace, Base, Holder, T> {
 // By default, the Base for the interface implementation is
 // value_iface of IFace (which transitively makes IFace also a base for
 // the implementation).
-template <typename IFace, typename Holder, typename T>
-struct impl_from_iface_impl : get_iface_impl<IFace, value_iface<IFace>, Holder, T> {
+template <typename IFace, typename Holder, typename T, wrap_semantics Sem>
+struct impl_from_iface_impl : get_iface_impl<IFace, value_iface<IFace, Sem>, Holder, T> {
 };
 
 // For composite interfaces, we synthesize a class hierarchy in which every
@@ -374,25 +386,26 @@ struct c_iface_assembler<Holder, T, CurIFace, CurBase, LastIFace> {
     using type = typename get_iface_impl<LastIFace, cur_impl, Holder, T>::type;
 };
 
-template <typename Holder, typename T, typename IFace0, typename IFace1, typename... IFaceN>
-struct impl_from_iface_impl<composite_iface<IFace0, IFace1, IFaceN...>, Holder, T> {
-    using type = typename c_iface_assembler<Holder, T, IFace0, value_iface<composite_iface<IFace0, IFace1, IFaceN...>>,
-                                            IFace1, IFaceN...>::type;
+template <typename Holder, typename T, wrap_semantics Sem, typename IFace0, typename IFace1, typename... IFaceN>
+struct impl_from_iface_impl<composite_iface<IFace0, IFace1, IFaceN...>, Holder, T, Sem> {
+    using type =
+        typename c_iface_assembler<Holder, T, IFace0, value_iface<composite_iface<IFace0, IFace1, IFaceN...>, Sem>,
+                                   IFace1, IFaceN...>::type;
 };
 
 // Helper alias.
-template <typename IFace, typename Holder, typename T>
-using impl_from_iface = typename impl_from_iface_impl<IFace, Holder, T>::type;
+template <typename IFace, typename Holder, typename T, wrap_semantics Sem>
+using impl_from_iface = typename impl_from_iface_impl<IFace, Holder, T, Sem>::type;
 
 // Concept to check that the interface IFace has an implementation
 // for the value type T.
-template <typename IFace, typename Holder, typename T>
+template <typename IFace, typename Holder, typename T, wrap_semantics Sem>
 concept iface_has_impl = requires() {
-    typename impl_from_iface<IFace, Holder, T>;
+    typename impl_from_iface<IFace, Holder, T, Sem>;
     // NOTE: this will check that the implementation derives
     // from its Base (e.g., the check will fail in case of
     // an empty implementation).
-    requires std::derived_from<impl_from_iface<IFace, Holder, T>, value_iface_base>;
+    requires std::derived_from<impl_from_iface<IFace, Holder, T, Sem>, value_iface_base>;
 };
 
 // Class for holding an instance of the value type T.
@@ -400,8 +413,8 @@ concept iface_has_impl = requires() {
 // holder -> iface impl -> value_iface -> iface.
 // NOTE: this class has several conceptual requirements which
 // are checked in wrap::ctor_impl().
-template <typename T, typename IFace>
-struct TANUKI_VISIBLE holder final : public impl_from_iface<IFace, holder<T, IFace>, T> {
+template <typename T, typename IFace, wrap_semantics Sem>
+struct TANUKI_VISIBLE holder final : public impl_from_iface<IFace, holder<T, IFace, Sem>, T, Sem> {
     TANUKI_NO_UNIQUE_ADDRESS T m_value;
 
     // Make sure we don't end up accidentally copying/moving
@@ -422,15 +435,17 @@ struct TANUKI_VISIBLE holder final : public impl_from_iface<IFace, holder<T, IFa
     // potentially competing with the copy/move ctors.
     template <typename U>
         requires(!std::same_as<holder, std::remove_cvref_t<U>>)
-    explicit holder(U &&x) noexcept(std::is_nothrow_constructible_v<T, U &&>
-                                    && nothrow_default_initializable<impl_from_iface<IFace, holder<T, IFace>, T>>)
+    explicit holder(U &&x) noexcept(
+        std::is_nothrow_constructible_v<T, U &&>
+        && nothrow_default_initializable<impl_from_iface<IFace, holder<T, IFace, Sem>, T, Sem>>)
         : m_value(std::forward<U>(x))
     {
     }
     template <typename... U>
         requires(sizeof...(U) != 1u)
-    explicit holder(U &&...x) noexcept(std::is_nothrow_constructible_v<T, U &&...>
-                                       && nothrow_default_initializable<impl_from_iface<IFace, holder<T, IFace>, T>>)
+    explicit holder(U &&...x) noexcept(
+        std::is_nothrow_constructible_v<T, U &&...>
+        && nothrow_default_initializable<impl_from_iface<IFace, holder<T, IFace, Sem>, T, Sem>>)
         : m_value(std::forward<U>(x)...)
     {
     }
@@ -453,7 +468,7 @@ private:
     }
 
     // Clone this, and cast the result to the value interface.
-    [[nodiscard]] value_iface<IFace> *_tanuki_clone() const final
+    [[nodiscard]] value_iface<IFace, Sem> *_tanuki_clone() const final
     {
         if constexpr (std::copy_constructible<T>) {
             // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
@@ -464,7 +479,7 @@ private:
     }
     // Copy-init a new holder into the storage beginning at ptr.
     // Then cast the result to the value interface and return.
-    [[nodiscard]] value_iface<IFace> *_tanuki_copy_init_holder(void *ptr) const final
+    [[nodiscard]] value_iface<IFace, Sem> *_tanuki_copy_init_holder(void *ptr) const final
     {
         if constexpr (std::copy_constructible<T>) {
             // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
@@ -475,7 +490,7 @@ private:
     }
     // Move-init a new holder into the storage beginning at ptr.
     // Then cast the result to the value interface and return.
-    [[nodiscard]] value_iface<IFace> *
+    [[nodiscard]] value_iface<IFace, Sem> *
     // NOLINTNEXTLINE(bugprone-exception-escape)
     _tanuki_move_init_holder(void *ptr) && noexcept final
     {
@@ -487,7 +502,7 @@ private:
         }
     }
     // Copy-assign m_value into the m_value of v_iface.
-    void _tanuki_copy_assign_value_to(value_iface<IFace> *v_iface) const final
+    void _tanuki_copy_assign_value_to(value_iface<IFace, Sem> *v_iface) const final
     {
         if constexpr (std::is_copy_assignable_v<T>) {
             // NOTE: I don't think it is necessary to invoke launder here,
@@ -503,7 +518,7 @@ private:
     }
     // Move-assign m_value into the m_value of v_iface.
     // NOLINTNEXTLINE(bugprone-exception-escape)
-    void _tanuki_move_assign_value_to(value_iface<IFace> *v_iface) && noexcept final
+    void _tanuki_move_assign_value_to(value_iface<IFace, Sem> *v_iface) && noexcept final
     {
         if constexpr (std::is_move_assignable_v<T>) {
             assert(typeid(T) == v_iface->_tanuki_value_type_index());
@@ -532,7 +547,7 @@ private:
     }
     // Swap m_value with the m_value of v_iface.
     // NOLINTNEXTLINE(bugprone-exception-escape)
-    void _tanuki_swap_value(value_iface<IFace> *v_iface) noexcept final
+    void _tanuki_swap_value(value_iface<IFace, Sem> *v_iface) noexcept final
     {
         if constexpr (std::swappable<T>) {
             assert(typeid(T) == v_iface->_tanuki_value_type_index());
@@ -551,7 +566,7 @@ private:
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &boost::serialization::base_object<value_iface<IFace>>(*this);
+        ar &boost::serialization::base_object<value_iface<IFace, Sem>>(*this);
         ar & m_value;
     }
 
@@ -573,28 +588,40 @@ template <typename>
 struct holder_value {
 };
 
-template <typename T, typename IFace>
-struct holder_value<holder<T, IFace>> {
+template <typename T, typename IFace, wrap_semantics Sem>
+struct holder_value<holder<T, IFace, Sem>> {
     using type = T;
 };
 
-// Implementation of storage for the wrap class.
-template <typename IFace, std::size_t StaticStorageSize, std::size_t StaticStorageAlignment>
+} // namespace detail
+
+namespace detail
+{
+
+// Implementation of storage for the wrap class. This will be used
+// to store an instance of the holder type.
+template <typename IFace, std::size_t StaticStorageSize, std::size_t StaticStorageAlignment, wrap_semantics Sem>
 struct TANUKI_VISIBLE wrap_storage {
     static_assert(StaticStorageSize > 0u);
+    static_assert(Sem == wrap_semantics::value);
 
     // Static storage optimisation enabled.
     // The active storage is dynamic if either m_pv_iface is null (which indicates the
     // invalid state) or if it points somewhere outside static_storage. Otherwise,
     // the active storage is static and m_pv_iface points somewhere within
     // static_storage.
-    value_iface<IFace> *m_pv_iface;
+    value_iface<IFace, Sem> *m_pv_iface;
     alignas(StaticStorageAlignment) std::byte static_storage[StaticStorageSize];
 };
 
 template <typename IFace, std::size_t StaticStorageAlignment>
-struct TANUKI_VISIBLE wrap_storage<IFace, 0, StaticStorageAlignment> {
-    value_iface<IFace> *m_pv_iface;
+struct TANUKI_VISIBLE wrap_storage<IFace, 0, StaticStorageAlignment, wrap_semantics::value> {
+    value_iface<IFace, wrap_semantics::value> *m_pv_iface;
+};
+
+template <typename IFace, std::size_t StaticStorageSize, std::size_t StaticStorageAlignment>
+struct TANUKI_VISIBLE wrap_storage<IFace, StaticStorageSize, StaticStorageAlignment, wrap_semantics::reference> {
+    std::shared_ptr<value_iface<IFace, wrap_semantics::reference>> m_pv_iface;
 };
 
 // NOTE: this is used to check that a config instance
@@ -606,11 +633,20 @@ struct config_base {
 
 // Helpers to determine the size and alignment of a holder instance, given the value
 // type T and the interface IFace.
+// NOTE: here we have the complication that holder technically depends on the
+// wrap semantics. We do not want to complicate the interface of these helpers
+// requiring the user to pass in the semantics as well, so instead we assert
+// that size/alignment are the same regardless of semantics (which should always
+// be the case).
 template <typename T, typename IFace>
-inline constexpr auto holder_size = sizeof(detail::holder<T, IFace>);
+    requires(sizeof(detail::holder<T, IFace, wrap_semantics::value>)
+             == sizeof(detail::holder<T, IFace, wrap_semantics::reference>))
+inline constexpr auto holder_size = sizeof(detail::holder<T, IFace, wrap_semantics::value>);
 
 template <typename T, typename IFace>
-inline constexpr auto holder_align = alignof(detail::holder<T, IFace>);
+    requires(alignof(detail::holder<T, IFace, wrap_semantics::value>)
+             == alignof(detail::holder<T, IFace, wrap_semantics::reference>))
+inline constexpr auto holder_align = alignof(detail::holder<T, IFace, wrap_semantics::value>);
 
 // Default implementation of the reference interface.
 struct TANUKI_VISIBLE no_ref_iface {
@@ -629,6 +665,9 @@ struct TANUKI_VISIBLE composite_ref_iface {
     };
 };
 
+// Enum to select the explicitness of the generic wrap ctors.
+enum class wrap_ctor { always_explicit, ref_implicit, always_implicit };
+
 // Configuration settings for the wrap class.
 // NOTE: the DefaultValueType is subject to the constraints
 // for valid value types.
@@ -640,13 +679,15 @@ struct TANUKI_VISIBLE config final : detail::config_base {
     // Size of the static storage.
     std::size_t static_size = 48;
     // Alignment of the static storage.
-    std::size_t static_alignment = alignof(std::max_align_t);
+    std::size_t static_align = alignof(std::max_align_t);
     // Default constructor initialises to the invalid state.
     bool invalid_default_ctor = false;
     // Provide pointer interface.
     bool pointer_interface = true;
     // Explicitness of the generic ctor.
-    bool explicit_generic_ctor = true;
+    wrap_ctor explicit_ctor = wrap_ctor::always_explicit;
+    // Semantics.
+    wrap_semantics semantics = wrap_semantics::value;
     // Enable copy construction/assignment.
     bool copyable = true;
     // Enable move construction/assignment.
@@ -670,7 +711,11 @@ concept valid_config =
     // This checks that decltype(Cfg) is a specialisation from the primary config template.
     std::derived_from<std::remove_const_t<decltype(Cfg)>, config_base> &&
     // The static alignment value must be a power of 2.
-    power_of_two<Cfg.static_alignment>;
+    power_of_two<Cfg.static_align> &&
+    // Cfg.explicit_ctor must be set to one of the valid enumerators.
+    (Cfg.explicit_ctor >= wrap_ctor::always_explicit && Cfg.explicit_ctor <= wrap_ctor::always_implicit) &&
+    // Cfg.semantics must be one of the two valid enumerators.
+    (Cfg.semantics == wrap_semantics::value || Cfg.semantics == wrap_semantics::reference);
 
 // Machinery to infer the reference interface from a config instance.
 template <typename>
@@ -791,7 +836,7 @@ using unwrap_cvref_t = std::remove_cvref_t<std::unwrap_reference_t<T>>;
 template <typename IFace, auto Cfg = default_config>
     requires std::is_polymorphic_v<IFace> && std::has_virtual_destructor_v<IFace> && detail::valid_config<Cfg>
 class TANUKI_VISIBLE wrap
-    : private detail::wrap_storage<IFace, Cfg.static_size, Cfg.static_alignment>,
+    : private detail::wrap_storage<IFace, Cfg.static_size, Cfg.static_align, Cfg.semantics>,
       // NOTE: the reference interface is not supposed to hold any data: it will always
       // be def-inited (even when copying/moving a wrap object), its assignment operators
       // will never be invoked, it will never be swapped, etc. This needs to be documented.
@@ -800,7 +845,7 @@ class TANUKI_VISIBLE wrap
 {
     // Aliases for the two interfaces.
     using iface_t = IFace;
-    using value_iface_t = detail::value_iface<iface_t>;
+    using value_iface_t = detail::value_iface<iface_t, Cfg.semantics>;
 
     // Alias for the reference interface.
     using ref_iface_t =
@@ -812,17 +857,25 @@ class TANUKI_VISIBLE wrap
 
     // Shortcut for the holder type corresponding to the value type T.
     template <typename T>
-    using holder_t = detail::holder<T, IFace>;
+    using holder_t = detail::holder<T, IFace, Cfg.semantics>;
 
     // Helper to detect the type of storage in use. Returns true for static
     // storage, false for dynamic storage (including the invalid state).
     [[nodiscard]] bool stype() const noexcept
-        requires(Cfg.static_size > 0u)
+        requires(Cfg.semantics == wrap_semantics::value && Cfg.static_size > 0u)
     {
-        return (this->m_pv_iface != nullptr)
-               && std::less{}(reinterpret_cast<const std::byte *>(this->m_pv_iface),
-                              this->static_storage + sizeof(this->static_storage))
-               && std::greater_equal{}(reinterpret_cast<const std::byte *>(this->m_pv_iface), this->static_storage);
+        const auto *ptr = reinterpret_cast<const std::byte *>(this->m_pv_iface);
+
+        // NOTE: this is not 100% portable, for the following reasons:
+        // - if ptr is not within static_storage, the results of the comparisons are unspecified;
+        // - even if we used std::less & co. (instead of builtin comparisons), in principle static_storage
+        //   could be interleaved with another object while at the same time respecting the total
+        //   pointer ordering guarantees given by the standard.
+        // In pratice, this should be ok an all commonly-used platforms.
+        // NOTE: it seems like the only truly portable way of implementing this is to compare ptr
+        // to the addresses of all elements in static_storage. Unfortunately, it seems like compilers
+        // are not able to optimise this to a simple pointer comparison.
+        return ptr >= this->static_storage && ptr < this->static_storage + sizeof(this->static_storage);
     }
 
     // Implementation of generic construction. This will constrcut
@@ -835,107 +888,138 @@ class TANUKI_VISIBLE wrap
     template <typename T, typename... U>
         requires
         // The interface must have an implementation for T.
-        detail::iface_has_impl<iface_t, holder_t<T>, T> &&
+        detail::iface_has_impl<iface_t, holder_t<T>, T, Cfg.semantics> &&
         // The implementation must be default-initable and
         // destructible.
-        std::default_initializable<detail::impl_from_iface<iface_t, holder_t<T>, T>>
-        && std::destructible<detail::impl_from_iface<iface_t, holder_t<T>, T>> &&
+        std::default_initializable<detail::impl_from_iface<iface_t, holder_t<T>, T, Cfg.semantics>>
+        && std::destructible<detail::impl_from_iface<iface_t, holder_t<T>, T, Cfg.semantics>> &&
         // T must be a valid value type.
         detail::valid_value_type<T> &&
         // T must be constructible from the construction arguments.
-        std::constructible_from<T, U &&...> &&
-        // Alignment checks: if we are going to use dynamic storage, then no checks are needed
-        // as new() takes care of proper alignment; otherwise, we need to ensure that the static
-        // storage is sufficiently aligned.
-        (sizeof(holder_t<T>) > Cfg.static_size || alignof(holder_t<T>) <= Cfg.static_alignment)
-        void ctor_impl(U &&...x) noexcept(sizeof(holder_t<T>) <= Cfg.static_size
+        std::constructible_from<T, U &&...>
+        void ctor_impl(U &&...x) noexcept(Cfg.semantics == wrap_semantics::value
+                                          && sizeof(holder_t<T>) <= Cfg.static_size
+                                          && alignof(holder_t<T>) <= Cfg.static_align
                                           && std::is_nothrow_constructible_v<holder_t<T>, U &&...>)
     {
-        if constexpr (Cfg.static_size == 0u) {
-            // Static storage disabled.
-            // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-            this->m_pv_iface = new holder_t<T>(std::forward<U>(x)...);
-        } else {
-            if constexpr (sizeof(holder_t<T>) <= Cfg.static_size) {
-                // Static storage.
-                // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-                this->m_pv_iface = ::new (this->static_storage) holder_t<T>(std::forward<U>(x)...);
-            } else {
-                // Dynamic storage.
+        if constexpr (Cfg.semantics == wrap_semantics::value) {
+            if constexpr (sizeof(holder_t<T>) > Cfg.static_size || alignof(holder_t<T>) > Cfg.static_align) {
+                // Static storage is disabled, or the type is overaligned, or
+                // there is not enough room in static storage.
+                // Use dynamic memory allocation.
                 // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
                 this->m_pv_iface = new holder_t<T>(std::forward<U>(x)...);
+            } else {
+                // Static storage is enabled and there is enough room. Construct in-place.
+                // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+                this->m_pv_iface = ::new (this->static_storage) holder_t<T>(std::forward<U>(x)...);
             }
+        } else {
+            this->m_pv_iface = std::make_shared<holder_t<T>>(std::forward<U>(x)...);
         }
     }
 
 #if defined(TANUKI_WITH_BOOST_S11N)
 
-    // Serialization.
+    // Serialisation.
+    // NOTE: serialisation support has certain prerequisites:
+    // - the value type must be default-initialisable,
+    // - the value type must be move-ctible (when using value semantics),
+    // - the value type must not be over-aligned (when using value semantics,
+    //   not sure if it applies to reference semantics as well).
+    // The first two come from the way pointer serialisation works
+    // in Boost (i.e., serialisation via pointer to base requires a
+    // default constructor and dynamic allocation of an object instance,
+    // from which we do a move-init of the holder when using value semantics).
+    // The last one I think comes from the way memory is allocated during des11n,
+    // i.e., see here:
+    // https://github.com/boostorg/serialization/blob/a20c4d97c37e5f437c8ba78f296830edb79cff9e/include/boost/archive/detail/iserializer.hpp#L241
+    // Perhaps by providing a custom new operator to the value interface
+    // class we can implement proper over-alignment of dynamically-allocated memory.
+    // NOTE: support for portable archives would requires some additional logic
+    // in case of value semantics with static storage enabled: the sizeof
+    // types will vary across platforms and thus we cannot assume that an archive
+    // that contains a wrap storing a value in static storage on a platform can
+    // be deserialised in static storage on another platform. Perhaps we can
+    // add a function in the value interface to report the sizeof?
     friend class boost::serialization::access;
     void save(boost::archive::binary_oarchive &ar, unsigned) const
     {
-        if constexpr (Cfg.static_size == 0u) {
-            // Store the pointer to the value interface.
-            ar << this->m_pv_iface;
-        } else {
+        if constexpr (Cfg.semantics == wrap_semantics::value && Cfg.static_size > 0u) {
             // Store the storage type.
             ar << stype();
-            // Store the pointer to the value interface.
-            ar << this->m_pv_iface;
         }
+
+        // Store the pointer to the value interface.
+        ar << this->m_pv_iface;
     }
     // NOTE: as I have understood, when deserialising a pointer Boost
     // allocates memory only the *first* time the pointer is encountered
     // in an archive:
     // https://stackoverflow.com/questions/62105624/how-does-boostserialization-allocate-memory-when-deserializing-through-a-point
-    // In our case, we disable object tracking for value_iface and I also
+    // In our case, when employing value semantics we disable
+    // object tracking for value_iface and I also
     // think that there are no situations in which a pointer to value_iface
     // could be shared amongst multiple wraps. Thus, we should be ok assuming
     // that the pointer coming out of des11n has always been created with a new
     // call.
     void load(boost::archive::binary_iarchive &ar, unsigned)
     {
-        if constexpr (Cfg.static_size == 0u) {
-            // Load the serialised pointer.
-            value_iface_t *pv_iface = nullptr;
-            ar >> pv_iface;
+        if constexpr (Cfg.semantics == wrap_semantics::value) {
+            if constexpr (Cfg.static_size == 0u) {
+                // Load the serialised pointer.
+                value_iface_t *pv_iface = nullptr;
+                ar >> pv_iface;
 
-            // NOTE: from now on, all is noexcept.
+                // NOTE: from now on, all is noexcept.
 
-            // Destroy the current object.
-            destroy();
+                // Destroy the current object.
+                destroy();
 
-            // Assign the deserialised pointer.
-            this->m_pv_iface = pv_iface;
-        } else {
-            // Recover the storage type.
-            bool st{};
-            ar >> st;
-
-            // Load the serialised pointer.
-            value_iface_t *pv_iface = nullptr;
-            ar >> pv_iface;
-
-            // NOTE: the only way pv_iface can be null
-            // is if the storage type is dynamic.
-            assert(pv_iface != nullptr || !st);
-
-            // NOTE: from now on, all is noexcept.
-
-            // Destroy the current object.
-            destroy();
-
-            if (st) {
-                // Move-init the value from pv_iface.
-                this->m_pv_iface = std::move(*pv_iface)._tanuki_move_init_holder(this->static_storage);
-
-                // Clean up pv_iface.
-                // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-                delete pv_iface;
-            } else {
                 // Assign the deserialised pointer.
                 this->m_pv_iface = pv_iface;
+            } else {
+                // Recover the storage type.
+                bool st{};
+                ar >> st;
+
+                // Load the serialised pointer.
+                value_iface_t *pv_iface = nullptr;
+                ar >> pv_iface;
+
+                // NOTE: the only way pv_iface can be null
+                // is if the storage type is dynamic.
+                assert(pv_iface != nullptr || !st);
+
+                // NOTE: from now on, all is noexcept.
+
+                // Destroy the current object.
+                destroy();
+
+                if (st) {
+                    // Move-init the value from pv_iface.
+                    this->m_pv_iface = std::move(*pv_iface)._tanuki_move_init_holder(this->static_storage);
+
+                    // Clean up pv_iface.
+                    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+                    delete pv_iface;
+                } else {
+                    // Assign the deserialised pointer.
+                    this->m_pv_iface = pv_iface;
+                }
             }
+        } else {
+            // NOTE: not sure what the guarantees from Boost in case
+            // of exceptions are here. Just in case, ensure we reset the wrap
+            // to the invalid state in case of exceptions before rethrowing.
+            try {
+                ar >> this->m_pv_iface;
+                // LCOV_EXCL_START
+            } catch (...) {
+                this->m_pv_iface = nullptr;
+                throw;
+            }
+            // LCOV_EXCL_STOP
         }
     }
     BOOST_SERIALIZATION_SPLIT_MEMBER()
@@ -950,7 +1034,11 @@ public:
     wrap() noexcept(detail::nothrow_default_initializable<ref_iface_t>)
         requires(Cfg.invalid_default_ctor) && std::default_initializable<ref_iface_t>
     {
-        this->m_pv_iface = nullptr;
+        // NOTE: for reference semantics, the default ctor
+        // of shared_ptr already does the right thing.
+        if constexpr (Cfg.semantics == wrap_semantics::value) {
+            this->m_pv_iface = nullptr;
+        }
     }
 
     // Default initialisation into the default value type.
@@ -993,14 +1081,31 @@ public:
             // We must be able to invoke the construction function.
             w.template ctor_impl<detail::value_t_from_arg<T &&>>(std::forward<T>(x));
         })
-    explicit(Cfg.explicit_generic_ctor)
-        // NOLINTNEXTLINE(bugprone-forwarding-reference-overload,cppcoreguidelines-pro-type-member-init,hicpp-member-init,google-explicit-constructor,hicpp-explicit-conversions)
+    explicit(Cfg.explicit_ctor < wrap_ctor::always_implicit)
+        // NOLINTNEXTLINE(bugprone-forwarding-reference-overload,google-explicit-constructor,hicpp-explicit-conversions)
         wrap(T &&x) noexcept(noexcept(this->ctor_impl<detail::value_t_from_arg<T &&>>(std::forward<T>(x)))
                              && detail::nothrow_default_initializable<ref_iface_t>)
     {
         ctor_impl<detail::value_t_from_arg<T &&>>(std::forward<T>(x));
     }
 
+    // Generic ctor from std::reference_wrapper.
+    template <typename T, typename W = wrap>
+        requires(requires(W &w, std::reference_wrapper<T> ref) {
+            requires std::default_initializable<ref_iface_t>;
+            // We must be able to invoke the construction function.
+            w.template ctor_impl<std::reference_wrapper<T>>(std::move(ref));
+        })
+    explicit(Cfg.explicit_ctor == wrap_ctor::always_explicit)
+        // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions)
+        wrap(std::reference_wrapper<T> ref) noexcept(
+            noexcept(this->ctor_impl<std::reference_wrapper<T>>(std::move(ref)))
+            && detail::nothrow_default_initializable<ref_iface_t>)
+    {
+        ctor_impl<std::reference_wrapper<T>>(std::move(ref));
+    }
+
+    // Generic in-place initialisation.
     // NOTE: this will *value-init* if no args
     // are provided. This must be documented well.
     template <typename T, typename W = wrap, typename... U>
@@ -1016,27 +1121,31 @@ public:
         ctor_impl<T>(std::forward<U>(args)...);
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init,hicpp-member-init)
-    wrap(const wrap &other)
+    wrap(const wrap &other) noexcept(Cfg.semantics == wrap_semantics::reference)
         requires(Cfg.copyable) && std::default_initializable<ref_iface_t>
     {
-        if constexpr (Cfg.static_size == 0u) {
-            // Static storage disabled.
-            this->m_pv_iface = other.m_pv_iface->_tanuki_clone();
-        } else {
-            if (other.stype()) {
-                // Other has static storage.
-                this->m_pv_iface = other.m_pv_iface->_tanuki_copy_init_holder(this->static_storage);
-            } else {
-                // Other has dynamic storage.
+        if constexpr (Cfg.semantics == wrap_semantics::value) {
+            if constexpr (Cfg.static_size == 0u) {
+                // Static storage disabled.
                 this->m_pv_iface = other.m_pv_iface->_tanuki_clone();
+            } else {
+                if (other.stype()) {
+                    // Other has static storage.
+                    this->m_pv_iface = other.m_pv_iface->_tanuki_copy_init_holder(this->static_storage);
+                } else {
+                    // Other has dynamic storage.
+                    this->m_pv_iface = other.m_pv_iface->_tanuki_clone();
+                }
             }
+        } else {
+            this->m_pv_iface = other.m_pv_iface;
         }
     }
 
 private:
     // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
     void move_init_from(wrap &&other) noexcept
+        requires(Cfg.semantics == wrap_semantics::value)
     {
         if constexpr (Cfg.static_size == 0u) {
             // Static storage disabled.
@@ -1062,15 +1171,19 @@ private:
     }
 
 public:
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init,hicpp-member-init)
     wrap(wrap &&other) noexcept
         requires(Cfg.movable) && std::default_initializable<ref_iface_t>
     {
-        move_init_from(std::move(other));
+        if constexpr (Cfg.semantics == wrap_semantics::value) {
+            move_init_from(std::move(other));
+        } else {
+            this->m_pv_iface = std::move(other.m_pv_iface);
+        }
     }
 
 private:
     void destroy() noexcept
+        requires(Cfg.semantics == wrap_semantics::value)
     {
         if constexpr (Cfg.static_size == 0u) {
             delete this->m_pv_iface;
@@ -1088,81 +1201,92 @@ public:
     ~wrap()
         requires std::destructible<ref_iface_t>
     {
-        destroy();
+        if constexpr (Cfg.semantics == wrap_semantics::value) {
+            destroy();
+        }
     }
 
     // Move assignment.
     wrap &operator=(wrap &&other) noexcept
         requires(Cfg.movable)
     {
-        // Handle self-assign.
-        if (this == std::addressof(other)) {
-            return *this;
-        }
+        if constexpr (Cfg.semantics == wrap_semantics::value) {
+            // Handle self-assign.
+            if (this == std::addressof(other)) {
+                return *this;
+            }
 
-        // Handle invalid object.
-        if (is_invalid(*this)) {
-            // No need to destroy, just move init
-            // from other is sufficient.
-            move_init_from(std::move(other));
-            return *this;
-        }
+            // Handle invalid object.
+            if (is_invalid(*this)) {
+                // No need to destroy, just move init
+                // from other is sufficient.
+                move_init_from(std::move(other));
+                return *this;
+            }
 
-        // Handle different internal types.
-        if (value_type_index(*this) != value_type_index(other)) {
-            destroy();
-            move_init_from(std::move(other));
-            return *this;
-        }
+            // Handle different internal types (which means
+            // in general also different storage types).
+            if (value_type_index(*this) != value_type_index(other)) {
+                destroy();
+                move_init_from(std::move(other));
+                return *this;
+            }
 
-        // The internal types are the same.
-        if constexpr (Cfg.static_size == 0u) {
-            // For dynamic storage, swap the pointer.
-            std::swap(this->m_pv_iface, other.m_pv_iface);
-        } else {
-            // The storage flags must match, as they depend only
-            // on the internal types.
-            assert(stype() == other.stype());
-
-            if (stype()) {
-                // For static storage, directly move assign the internal value.
-                std::move(*other.m_pv_iface)._tanuki_move_assign_value_to(this->m_pv_iface);
-            } else {
+            // The internal types are the same.
+            if constexpr (Cfg.static_size == 0u) {
                 // For dynamic storage, swap the pointer.
                 std::swap(this->m_pv_iface, other.m_pv_iface);
+            } else {
+                // The storage flags must match, as they depend only
+                // on the internal types.
+                assert(stype() == other.stype());
+
+                if (stype()) {
+                    // For static storage, directly move assign the internal value.
+                    std::move(*other.m_pv_iface)._tanuki_move_assign_value_to(this->m_pv_iface);
+                } else {
+                    // For dynamic storage, swap the pointer.
+                    std::swap(this->m_pv_iface, other.m_pv_iface);
+                }
             }
+        } else {
+            this->m_pv_iface = std::move(other.m_pv_iface);
         }
 
         return *this;
     }
 
     // Copy assignment.
-    wrap &operator=(const wrap &other)
+    wrap &operator=(const wrap &other) noexcept(Cfg.semantics == wrap_semantics::reference)
         requires(Cfg.copyable)
     {
-        // Handle self-assign.
-        if (this == std::addressof(other)) {
-            return *this;
+        if constexpr (Cfg.semantics == wrap_semantics::value) {
+            // Handle self-assign.
+            if (this == std::addressof(other)) {
+                return *this;
+            }
+
+            // Handle invalid object or different internal types.
+            if (is_invalid(*this) || value_type_index(*this) != value_type_index(other)) {
+                *this = wrap(other);
+                return *this;
+            }
+
+            // The internal types are the same and this is valid.
+
+            // NOTE: no need to branch on the storage type or static_size
+            // here, as everything happens through the value interface.
+            if constexpr (Cfg.static_size > 0u) {
+                // The storage flags must match, as they depend only
+                // on the internal types.
+                assert(stype() == other.stype());
+            }
+
+            // Assign the internal value.
+            other.m_pv_iface->_tanuki_copy_assign_value_to(this->m_pv_iface);
+        } else {
+            this->m_pv_iface = other.m_pv_iface;
         }
-
-        // Handle invalid object or different internal types.
-        if (is_invalid(*this) || value_type_index(*this) != value_type_index(other)) {
-            *this = wrap(other);
-            return *this;
-        }
-
-        // The internal types are the same and this is valid.
-
-        // NOTE: no need to branch on the storage type or static_size
-        // here, as everything happens through the value interface.
-        if constexpr (Cfg.static_size > 0u) {
-            // The storage flags must match, as they depend only
-            // on the internal types.
-            assert(stype() == other.stype());
-        }
-
-        // Assign the internal value.
-        other.m_pv_iface->_tanuki_copy_assign_value_to(this->m_pv_iface);
 
         return *this;
     }
@@ -1181,45 +1305,49 @@ public:
         })
     wrap &operator=(T &&x)
     {
-        // Handle invalid object.
-        if (is_invalid(*this)) {
-            ctor_impl<detail::value_t_from_arg<T &&>>(std::forward<T>(x));
-            return *this;
-        }
-
-        // Handle different internal types.
-        if (value_type_index(*this) != typeid(detail::value_t_from_arg<T &&>)) {
-            destroy();
-
-            try {
+        if constexpr (Cfg.semantics == wrap_semantics::value) {
+            // Handle invalid object.
+            if (is_invalid(*this)) {
                 ctor_impl<detail::value_t_from_arg<T &&>>(std::forward<T>(x));
-            } catch (...) {
-                // NOTE: if ctor_impl fails there's no cleanup required.
-                // Invalidate this before rethrowing.
-                this->m_pv_iface = nullptr;
-
-                throw;
+                return *this;
             }
 
-            return *this;
-        }
+            // Handle different types.
+            if (value_type_index(*this) != typeid(detail::value_t_from_arg<T &&>)) {
+                destroy();
 
-        if constexpr (std::is_function_v<std::remove_cvref_t<T &&>>) {
-            // NOTE: we need a special case if x is a function. The reason for this
-            // is that we cannot take the address of a function and then cast it directly to void *,
-            // as required by copy/move_assign_value_from(). See here:
-            // https://stackoverflow.com/questions/36645660/why-cant-i-cast-a-function-pointer-to-void
-            // Thus, we need to create a temporary pointer to the function and use its address
-            // in copy/move_assign_value_from() instead.
-            auto *fptr = std::addressof(x);
-            this->m_pv_iface->_tanuki_copy_assign_value_from(&fptr);
-        } else {
-            // The internal types are the same, do directly copy/move assignment.
-            if constexpr (detail::noncv_rvalue_reference<T &&>) {
-                this->m_pv_iface->_tanuki_move_assign_value_from(std::addressof(x));
+                try {
+                    ctor_impl<detail::value_t_from_arg<T &&>>(std::forward<T>(x));
+                } catch (...) {
+                    // NOTE: if ctor_impl fails there's no cleanup required.
+                    // Invalidate this before rethrowing.
+                    this->m_pv_iface = nullptr;
+
+                    throw;
+                }
+
+                return *this;
+            }
+
+            if constexpr (std::is_function_v<std::remove_cvref_t<T &&>>) {
+                // NOTE: we need a special case if x is a function. The reason for this
+                // is that we cannot take the address of a function and then cast it directly to void *,
+                // as required by copy/move_assign_value_from(). See here:
+                // https://stackoverflow.com/questions/36645660/why-cant-i-cast-a-function-pointer-to-void
+                // Thus, we need to create a temporary pointer to the function and use its address
+                // in copy/move_assign_value_from() instead.
+                auto *fptr = std::addressof(x);
+                this->m_pv_iface->_tanuki_copy_assign_value_from(&fptr);
             } else {
-                this->m_pv_iface->_tanuki_copy_assign_value_from(std::addressof(x));
+                // The internal types are the same, do directly copy/move assignment.
+                if constexpr (detail::noncv_rvalue_reference<T &&>) {
+                    this->m_pv_iface->_tanuki_move_assign_value_from(std::addressof(x));
+                } else {
+                    this->m_pv_iface->_tanuki_copy_assign_value_from(std::addressof(x));
+                }
             }
+        } else {
+            ctor_impl<detail::value_t_from_arg<T &&>>(std::forward<T>(x));
         }
 
         return *this;
@@ -1227,13 +1355,12 @@ public:
 
     // Free functions interface.
 
-    // NOTE: w is invalid if either its storage type is dynamic and
-    // it has been moved from (note that this also includes the case
+    // NOTE: w is invalid when the value interface pointer is set to null.
+    // This can happen if w has been moved from (note that this also includes the case
     // in which w has been swapped with an invalid object),
-    // or if generic assignment failed.
-    // In an invalid wrap, the value interface pointer is set to null.
+    // if generic assignment failed, or, in case of reference semantics,
+    // if deserialisation threw an exception.
     // The only valid operations on an invalid object are:
-    //
     // - invocation of is_invalid(),
     // - destruction,
     // - copy/move assignment from, and swapping with, a valid wrap,
@@ -1250,85 +1377,99 @@ public:
 
     [[nodiscard]] friend const iface_t *iface_ptr(const wrap &w) noexcept
     {
-        return w.m_pv_iface;
+        if constexpr (Cfg.semantics == wrap_semantics::value) {
+            return w.m_pv_iface;
+        } else {
+            return w.m_pv_iface.get();
+        }
     }
     [[nodiscard]] friend iface_t *iface_ptr(wrap &w) noexcept
     {
-        return w.m_pv_iface;
+        if constexpr (Cfg.semantics == wrap_semantics::value) {
+            return w.m_pv_iface;
+        } else {
+            return w.m_pv_iface.get();
+        }
     }
 
     friend void swap(wrap &w1, wrap &w2) noexcept
         requires(Cfg.swappable)
     {
-        // Handle self swap.
-        if (std::addressof(w1) == std::addressof(w2)) {
-            return;
-        }
+        if constexpr (Cfg.semantics == wrap_semantics::value) {
+            // Handle self swap.
+            if (std::addressof(w1) == std::addressof(w2)) {
+                return;
+            }
 
-        // Handle invalid arguments.
-        const auto inv1 = is_invalid(w1);
-        const auto inv2 = is_invalid(w2);
+            // Handle invalid arguments.
+            const auto inv1 = is_invalid(w1);
+            const auto inv2 = is_invalid(w2);
 
-        if (inv1 && inv2) {
-            // Both w1 and w2 are invalid, do nothing.
-            return;
-        }
+            if (inv1 && inv2) {
+                // Both w1 and w2 are invalid, do nothing.
+                return;
+            }
 
-        if (inv1) {
-            // w1 is invalid, w2 is not: move-assign w2 to w1.
-            // This may or may not
-            // leave w2 in the invalid state.
-            w1 = std::move(w2);
-            return;
-        }
+            if (inv1) {
+                // w1 is invalid, w2 is not: move-assign w2 to w1.
+                // This may or may not
+                // leave w2 in the invalid state.
+                w1 = std::move(w2);
+                return;
+            }
 
-        if (inv2) {
-            // Opposite of the above.
-            w2 = std::move(w1);
-            return;
-        }
+            if (inv2) {
+                // Opposite of the above.
+                w2 = std::move(w1);
+                return;
+            }
 
-        // Handle different types with the canonical swap() implementation.
-        if (value_type_index(w1) != value_type_index(w2)) {
-            auto temp(std::move(w1));
-            w1 = std::move(w2);
-            w2 = std::move(temp);
-            return;
-        }
+            // Handle different internal types (which means in general
+            // also different storage types) with the canonical swap()
+            // implementation.
+            if (value_type_index(w1) != value_type_index(w2)) {
+                auto temp(std::move(w1));
+                w1 = std::move(w2);
+                w2 = std::move(temp);
+                return;
+            }
 
-        // The types are the same.
-        if constexpr (Cfg.static_size == 0u) {
-            // For dynamic storage, swap the pointers.
-            std::swap(w1.m_pv_iface, w2.m_pv_iface);
-        } else {
-            // The storage flags must match, as they depend only
-            // on the internal types.
-            assert(w1.stype() == w2.stype());
-
-            if (w1.stype()) {
-                // For static storage, directly swap the internal values.
-                w2.m_pv_iface->_tanuki_swap_value(w1.m_pv_iface);
-            } else {
+            // The types are the same.
+            if constexpr (Cfg.static_size == 0u) {
                 // For dynamic storage, swap the pointers.
                 std::swap(w1.m_pv_iface, w2.m_pv_iface);
+            } else {
+                // The storage flags must match, as they depend only
+                // on the internal types.
+                assert(w1.stype() == w2.stype());
+
+                if (w1.stype()) {
+                    // For static storage, directly swap the internal values.
+                    w2.m_pv_iface->_tanuki_swap_value(w1.m_pv_iface);
+                } else {
+                    // For dynamic storage, swap the pointers.
+                    std::swap(w1.m_pv_iface, w2.m_pv_iface);
+                }
             }
+        } else {
+            std::swap(w1.m_pv_iface, w2.m_pv_iface);
         }
     }
 
     [[nodiscard]] friend bool has_static_storage(const wrap &w) noexcept
     {
-        if constexpr (Cfg.static_size == 0u) {
+        if constexpr (Cfg.semantics == wrap_semantics::reference || Cfg.static_size == 0u) {
             return false;
         } else {
             return w.stype();
         }
     }
 
-    [[nodiscard]] friend const void *raw_ptr(const wrap &w) noexcept
+    [[nodiscard]] friend const void *raw_value_ptr(const wrap &w) noexcept
     {
         return w.m_pv_iface->_tanuki_value_ptr();
     }
-    [[nodiscard]] friend void *raw_ptr(wrap &w) noexcept
+    [[nodiscard]] friend void *raw_value_ptr(wrap &w) noexcept
     {
         return w.m_pv_iface->_tanuki_value_ptr();
     }
@@ -1404,6 +1545,7 @@ struct iface_impl_helper : public detail::iface_impl_helper_base {
 
         if constexpr (detail::is_reference_wrapper<T>::value) {
             if constexpr (std::is_const_v<std::remove_reference_t<std::unwrap_reference_t<T>>>) {
+                // NOLINTNEXTLINE(google-readability-casting)
                 throw std::runtime_error("Invalid access to a const reference of type '"
                                          + detail::demangle(typeid(std::unwrap_reference_t<T>).name())
                                          + "' via a non-const member function");
@@ -1451,13 +1593,13 @@ bool has_dynamic_storage(const wrap<IFace, Cfg> &w) noexcept
 template <typename T, typename IFace, auto Cfg>
 const T *value_ptr(const wrap<IFace, Cfg> &w) noexcept
 {
-    return value_type_index(w) == typeid(T) ? static_cast<const T *>(raw_ptr(w)) : nullptr;
+    return value_type_index(w) == typeid(T) ? static_cast<const T *>(raw_value_ptr(w)) : nullptr;
 }
 
 template <typename T, typename IFace, auto Cfg>
 T *value_ptr(wrap<IFace, Cfg> &w) noexcept
 {
-    return value_type_index(w) == typeid(T) ? static_cast<T *>(raw_ptr(w)) : nullptr;
+    return value_type_index(w) == typeid(T) ? static_cast<T *>(raw_value_ptr(w)) : nullptr;
 }
 
 template <typename T, typename IFace, auto Cfg>
@@ -1493,47 +1635,61 @@ TANUKI_END_NAMESPACE
 namespace boost::serialization
 {
 
-// NOTE: disable address tracking for value_iface. We do not need it as value_iface
-// pointers are never shared, and it might only create issues when
+// NOTE: disable address tracking for value_iface when employing value semantics.
+// We do not need it as value_iface pointers are never shared, and it might only create issues when
 // deserialising into a function-local pointer which is then copied
 // into the wrap storage.
 template <typename IFace>
-struct tracking_level<tanuki::detail::value_iface<IFace>> {
+struct tracking_level<tanuki::detail::value_iface<IFace, tanuki::wrap_semantics::value>> {
     using tag = mpl::integral_c_tag;
     using type = mpl::int_<track_never>;
     BOOST_STATIC_CONSTANT(int, value = tracking_level::type::value);
     BOOST_STATIC_ASSERT(
-        (mpl::greater<implementation_level<tanuki::detail::value_iface<IFace>>, mpl::int_<primitive_type>>::value));
+        (mpl::greater<implementation_level<tanuki::detail::value_iface<IFace, tanuki::wrap_semantics::value>>,
+                      mpl::int_<primitive_type>>::value));
 };
 
 } // namespace boost::serialization
 
 // NOTE: these are verbatim re-implementations of the BOOST_CLASS_EXPORT_KEY(2)
 // and BOOST_CLASS_EXPORT_IMPLEMENT macros, which do not work well with class templates.
+// NOTE: the use of __VA_ARGS__ here is kind of a hacky convenience, as it allows us
+// to pass in arguments containing commas without additional mucking around.
+// NOTE: in these macros we are always exporting/implementing both semantics
+// variants.
 #define TANUKI_S11N_WRAP_EXPORT_KEY(ud_type, ...)                                                                      \
     namespace boost::serialization                                                                                     \
     {                                                                                                                  \
-    template <>                                                                                                        \
-    struct guid_defined<tanuki::detail::holder<ud_type, __VA_ARGS__>> : boost::mpl::true_ {                            \
+    template <tanuki::wrap_semantics Sem>                                                                              \
+    struct guid_defined<tanuki::detail::holder<ud_type, __VA_ARGS__, Sem>> : boost::mpl::true_ {                       \
     };                                                                                                                 \
     template <>                                                                                                        \
-    inline const char *guid<tanuki::detail::holder<ud_type, __VA_ARGS__>>()                                            \
+    inline const char *guid<tanuki::detail::holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::value>>()             \
     {                                                                                                                  \
-        /* NOTE: the stringize here will produce a name enclosed by brackets. */                                       \
-        return BOOST_PP_STRINGIZE((tanuki::detail::holder<ud_type, __VA_ARGS__>));                                     \
+        return "tanuki::wrap<" #__VA_ARGS__ ">@" #ud_type "#val";                                                      \
+    }                                                                                                                  \
+    template <>                                                                                                        \
+    inline const char *guid<tanuki::detail::holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::reference>>()         \
+    {                                                                                                                  \
+        return "tanuki::wrap<" #__VA_ARGS__ ">@" #ud_type "#ref";                                                      \
     }                                                                                                                  \
     }
 
 #define TANUKI_S11N_WRAP_EXPORT_KEY2(ud_type, gid, ...)                                                                \
     namespace boost::serialization                                                                                     \
     {                                                                                                                  \
-    template <>                                                                                                        \
-    struct guid_defined<tanuki::detail::holder<ud_type, __VA_ARGS__>> : boost::mpl::true_ {                            \
+    template <tanuki::wrap_semantics Sem>                                                                              \
+    struct guid_defined<tanuki::detail::holder<ud_type, __VA_ARGS__, Sem>> : boost::mpl::true_ {                       \
     };                                                                                                                 \
     template <>                                                                                                        \
-    inline const char *guid<tanuki::detail::holder<ud_type, __VA_ARGS__>>()                                            \
+    inline const char *guid<tanuki::detail::holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::value>>()             \
     {                                                                                                                  \
-        return gid;                                                                                                    \
+        return gid "#val";                                                                                             \
+    }                                                                                                                  \
+    template <>                                                                                                        \
+    inline const char *guid<tanuki::detail::holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::reference>>()         \
+    {                                                                                                                  \
+        return gid "#ref";                                                                                             \
     }                                                                                                                  \
     }
 
@@ -1541,13 +1697,23 @@ struct tracking_level<tanuki::detail::value_iface<IFace>> {
     namespace boost::archive::detail::extra_detail                                                                     \
     {                                                                                                                  \
     template <>                                                                                                        \
-    struct init_guid<tanuki::detail::holder<ud_type, __VA_ARGS__>> {                                                   \
-        static guid_initializer<tanuki::detail::holder<ud_type, __VA_ARGS__>> const &g;                                \
+    struct init_guid<tanuki::detail::holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::value>> {                    \
+        static guid_initializer<tanuki::detail::holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::value>> const &g; \
     };                                                                                                                 \
-    guid_initializer<tanuki::detail::holder<ud_type, __VA_ARGS__>> const                                               \
-        &init_guid<tanuki::detail::holder<ud_type, __VA_ARGS__>>::g                                                    \
-        = ::boost::serialization::singleton<                                                                           \
-              guid_initializer<tanuki::detail::holder<ud_type, __VA_ARGS__>>>::get_mutable_instance()                  \
+    template <>                                                                                                        \
+    struct init_guid<tanuki::detail::holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::reference>> {                \
+        static guid_initializer<tanuki::detail::holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::reference>> const \
+            &g;                                                                                                        \
+    };                                                                                                                 \
+    guid_initializer<tanuki::detail::holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::value>> const                \
+        &init_guid<tanuki::detail::holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::value>>::g                     \
+        = ::boost::serialization::singleton<guid_initializer<                                                          \
+            tanuki::detail::holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::value>>>::get_mutable_instance()      \
+              .export_guid();                                                                                          \
+    guid_initializer<tanuki::detail::holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::reference>> const            \
+        &init_guid<tanuki::detail::holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::reference>>::g                 \
+        = ::boost::serialization::singleton<guid_initializer<                                                          \
+            tanuki::detail::holder<ud_type, __VA_ARGS__, tanuki::wrap_semantics::reference>>>::get_mutable_instance()  \
               .export_guid();                                                                                          \
     }
 
