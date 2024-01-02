@@ -6,7 +6,17 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <algorithm>
+#include <iterator>
+#include <numeric>
+#include <ranges>
 #include <stdexcept>
+
+#include <boost/math/constants/constants.hpp>
+
+#include <xtensor/xadapt.hpp>
+#include <xtensor/xslice.hpp>
+#include <xtensor/xview.hpp>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -14,6 +24,7 @@
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/model/nbody.hpp>
 #include <heyoka/model/pendulum.hpp>
@@ -135,6 +146,123 @@ TEST_CASE("two body problem")
     REQUIRE(ta1.get_state()[9] == approximately(ta2.get_state()[9]));
     REQUIRE(ta1.get_state()[10] == approximately(ta2.get_state()[10]));
     REQUIRE(ta1.get_state()[11] == approximately(ta2.get_state()[11]));
+}
+
+// The damped wheel model from the elastic tides Python example.
+TEST_CASE("damped wheel")
+{
+    namespace stdv = std::views;
+
+    // Number of spokes.
+    const auto N = 4u;
+    // Central mass m_0 and smaller masses m_i.
+    const auto m0 = 10.;
+    const auto masses = std::vector<double>(N, 0.05);
+    // Length of the spokes (i.e., rest position of the springs).
+    const auto a = 1.;
+    // Elastic constant.
+    auto k = par[0];
+
+    // Generalised coordinates.
+    auto [x0, y0, alpha] = make_vars("x0", "y0", "alpha");
+    auto qs = std::vector{x0, y0, alpha};
+    auto ljs = stdv::iota(0u, N) | stdv::transform([](auto i) { return expression{fmt::format("l{}", i + 1u)}; });
+    std::ranges::copy(ljs, std::back_inserter(qs));
+
+    // Generalised velocities.
+    auto [vx0, vy0, valpha] = make_vars("vx0", "vy0", "valpha");
+    auto qdots = std::vector{vx0, vy0, valpha};
+    auto vljs = stdv::iota(0u, N) | stdv::transform([](auto i) { return expression{fmt::format("vl{}", i + 1u)}; });
+    std::ranges::copy(vljs, std::back_inserter(qdots));
+
+    // Cartesian positions.
+    std::vector<expression> xjs;
+    std::ranges::copy(stdv::iota(0u, N) | stdv::transform([&](auto i) {
+                          return x0 + (a - ljs[i]) * cos(alpha + i * (2. / N * boost::math::constants::pi<double>()));
+                      }),
+                      std::back_inserter(xjs));
+    std::vector<expression> yjs;
+    std::ranges::copy(stdv::iota(0u, N) | stdv::transform([&](auto i) {
+                          return y0 + (a - ljs[i]) * sin(alpha + i * (2. / N * boost::math::constants::pi<double>()));
+                      }),
+                      std::back_inserter(yjs));
+
+    // Compute the cartesian velocities as functions of the generalised coordinates/velocities.
+    auto v_jac_xjs = diff_tensors(xjs, kw::diff_args = qs).get_jacobian();
+    auto v_jac_yjs = diff_tensors(yjs, kw::diff_args = qs).get_jacobian();
+    auto jac_xjs = xt::adapt(v_jac_xjs, {static_cast<int>(N), static_cast<int>(qs.size())});
+    auto jac_yjs = xt::adapt(v_jac_yjs, {static_cast<int>(N), static_cast<int>(qs.size())});
+
+    std::vector<expression> vxjs, vyjs;
+    for (auto i = 0u; i < N; ++i) {
+        auto xrow = xt::view(jac_xjs, i, xt::all());
+        vxjs.push_back(std::inner_product(std::begin(xrow), std::end(xrow), std::begin(qdots), 0_dbl));
+
+        auto yrow = xt::view(jac_yjs, i, xt::all());
+        vyjs.push_back(std::inner_product(std::begin(yrow), std::end(yrow), std::begin(qdots), 0_dbl));
+    }
+
+    // Kinetic energy.
+    auto kin_mi = stdv::iota(0u, N)
+                  | stdv::transform([&](auto i) { return masses[i] * (vxjs[i] * vxjs[i] + vyjs[i] * vyjs[i]); });
+    auto T = 1 / 2. * m0 * (vx0 * vx0 + vy0 * vy0)
+             + 1 / 2. * sum(std::vector<expression>{std::begin(kin_mi), std::end(kin_mi)});
+
+    // Potential.
+    auto V_terms = stdv::iota(0u, N) | stdv::transform([&](auto i) { return ljs[i] * ljs[i]; });
+    auto V = 1 / 2. * k * sum(std::vector<expression>(V_terms.begin(), V_terms.end()));
+
+    // The Lagrangian.
+    auto L = T - V;
+
+    // The dissipation function.
+    auto fc = par[1];
+    auto D_terms = stdv::iota(0u, N) | stdv::transform([&](auto i) { return 0.5 * fc * vljs[i] * vljs[i]; });
+    auto D = sum(std::vector<expression>(D_terms.begin(), D_terms.end()));
+
+    // Formulate the equations of motion.
+    auto sys = lagrangian(L, qs, qdots, D);
+
+    // Init the integrator.
+    auto ics = {0.,
+                0.,
+                0.,
+                0.,
+                0.,
+                0.,
+                0.,
+                -0.4251330363293203,
+                0.05814973378505772,
+                0.4421418964987427,
+                0.3821135280593254,
+                0.4035319449465937,
+                0.473483299702404,
+                -0.32295977917610563};
+    auto ta = taylor_adaptive(sys, ics, kw::compact_mode = true);
+
+    // Set the values for the spring constant
+    // and friction coefficient.
+    ta.get_pars_data()[0] = 5.;
+    ta.get_pars_data()[1] = .1;
+
+    // Run the numerical integration.
+    ta.propagate_until(3.);
+
+    // Compare with the integration as formulated by sympy.
+    REQUIRE(ta.get_state()[0] == approximately(-1.27403829953764));
+    REQUIRE(ta.get_state()[1] == approximately(0.16376361801359088));
+    REQUIRE(ta.get_state()[2] == approximately(1.323428337349071));
+    REQUIRE(ta.get_state()[3] == approximately(-0.0038352625671087643));
+    REQUIRE(ta.get_state()[4] == approximately(-0.0038785147615456833));
+    REQUIRE(ta.get_state()[5] == approximately(-0.004319076923234549));
+    REQUIRE(ta.get_state()[6] == approximately(-0.0003951318230739097));
+    REQUIRE(ta.get_state()[7] == approximately(-0.4247224818094968));
+    REQUIRE(ta.get_state()[8] == approximately(0.05460006135548661));
+    REQUIRE(ta.get_state()[9] == approximately(0.4394061018791296));
+    REQUIRE(ta.get_state()[10] == approximately(0.003381629943640583));
+    REQUIRE(ta.get_state()[11] == approximately(0.006350901803721282));
+    REQUIRE(ta.get_state()[12] == approximately(0.004490453710403928));
+    REQUIRE(ta.get_state()[13] == approximately(-0.0013988052681859328));
 }
 
 TEST_CASE("error handling")
