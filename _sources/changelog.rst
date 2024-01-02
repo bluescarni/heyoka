@@ -8,7 +8,8 @@ New
 ~~~
 
 - Add support for Lagrangian and Hamiltonian mechanics
-  (`#379 <https://github.com/bluescarni/heyoka/pull/379>`__).
+  (`#381 <https://github.com/bluescarni/heyoka/pull/381>`__,
+  `#379 <https://github.com/bluescarni/heyoka/pull/379>`__).
 - It is now possible to pass a range of step callbacks to the
   ``propagate_*()`` functions. The individual callbacks will be
   automatically composed into a callback set
