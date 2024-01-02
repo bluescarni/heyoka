@@ -152,7 +152,7 @@ struct linmat {
 // and the dissipation function respectively. qdots is the
 // list of generalised velocities.
 template <typename T>
-auto build_linmat(T n_qs, const dtens &L_dt, const dtens &D_dt, const std::vector<expression> &qdots)
+linmat build_linmat(T n_qs, const dtens &L_dt, const dtens &D_dt, const std::vector<expression> &qdots)
 {
     assert(n_qs > 0);
     assert(n_qs == qdots.size());
@@ -235,7 +235,7 @@ bool ex_zero(const expression &ex)
 // The solution will be stored in the last column of mat.
 // Shamelessly taken from the wikipedia:
 // https://en.wikipedia.org/wiki/Gaussian_elimination
-auto solve_linmat(linmat &mat)
+void solve_linmat(linmat &mat)
 {
     // Number of rows and columns.
     const auto m = mat.m_rows.size();
