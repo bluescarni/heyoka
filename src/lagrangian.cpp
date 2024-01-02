@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
 #include <stdexcept>
 #include <unordered_set>
@@ -24,6 +25,7 @@
 #include <heyoka/lagrangian.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -113,6 +115,194 @@ void lagrangian_impl_sanity_checks(const expression &L, const std::vector<expres
     }
 }
 
+// Matrix representing the coefficients of a linear system with n variables
+// and n equations. The number of rows is n, the number of columns
+// is n+1 (i.e., this is the augmented matrix with the rhs of the
+// system in the last column).
+struct linmat {
+    std::vector<std::vector<expression>> m_rows;
+
+    using row_idx_t = decltype(m_rows.size());
+    using col_idx_t = decltype(m_rows[0].size());
+
+    auto &operator()(row_idx_t i, col_idx_t j)
+    {
+        assert(i < m_rows.size());
+        assert(j < m_rows[i].size());
+        return m_rows[i][j];
+    }
+
+    template <typename T>
+    explicit linmat(T n)
+    {
+        assert(n > 0);
+
+        m_rows.resize(n);
+
+        for (auto &row : m_rows) {
+            row.resize(n + 1);
+        }
+    }
+};
+
+// Prepare the matrix representing the Euler-Lagrange
+// equations as a linear system in the generalised
+// accelerations. n_qs is the number of generalised coordinates,
+// L_dt and D_dt the tensors of derivatives of the Lagrangian
+// and the dissipation function respectively. qdots is the
+// list of generalised velocities.
+template <typename T>
+linmat build_linmat(T n_qs, const dtens &L_dt, const dtens &D_dt, const std::vector<expression> &qdots)
+{
+    assert(n_qs > 0);
+    assert(n_qs == qdots.size());
+
+    // Prepare vectors of indices for indexing into L_dt and D_dt.
+    std::vector<std::uint32_t> vidx_L;
+    vidx_L.resize(1 + n_qs * 2 + 1);
+
+    std::vector<std::uint32_t> vidx_D;
+    vidx_D.resize(1 + n_qs);
+
+    // Temporary vector to build the rhs.
+    std::vector<expression> rhs_vec;
+
+    // Init the return value.
+    linmat mat(n_qs);
+
+    // Build row-by-row.
+    for (T i = 0; i < n_qs; ++i) {
+        // Reset the temp vectors.
+        std::ranges::fill(vidx_L, 0);
+        std::ranges::fill(vidx_D, 0);
+        rhs_vec.clear();
+
+        // dL/dqi.
+        vidx_L[1 + i] = 1;
+        rhs_vec.push_back(fix_nn(L_dt[vidx_L]));
+
+        // -d2L/(dqdoti dt).
+        vidx_L[1 + i] = 0;
+        vidx_L[1 + n_qs + i] = 1;
+        vidx_L.back() = 1;
+        rhs_vec.push_back(-fix_nn(L_dt[vidx_L]));
+
+        // -dD/dqdoti
+        vidx_D[1 + i] = 1;
+        rhs_vec.push_back(-fix_nn(D_dt[vidx_D]));
+
+        // Iterate over j to compute the -d2L/(dqdoti dqj) * qdotj
+        // and the d2L/(dqdoti dqdotj) terms.
+        auto &cur_row = mat.m_rows[i];
+        for (T j = 0; j < n_qs; ++j) {
+            // d2L/(dqdoti dqdotj).
+            std::ranges::fill(vidx_L, 0);
+            // NOTE: need to special case for i == j.
+            if (i == j) {
+                vidx_L[1 + n_qs + i] = 2;
+            } else {
+                vidx_L[1 + n_qs + i] = 1;
+                vidx_L[1 + n_qs + j] = 1;
+            }
+            cur_row[j] = fix_nn(L_dt[vidx_L]);
+
+            // -d2L/(dqdoti dqj) * qdotj.
+            std::ranges::fill(vidx_L, 0);
+            vidx_L[1 + n_qs + i] = 1;
+            vidx_L[1 + j] = 1;
+            rhs_vec.push_back(fix_nn(-fix_nn(L_dt[vidx_L]) * qdots[j]));
+        }
+
+        // Assemble the rhs.
+        cur_row[n_qs] = sum(rhs_vec);
+    }
+
+    return mat;
+}
+
+// Helper to check if an expression is the zero constant.
+bool ex_zero(const expression &ex)
+{
+    if (const auto *nptr = std::get_if<number>(&ex.value())) {
+        return is_zero(*nptr);
+    }
+
+    return false;
+}
+
+// Solve the linear system represented by mat
+// via Gaussian elimination + back-substitution.
+// The solution will be stored in the last column of mat.
+// Shamelessly taken from the wikipedia:
+// https://en.wikipedia.org/wiki/Gaussian_elimination
+void solve_linmat(linmat &mat)
+{
+    // Number of rows and columns.
+    const auto m = mat.m_rows.size();
+    assert(m > 0u);
+    const auto n = mat.m_rows[0].size();
+    assert(n > 0u);
+    assert(n - 1u == m);
+
+    // Init the pivot row and column.
+    linmat::row_idx_t h = 0;
+    linmat::col_idx_t k = 0;
+
+    while (h < m && k < n) {
+        // Find the k-th pivot.
+        auto i_max = h;
+
+        for (; i_max < m && ex_zero(mat(i_max, k)); ++i_max) {
+        }
+
+        if (i_max == m) {
+            // No pivot in this column, pass to next column.
+            ++k;
+            continue;
+        }
+
+        // Swap rows.
+        std::swap(mat.m_rows[h], mat.m_rows[i_max]);
+
+        // Do for all rows below pivot.
+        for (auto i = h + 1u; i < m; ++i) {
+            const auto f = fix_nn(fix_nn(mat(i, k)) / fix_nn(mat(h, k)));
+
+            // Fill with zeros the lower part of pivot column.
+            mat(i, k) = 0_dbl;
+
+            // Do for all remaining elements in current row.
+            for (auto j = k + 1u; j < n; ++j) {
+                mat(i, j) = fix_nn(fix_nn(mat(i, j)) - fix_nn(mat(h, j)) * f);
+            }
+        }
+
+        ++h;
+        ++k;
+    }
+
+    // Run the back-substitution.
+    std::vector<expression> new_rhs;
+    for (linmat::row_idx_t i_idx = 0; i_idx < m; ++i_idx) {
+        // The row on which we are operating (we are moving
+        // backwards).
+        const auto i = m - i_idx - 1u;
+
+        // Init the new rhs with the current one.
+        new_rhs.clear();
+        new_rhs.push_back(mat(i, n - 1u));
+
+        // Move the terms to the rhs.
+        for (linmat::col_idx_t j = i + 1u; j < m; ++j) {
+            new_rhs.push_back(fix_nn(-mat(i, j) * mat(j, n - 1u)));
+        }
+
+        // Divide the new rhs by the coefficient of the current variable
+        // and assign it.
+        mat(i, n - 1u) = fix_nn(fix_nn(sum(new_rhs)) / mat(i, i));
+    }
+}
+
 } // namespace
 
 } // namespace detail
@@ -145,6 +335,12 @@ std::vector<std::pair<expression, expression>> lagrangian(const expression &L_, 
     // Compute the tensor of derivatives of D up to order 1 wrt qdots.
     const auto D_dt = diff_tensors({D}, kw::diff_args = qdots, kw::diff_order = 1);
 
+    // Build the linear system.
+    auto mat = detail::build_linmat(n_qs, L_dt, D_dt, qdots);
+
+    // Solve it.
+    detail::solve_linmat(mat);
+
     // Start assembling the RHS of the return value.
     std::vector<expression> rhs_ret;
     rhs_ret.reserve(n_qs * 2);
@@ -154,43 +350,9 @@ std::vector<std::pair<expression, expression>> lagrangian(const expression &L_, 
         rhs_ret.push_back(qdots[i]);
     }
 
-    // Prepare vectors of indices for indexing into L_dt and D_dt.
-    std::vector<std::uint32_t> vidx_L;
-    vidx_L.resize(1 + n_qs * 2 + 1);
-
-    std::vector<std::uint32_t> vidx_D;
-    vidx_D.resize(1 + n_qs);
-
     // dqdot/dt.
     for (size_type i = 0; i < n_qs; ++i) {
-        // Reset the vectors of indices.
-        std::ranges::fill(vidx_L, 0);
-        std::ranges::fill(vidx_D, 0);
-
-        // dL/dq.
-        vidx_L[1 + i] = 1;
-        const auto dL_dq = fix_nn(L_dt[vidx_L]);
-
-        // d2L/dqdqdot.
-        vidx_L[1 + n_qs + i] = 1;
-        const auto d2L_dqdqdot = fix_nn(L_dt[vidx_L]);
-
-        // d2L/dqdot2.
-        vidx_L[1 + i] = 0;
-        vidx_L[1 + n_qs + i] = 2;
-        const auto d2L_dqdot2 = fix_nn(L_dt[vidx_L]);
-
-        // d2L/dtdqdot.
-        vidx_L[1 + n_qs + i] = 1;
-        vidx_L.back() = 1;
-        const auto d2L_dtdqdot = fix_nn(L_dt[vidx_L]);
-
-        // dD/dqdot.
-        vidx_D[1 + i] = 1;
-        const auto dD_dqdot = fix_nn(D_dt[vidx_D]);
-
-        // Assemble.
-        rhs_ret.push_back(sum({dL_dq, -d2L_dqdqdot * qdots[i], -d2L_dtdqdot, -dD_dqdot}) / d2L_dqdot2);
+        rhs_ret.push_back(mat.m_rows[i].back());
     }
 
     // Restore the time expression.
