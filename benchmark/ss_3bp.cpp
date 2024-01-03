@@ -20,6 +20,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/model/nbody.hpp>
+#include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "benchmark_utils.hpp"
@@ -85,13 +86,14 @@ int main(int argc, char *argv[])
     std::size_t n_steps;
     std::vector<double> d_out;
     std::optional<continuous_output<double>> c_out;
+    step_callback<double> scb;
 
     auto start = std::chrono::high_resolution_clock::now();
 
     if (with_dense) {
-        std::tie(oc, h_min, h_max, n_steps, d_out) = ta.propagate_grid(std::move(grid));
+        std::tie(oc, h_min, h_max, n_steps, scb, d_out) = ta.propagate_grid(std::move(grid));
     } else {
-        std::tie(oc, h_min, h_max, n_steps, c_out) = ta.propagate_until(100000.);
+        std::tie(oc, h_min, h_max, n_steps, c_out, scb) = ta.propagate_until(100000.);
     }
 
     auto elapsed = static_cast<double>(

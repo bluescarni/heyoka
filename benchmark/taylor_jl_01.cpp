@@ -39,7 +39,7 @@ int main()
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    auto [oc, min_ss, max_ss, nsteps, _] = ta.propagate_until(final_time);
+    auto [oc, min_ss, max_ss, nsteps, _1, _2] = ta.propagate_until(final_time);
 
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
