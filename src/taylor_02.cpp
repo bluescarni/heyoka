@@ -1147,8 +1147,8 @@ std::pair<llvm::Value *, llvm::Type *> taylor_compute_jet_compact_mode(
             });
         } else {
             // The manually-unrolled version of the above.
-            for (std::uint32_t i = 0; i < ncalls; ++i) {
-                auto *cur_call_idx = builder.getInt32(i);
+            for (std::uint32_t idx = 0; idx < ncalls; ++idx) {
+                auto *cur_call_idx = builder.getInt32(idx);
                 auto u_idx = gens[0](cur_call_idx);
                 std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_ptr, time_ptr};
 

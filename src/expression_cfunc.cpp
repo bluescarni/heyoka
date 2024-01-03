@@ -1482,8 +1482,8 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
             });
         } else {
             // The manually-unrolled version of the above.
-            for (std::uint32_t i = 0; i < ncalls; ++i) {
-                auto *cur_call_idx = builder.getInt32(i);
+            for (std::uint32_t idx = 0; idx < ncalls; ++idx) {
+                auto *cur_call_idx = builder.getInt32(idx);
                 auto u_idx = gens[0](cur_call_idx);
                 std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr, time_ptr, stride};
 
