@@ -1110,7 +1110,7 @@ std::pair<llvm::Value *, llvm::Type *> taylor_compute_jet_compact_mode(
     // func is the LLVM function for the computation of the Taylor derivative in the block,
     // ncalls the number of times it must be called, gens the generators for the
     // function arguments and cur_order the order of the derivative.
-    auto block_diff = [&](llvm::Function *func, const auto &ncalls, const auto &gens, llvm::Value *cur_order) {
+    auto block_diff = [&](llvm::Function *func, std::uint32_t ncalls, const auto &gens, llvm::Value *cur_order) {
         // LCOV_EXCL_START
         assert(ncalls > 0u);
         assert(!gens.empty());

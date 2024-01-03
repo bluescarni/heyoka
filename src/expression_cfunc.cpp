@@ -1447,7 +1447,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
     // func is the LLVM function for evaluation in the block,
     // ncalls the number of times it must be called and gens the generators for the
     // function arguments.
-    auto block_eval = [&](llvm::Function *func, const auto &ncalls, const auto &gens) {
+    auto block_eval = [&](llvm::Function *func, std::uint32_t ncalls, const auto &gens) {
         // LCOV_EXCL_START
         assert(ncalls > 0u);
         assert(!gens.empty());
