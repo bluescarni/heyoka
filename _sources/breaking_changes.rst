@@ -34,7 +34,7 @@ The way step callbacks interact with the ``propagate_*()`` functions has changed
 Adapting existing code for the new API should be straightforward. In most cases it should be just
 a matter of:
 
-- adapting strucuted bindings declarations to account for the new element in the return tuple
+- adapting structured bindings declarations to account for the new element in the return tuple
   of scalar propagations,
 - adjusting the indexing into the return tuple when fetching a specific element,
 - accounting for the fact that batch propagations now return a tuple of two elements
