@@ -1454,27 +1454,46 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
         assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
         // LCOV_EXCL_STOP
 
-        // Loop over the number of calls.
-        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
-            // Create the u variable index from the first generator.
-            auto u_idx = gens[0](cur_call_idx);
+        // We will be manually unrolling loops if ncalls is small enough.
+        // This seems to help with compilation times.
+        constexpr auto max_unroll_n = 5u;
 
-            // Initialise the vector of arguments with which func must be called. The following
-            // initial arguments are always present:
-            // - eval array,
-            // - pointer to the param values,
-            // - pointer to the time value(s),
-            // - stride.
-            std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr, time_ptr, stride};
+        if (ncalls > max_unroll_n) {
+            // Loop over the number of calls.
+            llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+                // Create the u variable index from the first generator.
+                auto u_idx = gens[0](cur_call_idx);
 
-            // Create the other arguments via the generators.
-            for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
-                args.push_back(gens[i](cur_call_idx));
+                // Initialise the vector of arguments with which func must be called. The following
+                // initial arguments are always present:
+                // - eval array,
+                // - pointer to the param values,
+                // - pointer to the time value(s),
+                // - stride.
+                std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr, time_ptr, stride};
+
+                // Create the other arguments via the generators.
+                for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                    args.push_back(gens[i](cur_call_idx));
+                }
+
+                // Evaluate and store the result.
+                cfunc_c_store_eval(s, fp_vec_type, eval_arr, u_idx, builder.CreateCall(func, args));
+            });
+        } else {
+            // The manually-unrolled version of the above.
+            for (std::uint32_t i = 0; i < ncalls; ++i) {
+                auto *cur_call_idx = builder.getInt32(i);
+                auto u_idx = gens[0](cur_call_idx);
+                std::vector<llvm::Value *> args{u_idx, eval_arr, par_ptr, time_ptr, stride};
+
+                for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                    args.push_back(gens[i](cur_call_idx));
+                }
+
+                cfunc_c_store_eval(s, fp_vec_type, eval_arr, u_idx, builder.CreateCall(func, args));
             }
-
-            // Evaluate and store the result.
-            cfunc_c_store_eval(s, fp_vec_type, eval_arr, u_idx, builder.CreateCall(func, args));
-        });
+        }
     };
 
     // Evaluate all elementary subexpressions by iterating
