@@ -153,16 +153,6 @@ taylor_adaptive<double> taylor_factory(const P &mascon_points, const M &mascon_m
     return taylor;
 }
 
-// template <typename P, typename M>
-// double compute_energy(const std::vector<double> x, const P &mascon_points, const M &mascon_masses, double p, double
-// q,
-//                       double r, double G)
-// {
-//     auto energy = energy_mascon_system(kw::state = x, kw::points = mascon_points, kw::masses = mascon_masses,
-//                                        kw::omega = std::vector<double>{p, q, r}, kw::Gconst = G);
-//     return eval_dbl(energy, std::unordered_map<std::string, double>());
-// }
-
 template <typename P, typename M>
 void compare_taylor_vs_rkf(const P &mascon_points, const M &mascon_masses, taylor_adaptive<double> &taylor, double wz,
                            double test_time = 10.)

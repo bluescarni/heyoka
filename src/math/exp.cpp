@@ -15,7 +15,6 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
-#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -55,68 +54,6 @@ namespace detail
 exp_impl::exp_impl(expression e) : func_base("exp", std::vector{std::move(e)}) {}
 
 exp_impl::exp_impl() : exp_impl(0_dbl) {}
-
-double exp_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
-{
-    assert(args().size() == 1u);
-
-    return std::exp(heyoka::eval_dbl(args()[0], map, pars));
-}
-
-long double exp_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map,
-                                const std::vector<long double> &pars) const
-{
-    assert(args().size() == 1u);
-
-    return std::exp(heyoka::eval_ldbl(args()[0], map, pars));
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-mppp::real128 exp_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map,
-                                  const std::vector<mppp::real128> &pars) const
-{
-    assert(args().size() == 1u);
-
-    return mppp::exp(heyoka::eval_f128(args()[0], map, pars));
-}
-
-#endif
-
-void exp_impl::eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std::string, std::vector<double>> &map,
-                              const std::vector<double> &pars) const
-{
-    assert(args().size() == 1u);
-
-    heyoka::eval_batch_dbl(out, args()[0], map, pars);
-    for (auto &el : out) {
-        el = std::exp(el);
-    }
-}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-double exp_impl::eval_num_dbl(const std::vector<double> &a) const
-{
-    if (a.size() != 1u) {
-        throw std::invalid_argument(
-            fmt::format("Inconsistent number of arguments when computing the numerical value of the "
-                        "exponential over doubles (1 argument was expected, but {} arguments were provided",
-                        a.size()));
-    }
-
-    return std::exp(a[0]);
-}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-double exp_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>::size_type i) const
-{
-    if (a.size() != 1u || i != 0u) {
-        throw std::invalid_argument("Inconsistent number of arguments or derivative requested when computing the "
-                                    "numerical derivative of the exponential");
-    }
-
-    return std::exp(a[0]);
-}
 
 llvm::Value *exp_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
                                  llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,

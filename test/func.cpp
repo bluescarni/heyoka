@@ -77,26 +77,6 @@ TEST_CASE("func minimal")
                            Message("Cannot compute the derivative of the function 'f' with respect to a parameter, "
                                    "because the function does not provide "
                                    "neither a diff() nor a gradient() member function"));
-    REQUIRE_THROWS_MATCHES(f.eval_dbl({{}}, {}), not_implemented_error,
-                           Message("double eval is not implemented for the function 'f'"));
-    std::vector<double> tmp;
-    REQUIRE_THROWS_MATCHES(f.eval_batch_dbl(tmp, {{}}, {}), not_implemented_error,
-                           Message("double batch eval is not implemented for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.eval_num_dbl({1., 1.}), not_implemented_error,
-                           Message("double numerical eval is not implemented for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(
-        f.eval_num_dbl({}), std::invalid_argument,
-        Message("Inconsistent number of arguments supplied to the double numerical evaluation of the function 'f': 2 "
-                "arguments were expected, but 0 arguments were provided instead"));
-    REQUIRE_THROWS_MATCHES(f.deval_num_dbl({1., 1.}, 0), not_implemented_error,
-                           Message("double numerical eval of the derivative is not implemented for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.deval_num_dbl({1.}, 0), std::invalid_argument,
-                           Message("Inconsistent number of arguments supplied to the double numerical evaluation of "
-                                   "the derivative of function 'f': 2 "
-                                   "arguments were expected, but 1 arguments were provided instead"));
-    REQUIRE_THROWS_MATCHES(f.deval_num_dbl({1., 1.}, 2), std::invalid_argument,
-                           Message("Invalid index supplied to the double numerical evaluation of the derivative of "
-                                   "function 'f': index 2 was supplied, but the number of arguments is only 2"));
     REQUIRE_THROWS_MATCHES(f.llvm_eval(s, fp_t, {}, nullptr, nullptr, nullptr, 1, false), not_implemented_error,
                            Message("llvm_eval() is not implemented for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.llvm_c_eval_func(s, fp_t, 1, false), not_implemented_error,
@@ -201,86 +181,6 @@ TEST_CASE("func diff")
                            Message("Inconsistent gradient returned by the function 'f': a vector of 1 elements was "
                                    "expected, but the number of elements is 0 instead"));
     REQUIRE(func(func_05b{{"x"_var}}).diff(func_map, std::get<param>(par[0].value())) == -42_dbl);
-}
-
-struct func_06 : func_base {
-    func_06() : func_base("f", {}) {}
-    explicit func_06(std::vector<expression> args) : func_base("f", std::move(args)) {}
-
-    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const
-    {
-        return 42;
-    }
-    long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const
-    {
-        return 42;
-    }
-#if defined(HEYOKA_HAVE_REAL128)
-    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                            const std::vector<mppp::real128> &) const
-    {
-        return mppp::real128(42);
-    }
-#endif
-};
-
-TEST_CASE("func eval_dbl")
-{
-    auto f = func(func_06{});
-
-    REQUIRE(f.eval_dbl({{}}, {}) == 42);
-}
-
-struct func_07 : func_base {
-    func_07() : func_base("f", {}) {}
-    explicit func_07(std::vector<expression> args) : func_base("f", std::move(args)) {}
-
-    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
-                        const std::vector<double> &) const
-    {
-    }
-};
-
-TEST_CASE("func eval_batch_dbl")
-{
-    auto f = func(func_07{});
-
-    std::vector<double> tmp;
-    REQUIRE_NOTHROW(f.eval_batch_dbl(tmp, {{}}, {}));
-}
-
-struct func_08 : func_base {
-    func_08() : func_base("f", {}) {}
-    explicit func_08(std::vector<expression> args) : func_base("f", std::move(args)) {}
-
-    double eval_num_dbl(const std::vector<double> &) const
-    {
-        return 42;
-    }
-};
-
-TEST_CASE("func eval_num_dbl")
-{
-    auto f = func(func_08{{"x"_var}});
-
-    REQUIRE(f.eval_num_dbl({1.}) == 42);
-}
-
-struct func_09 : func_base {
-    func_09() : func_base("f", {}) {}
-    explicit func_09(std::vector<expression> args) : func_base("f", std::move(args)) {}
-
-    double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const
-    {
-        return 43;
-    }
-};
-
-TEST_CASE("func deval_num_dbl")
-{
-    auto f = func(func_09{{"x"_var}});
-
-    REQUIRE(f.deval_num_dbl({1.}, 0) == 43);
 }
 
 struct func_10 : func_base {

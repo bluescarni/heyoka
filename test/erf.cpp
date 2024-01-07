@@ -80,9 +80,6 @@ TEST_CASE("erf")
     std::ostringstream stream;
     stream << erf(x);
     REQUIRE(stream.str() == "erf(x)");
-    // Test the expression evaluation
-    REQUIRE(eval<double>(erf(x), {{"x", 0.}}) == erf(0.));
-    REQUIRE(eval<double>(erf(x), {{"x", 1.}}) == erf(1.));
 }
 
 TEST_CASE("erf diff")
