@@ -15,7 +15,6 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
-#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -80,31 +79,6 @@ expression atanh_impl::diff(funcptr_map<expression> &func_map, const param &p) c
     assert(args().size() == 1u);
     return atanh(args()[0]);
 }
-
-double atanh_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
-{
-    assert(args().size() == 1u);
-
-    return std::atanh(heyoka::eval_dbl(args()[0], map, pars));
-}
-
-long double atanh_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map,
-                                  const std::vector<long double> &pars) const
-{
-    assert(args().size() == 1u);
-
-    return std::atanh(heyoka::eval_ldbl(args()[0], map, pars));
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-mppp::real128 atanh_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map,
-                                    const std::vector<mppp::real128> &pars) const
-{
-    assert(args().size() == 1u);
-
-    return mppp::atanh(heyoka::eval_f128(args()[0], map, pars));
-}
-#endif
 
 llvm::Value *atanh_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
                                    llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,

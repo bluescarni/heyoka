@@ -21,10 +21,8 @@
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
-#include <string>
 #include <type_traits>
 #include <typeinfo>
-#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -546,90 +544,6 @@ number sqrt(const number &n)
             return number{sqrt(arg)};
         },
         n.value());
-}
-
-namespace detail
-{
-
-namespace
-{
-
-template <typename To>
-To number_eval_impl(const number &n)
-{
-    return std::visit(
-        [](const auto &v) -> To {
-            if constexpr (std::is_constructible_v<To, decltype(v)>) {
-                return static_cast<To>(v);
-            } else {
-                // LCOV_EXCL_START
-                throw std::invalid_argument(
-                    fmt::format("Cannot convert an object of type '{}' to an object of type '{}'",
-                                boost::core::demangle(typeid(v).name()), boost::core::demangle(typeid(To).name())));
-                // LCOV_EXCL_STOP
-            }
-        },
-        n.value());
-}
-
-} // namespace
-
-} // namespace detail
-
-double eval_dbl(const number &n, const std::unordered_map<std::string, double> &, const std::vector<double> &)
-{
-    return detail::number_eval_impl<double>(n);
-}
-
-long double eval_ldbl(const number &n, const std::unordered_map<std::string, long double> &,
-                      const std::vector<long double> &)
-{
-    return detail::number_eval_impl<long double>(n);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-mppp::real128 eval_f128(const number &n, const std::unordered_map<std::string, mppp::real128> &,
-                        const std::vector<mppp::real128> &)
-{
-    return detail::number_eval_impl<mppp::real128>(n);
-}
-
-#endif
-
-void eval_batch_dbl(std::vector<double> &out_values, const number &n,
-                    const std::unordered_map<std::string, std::vector<double>> &, const std::vector<double> &)
-{
-    std::visit(
-        [&out_values](const auto &v) {
-            for (auto &el : out_values) {
-                el = static_cast<double>(v);
-            }
-        },
-        n.value());
-}
-
-void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const number &,
-                        std::size_t &node_counter)
-{
-    node_connections.emplace_back();
-    node_counter++;
-}
-
-void update_node_values_dbl(std::vector<double> &node_values, const number &n,
-                            const std::unordered_map<std::string, double> &,
-                            const std::vector<std::vector<std::size_t>> &, std::size_t &node_counter)
-{
-    std::visit([&node_values, &node_counter](const auto &v) { node_values[node_counter] = static_cast<double>(v); },
-               n.value());
-    node_counter++;
-}
-
-void update_grad_dbl(std::unordered_map<std::string, double> &, const number &,
-                     const std::unordered_map<std::string, double> &, const std::vector<double> &,
-                     const std::vector<std::vector<std::size_t>> &, std::size_t &node_counter, double)
-{
-    node_counter++;
 }
 
 // Generate an LLVM constant of type tp representing the number n.

@@ -10,7 +10,6 @@
 #define HEYOKA_MATH_ACOSH_HPP
 
 #include <cstdint>
-#include <unordered_map>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -41,14 +40,6 @@ public:
     [[nodiscard]] std::vector<expression> gradient() const;
 
     [[nodiscard]] expression normalise() const;
-
-    [[nodiscard]] double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
-    [[nodiscard]] long double eval_ldbl(const std::unordered_map<std::string, long double> &,
-                                        const std::vector<long double> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    [[nodiscard]] mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                                          const std::vector<mppp::real128> &) const;
-#endif
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;

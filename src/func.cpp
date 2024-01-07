@@ -20,7 +20,6 @@
 #include <string>
 #include <type_traits>
 #include <typeindex>
-#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -315,61 +314,6 @@ expression func::diff(detail::funcptr_map<expression> &func_map, const param &p)
     }
 
     return sum(prod);
-}
-
-double func::eval_dbl(const std::unordered_map<std::string, double> &m, const std::vector<double> &pars) const
-{
-    return ptr()->eval_dbl(m, pars);
-}
-
-long double func::eval_ldbl(const std::unordered_map<std::string, long double> &m,
-                            const std::vector<long double> &pars) const
-{
-    return ptr()->eval_ldbl(m, pars);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-mppp::real128 func::eval_f128(const std::unordered_map<std::string, mppp::real128> &m,
-                              const std::vector<mppp::real128> &pars) const
-{
-    return ptr()->eval_f128(m, pars);
-}
-#endif
-void func::eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std::string, std::vector<double>> &m,
-                          const std::vector<double> &pars) const
-{
-    ptr()->eval_batch_dbl(out, m, pars);
-}
-
-double func::eval_num_dbl(const std::vector<double> &v) const
-{
-    if (v.size() != args().size()) {
-        throw std::invalid_argument(
-            fmt::format("Inconsistent number of arguments supplied to the double numerical evaluation of the function "
-                        "'{}': {} arguments were expected, but {} arguments were provided instead",
-                        get_name(), args().size(), v.size()));
-    }
-
-    return ptr()->eval_num_dbl(v);
-}
-
-double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::size_type i) const
-{
-    if (v.size() != args().size()) {
-        throw std::invalid_argument(fmt::format(
-            "Inconsistent number of arguments supplied to the double numerical evaluation of the derivative of "
-            "function '{}': {} arguments were expected, but {} arguments were provided instead",
-            get_name(), args().size(), v.size()));
-    }
-
-    if (i >= v.size()) {
-        throw std::invalid_argument(
-            fmt::format("Invalid index supplied to the double numerical evaluation of the derivative of function '{}': "
-                        "index {} was supplied, but the number of arguments is only {}",
-                        get_name(), args().size(), v.size()));
-    }
-
-    return ptr()->deval_num_dbl(v, i);
 }
 
 llvm::Value *func::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
@@ -673,90 +617,6 @@ bool operator<(const func &a, const func &b)
     assert(a == b);
 
     return false;
-}
-
-double eval_dbl(const func &f, const std::unordered_map<std::string, double> &map, const std::vector<double> &pars)
-{
-    return f.eval_dbl(map, pars);
-}
-
-long double eval_ldbl(const func &f, const std::unordered_map<std::string, long double> &map,
-                      const std::vector<long double> &pars)
-{
-    return f.eval_ldbl(map, pars);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-mppp::real128 eval_f128(const func &f, const std::unordered_map<std::string, mppp::real128> &map,
-                        const std::vector<mppp::real128> &pars)
-{
-    return f.eval_f128(map, pars);
-}
-
-#endif
-
-void eval_batch_dbl(std::vector<double> &out_values, const func &f,
-                    const std::unordered_map<std::string, std::vector<double>> &map, const std::vector<double> &pars)
-{
-    f.eval_batch_dbl(out_values, map, pars);
-}
-
-double eval_num_dbl(const func &f, const std::vector<double> &in)
-{
-    return f.eval_num_dbl(in);
-}
-
-double deval_num_dbl(const func &f, const std::vector<double> &in, std::vector<double>::size_type d)
-{
-    return f.deval_num_dbl(in, d);
-}
-
-void update_node_values_dbl(std::vector<double> &node_values, const func &f,
-                            const std::unordered_map<std::string, double> &map,
-                            const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter)
-{
-    const auto node_id = node_counter;
-    node_counter++;
-    // We have to recurse first as to make sure node_values is filled before being accessed later.
-    for (const auto &arg : f.args()) {
-        update_node_values_dbl(node_values, arg, map, node_connections, node_counter);
-    }
-    // Then we compute
-    std::vector<double> in_values(f.args().size());
-    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
-        in_values[i] = node_values[node_connections[node_id][i]];
-    }
-    node_values[node_id] = eval_num_dbl(f, in_values);
-}
-
-void update_grad_dbl(std::unordered_map<std::string, double> &grad, const func &f,
-                     const std::unordered_map<std::string, double> &map, const std::vector<double> &node_values,
-                     const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter,
-                     double acc)
-{
-    const auto node_id = node_counter;
-    node_counter++;
-    std::vector<double> in_values(f.args().size());
-    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
-        in_values[i] = node_values[node_connections[node_id][i]];
-    }
-    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
-        auto value = deval_num_dbl(f, in_values, i);
-        update_grad_dbl(grad, f.args()[i], map, node_values, node_connections, node_counter, acc * value);
-    }
-}
-
-void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const func &f,
-                        std::size_t &node_counter)
-{
-    const auto node_id = node_counter;
-    node_counter++;
-    node_connections.emplace_back(f.args().size());
-    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
-        node_connections[node_id][i] = node_counter;
-        update_connections(node_connections, f.args()[i], node_counter);
-    };
 }
 
 namespace detail

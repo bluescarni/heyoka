@@ -580,57 +580,6 @@ dtens diff_tensors(const std::vector<expression> &v_ex, const KwArgs &...kw_args
     return detail::diff_tensors(v_ex, d_args, order);
 }
 
-HEYOKA_DLL_PUBLIC double eval_dbl(const expression &, const std::unordered_map<std::string, double> &,
-                                  const std::vector<double> & = {});
-HEYOKA_DLL_PUBLIC long double eval_ldbl(const expression &, const std::unordered_map<std::string, long double> &,
-                                        const std::vector<long double> & = {});
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC mppp::real128 eval_f128(const expression &, const std::unordered_map<std::string, mppp::real128> &,
-                                          const std::vector<mppp::real128> & = {});
-
-#endif
-
-template <typename T>
-inline T eval(const expression &e, const std::unordered_map<std::string, T> &map, const std::vector<T> &pars = {})
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return eval_dbl(e, map, pars);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return eval_ldbl(e, map, pars);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return eval_f128(e, map, pars);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
-
-HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const expression &,
-                                      const std::unordered_map<std::string, std::vector<double>> &,
-                                      const std::vector<double> & = {});
-
-// When traversing the expression tree with some recursive algorithm we may have to do some book-keeping and use
-// preallocated memory to store the result, in which case the corresponding function is called update_*. A corresponding
-// method, more friendly to use, takes care of allocating memory and initializing the book-keeping variables, its called
-// compute_*.
-HEYOKA_DLL_PUBLIC std::vector<std::vector<std::size_t>> compute_connections(const expression &);
-HEYOKA_DLL_PUBLIC void update_connections(std::vector<std::vector<std::size_t>> &, const expression &, std::size_t &);
-HEYOKA_DLL_PUBLIC std::vector<double> compute_node_values_dbl(const expression &,
-                                                              const std::unordered_map<std::string, double> &,
-                                                              const std::vector<std::vector<std::size_t>> &);
-HEYOKA_DLL_PUBLIC void update_node_values_dbl(std::vector<double> &, const expression &,
-                                              const std::unordered_map<std::string, double> &,
-                                              const std::vector<std::vector<std::size_t>> &, std::size_t &);
-
-HEYOKA_DLL_PUBLIC std::unordered_map<std::string, double>
-compute_grad_dbl(const expression &, const std::unordered_map<std::string, double> &,
-                 const std::vector<std::vector<std::size_t>> &);
-HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &, const expression &,
-                                       const std::unordered_map<std::string, double> &, const std::vector<double> &,
-                                       const std::vector<std::vector<std::size_t>> &, std::size_t &, double = 1.);
-
 namespace detail
 {
 

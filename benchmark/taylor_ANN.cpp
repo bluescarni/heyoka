@@ -117,26 +117,6 @@ int main()
     // Longer times result in reaching limit cycles and thus loss of precision
     auto state = neural_network_ode.get_state();
 
-    // Uncomment these lines to print the state on screen during the first steps
-    // std::unordered_map<std::string, double> eval_map;
-    // eval_map["a0"] = state[0];
-    // eval_map["a1"] = state[1];
-    // for (decltype(w.size()) i = 0u; i < w.size(); ++i) {
-    //    eval_map["w" + std::to_string(i + offset_w_names)] = ic[4 + i];
-    //}
-    // auto V = eval_dbl(-out[0] - 1_dbl / pow(x[0] * x[0] + x[1] * x[1], 0.5_dbl), eval_map);
-    // auto E0 = V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
-    // for (auto i = 0u; i < 100; ++i) {
-    //    auto res = neural_network_ode.step();
-    //    state = neural_network_ode.get_state();
-    //    eval_map["a0"] = state[0];
-    //    eval_map["a1"] = state[1];
-    //    V = eval_dbl(-out[0] - 1_dbl / pow(x[0] * x[0] + x[1] * x[1], 0.5_dbl), eval_map);
-    //    auto E = V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
-    //    std::cout << neural_network_ode.get_time() << "," << state[0] << "," << state[1] << "," << E - E0 << ", "
-    //              << static_cast<int>(std::get<0>(res)) << ", " << V << ", " << std::endl;
-    //}
-
     neural_network_ode.propagate_until(100.);
     neural_network_ode.propagate_until(0.);
     stop = high_resolution_clock::now();

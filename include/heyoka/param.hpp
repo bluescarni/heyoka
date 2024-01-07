@@ -15,10 +15,6 @@
 #include <cstdint>
 #include <functional>
 #include <ostream>
-#include <string>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -45,7 +41,7 @@ class HEYOKA_DLL_PUBLIC param
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &m_index;
+        ar & m_index;
     }
 
 public:
@@ -75,31 +71,6 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const param &);
 
 HEYOKA_DLL_PUBLIC bool operator==(const param &, const param &) noexcept;
 HEYOKA_DLL_PUBLIC bool operator!=(const param &, const param &) noexcept;
-
-HEYOKA_DLL_PUBLIC double eval_dbl(const param &, const std::unordered_map<std::string, double> &,
-                                  const std::vector<double> &);
-HEYOKA_DLL_PUBLIC long double eval_ldbl(const param &, const std::unordered_map<std::string, long double> &,
-                                        const std::vector<long double> &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-HEYOKA_DLL_PUBLIC mppp::real128 eval_f128(const param &, const std::unordered_map<std::string, mppp::real128> &,
-                                          const std::vector<mppp::real128> &);
-#endif
-
-HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const param &,
-                                      const std::unordered_map<std::string, std::vector<double>> &,
-                                      const std::vector<double> &);
-
-HEYOKA_DLL_PUBLIC void update_connections(std::vector<std::vector<std::size_t>> &, const param &, std::size_t &);
-[[noreturn]] HEYOKA_DLL_PUBLIC void update_node_values_dbl(std::vector<double> &, const param &,
-                                                           const std::unordered_map<std::string, double> &,
-                                                           const std::vector<std::vector<std::size_t>> &,
-                                                           std::size_t &);
-[[noreturn]] HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &, const param &,
-                                                    const std::unordered_map<std::string, double> &,
-                                                    const std::vector<double> &,
-                                                    const std::vector<std::vector<std::size_t>> &, std::size_t &,
-                                                    double);
 
 HEYOKA_END_NAMESPACE
 

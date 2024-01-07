@@ -22,7 +22,6 @@
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -124,24 +123,6 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     [[nodiscard]] virtual bool has_gradient() const = 0;
     [[nodiscard]] virtual std::vector<expression> gradient() const = 0;
 
-    [[nodiscard]] virtual double eval_dbl(const std::unordered_map<std::string, double> &,
-                                          const std::vector<double> &) const
-        = 0;
-    [[nodiscard]] virtual long double eval_ldbl(const std::unordered_map<std::string, long double> &,
-                                                const std::vector<long double> &) const
-        = 0;
-#if defined(HEYOKA_HAVE_REAL128)
-    [[nodiscard]] virtual mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                                                  const std::vector<mppp::real128> &) const
-        = 0;
-#endif
-
-    virtual void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
-                                const std::vector<double> &) const
-        = 0;
-    [[nodiscard]] virtual double eval_num_dbl(const std::vector<double> &) const = 0;
-    [[nodiscard]] virtual double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const = 0;
-
     [[nodiscard]] virtual llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &,
                                                  llvm::Value *, llvm::Value *, llvm::Value *, std::uint32_t, bool) const
         = 0;
@@ -209,55 +190,6 @@ using func_gradient_t = decltype(std::declval<std::add_lvalue_reference_t<const 
 
 template <typename T>
 inline constexpr bool func_has_gradient_v = std::is_same_v<detected_t<func_gradient_t, T>, std::vector<expression>>;
-
-template <typename T>
-using func_eval_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_dbl(
-    std::declval<const std::unordered_map<std::string, double> &>(), std::declval<const std::vector<double> &>()));
-
-template <typename T>
-inline constexpr bool func_has_eval_dbl_v = std::is_same_v<detected_t<func_eval_dbl_t, T>, double>;
-
-template <typename T>
-using func_eval_ldbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_ldbl(
-    std::declval<const std::unordered_map<std::string, long double> &>(),
-    std::declval<const std::vector<long double> &>()));
-
-template <typename T>
-inline constexpr bool func_has_eval_ldbl_v = std::is_same_v<detected_t<func_eval_ldbl_t, T>, long double>;
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <typename T>
-using func_eval_f128_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_f128(
-    std::declval<const std::unordered_map<std::string, mppp::real128> &>(),
-    std::declval<const std::vector<mppp::real128> &>()));
-
-template <typename T>
-inline constexpr bool func_has_eval_f128_v = std::is_same_v<detected_t<func_eval_f128_t, T>, mppp::real128>;
-
-#endif
-
-template <typename T>
-using func_eval_batch_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_batch_dbl(
-    std::declval<std::vector<double> &>(), std::declval<const std::unordered_map<std::string, std::vector<double>> &>(),
-    std::declval<const std::vector<double> &>()));
-
-template <typename T>
-inline constexpr bool func_has_eval_batch_dbl_v = std::is_same_v<detected_t<func_eval_batch_dbl_t, T>, void>;
-
-template <typename T>
-using func_eval_num_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_num_dbl(
-    std::declval<const std::vector<double> &>()));
-
-template <typename T>
-inline constexpr bool func_has_eval_num_dbl_v = std::is_same_v<detected_t<func_eval_num_dbl_t, T>, double>;
-
-template <typename T>
-using func_deval_num_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().deval_num_dbl(
-    std::declval<const std::vector<double> &>(), std::declval<std::vector<double>::size_type>()));
-
-template <typename T>
-inline constexpr bool func_has_deval_num_dbl_v = std::is_same_v<detected_t<func_deval_num_dbl_t, T>, double>;
 
 template <typename T>
 using func_llvm_eval_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().llvm_eval(
@@ -406,64 +338,6 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         assert(false);
         throw;
         // LCOV_EXCL_STOP
-    }
-
-    // eval.
-    [[nodiscard]] double eval_dbl(const std::unordered_map<std::string, double> &m,
-                                  const std::vector<double> &pars) const final
-    {
-        if constexpr (func_has_eval_dbl_v<T>) {
-            return m_value.eval_dbl(m, pars);
-        } else {
-            throw not_implemented_error("double eval is not implemented for the function '" + get_name() + "'");
-        }
-    }
-    [[nodiscard]] long double eval_ldbl(const std::unordered_map<std::string, long double> &m,
-                                        const std::vector<long double> &pars) const final
-    {
-        if constexpr (func_has_eval_ldbl_v<T>) {
-            return m_value.eval_ldbl(m, pars);
-        } else {
-            throw not_implemented_error("long double eval is not implemented for the function '" + get_name() + "'");
-        }
-    }
-#if defined(HEYOKA_HAVE_REAL128)
-    [[nodiscard]] mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &m,
-                                          const std::vector<mppp::real128> &pars) const final
-    {
-        if constexpr (func_has_eval_f128_v<T>) {
-            return m_value.eval_f128(m, pars);
-        } else {
-            throw not_implemented_error("mppp::real128 eval is not implemented for the function '" + get_name() + "'");
-        }
-    }
-#endif
-    void eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std::string, std::vector<double>> &m,
-                        const std::vector<double> &pars) const final
-    {
-        if constexpr (func_has_eval_batch_dbl_v<T>) {
-            m_value.eval_batch_dbl(out, m, pars);
-        } else {
-            throw not_implemented_error("double batch eval is not implemented for the function '" + get_name() + "'");
-        }
-    }
-    [[nodiscard]] double eval_num_dbl(const std::vector<double> &v) const final
-    {
-        if constexpr (func_has_eval_num_dbl_v<T>) {
-            return m_value.eval_num_dbl(v);
-        } else {
-            throw not_implemented_error("double numerical eval is not implemented for the function '" + get_name()
-                                        + "'");
-        }
-    }
-    [[nodiscard]] double deval_num_dbl(const std::vector<double> &v, std::vector<double>::size_type i) const final
-    {
-        if constexpr (func_has_deval_num_dbl_v<T>) {
-            return m_value.deval_num_dbl(v, i);
-        } else {
-            throw not_implemented_error("double numerical eval of the derivative is not implemented for the function '"
-                                        + get_name() + "'");
-        }
     }
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
@@ -641,19 +515,6 @@ public:
     expression diff(detail::funcptr_map<expression> &, const std::string &) const;
     expression diff(detail::funcptr_map<expression> &, const param &) const;
 
-    [[nodiscard]] double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
-    [[nodiscard]] long double eval_ldbl(const std::unordered_map<std::string, long double> &,
-                                        const std::vector<long double> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    [[nodiscard]] mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                                          const std::vector<mppp::real128> &) const;
-#endif
-
-    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
-                        const std::vector<double> &) const;
-    [[nodiscard]] double eval_num_dbl(const std::vector<double> &) const;
-    [[nodiscard]] double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
-
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
@@ -668,29 +529,6 @@ public:
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
 };
-
-HEYOKA_DLL_PUBLIC double eval_dbl(const func &, const std::unordered_map<std::string, double> &,
-                                  const std::vector<double> &);
-HEYOKA_DLL_PUBLIC long double eval_ldbl(const func &, const std::unordered_map<std::string, long double> &,
-                                        const std::vector<long double> &);
-#if defined(HEYOKA_HAVE_REAL128)
-HEYOKA_DLL_PUBLIC mppp::real128 eval_f128(const func &, const std::unordered_map<std::string, mppp::real128> &,
-                                          const std::vector<mppp::real128> &);
-#endif
-
-HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const func &,
-                                      const std::unordered_map<std::string, std::vector<double>> &,
-                                      const std::vector<double> &);
-HEYOKA_DLL_PUBLIC double eval_num_dbl(const func &, const std::vector<double> &);
-HEYOKA_DLL_PUBLIC double deval_num_dbl(const func &, const std::vector<double> &, std::vector<double>::size_type);
-
-HEYOKA_DLL_PUBLIC void update_connections(std::vector<std::vector<std::size_t>> &, const func &, std::size_t &);
-HEYOKA_DLL_PUBLIC void update_node_values_dbl(std::vector<double> &, const func &,
-                                              const std::unordered_map<std::string, double> &,
-                                              const std::vector<std::vector<std::size_t>> &, std::size_t &);
-HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &, const func &,
-                                       const std::unordered_map<std::string, double> &, const std::vector<double> &,
-                                       const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
 
 namespace detail
 {

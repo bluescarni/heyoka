@@ -33,7 +33,6 @@ function(ADD_HEYOKA_BENCHMARK arg1)
   set_property(TARGET ${arg1} PROPERTY CXX_EXTENSIONS NO)
 endfunction()
 
-# ADD_HEYOKA_BENCHMARK(evaluate_dbl)
 # ADD_HEYOKA_BENCHMARK(genetics)
 ADD_HEYOKA_BENCHMARK(taylor_jet_batch_benchmark)
 ADD_HEYOKA_BENCHMARK(two_body_long_term)

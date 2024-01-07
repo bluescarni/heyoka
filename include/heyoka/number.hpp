@@ -14,12 +14,7 @@
 #include <cstddef>
 #include <functional>
 #include <ostream>
-#include <string>
-#include <type_traits>
-#include <unordered_map>
-#include <unordered_set>
 #include <variant>
-#include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -119,28 +114,6 @@ HEYOKA_DLL_PUBLIC number exp(const number &);
 HEYOKA_DLL_PUBLIC number binomial(const number &, const number &);
 HEYOKA_DLL_PUBLIC number nextafter(const number &, const number &);
 HEYOKA_DLL_PUBLIC number sqrt(const number &);
-
-HEYOKA_DLL_PUBLIC double eval_dbl(const number &, const std::unordered_map<std::string, double> &,
-                                  const std::vector<double> &);
-HEYOKA_DLL_PUBLIC long double eval_ldbl(const number &, const std::unordered_map<std::string, long double> &,
-                                        const std::vector<long double> &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-HEYOKA_DLL_PUBLIC mppp::real128 eval_f128(const number &, const std::unordered_map<std::string, mppp::real128> &,
-                                          const std::vector<mppp::real128> &);
-#endif
-
-HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const number &,
-                                      const std::unordered_map<std::string, std::vector<double>> &,
-                                      const std::vector<double> &);
-
-HEYOKA_DLL_PUBLIC void update_connections(std::vector<std::vector<std::size_t>> &, const number &, std::size_t &);
-HEYOKA_DLL_PUBLIC void update_node_values_dbl(std::vector<double> &, const number &,
-                                              const std::unordered_map<std::string, double> &,
-                                              const std::vector<std::vector<std::size_t>> &, std::size_t &);
-HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &, const number &,
-                                       const std::unordered_map<std::string, double> &, const std::vector<double> &,
-                                       const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_codegen(llvm_state &, llvm::Type *, const number &);
 

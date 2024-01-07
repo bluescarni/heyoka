@@ -19,7 +19,6 @@
 #include <string>
 #include <type_traits>
 #include <typeinfo>
-#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -286,70 +285,6 @@ std::optional<safe_int64_t> ex_is_odd_integral_half(const expression &ex)
 }
 
 } // namespace
-
-double pow_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
-{
-    assert(args().size() == 2u);
-
-    return std::pow(heyoka::eval_dbl(args()[0], map, pars), heyoka::eval_dbl(args()[1], map, pars));
-}
-
-long double pow_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map,
-                                const std::vector<long double> &pars) const
-{
-    assert(args().size() == 2u);
-
-    return std::pow(heyoka::eval_ldbl(args()[0], map, pars), heyoka::eval_ldbl(args()[1], map, pars));
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-mppp::real128 pow_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map,
-                                  const std::vector<mppp::real128> &pars) const
-{
-    assert(args().size() == 2u);
-
-    return mppp::pow(heyoka::eval_f128(args()[0], map, pars), heyoka::eval_f128(args()[1], map, pars));
-}
-
-#endif
-
-void pow_impl::eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std::string, std::vector<double>> &map,
-                              const std::vector<double> &pars) const
-{
-    assert(args().size() == 2u);
-
-    auto out0 = out; // is this allocation needed?
-    heyoka::eval_batch_dbl(out0, args()[0], map, pars);
-    heyoka::eval_batch_dbl(out, args()[1], map, pars);
-    for (decltype(out.size()) i = 0; i < out.size(); ++i) {
-        out[i] = std::pow(out0[i], out[i]);
-    }
-}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-double pow_impl::eval_num_dbl(const std::vector<double> &a) const
-{
-    if (a.size() != 2u) {
-        throw std::invalid_argument(
-            fmt::format("Inconsistent number of arguments when computing the numerical value of the "
-                        "exponentiation over doubles (2 arguments were expected, but {} arguments were provided",
-                        a.size()));
-    }
-
-    return std::pow(a[0], a[1]);
-}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-double pow_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>::size_type i) const
-{
-    if (a.size() != 2u || i != 0u) {
-        throw std::invalid_argument("Inconsistent number of arguments or derivative requested when computing the "
-                                    "numerical derivative of the exponentiation");
-    }
-
-    return a[1] * std::pow(a[0], a[1] - 1.) + std::log(a[0]) * std::pow(a[0], a[1]);
-}
 
 // Construct a pow_eval_algo based on the exponentiation arguments of 'impl'.
 pow_eval_algo get_pow_eval_algo(const pow_impl &impl)

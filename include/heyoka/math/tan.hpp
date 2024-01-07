@@ -10,8 +10,6 @@
 #define HEYOKA_MATH_TAN_HPP
 
 #include <cstdint>
-#include <string>
-#include <unordered_map>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -42,19 +40,6 @@ public:
     [[nodiscard]] std::vector<expression> gradient() const;
 
     [[nodiscard]] expression normalise() const;
-
-    [[nodiscard]] double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
-    [[nodiscard]] long double eval_ldbl(const std::unordered_map<std::string, long double> &,
-                                        const std::vector<long double> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    [[nodiscard]] mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                                          const std::vector<mppp::real128> &) const;
-#endif
-
-    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
-                        const std::vector<double> &) const;
-    [[nodiscard]] double eval_num_dbl(const std::vector<double> &) const;
-    [[nodiscard]] double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
