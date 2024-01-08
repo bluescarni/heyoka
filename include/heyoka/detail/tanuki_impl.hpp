@@ -1719,13 +1719,21 @@ bool has_dynamic_storage(const wrap<IFace, Cfg> &w) noexcept
 template <typename T, typename IFace, auto Cfg>
 const T *value_ptr(const wrap<IFace, Cfg> &w) noexcept
 {
-    return value_type_index(w) == typeid(T) ? static_cast<const T *>(raw_value_ptr(w)) : nullptr;
+    if constexpr (std::same_as<T, std::remove_cvref_t<T>>) {
+        return value_type_index(w) == typeid(T) ? static_cast<const T *>(raw_value_ptr(w)) : nullptr;
+    } else {
+        return nullptr;
+    }
 }
 
 template <typename T, typename IFace, auto Cfg>
 T *value_ptr(wrap<IFace, Cfg> &w) noexcept
 {
-    return value_type_index(w) == typeid(T) ? static_cast<T *>(raw_value_ptr(w)) : nullptr;
+    if constexpr (std::same_as<T, std::remove_cvref_t<T>>) {
+        return value_type_index(w) == typeid(T) ? static_cast<T *>(raw_value_ptr(w)) : nullptr;
+    } else {
+        return nullptr;
+    }
 }
 
 template <typename T, typename IFace, auto Cfg>

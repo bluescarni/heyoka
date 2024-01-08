@@ -6,19 +6,15 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <heyoka/config.hpp>
-
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
-#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <type_traits>
 #include <typeindex>
 #include <utility>
 #include <variant>
@@ -26,7 +22,7 @@
 
 #include <boost/container_hash/hash.hpp>
 
-#include <fmt/format.h>
+#include <fmt/core.h>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -38,18 +34,14 @@
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
 
-#if defined(HEYOKA_HAVE_REAL128)
-
-#include <mp++/real128.hpp>
-
-#endif
-
+#include <heyoka/config.hpp>
 #include <heyoka/detail/cm_utils.hpp>
 #include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/tanuki.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
@@ -146,220 +138,23 @@ void func_default_to_stream_impl(std::ostringstream &oss, const func_base &f)
     oss << ')';
 }
 
-func_inner_base::func_inner_base() = default;
-
-func_inner_base::~func_inner_base() = default;
-
 null_func::null_func() : func_base("null_func", {}) {}
-
-} // namespace detail
-
-// NOTE: if memory allocation fails when constructing the shared_ptr m_ptr,
-// then delete will be called on the pointee of p (obtained via
-// p.release()). Since we are using the default deleter for p,
-// this is all correct/consistent and cannot result in memory leaks.
-func::func(std::unique_ptr<detail::func_inner_base> p) : m_ptr(p.release()) {}
-
-func::func() : func(detail::null_func{}) {}
-
-func::func(const func &) noexcept = default;
-
-func::func(func &&) noexcept = default;
-
-func &func::operator=(const func &) noexcept = default;
-
-func &func::operator=(func &&) noexcept = default;
-
-func::~func() = default;
-
-func func::copy(const std::vector<expression> &new_args) const
-{
-    const auto orig_size = args().size();
-
-    if (new_args.size() != orig_size) {
-        throw std::invalid_argument(
-            fmt::format("The set of new arguments passed to func::copy() has a size of {}, but the number of arguments "
-                        "of the original function is {} (the two sizes must be equal)",
-                        new_args.size(), orig_size));
-    }
-
-    // NOTE: this will end up invoking the copy constructor
-    // of the internal user-defined function.
-    func ret{m_ptr->clone()};
-
-    // NOTE: a user-defined function might have a funky
-    // implementation of the copy constructor which, e.g.,
-    // changes the arity.
-    // LCOV_EXCL_START
-    if (ret.args().size() != orig_size) {
-        throw std::invalid_argument(fmt::format("The copy constructor of a user-defined function changed the arity"
-                                                "from {} to {} - this is not allowed",
-                                                orig_size, ret.args().size()));
-    }
-    // LCOV_EXCL_STOP
-
-    // Copy over the new arguments.
-    auto *it = ret.ptr()->get_mutable_args_range().first;
-    for (decltype(new_args.size()) i = 0; i < new_args.size(); ++i, ++it) {
-        *it = new_args[i];
-    }
-
-    return ret;
-}
-
-// Just two small helpers to make sure that whenever we require
-// access to the pointer it actually points to something.
-const detail::func_inner_base *func::ptr() const
-{
-    assert(m_ptr.get() != nullptr);
-    return m_ptr.get();
-}
-
-detail::func_inner_base *func::ptr()
-{
-    assert(m_ptr.get() != nullptr);
-    return m_ptr.get();
-}
-
-std::type_index func::get_type_index() const
-{
-    return ptr()->get_type_index();
-}
-
-const void *func::get_ptr() const
-{
-    return ptr()->get_ptr();
-}
-
-// NOTE: time dependency here means **intrinsic** time
-// dependence of the function. That is, we are not concerned
-// with the arguments' time dependence and, e.g., cos(time)
-// is **not** time-dependent according to this definition.
-bool func::is_time_dependent() const
-{
-    return ptr()->is_time_dependent();
-}
-
-expression func::normalise() const
-{
-    if (ptr()->has_normalise()) {
-        return ptr()->normalise();
-    } else {
-        return expression{*this};
-    }
-}
-
-const std::string &func::get_name() const
-{
-    return ptr()->get_name();
-}
-
-void func::to_stream(std::ostringstream &oss) const
-{
-    ptr()->to_stream(oss);
-}
-
-const std::vector<expression> &func::args() const
-{
-    return ptr()->args();
-}
-
-std::vector<expression> func::fetch_gradient(const std::string &target) const
-{
-    // Check if we have the gradient.
-    if (!ptr()->has_gradient()) {
-        throw not_implemented_error(
-            fmt::format("Cannot compute the derivative of the function '{}' with respect to a {}, because "
-                        "the function does not provide neither a diff() "
-                        "nor a gradient() member function",
-                        get_name(), target));
-    }
-
-    // Fetch the gradient.
-    auto grad = ptr()->gradient();
-
-    // Check it.
-    const auto arity = args().size();
-    if (grad.size() != arity) {
-        throw std::invalid_argument(fmt::format("Inconsistent gradient returned by the function '{}': a vector of {} "
-                                                "elements was expected, but the number of elements is {} instead",
-                                                get_name(), arity, grad.size()));
-    }
-
-    return grad;
-}
-
-expression func::diff(detail::funcptr_map<expression> &func_map, const std::string &s) const
-{
-    // Run the specialised diff implementation,
-    // if available.
-    if (ptr()->has_diff_var()) {
-        return ptr()->diff(func_map, s);
-    }
-
-    const auto arity = args().size();
-
-    // Fetch the gradient.
-    auto grad = fetch_gradient("variable");
-
-    // Compute the total derivative.
-    std::vector<expression> prod;
-    prod.reserve(arity);
-    for (decltype(args().size()) i = 0; i < arity; ++i) {
-        prod.push_back(grad[i] * detail::diff(func_map, args()[i], s));
-    }
-
-    return sum(prod);
-}
-
-expression func::diff(detail::funcptr_map<expression> &func_map, const param &p) const
-{
-    // Run the specialised diff implementation,
-    // if available.
-    if (ptr()->has_diff_par()) {
-        return ptr()->diff(func_map, p);
-    }
-
-    const auto arity = args().size();
-
-    // Fetch the gradient.
-    auto grad = fetch_gradient("parameter");
-
-    // Compute the total derivative.
-    std::vector<expression> prod;
-    prod.reserve(arity);
-    for (decltype(args().size()) i = 0; i < arity; ++i) {
-        prod.push_back(grad[i] * detail::diff(func_map, args()[i], p));
-    }
-
-    return sum(prod);
-}
-
-llvm::Value *func::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
-                             llvm::Value *par_ptr, llvm::Value *time_ptr, llvm::Value *stride, std::uint32_t batch_size,
-                             bool high_accuracy) const
-{
-    return ptr()->llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size, high_accuracy);
-}
-
-llvm::Function *func::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
-                                       bool high_accuracy) const
-{
-    return ptr()->llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
-}
-
-namespace detail
-{
 
 namespace
 {
+
+// Helper to invoke the copy() function via ADL.
+auto make_adl_copy(const auto &x)
+{
+    return copy(x);
+}
 
 // Perform the Taylor decomposition of the arguments of a function. This function
 // will return a vector of arguments in which each element will be either:
 // - a variable,
 // - a number,
 // - a param.
-std::vector<expression> func_td_args(const func &fb, funcptr_map<taylor_dc_t::size_type> &func_map, taylor_dc_t &dc)
+std::vector<expression> func_td_args(const auto &fb, funcptr_map<taylor_dc_t::size_type> &func_map, taylor_dc_t &dc)
 {
     std::vector<expression> retval;
     retval.reserve(fb.args().size());
@@ -385,7 +180,7 @@ std::vector<expression> func_td_args(const func &fb, funcptr_map<taylor_dc_t::si
 // - a variable,
 // - a number,
 // - a param.
-std::vector<expression> func_d_args(const func &fb, funcptr_map<std::vector<expression>::size_type> &func_map,
+std::vector<expression> func_d_args(const auto &fb, funcptr_map<std::vector<expression>::size_type> &func_map,
                                     std::vector<expression> &dc)
 {
     std::vector<expression> retval;
@@ -410,6 +205,117 @@ std::vector<expression> func_d_args(const func &fb, funcptr_map<std::vector<expr
 } // namespace
 
 } // namespace detail
+
+func::func() = default;
+
+func::func(const func &) = default;
+
+func::func(func &&) noexcept = default;
+
+func &func::operator=(const func &) = default;
+
+func &func::operator=(func &&) noexcept = default;
+
+func::~func() = default;
+
+const void *func::get_ptr() const
+{
+    return raw_value_ptr(m_func);
+}
+
+const std::vector<expression> &func::args() const
+{
+    return m_func->args();
+}
+
+func func::copy(const std::vector<expression> &new_args) const
+{
+    const auto orig_size = args().size();
+
+    if (new_args.size() != orig_size) {
+        throw std::invalid_argument(
+            fmt::format("The set of new arguments passed to func::copy() has a size of {}, but the number of arguments "
+                        "of the original function is {} (the two sizes must be equal)",
+                        new_args.size(), orig_size));
+    }
+
+    // NOTE: this will end up invoking the copy constructor
+    // of the internal user-defined function.
+    // NOTE: need to go through the make_adl_copy() wrapper
+    // in order to avoid ambiguities.
+    func ret;
+    ret.m_func = detail::make_adl_copy(m_func);
+
+    // NOTE: a user-defined function might have a funky
+    // implementation of the copy constructor which, e.g.,
+    // changes the arity.
+    // LCOV_EXCL_START
+    if (ret.args().size() != orig_size) {
+        throw std::invalid_argument(fmt::format("The copy constructor of a user-defined function changed the arity"
+                                                "from {} to {} - this is not allowed",
+                                                orig_size, ret.args().size()));
+    }
+    // LCOV_EXCL_STOP
+
+    // Copy over the new arguments.
+    auto *it = ret.m_func->get_mutable_args_range().first;
+    for (decltype(new_args.size()) i = 0; i < new_args.size(); ++i, ++it) {
+        *it = new_args[i];
+    }
+
+    return ret;
+}
+
+std::type_index func::get_type_index() const
+{
+    return value_type_index(m_func);
+}
+
+expression func::diff(detail::funcptr_map<expression> &func_map, const std::string &s) const
+{
+    // Run the specialised diff implementation,
+    // if available.
+    if (m_func->has_diff_var()) {
+        return m_func->diff(func_map, s);
+    }
+
+    const auto arity = args().size();
+
+    // Fetch the gradient.
+    auto grad = m_func->fetch_gradient("variable");
+
+    // Compute the total derivative.
+    std::vector<expression> prod;
+    prod.reserve(arity);
+    for (decltype(args().size()) i = 0; i < arity; ++i) {
+        prod.push_back(grad[i] * detail::diff(func_map, args()[i], s));
+    }
+
+    return sum(prod);
+}
+
+expression func::diff(detail::funcptr_map<expression> &func_map, const param &p) const
+{
+    // Run the specialised diff implementation,
+    // if available.
+    if (m_func->has_diff_par()) {
+        return m_func->diff(func_map, p);
+    }
+
+    const auto arity = args().size();
+
+    // Fetch the gradient.
+    auto grad = m_func->fetch_gradient("parameter");
+
+    // Compute the total derivative.
+    std::vector<expression> prod;
+    prod.reserve(arity);
+    for (decltype(args().size()) i = 0; i < arity; ++i) {
+        prod.push_back(grad[i] * detail::diff(func_map, args()[i], p));
+    }
+
+    return sum(prod);
+}
 
 std::vector<expression>::size_type func::decompose(detail::funcptr_map<std::vector<expression>::size_type> &func_map,
                                                    std::vector<expression> &dc) const
@@ -439,6 +345,47 @@ std::vector<expression>::size_type func::decompose(detail::funcptr_map<std::vect
     return ret;
 }
 
+// NOTE: time dependency here means **intrinsic** time
+// dependence of the function. That is, we are not concerned
+// with the arguments' time dependence and, e.g., cos(time)
+// is **not** time-dependent according to this definition.
+bool func::is_time_dependent() const
+{
+    return m_func->is_time_dependent();
+}
+
+expression func::normalise() const
+{
+    if (m_func->has_normalise()) {
+        return m_func->normalise();
+    } else {
+        return expression{*this};
+    }
+}
+
+const std::string &func::get_name() const
+{
+    return m_func->get_name();
+}
+
+void func::to_stream(std::ostringstream &oss) const
+{
+    m_func->to_stream(oss);
+}
+
+llvm::Value *func::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                             llvm::Value *par_ptr, llvm::Value *time_ptr, llvm::Value *stride, std::uint32_t batch_size,
+                             bool high_accuracy) const
+{
+    return m_func->llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size, high_accuracy);
+}
+
+llvm::Function *func::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                       bool high_accuracy) const
+{
+    return m_func->llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
+}
+
 taylor_dc_t::size_type func::taylor_decompose(detail::funcptr_map<taylor_dc_t::size_type> &func_map,
                                               taylor_dc_t &dc) const
 {
@@ -458,9 +405,9 @@ taylor_dc_t::size_type func::taylor_decompose(detail::funcptr_map<taylor_dc_t::s
 
     // Run the decomposition.
     taylor_dc_t::size_type ret = 0;
-    if (f_copy.ptr()->has_taylor_decompose()) {
+    if (f_copy.m_func->has_taylor_decompose()) {
         // Custom implementation.
-        ret = std::move(*f_copy.ptr()).taylor_decompose(dc);
+        ret = std::move(*f_copy.m_func).taylor_decompose(dc);
     } else {
         // Default implementation: append f_copy and return the index
         // at which it was appended.
@@ -518,7 +465,7 @@ llvm::Value *func::taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vecto
     }
 
     auto *retval
-        = ptr()->taylor_diff(s, fp_t, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size, high_accuracy);
+        = m_func->taylor_diff(s, fp_t, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size, high_accuracy);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
@@ -546,7 +493,7 @@ llvm::Function *func::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::u
             "Zero number of u variables detected in func::taylor_c_diff_func() for the function '{}'", get_name()));
     }
 
-    auto *retval = ptr()->taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy);
+    auto *retval = m_func->taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
@@ -558,7 +505,8 @@ llvm::Function *func::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::u
 
 void swap(func &a, func &b) noexcept
 {
-    std::swap(a.m_ptr, b.m_ptr);
+    using std::swap;
+    swap(a.m_func, b.m_func);
 }
 
 // NOTE: it is very important that the implementation here is kept exactly in sync
@@ -581,7 +529,8 @@ std::size_t func::hash(detail::funcptr_map<std::size_t> &func_map) const
 bool operator==(const func &a, const func &b)
 {
     // Check if the underlying object is the same.
-    if (a.m_ptr == b.m_ptr) {
+    // TODO better way?
+    if (raw_value_ptr(a.m_func) == raw_value_ptr(b.m_func)) {
         return true;
     }
 
@@ -602,8 +551,8 @@ bool operator!=(const func &a, const func &b)
 // - the arguments.
 bool operator<(const func &a, const func &b)
 {
-    // Check if the underlying object is the same.
-    if (a.m_ptr == b.m_ptr) {
+    // TODO better way?
+    if (raw_value_ptr(a.m_func) == raw_value_ptr(b.m_func)) {
         // Same object, a is NOT less than b.
         return false;
     }
@@ -888,4 +837,5 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
 HEYOKA_END_NAMESPACE
 
 // s11n implementation for null_func.
+// NOLINTNEXTLINE(cert-err58-cpp)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::null_func)
