@@ -133,7 +133,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base, tanuki::ifa
 
     void to_stream(std::ostringstream &oss) const final
     {
-        if constexpr (requires() { static_cast<void>(this->value().to_stream(oss)); }) {
+        if constexpr (requires(const T &x) { static_cast<void>(x.to_stream(oss)); }) {
             static_cast<void>(this->value().to_stream(oss));
         } else {
             func_default_to_stream_impl(oss, static_cast<const func_base &>(this->value()));
@@ -142,7 +142,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base, tanuki::ifa
 
     [[nodiscard]] bool is_time_dependent() const final
     {
-        if constexpr (requires() { static_cast<bool>(this->value().is_time_dependent()); }) {
+        if constexpr (requires(const T &x) { static_cast<bool>(x.is_time_dependent()); }) {
             return static_cast<bool>(this->value().is_time_dependent());
         } else {
             return false;
@@ -197,10 +197,9 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base, tanuki::ifa
                                          llvm::Value *par_ptr, llvm::Value *time_ptr, llvm::Value *stride,
                                          std::uint32_t batch_size, bool high_accuracy) const final
     {
-        if constexpr (requires() {
+        if constexpr (requires(const T &x) {
                           {
-                              this->value().llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size,
-                                                      high_accuracy)
+                              x.llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size, high_accuracy)
                           } -> std::same_as<llvm::Value *>;
                       }) {
             return this->value().llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size, high_accuracy);
@@ -213,9 +212,9 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base, tanuki::ifa
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
                                                    bool high_accuracy) const final
     {
-        if constexpr (requires() {
+        if constexpr (requires(const T &x) {
                           {
-                              this->value().llvm_c_eval_func(s, fp_t, batch_size, high_accuracy)
+                              x.llvm_c_eval_func(s, fp_t, batch_size, high_accuracy)
                           } -> std::same_as<llvm::Function *>;
                       }) {
             return this->value().llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
@@ -246,10 +245,10 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base, tanuki::ifa
                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
                              bool high_accuracy) const final
     {
-        if constexpr (requires() {
+        if constexpr (requires(const T &x) {
                           {
-                              this->value().taylor_diff(s, fp_t, deps, arr, par_ptr, time_ptr, n_uvars, order, idx,
-                                                        batch_size, high_accuracy)
+                              x.taylor_diff(s, fp_t, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
+                                            high_accuracy)
                           } -> std::same_as<llvm::Value *>;
                       }) {
             return this->value().taylor_diff(s, fp_t, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
@@ -262,9 +261,9 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base, tanuki::ifa
     llvm::Function *taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars, std::uint32_t batch_size,
                                        bool high_accuracy) const final
     {
-        if constexpr (requires() {
+        if constexpr (requires(const T &x) {
                           {
-                              this->value().taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy)
+                              x.taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy)
                           } -> std::same_as<llvm::Function *>;
                       }) {
             return this->value().taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy);
