@@ -529,7 +529,7 @@ std::size_t func::hash(detail::funcptr_map<std::size_t> &func_map) const
 bool operator==(const func &a, const func &b)
 {
     // Check if the underlying object is the same.
-    if (same_reference(a.m_func, b.m_func)) {
+    if (same_value(a.m_func, b.m_func)) {
         return true;
     }
 
@@ -550,7 +550,7 @@ bool operator!=(const func &a, const func &b)
 // - the arguments.
 bool operator<(const func &a, const func &b)
 {
-    if (same_reference(a.m_func, b.m_func)) {
+    if (same_value(a.m_func, b.m_func)) {
         // Same object, a is NOT less than b.
         return false;
     }
