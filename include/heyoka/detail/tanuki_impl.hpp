@@ -168,6 +168,13 @@ template <typename T>
 struct is_reference_wrapper<std::reference_wrapper<T>> : std::true_type {
 };
 
+// Implementation of the concept to detect any wrap instance.
+// This will be specialised after the definition of the
+// wrap class.
+template <typename>
+struct is_any_wrap_impl : std::false_type {
+};
+
 // This is a base class for value_iface, used
 // to check that an interface implementation
 // is correctly inheriting from its Base.
@@ -214,6 +221,11 @@ struct TANUKI_VISIBLE value_iface : public IFace, value_iface_base {
 
     // Methods to implement virtual copy/move primitives for the holder class.
     [[nodiscard]] virtual value_iface *_tanuki_clone() const
+    {
+        assert(false);
+        return {};
+    }
+    [[nodiscard]] virtual std::shared_ptr<value_iface> _tanuki_shared_clone() const
     {
         assert(false);
         return {};
@@ -301,6 +313,10 @@ concept valid_value_type = std::is_object_v<T> && (!std::is_const_v<T>)&&(!std::
 template <typename IFace0, typename IFace1, typename... IFaceN>
 struct TANUKI_VISIBLE composite_iface : public IFace0, public IFace1, public IFaceN... {
 };
+
+// Concept to detect any wrap instance.
+template <typename T>
+concept any_wrap = detail::is_any_wrap_impl<T>::value;
 
 namespace detail
 {
@@ -473,6 +489,15 @@ private:
         if constexpr (std::copy_constructible<T>) {
             // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
             return new holder(m_value);
+        } else {
+            throw std::invalid_argument("Attempting to clone a non-copyable value type");
+        }
+    }
+    // Same as above, but return a shared ptr.
+    [[nodiscard]] std::shared_ptr<value_iface<IFace, Sem>> _tanuki_shared_clone() const final
+    {
+        if constexpr (std::copy_constructible<T>) {
+            return std::make_shared<holder>(m_value);
         } else {
             throw std::invalid_argument("Attempting to clone a non-copyable value type");
         }
@@ -774,20 +799,7 @@ template <typename T>
 using value_t_from_arg = std::conditional_t<std::is_function_v<std::remove_cvref_t<T>>,
                                             std::decay_t<std::remove_cvref_t<T>>, std::remove_cvref_t<T>>;
 
-} // namespace detail
-
-// Type used to indicate emplace construction in the wrap class.
-template <typename>
-struct in_place_type {
-};
-
-template <typename T>
-inline constexpr auto in_place = in_place_type<T>{};
-
-namespace detail
-{
-
-// Helper to detect if T is an in_place_type. This is used
+// Helper to detect if T is a std::in_place_type_t. This is used
 // to avoid ambiguities in the wrap class between the nullary emplace ctor
 // and the generic ctor.
 template <typename>
@@ -795,7 +807,7 @@ struct is_in_place_type : std::false_type {
 };
 
 template <typename T>
-struct is_in_place_type<in_place_type<T>> : std::true_type {
+struct is_in_place_type<std::in_place_type_t<T>> : std::true_type {
 };
 
 // Implementation of the pointer interface for the wrap
@@ -825,7 +837,24 @@ template <typename Wrap, typename IFace>
 struct wrap_pointer_iface<false, Wrap, IFace> {
 };
 
+// This is a re-implementation of std::same_as
+// in order to work around a GCC 10 bug.
+template <typename, typename>
+struct same_as : std::false_type {
+};
+
+template <typename T>
+struct same_as<T, T> : std::true_type {
+};
+
 } // namespace detail
+
+// Tag structure to construct/assign a wrap
+// into the invalid state.
+struct invalid_wrap_t {
+};
+
+inline constexpr invalid_wrap_t invalid_wrap{};
 
 // Helper to unwrap a std::reference_wrapper and remove reference
 // and cv qualifiers from the result.
@@ -1027,18 +1056,25 @@ class TANUKI_VISIBLE wrap
 #endif
 
 public:
-    // Store the configuration.
-    static constexpr auto cfg = Cfg;
-
-    // Default initialisation into the invalid state.
-    wrap() noexcept(detail::nothrow_default_initializable<ref_iface_t>)
-        requires(Cfg.invalid_default_ctor) && std::default_initializable<ref_iface_t>
+    // Explicit initialisation into the invalid state.
+    explicit wrap(invalid_wrap_t) noexcept(detail::nothrow_default_initializable<ref_iface_t>)
+        requires std::default_initializable<ref_iface_t>
     {
         // NOTE: for reference semantics, the default ctor
         // of shared_ptr already does the right thing.
         if constexpr (Cfg.semantics == wrap_semantics::value) {
             this->m_pv_iface = nullptr;
         }
+    }
+
+    // Default initialisation into the invalid state.
+    // NOTE: there's some repetition here with the invalid state ctor
+    // in the noexcept() and requires() clauses. This helps avoiding
+    // compiler issues on earlier clang versions.
+    wrap() noexcept(detail::nothrow_default_initializable<ref_iface_t>)
+        requires(Cfg.invalid_default_ctor) && std::default_initializable<ref_iface_t>
+        : wrap(invalid_wrap_t{})
+    {
     }
 
     // Default initialisation into the default value type.
@@ -1074,6 +1110,8 @@ public:
     template <typename T, typename W = wrap>
         requires(requires(W &w, T &&x) {
             requires std::default_initializable<ref_iface_t>;
+            // Make extra sure this does not compete with the invalid ctor.
+            requires !std::same_as<invalid_wrap_t, std::remove_cvref_t<T>>;
             // Must not compete with the emplace ctor.
             requires !detail::is_in_place_type<std::remove_cvref_t<T>>::value;
             // Must not compete with copy/move.
@@ -1090,6 +1128,9 @@ public:
     }
 
     // Generic ctor from std::reference_wrapper.
+    // NOTE: this is implemented separately from the generic ctor
+    // only in order to work around compiler bugs when the explicit()
+    // clause contains complex expressions.
     template <typename T, typename W = wrap>
         requires(requires(W &w, std::reference_wrapper<T> ref) {
             requires std::default_initializable<ref_iface_t>;
@@ -1115,14 +1156,14 @@ public:
             requires !std::same_as<T, W>;
             w.template ctor_impl<T>(std::forward<U>(args)...);
         })
-    explicit wrap(in_place_type<T>, U &&...args) noexcept(noexcept(this->ctor_impl<T>(std::forward<U>(args)...))
-                                                          && detail::nothrow_default_initializable<ref_iface_t>)
+    explicit wrap(std::in_place_type_t<T>, U &&...args) noexcept(noexcept(this->ctor_impl<T>(std::forward<U>(args)...))
+                                                                 && detail::nothrow_default_initializable<ref_iface_t>)
     {
         ctor_impl<T>(std::forward<U>(args)...);
     }
 
     wrap(const wrap &other) noexcept(Cfg.semantics == wrap_semantics::reference)
-        requires(Cfg.copyable) && std::default_initializable<ref_iface_t>
+        requires(Cfg.copyable || Cfg.semantics == wrap_semantics::reference) && std::default_initializable<ref_iface_t>
     {
         if constexpr (Cfg.semantics == wrap_semantics::value) {
             if constexpr (Cfg.static_size == 0u) {
@@ -1172,7 +1213,7 @@ private:
 
 public:
     wrap(wrap &&other) noexcept
-        requires(Cfg.movable) && std::default_initializable<ref_iface_t>
+        requires(Cfg.movable || Cfg.semantics == wrap_semantics::reference) && std::default_initializable<ref_iface_t>
     {
         if constexpr (Cfg.semantics == wrap_semantics::value) {
             move_init_from(std::move(other));
@@ -1208,7 +1249,7 @@ public:
 
     // Move assignment.
     wrap &operator=(wrap &&other) noexcept
-        requires(Cfg.movable)
+        requires(Cfg.movable || Cfg.semantics == wrap_semantics::reference)
     {
         if constexpr (Cfg.semantics == wrap_semantics::value) {
             // Handle self-assign.
@@ -1258,7 +1299,7 @@ public:
 
     // Copy assignment.
     wrap &operator=(const wrap &other) noexcept(Cfg.semantics == wrap_semantics::reference)
-        requires(Cfg.copyable)
+        requires(Cfg.copyable || Cfg.semantics == wrap_semantics::reference)
     {
         if constexpr (Cfg.semantics == wrap_semantics::value) {
             // Handle self-assign.
@@ -1291,14 +1332,35 @@ public:
         return *this;
     }
 
+    // Assignment to the invalid state.
+    wrap &operator=(invalid_wrap_t) noexcept
+    {
+        if constexpr (Cfg.semantics == wrap_semantics::value) {
+            // Don't do anything if this is already
+            // in the invalid state.
+            if (!is_invalid(*this)) {
+                // Destroy the contained value.
+                destroy();
+
+                // Set the invalid state.
+                this->m_pv_iface = nullptr;
+            }
+        } else {
+            this->m_pv_iface.reset();
+        }
+
+        return *this;
+    }
+
     // Generic assignment.
     template <typename T, typename W = wrap>
         requires(requires(W &w, T &&x) {
             // NOTE: not 100% sure about this, but it seems consistent
             // for generic assignment to be enabled only if copy/move
             // assignment are as well.
-            requires Cfg.copyable;
-            requires Cfg.movable;
+            requires(Cfg.copyable && Cfg.movable) || Cfg.semantics == wrap_semantics::reference;
+            // Make extra sure this does not compete with the invalid assignment operator.
+            requires !std::same_as<invalid_wrap_t, std::remove_cvref_t<T>>;
             // Must not compete with copy/move assignment.
             requires !std::same_as<std::remove_cvref_t<T>, W>;
             w.template ctor_impl<detail::value_t_from_arg<T &&>>(std::forward<T>(x));
@@ -1355,16 +1417,80 @@ public:
 
     // Free functions interface.
 
+#if defined(__GNUC__) && !defined(__clang__)
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wterminate"
+
+#endif
+
+    // Emplacement.
+    // NOTE: this is a mess on earlier clang/GCC versions...
+#if defined(__clang__)
+    template <typename T, typename W, typename... Args>
+        requires(requires(W &w, Args &&...args) {
+            requires detail::same_as<W, wrap>::value;
+            // Forbid emplacing a wrap inside a wrap.
+            requires !detail::same_as<T, W>::value;
+            w.template ctor_impl<T>(std::forward<Args>(args)...);
+        })
+    friend void
+    emplace(W &w,
+            Args &&...args) noexcept(noexcept(std::declval<W &>().template ctor_impl<T>(std::forward<Args>(args)...)))
+#elif defined(__GNUC__)
+    template <typename T, std::enable_if_t<!detail::same_as<T, wrap>::value, int> = 0, typename... Args>
+        requires(requires(wrap &w, Args &&...args) { w.ctor_impl<T>(std::forward<Args>(args)...); })
+    friend void emplace(wrap &w, Args &&...args) noexcept(noexcept(w.ctor_impl<T>(std::forward<Args>(args)...)))
+#else
+    // This should be the canonical version.
+    template <typename T, typename... Args>
+        requires(requires(wrap &w, Args &&...args) {
+            // Forbid emplacing a wrap inside a wrap.
+            requires !std::same_as<T, wrap>;
+            w.ctor_impl<T>(std::forward<Args>(args)...);
+        })
+    friend void emplace(wrap &w, Args &&...args) noexcept(noexcept(w.ctor_impl<T>(std::forward<Args>(args)...)))
+#endif
+    {
+        if constexpr (Cfg.semantics == wrap_semantics::value) {
+            // Destroy the value in w if necessary.
+            if (!is_invalid(w)) {
+                w.destroy();
+            }
+
+            try {
+                w.template ctor_impl<T>(std::forward<Args>(args)...);
+            } catch (...) {
+                // NOTE: if ctor_impl fails there's no cleanup required.
+                // Invalidate this before rethrowing.
+                w.m_pv_iface = nullptr;
+
+                throw;
+            }
+        } else {
+            w.template ctor_impl<T>(std::forward<Args>(args)...);
+        }
+    }
+
+#if defined(__GNUC__) && !defined(__clang__)
+
+#pragma GCC diagnostic pop
+
+#endif
+
     // NOTE: w is invalid when the value interface pointer is set to null.
     // This can happen if w has been moved from (note that this also includes the case
     // in which w has been swapped with an invalid object),
-    // if generic assignment failed, or, in case of reference semantics,
+    // if generic assignment or emplacement failed, or, in case of reference semantics,
     // if deserialisation threw an exception.
+    // The invalid state can also be explicitly set by constructing/assigning
+    // from invalid_wrap_t.
     // The only valid operations on an invalid object are:
     // - invocation of is_invalid(),
     // - destruction,
     // - copy/move assignment from, and swapping with, a valid wrap,
-    // - generic assignment.
+    // - generic assignment,
+    // - emplacement.
     [[nodiscard]] friend bool is_invalid(const wrap &w) noexcept
     {
         return w.m_pv_iface == nullptr;
@@ -1478,27 +1604,23 @@ public:
     {
         return w.m_pv_iface->_tanuki_is_reference();
     }
+
+    [[nodiscard]] friend wrap copy(const wrap &w)
+        requires(Cfg.semantics == wrap_semantics::reference)
+    {
+        wrap retval(invalid_wrap);
+        retval.m_pv_iface = w.m_pv_iface->_tanuki_shared_clone();
+        return retval;
+    }
 };
 
 namespace detail
 {
 
-template <typename>
-struct is_any_wrap_impl : std::false_type {
-};
-
+// Specialise is_any_wrap_impl.
 template <typename IFace, auto Cfg>
 struct is_any_wrap_impl<wrap<IFace, Cfg>> : std::true_type {
 };
-
-} // namespace detail
-
-// Concept to detect any wrap instance.
-template <typename T>
-concept any_wrap = detail::is_any_wrap_impl<T>::value;
-
-namespace detail
-{
 
 // Base class for iface_impl_helper.
 struct iface_impl_helper_base {
@@ -1512,9 +1634,7 @@ consteval bool iface_impl_value_getter_is_noexcept()
     using T = typename detail::holder_value<Holder>::type;
 
     if constexpr (detail::is_reference_wrapper<T>::value) {
-        if constexpr (std::is_const_v<std::remove_reference_t<std::unwrap_reference_t<T>>>) {
-            return false;
-        }
+        return !std::is_const_v<std::remove_reference_t<std::unwrap_reference_t<T>>>;
     }
 
     return true;
@@ -1621,6 +1741,24 @@ bool value_isa(const wrap<IFace, Cfg> &w) noexcept
 {
     return value_ptr<T>(w) != nullptr;
 }
+
+namespace detail
+{
+
+template <typename>
+struct cfg_from_wrap {
+};
+
+template <typename IFace, auto Cfg>
+struct cfg_from_wrap<wrap<IFace, Cfg>> {
+    static constexpr auto cfg = Cfg;
+};
+
+} // namespace detail
+
+// Fetch the configuration settings for a wrap type.
+template <any_wrap W>
+inline constexpr auto wrap_cfg = detail::cfg_from_wrap<W>::cfg;
 
 TANUKI_END_NAMESPACE
 
