@@ -1611,12 +1611,18 @@ public:
         return w.m_pv_iface->_tanuki_is_reference();
     }
 
+    // Specific functions for reference semantics.
     [[nodiscard]] friend wrap copy(const wrap &w)
         requires(Cfg.semantics == wrap_semantics::reference)
     {
         wrap retval(invalid_wrap);
         retval.m_pv_iface = w.m_pv_iface->_tanuki_shared_clone();
         return retval;
+    }
+    [[nodiscard]] friend bool same_reference(const wrap &w1, const wrap &w2) noexcept
+        requires(Cfg.semantics == wrap_semantics::reference)
+    {
+        return w1.m_pv_iface == w2.m_pv_iface;
     }
 };
 
