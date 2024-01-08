@@ -51,6 +51,7 @@
 #include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -103,6 +104,18 @@ func_base &func_base::operator=(const func_base &) = default;
 func_base &func_base::operator=(func_base &&) noexcept = default;
 
 func_base::~func_base() = default;
+
+void func_base::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << m_name;
+    ar << m_args;
+}
+
+void func_base::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> m_name;
+    ar >> m_args;
+}
 
 const std::string &func_base::get_name() const noexcept
 {
@@ -217,6 +230,22 @@ func &func::operator=(const func &) = default;
 func &func::operator=(func &&) noexcept = default;
 
 func::~func() = default;
+
+void func::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << m_func;
+}
+
+void func::load(boost::archive::binary_iarchive &ar, unsigned version)
+{
+    // LCOV_EXCL_START
+    if (version < static_cast<unsigned>(boost::serialization::version<func>::type::value)) {
+        throw std::invalid_argument("Cannot load a function instance from an older archive");
+    }
+    // LCOV_EXCL_STOP
+
+    ar >> m_func;
+}
 
 const void *func::get_ptr() const
 {

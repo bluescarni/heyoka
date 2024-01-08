@@ -14,7 +14,6 @@
 #include <cstdint>
 #include <functional>
 #include <sstream>
-#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <typeindex>
@@ -47,12 +46,9 @@ class HEYOKA_DLL_PUBLIC func_base
 
     // Serialization.
     friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar & m_name;
-        ar & m_args;
-    }
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 public:
     explicit func_base(std::string, std::vector<expression>);
@@ -362,17 +358,9 @@ class HEYOKA_DLL_PUBLIC func
 
     // Serialization.
     friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned version)
-    {
-        // LCOV_EXCL_START
-        if (version < static_cast<unsigned>(boost::serialization::version<func>::type::value)) {
-            throw std::invalid_argument("Cannot load a function instance from an older archive");
-        }
-        // LCOV_EXCL_STOP
-
-        ar & m_func;
-    }
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 public:
     func();
