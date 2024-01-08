@@ -98,6 +98,12 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-align"
 
+#if !defined(__clang__)
+
+#pragma GCC diagnostic ignored "-Wsuggest-final-methods"
+
+#endif
+
 #endif
 
 // Visibility setup.

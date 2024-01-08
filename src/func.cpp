@@ -63,6 +63,38 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
+namespace detail
+{
+
+func_iface::~func_iface() = default;
+
+std::vector<expression> func_iface::fetch_gradient(const std::string &target) const
+{
+    // Check if we have the gradient.
+    if (!has_gradient()) {
+        throw not_implemented_error(
+            fmt::format("Cannot compute the derivative of the function '{}' with respect to a {}, because "
+                        "the function does not provide neither a diff() "
+                        "nor a gradient() member function",
+                        get_name(), target));
+    }
+
+    // Fetch the gradient.
+    auto grad = gradient();
+
+    // Check it.
+    const auto arity = args().size();
+    if (grad.size() != arity) {
+        throw std::invalid_argument(fmt::format("Inconsistent gradient returned by the function '{}': a vector of {} "
+                                                "elements was expected, but the number of elements is {} instead",
+                                                get_name(), arity, grad.size()));
+    }
+
+    return grad;
+}
+
+} // namespace detail
+
 func_base::func_base(std::string name, std::vector<expression> args) : m_name(std::move(name)), m_args(std::move(args))
 {
     if (m_name.empty()) {
@@ -118,22 +150,9 @@ func_inner_base::func_inner_base() = default;
 
 func_inner_base::~func_inner_base() = default;
 
-namespace
-{
-
-struct null_func : func_base {
-    null_func() : func_base("null_func", {}) {}
-};
-
-} // namespace
+null_func::null_func() : func_base("null_func", {}) {}
 
 } // namespace detail
-
-HEYOKA_END_NAMESPACE
-
-HEYOKA_S11N_FUNC_EXPORT(heyoka::detail::null_func)
-
-HEYOKA_BEGIN_NAMESPACE
 
 // NOTE: if memory allocation fails when constructing the shared_ptr m_ptr,
 // then delete will be called on the pointee of p (obtained via
@@ -867,3 +886,6 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
 } // namespace detail
 
 HEYOKA_END_NAMESPACE
+
+// s11n implementation for null_func.
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::null_func)

@@ -9,8 +9,6 @@
 #ifndef HEYOKA_FUNC_HPP
 #define HEYOKA_FUNC_HPP
 
-#include <heyoka/config.hpp>
-
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -25,15 +23,13 @@
 #include <utility>
 #include <vector>
 
-#if defined(HEYOKA_HAVE_REAL128)
+#include <fmt/core.h>
 
-#include <mp++/real128.hpp>
-
-#endif
-
+#include <heyoka/config.hpp>
 #include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/tanuki.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
@@ -43,15 +39,6 @@
 BOOST_CLASS_VERSION(heyoka::func, 1)
 
 HEYOKA_BEGIN_NAMESPACE
-
-namespace detail
-{
-
-// Fwd declaration.
-template <typename>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner;
-
-} // namespace detail
 
 class HEYOKA_DLL_PUBLIC func_base
 {
@@ -67,12 +54,6 @@ class HEYOKA_DLL_PUBLIC func_base
         ar & m_args;
     }
 
-    // NOTE: func_inner needs access to get_mutable_args_range().
-    template <typename>
-    friend struct HEYOKA_DLL_PUBLIC_INLINE_CLASS detail::func_inner;
-
-    std::pair<expression *, expression *> get_mutable_args_range();
-
 public:
     explicit func_base(std::string, std::vector<expression>);
 
@@ -86,7 +67,276 @@ public:
 
     [[nodiscard]] const std::string &get_name() const noexcept;
     [[nodiscard]] const std::vector<expression> &args() const noexcept;
+
+    // NOTE: this is supposed to be private, but there are issues making friends
+    // with concept constraints on clang. Leave it public and undocumented for now.
+    std::pair<expression *, expression *> get_mutable_args_range();
 };
+
+// UDF concept.
+template <typename T>
+concept is_udf
+    = std::default_initializable<T> && std::movable<T> && std::copyable<T> && std::derived_from<T, func_base>;
+
+namespace detail
+{
+
+// Fwd declaration of the function interface implementation.
+template <typename, typename, is_udf T>
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl;
+
+HEYOKA_DLL_PUBLIC void func_default_to_stream_impl(std::ostringstream &, const func_base &);
+
+// The function interface.
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
+struct HEYOKA_DLL_PUBLIC func_iface {
+    virtual ~func_iface();
+
+    [[nodiscard]] virtual const std::string &get_name() const = 0;
+
+    virtual void to_stream(std::ostringstream &) const = 0;
+
+    [[nodiscard]] virtual bool is_time_dependent() const = 0;
+
+    [[nodiscard]] virtual bool has_normalise() const = 0;
+    [[nodiscard]] virtual expression normalise() const = 0;
+
+    [[nodiscard]] virtual const std::vector<expression> &args() const = 0;
+    virtual std::pair<expression *, expression *> get_mutable_args_range() = 0;
+
+    [[nodiscard]] virtual bool has_diff_var() const = 0;
+    virtual expression diff(funcptr_map<expression> &, const std::string &) const = 0;
+    [[nodiscard]] virtual bool has_diff_par() const = 0;
+    virtual expression diff(funcptr_map<expression> &, const param &) const = 0;
+    [[nodiscard]] virtual bool has_gradient() const = 0;
+    [[nodiscard]] virtual std::vector<expression> gradient() const = 0;
+    [[nodiscard]] std::vector<expression> fetch_gradient(const std::string &) const;
+
+    [[nodiscard]] virtual llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &,
+                                                 llvm::Value *, llvm::Value *, llvm::Value *, std::uint32_t, bool) const
+        = 0;
+
+    [[nodiscard]] virtual llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const = 0;
+
+    // NOTE: this is the last remaining trace of mutability
+    // related to decomposition. Note, however, that this is never
+    // exposed in the public API.
+    virtual taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) && = 0;
+    [[nodiscard]] virtual bool has_taylor_decompose() const = 0;
+
+    virtual llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const std::vector<std::uint32_t> &,
+                                     const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
+                                     std::uint32_t, std::uint32_t, std::uint32_t, bool) const
+        = 0;
+
+    virtual llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const
+        = 0;
+
+    template <typename Base, typename Holder, typename T>
+    using impl = func_iface_impl<Base, Holder, T>;
+};
+
+// The udf used in the default construction of a func.
+struct HEYOKA_DLL_PUBLIC null_func : func_base {
+    null_func();
+};
+
+} // namespace detail
+
+namespace detail
+{
+
+template <typename T>
+concept func_has_normalise = requires(const T &x) {
+    {
+        x.normalise()
+    } -> std::same_as<expression>;
+};
+
+template <typename T>
+concept func_has_diff_var = requires(const T &x, funcptr_map<expression> &m, const std::string &name) {
+    {
+        x.diff(m, name)
+    } -> std::same_as<expression>;
+};
+
+template <typename T>
+concept func_has_diff_par = requires(const T &x, funcptr_map<expression> &m, const param &p) {
+    {
+        x.diff(m, p)
+    } -> std::same_as<expression>;
+};
+
+template <typename T>
+concept func_has_gradient = requires(const T &x) {
+    {
+        x.gradient()
+    } -> std::same_as<std::vector<expression>>;
+};
+
+template <typename T>
+concept func_has_taylor_decompose = requires(T &&x, taylor_dc_t &dc) {
+    {
+        std::move(x).taylor_decompose(dc)
+    } -> std::same_as<taylor_dc_t::size_type>;
+};
+
+// Function interface implementation.
+template <typename Base, typename Holder, is_udf T>
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base, tanuki::iface_impl_helper<Base, Holder> {
+    [[nodiscard]] const std::string &get_name() const final
+    {
+        // NOTE: make sure we are invoking the member functions
+        // from func_base (these functions could have been overriden
+        // in the derived class).
+        return static_cast<const func_base &>(this->value()).get_name();
+    }
+
+    void to_stream(std::ostringstream &oss) const final
+    {
+        if constexpr (requires() { static_cast<void>(this->value().to_stream(oss)); }) {
+            static_cast<void>(this->value().to_stream(oss));
+        } else {
+            func_default_to_stream_impl(oss, static_cast<const func_base &>(this->value()));
+        }
+    }
+
+    [[nodiscard]] bool is_time_dependent() const final
+    {
+        if constexpr (requires() { static_cast<bool>(this->value().is_time_dependent()); }) {
+            return static_cast<bool>(this->value().is_time_dependent());
+        } else {
+            return false;
+        }
+    }
+
+    [[nodiscard]] bool has_normalise() const final
+    {
+        return func_has_normalise<T>;
+    }
+    [[nodiscard]] expression normalise() const final;
+
+    [[nodiscard]] const std::vector<expression> &args() const final
+    {
+        return static_cast<const func_base &>(this->value()).args();
+    }
+    std::pair<expression *, expression *> get_mutable_args_range() final
+    {
+        return static_cast<func_base &>(this->value()).get_mutable_args_range();
+    }
+
+    // diff.
+    [[nodiscard]] bool has_diff_var() const final
+    {
+        return func_has_diff_var<T>;
+    }
+    expression diff(funcptr_map<expression> &, const std::string &) const final;
+    [[nodiscard]] bool has_diff_par() const final
+    {
+        return func_has_diff_par<T>;
+    }
+    expression diff(funcptr_map<expression> &, const param &) const final;
+
+    // gradient.
+    [[nodiscard]] bool has_gradient() const final
+    {
+        return func_has_gradient<T>;
+    }
+    [[nodiscard]] std::vector<expression> gradient() const final
+    {
+        if constexpr (func_has_gradient<T>) {
+            return this->value().gradient();
+        }
+
+        // LCOV_EXCL_START
+        assert(false);
+        throw;
+        // LCOV_EXCL_STOP
+    }
+
+    [[nodiscard]] llvm::Value *llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
+                                         llvm::Value *par_ptr, llvm::Value *time_ptr, llvm::Value *stride,
+                                         std::uint32_t batch_size, bool high_accuracy) const final
+    {
+        if constexpr (requires() {
+                          {
+                              this->value().llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size,
+                                                      high_accuracy)
+                          } -> std::same_as<llvm::Value *>;
+                      }) {
+            return this->value().llvm_eval(s, fp_t, eval_arr, par_ptr, time_ptr, stride, batch_size, high_accuracy);
+        } else {
+            throw not_implemented_error(
+                fmt::format("llvm_eval() is not implemented for the function '{}'", get_name()));
+        }
+    }
+
+    [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t batch_size,
+                                                   bool high_accuracy) const final
+    {
+        if constexpr (requires() {
+                          {
+                              this->value().llvm_c_eval_func(s, fp_t, batch_size, high_accuracy)
+                          } -> std::same_as<llvm::Function *>;
+                      }) {
+            return this->value().llvm_c_eval_func(s, fp_t, batch_size, high_accuracy);
+        } else {
+            throw not_implemented_error(
+                fmt::format("llvm_c_eval_func() is not implemented for the function '{}'", get_name()));
+        }
+    }
+
+    // Taylor.
+    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &dc) && final
+    {
+        if constexpr (func_has_taylor_decompose<T>) {
+            return std::move(this->value()).taylor_decompose(dc);
+        }
+
+        // LCOV_EXCL_START
+        assert(false);
+        throw;
+        // LCOV_EXCL_STOP
+    }
+    [[nodiscard]] bool has_taylor_decompose() const final
+    {
+        return func_has_taylor_decompose<T>;
+    }
+    llvm::Value *taylor_diff(llvm_state &s, llvm::Type *fp_t, const std::vector<std::uint32_t> &deps,
+                             const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                             bool high_accuracy) const final
+    {
+        if constexpr (requires() {
+                          {
+                              this->value().taylor_diff(s, fp_t, deps, arr, par_ptr, time_ptr, n_uvars, order, idx,
+                                                        batch_size, high_accuracy)
+                          } -> std::same_as<llvm::Value *>;
+                      }) {
+            return this->value().taylor_diff(s, fp_t, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
+                                             high_accuracy);
+        } else {
+            throw not_implemented_error(
+                fmt::format("Taylor diff is not implemented for the function '{}'", get_name()));
+        }
+    }
+    llvm::Function *taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                       bool high_accuracy) const final
+    {
+        if constexpr (requires() {
+                          {
+                              this->value().taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy)
+                          } -> std::same_as<llvm::Function *>;
+                      }) {
+            return this->value().taylor_c_diff_func(s, fp_t, n_uvars, batch_size, high_accuracy);
+        } else {
+            throw not_implemented_error(
+                fmt::format("Taylor diff in compact mode is not implemented for the function '{}'", get_name()));
+        }
+    }
+};
+
+} // namespace detail
 
 namespace detail
 {
@@ -234,8 +484,6 @@ using func_taylor_c_diff_func_t = decltype(std::declval<std::add_lvalue_referenc
 template <typename T>
 inline constexpr bool func_has_taylor_c_diff_func_v
     = std::is_same_v<detected_t<func_taylor_c_diff_func_t, T>, llvm::Function *>;
-
-HEYOKA_DLL_PUBLIC void func_default_to_stream_impl(std::ostringstream &, const func_base &);
 
 template <typename T>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
@@ -419,11 +667,6 @@ HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
 HEYOKA_DLL_PUBLIC bool operator!=(const func &, const func &);
 HEYOKA_DLL_PUBLIC bool operator<(const func &, const func &);
 
-// UDF concept.
-template <typename T>
-concept is_udf
-    = std::default_initializable<T> && std::movable<T> && std::copyable<T> && std::derived_from<T, func_base>;
-
 class HEYOKA_DLL_PUBLIC func
 {
     friend HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
@@ -562,5 +805,8 @@ HEYOKA_END_NAMESPACE
 #define HEYOKA_S11N_FUNC_EXPORT(f)                                                                                     \
     HEYOKA_S11N_FUNC_EXPORT_KEY(f)                                                                                     \
     HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(f)
+
+// Export the key for null_func.
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::null_func)
 
 #endif
