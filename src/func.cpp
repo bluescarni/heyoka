@@ -186,7 +186,7 @@ std::vector<expression> func_td_args(const auto &fb, funcptr_map<taylor_dc_t::si
     }
 
     return retval;
-}
+} // LCOV_EXCL_LINE
 
 // Perform the decomposition of the arguments of a function. This function
 // will return a vector of arguments in which each element will be either:
@@ -213,7 +213,7 @@ std::vector<expression> func_d_args(const auto &fb, funcptr_map<std::vector<expr
     }
 
     return retval;
-}
+} // LCOV_EXCL_LINE
 
 } // namespace
 
