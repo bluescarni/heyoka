@@ -153,11 +153,12 @@ namespace detail
 
 // NOTE: these need to go here because
 // the definition of expression must be available.
-template <typename T>
-inline expression func_inner<T>::diff(funcptr_map<expression> &func_map, const std::string &s) const
+template <typename Base, typename Holder, typename T>
+    requires is_udf<T>
+inline expression func_iface_impl<Base, Holder, T>::diff(funcptr_map<expression> &func_map, const std::string &s) const
 {
-    if constexpr (func_has_diff_var_v<T>) {
-        return m_value.diff(func_map, s);
+    if constexpr (func_has_diff_var<T>) {
+        return this->value().diff(func_map, s);
     }
 
     // LCOV_EXCL_START
@@ -166,11 +167,12 @@ inline expression func_inner<T>::diff(funcptr_map<expression> &func_map, const s
     // LCOV_EXCL_STOP
 }
 
-template <typename T>
-inline expression func_inner<T>::diff(funcptr_map<expression> &func_map, const param &p) const
+template <typename Base, typename Holder, typename T>
+    requires is_udf<T>
+inline expression func_iface_impl<Base, Holder, T>::diff(funcptr_map<expression> &func_map, const param &p) const
 {
-    if constexpr (func_has_diff_par_v<T>) {
-        return m_value.diff(func_map, p);
+    if constexpr (func_has_diff_par<T>) {
+        return this->value().diff(func_map, p);
     }
 
     // LCOV_EXCL_START
@@ -179,11 +181,12 @@ inline expression func_inner<T>::diff(funcptr_map<expression> &func_map, const p
     // LCOV_EXCL_STOP
 }
 
-template <typename T>
-inline expression func_inner<T>::normalise() const
+template <typename Base, typename Holder, typename T>
+    requires is_udf<T>
+inline expression func_iface_impl<Base, Holder, T>::normalise() const
 {
-    if constexpr (func_has_normalise_v<T>) {
-        return m_value.normalise();
+    if constexpr (func_has_normalise<T>) {
+        return this->value().normalise();
     }
 
     // LCOV_EXCL_START

@@ -182,4 +182,5 @@ std::vector<expression> unfix(const std::vector<expression> &v_ex)
 
 HEYOKA_END_NAMESPACE
 
+// NOLINTNEXTLINE(cert-err58-cpp)
 HEYOKA_S11N_FUNC_EXPORT(heyoka::detail::fix_impl)

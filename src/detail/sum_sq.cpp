@@ -529,4 +529,5 @@ llvm::Function *sum_sq_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t,
 
 HEYOKA_END_NAMESPACE
 
+// NOLINTNEXTLINE(cert-err58-cpp)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::sum_sq_impl)

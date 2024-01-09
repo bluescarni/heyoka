@@ -1190,4 +1190,5 @@ expression prod(const std::vector<expression> &args_)
 
 HEYOKA_END_NAMESPACE
 
+// NOLINTNEXTLINE(cert-err58-cpp)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::prod_impl)

@@ -656,7 +656,7 @@ TEST_CASE("is_time_dependent")
     REQUIRE(!f.is_time_dependent());
 
     f = func(func_22{});
-    REQUIRE(!f.is_time_dependent());
+    REQUIRE(f.is_time_dependent());
 }
 
 TEST_CASE("func lt")

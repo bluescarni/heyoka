@@ -407,4 +407,5 @@ expression asinh(expression e)
 
 HEYOKA_END_NAMESPACE
 
+// NOLINTNEXTLINE(cert-err58-cpp)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::asinh_impl)

@@ -444,4 +444,5 @@ expression sub(expression a, expression b)
 
 HEYOKA_END_NAMESPACE
 
+// NOLINTNEXTLINE(cert-err58-cpp)
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::sub_impl)
