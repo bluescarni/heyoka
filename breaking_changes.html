@@ -399,6 +399,7 @@ document.write(`
                 <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bchanges-4-0-0">4.0.0</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#api-behaviour-changes">API/behaviour changes</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#terminal-events-callbacks">Terminal events callbacks</a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#step-callbacks-and-propagate">Step callbacks and <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#propagate-grid"><code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code></a></li>
 </ul>
@@ -430,6 +431,15 @@ document.write(`
 <p>heyoka 4 includes several backwards-incompatible changes.</p>
 <section id="api-behaviour-changes">
 <h3>API/behaviour changes<a class="headerlink" href="#api-behaviour-changes" title="Link to this heading">#</a></h3>
+<section id="terminal-events-callbacks">
+<h4>Terminal events callbacks<a class="headerlink" href="#terminal-events-callbacks" title="Link to this heading">#</a></h4>
+<p>The second argument in the signature of callbacks for terminal events, a <code class="docutils literal notranslate"><span class="pre">bool</span></code> conventionally
+called <code class="docutils literal notranslate"><span class="pre">mr</span></code>, has been removed. This flag was meant to signal the possibility of multiple roots
+in the event function within the cooldown period, but it never worked as intended and
+it has thus been dropped.</p>
+<p>Adapting existing code for this API change is straightforward: you just have to remove the second argument
+from the signature of a terminal event callback.</p>
+</section>
 <section id="step-callbacks-and-propagate">
 <h4>Step callbacks and <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code><a class="headerlink" href="#step-callbacks-and-propagate" title="Link to this heading">#</a></h4>
 <p>The way step callbacks interact with the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions has changed. Specifically:</p>
@@ -602,6 +612,7 @@ time, and its value will be -1 for negative derivative,
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bchanges-4-0-0">4.0.0</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#api-behaviour-changes">API/behaviour changes</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#terminal-events-callbacks">Terminal events callbacks</a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#step-callbacks-and-propagate">Step callbacks and <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#propagate-grid"><code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code></a></li>
 </ul>

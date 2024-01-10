@@ -13,6 +13,17 @@ heyoka 4 includes several backwards-incompatible changes.
 API/behaviour changes
 ~~~~~~~~~~~~~~~~~~~~~
 
+Terminal events callbacks
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The second argument in the signature of callbacks for terminal events, a ``bool`` conventionally
+called ``mr``, has been removed. This flag was meant to signal the possibility of multiple roots
+in the event function within the cooldown period, but it never worked as intended and
+it has thus been dropped.
+
+Adapting existing code for this API change is straightforward: you just have to remove the second argument
+from the signature of a terminal event callback.
+
 Step callbacks and ``propagate_*()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

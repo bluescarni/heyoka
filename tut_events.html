@@ -731,7 +731,7 @@ v^\prime = - 9.8\sin x - \alpha v
 <span class="w">        </span><span class="c1">// The event equation.</span>
 <span class="w">        </span><span class="n">v</span><span class="p">,</span>
 <span class="w">        </span><span class="c1">// The callback.</span>
-<span class="w">        </span><span class="n">kw</span><span class="o">::</span><span class="n">callback</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span><span class="w"> </span><span class="p">[[</span><span class="n">maybe_unused</span><span class="p">]]</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">mr</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">kw</span><span class="o">::</span><span class="n">callback</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">            </span><span class="c1">// NOTE: the value of the drag coefficient</span>
 <span class="w">            </span><span class="c1">// is stored as the first (and only) runtime parameter</span>
 <span class="w">            </span><span class="c1">// of the integrator.</span>
@@ -756,15 +756,16 @@ differs from the signature non-terminal callbacks. Specifically:</p>
 because, when a terminal event triggers, the state of the integrator is propagated
 up to the event, and thus the trigger time is the current integrator time
 (which can be fetched via <code class="docutils literal notranslate"><span class="pre">ta.get_time()</span></code>);</p></li>
-<li><p>there is an additional boolean function argument, here called <code class="docutils literal notranslate"><span class="pre">mr</span></code>. We will be ignoring
-this extra argument for the moment, its meaning will be clarified in the
-<a class="reference internal" href="#tut-t-event-cooldown"><span class="std std-ref">cooldown section</span></a>;</p></li>
 <li><p>whereas non-terminal event callbacks do not return anything, terminal event callbacks
 are required to return <code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code>. If the callback returns <code class="docutils literal notranslate"><span class="pre">false</span></code> the integration
 will always be stopped after the execution of the callback. Otherwise, when using the
 <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> family of functions, the integration will resume after the execution
 of the callback.</p></li>
 </ul>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 4.0.0: </span>The signature of callbacks for terminal events used to include an extra
+<code class="docutils literal notranslate"><span class="pre">bool</span></code> argument which has been removed in version 4.0.0.</p>
+</div>
 <p>Note that, for the purpose of stopping the integration, an event <em>without</em> a callback is considered
 equivalent to an event whose callback returns <code class="docutils literal notranslate"><span class="pre">false</span></code>.
 We thus refer to terminal events without a callback or whose callback returns <code class="docutils literal notranslate"><span class="pre">false</span></code>
@@ -861,11 +862,6 @@ does not change (much) after the execution of the event’s callback. If, for an
 to be avoided, it is possible to set a custom value for the cooldown.
 A custom cooldown period can be selected when constructing
 a terminal event via the <code class="docutils literal notranslate"><span class="pre">kw::cooldown</span></code> keyword argument.</p>
-<p>When a terminal event triggers and enters the cooldown period, the event detection system will also try to detect
-the occurrence of multiple roots of the event equation within the cooldown period. If such multiple roots are detected,
-then the <code class="docutils literal notranslate"><span class="pre">mr</span></code> boolean parameter in the terminal event callback will be set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, so that the user
-has the possibility to handle such occurrence. Note that an <code class="docutils literal notranslate"><span class="pre">mr</span></code> value of <code class="docutils literal notranslate"><span class="pre">false</span></code> in the callback does not imply
-that multiple roots do not exist, just that they were not detected.</p>
 <p>Note that manually modifying the integrator’s time or state does <strong>not</strong> automatically reset the cooldown values
 for terminal events. This could in principle lead to missing terminal events when the integration restarts.
 For this reason, a member function called <code class="docutils literal notranslate"><span class="pre">reset_cooldowns()</span></code> is available to clear the cooldown timers of
@@ -1002,7 +998,7 @@ will inevitably slow down also the propagation of the ODEs.</p>
 <span class="w">        </span><span class="c1">// The event equation.</span>
 <span class="w">        </span><span class="n">v</span><span class="p">,</span>
 <span class="w">        </span><span class="c1">// The callback.</span>
-<span class="w">        </span><span class="n">kw</span><span class="o">::</span><span class="n">callback</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span><span class="w"> </span><span class="p">[[</span><span class="n">maybe_unused</span><span class="p">]]</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">mr</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">kw</span><span class="o">::</span><span class="n">callback</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">            </span><span class="c1">// NOTE: the value of the drag coefficient</span>
 <span class="w">            </span><span class="c1">// is stored as the first (and only) runtime parameter</span>
 <span class="w">            </span><span class="c1">// of the integrator.</span>
