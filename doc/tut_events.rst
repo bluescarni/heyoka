@@ -327,14 +327,16 @@ differs from the signature non-terminal callbacks. Specifically:
   because, when a terminal event triggers, the state of the integrator is propagated
   up to the event, and thus the trigger time is the current integrator time
   (which can be fetched via ``ta.get_time()``);
-- there is an additional boolean function argument, here called ``mr``. We will be ignoring
-  this extra argument for the moment, its meaning will be clarified in the
-  :ref:`cooldown section <tut_t_event_cooldown>`;
 - whereas non-terminal event callbacks do not return anything, terminal event callbacks
   are required to return ``true`` or ``false``. If the callback returns ``false`` the integration
   will always be stopped after the execution of the callback. Otherwise, when using the
   ``propagate_*()`` family of functions, the integration will resume after the execution
   of the callback.
+
+.. versionchanged:: 4.0.0
+
+   The signature of callbacks for terminal events used to include an extra
+   ``bool`` argument which has been removed in version 4.0.0.
 
 Note that, for the purpose of stopping the integration, an event *without* a callback is considered
 equivalent to an event whose callback returns ``false``.
@@ -425,12 +427,6 @@ does not change (much) after the execution of the event's callback. If, for any 
 to be avoided, it is possible to set a custom value for the cooldown.
 A custom cooldown period can be selected when constructing
 a terminal event via the ``kw::cooldown`` keyword argument.
-
-When a terminal event triggers and enters the cooldown period, the event detection system will also try to detect
-the occurrence of multiple roots of the event equation within the cooldown period. If such multiple roots are detected,
-then the ``mr`` boolean parameter in the terminal event callback will be set to ``true``, so that the user
-has the possibility to handle such occurrence. Note that an ``mr`` value of ``false`` in the callback does not imply
-that multiple roots do not exist, just that they were not detected.
 
 Note that manually modifying the integrator's time or state does **not** automatically reset the cooldown values
 for terminal events. This could in principle lead to missing terminal events when the integration restarts.
