@@ -228,7 +228,7 @@ namespace boost::serialization
 {
 
 template <typename Archive, typename... Args>
-inline void save(Archive &ar, const std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
+void save(Archive &ar, const std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
 {
     auto tf = [&ar](const auto &x) {
         if constexpr (std::is_same_v<decltype(x), const heyoka::taylor_outcome &>) {
@@ -246,7 +246,7 @@ inline void save(Archive &ar, const std::tuple<heyoka::taylor_outcome, Args...> 
 }
 
 template <typename Archive, typename... Args>
-inline void load(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
+void load(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
 {
     auto tf = [&ar](auto &x) {
         if constexpr (std::is_same_v<decltype(x), heyoka::taylor_outcome &>) {
@@ -263,7 +263,7 @@ inline void load(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, 
 }
 
 template <typename Archive, typename... Args>
-inline void serialize(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned v)
+void serialize(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned v)
 {
     split_free(ar, tup, v);
 }
@@ -359,13 +359,9 @@ private:
 
     // Serialization.
     friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar & eq;
-        ar & callback;
-        ar & dir;
-    }
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     void finalise_ctor(event_direction);
 
@@ -479,8 +475,8 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS t_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = callable<std::conditional_t<B, bool(taylor_adaptive_batch<T> &, bool, int, std::uint32_t),
-                                                   bool(taylor_adaptive<T> &, bool, int)>>;
+    using callback_t = callable<
+        std::conditional_t<B, bool(taylor_adaptive_batch<T> &, int, std::uint32_t), bool(taylor_adaptive<T> &, int)>>;
 
 private:
     expression eq;
@@ -490,14 +486,9 @@ private:
 
     // Serialization.
     friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar & eq;
-        ar & callback;
-        ar & cooldown;
-        ar & dir;
-    }
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     void finalise_ctor(callback_t, T, event_direction);
 
@@ -1005,11 +996,9 @@ template <typename Derived>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_base<mppp::real, Derived>
 {
     friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar & m_prec;
-    }
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 protected:
     // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes,misc-non-private-member-variables-in-classes)
@@ -1063,7 +1052,7 @@ private:
         // and the events.
         std::vector<T> m_ev_jet;
         // Vector of detected terminal events.
-        std::vector<std::tuple<std::uint32_t, T, bool, int, T>> m_d_tes;
+        std::vector<std::tuple<std::uint32_t, T, int, T>> m_d_tes;
         // The vector of cooldowns for the terminal events.
         // If an event is on cooldown, the corresponding optional
         // in this vector will contain the total time elapsed
@@ -1554,7 +1543,7 @@ private:
         // on the Taylor series of the event equations.
         std::vector<T> m_g_eps;
         // Vector of detected terminal events.
-        std::vector<std::vector<std::tuple<std::uint32_t, T, bool, int, T>>> m_d_tes;
+        std::vector<std::vector<std::tuple<std::uint32_t, T, int, T>>> m_d_tes;
         // The vector of cooldowns for the terminal events.
         // If an event is on cooldown, the corresponding optional
         // in this vector will contain the total time elapsed
@@ -1997,11 +1986,15 @@ namespace detail
 // Boost s11n class version history for taylor_adaptive:
 // - 1: added base class to taylor_adaptive.
 // - 2: added the m_state_vars and m_rhs members.
-inline constexpr int taylor_adaptive_s11n_version = 2;
+// - 3: removed the mr flag from the terminal event callback siganture,
+//      which resulted also in changes in the event detection data structure.
+inline constexpr int taylor_adaptive_s11n_version = 3;
 
 // Boost s11n class version history for taylor_adaptive_batch:
 // - 1: added the m_state_vars and m_rhs members.
-inline constexpr int taylor_adaptive_batch_s11n_version = 1;
+// - 2: removed the mr flag from the terminal event callback siganture,
+//      which resulted also in changes in the event detection data structure.
+inline constexpr int taylor_adaptive_batch_s11n_version = 2;
 
 } // namespace detail
 
@@ -2037,13 +2030,13 @@ BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<mppp::real>, heyoka::detail::t
 // Export the s11n keys for default-constructed event callbacks.
 #define HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY(T)                                                                      \
     HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::empty_callable, void, heyoka::taylor_adaptive<T> &, T, int)        \
-    HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::empty_callable, bool, heyoka::taylor_adaptive<T> &, bool, int)
+    HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::empty_callable, bool, heyoka::taylor_adaptive<T> &, int)
 
 #define HEYOKA_S11N_BATCH_EVENT_CALLBACKS_EXPORT_KEY(T)                                                                \
     HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::empty_callable, void, heyoka::taylor_adaptive_batch<T> &, T, int,  \
                                     std::uint32_t)                                                                     \
-    HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::empty_callable, bool, heyoka::taylor_adaptive_batch<T> &, bool,    \
-                                    int, std::uint32_t)
+    HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::empty_callable, bool, heyoka::taylor_adaptive_batch<T> &, int,     \
+                                    std::uint32_t)
 
 HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY(float)
 HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY(double)

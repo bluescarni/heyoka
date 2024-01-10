@@ -299,11 +299,10 @@ TEST_CASE("propagate grid scalar")
 
     // A case in which we have a callback which never stops and a terminal event
     // which triggers.
-    ta = taylor_adaptive<double>{
-        {prime(x) = v, prime(v) = -x},
-        {0., 1.},
-        kw::t_events = {t_event<double>(
-            v - .1, kw::callback = [](taylor_adaptive<double> &, bool, int) { return false; })}};
+    ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -x},
+                                 {0., 1.},
+                                 kw::t_events = {t_event<double>(
+                                     v - .1, kw::callback = [](taylor_adaptive<double> &, int) { return false; })}};
     out = ta.propagate_grid(
         {0., 10.}, kw::callback = [](const auto &) { return true; });
     REQUIRE(std::get<0>(out) == taylor_outcome{-1});
@@ -1618,7 +1617,7 @@ private:
 HEYOKA_S11N_CALLABLE_EXPORT(s11n_nt_cb, void, taylor_adaptive<double> &, double, int);
 
 struct s11n_t_cb {
-    bool operator()(taylor_adaptive<double> &, bool, int) const
+    bool operator()(taylor_adaptive<double> &, int) const
     {
         return false;
     }
@@ -1631,7 +1630,7 @@ private:
     }
 };
 
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_t_cb, bool, taylor_adaptive<double> &, bool, int);
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_t_cb, bool, taylor_adaptive<double> &, int);
 
 template <typename Oa, typename Ia>
 void s11n_test_impl()
@@ -2235,7 +2234,7 @@ TEST_CASE("event cb time")
                                                       tint.set_time(std::numeric_limits<double>::quiet_NaN());
                                                   })},
                          kw::t_events = {t_ev_t(
-                             x - 2e-5, kw::callback = [&](auto &tint, auto, auto) {
+                             x - 2e-5, kw::callback = [&](auto &tint, auto) {
                                  trigger2 = true;
 
                                  tint.set_time(-10.);
@@ -2253,7 +2252,7 @@ TEST_CASE("event cb time")
 
     ta = taylor_adaptive({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 1.},
                          kw::t_events = {t_ev_t(
-                             x - 1e-5, kw::callback = [](auto &tint, auto, auto) {
+                             x - 1e-5, kw::callback = [](auto &tint, auto) {
                                  tint.set_time(std::numeric_limits<double>::infinity());
 
                                  return true;

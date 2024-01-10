@@ -33,13 +33,13 @@
 // Scalar and batch event callbacks.
 #define HEYOKA_S11N_IMPLEMENT_EVENT_CALLBACKS(T)                                                                       \
     HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::empty_callable, void, heyoka::taylor_adaptive<T> &, T, int)  \
-    HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::empty_callable, bool, heyoka::taylor_adaptive<T> &, bool, int)
+    HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::empty_callable, bool, heyoka::taylor_adaptive<T> &, int)
 
 #define HEYOKA_S11N_IMPLEMENT_BATCH_EVENT_CALLBACKS(T)                                                                 \
     HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::empty_callable, void, heyoka::taylor_adaptive_batch<T> &, T, \
                                           int, std::uint32_t)                                                          \
     HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(heyoka::detail::empty_callable, bool, heyoka::taylor_adaptive_batch<T> &,    \
-                                          bool, int, std::uint32_t)
+                                          int, std::uint32_t)
 
 HEYOKA_S11N_IMPLEMENT_EVENT_CALLBACKS(float)
 HEYOKA_S11N_IMPLEMENT_EVENT_CALLBACKS(double)

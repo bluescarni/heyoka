@@ -65,7 +65,7 @@ TEST_CASE("linear box")
     auto ta_ev = taylor_adaptive<double>{{prime(x) = 1_dbl},
                                          {0.},
                                          kw::t_events = {ev_t(
-                                             x - 1., kw::callback = [&counter](taylor_adaptive<double> &, bool, int) {
+                                             x - 1., kw::callback = [&counter](taylor_adaptive<double> &, int) {
                                                  ++counter;
                                                  return true;
                                              })}};
@@ -158,7 +158,7 @@ TEST_CASE("taylor te")
 
             oss << ev_t(
                 v * v - 1e-10, kw::direction = event_direction::negative,
-                kw::callback = [](auto &, bool, int, auto...) { return true; });
+                kw::callback = [](auto &, int, auto...) { return true; });
             REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
             REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
             REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
@@ -167,7 +167,7 @@ TEST_CASE("taylor te")
 
             oss << ev_t(
                 v * v - 1e-10, kw::direction = event_direction::negative,
-                kw::callback = [](auto &, bool, int, auto...) { return true; }, kw::cooldown = fp_t(-5));
+                kw::callback = [](auto &, int, auto...) { return true; }, kw::cooldown = fp_t(-5));
             REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
             REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
             REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
@@ -176,7 +176,7 @@ TEST_CASE("taylor te")
 
             oss << ev_t(
                 v * v - 1e-10, kw::direction = event_direction::negative,
-                kw::callback = [](auto &, bool, int, auto...) { return true; }, kw::cooldown = fp_t(1));
+                kw::callback = [](auto &, int, auto...) { return true; }, kw::cooldown = fp_t(1));
             REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
             REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
             REQUIRE(boost::algorithm::contains(oss.str(), " 1"));
@@ -185,12 +185,12 @@ TEST_CASE("taylor te")
 
             // Check the assignment operators.
             ev_t ev0(
-                v * v - 1e-10, kw::callback = [](auto &, bool, int, auto...) { return true; }),
+                v * v - 1e-10, kw::callback = [](auto &, int, auto...) { return true; }),
                 ev1(
-                    v * v - 1e-10, kw::callback = [](auto &, bool, int, auto...) { return true; },
+                    v * v - 1e-10, kw::callback = [](auto &, int, auto...) { return true; },
                     kw::direction = event_direction::negative),
                 ev2(
-                    v * v - 1e-10, kw::callback = [](auto &, bool, int, auto...) { return true; },
+                    v * v - 1e-10, kw::callback = [](auto &, int, auto...) { return true; },
                     kw::direction = event_direction::positive);
             ev0 = ev1;
             oss << ev0;
@@ -207,13 +207,13 @@ TEST_CASE("taylor te")
             // Failure modes.
             REQUIRE_THROWS_MATCHES(ev_t(
                                        v * v - 1e-10, kw::direction = event_direction::negative,
-                                       kw::callback = [](auto &, bool, int, auto...) { return true; },
+                                       kw::callback = [](auto &, int, auto...) { return true; },
                                        kw::cooldown = std::numeric_limits<fp_t>::quiet_NaN()),
                                    std::invalid_argument,
                                    Message("Cannot set a non-finite cooldown value for a terminal event"));
             REQUIRE_THROWS_MATCHES(ev_t(
                                        v * v - 1e-10, kw::direction = event_direction{50},
-                                       kw::callback = [](auto &, bool, int, auto...) { return true; }),
+                                       kw::callback = [](auto &, int, auto...) { return true; }),
                                    std::invalid_argument,
                                    Message("Invalid value selected for the direction of a terminal event"));
         };
@@ -272,10 +272,8 @@ TEST_CASE("taylor te basic")
                                cur_time = t;
                            })},
                 kw::t_events = {t_ev_t(
-                    v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta_, bool mr, int) {
+                    v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta_, int) {
                         const auto t = ta_.get_time();
-
-                        REQUIRE(!mr);
 
                         if (direction) {
                             REQUIRE(t > cur_time);
@@ -437,10 +435,8 @@ TEST_CASE("taylor te close")
 
         t_ev_t ev1(x);
         t_ev_t ev2(
-            x - std::numeric_limits<fp_t>::epsilon() * 2, kw::callback = [](taylor_adaptive<fp_t> &, bool mr, int) {
-                REQUIRE(!mr);
-                return true;
-            });
+            x - std::numeric_limits<fp_t>::epsilon() * 2,
+            kw::callback = [](taylor_adaptive<fp_t> &, int) { return true; });
 
         auto ta = taylor_adaptive<fp_t>{
             {prime(x) = v, prime(v) = -9.8 * sin(x)}, {fp_t(0.1), fp_t(0.25)},         kw::opt_level = opt_level,
@@ -565,8 +561,7 @@ TEST_CASE("taylor te dir")
         t_ev_t ev(
             v,
             kw::callback =
-                [](taylor_adaptive<fp_t> &, bool mr, int d_sgn) {
-                    REQUIRE(!mr);
+                [](taylor_adaptive<fp_t> &, int d_sgn) {
                     REQUIRE(d_sgn == 1);
                     return true;
                 },
@@ -609,8 +604,7 @@ TEST_CASE("taylor te dir")
         auto ev1 = t_ev_t(
             v,
             kw::callback =
-                [](taylor_adaptive<fp_t> &, bool mr, int d_sgn) {
-                    REQUIRE(!mr);
+                [](taylor_adaptive<fp_t> &, int d_sgn) {
                     REQUIRE(d_sgn == -1);
                     return true;
                 },
@@ -670,12 +664,7 @@ TEST_CASE("taylor te custom cooldown")
 
         t_ev_t ev(
             v * v - std::numeric_limits<fp_t>::epsilon() * 4,
-            kw::callback =
-                [](taylor_adaptive<fp_t> &, bool mr, int) {
-                    REQUIRE(mr);
-                    return true;
-                },
-            kw::cooldown = fp_t(1e-1));
+            kw::callback = [](taylor_adaptive<fp_t> &, int) { return true; }, kw::cooldown = fp_t(1e-1));
 
         auto ta = taylor_adaptive<fp_t>{
             {prime(x) = v, prime(v) = -9.8 * sin(x)}, {fp_t(0), fp_t(0.25)},           kw::opt_level = opt_level,
@@ -717,9 +706,8 @@ TEST_CASE("taylor te propagate_for")
         auto counter = 0u;
 
         t_ev_t ev(
-            v, kw::callback = [&counter](taylor_adaptive<fp_t> &, bool mr, int) {
+            v, kw::callback = [&counter](taylor_adaptive<fp_t> &, int) {
                 ++counter;
-                REQUIRE(!mr);
                 return true;
             });
 
@@ -769,9 +757,8 @@ TEST_CASE("taylor te propagate_grid")
         auto counter = 0u;
 
         t_ev_t ev(
-            v, kw::callback = [&counter](taylor_adaptive<fp_t> &, bool mr, int) {
+            v, kw::callback = [&counter](taylor_adaptive<fp_t> &, int) {
                 ++counter;
-                REQUIRE(!mr);
                 return true;
             });
 
@@ -832,10 +819,7 @@ TEST_CASE("taylor te propagate_grid first step bug")
 
     {
         t_ev_t ev(
-            v, kw::callback = [](taylor_adaptive<double> &, bool mr, int) {
-                REQUIRE(!mr);
-                return true;
-            });
+            v, kw::callback = [](taylor_adaptive<double> &, int) { return true; });
 
         auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}, kw::t_events = {ev}};
 
@@ -875,7 +859,7 @@ TEST_CASE("taylor te damped pendulum")
 
     std::vector<double> zero_vel_times;
 
-    auto callback = [&zero_vel_times](taylor_adaptive<double> &ta, bool, int) {
+    auto callback = [&zero_vel_times](taylor_adaptive<double> &ta, int) {
         const auto tm = ta.get_time();
 
         if (ta.get_pars()[0] == 0) {
@@ -944,10 +928,8 @@ TEST_CASE("taylor te boolean callback")
             kw::high_accuracy = high_accuracy,
             kw::compact_mode = compact_mode,
             kw::t_events = {t_ev_t(
-                v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta_, bool mr, int) {
+                v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta_, int) {
                     const auto t = ta_.get_time();
-
-                    REQUIRE(!mr);
 
                     if (direction) {
                         REQUIRE(t > cur_time);
@@ -1042,51 +1024,24 @@ TEST_CASE("step end")
 
     auto counter = 0u;
 
-    auto ta = taylor_adaptive<double>{
-        {prime(x) = v, prime(v) = -9.8 * sin(x)},
-        {0., 0.25},
-        kw::t_events = {t_ev_t(
-            heyoka::time - 1., kw::callback = [&counter](taylor_adaptive<double> &ta_, bool, int) {
-                ++counter;
-                REQUIRE(ta_.get_time() == 1.);
-                return true;
-            })}};
+    auto ta
+        = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                  {0., 0.25},
+                                  kw::t_events = {t_ev_t(
+                                      heyoka::time - 1., kw::callback = [&counter](taylor_adaptive<double> &ta_, int) {
+                                          ++counter;
+                                          REQUIRE(ta_.get_time() == 1.);
+                                          return true;
+                                      })}};
 
     ta.propagate_until(10., kw::max_delta_t = 0.005);
 
     REQUIRE(counter == 1u);
 }
 
-// Bug: mr always being true for an
-// event with zero cooldown.
-TEST_CASE("taylor zero cd mr bug")
-{
-    auto [x, v] = make_vars("x", "v");
-
-    using t_ev_t = typename taylor_adaptive<double>::t_event_t;
-
-    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
-                                      {0., 0.25},
-                                      kw::t_events = {
-                                          t_ev_t(
-                                              v,
-                                              kw::callback =
-                                                  [](taylor_adaptive<double> &, bool mr, int) {
-                                                      REQUIRE(!mr);
-
-                                                      return false;
-                                                  },
-                                              kw::cooldown = 0),
-                                      }};
-
-    auto oc = std::get<0>(ta.propagate_until(10.));
-
-    REQUIRE(static_cast<int>(oc) == -1);
-}
-
 struct s11n_callback {
     template <typename T>
-    bool operator()(taylor_adaptive<T> &, bool, int) const
+    bool operator()(taylor_adaptive<T> &, int) const
     {
         return true;
     }
@@ -1099,13 +1054,13 @@ private:
     }
 };
 
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<float> &, bool, int)
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<double> &, bool, int)
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<long double> &, bool, int)
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<float> &, int)
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<double> &, int)
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<long double> &, int)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<mppp::real128> &, bool, int)
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<mppp::real128> &, int)
 
 #endif
 

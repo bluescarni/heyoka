@@ -1123,34 +1123,6 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
                     // LCOV_EXCL_STOP
                 }
 
-                // Check if multiple roots are detected in the cooldown
-                // period for a terminal event. For non-terminal events,
-                // this will be unused.
-                // NOLINTNEXTLINE(misc-const-correctness)
-                [[maybe_unused]] bool has_multi_roots = false;
-                if constexpr (detail::is_terminal_event_v<ev_type>) {
-                    // Establish the cooldown time.
-                    // NOTE: this is the same logic that is
-                    // employed in taylor.cpp to assign a cooldown
-                    // to a detected terminal event. g_eps has been checked
-                    // for finiteness early on, abs_der also has been checked for
-                    // finiteness above.
-                    const auto cd = (ev_vec[i].get_cooldown() >= 0) ? ev_vec[i].get_cooldown()
-                                                                    : detail::taylor_deduce_cooldown(g_eps, abs_der);
-
-                    // NOTE: if the cooldown is zero, no sense to
-                    // run the check.
-                    if (cd != 0) {
-                        // Evaluate the polynomial at the cooldown boundaries.
-                        const auto e1 = detail::poly_eval(ptr, root + cd, order);
-                        const auto e2 = detail::poly_eval(ptr, root - cd, order);
-
-                        // We detect multiple roots within the cooldown
-                        // if the signs of e1 and e2 are equal.
-                        has_multi_roots = (e1 > 0) == (e2 > 0);
-                    }
-                }
-
                 // Compute the sign of the derivative.
                 const auto d_sgn = detail::sgn(der);
 
@@ -1161,7 +1133,7 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
                     // If the event direction does not
                     // matter, just add it.
                     if constexpr (detail::is_terminal_event_v<ev_type>) {
-                        out.emplace_back(i, std::move(root), has_multi_roots, d_sgn, std::move(abs_der));
+                        out.emplace_back(i, std::move(root), d_sgn, std::move(abs_der));
                     } else {
                         out.emplace_back(i, std::move(root), d_sgn);
                     }
@@ -1170,7 +1142,7 @@ void taylor_adaptive<T>::ed_data::detect_events(const T &h, std::uint32_t order,
                     // matches the sign of the derivative.
                     if (static_cast<event_direction>(d_sgn) == dir) {
                         if constexpr (detail::is_terminal_event_v<ev_type>) {
-                            out.emplace_back(i, std::move(root), has_multi_roots, d_sgn, std::move(abs_der));
+                            out.emplace_back(i, std::move(root), d_sgn, std::move(abs_der));
                         } else {
                             out.emplace_back(i, std::move(root), d_sgn);
                         }
@@ -1817,35 +1789,6 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
                         // LCOV_EXCL_STOP
                     }
 
-                    // Check if multiple roots are detected in the cooldown
-                    // period for a terminal event. For non-terminal events,
-                    // this will be unused.
-                    // NOLINTNEXTLINE(misc-const-correctness)
-                    [[maybe_unused]] bool has_multi_roots = false;
-                    if constexpr (detail::is_terminal_event_v<ev_type>) {
-                        // Establish the cooldown time.
-                        // NOTE: this is the same logic that is
-                        // employed in taylor.cpp to assign a cooldown
-                        // to a detected terminal event. g_eps has been checked
-                        // for finiteness early on, abs_der also has been checked for
-                        // finiteness above.
-                        const auto cd = (ev_vec[i].get_cooldown() >= 0)
-                                            ? ev_vec[i].get_cooldown()
-                                            : detail::taylor_deduce_cooldown(g_eps, abs_der);
-
-                        // NOTE: if the cooldown is zero, no sense to
-                        // run the check.
-                        if (cd != 0) {
-                            // Evaluate the polynomial at the cooldown boundaries.
-                            const auto e1 = detail::poly_eval(ptr, root + cd, order);
-                            const auto e2 = detail::poly_eval(ptr, root - cd, order);
-
-                            // We detect multiple roots within the cooldown
-                            // if the signs of e1 and e2 are equal.
-                            has_multi_roots = (e1 > 0) == (e2 > 0);
-                        }
-                    }
-
                     // Compute sign of the derivative.
                     const auto d_sgn = detail::sgn(der);
 
@@ -1856,7 +1799,7 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
                         // If the event direction does not
                         // matter, just add it.
                         if constexpr (detail::is_terminal_event_v<ev_type>) {
-                            out.emplace_back(i, root, has_multi_roots, d_sgn, abs_der);
+                            out.emplace_back(i, root, d_sgn, abs_der);
                         } else {
                             out.emplace_back(i, root, d_sgn);
                         }
@@ -1865,7 +1808,7 @@ void taylor_adaptive_batch<T>::ed_data::detect_events(const T *h_ptr, std::uint3
                         // matches the sign of the derivative.
                         if (static_cast<event_direction>(d_sgn) == dir) {
                             if constexpr (detail::is_terminal_event_v<ev_type>) {
-                                out.emplace_back(i, root, has_multi_roots, d_sgn, abs_der);
+                                out.emplace_back(i, root, d_sgn, abs_der);
                             } else {
                                 out.emplace_back(i, root, d_sgn);
                             }

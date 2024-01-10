@@ -197,7 +197,7 @@ TEST_CASE("te single step")
         std::vector<fp_t> trig_times, v_vals;
         t_event<fp_t> ev{ev_eq,
                          kw::callback =
-                             [&trig_times, &v_vals](auto &tint, bool, int) {
+                             [&trig_times, &v_vals](auto &tint, int) {
                                  trig_times.push_back(tint.get_time());
                                  v_vals.push_back(tint.get_state()[1]);
                                  return true;
@@ -207,7 +207,7 @@ TEST_CASE("te single step")
         t_event_batch<fp_t> ev_batch{
             ev_eq,
             kw::callback =
-                [&trig_times_batch, batch_size, &v_vals_batch](auto &tint, bool, int, std::uint32_t batch_idx) {
+                [&trig_times_batch, batch_size, &v_vals_batch](auto &tint, int, std::uint32_t batch_idx) {
                     trig_times_batch[batch_idx].push_back(tint.get_time()[batch_idx]);
                     v_vals_batch[batch_idx].push_back(tint.get_state()[batch_size + batch_idx]);
                     return true;
@@ -304,7 +304,7 @@ TEST_CASE("te linear box")
                                                4,
                                                kw::t_events = {ev_t(
                                                    x - 1., kw::callback =
-                                                               [&counter](auto &, bool, int, std::uint32_t) {
+                                                               [&counter](auto &, int, std::uint32_t) {
                                                                    ++counter;
                                                                    return true;
                                                                })},
@@ -852,10 +852,8 @@ TEST_CASE("te basic")
                                          cur_time[idx] = t;
                                      })},
             kw::t_events = {t_ev_t(
-                v, kw::callback = [&counter_t, &cur_time, &direction](auto &ta_, bool mr, int, std::uint32_t idx) {
+                v, kw::callback = [&counter_t, &cur_time, &direction](auto &ta_, int, std::uint32_t idx) {
                     const auto &t = ta_.get_time();
-
-                    REQUIRE(!mr);
 
                     if (direction) {
                         REQUIRE(t[idx] > cur_time[idx]);
@@ -1135,10 +1133,7 @@ TEST_CASE("te close")
 
     t_ev_t ev1(x);
     t_ev_t ev2(
-        x - std::numeric_limits<fp_t>::epsilon() * 2, kw::callback = [](auto &, bool mr, int, std::uint32_t) {
-            REQUIRE(!mr);
-            return true;
-        });
+        x - std::numeric_limits<fp_t>::epsilon() * 2, kw::callback = [](auto &, int, std::uint32_t) { return true; });
 
     auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                           {0.1, 0.11, 0.12, 0.13, .25, .26, .27, .28},
@@ -1331,8 +1326,7 @@ TEST_CASE("te dir")
     t_ev_t ev(
         v,
         kw::callback =
-            [](auto &, bool mr, int d_sgn, std::uint32_t) {
-                REQUIRE(!mr);
+            [](auto &, int d_sgn, std::uint32_t) {
                 REQUIRE(d_sgn == 1);
                 return true;
             },
@@ -1364,8 +1358,7 @@ TEST_CASE("te dir")
     auto ev1 = t_ev_t(
         v,
         kw::callback =
-            [](auto &, bool mr, int d_sgn, std::uint32_t) {
-                REQUIRE(!mr);
+            [](auto &, int d_sgn, std::uint32_t) {
                 REQUIRE(d_sgn == -1);
                 return true;
             },
@@ -1416,12 +1409,7 @@ TEST_CASE("te custom cooldown")
 
     t_ev_t ev(
         v * v - std::numeric_limits<fp_t>::epsilon() * 4,
-        kw::callback =
-            [](auto &, bool mr, int, std::uint32_t) {
-                REQUIRE(mr);
-                return true;
-            },
-        kw::cooldown = fp_t(1e-1));
+        kw::callback = [](auto &, int, std::uint32_t) { return true; }, kw::cooldown = fp_t(1e-1));
 
     auto ta = taylor_adaptive_batch<fp_t>{
         {prime(x) = v, prime(v) = -9.8 * sin(x)}, {0, 0.01, 0.02, 0.03, .25, .26, .27, .28}, 4, kw::t_events = {ev}};
@@ -1461,9 +1449,8 @@ TEST_CASE("te propagate_for")
     std::vector<unsigned> counter(4u, 0u);
 
     t_ev_t ev(
-        v, kw::callback = [&counter](auto &, bool mr, int, std::uint32_t idx) {
+        v, kw::callback = [&counter](auto &, int, std::uint32_t idx) {
             ++counter[idx];
-            REQUIRE(!mr);
             return true;
         });
 
@@ -1501,9 +1488,8 @@ TEST_CASE("te propagate_grid")
     std::vector<unsigned> counter(4u, 0u);
 
     t_ev_t ev(
-        v, kw::callback = [&counter](auto &, bool mr, int, std::uint32_t idx) {
+        v, kw::callback = [&counter](auto &, int, std::uint32_t idx) {
             ++counter[idx];
-            REQUIRE(!mr);
             return true;
         });
 
@@ -1561,10 +1547,7 @@ TEST_CASE("te propagate_grid first step bug")
 
     {
         t_ev_t ev(
-            v, kw::callback = [](auto &, bool mr, int, std::uint32_t) {
-                REQUIRE(!mr);
-                return true;
-            });
+            v, kw::callback = [](auto &, int, std::uint32_t) { return true; });
 
         auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                                 {0.05, 0.051, 0.052, 0.053, 0.025, 0.0251, 0.0252, 0.0253},
@@ -1602,7 +1585,7 @@ TEST_CASE("te damped pendulum")
 
     std::vector<std::vector<double>> zero_vel_times(4u);
 
-    auto callback = [&zero_vel_times](auto &ta, bool, int, std::uint32_t idx) {
+    auto callback = [&zero_vel_times](auto &ta, int, std::uint32_t idx) {
         const auto tm = ta.get_time()[idx];
 
         if (ta.get_pars()[idx] == 0) {
@@ -1680,10 +1663,8 @@ TEST_CASE("te boolean callback")
         {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
         4,
         kw::t_events = {t_ev_t(
-            v, kw::callback = [&counter_t, &cur_time, &direction](auto &ta_, bool mr, int, std::uint32_t idx) {
+            v, kw::callback = [&counter_t, &cur_time, &direction](auto &ta_, int, std::uint32_t idx) {
                 const auto &t = ta_.get_time();
-
-                REQUIRE(!mr);
 
                 if (direction) {
                     REQUIRE(t[idx] > cur_time[idx]);
@@ -1752,7 +1733,7 @@ TEST_CASE("te step end")
         {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
         4,
         kw::t_events = {t_ev_t(
-            heyoka::time - 1., kw::callback = [&counter](auto &ta_, bool, int, std::uint32_t idx) {
+            heyoka::time - 1., kw::callback = [&counter](auto &ta_, int, std::uint32_t idx) {
                 ++counter[idx];
                 REQUIRE(ta_.get_time()[idx] == 1.);
                 return true;
@@ -1771,20 +1752,14 @@ TEST_CASE("te zero cd mr bug")
 
     using t_ev_t = typename taylor_adaptive_batch<double>::t_event_t;
 
-    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
-                                            {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
-                                            4,
-                                            kw::t_events = {
-                                                t_ev_t(
-                                                    v,
-                                                    kw::callback =
-                                                        [](auto &, bool mr, int, std::uint32_t) {
-                                                            REQUIRE(!mr);
-
-                                                            return false;
-                                                        },
-                                                    kw::cooldown = 0),
-                                            }};
+    auto ta = taylor_adaptive_batch<double>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)},
+        {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+        4,
+        kw::t_events = {
+            t_ev_t(
+                v, kw::callback = [](auto &, int, std::uint32_t) { return false; }, kw::cooldown = 0),
+        }};
 
     ta.propagate_until({10., 10., 10., 10.});
 
@@ -1794,7 +1769,7 @@ TEST_CASE("te zero cd mr bug")
 
 struct s11n_te_callback {
     template <typename I>
-    bool operator()(I &, bool, int, std::uint32_t) const
+    bool operator()(I &, int, std::uint32_t) const
     {
         return true;
     }
@@ -1807,7 +1782,7 @@ private:
     }
 };
 
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_te_callback, bool, taylor_adaptive_batch<double> &, bool, int, std::uint32_t)
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_te_callback, bool, taylor_adaptive_batch<double> &, int, std::uint32_t)
 
 TEST_CASE("te s11n")
 {

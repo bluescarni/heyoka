@@ -911,13 +911,12 @@ TEST_CASE("propagate grid scalar")
 
             // A case in which we have a callback which never stops and a terminal event
             // which triggers.
-            ta = taylor_adaptive<fp_t>{
-                {prime(x) = v, prime(v) = -x},
-                {fp_t(0., prec), fp_t(1., prec)},
-                kw::opt_level = opt_level,
-                kw::compact_mode = true,
-                kw::t_events = {t_event<fp_t>(
-                    v - .1, kw::callback = [](taylor_adaptive<fp_t> &, bool, int) { return false; })}};
+            ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -x},
+                                       {fp_t(0., prec), fp_t(1., prec)},
+                                       kw::opt_level = opt_level,
+                                       kw::compact_mode = true,
+                                       kw::t_events = {t_event<fp_t>(
+                                           v - .1, kw::callback = [](taylor_adaptive<fp_t> &, int) { return false; })}};
             out = ta.propagate_grid(
                 {fp_t(0., prec), fp_t(10., prec), fp_t(100., prec)}, kw::callback = [](const auto &) { return true; });
             REQUIRE(std::get<0>(out) == taylor_outcome{-1});

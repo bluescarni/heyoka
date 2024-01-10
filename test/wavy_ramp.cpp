@@ -29,7 +29,7 @@ const auto pi_const = boost::math::constants::pi<double>();
 
 auto make_wavy_ramp(bool check_event)
 {
-    auto cb_curve = [check_event](taylor_adaptive<double> &ta, bool, int) {
+    auto cb_curve = [check_event](taylor_adaptive<double> &ta, int) {
         auto x = ta.get_state()[0];
         auto y = ta.get_state()[1];
 
@@ -54,7 +54,7 @@ auto make_wavy_ramp(bool check_event)
         return true;
     };
 
-    auto cb_bottom = [check_event](taylor_adaptive<double> &ta, bool, int) {
+    auto cb_bottom = [check_event](taylor_adaptive<double> &ta, int) {
         if (check_event) {
             auto y = ta.get_state()[1];
 

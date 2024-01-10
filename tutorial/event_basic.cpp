@@ -99,7 +99,7 @@ int main()
         // The event equation.
         v,
         // The callback.
-        kw::callback = [](taylor_adaptive<double> &ta, [[maybe_unused]] bool mr, int) {
+        kw::callback = [](taylor_adaptive<double> &ta, int) {
             // NOTE: the value of the drag coefficient
             // is stored as the first (and only) runtime parameter
             // of the integrator.

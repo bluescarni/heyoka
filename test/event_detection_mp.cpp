@@ -142,7 +142,7 @@ TEST_CASE("event construction")
                 {fp_t{0., prec}},
                 kw::opt_level = opt_level,
                 kw::t_events = {t_ev_t(
-                    x - 1., kw::callback = [](const taylor_adaptive<fp_t> &, bool, int) { return true; })},
+                    x - 1., kw::callback = [](const taylor_adaptive<fp_t> &, int) { return true; })},
                 kw::nt_events = {nt_ev_t(x - 1., [](taylor_adaptive<fp_t> &, const fp_t &, int) {})}};
         }
     }
@@ -152,7 +152,7 @@ TEST_CASE("event construction")
         std::ostringstream oss;
 
         t_ev_t ev(
-            x - 1., kw::callback = [](const taylor_adaptive<fp_t> &, bool, int) { return true; });
+            x - 1., kw::callback = [](const taylor_adaptive<fp_t> &, int) { return true; });
 
         oss << ev;
 
@@ -695,7 +695,7 @@ TEST_CASE("te linear box")
                                                {fp_t(0., prec)},
                                                kw::t_events = {ev_t(
                                                    x - 1., kw::callback =
-                                                               [&counter](taylor_adaptive<fp_t> &, bool, int) {
+                                                               [&counter](taylor_adaptive<fp_t> &, int) {
                                                                    ++counter;
                                                                    return true;
                                                                })},
@@ -764,10 +764,8 @@ TEST_CASE("taylor te basic")
                                                  cur_time = t;
                                              })},
                     kw::t_events = {t_ev_t(
-                        v, kw::callback = [&](taylor_adaptive<fp_t> &ta_, bool mr, int) {
+                        v, kw::callback = [&](taylor_adaptive<fp_t> &ta_, int) {
                             const auto t = ta_.get_time();
-
-                            REQUIRE(!mr);
 
                             if (direction) {
                                 REQUIRE(t > cur_time);
@@ -919,10 +917,7 @@ TEST_CASE("taylor te close")
             t_ev_t ev1(x);
             t_ev_t ev2(
                 x - detail::eps_from_prec(prec) * fp_t(2, prec),
-                kw::callback = [](taylor_adaptive<fp_t> &, bool mr, int) {
-                    REQUIRE(!mr);
-                    return true;
-                });
+                kw::callback = [](taylor_adaptive<fp_t> &, int) { return true; });
 
             auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                             {fp_t(0.1, prec), fp_t(0.25, prec)},
@@ -1033,12 +1028,7 @@ TEST_CASE("taylor te custom cooldown")
         for (auto prec : {30, 123}) {
             t_ev_t ev(
                 v * v - detail::eps_from_prec(prec) * fp_t(4, prec),
-                kw::callback =
-                    [](taylor_adaptive<fp_t> &, bool mr, int) {
-                        REQUIRE(mr);
-                        return true;
-                    },
-                kw::cooldown = fp_t(1e-1));
+                kw::callback = [](taylor_adaptive<fp_t> &, int) { return true; }, kw::cooldown = fp_t(1e-1));
 
             auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                             {fp_t(0, prec), fp_t(0.25, prec)},
@@ -1076,9 +1066,8 @@ TEST_CASE("taylor te propagate_for")
             auto counter = 0u;
 
             t_ev_t ev(
-                v, kw::callback = [&counter](taylor_adaptive<fp_t> &, bool mr, int) {
+                v, kw::callback = [&counter](taylor_adaptive<fp_t> &, int) {
                     ++counter;
-                    REQUIRE(!mr);
                     return true;
                 });
 
@@ -1126,9 +1115,8 @@ TEST_CASE("taylor te propagate_grid")
             auto counter = 0u;
 
             t_ev_t ev(
-                v, kw::callback = [&counter](taylor_adaptive<fp_t> &, bool mr, int) {
+                v, kw::callback = [&counter](taylor_adaptive<fp_t> &, int) {
                     ++counter;
-                    REQUIRE(!mr);
                     return true;
                 });
 
@@ -1192,7 +1180,7 @@ TEST_CASE("te step end")
                 {fp_t(0., prec), fp_t(0.25, prec)},
                 kw::t_events = {t_ev_t(
                                     heyoka::time - 1., kw::callback =
-                                                           [&counter](taylor_adaptive<fp_t> &ta_, bool, int) {
+                                                           [&counter](taylor_adaptive<fp_t> &ta_, int) {
                                                                ++counter;
                                                                REQUIRE(ta_.get_time() == 1.);
                                                                return true;
