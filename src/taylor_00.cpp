@@ -14,7 +14,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
-#include <functional>
 #include <initializer_list>
 #include <limits>
 #include <optional>
@@ -1218,12 +1217,12 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
                 // altogether and thus we never end up here. If the derivative
                 // of the event equation is not finite, the event is also skipped.
                 edd.m_te_cooldowns[te_idx].emplace(0,
-                                                   detail::taylor_deduce_cooldown(g_eps, std::get<4>(edd.m_d_tes[0])));
+                                                   detail::taylor_deduce_cooldown(g_eps, std::get<3>(edd.m_d_tes[0])));
             }
 
             // Invoke the callback of the first terminal event, if it has one.
             if (te.get_callback()) {
-                te_cb_ret = te.get_callback()(*this, std::get<2>(edd.m_d_tes[0]), std::get<3>(edd.m_d_tes[0]));
+                te_cb_ret = te.get_callback()(*this, std::get<2>(edd.m_d_tes[0]));
             }
         }
 
@@ -2958,14 +2957,13 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
                     // altogether and thus we never end up here. If the derivative
                     // of the event equation is not finite, the event is also skipped.
                     edd.m_te_cooldowns[i][te_idx].emplace(
-                        0, detail::taylor_deduce_cooldown(edd.m_g_eps[i], std::get<4>(edd.m_d_tes[i][0])));
+                        0, detail::taylor_deduce_cooldown(edd.m_g_eps[i], std::get<3>(edd.m_d_tes[i][0])));
                 }
 
                 // Invoke the callback of the first terminal event, if it has one.
                 if (te.get_callback()) {
                     try {
-                        te_cb_ret = te.get_callback()(*this, std::get<2>(edd.m_d_tes[i][0]),
-                                                      std::get<3>(edd.m_d_tes[i][0]), i);
+                        te_cb_ret = te.get_callback()(*this, std::get<2>(edd.m_d_tes[i][0]), i);
                     } catch (...) {
                         // NOTE: if an exception is raised, record it
                         // and then move on to the next batch element.

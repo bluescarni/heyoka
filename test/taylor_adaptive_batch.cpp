@@ -1004,7 +1004,7 @@ HEYOKA_S11N_CALLABLE_EXPORT(s11n_nt_cb, void, taylor_adaptive_batch<double> &, d
 
 struct s11n_t_cb {
     template <typename T>
-    bool operator()(T &, bool, int, std::uint32_t) const
+    bool operator()(T &, int, std::uint32_t) const
     {
         return false;
     }
@@ -1017,7 +1017,7 @@ private:
     }
 };
 
-HEYOKA_S11N_CALLABLE_EXPORT(s11n_t_cb, bool, taylor_adaptive_batch<double> &, bool, int, std::uint32_t);
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_t_cb, bool, taylor_adaptive_batch<double> &, int, std::uint32_t);
 
 template <typename Oa, typename Ia>
 void s11n_test_impl()
@@ -1419,7 +1419,7 @@ TEST_CASE("ev exception callback")
             kw::nt_events = {nte_t(
                 v * v - 1e-10, [](auto &, fp_t, int, std::uint32_t) { throw std::invalid_argument("hello world 0"); })},
             kw::t_events = {te_t(
-                v, kw::callback = [](auto &, bool, int, std::uint32_t) -> bool {
+                v, kw::callback = [](auto &, int, std::uint32_t) -> bool {
                     throw std::invalid_argument("hello world 1");
                 })}};
 
@@ -1448,7 +1448,7 @@ TEST_CASE("ev exception callback")
                                               kw::nt_events
                                               = {nte_t(v * v - 1e-10, [](auto &, fp_t, int, std::uint32_t) {})},
                                               kw::t_events = {te_t(
-                                                  v, kw::callback = [](auto &, bool, int, std::uint32_t) -> bool {
+                                                  v, kw::callback = [](auto &, int, std::uint32_t) -> bool {
                                                       throw std::invalid_argument("hello world 1");
                                                   })}};
 
@@ -1477,7 +1477,7 @@ TEST_CASE("ev exception callback")
                                               kw::nt_events
                                               = {nte_t(v * v - 1e-10, [](auto &, fp_t, int, std::uint32_t) {})},
                                               kw::t_events = {te_t(
-                                                  v, kw::callback = [](auto &, bool, int, std::uint32_t) -> bool {
+                                                  v, kw::callback = [](auto &, int, std::uint32_t) -> bool {
                                                       throw std::invalid_argument("hello world 1");
                                                   })}};
 
@@ -1614,7 +1614,7 @@ TEST_CASE("event cb time")
                                      tint.set_time({-std::numeric_limits<double>::infinity(), tint.get_time()[1]});
                                  })},
         kw::t_events = {t_ev_t(
-            x - 2e-5, kw::callback = [&](auto &tint, auto, auto, auto) {
+            x - 2e-5, kw::callback = [&](auto &tint, auto, auto) {
                 ++tcount1;
 
                 tint.set_time({-10., tint.get_time()[1]});
@@ -1634,7 +1634,7 @@ TEST_CASE("event cb time")
 
     ta = taylor_adaptive_batch({prime(x) = v, prime(v) = -x}, std::vector<double>{0., 0., 1., 1.}, 2u,
                                kw::t_events = {t_ev_t(
-                                   x - 2e-5, kw::callback = [&](auto &tint, auto, auto, auto) {
+                                   x - 2e-5, kw::callback = [&](auto &tint, auto, auto) {
                                        auto *ptr = tint.get_state_data();
 
                                        std::fill(ptr, ptr + 4, std::numeric_limits<double>::infinity());
@@ -1661,12 +1661,11 @@ TEST_CASE("reset cooldowns")
 
     using te_t = typename taylor_adaptive_batch<fp_t>::t_event_t;
 
-    auto ta
-        = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
-                                      {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
-                                      4,
-                                      kw::t_events = {te_t(
-                                          v, kw::callback = [](auto &, bool, int, std::uint32_t) { return false; })}};
+    auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                          {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+                                          4,
+                                          kw::t_events = {te_t(
+                                              v, kw::callback = [](auto &, int, std::uint32_t) { return false; })}};
 
     ta.propagate_until({100., 100., 100., 100.});
 
