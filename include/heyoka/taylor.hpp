@@ -359,13 +359,9 @@ private:
 
     // Serialization.
     friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar & eq;
-        ar & callback;
-        ar & dir;
-    }
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     void finalise_ctor(event_direction);
 
@@ -490,14 +486,9 @@ private:
 
     // Serialization.
     friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar & eq;
-        ar & callback;
-        ar & cooldown;
-        ar & dir;
-    }
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     void finalise_ctor(callback_t, T, event_direction);
 
@@ -1005,11 +996,9 @@ template <typename Derived>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_base<mppp::real, Derived>
 {
     friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar & m_prec;
-    }
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 protected:
     // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes,misc-non-private-member-variables-in-classes)

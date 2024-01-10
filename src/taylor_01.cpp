@@ -1485,6 +1485,22 @@ auto nt_event_def_cb()
 } // namespace
 
 template <typename T, bool B>
+void nt_event_impl<T, B>::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << eq;
+    ar << callback;
+    ar << dir;
+}
+
+template <typename T, bool B>
+void nt_event_impl<T, B>::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> eq;
+    ar >> callback;
+    ar >> dir;
+}
+
+template <typename T, bool B>
 nt_event_impl<T, B>::nt_event_impl() : nt_event_impl(expression{}, nt_event_def_cb<T, B>())
 {
 }
@@ -1546,6 +1562,24 @@ template <typename T, bool B>
 event_direction nt_event_impl<T, B>::get_direction() const
 {
     return dir;
+}
+
+template <typename T, bool B>
+void t_event_impl<T, B>::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << eq;
+    ar << callback;
+    ar << cooldown;
+    ar << dir;
+}
+
+template <typename T, bool B>
+void t_event_impl<T, B>::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> eq;
+    ar >> callback;
+    ar >> cooldown;
+    ar >> dir;
 }
 
 template <typename T, bool B>

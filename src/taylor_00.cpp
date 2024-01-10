@@ -429,6 +429,18 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
 #if defined(HEYOKA_HAVE_REAL)
 
 template <typename Derived>
+void taylor_adaptive_base<mppp::real, Derived>::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << m_prec;
+}
+
+template <typename Derived>
+void taylor_adaptive_base<mppp::real, Derived>::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> m_prec;
+}
+
+template <typename Derived>
 mpfr_prec_t taylor_adaptive_base<mppp::real, Derived>::get_prec() const
 {
     assert(m_prec >= mppp::real_prec_min() && m_prec <= mppp::real_prec_max());
