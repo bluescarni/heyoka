@@ -93,7 +93,7 @@ TEST_CASE("atanh s11n")
 {
     std::stringstream ss;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto ex = atanh(x);
 
@@ -121,7 +121,7 @@ TEST_CASE("cfunc")
 
         using fp_t = decltype(fp_x);
 
-        auto [x] = make_vars("x");
+        auto x = make_vars("x");
 
         std::uniform_real_distribution<double> rdist(-1., 1.);
 
@@ -180,7 +180,7 @@ TEST_CASE("cfunc")
 
 TEST_CASE("cfunc_mp")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     const auto prec = 237u;
 
@@ -215,7 +215,7 @@ TEST_CASE("cfunc_mp")
 
 TEST_CASE("normalise")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     REQUIRE(normalise(atanh(x)) == atanh(x));
     REQUIRE(normalise(subs(atanh(x), {{x, .5_dbl}})) == atanh(.5_dbl));

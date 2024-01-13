@@ -34,8 +34,8 @@ using namespace heyoka;
 
 using v_ex_t = std::array<expression, 3>;
 
-const auto mu = make_vars("mu")[0];
-const auto tm = make_vars("t")[0];
+const auto mu = make_vars("mu");
+const auto tm = make_vars("t");
 
 std::pair<v_ex_t, v_ex_t> make_lp(const v_ex_t &pos_0, const v_ex_t &vel_0)
 {

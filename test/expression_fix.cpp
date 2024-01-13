@@ -27,7 +27,7 @@ TEST_CASE("fix s11n")
 {
     std::stringstream ss;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto ex = fix(x);
 

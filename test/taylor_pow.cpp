@@ -95,7 +95,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
 // being used under certain conditions.
 TEST_CASE("taylor pow approx")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     {
         llvm_state s{kw::opt_level = 0u};

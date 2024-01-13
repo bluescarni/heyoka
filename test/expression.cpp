@@ -1481,7 +1481,7 @@ TEST_CASE("mp interop")
 {
     using namespace mppp::literals;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     REQUIRE(std::get<mppp::real>(std::get<number>(expression{1.1_r256}.value()).value()) == 1.1_r256);
 
@@ -1526,7 +1526,7 @@ TEST_CASE("mp interop")
 
 TEST_CASE("output too long")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto ex = 1. + x;
 
@@ -1639,7 +1639,7 @@ TEST_CASE("less than")
 
 TEST_CASE("mul compress")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     REQUIRE(2_dbl * x + 3_dbl * x == 5_dbl * x);
     REQUIRE(2_dbl * x + x == 3_dbl * x);

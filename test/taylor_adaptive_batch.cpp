@@ -1385,7 +1385,7 @@ TEST_CASE("events error")
 
 TEST_CASE("ev inf state")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto ta = taylor_adaptive_batch<double>{
         {prime(x) = 1_dbl}, {0., 0., 0., 0.}, 4, kw::t_events = {t_event_batch<double>(x - 5.)}};

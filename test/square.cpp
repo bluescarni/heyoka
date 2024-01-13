@@ -90,7 +90,7 @@ TEST_CASE("square s11n")
 {
     std::stringstream ss;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto ex = square_wrapper(x);
 
@@ -116,7 +116,7 @@ TEST_CASE("cfunc")
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using fp_t = decltype(fp_x);
 
-        auto [x] = make_vars("x");
+        auto x = make_vars("x");
 
         std::uniform_real_distribution<double> rdist(.1, 10.);
 
@@ -175,7 +175,7 @@ TEST_CASE("cfunc")
 
 TEST_CASE("cfunc_mp")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     const auto prec = 237u;
 

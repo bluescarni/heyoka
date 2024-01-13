@@ -85,7 +85,7 @@ TEST_CASE("sin s11n")
 {
     std::stringstream ss;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto ex = sin(x);
 
@@ -110,7 +110,7 @@ TEST_CASE("sin number simpl")
 {
     using std::sin;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     REQUIRE(sin(x * 0.) == 0_dbl);
     REQUIRE(sin(0.123_flt) == expression{sin(0.123f)});
@@ -131,7 +131,7 @@ TEST_CASE("cfunc")
 
         using fp_t = decltype(fp_x);
 
-        auto [x] = make_vars("x");
+        auto x = make_vars("x");
 
         std::uniform_real_distribution<double> rdist(.1, 10.);
 
@@ -189,7 +189,7 @@ TEST_CASE("cfunc")
 
 TEST_CASE("cfunc_mp")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     const auto prec = 237u;
 
@@ -224,7 +224,7 @@ TEST_CASE("cfunc_mp")
 
 TEST_CASE("normalise")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     REQUIRE(normalise(sin(x)) == sin(x));
     REQUIRE(normalise(subs(sin(x), {{x, .1_dbl}})) == sin(.1_dbl));

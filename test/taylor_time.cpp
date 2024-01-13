@@ -104,7 +104,7 @@ TEST_CASE("ode test")
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
-                auto [x] = make_vars("x");
+                auto x = make_vars("x");
 
                 taylor_adaptive<double> ta({prime(x) = cos(hy::time)}, {.5}, kw::high_accuracy = ha,
                                            kw::compact_mode = cm, kw::opt_level = opt_level);

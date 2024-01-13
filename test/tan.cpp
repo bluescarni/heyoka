@@ -93,7 +93,7 @@ TEST_CASE("tan s11n")
 {
     std::stringstream ss;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto ex = tan(x);
 
@@ -121,7 +121,7 @@ TEST_CASE("cfunc")
 
         using fp_t = decltype(fp_x);
 
-        auto [x] = make_vars("x");
+        auto x = make_vars("x");
 
         std::uniform_real_distribution<double> rdist(-1., 1.);
 
@@ -179,7 +179,7 @@ TEST_CASE("cfunc")
 
 TEST_CASE("cfunc_mp")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     const auto prec = 237u;
 
@@ -214,7 +214,7 @@ TEST_CASE("cfunc_mp")
 
 TEST_CASE("normalise")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     REQUIRE(normalise(tan(x)) == tan(x));
     REQUIRE(normalise(subs(tan(x), {{x, .1_dbl}})) == tan(.1_dbl));

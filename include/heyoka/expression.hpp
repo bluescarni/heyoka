@@ -13,6 +13,7 @@
 
 #include <array>
 #include <cassert>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -590,10 +591,15 @@ taylor_dc_t::size_type taylor_decompose(funcptr_map<taylor_dc_t::size_type> &, c
 
 } // namespace detail
 
-template <typename... Args>
-inline std::array<expression, sizeof...(Args)> make_vars(const Args &...strs)
+template <typename Arg0, typename... Args>
+    requires std::convertible_to<const Arg0 &, std::string> && (std::convertible_to<const Args &, std::string> && ...)
+auto make_vars(const Arg0 &str, const Args &...strs)
 {
-    return std::array{expression{variable{strs}}...};
+    if constexpr (sizeof...(Args) == 0u) {
+        return expression{variable{str}};
+    } else {
+        return std::array{expression{variable{str}}, expression{variable{strs}}...};
+    }
 }
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff(llvm_state &, llvm::Type *, const expression &,

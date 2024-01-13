@@ -95,7 +95,7 @@ TEST_CASE("time s11n")
 {
     std::stringstream ss;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto ex = heyoka::time + x;
 
@@ -123,7 +123,7 @@ TEST_CASE("cfunc")
 
         using std::cos;
 
-        auto [x] = make_vars("x");
+        auto x = make_vars("x");
 
         std::uniform_real_distribution<double> rdist(-1., 1.);
 
@@ -185,7 +185,7 @@ TEST_CASE("cfunc")
 
 TEST_CASE("cfunc_mp")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     const auto prec = 237u;
 

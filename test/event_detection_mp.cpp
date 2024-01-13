@@ -133,7 +133,7 @@ TEST_CASE("event construction")
     using nt_ev_t = nt_event<fp_t>;
     using t_ev_t = t_event<fp_t>;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     for (auto opt_level : {0u, 3u}) {
         for (auto prec : {30, 123}) {
@@ -644,7 +644,7 @@ TEST_CASE("nte linear box")
 
     using ev_t = taylor_adaptive<mppp::real>::nt_event_t;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     for (auto opt_level : {0u, 3u}) {
         for (auto prec : {30, 123}) {
@@ -685,7 +685,7 @@ TEST_CASE("te linear box")
 
     using ev_t = taylor_adaptive<fp_t>::t_event_t;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     for (auto opt_level : {0u, 3u}) {
         for (auto prec : {30, 123}) {

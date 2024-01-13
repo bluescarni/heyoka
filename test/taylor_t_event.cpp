@@ -58,7 +58,7 @@ TEST_CASE("linear box")
 {
     using ev_t = taylor_adaptive<double>::t_event_t;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto counter = 0u;
 
@@ -89,7 +89,7 @@ TEST_CASE("copy semantics")
 {
     using ev_t = taylor_adaptive<double>::t_event_t;
 
-    auto [v] = make_vars("v");
+    auto v = make_vars("v");
 
     auto ex = v + 3_dbl;
 
@@ -123,7 +123,7 @@ TEST_CASE("taylor te")
         auto inner = [](auto bflag) {
             using Catch::Matchers::Message;
 
-            auto [v] = make_vars("v");
+            auto v = make_vars("v");
 
             using ev_t = detail::t_event_impl<fp_t, decltype(bflag)::value>;
 
