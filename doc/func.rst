@@ -1,12 +1,12 @@
-Functions
-=========
+N-ary functions
+===============
+
+.. cpp:namespace-push:: heyoka
 
 *#include <heyoka/func.hpp>*
 
 The :cpp:class:`~heyoka::func_base` class
 -----------------------------------------
-
-.. cpp:namespace-push:: heyoka
 
 .. cpp:class:: func_base
 

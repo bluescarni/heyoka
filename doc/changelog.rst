@@ -23,6 +23,11 @@ New
 Changes
 ~~~~~~~
 
+- **BREAKING**: the :cpp:func:`~heyoka::make_vars()` function
+  now returns a single expression (rather than an array of expressions)
+  if a single argument is passed in input
+  (`#386 <https://github.com/bluescarni/heyoka/pull/386>`__).
+  This is a :ref:`breaking change <bchanges_4_0_0>`.
 - **BREAKING**: the signature of callbacks for terminal events
   has been simplified
   (`#385 <https://github.com/bluescarni/heyoka/pull/385>`__).

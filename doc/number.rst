@@ -1,12 +1,12 @@
 Numerical constants
 ===================
 
+.. cpp:namespace-push:: heyoka
+
 *#include <heyoka/number.hpp>*
 
 The :cpp:class:`~heyoka::number` class
 --------------------------------------
-
-.. cpp:namespace-push:: heyoka
 
 .. cpp:class:: number
 

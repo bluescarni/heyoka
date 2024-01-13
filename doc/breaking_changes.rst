@@ -13,6 +13,22 @@ heyoka 4 includes several backwards-incompatible changes.
 API/behaviour changes
 ~~~~~~~~~~~~~~~~~~~~~
 
+Changes to :cpp:func:`~heyoka::make_vars()`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The :cpp:func:`~heyoka::make_vars()` function now returns a single expression (rather than an array of expressions)
+if a single argument is passed in input. This means that code such as
+
+.. code-block:: c++
+
+    auto [x] = make_vars("x")
+
+needs to be rewritten like this:
+
+.. code-block:: c++
+
+    auto x = make_vars("x")
+
 Terminal events callbacks
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
