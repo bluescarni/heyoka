@@ -791,7 +791,7 @@ TEST_CASE("vsop2013 low prec zero inc")
 
     llvm_state s;
 
-    add_cfunc<double>(s, "f", {ex});
+    add_cfunc<double>(s, "f", {ex}, {"tm"_var});
 
     s.compile();
 

@@ -311,7 +311,7 @@ TEST_CASE("cfunc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {sum({x, y}), sum({x, expression{fp_t(.5)}}), sum({par[0], y})},
+            add_cfunc<fp_t>(s, "cfunc", {sum({x, y}), sum({x, expression{fp_t(.5)}}), sum({par[0], y})}, {x, y},
                             kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
                             kw::compact_mode = compact_mode);
 
@@ -375,7 +375,7 @@ TEST_CASE("cfunc mp")
 
                 llvm_state s{kw::opt_level = opt_level};
 
-                add_cfunc<fp_t>(s, "cfunc", {sum({x, y}), sum({x, expression{fp_t(.5)}}), sum({par[0], y})},
+                add_cfunc<fp_t>(s, "cfunc", {sum({x, y}), sum({x, expression{fp_t(.5)}}), sum({par[0], y})}, {x, y},
                                 kw::prec = prec, kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
 
                 if (opt_level == 0u && compact_mode) {
@@ -450,7 +450,7 @@ TEST_CASE("sum split")
                      x_vars[9], cos(sum_wrapper(x_vars))});
 
     llvm_state ls;
-    const auto dc = add_cfunc<double>(ls, "cfunc", {s});
+    const auto dc = add_cfunc<double>(ls, "cfunc", {s}, x_vars);
 
     for (const auto &ex : dc) {
         if (const auto *fptr = std::get_if<func>(&ex.value())) {

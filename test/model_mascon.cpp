@@ -319,13 +319,13 @@ TEST_CASE("basic cmp")
         const auto dc1 = add_cfunc<double>(
             s, "en",
             {model::mascon_energy(kw::masses = masses, kw::positions = pos, kw::Gconst = 1.01, kw::omega = omega)},
-            kw::vars = {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
+            {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
 
         const auto dc2 = add_cfunc<double>(
             s, "en2",
             {0.5 * ("vx"_var * "vx"_var + "vy"_var * "vy"_var + "vz"_var * "vz"_var)
              + model::mascon_potential(kw::masses = masses, kw::positions = pos, kw::Gconst = 1.01, kw::omega = omega)},
-            kw::vars = {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
+            {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
 
         REQUIRE(dc1.size() == 27u);
         REQUIRE(dc2.size() == 30u);

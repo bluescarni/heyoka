@@ -141,7 +141,7 @@ TEST_CASE("cfunc")
             add_cfunc<fp_t>(s, "cfunc",
                             {detail::div(expression{fp_t{-1}}, x), detail::div(x, par[0]), detail::div(1_dbl, par[0]),
                              detail::div(x, y)},
-                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                            {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
                             kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
@@ -189,7 +189,7 @@ TEST_CASE("cfunc_mp")
             add_cfunc<mppp::real>(s, "cfunc",
                                   {detail::div(expression{mppp::real{-1, prec}}, x), detail::div(x, par[0]),
                                    detail::div(expression{mppp::real{1, prec}}, par[0]), detail::div(x, y)},
-                                  kw::compact_mode = compact_mode, kw::prec = prec);
+                                  {x, y}, kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();
 

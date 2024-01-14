@@ -297,7 +297,7 @@ TEST_CASE("cfunc")
             llvm_state s{kw::opt_level = opt_level};
 
             add_cfunc<fp_t>(
-                s, "cfunc", {kepE(x, y), kepE(x, par[0]), kepE(x, .5_dbl), kepE(par[0], y), kepE(.5_dbl, y)},
+                s, "cfunc", {kepE(x, y), kepE(x, par[0]), kepE(x, .5_dbl), kepE(par[0], y), kepE(.5_dbl, y)}, {x, y},
                 kw::batch_size = batch_size, kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
@@ -362,7 +362,7 @@ TEST_CASE("cfunc mp")
             llvm_state s{kw::opt_level = opt_level};
 
             add_cfunc<fp_t>(s, "cfunc",
-                            {kepE(x, y), kepE(x, par[0]), kepE(x, .5_dbl), kepE(par[0], y), kepE(.5_dbl, y)},
+                            {kepE(x, y), kepE(x, par[0]), kepE(x, .5_dbl), kepE(par[0], y), kepE(.5_dbl, y)}, {x, y},
                             kw::prec = prec, kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {

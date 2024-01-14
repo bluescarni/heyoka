@@ -33,7 +33,8 @@ TEST_CASE("basic")
 
     llvm_state s;
 
-    auto dc = add_cfunc<double>(s, "func", model::elp2000_cartesian_e2000(kw::thresh = 1e-5), kw::compact_mode = true);
+    auto dc
+        = add_cfunc<double>(s, "func", model::elp2000_cartesian_e2000(kw::thresh = 1e-5), {}, kw::compact_mode = true);
     s.compile();
 
     auto *cf_ptr
@@ -68,7 +69,8 @@ TEST_CASE("fk5")
 {
     llvm_state s;
 
-    auto dc = add_cfunc<double>(s, "func", model::elp2000_cartesian_fk5(kw::thresh = 1e-5), kw::compact_mode = true);
+    auto dc
+        = add_cfunc<double>(s, "func", model::elp2000_cartesian_fk5(kw::thresh = 1e-5), {}, kw::compact_mode = true);
     s.compile();
 
     auto *cf_ptr

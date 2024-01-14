@@ -144,8 +144,9 @@ TEST_CASE("cfunc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {exp(x), exp(expression{fp_t(-.5)}), exp(par[0])}, kw::batch_size = batch_size,
-                            kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
+            add_cfunc<fp_t>(s, "cfunc", {exp(x), exp(expression{fp_t(-.5)}), exp(par[0])}, {x},
+                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                            kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
                 REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.exp."));
@@ -188,7 +189,7 @@ TEST_CASE("cfunc_mp")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<mppp::real>(s, "cfunc", {exp(x), exp(expression{mppp::real{1.5, prec}}), exp(par[0])},
+            add_cfunc<mppp::real>(s, "cfunc", {exp(x), exp(expression{mppp::real{1.5, prec}}), exp(par[0])}, {x},
                                   kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();
@@ -229,7 +230,8 @@ TEST_CASE("vfabi double")
 
         auto [a, b] = make_vars("a", "b");
 
-        add_cfunc<double>(s, "cfunc", {exp(a), exp(b)});
+        add_cfunc<double>(s, "cfunc", {exp(a), exp(b)}, {a, b});
+        add_cfunc<double>(s, "cfuncs", {exp(a), exp(b)}, {a, b}, kw::strided = true);
 
         s.compile();
 
@@ -295,7 +297,8 @@ TEST_CASE("vfabi float")
 
         auto [a, b, c, d] = make_vars("a", "b", "c", "d");
 
-        add_cfunc<float>(s, "cfunc", {exp(a), exp(b), exp(c), exp(d)});
+        add_cfunc<float>(s, "cfunc", {exp(a), exp(b), exp(c), exp(d)}, {a, b, c, d});
+        add_cfunc<float>(s, "cfuncs", {exp(a), exp(b), exp(c), exp(d)}, {a, b, c, d}, kw::strided = true);
 
         s.compile();
 

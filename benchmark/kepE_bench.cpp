@@ -82,8 +82,8 @@ int main(int argc, char *argv[])
 
     llvm_state s{kw::fast_math = fast_math};
     const auto batch_size = recommended_simd_size<double>();
-    add_cfunc<double>(s, "f_scalar", {kepE(e, M)}, kw::vars = {e, M});
-    add_cfunc<double>(s, "f_batch", {kepE(e, M)}, kw::vars = {e, M}, kw::batch_size = batch_size);
+    add_cfunc<double>(s, "f_scalar", {kepE(e, M)}, {e, M});
+    add_cfunc<double>(s, "f_batch", {kepE(e, M)}, {e, M}, kw::batch_size = batch_size);
     s.compile();
 
     auto *f_sc = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(

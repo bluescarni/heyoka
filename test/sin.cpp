@@ -153,8 +153,9 @@ TEST_CASE("cfunc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {sin(x), sin(expression{fp_t(.5)}), sin(par[0])}, kw::batch_size = batch_size,
-                            kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
+            add_cfunc<fp_t>(s, "cfunc", {sin(x), sin(expression{fp_t(.5)}), sin(par[0])}, {x},
+                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                            kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
                 REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.sin."));
@@ -197,7 +198,7 @@ TEST_CASE("cfunc_mp")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<mppp::real>(s, "cfunc", {sin(x), sin(expression{mppp::real{-.5, prec}}), sin(par[0])},
+            add_cfunc<mppp::real>(s, "cfunc", {sin(x), sin(expression{mppp::real{-.5, prec}}), sin(par[0])}, {x},
                                   kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();
@@ -238,7 +239,8 @@ TEST_CASE("vfabi double")
 
         auto [a, b] = make_vars("a", "b");
 
-        add_cfunc<double>(s, "cfunc", {sin(a), sin(b)});
+        add_cfunc<double>(s, "cfunc", {sin(a), sin(b)}, {a, b});
+        add_cfunc<double>(s, "cfuncs", {sin(a), sin(b)}, {a, b}, kw::strided = true);
 
         s.compile();
 
@@ -298,8 +300,10 @@ TEST_CASE("vfabi double")
 
         llvm_state s2{kw::slp_vectorize = true};
 
-        add_cfunc<double>(s2, "cfunc1", {sin(a), sin(b), sin(c), sin(d)});
-        add_cfunc<double>(s2, "cfunc2", {sin(a), sin(b), sin(c), sin(d), sin(e)});
+        add_cfunc<double>(s2, "cfunc1", {sin(a), sin(b), sin(c), sin(d)}, {a, b, c, d});
+        add_cfunc<double>(s2, "cfunc1s", {sin(a), sin(b), sin(c), sin(d)}, {a, b, c, d}, kw::strided = true);
+        add_cfunc<double>(s2, "cfunc2", {sin(a), sin(b), sin(c), sin(d), sin(e)}, {a, b, c, d, e});
+        add_cfunc<double>(s2, "cfunc2s", {sin(a), sin(b), sin(c), sin(d), sin(e)}, {a, b, c, d, e}, kw::strided = true);
 
         s2.compile();
 
@@ -347,7 +351,8 @@ TEST_CASE("vfabi double")
         // exactly to an available vector width.
         llvm_state s3{kw::slp_vectorize = true};
 
-        add_cfunc<double>(s3, "cfunc", {sin(a)}, kw::batch_size = 3u);
+        add_cfunc<double>(s3, "cfunc", {sin(a)}, {a}, kw::batch_size = 3u);
+        add_cfunc<double>(s3, "cfuncs", {sin(a)}, {a}, kw::batch_size = 3u, kw::strided = true);
 
         s3.compile();
 
@@ -397,7 +402,8 @@ TEST_CASE("vfabi float")
 
         auto [a, b, c, d] = make_vars("a", "b", "c", "d");
 
-        add_cfunc<float>(s, "cfunc", {sin(a), sin(b), sin(c), sin(d)});
+        add_cfunc<float>(s, "cfunc", {sin(a), sin(b), sin(c), sin(d)}, {a, b, c, d});
+        add_cfunc<float>(s, "cfuncs", {sin(a), sin(b), sin(c), sin(d)}, {a, b, c, d}, kw::strided = true);
 
         s.compile();
 
@@ -459,8 +465,14 @@ TEST_CASE("vfabi float")
 
         llvm_state s2{kw::slp_vectorize = true};
 
-        add_cfunc<float>(s2, "cfunc1", {sin(a), sin(b), sin(c), sin(d), sin(e), sin(f), sin(g), sin(h)});
-        add_cfunc<float>(s2, "cfunc2", {sin(a), sin(b), sin(c), sin(d), sin(e), sin(f), sin(g), sin(h), sin(i)});
+        add_cfunc<float>(s2, "cfunc1", {sin(a), sin(b), sin(c), sin(d), sin(e), sin(f), sin(g), sin(h)},
+                         {a, b, c, d, e, f, g, h});
+        add_cfunc<float>(s2, "cfunc1s", {sin(a), sin(b), sin(c), sin(d), sin(e), sin(f), sin(g), sin(h)},
+                         {a, b, c, d, e, f, g, h}, kw::strided = true);
+        add_cfunc<float>(s2, "cfunc2", {sin(a), sin(b), sin(c), sin(d), sin(e), sin(f), sin(g), sin(h), sin(i)},
+                         {a, b, c, d, e, f, g, h, i});
+        add_cfunc<float>(s2, "cfunc2s", {sin(a), sin(b), sin(c), sin(d), sin(e), sin(f), sin(g), sin(h), sin(i)},
+                         {a, b, c, d, e, f, g, h, i}, kw::strided = true);
 
         s2.compile();
 
@@ -516,7 +528,8 @@ TEST_CASE("vfabi float")
         // exactly to an available vector width.
         llvm_state s3{kw::slp_vectorize = true};
 
-        add_cfunc<float>(s3, "cfunc", {sin(a)}, kw::batch_size = 5u);
+        add_cfunc<float>(s3, "cfunc", {sin(a)}, {a}, kw::batch_size = 5u);
+        add_cfunc<float>(s3, "cfuncs", {sin(a)}, {a}, kw::strided = true, kw::batch_size = 5u);
 
         s3.compile();
 

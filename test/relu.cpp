@@ -397,8 +397,9 @@ TEST_CASE("cfunc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {relu(x), relu(par[0]), relup(x), relup(par[1])}, kw::batch_size = batch_size,
-                            kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
+            add_cfunc<fp_t>(s, "cfunc", {relu(x), relu(par[0]), relup(x), relup(par[1])}, {x},
+                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                            kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
                 REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.relu."));
@@ -464,7 +465,7 @@ TEST_CASE("cfunc leaky")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {relu(x, .01), relu(par[0], .02), relup(x, .03), relup(par[1], .04)},
+            add_cfunc<fp_t>(s, "cfunc", {relu(x, .01), relu(par[0], .02), relup(x, .03), relup(par[1], .04)}, {x},
                             kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
                             kw::compact_mode = compact_mode);
 
@@ -532,7 +533,7 @@ TEST_CASE("cfunc mp")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {relu(x), relu(par[0]), relup(x), relup(par[1])},
+            add_cfunc<fp_t>(s, "cfunc", {relu(x), relu(par[0]), relup(x), relup(par[1])}, {x},
                             kw::compact_mode = compact_mode, kw::prec = prec);
 
             if (opt_level == 0u && compact_mode) {
@@ -580,7 +581,7 @@ TEST_CASE("cfunc mp leaky")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {relu(x, .01), relu(par[0], .02), relup(x, .03), relup(par[1], .04)},
+            add_cfunc<fp_t>(s, "cfunc", {relu(x, .01), relu(par[0], .02), relup(x, .03), relup(par[1], .04)}, {x},
                             kw::compact_mode = compact_mode, kw::prec = prec);
 
             if (opt_level == 0u && compact_mode) {

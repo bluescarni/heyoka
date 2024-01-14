@@ -263,16 +263,17 @@ TEST_CASE("cfunc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc1", {pow(x, y), pow(x, par[0]), pow(x, fp_t{3} / 2)}, kw::batch_size = batch_size,
-                            kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
+            add_cfunc<fp_t>(s, "cfunc1", {pow(x, y), pow(x, par[0]), pow(x, fp_t{3} / 2)}, {x, y},
+                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                            kw::compact_mode = compact_mode);
 
             add_cfunc<fp_t>(s, "cfunc2",
                             {expression{func{detail::pow_impl(x, 0_dbl)}}, pow(x, fp_t{-3}),
                              pow(x, -std::numeric_limits<fp_t>::infinity())},
-                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                            {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
                             kw::compact_mode = compact_mode);
 
-            add_cfunc<fp_t>(s, "cfunc3", {pow(x, fp_t(7)), pow(x, fp_t{-8}), pow(x, fp_t{11} / 2)},
+            add_cfunc<fp_t>(s, "cfunc3", {pow(x, fp_t(7)), pow(x, fp_t{-8}), pow(x, fp_t{11} / 2)}, {x, y},
                             kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
                             kw::compact_mode = compact_mode);
 
@@ -337,7 +338,7 @@ TEST_CASE("cfunc")
 
         llvm_state s{kw::opt_level = 0u};
 
-        add_cfunc<double>(s, "cfunc1", {pow(x, 2_dbl), pow(x, -3_dbl), pow(x, -3_dbl / 2.), pow(x, 5_dbl / 2.)});
+        add_cfunc<double>(s, "cfunc1", {pow(x, 2_dbl), pow(x, -3_dbl), pow(x, -3_dbl / 2.), pow(x, 5_dbl / 2.)}, {x});
 
         REQUIRE(!boost::contains(s.get_ir(), "llvm.pow"));
     }
@@ -357,7 +358,7 @@ TEST_CASE("cfunc_mp")
 
             add_cfunc<mppp::real>(
                 s, "cfunc1", {pow(x, y), pow(x, par[0]), pow(x, mppp::real{3. / 2, prec}), pow(x, mppp::real{6, prec})},
-                kw::compact_mode = compact_mode, kw::prec = prec);
+                {x, y}, kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();
 
@@ -454,7 +455,8 @@ TEST_CASE("vfabi double")
 
         auto [a, b] = make_vars("a", "b");
 
-        add_cfunc<double>(s, "cfunc", {pow(a, .1), pow(b, .2)});
+        add_cfunc<double>(s, "cfunc", {pow(a, .1), pow(b, .2)}, {a, b});
+        add_cfunc<double>(s, "cfuncs", {pow(a, .1), pow(b, .2)}, {a, b}, kw::strided = true);
 
         s.compile();
 
@@ -520,7 +522,9 @@ TEST_CASE("vfabi float")
 
         auto [a, b, c, d] = make_vars("a", "b", "c", "d");
 
-        add_cfunc<float>(s, "cfunc", {pow(a, .6f), pow(b, .7f), pow(c, .8f), pow(d, .9f)});
+        add_cfunc<float>(s, "cfunc", {pow(a, .6f), pow(b, .7f), pow(c, .8f), pow(d, .9f)}, {a, b, c, d});
+        add_cfunc<float>(s, "cfuncs", {pow(a, .6f), pow(b, .7f), pow(c, .8f), pow(d, .9f)}, {a, b, c, d},
+                         kw::strided = true);
 
         s.compile();
 

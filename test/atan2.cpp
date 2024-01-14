@@ -249,7 +249,7 @@ TEST_CASE("cfunc")
             llvm_state s{kw::opt_level = opt_level};
 
             add_cfunc<fp_t>(
-                s, "cfunc", {atan2(x, y), atan2(x, par[0]), atan2(x, 3_dbl), atan2(par[0], y), atan2(1_dbl, y)},
+                s, "cfunc", {atan2(x, y), atan2(x, par[0]), atan2(x, 3_dbl), atan2(par[0], y), atan2(1_dbl, y)}, {x, y},
                 kw::batch_size = batch_size, kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
@@ -297,7 +297,7 @@ TEST_CASE("cfunc_mp")
 
             add_cfunc<mppp::real>(
                 s, "cfunc",
-                {atan2(x, y), atan2(x, par[0]), atan2(par[0], x), atan2(x, 3. / 2_dbl), atan2(3. / 2_dbl, x)},
+                {atan2(x, y), atan2(x, par[0]), atan2(par[0], x), atan2(x, 3. / 2_dbl), atan2(3. / 2_dbl, x)}, {x, y},
                 kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();
@@ -340,7 +340,8 @@ TEST_CASE("vfabi double")
 
         auto [a, b] = make_vars("a", "b");
 
-        add_cfunc<double>(s, "cfunc", {atan2(a, .3), atan2(b, .4)});
+        add_cfunc<double>(s, "cfunc", {atan2(a, .3), atan2(b, .4)}, {a, b});
+        add_cfunc<double>(s, "cfuncs", {atan2(a, .3), atan2(b, .4)}, {a, b}, kw::strided = true);
 
         s.compile();
 
@@ -403,7 +404,9 @@ TEST_CASE("vfabi float")
 
         auto [a, b, c, d] = make_vars("a", "b", "c", "d");
 
-        add_cfunc<float>(s, "cfunc", {atan2(a, .5f), atan2(b, .6f), atan2(c, .7f), atan2(d, .8f)});
+        add_cfunc<float>(s, "cfunc", {atan2(a, .5f), atan2(b, .6f), atan2(c, .7f), atan2(d, .8f)}, {a, b, c, d});
+        add_cfunc<float>(s, "cfuncs", {atan2(a, .5f), atan2(b, .6f), atan2(c, .7f), atan2(d, .8f)}, {a, b, c, d},
+                         kw::strided = true);
 
         s.compile();
 

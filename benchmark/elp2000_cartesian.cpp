@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
     llvm_state s;
 
     sw.reset();
-    add_cfunc<double>(s, "func", sol, kw::compact_mode = true);
+    add_cfunc<double>(s, "func", sol, {}, kw::compact_mode = true);
     s.compile();
     logger->trace("Compiling the solution took: {}", sw);
 

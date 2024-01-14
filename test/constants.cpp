@@ -214,8 +214,8 @@ TEST_CASE("pi cfunc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {heyoka::pi}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
-                            kw::compact_mode = compact_mode);
+            add_cfunc<fp_t>(s, "cfunc", {heyoka::pi}, {}, kw::batch_size = batch_size,
+                            kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
                 REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pi."));
@@ -260,7 +260,7 @@ TEST_CASE("pi cfunc mp")
 
             outs[0] = mppp::real{0, prec};
 
-            add_cfunc<fp_t>(s, "cfunc", {heyoka::pi}, kw::prec = prec, kw::compact_mode = compact_mode);
+            add_cfunc<fp_t>(s, "cfunc", {heyoka::pi}, {}, kw::prec = prec, kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
                 REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.pi."));

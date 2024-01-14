@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <functional>
 #include <initializer_list>
+#include <iterator>
 #include <limits>
 #include <random>
 #include <sstream>
@@ -681,7 +682,11 @@ TEST_CASE("cfunc nbody")
 
                 std::generate(ins.begin(), ins.end(), gen);
 
-                add_cfunc<double>(s, "cfunc", exs, kw::batch_size = batch_size, kw::compact_mode = cm);
+                std::vector<expression> vars;
+                std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
+                std::ranges::sort(vars, std::less<expression>{});
+
+                add_cfunc<double>(s, "cfunc", exs, vars, kw::batch_size = batch_size, kw::compact_mode = cm);
 
                 s.compile();
 
@@ -777,7 +782,11 @@ TEST_CASE("cfunc nbody mp")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(outs.begin(), outs.end(), gen);
 
-            add_cfunc<mppp::real>(s, "cfunc", exs, kw::prec = prec, kw::compact_mode = cm);
+            std::vector<expression> vars;
+            std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
+            std::ranges::sort(vars, std::less<expression>{});
+
+            add_cfunc<mppp::real>(s, "cfunc", exs, vars, kw::prec = prec, kw::compact_mode = cm);
 
             s.compile();
 
@@ -873,7 +882,13 @@ TEST_CASE("cfunc nbody par")
 
                 std::generate(ins.begin(), ins.end(), gen);
 
-                add_cfunc<double>(s, "cfunc", exs, kw::batch_size = batch_size, kw::compact_mode = cm);
+                std::vector<expression> vars;
+                std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
+                std::ranges::sort(vars, std::less<expression>{});
+
+                add_cfunc<double>(s, "cfunc", exs, vars, kw::batch_size = batch_size, kw::compact_mode = cm);
+                add_cfunc<double>(s, "cfunc.strided", exs, vars, kw::batch_size = batch_size, kw::compact_mode = cm,
+                                  kw::strided = true);
 
                 s.compile();
 
@@ -1049,7 +1064,13 @@ TEST_CASE("cfunc nbody par mp")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(outs.begin(), outs.end(), gen);
 
-            add_cfunc<mppp::real>(s, "cfunc", exs, kw::prec = prec, kw::compact_mode = cm);
+            std::vector<expression> vars;
+            std::ranges::transform(sys, std::back_inserter(vars), [](const auto &p) { return p.first; });
+            std::ranges::sort(vars, std::less<expression>{});
+
+            add_cfunc<mppp::real>(s, "cfunc", exs, vars, kw::prec = prec, kw::compact_mode = cm);
+            add_cfunc<mppp::real>(s, "cfunc.strided", exs, vars, kw::prec = prec, kw::compact_mode = cm,
+                                  kw::strided = true);
 
             s.compile();
 
@@ -1201,7 +1222,9 @@ TEST_CASE("cfunc numparams")
 
                 std::generate(pars.begin(), pars.end(), gen);
 
-                add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, kw::batch_size = batch_size, kw::compact_mode = cm);
+                add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, {}, kw::batch_size = batch_size, kw::compact_mode = cm);
+                add_cfunc<double>(s, "cfunc.strided", {1_dbl, par[0]}, {}, kw::batch_size = batch_size,
+                                  kw::compact_mode = cm, kw::strided = true);
 
                 s.compile();
 
@@ -1262,7 +1285,10 @@ TEST_CASE("cfunc numparams mp")
             std::generate(pars.begin(), pars.end(), gen);
             std::generate(outs.begin(), outs.end(), gen);
 
-            add_cfunc<mppp::real>(s, "cfunc", {1_dbl, par[0], par[1], -2_dbl}, kw::prec = prec, kw::compact_mode = cm);
+            add_cfunc<mppp::real>(s, "cfunc", {1_dbl, par[0], par[1], -2_dbl}, {}, kw::prec = prec,
+                                  kw::compact_mode = cm);
+            add_cfunc<mppp::real>(s, "cfunc.strided", {1_dbl, par[0], par[1], -2_dbl}, {}, kw::prec = prec,
+                                  kw::compact_mode = cm, kw::strided = true);
 
             s.compile();
 
@@ -1311,7 +1337,7 @@ TEST_CASE("cfunc explicit")
 
     auto [x, y, z] = make_vars("x", "y", "z");
 
-    add_cfunc<double>(s, "cfunc", {x + 2_dbl * y + 3_dbl * z}, kw::vars = {z, y, x});
+    add_cfunc<double>(s, "cfunc", {x + 2_dbl * y + 3_dbl * z}, {z, y, x});
 
     s.compile();
 
@@ -1348,8 +1374,10 @@ TEST_CASE("cfunc bogus stride")
             std::generate(ins.begin(), ins.end(), gen);
             std::generate(pars.begin(), pars.end(), gen);
 
-            add_cfunc<double>(s, "cfunc", {x + 2_dbl * y + par[0] * z, par[1] - x * y}, kw::batch_size = batch_size,
-                              kw::compact_mode = cm);
+            add_cfunc<double>(s, "cfunc", {x + 2_dbl * y + par[0] * z, par[1] - x * y}, {x, y, z},
+                              kw::batch_size = batch_size, kw::compact_mode = cm);
+            add_cfunc<double>(s, "cfunc.strided", {x + 2_dbl * y + par[0] * z, par[1] - x * y}, {x, y, z},
+                              kw::batch_size = batch_size, kw::compact_mode = cm, kw::strided = true);
 
             s.compile();
 
@@ -1390,21 +1418,21 @@ TEST_CASE("cfunc failure modes")
 
         s.compile();
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, {}), std::invalid_argument,
                                Message("A compiled function cannot be added to an llvm_state after compilation"));
     }
 
     {
         llvm_state s;
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, kw::batch_size = 0u),
+        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, {}, kw::batch_size = 0u),
                                std::invalid_argument, Message("The batch size of a compiled function cannot be zero"));
     }
 
     {
         llvm_state s;
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, kw::parallel_mode = true),
+        REQUIRE_THROWS_MATCHES(add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, {}, kw::parallel_mode = true),
                                std::invalid_argument,
                                Message("Parallel mode can only be enabled in conjunction with compact mode"));
     }
@@ -1413,7 +1441,7 @@ TEST_CASE("cfunc failure modes")
         llvm_state s;
 
         REQUIRE_THROWS_MATCHES(
-            add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, kw::parallel_mode = true, kw::compact_mode = true),
+            add_cfunc<double>(s, "cfunc", {1_dbl, par[0]}, {}, kw::parallel_mode = true, kw::compact_mode = true),
             std::invalid_argument, Message("Parallel mode has not been implemented yet"));
     }
 
@@ -1421,7 +1449,7 @@ TEST_CASE("cfunc failure modes")
     {
         llvm_state s;
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<long double>(s, "cfunc", {1_dbl, par[0]}), not_implemented_error,
+        REQUIRE_THROWS_MATCHES(add_cfunc<long double>(s, "cfunc", {1_dbl, par[0]}, {}), not_implemented_error,
                                Message("'long double' computations are not supported on PowerPC"));
     }
 #endif
@@ -1431,7 +1459,7 @@ TEST_CASE("cfunc failure modes")
     {
         llvm_state s;
 
-        REQUIRE_THROWS_MATCHES(add_cfunc<mppp::real>(s, "cfunc", {1_dbl, par[0]}), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(add_cfunc<mppp::real>(s, "cfunc", {1_dbl, par[0]}, {}), std::invalid_argument,
                                Message(fmt::format("An invalid precision value of 0 was passed to add_cfunc() (the "
                                                    "value must be in the [{}, {}] range)",
                                                    mppp::real_prec_min(), mppp::real_prec_max())));
@@ -1459,7 +1487,7 @@ TEST_CASE("cfunc vsop2013")
 
     llvm_state s;
 
-    add_cfunc<double>(s, "cfunc", {venus_sol2[0], venus_sol2[1], venus_sol2[2]}, kw::compact_mode = true);
+    add_cfunc<double>(s, "cfunc", {venus_sol2[0], venus_sol2[1], venus_sol2[2]}, {t}, kw::compact_mode = true);
 
     s.compile();
 
@@ -1654,7 +1682,7 @@ TEST_CASE("cfunc prod_to_div")
     {
         llvm_state s;
 
-        const auto dc = add_cfunc<double>(s, "cfunc", {prod({3_dbl, pow(y, -1_dbl), pow(x, -1.5_dbl)})});
+        const auto dc = add_cfunc<double>(s, "cfunc", {prod({3_dbl, pow(y, -1_dbl), pow(x, -1.5_dbl)})}, {x, y});
 
         REQUIRE(dc.size() == 6u);
         REQUIRE(std::count_if(dc.begin(), dc.end(),
@@ -1681,8 +1709,7 @@ TEST_CASE("cfunc prod_to_div")
     {
         llvm_state s;
 
-        const auto dc
-            = add_cfunc<double>(s, "cfunc", {prod({3_dbl, pow(y, -1_dbl), pow(x, -1.5_dbl)})}, kw::vars = {x, y});
+        const auto dc = add_cfunc<double>(s, "cfunc", {prod({3_dbl, pow(y, -1_dbl), pow(x, -1.5_dbl)})}, {x, y});
 
         REQUIRE(dc.size() == 6u);
         REQUIRE(std::count_if(dc.begin(), dc.end(),
@@ -1714,7 +1741,7 @@ TEST_CASE("cfunc sum_to_sub")
     {
         llvm_state s;
 
-        const auto dc = add_cfunc<double>(s, "cfunc", {sum({1_dbl, prod({-1_dbl, x}), prod({-1_dbl, y})})});
+        const auto dc = add_cfunc<double>(s, "cfunc", {sum({1_dbl, prod({-1_dbl, x}), prod({-1_dbl, y})})}, {x, y});
 
         REQUIRE(dc.size() == 5u);
         REQUIRE(std::count_if(dc.begin(), dc.end(),
@@ -1734,8 +1761,7 @@ TEST_CASE("cfunc sum_to_sub")
     {
         llvm_state s;
 
-        const auto dc
-            = add_cfunc<double>(s, "cfunc", {sum({1_dbl, prod({-1_dbl, x}), prod({-1_dbl, y})})}, kw::vars = {x, y});
+        const auto dc = add_cfunc<double>(s, "cfunc", {sum({1_dbl, prod({-1_dbl, x}), prod({-1_dbl, y})})}, {x, y});
 
         REQUIRE(dc.size() == 5u);
         REQUIRE(std::count_if(dc.begin(), dc.end(),

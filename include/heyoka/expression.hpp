@@ -652,8 +652,6 @@ llvm::Value *cfunc_c_load_eval(llvm_state &, llvm::Type *, llvm::Value *, llvm::
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC std::pair<std::vector<expression>, std::vector<expression>::size_type>
-function_decompose(const std::vector<expression> &);
 HEYOKA_DLL_PUBLIC std::vector<expression> function_decompose(const std::vector<expression> &,
                                                              const std::vector<expression> &);
 
@@ -661,21 +659,14 @@ namespace detail
 {
 
 template <typename>
-std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &, std::uint32_t,
-                                  bool, bool, bool, long long);
-
-template <typename>
 std::vector<expression> add_cfunc(llvm_state &, const std::string &, const std::vector<expression> &,
-                                  const std::vector<expression> &, std::uint32_t, bool, bool, bool, long long);
+                                  const std::vector<expression> &, std::uint32_t, bool, bool, bool, long long, bool);
 
 // Prevent implicit instantiations.
 #define HEYOKA_CFUNC_EXTERN_INST(T)                                                                                    \
-    extern template std::vector<expression> add_cfunc<T>(llvm_state &, const std::string &,                            \
-                                                         const std::vector<expression> &, std::uint32_t, bool, bool,   \
-                                                         bool, long long);                                             \
     extern template std::vector<expression> add_cfunc<T>(                                                              \
         llvm_state &, const std::string &, const std::vector<expression> &, const std::vector<expression> &,           \
-        std::uint32_t, bool, bool, bool, long long);
+        std::uint32_t, bool, bool, bool, long long, bool);
 
 HEYOKA_CFUNC_EXTERN_INST(float)
 HEYOKA_CFUNC_EXTERN_INST(double)
@@ -698,80 +689,102 @@ HEYOKA_CFUNC_EXTERN_INST(mppp::real)
 } // namespace detail
 
 template <typename T, typename... KwArgs>
-inline std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &fn,
-                                         const KwArgs &...kw_args)
+std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &fn,
+                                  const std::vector<expression> &vars, const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
     if constexpr (p.has_unnamed_arguments()) {
         static_assert(detail::always_false_v<KwArgs...>,
                       "The variadic arguments in add_cfunc() contain unnamed arguments.");
-    } else {
-        // Check if the list of variables was
-        // provided explicitly.
-        std::optional<std::vector<expression>> vars;
-        if constexpr (p.has(kw::vars)) {
-            vars = p(kw::vars);
+    }
+
+    // Batch size (defaults to 1).
+    const auto batch_size = [&]() -> std::uint32_t {
+        if constexpr (p.has(kw::batch_size)) {
+            if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::batch_size))>>) {
+                return boost::numeric_cast<std::uint32_t>(p(kw::batch_size));
+            } else {
+                static_assert(detail::always_false_v<T>, "Invalid type for the 'batch_size' keyword argument.");
+            }
+        } else {
+            return 1;
         }
+    }();
 
-        // Batch size (defaults to 1).
-        const auto batch_size = [&]() -> std::uint32_t {
-            if constexpr (p.has(kw::batch_size)) {
-                return p(kw::batch_size);
+    // High accuracy mode (defaults to false).
+    const auto high_accuracy = [&p]() -> bool {
+        if constexpr (p.has(kw::high_accuracy)) {
+            if constexpr (std::convertible_to<decltype(p(kw::high_accuracy)), bool>) {
+                return static_cast<bool>(p(kw::high_accuracy));
             } else {
-                return 1;
+                static_assert(detail::always_false_v<T>, "Invalid type for the 'high_accuracy' keyword argument.");
             }
-        }();
+        } else {
+            return false;
+        }
+    }();
 
-        // High accuracy mode (defaults to false).
-        const auto high_accuracy = [&p]() -> bool {
-            if constexpr (p.has(kw::high_accuracy)) {
-                return p(kw::high_accuracy);
+    // Compact mode (defaults to false, except for real where
+    // it defaults to true).
+    const auto compact_mode = [&p]() -> bool {
+        if constexpr (p.has(kw::compact_mode)) {
+            if constexpr (std::convertible_to<decltype(p(kw::compact_mode)), bool>) {
+                return static_cast<bool>(p(kw::compact_mode));
             } else {
-                return false;
+                static_assert(detail::always_false_v<T>, "Invalid type for the 'compact_mode' keyword argument.");
             }
-        }();
-
-        // Compact mode (defaults to false, except for real where
-        // it defaults to true).
-        const auto compact_mode = [&p]() -> bool {
-            if constexpr (p.has(kw::compact_mode)) {
-                return p(kw::compact_mode);
-            } else {
+        } else {
 #if defined(HEYOKA_HAVE_REAL)
-                return std::is_same_v<T, mppp::real>;
+            return std::is_same_v<T, mppp::real>;
 #else
-                return false;
+            return false;
 
 #endif
-            }
-        }();
-
-        // Parallel mode (defaults to false).
-        const auto parallel_mode = [&p]() -> bool {
-            if constexpr (p.has(kw::parallel_mode)) {
-                return p(kw::parallel_mode);
-            } else {
-                return false;
-            }
-        }();
-
-        // Precision (defaults to zero).
-        const auto prec = [&p]() -> long long {
-            if constexpr (p.has(kw::prec)) {
-                return p(kw::prec);
-            } else {
-                return 0;
-            }
-        }();
-
-        if (vars) {
-            return detail::add_cfunc<T>(s, name, fn, *vars, batch_size, high_accuracy, compact_mode, parallel_mode,
-                                        prec);
-        } else {
-            return detail::add_cfunc<T>(s, name, fn, batch_size, high_accuracy, compact_mode, parallel_mode, prec);
         }
-    }
+    }();
+
+    // Parallel mode (defaults to false).
+    const auto parallel_mode = [&p]() -> bool {
+        if constexpr (p.has(kw::parallel_mode)) {
+            if constexpr (std::convertible_to<decltype(p(kw::parallel_mode)), bool>) {
+                return static_cast<bool>(p(kw::parallel_mode));
+            } else {
+                static_assert(detail::always_false_v<T>, "Invalid type for the 'parallel_mode' keyword argument.");
+            }
+        } else {
+            return false;
+        }
+    }();
+
+    // Precision (defaults to zero).
+    const auto prec = [&p]() -> long long {
+        if constexpr (p.has(kw::prec)) {
+            if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::prec))>>) {
+                return boost::numeric_cast<long long>(p(kw::prec));
+            } else {
+                static_assert(detail::always_false_v<T>, "Invalid type for the 'prec' keyword argument.");
+            }
+        } else {
+            return 0;
+        }
+    }();
+
+    // Strided mode (defaults to false).
+    const auto strided = [&p]() -> bool {
+        if constexpr (p.has(kw::strided)) {
+            if constexpr (std::convertible_to<decltype(p(kw::strided)), bool>) {
+                return static_cast<bool>(p(kw::strided));
+            } else {
+                static_assert(detail::always_false_v<T>, "Invalid type for the 'strided' keyword argument.");
+            }
+        } else {
+            return false;
+        }
+    }();
+
+    return detail::add_cfunc<T>(s, name, fn, vars, batch_size, high_accuracy, compact_mode, parallel_mode, prec,
+                                strided);
 }
 
 namespace detail

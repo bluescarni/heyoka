@@ -82,7 +82,7 @@ TEST_CASE("basic")
             s, "en",
             // NOTE: need to add the kinetic energy per unit of mass.
             {0.5 * fix(vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {.1, .2, .3})},
-            kw::vars = {x, y, z, vx, vy, vz});
+            {x, y, z, vx, vy, vz});
 
         REQUIRE(dc.size() == 19u);
 
@@ -123,7 +123,7 @@ TEST_CASE("basic")
             s, "en",
             // NOTE: need to add the kinetic energy per unit of mass.
             {0.5 * fix(vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {par[0], par[1], par[2]})},
-            kw::vars = {x, y, z, vx, vy, vz});
+            {x, y, z, vx, vy, vz});
 
         REQUIRE(dc.size() == 20u);
 

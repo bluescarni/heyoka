@@ -171,7 +171,7 @@ TEST_CASE("cfunc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {-x, -expression{fp_t(.5)}, -par[0]}, kw::batch_size = batch_size,
+            add_cfunc<fp_t>(s, "cfunc", {-x, -expression{fp_t(.5)}, -par[0]}, {x}, kw::batch_size = batch_size,
                             kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
@@ -215,7 +215,7 @@ TEST_CASE("cfunc_mp")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<mppp::real>(s, "cfunc", {-x, -expression{mppp::real{-.5, prec}}, -par[0]},
+            add_cfunc<mppp::real>(s, "cfunc", {-x, -expression{mppp::real{-.5, prec}}, -par[0]}, {x},
                                   kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();

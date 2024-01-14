@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
 
     logger->trace("Adding cfunc");
 
-    add_cfunc<double>(s, "func", jac, kw::vars = vars_list);
+    add_cfunc<double>(s, "func", jac, vars_list);
 
     logger->trace("Compiling cfunc");
 
