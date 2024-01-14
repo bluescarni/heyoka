@@ -1,12 +1,12 @@
 Runtime parameters
 ==================
 
+.. cpp:namespace-push:: heyoka
+
 *#include <heyoka/param.hpp>*
 
 The :cpp:class:`~heyoka::param` class
 -------------------------------------
-
-.. cpp:namespace-push:: heyoka
 
 .. cpp:class:: param
 

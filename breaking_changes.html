@@ -189,7 +189,7 @@
 <li class="toctree-l3"><a class="reference internal" href="variable.html">Variables</a></li>
 <li class="toctree-l3"><a class="reference internal" href="number.html">Numerical constants</a></li>
 <li class="toctree-l3"><a class="reference internal" href="param.html">Runtime parameters</a></li>
-<li class="toctree-l3"><a class="reference internal" href="func.html">Functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="func.html">N-ary functions</a></li>
 <li class="toctree-l3"><a class="reference internal" href="expression.html">Expressions</a></li>
 </ul>
 </li>
@@ -399,6 +399,7 @@ document.write(`
                 <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bchanges-4-0-0">4.0.0</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#api-behaviour-changes">API/behaviour changes</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#changes-to-make-vars">Changes to <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">make_vars()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#terminal-events-callbacks">Terminal events callbacks</a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#step-callbacks-and-propagate">Step callbacks and <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#propagate-grid"><code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code></a></li>
@@ -431,6 +432,18 @@ document.write(`
 <p>heyoka 4 includes several backwards-incompatible changes.</p>
 <section id="api-behaviour-changes">
 <h3>API/behaviour changes<a class="headerlink" href="#api-behaviour-changes" title="Link to this heading">#</a></h3>
+<section id="changes-to-make-vars">
+<h4>Changes to <a class="reference internal" href="expression.html#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args" title="heyoka::make_vars"><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">make_vars()</span></code></a><a class="headerlink" href="#changes-to-make-vars" title="Link to this heading">#</a></h4>
+<p>The <a class="reference internal" href="expression.html#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args" title="heyoka::make_vars"><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">make_vars()</span></code></a> function now returns a single expression (rather than an array of expressions)
+if a single argument is passed in input. This means that code such as</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>needs to be rewritten like this:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
 <section id="terminal-events-callbacks">
 <h4>Terminal events callbacks<a class="headerlink" href="#terminal-events-callbacks" title="Link to this heading">#</a></h4>
 <p>The second argument in the signature of callbacks for terminal events, a <code class="docutils literal notranslate"><span class="pre">bool</span></code> conventionally
@@ -612,6 +625,7 @@ time, and its value will be -1 for negative derivative,
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#bchanges-4-0-0">4.0.0</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#api-behaviour-changes">API/behaviour changes</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#changes-to-make-vars">Changes to <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">make_vars()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#terminal-events-callbacks">Terminal events callbacks</a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#step-callbacks-and-propagate">Step callbacks and <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#propagate-grid"><code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code></a></li>

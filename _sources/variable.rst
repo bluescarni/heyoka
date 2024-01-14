@@ -1,12 +1,12 @@
 Variables
 =========
 
+.. cpp:namespace-push:: heyoka
+
 *#include <heyoka/variable.hpp>*
 
 The :cpp:class:`~heyoka::variable` class
 ----------------------------------------
-
-.. cpp:namespace-push:: heyoka
 
 .. cpp:class:: variable
 

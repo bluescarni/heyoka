@@ -3,9 +3,9 @@
 Exceptions
 ==========
 
-*#include <heyoka/exceptions.hpp>*
-
 .. cpp:namespace-push:: heyoka
+
+*#include <heyoka/exceptions.hpp>*
 
 .. cpp:class:: not_implemented_error final : public std::runtime_error
 
