@@ -105,7 +105,7 @@ TEST_CASE("unary minus simpl")
     REQUIRE(-1_dbl == expression{-1.});
     REQUIRE(-1.1_ldbl == expression{-1.1l});
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     REQUIRE(-x == neg(x));
 }
@@ -123,7 +123,7 @@ TEST_CASE("neg s11n")
 {
     std::stringstream ss;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto ex = -x;
 
@@ -149,7 +149,7 @@ TEST_CASE("cfunc")
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using fp_t = decltype(fp_x);
 
-        auto [x] = make_vars("x");
+        auto x = make_vars("x");
 
         std::uniform_real_distribution<double> rdist(.1, 10.);
 
@@ -207,7 +207,7 @@ TEST_CASE("cfunc")
 
 TEST_CASE("cfunc_mp")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     const auto prec = 237u;
 

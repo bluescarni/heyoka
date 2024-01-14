@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto start = std::chrono::high_resolution_clock::now();
 

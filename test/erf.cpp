@@ -75,7 +75,7 @@ constexpr bool skip_batch_ld =
 TEST_CASE("erf")
 {
     using std::erf;
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
     // Test the textual output
     std::ostringstream stream;
     stream << erf(x);
@@ -98,7 +98,7 @@ TEST_CASE("erf s11n")
 {
     std::stringstream ss;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto ex = erf(x);
 
@@ -126,7 +126,7 @@ TEST_CASE("cfunc")
 
         using fp_t = decltype(fp_x);
 
-        auto [x] = make_vars("x");
+        auto x = make_vars("x");
 
         std::uniform_real_distribution<double> rdist(-1., 1.);
 
@@ -184,7 +184,7 @@ TEST_CASE("cfunc")
 
 TEST_CASE("cfunc_mp")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     const auto prec = 237u;
 
@@ -219,7 +219,7 @@ TEST_CASE("cfunc_mp")
 
 TEST_CASE("normalise")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     REQUIRE(normalise(erf(x)) == erf(x));
     REQUIRE(normalise(subs(erf(x), {{x, 1.5_dbl}})) == erf(1.5_dbl));

@@ -333,7 +333,7 @@ TEST_CASE("cfunc")
 
     // Small test to check that pow() is never invoked for small powers.
     {
-        auto [x] = make_vars("x");
+        auto x = make_vars("x");
 
         llvm_state s{kw::opt_level = 0u};
 

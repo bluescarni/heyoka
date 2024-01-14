@@ -99,7 +99,7 @@ TEST_CASE("asin s11n")
 {
     std::stringstream ss;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto ex = asin(x);
 
@@ -127,7 +127,7 @@ TEST_CASE("cfunc")
 
         using fp_t = decltype(fp_x);
 
-        auto [x] = make_vars("x");
+        auto x = make_vars("x");
 
         std::uniform_real_distribution<double> rdist(-1., 1.);
 
@@ -186,7 +186,7 @@ TEST_CASE("cfunc")
 
 TEST_CASE("cfunc_mp")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     const auto prec = 237u;
 
@@ -221,7 +221,7 @@ TEST_CASE("cfunc_mp")
 
 TEST_CASE("normalise")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     REQUIRE(normalise(asin(x)) == asin(x));
     REQUIRE(normalise(subs(asin(x), {{x, .1_dbl}})) == asin(.1_dbl));

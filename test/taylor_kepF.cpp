@@ -48,7 +48,7 @@ TEST_CASE("taylor kepF decompose bug 00")
 {
     llvm_state s;
 
-    auto [lam] = make_vars("lam");
+    auto lam = make_vars("lam");
 
     taylor_add_jet<double>(s, "jet", {kepF(0_dbl, 0_dbl, lam)}, 1, 1, false, false);
 }

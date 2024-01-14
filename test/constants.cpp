@@ -152,7 +152,7 @@ TEST_CASE("pi s11n")
 {
     std::stringstream ss;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto ex = heyoka::pi + x;
 
@@ -177,7 +177,7 @@ TEST_CASE("default s11n")
 {
     std::stringstream ss;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto ex = expression{func{constant{}}} + x;
 

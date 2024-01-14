@@ -44,7 +44,7 @@ TEST_CASE("nte copy semantics")
 {
     using ev_t = taylor_adaptive_batch<double>::nt_event_t;
 
-    auto [v] = make_vars("v");
+    auto v = make_vars("v");
 
     auto ex = v + 3_dbl;
 
@@ -72,7 +72,7 @@ TEST_CASE("te copy semantics")
 {
     using ev_t = taylor_adaptive_batch<double>::t_event_t;
 
-    auto [v] = make_vars("v");
+    auto v = make_vars("v");
 
     auto ex = v + 3_dbl;
 
@@ -262,7 +262,7 @@ TEST_CASE("nte linear box")
 {
     using ev_t = taylor_adaptive_batch<double>::nt_event_t;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto counter = 0u;
 
@@ -295,7 +295,7 @@ TEST_CASE("te linear box")
 {
     using ev_t = taylor_adaptive_batch<double>::t_event_t;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     auto counter = 0u;
 

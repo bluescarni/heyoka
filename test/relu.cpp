@@ -380,7 +380,7 @@ TEST_CASE("cfunc")
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using fp_t = decltype(fp_x);
 
-        auto [x] = make_vars("x");
+        auto x = make_vars("x");
 
         std::uniform_real_distribution<double> x_dist(-10, 10);
 
@@ -447,7 +447,7 @@ TEST_CASE("cfunc leaky")
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using fp_t = decltype(fp_x);
 
-        auto [x] = make_vars("x");
+        auto x = make_vars("x");
 
         std::uniform_real_distribution<double> x_dist(-10, 10);
 
@@ -518,7 +518,7 @@ TEST_CASE("cfunc mp")
 
     const auto prec = 237;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     std::uniform_real_distribution<double> x_dist(-10, 10);
 
@@ -566,7 +566,7 @@ TEST_CASE("cfunc mp leaky")
 
     const auto prec = 237;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     std::uniform_real_distribution<double> x_dist(-10, 10);
 

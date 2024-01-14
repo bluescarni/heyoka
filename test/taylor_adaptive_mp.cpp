@@ -225,7 +225,7 @@ TEST_CASE("step")
 {
     using Catch::Matchers::Message;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     const auto prec = 30u;
 
@@ -272,7 +272,7 @@ TEST_CASE("time set")
 {
     using Catch::Matchers::Message;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     const auto prec = 30u;
 
@@ -300,7 +300,7 @@ TEST_CASE("time set")
 // Test that precision is preserved when copying/moving an integrator object.
 TEST_CASE("copy move prec")
 {
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     const auto prec = 30u;
 
@@ -329,7 +329,7 @@ TEST_CASE("taylor_add_jet prec")
 {
     using Catch::Matchers::Message;
 
-    auto [x] = make_vars("x");
+    auto x = make_vars("x");
 
     llvm_state s;
 
