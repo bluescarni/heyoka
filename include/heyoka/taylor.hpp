@@ -983,11 +983,11 @@ auto taylor_propagate_common_ops(const KwArgs &...kw_args)
 template <typename T, typename Derived>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_base
 {
+    // Serialisation.
     friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &, unsigned)
-    {
-    }
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 };
 
 #if defined(HEYOKA_HAVE_REAL)

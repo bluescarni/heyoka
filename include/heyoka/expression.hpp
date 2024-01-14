@@ -228,11 +228,6 @@ std::size_t hash(funcptr_map<std::size_t> &, const expression &) noexcept;
 
 HEYOKA_DLL_PUBLIC std::size_t hash(const expression &) noexcept;
 
-} // namespace detail
-
-namespace detail
-{
-
 void stream_expression(std::ostringstream &, const expression &);
 
 } // namespace detail
