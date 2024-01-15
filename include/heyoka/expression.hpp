@@ -694,10 +694,7 @@ std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const 
 {
     igor::parser p{kw_args...};
 
-    if constexpr (p.has_unnamed_arguments()) {
-        static_assert(detail::always_false_v<KwArgs...>,
-                      "The variadic arguments in add_cfunc() contain unnamed arguments.");
-    }
+    static_assert(!p.has_unnamed_arguments(), "The variadic arguments in add_cfunc() contain unnamed arguments.");
 
     // Batch size (defaults to 1).
     const auto batch_size = [&]() -> std::uint32_t {
