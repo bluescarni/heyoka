@@ -450,7 +450,7 @@ TEST_CASE("cfunc")
                             {prod({expression{fp_t{-1}}, x}), prod({par[0], x, y}), prod({expression{fp_t{5}}, x, y}),
                              // NOTE: test a couple of corner cases as well.
                              expression{func{detail::prod_impl({x})}}, expression{func{detail::prod_impl{}}}},
-                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                            {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
                             kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
@@ -500,7 +500,7 @@ TEST_CASE("cfunc_mp")
             add_cfunc<mppp::real>(s, "cfunc",
                                   {prod({expression{mppp::real{-1, prec}}, x}), prod({par[0], x, y}),
                                    prod({expression{mppp::real{5, prec}}, x, y})},
-                                  kw::compact_mode = compact_mode, kw::prec = prec);
+                                  {x, y}, kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();
 
@@ -573,7 +573,7 @@ TEST_CASE("prod split")
                       x_vars[9], cos(prod_wrapper(x_vars))});
 
     llvm_state ls;
-    const auto dc = add_cfunc<double>(ls, "cfunc", {s});
+    const auto dc = add_cfunc<double>(ls, "cfunc", {s}, x_vars);
 
     for (const auto &ex : dc) {
         if (const auto *fptr = std::get_if<func>(&ex.value())) {

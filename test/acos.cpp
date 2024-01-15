@@ -149,7 +149,7 @@ TEST_CASE("cfunc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {acos(x), acos(expression{fp_t(-.5)}), acos(par[0])},
+            add_cfunc<fp_t>(s, "cfunc", {acos(x), acos(expression{fp_t(-.5)}), acos(par[0])}, {x},
                             kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
                             kw::compact_mode = compact_mode);
 
@@ -194,7 +194,7 @@ TEST_CASE("cfunc_mp")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<mppp::real>(s, "cfunc", {acos(x), acos(expression{mppp::real{-.5, prec}}), acos(par[0])},
+            add_cfunc<mppp::real>(s, "cfunc", {acos(x), acos(expression{mppp::real{-.5, prec}}), acos(par[0])}, {x},
                                   kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();
@@ -235,7 +235,8 @@ TEST_CASE("vfabi double")
 
         auto [a, b] = make_vars("a", "b");
 
-        add_cfunc<double>(s, "cfunc", {acos(a), acos(b)});
+        add_cfunc<double>(s, "cfunc", {acos(a), acos(b)}, {a, b});
+        add_cfunc<double>(s, "cfuncs", {acos(a), acos(b)}, {a, b}, kw::strided = true);
 
         s.compile();
 
@@ -298,7 +299,8 @@ TEST_CASE("vfabi float")
 
         auto [a, b, c, d] = make_vars("a", "b", "c", "d");
 
-        add_cfunc<float>(s, "cfunc", {acos(a), acos(b), acos(c), acos(d)});
+        add_cfunc<float>(s, "cfunc", {acos(a), acos(b), acos(c), acos(d)}, {a, b, c, d});
+        add_cfunc<float>(s, "cfuncs", {acos(a), acos(b), acos(c), acos(d)}, {a, b, c, d}, kw::strided = true);
 
         s.compile();
 

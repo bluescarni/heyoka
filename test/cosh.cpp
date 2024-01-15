@@ -143,7 +143,7 @@ TEST_CASE("cfunc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {cosh(x), cosh(expression{fp_t(-.5)}), cosh(par[0])},
+            add_cfunc<fp_t>(s, "cfunc", {cosh(x), cosh(expression{fp_t(-.5)}), cosh(par[0])}, {x},
                             kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
                             kw::compact_mode = compact_mode);
 
@@ -188,7 +188,7 @@ TEST_CASE("cfunc_mp")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<mppp::real>(s, "cfunc", {cosh(x), cosh(expression{mppp::real{1.5, prec}}), cosh(par[0])},
+            add_cfunc<mppp::real>(s, "cfunc", {cosh(x), cosh(expression{mppp::real{1.5, prec}}), cosh(par[0])}, {x},
                                   kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();
@@ -229,7 +229,8 @@ TEST_CASE("vfabi double")
 
         auto [a, b] = make_vars("a", "b");
 
-        add_cfunc<double>(s, "cfunc", {cosh(a), cosh(b)});
+        add_cfunc<double>(s, "cfunc", {cosh(a), cosh(b)}, {a, b});
+        add_cfunc<double>(s, "cfuncs", {cosh(a), cosh(b)}, {a, b}, kw::strided = true);
 
         s.compile();
 
@@ -292,7 +293,8 @@ TEST_CASE("vfabi float")
 
         auto [a, b, c, d] = make_vars("a", "b", "c", "d");
 
-        add_cfunc<float>(s, "cfunc", {cosh(a), cosh(b), cosh(c), cosh(d)});
+        add_cfunc<float>(s, "cfunc", {cosh(a), cosh(b), cosh(c), cosh(d)}, {a, b, c, d});
+        add_cfunc<float>(s, "cfuncs", {cosh(a), cosh(b), cosh(c), cosh(d)}, {a, b, c, d}, kw::strided = true);
 
         s.compile();
 

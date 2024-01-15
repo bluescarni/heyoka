@@ -8,7 +8,6 @@
 
 #include <initializer_list>
 #include <stdexcept>
-#include <tuple>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/time.hpp>
@@ -16,69 +15,6 @@
 #include "catch.hpp"
 
 using namespace heyoka;
-
-TEST_CASE("basic auto")
-{
-    using Catch::Matchers::Message;
-
-    // Error handling.
-    REQUIRE_THROWS_MATCHES(function_decompose({}), std::invalid_argument,
-                           Message("Cannot decompose a function with no outputs"));
-
-    // A couple of trivial cases.
-    auto [dc, nvars] = function_decompose({0_dbl});
-    REQUIRE(dc.size() == 1u);
-    REQUIRE(dc[0] == 0_dbl);
-    REQUIRE(nvars == 0u);
-
-    std::tie(dc, nvars) = function_decompose({par[1]});
-    REQUIRE(dc.size() == 1u);
-    REQUIRE(dc[0] == par[1]);
-    REQUIRE(nvars == 0u);
-
-    auto [x, y] = make_vars("x", "y");
-
-    std::tie(dc, nvars) = function_decompose({x});
-    REQUIRE(dc.size() == 2u);
-    REQUIRE(dc[0] == x);
-    REQUIRE(dc[1] == "u_0"_var);
-    REQUIRE(nvars == 1u);
-
-    std::tie(dc, nvars) = function_decompose({x, y});
-    REQUIRE(dc.size() == 4u);
-    REQUIRE(dc[0] == x);
-    REQUIRE(dc[1] == y);
-    REQUIRE(dc[2] == "u_0"_var);
-    REQUIRE(dc[3] == "u_1"_var);
-    REQUIRE(nvars == 2u);
-
-    std::tie(dc, nvars) = function_decompose({y, x});
-    REQUIRE(dc.size() == 4u);
-    REQUIRE(dc[0] == x);
-    REQUIRE(dc[1] == y);
-    REQUIRE(dc[2] == "u_1"_var);
-    REQUIRE(dc[3] == "u_0"_var);
-    REQUIRE(nvars == 2u);
-
-    auto tmp = x + y;
-
-    std::tie(dc, nvars) = function_decompose({tmp + tmp});
-    REQUIRE(dc.size() == 6u);
-    REQUIRE(dc[0] == x);
-    REQUIRE(dc[1] == y);
-    REQUIRE(dc[2] == 2_dbl * "u_0"_var);
-    REQUIRE(dc[3] == 2_dbl * "u_1"_var);
-    REQUIRE(dc[4] == "u_2"_var + "u_3"_var);
-    REQUIRE(dc[5] == "u_4"_var);
-    REQUIRE(nvars == 2u);
-
-    // Try with nullary function too.
-    std::tie(dc, nvars) = function_decompose({tmp + tmp, tmp * heyoka::time});
-    REQUIRE(dc.size() == 10u);
-    REQUIRE(dc[0] == x);
-    REQUIRE(dc[1] == y);
-    REQUIRE(dc[2] == heyoka::time);
-}
 
 TEST_CASE("basic explicit")
 {

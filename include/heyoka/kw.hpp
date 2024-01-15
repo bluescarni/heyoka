@@ -35,8 +35,8 @@ IGOR_MAKE_NAMED_ARGUMENT(force_avx512);
 IGOR_MAKE_NAMED_ARGUMENT(slp_vectorize);
 
 // cfunc API.
-IGOR_MAKE_NAMED_ARGUMENT(vars);
 IGOR_MAKE_NAMED_ARGUMENT(batch_size);
+IGOR_MAKE_NAMED_ARGUMENT(strided);
 
 // taylor_adaptive and friends.
 IGOR_MAKE_NAMED_ARGUMENT(tol);

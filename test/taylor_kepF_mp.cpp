@@ -34,7 +34,7 @@ TEST_CASE("kepF")
         // cfunc for testing purposes.
         llvm_state s_cfunc;
 
-        add_cfunc<fp_t>(s_cfunc, "cfunc", {kepF(x, y, z)}, kw::prec = prec);
+        add_cfunc<fp_t>(s_cfunc, "cfunc", {kepF(x, y, z)}, {x, y, z}, kw::prec = prec);
 
         s_cfunc.compile();
 

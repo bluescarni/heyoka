@@ -93,7 +93,7 @@ TEST_CASE("nbody")
         REQUIRE(n_subs == 45);
         REQUIRE(ta.get_decomposition().size() == 270u);
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 146u);
 
@@ -128,7 +128,7 @@ TEST_CASE("nbody")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 114u);
 
@@ -174,7 +174,7 @@ TEST_CASE("nbody")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 146u);
 
@@ -222,7 +222,7 @@ TEST_CASE("nbody")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 114u);
 
@@ -272,7 +272,7 @@ TEST_CASE("nbody")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 146u);
 
@@ -323,7 +323,7 @@ TEST_CASE("nbody")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 114u);
 
@@ -369,7 +369,7 @@ TEST_CASE("nbody")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 124u);
 
@@ -413,7 +413,7 @@ TEST_CASE("nbody")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 37u);
 
@@ -500,7 +500,7 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 158u);
 
@@ -535,7 +535,7 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 123u);
 
@@ -570,7 +570,7 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 158u);
 
@@ -605,7 +605,7 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 123u);
 
@@ -642,7 +642,7 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 158u);
 
@@ -680,7 +680,7 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 123u);
 
@@ -713,7 +713,7 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 136u);
 
@@ -750,7 +750,7 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 141u);
 
@@ -784,7 +784,7 @@ TEST_CASE("np1body")
             vars.push_back(p.first);
         }
 
-        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, kw::vars = vars);
+        const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
         REQUIRE(dc.size() == 31u);
 

@@ -54,7 +54,7 @@ TEST_CASE("basic")
 
         llvm_state s;
 
-        const auto dc = add_cfunc<double>(s, "jac", {model::cr3bp_jacobi()}, kw::vars = {x, y, z, px, py, pz});
+        const auto dc = add_cfunc<double>(s, "jac", {model::cr3bp_jacobi()}, {x, y, z, px, py, pz});
 
         REQUIRE(dc.size() == 25u);
 
@@ -87,8 +87,7 @@ TEST_CASE("basic")
 
         llvm_state s;
 
-        const auto dc
-            = add_cfunc<double>(s, "jac", {model::cr3bp_jacobi(kw::mu = 1e-2)}, kw::vars = {x, y, z, px, py, pz});
+        const auto dc = add_cfunc<double>(s, "jac", {model::cr3bp_jacobi(kw::mu = 1e-2)}, {x, y, z, px, py, pz});
 
         REQUIRE(dc.size() == 25u);
 

@@ -113,8 +113,8 @@ TEST_CASE("kepF diff")
         llvm_state s;
 
         auto der = diff(kepF(x, y, z), x);
-        add_cfunc<double>(s, "der", {der});
-        add_cfunc<double>(s, "f", {kepF(x, y, z)});
+        add_cfunc<double>(s, "der", {der}, {x, y, z});
+        add_cfunc<double>(s, "f", {kepF(x, y, z)}, {x, y, z});
         s.compile();
 
         auto *der_ptr
@@ -140,8 +140,8 @@ TEST_CASE("kepF diff")
         llvm_state s;
 
         auto der = diff(kepF(x, y, z), y);
-        add_cfunc<double>(s, "der", {der});
-        add_cfunc<double>(s, "f", {kepF(x, y, z)});
+        add_cfunc<double>(s, "der", {der}, {x, y, z});
+        add_cfunc<double>(s, "f", {kepF(x, y, z)}, {x, y, z});
         s.compile();
 
         auto *der_ptr
@@ -167,8 +167,8 @@ TEST_CASE("kepF diff")
         llvm_state s;
 
         auto der = diff(kepF(x, y, z), z);
-        add_cfunc<double>(s, "der", {der});
-        add_cfunc<double>(s, "f", {kepF(x, y, z)});
+        add_cfunc<double>(s, "der", {der}, {x, y, z});
+        add_cfunc<double>(s, "f", {kepF(x, y, z)}, {x, y, z});
         s.compile();
 
         auto *der_ptr
@@ -329,7 +329,7 @@ TEST_CASE("cfunc")
             llvm_state s{kw::opt_level = opt_level};
 
             add_cfunc<fp_t>(s, "cfunc", {kepF(h, k, lam), kepF(par[0], par[1], lam), kepF(.5_dbl, .3_dbl, lam)},
-                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                            {h, k, lam}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
                             kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
@@ -409,7 +409,7 @@ TEST_CASE("cfunc")
 
     llvm_state s;
 
-    add_cfunc<double>(s, "cfunc", {kepF(h, k, lam)});
+    add_cfunc<double>(s, "cfunc", {kepF(h, k, lam)}, {h, k, lam});
 
     s.compile();
 
@@ -459,7 +459,7 @@ TEST_CASE("cfunc bound")
 
     llvm_state s;
 
-    add_cfunc<double>(s, "cfunc", {kepF(h, k, lam)});
+    add_cfunc<double>(s, "cfunc", {kepF(h, k, lam)}, {h, k, lam});
 
     s.compile();
 
@@ -523,7 +523,7 @@ TEST_CASE("cfunc mp")
             llvm_state s{kw::opt_level = opt_level};
 
             add_cfunc<fp_t>(s, "cfunc", {kepF(h, k, lam), kepF(par[0], par[1], lam), kepF(.5_dbl, .3_dbl, lam)},
-                            kw::compact_mode = compact_mode, kw::prec = prec);
+                            {h, k, lam}, kw::compact_mode = compact_mode, kw::prec = prec);
 
             if (opt_level == 0u && compact_mode) {
                 REQUIRE(boost::contains(s.get_ir(), "heyoka.llvm_c_eval.kepF."));
@@ -585,7 +585,7 @@ TEST_CASE("cfunc mp")
     // Check nan/invalid values handling.
     llvm_state s;
 
-    add_cfunc<mppp::real>(s, "cfunc", {kepF(h, k, lam)}, kw::prec = prec);
+    add_cfunc<mppp::real>(s, "cfunc", {kepF(h, k, lam)}, {h, k, lam}, kw::prec = prec);
 
     s.compile();
 

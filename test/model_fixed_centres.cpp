@@ -101,7 +101,7 @@ TEST_CASE("basic")
         add_cfunc<double>(
             s, "en",
             {model::fixed_centres_energy(kw::Gconst = 1.02, kw::masses = {1.01}, kw::positions = {1., 2., 3.})},
-            kw::vars = {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
+            {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
         s.compile();
 
         auto *cf
@@ -139,7 +139,7 @@ TEST_CASE("basic")
 
         const auto dc
             = add_cfunc<double>(s, "en", {model::fixed_centres_energy(kw::masses = masses, kw::positions = pos)},
-                                kw::vars = {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
+                                {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
 
         REQUIRE(dc.size() == 626u);
 

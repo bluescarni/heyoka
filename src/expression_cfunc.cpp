@@ -478,145 +478,6 @@ std::vector<expression> function_sort_dc(std::vector<expression> &dc,
 
 } // namespace detail
 
-// Decomposition with automatic deduction of variables.
-std::pair<std::vector<expression>, std::vector<expression>::size_type>
-function_decompose(const std::vector<expression> &v_ex_)
-{
-    if (v_ex_.empty()) {
-        throw std::invalid_argument("Cannot decompose a function with no outputs");
-    }
-
-    const auto vars = get_variables(v_ex_);
-
-    // Cache the number of variables.
-    const auto nvars = vars.size();
-
-    // Cache the number of outputs.
-    const auto nouts = v_ex_.size();
-
-    // Create the map for renaming the variables to u_i.
-    // The renaming will be done in alphabetical order.
-    std::unordered_map<std::string, std::string> repl_map;
-    {
-        decltype(vars.size()) var_idx = 0;
-        for (const auto &var : vars) {
-            [[maybe_unused]] const auto eres = repl_map.emplace(var, fmt::format("u_{}", var_idx++));
-            assert(eres.second);
-        }
-    }
-
-    // Transform sums into subs.
-    auto v_ex = detail::sum_to_sub(v_ex_);
-
-    // Split sums.
-    v_ex = detail::split_sums_for_decompose(v_ex);
-
-    // Transform sums into sum_sqs if possible.
-    v_ex = detail::sums_to_sum_sqs_for_decompose(v_ex);
-
-    // Transform prods into divs.
-    v_ex = detail::prod_to_div_llvm_eval(v_ex);
-
-    // Split prods.
-    // NOTE: 8 is the same value as for split_sums_for_decompose().
-    v_ex = detail::split_prods_for_decompose(v_ex, 8u);
-
-    // Unfix.
-    // NOTE: unfix is the last step, as we want to keep expressions
-    // fixed in the previous preprocessing steps.
-    v_ex = unfix(v_ex);
-
-#if !defined(NDEBUG)
-
-    // Save copy for checking in debug mode.
-    const auto v_ex_verify = v_ex;
-
-#endif
-
-    // Rename the variables in the original function.
-    v_ex = rename_variables(v_ex, repl_map);
-
-    // Init the decomposition. It begins with a list
-    // of the original variables of the function.
-    std::vector<expression> ret;
-    ret.reserve(nvars);
-    for (const auto &var : vars) {
-        ret.emplace_back(var);
-    }
-
-    // Prepare the outputs vector.
-    std::vector<expression> outs;
-    outs.reserve(nouts);
-
-    // Log the construction runtime in trace mode.
-    spdlog::stopwatch sw;
-
-    // Run the decomposition on each component of the function.
-    detail::funcptr_map<std::vector<expression>::size_type> func_map;
-    for (const auto &ex : v_ex) {
-        // Decompose the current component.
-        if (const auto dres = detail::decompose(func_map, ex, ret)) {
-            // NOTE: if the component was decomposed
-            // (that is, it is not constant or a single variable),
-            // then the output is a u variable.
-            // NOTE: all functions are forced to return
-            // a non-empty dres
-            // in the func API, so the only entities that
-            // can return an empty dres are const/params or
-            // variables.
-            outs.emplace_back(fmt::format("u_{}", *dres));
-        } else {
-            assert(std::holds_alternative<variable>(ex.value()) || std::holds_alternative<number>(ex.value())
-                   || std::holds_alternative<param>(ex.value()));
-
-            outs.push_back(ex);
-        }
-    }
-
-    assert(outs.size() == nouts);
-
-    // Append the definitions of the outputs.
-    ret.insert(ret.end(), outs.begin(), outs.end());
-
-    detail::get_logger()->trace("function decomposition construction runtime: {}", sw);
-
-#if !defined(NDEBUG)
-
-    // Verify the decomposition.
-    // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
-    // This is fine, as the decomposition must contain at least nvars items.
-    detail::verify_function_dec(v_ex_verify, ret, nvars);
-
-#endif
-
-    // Simplify the decomposition.
-    // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
-    // This is fine, as the decomposition must contain at least nvars items.
-    ret = detail::function_decompose_cse(ret, nvars, nouts);
-
-#if !defined(NDEBUG)
-
-    // Verify the simplified decomposition.
-    detail::verify_function_dec(v_ex_verify, ret, nvars);
-
-#endif
-
-    // Run the breadth-first topological sort on the decomposition.
-    // NOTE: nvars is implicitly converted to std::vector<expression>::size_type here.
-    // This is fine, as the decomposition must contain at least nvars items.
-    ret = detail::function_sort_dc(ret, nvars, nouts);
-
-#if !defined(NDEBUG)
-
-    // Verify the reordered decomposition.
-    detail::verify_function_dec(v_ex_verify, ret, nvars);
-
-#endif
-
-    // NOTE: static_cast is fine, as we know that ret contains at least nvars elements.
-    return std::make_pair(std::move(ret), static_cast<std::vector<expression>::size_type>(nvars));
-}
-
 // Function decomposition from with explicit list of input variables.
 std::vector<expression> function_decompose(const std::vector<expression> &v_ex_, const std::vector<expression> &vars)
 {
@@ -1529,7 +1390,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
 // [0, 1], [3, 4], [6, 7], [9, 10], ... in the input array.
 template <typename T, typename F>
 auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::uint32_t batch_size, bool high_accuracy,
-                    bool compact_mode, bool parallel_mode, [[maybe_unused]] long long prec)
+                    bool compact_mode, bool parallel_mode, [[maybe_unused]] long long prec, bool strided)
 {
     if (s.is_compiled()) {
         throw std::invalid_argument("A compiled function cannot be added to an llvm_state after compilation");
@@ -1568,22 +1429,11 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
 #endif
 
     // Decompose the function and cache the number of vars and outputs.
-    // NOTE: nvars and nouts are already safely cast to 32-bit integers.
-    auto [dc, nvars, nouts] = [&fn]() {
-        if constexpr (std::is_same_v<F, std::vector<expression>>) {
-            auto dec_res = function_decompose(fn);
-
-            return std::make_tuple(std::move(dec_res.first), boost::numeric_cast<std::uint32_t>(dec_res.second),
-                                   boost::numeric_cast<std::uint32_t>(fn.size()));
-        } else {
-            return std::make_tuple(function_decompose(fn.first, fn.second),
-                                   boost::numeric_cast<std::uint32_t>(fn.second.size()),
-                                   boost::numeric_cast<std::uint32_t>(fn.first.size()));
-        }
-    }();
+    auto dc = function_decompose(fn.first, fn.second);
+    const auto nvars = boost::numeric_cast<std::uint32_t>(fn.second.size());
+    const auto nouts = boost::numeric_cast<std::uint32_t>(fn.first.size());
 
     // Determine the number of u variables.
-    // NOTE: this is also safely cast to a 32-bit integer.
     assert(dc.size() >= nouts); // LCOV_EXCL_LINE
     const auto nuvars = boost::numeric_cast<std::uint32_t>(dc.size() - nouts);
 
@@ -1606,7 +1456,7 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // - a const float pointer to the inputs,
     // - a const float pointer to the pars,
     // - a const float pointer to the time value(s),
-    // - the stride.
+    // - the stride (if requested).
     //
     // The pointer arguments cannot overlap.
     auto *fp_t = [&]() {
@@ -1622,14 +1472,17 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     }();
     auto *ext_fp_t = llvm_ext_type(fp_t);
     std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(ext_fp_t));
-    fargs.push_back(to_llvm_type<std::size_t>(context));
+
+    if (strided) {
+        fargs.push_back(to_llvm_type<std::size_t>(context));
+    }
+
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
-    // Append ".strided" to the function name.
-    const auto sname = name + ".strided";
+
     // Now create the function.
-    auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, sname, &md);
+    auto *f = llvm_func_create(ft, llvm::Function::ExternalLinkage, name, &md);
     // NOTE: a cfunc cannot call itself recursively.
     f->addFnAttr(llvm::Attribute::NoRecurse);
 
@@ -1658,8 +1511,13 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     time_ptr->addAttr(llvm::Attribute::NoAlias);
     time_ptr->addAttr(llvm::Attribute::ReadOnly);
 
-    auto *stride = out_ptr + 4;
-    stride->setName("stride");
+    llvm::Value *stride = nullptr;
+    if (strided) {
+        stride = out_ptr + 4;
+        stride->setName("stride");
+    } else {
+        stride = to_size_t(s, builder.getInt32(batch_size));
+    }
 
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(context, "entry", f);
@@ -1680,68 +1538,6 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
     // Verify it.
     s.verify_function(f);
 
-    // Store the strided function pointer for use later.
-    auto *f_strided = f;
-
-    // Build the version of the function with stride == 1.
-    fargs.pop_back();
-    ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-    assert(ft != nullptr); // LCOV_EXCL_LINE
-    f = llvm_func_create(ft, llvm::Function::ExternalLinkage, name, &md);
-
-    // Set the names/attributes of the function arguments.
-    out_ptr = f->args().begin();
-    out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
-    out_ptr->addAttr(llvm::Attribute::NoAlias);
-    out_ptr->addAttr(llvm::Attribute::WriteOnly);
-
-    in_ptr = out_ptr + 1;
-    in_ptr->setName("in_ptr");
-    in_ptr->addAttr(llvm::Attribute::NoCapture);
-    in_ptr->addAttr(llvm::Attribute::NoAlias);
-    in_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-    par_ptr = out_ptr + 2;
-    par_ptr->setName("par_ptr");
-    par_ptr->addAttr(llvm::Attribute::NoCapture);
-    par_ptr->addAttr(llvm::Attribute::NoAlias);
-    par_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-    time_ptr = out_ptr + 3;
-    time_ptr->setName("time_ptr");
-    time_ptr->addAttr(llvm::Attribute::NoCapture);
-    time_ptr->addAttr(llvm::Attribute::NoAlias);
-    time_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-    // Create a new basic block to start insertion into.
-    bb = llvm::BasicBlock::Create(context, "entry", f);
-    assert(bb != nullptr); // LCOV_EXCL_LINE
-    builder.SetInsertPoint(bb);
-
-    // Invoke the strided function with stride == batch_size.
-    auto *fcall = builder.CreateCall(f_strided,
-                                     {out_ptr, in_ptr, par_ptr, time_ptr, to_size_t(s, builder.getInt32(batch_size))});
-    // NOTE: forcibly inline the function call. This will increase
-    // compile time, but we want to make sure that the non-strided
-    // version of the compiled function is optimised as much as possible,
-    // so we accept the tradeoff.
-#if LLVM_VERSION_MAJOR >= 14
-    fcall->addFnAttr(llvm::Attribute::AlwaysInline);
-#else
-    {
-        auto attrs = fcall->getAttributes();
-        attrs = attrs.addAttribute(context, llvm::AttributeList::FunctionIndex, llvm::Attribute::AlwaysInline);
-        fcall->setAttributes(attrs);
-    }
-#endif
-
-    // Finish off the function.
-    builder.CreateRetVoid();
-
-    // Verify it.
-    s.verify_function(f);
-
     // Restore the original insertion block.
     builder.SetInsertPoint(orig_bb);
 
@@ -1752,69 +1548,36 @@ auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::ui
 
 template <typename T>
 std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &v_ex,
-                                  std::uint32_t batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode,
-                                  long long prec)
-{
-    return detail::add_cfunc_impl<T>(s, name, v_ex, batch_size, high_accuracy, compact_mode, parallel_mode, prec);
-}
-
-template <typename T>
-std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &v_ex,
                                   const std::vector<expression> &vars, std::uint32_t batch_size, bool high_accuracy,
-                                  bool compact_mode, bool parallel_mode, long long prec)
+                                  bool compact_mode, bool parallel_mode, long long prec, bool strided)
 {
     return detail::add_cfunc_impl<T>(s, name, std::make_pair(std::cref(v_ex), std::cref(vars)), batch_size,
-                                     high_accuracy, compact_mode, parallel_mode, prec);
+                                     high_accuracy, compact_mode, parallel_mode, prec, strided);
 }
 
 // Explicit instantiations.
-template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<float>(llvm_state &, const std::string &,
-                                                                    const std::vector<expression> &, std::uint32_t,
-                                                                    bool, bool, bool, long long);
-template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<float>(llvm_state &, const std::string &,
-                                                                    const std::vector<expression> &,
-                                                                    const std::vector<expression> &, std::uint32_t,
-                                                                    bool, bool, bool, long long);
+#define HEYOKA_ADD_CFUNC_INST(T)                                                                                       \
+    template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<T>(                                                   \
+        llvm_state &, const std::string &, const std::vector<expression> &, const std::vector<expression> &,           \
+        std::uint32_t, bool, bool, bool, long long, bool);
 
-template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<double>(llvm_state &, const std::string &,
-                                                                     const std::vector<expression> &, std::uint32_t,
-                                                                     bool, bool, bool, long long);
-template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<double>(llvm_state &, const std::string &,
-                                                                     const std::vector<expression> &,
-                                                                     const std::vector<expression> &, std::uint32_t,
-                                                                     bool, bool, bool, long long);
-
-template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<long double>(llvm_state &, const std::string &,
-                                                                          const std::vector<expression> &,
-                                                                          std::uint32_t, bool, bool, bool, long long);
-template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<long double>(llvm_state &, const std::string &,
-                                                                          const std::vector<expression> &,
-                                                                          const std::vector<expression> &,
-                                                                          std::uint32_t, bool, bool, bool, long long);
+HEYOKA_ADD_CFUNC_INST(float)
+HEYOKA_ADD_CFUNC_INST(double)
+HEYOKA_ADD_CFUNC_INST(long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real128>(llvm_state &, const std::string &,
-                                                                            const std::vector<expression> &,
-                                                                            std::uint32_t, bool, bool, bool, long long);
-template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real128>(llvm_state &, const std::string &,
-                                                                            const std::vector<expression> &,
-                                                                            const std::vector<expression> &,
-                                                                            std::uint32_t, bool, bool, bool, long long);
+HEYOKA_ADD_CFUNC_INST(mppp::real128)
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real>(llvm_state &, const std::string &,
-                                                                         const std::vector<expression> &, std::uint32_t,
-                                                                         bool, bool, bool, long long);
-template HEYOKA_DLL_PUBLIC std::vector<expression> add_cfunc<mppp::real>(llvm_state &, const std::string &,
-                                                                         const std::vector<expression> &,
-                                                                         const std::vector<expression> &, std::uint32_t,
-                                                                         bool, bool, bool, long long);
+HEYOKA_ADD_CFUNC_INST(mppp::real)
 
 #endif
+
+#undef HEYOKA_ADD_CFUNC_INST
 
 } // namespace detail
 

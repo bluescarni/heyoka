@@ -221,7 +221,7 @@ TEST_CASE("cfunc")
             llvm_state s{kw::opt_level = opt_level};
 
             add_cfunc<fp_t>(s, "cfunc", {sum_sq({x, y}), sum_sq({x, expression{fp_t(.5)}}), sum_sq({par[0], y})},
-                            kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
+                            {x, y}, kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
                             kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
@@ -261,7 +261,7 @@ TEST_CASE("cfunc")
     {
         llvm_state s;
 
-        const auto dc = add_cfunc<double>(s, "cfunc", {sum_sq({x, y, cos(sum_sq({x, y}))})});
+        const auto dc = add_cfunc<double>(s, "cfunc", {sum_sq({x, y, cos(sum_sq({x, y}))})}, {x, y});
 
         s.compile();
 
@@ -280,7 +280,7 @@ TEST_CASE("cfunc")
     {
         llvm_state s{kw::opt_level = 0u};
 
-        add_cfunc<double>(s, "cfunc", {sum({pow(x, 2_dbl), pow(x, y)})}, kw::compact_mode = true);
+        add_cfunc<double>(s, "cfunc", {sum({pow(x, 2_dbl), pow(x, y)})}, {x, y}, kw::compact_mode = true);
 
         REQUIRE(!boost::contains(s.get_ir(), "sum_sq"));
     }
@@ -299,7 +299,7 @@ TEST_CASE("cfunc_mp")
             llvm_state s{kw::opt_level = opt_level};
 
             add_cfunc<mppp::real>(s, "cfunc", {sum_sq({x, y}), sum_sq({x, expression{.5}}), sum_sq({par[0], y})},
-                                  kw::compact_mode = compact_mode, kw::prec = prec);
+                                  {x, y}, kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();
 

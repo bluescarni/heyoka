@@ -425,7 +425,7 @@ TEST_CASE("fixed centres check")
         assign_sr(sr);
 
         llvm_state s;
-        add_cfunc<double>(s, "diff", diff_vec, kw::vars = vars);
+        add_cfunc<double>(s, "diff", diff_vec, vars);
         s.compile();
 
         auto *fr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
@@ -467,7 +467,7 @@ TEST_CASE("fixed centres check")
 
             // Compile and fetch the expression of the derivative.
             llvm_state s2;
-            add_cfunc<double>(s2, "diff", {ex}, kw::vars = vars);
+            add_cfunc<double>(s2, "diff", {ex}, vars);
             s2.compile();
 
             auto *fr2 = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
@@ -518,7 +518,7 @@ TEST_CASE("speelpenning check")
         assign_sr(sr);
 
         llvm_state s;
-        add_cfunc<double>(s, "diff", diff_vec, kw::vars = vars);
+        add_cfunc<double>(s, "diff", diff_vec, vars);
         s.compile();
 
         auto *fr = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
@@ -556,7 +556,7 @@ TEST_CASE("speelpenning check")
 
             // Compile and fetch the expression of the derivative.
             llvm_state s2;
-            add_cfunc<double>(s2, "diff", {ex}, kw::vars = vars);
+            add_cfunc<double>(s2, "diff", {ex}, vars);
             s2.compile();
 
             auto *fr2 = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(
@@ -615,7 +615,8 @@ TEST_CASE("speelpenning complexity")
         auto sr = dt.get_derivatives(1);
         assign_sr(sr);
 
-        auto dc_reverse = add_cfunc<double>(s, "f_reverse", diff_vec, kw::compact_mode = true);
+        std::ranges::sort(vars, std::less<expression>{});
+        auto dc_reverse = add_cfunc<double>(s, "f_reverse", diff_vec, vars, kw::compact_mode = true);
 
         fmt::print("nvars={:<5} decomposition size={:<6}\n", nvars, dc_reverse.size() - nvars - nvars);
 

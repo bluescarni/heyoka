@@ -1,3 +1,5 @@
+.. _api_func:
+
 N-ary functions
 ===============
 

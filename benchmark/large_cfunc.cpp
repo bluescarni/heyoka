@@ -55,7 +55,7 @@ int main()
 
     llvm_state s;
 
-    add_cfunc<double>(s, "en", {en}, kw::vars = {x, y, z, vx, vy, vz}, kw::compact_mode = true);
+    add_cfunc<double>(s, "en", {en}, {x, y, z, vx, vy, vz}, kw::compact_mode = true);
 
     s.compile();
 

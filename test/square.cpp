@@ -139,7 +139,7 @@ TEST_CASE("cfunc")
             llvm_state s{kw::opt_level = opt_level};
 
             add_cfunc<fp_t>(
-                s, "cfunc", {square_wrapper(x), square_wrapper(expression{fp_t(.5)}), square_wrapper(par[0])},
+                s, "cfunc", {square_wrapper(x), square_wrapper(expression{fp_t(.5)}), square_wrapper(par[0])}, {x},
                 kw::batch_size = batch_size, kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
@@ -184,7 +184,7 @@ TEST_CASE("cfunc_mp")
             llvm_state s{kw::opt_level = opt_level};
 
             add_cfunc<mppp::real>(s, "cfunc",
-                                  {square_wrapper(x), square_wrapper(expression{.5}), square_wrapper(par[0])},
+                                  {square_wrapper(x), square_wrapper(expression{.5}), square_wrapper(par[0])}, {x},
                                   kw::compact_mode = compact_mode, kw::prec = prec);
 
             REQUIRE(boost::contains(s.get_ir(), "mpfr_sqr"));

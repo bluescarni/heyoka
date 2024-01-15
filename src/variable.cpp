@@ -24,9 +24,20 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
+
+void variable::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << m_name;
+}
+
+void variable::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> m_name;
+}
 
 variable::variable() : variable("") {}
 

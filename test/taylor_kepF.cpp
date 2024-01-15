@@ -66,7 +66,7 @@ TEST_CASE("taylor kepF")
         // cfunc for testing purposes.
         llvm_state s_cfunc;
 
-        add_cfunc<fp_t>(s_cfunc, "cfunc", {kepF(x, y, z)});
+        add_cfunc<fp_t>(s_cfunc, "cfunc", {kepF(x, y, z)}, {x, y, z});
 
         s_cfunc.compile();
 

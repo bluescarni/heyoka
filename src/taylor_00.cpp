@@ -426,6 +426,16 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
 
 } // namespace
 
+template <typename T, typename Derived>
+void taylor_adaptive_base<T, Derived>::save(boost::archive::binary_oarchive &, unsigned) const
+{
+}
+
+template <typename T, typename Derived>
+void taylor_adaptive_base<T, Derived>::load(boost::archive::binary_iarchive &, unsigned)
+{
+}
+
 #if defined(HEYOKA_HAVE_REAL)
 
 template <typename Derived>

@@ -139,7 +139,7 @@ TEST_CASE("cfunc")
 
             llvm_state s{kw::opt_level = opt_level};
 
-            add_cfunc<fp_t>(s, "cfunc", {sigmoid(x), sigmoid(expression{fp_t(-.5)}), sigmoid(par[0])},
+            add_cfunc<fp_t>(s, "cfunc", {sigmoid(x), sigmoid(expression{fp_t(-.5)}), sigmoid(par[0])}, {x},
                             kw::batch_size = batch_size, kw::high_accuracy = high_accuracy,
                             kw::compact_mode = compact_mode);
 
@@ -185,7 +185,7 @@ TEST_CASE("cfunc_mp")
             llvm_state s{kw::opt_level = opt_level};
 
             add_cfunc<mppp::real>(s, "cfunc", {sigmoid(x), sigmoid(expression{mppp::real{1.5, prec}}), sigmoid(par[0])},
-                                  kw::compact_mode = compact_mode, kw::prec = prec);
+                                  {x}, kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();
 

@@ -149,7 +149,7 @@ TEST_CASE("cfunc")
 
             add_cfunc<fp_t>(
                 s, "cfunc",
-                {cos(x - heyoka::time), heyoka::time + cos(expression{fp_t(-.5)}), cos(par[0]) * heyoka::time},
+                {cos(x - heyoka::time), heyoka::time + cos(expression{fp_t(-.5)}), cos(par[0]) * heyoka::time}, {x},
                 kw::batch_size = batch_size, kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
 
             if (opt_level == 0u && compact_mode) {
@@ -196,7 +196,7 @@ TEST_CASE("cfunc_mp")
             add_cfunc<mppp::real>(s, "cfunc",
                                   {cos(x - heyoka::time), heyoka::time + cos(expression{mppp::real{-.5, prec}}),
                                    cos(par[0]) * heyoka::time},
-                                  kw::compact_mode = compact_mode, kw::prec = prec);
+                                  {x}, kw::compact_mode = compact_mode, kw::prec = prec);
 
             s.compile();
 
