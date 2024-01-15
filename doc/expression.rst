@@ -15,9 +15,10 @@ Functions
 
 .. cpp:function:: template <typename Arg0, typename... Args> auto make_vars(const Arg0 &str, const Args &...strs)
 
-   Create expressions from strings.
+   Create variable expressions from strings.
 
-   This function will return one or more :cpp:class:`expression` instances constructed from the input arguments.
+   This function will return one or more :cpp:class:`expression` instances
+   containing :cpp:class:`variables <variable>` constructed from the input arguments.
    If a single argument is supplied, a single expression is returned. Otherwise, a ``std::array`` of
    expressions (one for each argument) is returned.
 
