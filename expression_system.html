@@ -189,6 +189,7 @@
 <li class="toctree-l3"><a class="reference internal" href="param.html">Runtime parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="func.html">N-ary functions</a></li>
 <li class="toctree-l3"><a class="reference internal" href="expression.html">Expressions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="math.html">Mathematical functions</a></li>
 </ul>
 </li>
 </ul>
@@ -399,9 +400,18 @@ document.write(`
                   
   <section id="expression-system">
 <span id="id1"></span><h1>Expression system<a class="headerlink" href="#expression-system" title="Link to this heading">#</a></h1>
-<p>List node types.</p>
-<p>Mention that expression system API is immutable.</p>
-<p>Mention reference semantics for non-trivial expressions.</p>
+<p>The expression system is used to create and manipulate mathematical expressions in symbolic form.
+An <a class="reference internal" href="expression.html#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">expression</span></code></a> is a union of several types:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="variable.html#api-variable"><span class="std std-ref">symbolic variables</span></a>,</p></li>
+<li><p><a class="reference internal" href="number.html#api-number"><span class="std std-ref">numerical constants</span></a>,</p></li>
+<li><p><a class="reference internal" href="param.html#api-param"><span class="std std-ref">runtime parameters</span></a>,</p></li>
+<li><p><a class="reference internal" href="func.html#api-func"><span class="std std-ref">n-ary functions</span></a>.</p></li>
+</ul>
+<p>Arithmetic operators and several <a class="reference internal" href="math.html#api-math"><span class="std std-ref">mathematical functions</span></a> can be used
+to construct arbitrarily-complicated symbolic expressions.</p>
+<p>A <a class="reference internal" href="tut_expression_system.html#tut-expression-system"><span class="std std-ref">tutorial</span></a> showcasing the capabilities of the expression
+system is available.</p>
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="variable.html">Variables</a></li>
@@ -409,6 +419,7 @@ document.write(`
 <li class="toctree-l1"><a class="reference internal" href="param.html">Runtime parameters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="func.html">N-ary functions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="expression.html">Expressions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="math.html">Mathematical functions</a></li>
 </ul>
 </div>
 </section>

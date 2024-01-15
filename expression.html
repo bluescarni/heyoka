@@ -43,7 +43,7 @@
     <script>DOCUMENTATION_OPTIONS.pagename = 'expression';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Benchmarks" href="benchmarks.html" />
+    <link rel="next" title="Mathematical functions" href="math.html" />
     <link rel="prev" title="N-ary functions" href="func.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -189,6 +189,7 @@
 <li class="toctree-l3"><a class="reference internal" href="param.html">Runtime parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="func.html">N-ary functions</a></li>
 <li class="toctree-l3 current active"><a class="current reference internal" href="#">Expressions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="math.html">Mathematical functions</a></li>
 </ul>
 </li>
 </ul>
@@ -430,7 +431,26 @@ document.write(`
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args">
 <span id="_CPPv3I0DpEN6heyoka9make_varsERK4Arg0DpRK4Args"></span><span id="_CPPv2I0DpEN6heyoka9make_varsERK4Arg0DpRK4Args"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Arg0</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="sig-name descname"><span class="n"><span class="pre">Args</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">make_vars</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args" title="heyoka::make_vars::Arg0"><span class="n"><span class="pre">Arg0</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">str</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args" title="heyoka::make_vars::Args"><span class="n"><span class="pre">Args</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">strs</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Create expressions from strings.</p>
+<p>This function will return one or more <a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">expression</span></code></a> instances constructed from the input arguments.
+If a single argument is supplied, a single expression is returned. Otherwise, a <code class="docutils literal notranslate"><span class="pre">std::array</span></code> of
+expressions (one for each argument) is returned.</p>
+<p>This function is enabled only if all input arguments are convertible to <code class="docutils literal notranslate"><span class="pre">std::string</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>str</strong> – the first string argument.</p></li>
+<li><p><strong>strs</strong> – the remaining string arguments.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>one or more expressions constructed from <em>str</em> and <em>strs</em>.</p>
+</dd>
+<dt class="field-odd">Exception<span class="colon">:</span></dt>
+<dd class="field-odd"><p>any exception thrown by constructing <code class="docutils literal notranslate"><span class="pre">std::string</span></code> objects.</p>
+</dd>
+</dl>
+</dd></dl>
 
 </section>
 </section>
@@ -456,11 +476,11 @@ document.write(`
       </div>
     </a>
     <a class="right-next"
-       href="benchmarks.html"
+       href="math.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Benchmarks</p>
+        <p class="prev-next-title">Mathematical functions</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>

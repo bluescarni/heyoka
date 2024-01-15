@@ -189,6 +189,7 @@
 <li class="toctree-l3"><a class="reference internal" href="param.html">Runtime parameters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="func.html">N-ary functions</a></li>
 <li class="toctree-l3"><a class="reference internal" href="expression.html">Expressions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="math.html">Mathematical functions</a></li>
 </ul>
 </li>
 </ul>
@@ -414,12 +415,12 @@ needs to be able to represent the right-hand side of an ODE system in symbolic
 form in order to be able to compute its high-order derivatives via automatic
 differentiation. heyoka represents generic mathematical expressions
 via a simple <a class="reference external" href="https://en.wikipedia.org/wiki/Abstract_syntax_tree">abstract syntax tree (AST)</a>
-in which the internal nodes are n-ary functions,
+in which the internal nodes are <a class="reference internal" href="func.html#api-func"><span class="std std-ref">n-ary functions</span></a>,
 and the leaf nodes can be:</p>
 <ul class="simple">
-<li><p>symbolic variables,</p></li>
-<li><p>numerical constants,</p></li>
-<li><p>runtime parameters.</p></li>
+<li><p><a class="reference internal" href="variable.html#api-variable"><span class="std std-ref">symbolic variables</span></a>,</p></li>
+<li><p><a class="reference internal" href="number.html#api-number"><span class="std std-ref">numerical constants</span></a>,</p></li>
+<li><p><a class="reference internal" href="param.html#api-param"><span class="std std-ref">runtime parameters</span></a>.</p></li>
 </ul>
 <p>Constants and parameters are mathematically equivalent, the only difference being
 that the value of a constant is determined when the expression is created, whereas
@@ -454,7 +455,7 @@ mathematical notation:</p>
 <p>Note that support for extended-precision floating-point types
 <a class="reference internal" href="install.html#ep-support"><span class="std std-ref">varies depending on the software/hardware platform</span></a>.</p>
 <p>In addition to the standard mathematical operators, heyoka’s expression system
-also supports the following elementary functions (with more to come in the near future):</p>
+also supports several <a class="reference internal" href="math.html#api-math"><span class="std std-ref">elementary and special functions</span></a>:</p>
 <ul class="simple">
 <li><p>square root,</p></li>
 <li><p>exponentiation,</p></li>
@@ -462,7 +463,7 @@ also supports the following elementary functions (with more to come in the near 
 <li><p>the natural logarithm and exponential,</p></li>
 <li><p>the standard logistic function (sigmoid),</p></li>
 <li><p>the error function,</p></li>
-<li><p>the inverse of Kepler’s elliptic equation.</p></li>
+<li><p>several variants of Kepler’s elliptic equation.</p></li>
 </ul>
 <p>heyoka also provides an API for implementing new functions without
 modifying the library’s code.</p>

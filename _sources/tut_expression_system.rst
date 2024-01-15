@@ -8,12 +8,12 @@ needs to be able to represent the right-hand side of an ODE system in symbolic
 form in order to be able to compute its high-order derivatives via automatic
 differentiation. heyoka represents generic mathematical expressions
 via a simple `abstract syntax tree (AST) <https://en.wikipedia.org/wiki/Abstract_syntax_tree>`__
-in which the internal nodes are n-ary functions,
+in which the internal nodes are :ref:`n-ary functions <api_func>`,
 and the leaf nodes can be:
 
-* symbolic variables,
-* numerical constants,
-* runtime parameters.
+- :ref:`symbolic variables <api_variable>`,
+- :ref:`numerical constants <api_number>`,
+- :ref:`runtime parameters <api_param>`.
 
 Constants and parameters are mathematically equivalent, the only difference being
 that the value of a constant is determined when the expression is created, whereas
@@ -37,7 +37,7 @@ Note that support for extended-precision floating-point types
 :ref:`varies depending on the software/hardware platform <ep_support>`.
 
 In addition to the standard mathematical operators, heyoka's expression system
-also supports the following elementary functions (with more to come in the near future):
+also supports several :ref:`elementary and special functions <api_math>`:
 
 * square root,
 * exponentiation,
@@ -45,7 +45,7 @@ also supports the following elementary functions (with more to come in the near 
 * the natural logarithm and exponential,
 * the standard logistic function (sigmoid),
 * the error function,
-* the inverse of Kepler's elliptic equation.
+* several variants of Kepler's elliptic equation.
 
 heyoka also provides an API for implementing new functions without
 modifying the library's code.
