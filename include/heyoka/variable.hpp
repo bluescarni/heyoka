@@ -38,11 +38,9 @@ class HEYOKA_DLL_PUBLIC variable
 
     // Serialization.
     friend class boost::serialization::access;
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar & m_name;
-    }
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 public:
     variable();
