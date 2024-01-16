@@ -1158,13 +1158,12 @@ private:
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
     // Private implementation-detail constructor machinery.
-    // NOTE: apparently on Windows we need to re-iterate
-    // here that this is going to be dll-exported.
-    template <typename U>
-    void finalise_ctor_impl(const U &, std::vector<T>, std::optional<T>, std::optional<T>, bool, bool, std::vector<T>,
-                            std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);
-    template <typename U, typename... KwArgs>
-    void finalise_ctor(const U &sys, std::vector<T> state, KwArgs &&...kw_args)
+    void finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &, std::vector<T>, std::optional<T>,
+                            std::optional<T>, bool, bool, std::vector<T>, std::vector<t_event_t>,
+                            std::vector<nt_event_t>, bool, std::optional<long long>);
+    template <typename... KwArgs>
+    void finalise_ctor(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
+                       KwArgs &&...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -1353,10 +1352,7 @@ public:
 // NOLINTBEGIN
 #define HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(F)                                                                          \
     extern template class detail::taylor_adaptive_base<F, taylor_adaptive<F>>;                                         \
-    extern template class taylor_adaptive<F>;                                                                          \
-    extern template void taylor_adaptive<F>::finalise_ctor_impl(                                                       \
-        const std::vector<std::pair<expression, expression>> &, std::vector<F>, std::optional<F>, std::optional<F>,    \
-        bool, bool, std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);
+    extern template class taylor_adaptive<F>;
 // NOLINTEND
 
 HEYOKA_TAYLOR_ADAPTIVE_EXTERN_INST(float)
@@ -1664,11 +1660,12 @@ private:
     HEYOKA_DLL_LOCAL void step_impl(const std::vector<T> &, bool);
 
     // Private implementation-detail constructor machinery.
-    template <typename U>
-    void finalise_ctor_impl(const U &, std::vector<T>, std::uint32_t, std::vector<T>, std::optional<T>, bool, bool,
-                            std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
-    template <typename U, typename... KwArgs>
-    void finalise_ctor(const U &sys, std::vector<T> state, std::uint32_t batch_size, KwArgs &&...kw_args)
+    void finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &, std::vector<T>, std::uint32_t,
+                            std::vector<T>, std::optional<T>, bool, bool, std::vector<T>, std::vector<t_event_t>,
+                            std::vector<nt_event_t>, bool);
+    template <typename... KwArgs>
+    void finalise_ctor(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
+                       std::uint32_t batch_size, KwArgs &&...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -1871,11 +1868,7 @@ public:
 };
 
 // Prevent implicit instantiations.
-#define HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(F)                                                                    \
-    extern template class taylor_adaptive_batch<F>;                                                                    \
-    extern template void taylor_adaptive_batch<F>::finalise_ctor_impl(                                                 \
-        const std::vector<std::pair<expression, expression>> &, std::vector<F>, std::uint32_t, std::vector<F>,         \
-        std::optional<F>, bool, bool, std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+#define HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(F) extern template class taylor_adaptive_batch<F>;
 
 HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(float)
 HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(double)
