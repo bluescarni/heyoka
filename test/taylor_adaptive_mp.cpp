@@ -68,7 +68,7 @@ TEST_CASE("ctors prec")
         // - tolerance and time are default constructed with the correct
         //   precision and values,
         // - pars are padded with the correct precision.
-        auto ta = taylor_adaptive<mppp::real>({x + par[0]}, {mppp::real{1, prec}}, kw::compact_mode = cm,
+        auto ta = taylor_adaptive<mppp::real>({{x, x + par[0]}}, {mppp::real{1, prec}}, kw::compact_mode = cm,
                                               kw::opt_level = 0u);
 
         REQUIRE(ta.get_prec() == prec);
@@ -86,42 +86,43 @@ TEST_CASE("ctors prec")
         REQUIRE(ta.get_last_h().get_prec() == prec);
 
         // Check that tolerance is autocast to the correct precision.
-        ta = taylor_adaptive<mppp::real>({x + par[0]}, {mppp::real{1, prec}}, kw::compact_mode = cm, kw::opt_level = 0u,
-                                         kw::tol = mppp::real(1e-1));
+        ta = taylor_adaptive<mppp::real>({{x, x + par[0]}}, {mppp::real{1, prec}}, kw::compact_mode = cm,
+                                         kw::opt_level = 0u, kw::tol = mppp::real(1e-1));
         REQUIRE(ta.get_tol() == mppp::real(1e-1, prec));
         REQUIRE(ta.get_tol().get_prec() == prec);
 
         // Check with explicit time.
-        ta = taylor_adaptive<mppp::real>({x + par[0]}, {mppp::real{1, prec}}, kw::compact_mode = cm, kw::opt_level = 0u,
-                                         kw::time = mppp::real(1, prec));
+        ta = taylor_adaptive<mppp::real>({{x, x + par[0]}}, {mppp::real{1, prec}}, kw::compact_mode = cm,
+                                         kw::opt_level = 0u, kw::time = mppp::real(1, prec));
         REQUIRE(ta.get_time() == 1);
         REQUIRE(ta.get_time().get_prec() == prec);
 
         // Check wrong time prec is automatically corrected.
-        ta = taylor_adaptive<mppp::real>({x + par[0]}, {mppp::real{1, prec}}, kw::compact_mode = cm, kw::opt_level = 0u,
-                                         kw::time = mppp::real{0, prec + 1});
+        ta = taylor_adaptive<mppp::real>({{x, x + par[0]}}, {mppp::real{1, prec}}, kw::compact_mode = cm,
+                                         kw::opt_level = 0u, kw::time = mppp::real{0, prec + 1});
         REQUIRE(ta.get_dtime().first.get_prec() == prec);
         REQUIRE(ta.get_dtime().second.get_prec() == prec);
 
         // Wrong precision in the state vector with automatic deduction.
         REQUIRE_THROWS_MATCHES(
-            taylor_adaptive<mppp::real>({x + par[0], y + par[1]}, {mppp::real{1, prec}, mppp::real{1, prec + 1}},
-                                        kw::compact_mode = cm, kw::opt_level = 0u),
+            taylor_adaptive<mppp::real>({{x, x + par[0]}, {y, y + par[1]}},
+                                        {mppp::real{1, prec}, mppp::real{1, prec + 1}}, kw::compact_mode = cm,
+                                        kw::opt_level = 0u),
             std::invalid_argument,
             Message("The precision deduced automatically from the initial state vector in a multiprecision "
                     "adaptive Taylor integrator is 30, but values with different precision(s) were "
                     "detected in the state vector"));
 
         // Check that wrong precision in the pars if automatically corrected.
-        ta = taylor_adaptive<mppp::real>({x + par[0], y + par[1]}, {mppp::real{1, prec}, mppp::real{1, prec}},
+        ta = taylor_adaptive<mppp::real>({{x, x + par[0]}, {y, y + par[1]}}, {mppp::real{1, prec}, mppp::real{1, prec}},
                                          kw::compact_mode = cm, kw::opt_level = 0u,
                                          kw::pars = {mppp::real{1, prec}, mppp::real{1, prec + 1}});
         REQUIRE(std::all_of(ta.get_pars().begin(), ta.get_pars().end(),
                             [prec](const auto &val) { return val.get_prec() == prec; }));
 
         // Checks with precision provided explicitly by the user.
-        ta = taylor_adaptive<mppp::real>({x + par[0]}, {mppp::real{1, prec}}, kw::compact_mode = cm, kw::opt_level = 0u,
-                                         kw::prec = prec + 1);
+        ta = taylor_adaptive<mppp::real>({{x, x + par[0]}}, {mppp::real{1, prec}}, kw::compact_mode = cm,
+                                         kw::opt_level = 0u, kw::prec = prec + 1);
 
         // Check that time and state are automatically adjusted.
         REQUIRE(ta.get_dtime().first.get_prec() == prec + 1);
@@ -132,8 +133,9 @@ TEST_CASE("ctors prec")
                             [prec](const auto &val) { return val.get_prec() == prec + 1; }));
 
         // Check that it does not matter if the state vector has different precisions.
-        ta = taylor_adaptive<mppp::real>({x + par[0], y + par[1]}, {mppp::real{1, prec}, mppp::real{1, prec - 1}},
-                                         kw::compact_mode = cm, kw::opt_level = 0u, kw::prec = prec + 1);
+        ta = taylor_adaptive<mppp::real>({{x, x + par[0]}, {y, y + par[1]}},
+                                         {mppp::real{1, prec}, mppp::real{1, prec - 1}}, kw::compact_mode = cm,
+                                         kw::opt_level = 0u, kw::prec = prec + 1);
         REQUIRE(ta.get_dtime().first.get_prec() == prec + 1);
         REQUIRE(ta.get_dtime().second.get_prec() == prec + 1);
         REQUIRE(std::all_of(ta.get_state().begin(), ta.get_state().end(),
@@ -142,10 +144,10 @@ TEST_CASE("ctors prec")
                             [prec](const auto &val) { return val.get_prec() == prec + 1; }));
 
         // Try with several different precisions for the data.
-        ta = taylor_adaptive<mppp::real>({x + par[0], y + par[1]}, {mppp::real{1, prec}, mppp::real{1, prec - 1}},
-                                         kw::compact_mode = cm, kw::opt_level = 0u, kw::prec = prec + 1,
-                                         kw::pars = {mppp::real{-1, prec - 2}}, kw::time = mppp::real{0, prec + 3},
-                                         kw::tol = mppp::real{1e-1, prec + 4});
+        ta = taylor_adaptive<mppp::real>({{x, x + par[0]}, {y, y + par[1]}},
+                                         {mppp::real{1, prec}, mppp::real{1, prec - 1}}, kw::compact_mode = cm,
+                                         kw::opt_level = 0u, kw::prec = prec + 1, kw::pars = {mppp::real{-1, prec - 2}},
+                                         kw::time = mppp::real{0, prec + 3}, kw::tol = mppp::real{1e-1, prec + 4});
         REQUIRE(ta.get_tol().get_prec() == prec + 1);
         REQUIRE(ta.get_dtime().first.get_prec() == prec + 1);
         REQUIRE(ta.get_dtime().second.get_prec() == prec + 1);
@@ -155,21 +157,21 @@ TEST_CASE("ctors prec")
                             [prec](const auto &val) { return val.get_prec() == prec + 1; }));
 
         // Try with bogus precision values.
-        REQUIRE_THROWS_AS(taylor_adaptive<mppp::real>({x + par[0], y + par[1]},
+        REQUIRE_THROWS_AS(taylor_adaptive<mppp::real>({{x, x + par[0]}, {y, y + par[1]}},
                                                       {mppp::real{1, prec}, mppp::real{1, prec - 1}},
                                                       kw::compact_mode = cm, kw::opt_level = 0u, kw::prec = -1),
                           std::invalid_argument);
         REQUIRE_THROWS_AS(taylor_adaptive<mppp::real>(
-                              {x + par[0], y + par[1]}, {mppp::real{1, prec}, mppp::real{1, prec - 1}},
+                              {{x, x + par[0]}, {y, y + par[1]}}, {mppp::real{1, prec}, mppp::real{1, prec - 1}},
                               kw::compact_mode = cm, kw::opt_level = 0u, kw::prec = mppp::real_prec_max() + 1),
                           std::invalid_argument);
         REQUIRE_THROWS_AS(taylor_adaptive<mppp::real>(
-                              {x + par[0], y + par[1]}, {mppp::real{1, prec}, mppp::real{1, prec - 1}},
+                              {{x, x + par[0]}, {y, y + par[1]}}, {mppp::real{1, prec}, mppp::real{1, prec - 1}},
                               kw::compact_mode = cm, kw::opt_level = 0u, kw::prec = mppp::real_prec_min() - 1),
                           std::invalid_argument);
 
         // Check that kw::prec = 0 is the same as undefined.
-        ta = taylor_adaptive<mppp::real>({x + par[0]}, {mppp::real{1, prec + 1}}, kw::compact_mode = cm,
+        ta = taylor_adaptive<mppp::real>({{x, x + par[0]}}, {mppp::real{1, prec + 1}}, kw::compact_mode = cm,
                                          kw::opt_level = 0u, kw::prec = 0);
         REQUIRE(ta.get_prec() == prec + 1);
         REQUIRE(ta.get_time() == 0);

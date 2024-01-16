@@ -114,8 +114,18 @@ TEST_CASE("two body")
         std::vector<fp_t> init_state{c_v[0], -c_v[0], c_v[1], -c_v[1], c_v[2], -c_v[2],
                                      c_x[0], -c_x[0], c_x[1], -c_x[1], c_x[2], -c_x[2]};
 
-        taylor_adaptive<fp_t> tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
-                                   -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
+        taylor_adaptive<fp_t> tad{{{vx0, x01 * r01_m3},
+                                   {vx1, -x01 * r01_m3},
+                                   {vy0, y01 * r01_m3},
+                                   {vy1, -y01 * r01_m3},
+                                   {vz0, z01 * r01_m3},
+                                   {vz1, -z01 * r01_m3},
+                                   {x0, vx0},
+                                   {x1, vx1},
+                                   {y0, vy0},
+                                   {y1, vy1},
+                                   {z0, vz0},
+                                   {z1, vz1}},
                                   std::move(init_state),
                                   kw::opt_level = opt_level,
                                   kw::high_accuracy = high_accuracy,
@@ -198,9 +208,19 @@ TEST_CASE("two uniform spheres")
 
     std::vector<double> init_state{0.593, -0.593, 0, 0, 0, 0, -1.000001, 1.000001, -1, 1, 0, 0};
 
-    taylor_adaptive<double> tad{
-        {x01 * fac, -x01 * fac, y01 * fac, -y01 * fac, z01 * fac, -z01 * fac, vx0, vx1, vy0, vy1, vz0, vz1},
-        std::move(init_state)};
+    taylor_adaptive<double> tad{{{vx0, x01 * fac},
+                                 {vx1, -x01 * fac},
+                                 {vy0, y01 * fac},
+                                 {vy1, -y01 * fac},
+                                 {vz0, z01 * fac},
+                                 {vz1, -z01 * fac},
+                                 {x0, vx0},
+                                 {x1, vx1},
+                                 {y0, vy0},
+                                 {y1, vy1},
+                                 {z0, vz0},
+                                 {z1, vz1}},
+                                std::move(init_state)};
 
     const auto &st = tad.get_state();
 
@@ -235,14 +255,34 @@ TEST_CASE("mixed tb/spheres")
     std::vector<double> init_state{0.593, -0.593, 0, 0, 0, 0, -1.000001, 1.000001, -1, 1, 0, 0};
 
     // 2BP integrator.
-    taylor_adaptive<double> t_2bp{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
-                                   -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
+    taylor_adaptive<double> t_2bp{{{vx0, x01 * r01_m3},
+                                   {vx1, -x01 * r01_m3},
+                                   {vy0, y01 * r01_m3},
+                                   {vy1, -y01 * r01_m3},
+                                   {vz0, z01 * r01_m3},
+                                   {vz1, -z01 * r01_m3},
+                                   {x0, vx0},
+                                   {x1, vx1},
+                                   {y0, vy0},
+                                   {y1, vy1},
+                                   {z0, vz0},
+                                   {z1, vz1}},
                                   init_state};
 
     // 2US integrator.
-    taylor_adaptive<double> t_2us{
-        {x01 * fac, -x01 * fac, y01 * fac, -y01 * fac, z01 * fac, -z01 * fac, vx0, vx1, vy0, vy1, vz0, vz1},
-        std::move(init_state)};
+    taylor_adaptive<double> t_2us{{{vx0, x01 * fac},
+                                   {vx1, -x01 * fac},
+                                   {vy0, y01 * fac},
+                                   {vy1, -y01 * fac},
+                                   {vz0, z01 * fac},
+                                   {vz1, -z01 * fac},
+                                   {x0, vx0},
+                                   {x1, vx1},
+                                   {y0, vy0},
+                                   {y1, vy1},
+                                   {z0, vz0},
+                                   {z1, vz1}},
+                                  std::move(init_state)};
 
     // Helper to compute the distance**2 between
     // the sphere's centres given a state vector.

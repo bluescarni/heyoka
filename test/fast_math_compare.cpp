@@ -57,12 +57,32 @@ TEST_CASE("two body fast math comparison")
     auto init_state = std::vector{c_v[0], -c_v[0], c_v[1], -c_v[1], c_v[2], -c_v[2],
                                   c_x[0], -c_x[0], c_x[1], -c_x[1], c_x[2], -c_x[2]};
 
-    taylor_adaptive<double> ta_fm{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
-                                   -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
+    taylor_adaptive<double> ta_fm{{{vx0, x01 * r01_m3},
+                                   {vx1, -x01 * r01_m3},
+                                   {vy0, y01 * r01_m3},
+                                   {vy1, -y01 * r01_m3},
+                                   {vz0, z01 * r01_m3},
+                                   {vz1, -z01 * r01_m3},
+                                   {x0, vx0},
+                                   {x1, vx1},
+                                   {y0, vy0},
+                                   {y1, vy1},
+                                   {z0, vz0},
+                                   {z1, vz1}},
                                   init_state};
 
-    taylor_adaptive<double> ta_no_fm{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
-                                      -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
+    taylor_adaptive<double> ta_no_fm{{{vx0, x01 * r01_m3},
+                                      {vx1, -x01 * r01_m3},
+                                      {vy0, y01 * r01_m3},
+                                      {vy1, -y01 * r01_m3},
+                                      {vz0, z01 * r01_m3},
+                                      {vz1, -z01 * r01_m3},
+                                      {x0, vx0},
+                                      {x1, vx1},
+                                      {y0, vy0},
+                                      {y1, vy1},
+                                      {z0, vz0},
+                                      {z1, vz1}},
                                      std::move(init_state),
                                      kw::fast_math = false};
 
