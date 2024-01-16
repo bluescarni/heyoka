@@ -138,7 +138,7 @@ HEYOKA_DLL_PUBLIC expression operator""_ldbl(unsigned long long);
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <char... Chars>
-inline expression operator""_f128()
+expression operator""_f128()
 {
     return expression{mppp::literals::operator""_rq < Chars... > ()};
 }

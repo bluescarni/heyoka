@@ -21,13 +21,13 @@ if a single argument is passed in input. This means that code such as
 
 .. code-block:: c++
 
-    auto [x] = make_vars("x")
+    auto [x] = make_vars("x");
 
 needs to be rewritten like this:
 
 .. code-block:: c++
 
-    auto x = make_vars("x")
+    auto x = make_vars("x");
 
 Terminal events callbacks
 ^^^^^^^^^^^^^^^^^^^^^^^^^

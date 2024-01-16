@@ -10,6 +10,8 @@ The :cpp:class:`expression` class
 
 .. cpp:class:: expression
 
+   .. cpp:type:: value_type = std::variant<number, variable, func, param>
+
 Functions
 ---------
 
@@ -30,3 +32,28 @@ Functions
    :return: one or more expressions constructed from *str* and *strs*.
 
    :exception: any exception thrown by constructing ``std::string`` objects.
+
+   Example
+   ~~~~~~~
+
+   .. code-block:: c++
+
+      auto x = make_vars("x");
+      auto [y, z] = make_vars("y", "z");
+
+User-defined literals
+---------------------
+
+.. cpp:function:: expression literals::operator""_flt(long double)
+
+.. cpp:function:: expression literals::operator""_flt(unsigned long long)
+
+.. cpp:function:: expression literals::operator""_dbl(long double)
+
+.. cpp:function:: expression literals::operator""_dbl(unsigned long long)
+
+.. cpp:function:: expression literals::operator""_ldbl(long double)
+
+.. cpp:function:: expression literals::operator""_ldbl(unsigned long long)
+
+.. cpp:function:: template <char... Chars> expression literals::operator""_f128()
