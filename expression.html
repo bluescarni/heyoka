@@ -397,11 +397,24 @@ document.write(`
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-expression-class">The <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">expression</span></code> class</a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expressionE"><code class="docutils literal notranslate"><span class="pre">expression</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expressionE"><code class="docutils literal notranslate"><span class="pre">expression</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10value_typeE"><code class="docutils literal notranslate"><span class="pre">expression::value_type</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#functions">Functions</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args"><code class="docutils literal notranslate"><span class="pre">make_vars()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#user-defined-literals">User-defined literals</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_fltEe"><code class="docutils literal notranslate"><span class="pre">operator""_flt()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_fltEy"><code class="docutils literal notranslate"><span class="pre">operator""_flt()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_dblEe"><code class="docutils literal notranslate"><span class="pre">operator""_dbl()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_dblEy"><code class="docutils literal notranslate"><span class="pre">operator""_dbl()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli5_ldblEe"><code class="docutils literal notranslate"><span class="pre">operator""_ldbl()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli5_ldblEy"><code class="docutils literal notranslate"><span class="pre">operator""_ldbl()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I_DpcEN6heyoka8literalsli5_f128E10expressionv"><code class="docutils literal notranslate"><span class="pre">operator""_f128()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -423,7 +436,12 @@ document.write(`
 <dl class="cpp class">
 <dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expressionE">
 <span id="_CPPv3N6heyoka10expressionE"></span><span id="_CPPv2N6heyoka10expressionE"></span><span id="heyoka::expression"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">expression</span></span></span><a class="headerlink" href="#_CPPv4N6heyoka10expressionE" title="Link to this definition">#</a><br /></dt>
+<dd><dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expression10value_typeE">
+<span id="_CPPv3N6heyoka10expression10value_typeE"></span><span id="_CPPv2N6heyoka10expression10value_typeE"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">value_type</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">variant</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="number.html#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="variable.html#_CPPv4N6heyoka8variableE" title="heyoka::variable"><span class="n"><span class="pre">variable</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="func.html#_CPPv4N6heyoka4funcE" title="heyoka::func"><span class="n"><span class="pre">func</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="param.html#_CPPv4N6heyoka5paramE" title="heyoka::param"><span class="n"><span class="pre">param</span></span></a><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4N6heyoka10expression10value_typeE" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
+
+</dd></dl>
 
 </section>
 <section id="functions">
@@ -431,8 +449,9 @@ document.write(`
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args">
 <span id="_CPPv3I0DpEN6heyoka9make_varsERK4Arg0DpRK4Args"></span><span id="_CPPv2I0DpEN6heyoka9make_varsERK4Arg0DpRK4Args"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Arg0</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="sig-name descname"><span class="n"><span class="pre">Args</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="kt"><span class="pre">auto</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">make_vars</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args" title="heyoka::make_vars::Arg0"><span class="n"><span class="pre">Arg0</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">str</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args" title="heyoka::make_vars::Args"><span class="n"><span class="pre">Args</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">strs</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args" title="Link to this definition">#</a><br /></dt>
-<dd><p>Create expressions from strings.</p>
-<p>This function will return one or more <a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">expression</span></code></a> instances constructed from the input arguments.
+<dd><p>Create variable expressions from strings.</p>
+<p>This function will return one or more <a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">expression</span></code></a> instances
+containing <a class="reference internal" href="variable.html#_CPPv4N6heyoka8variableE" title="heyoka::variable"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">variables</span></code></a> constructed from the input arguments.
 If a single argument is supplied, a single expression is returned. Otherwise, a <code class="docutils literal notranslate"><span class="pre">std::array</span></code> of
 expressions (one for each argument) is returned.</p>
 <p>This function is enabled only if all input arguments are convertible to <code class="docutils literal notranslate"><span class="pre">std::string</span></code>.</p>
@@ -450,7 +469,52 @@ expressions (one for each argument) is returned.</p>
 <dd class="field-odd"><p>any exception thrown by constructing <code class="docutils literal notranslate"><span class="pre">std::string</span></code> objects.</p>
 </dd>
 </dl>
+<section id="example">
+<h3>Example<a class="headerlink" href="#example" title="Link to this heading">#</a></h3>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">);</span>
+<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">y</span><span class="p">,</span><span class="w"> </span><span class="n">z</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;y&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;z&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
 </dd></dl>
+
+</section>
+<section id="user-defined-literals">
+<h2>User-defined literals<a class="headerlink" href="#user-defined-literals" title="Link to this heading">#</a></h2>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka8literalsli4_fltEe">
+<span id="_CPPv3N6heyoka8literalsli4_fltEe"></span><span id="_CPPv2N6heyoka8literalsli4_fltEe"></span><a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><span class="n"><span class="pre">expression</span></span></a><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">literals</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="s"><span class="pre">&quot;&quot;</span></span><span class="n"><span class="pre">_flt</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">long</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka8literalsli4_fltEe" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka8literalsli4_fltEy">
+<span id="_CPPv3N6heyoka8literalsli4_fltEy"></span><span id="_CPPv2N6heyoka8literalsli4_fltEy"></span><a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><span class="n"><span class="pre">expression</span></span></a><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">literals</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="s"><span class="pre">&quot;&quot;</span></span><span class="n"><span class="pre">_flt</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">unsigned</span></span><span class="w"> </span><span class="kt"><span class="pre">long</span></span><span class="w"> </span><span class="kt"><span class="pre">long</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka8literalsli4_fltEy" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka8literalsli4_dblEe">
+<span id="_CPPv3N6heyoka8literalsli4_dblEe"></span><span id="_CPPv2N6heyoka8literalsli4_dblEe"></span><a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><span class="n"><span class="pre">expression</span></span></a><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">literals</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="s"><span class="pre">&quot;&quot;</span></span><span class="n"><span class="pre">_dbl</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">long</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka8literalsli4_dblEe" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka8literalsli4_dblEy">
+<span id="_CPPv3N6heyoka8literalsli4_dblEy"></span><span id="_CPPv2N6heyoka8literalsli4_dblEy"></span><a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><span class="n"><span class="pre">expression</span></span></a><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">literals</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="s"><span class="pre">&quot;&quot;</span></span><span class="n"><span class="pre">_dbl</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">unsigned</span></span><span class="w"> </span><span class="kt"><span class="pre">long</span></span><span class="w"> </span><span class="kt"><span class="pre">long</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka8literalsli4_dblEy" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka8literalsli5_ldblEe">
+<span id="_CPPv3N6heyoka8literalsli5_ldblEe"></span><span id="_CPPv2N6heyoka8literalsli5_ldblEe"></span><a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><span class="n"><span class="pre">expression</span></span></a><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">literals</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="s"><span class="pre">&quot;&quot;</span></span><span class="n"><span class="pre">_ldbl</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">long</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka8literalsli5_ldblEe" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka8literalsli5_ldblEy">
+<span id="_CPPv3N6heyoka8literalsli5_ldblEy"></span><span id="_CPPv2N6heyoka8literalsli5_ldblEy"></span><a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><span class="n"><span class="pre">expression</span></span></a><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">literals</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="s"><span class="pre">&quot;&quot;</span></span><span class="n"><span class="pre">_ldbl</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">unsigned</span></span><span class="w"> </span><span class="kt"><span class="pre">long</span></span><span class="w"> </span><span class="kt"><span class="pre">long</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka8literalsli5_ldblEy" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4I_DpcEN6heyoka8literalsli5_f128E10expressionv">
+<span id="_CPPv3I_DpcEN6heyoka8literalsli5_f128Ev"></span><span id="_CPPv2I_DpcEN6heyoka8literalsli5_f128Ev"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">char</span></span><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Chars</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><span class="n"><span class="pre">expression</span></span></a><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">literals</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="s"><span class="pre">&quot;&quot;</span></span><span class="n"><span class="pre">_f128</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4I_DpcEN6heyoka8literalsli5_f128E10expressionv" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
 
 </section>
 </section>
@@ -501,11 +565,24 @@ expressions (one for each argument) is returned.</p>
   <nav class="bd-toc-nav page-toc">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-expression-class">The <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">expression</span></code> class</a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expressionE"><code class="docutils literal notranslate"><span class="pre">expression</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expressionE"><code class="docutils literal notranslate"><span class="pre">expression</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10value_typeE"><code class="docutils literal notranslate"><span class="pre">expression::value_type</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#functions">Functions</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args"><code class="docutils literal notranslate"><span class="pre">make_vars()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#user-defined-literals">User-defined literals</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_fltEe"><code class="docutils literal notranslate"><span class="pre">operator""_flt()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_fltEy"><code class="docutils literal notranslate"><span class="pre">operator""_flt()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_dblEe"><code class="docutils literal notranslate"><span class="pre">operator""_dbl()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_dblEy"><code class="docutils literal notranslate"><span class="pre">operator""_dbl()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli5_ldblEe"><code class="docutils literal notranslate"><span class="pre">operator""_ldbl()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli5_ldblEy"><code class="docutils literal notranslate"><span class="pre">operator""_ldbl()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I_DpcEN6heyoka8literalsli5_f128E10expressionv"><code class="docutils literal notranslate"><span class="pre">operator""_f128()</span></code></a></li>
 </ul>
 </li>
 </ul>

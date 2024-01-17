@@ -403,7 +403,7 @@ document.write(`
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#changes-to-make-vars">Changes to <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">make_vars()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#terminal-events-callbacks">Terminal events callbacks</a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#step-callbacks-and-propagate">Step callbacks and <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code></a></li>
-<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#propagate-grid"><code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#changes-to-propagate-grid">Changes to <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code></a></li>
 </ul>
 </li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#general">General</a></li>
@@ -437,11 +437,11 @@ document.write(`
 <h4>Changes to <a class="reference internal" href="expression.html#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args" title="heyoka::make_vars"><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">make_vars()</span></code></a><a class="headerlink" href="#changes-to-make-vars" title="Link to this heading">#</a></h4>
 <p>The <a class="reference internal" href="expression.html#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args" title="heyoka::make_vars"><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">make_vars()</span></code></a> function now returns a single expression (rather than an array of expressions)
 if a single argument is passed in input. This means that code such as</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">)</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">);</span>
 </pre></div>
 </div>
 <p>needs to be rewritten like this:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">)</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">);</span>
 </pre></div>
 </div>
 </section>
@@ -482,8 +482,8 @@ of scalar propagations,</p></li>
 rather than a single value.</p></li>
 </ul>
 </section>
-<section id="propagate-grid">
-<h4><code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code><a class="headerlink" href="#propagate-grid" title="Link to this heading">#</a></h4>
+<section id="changes-to-propagate-grid">
+<h4>Changes to <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code><a class="headerlink" href="#changes-to-propagate-grid" title="Link to this heading">#</a></h4>
 <p>The <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> functions of the adaptive integrators now require the first element of the
 time grid to be equal to the current integrator time. Previously, in case of a difference between the
 integrator time and the first grid point, heyoka would propagate the state of the system up to the
@@ -629,7 +629,7 @@ time, and its value will be -1 for negative derivative,
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#changes-to-make-vars">Changes to <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">make_vars()</span></code></a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#terminal-events-callbacks">Terminal events callbacks</a></li>
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#step-callbacks-and-propagate">Step callbacks and <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code></a></li>
-<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#propagate-grid"><code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#changes-to-propagate-grid">Changes to <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code></a></li>
 </ul>
 </li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#general">General</a></li>

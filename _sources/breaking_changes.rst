@@ -21,13 +21,13 @@ if a single argument is passed in input. This means that code such as
 
 .. code-block:: c++
 
-    auto [x] = make_vars("x")
+    auto [x] = make_vars("x");
 
 needs to be rewritten like this:
 
 .. code-block:: c++
 
-    auto x = make_vars("x")
+    auto x = make_vars("x");
 
 Terminal events callbacks
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -67,8 +67,8 @@ a matter of:
 - accounting for the fact that batch propagations now return a tuple of two elements
   rather than a single value.
 
-``propagate_grid()``
-^^^^^^^^^^^^^^^^^^^^
+Changes to ``propagate_grid()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ``propagate_grid()`` functions of the adaptive integrators now require the first element of the
 time grid to be equal to the current integrator time. Previously, in case of a difference between the

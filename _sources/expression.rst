@@ -10,14 +10,17 @@ The :cpp:class:`expression` class
 
 .. cpp:class:: expression
 
+   .. cpp:type:: value_type = std::variant<number, variable, func, param>
+
 Functions
 ---------
 
 .. cpp:function:: template <typename Arg0, typename... Args> auto make_vars(const Arg0 &str, const Args &...strs)
 
-   Create expressions from strings.
+   Create variable expressions from strings.
 
-   This function will return one or more :cpp:class:`expression` instances constructed from the input arguments.
+   This function will return one or more :cpp:class:`expression` instances
+   containing :cpp:class:`variables <variable>` constructed from the input arguments.
    If a single argument is supplied, a single expression is returned. Otherwise, a ``std::array`` of
    expressions (one for each argument) is returned.
 
@@ -29,3 +32,28 @@ Functions
    :return: one or more expressions constructed from *str* and *strs*.
 
    :exception: any exception thrown by constructing ``std::string`` objects.
+
+   Example
+   ~~~~~~~
+
+   .. code-block:: c++
+
+      auto x = make_vars("x");
+      auto [y, z] = make_vars("y", "z");
+
+User-defined literals
+---------------------
+
+.. cpp:function:: expression literals::operator""_flt(long double)
+
+.. cpp:function:: expression literals::operator""_flt(unsigned long long)
+
+.. cpp:function:: expression literals::operator""_dbl(long double)
+
+.. cpp:function:: expression literals::operator""_dbl(unsigned long long)
+
+.. cpp:function:: expression literals::operator""_ldbl(long double)
+
+.. cpp:function:: expression literals::operator""_ldbl(unsigned long long)
+
+.. cpp:function:: template <char... Chars> expression literals::operator""_f128()
