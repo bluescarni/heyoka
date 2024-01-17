@@ -55,7 +55,6 @@ IGOR_MAKE_NAMED_ARGUMENT(write_tc);
 IGOR_MAKE_NAMED_ARGUMENT(c_output);
 
 // Diff tensors API.
-IGOR_MAKE_NAMED_ARGUMENT(diff_args);
 IGOR_MAKE_NAMED_ARGUMENT(diff_order);
 
 // Used in several APIs.

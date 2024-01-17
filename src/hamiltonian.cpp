@@ -122,7 +122,7 @@ std::vector<std::pair<expression, expression>> hamiltonian(const expression &H, 
 
     // Compute the tensor of derivatives of H up to order 1 wrt
     // qs and ps.
-    const auto H_dt = diff_tensors({H}, kw::diff_args = diff_args, kw::diff_order = 1);
+    const auto H_dt = diff_tensors({H}, diff_args, kw::diff_order = 1);
 
     // Fetch the gradient.
     auto grad = H_dt.get_gradient();

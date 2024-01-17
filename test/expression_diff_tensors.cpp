@@ -75,10 +75,10 @@ TEST_CASE("diff_tensors basic")
     auto [x, y] = make_vars("x", "y");
 
     // Let's begin with some trivial expressions.
-    REQUIRE_THROWS_MATCHES(diff_tensors({1_dbl}, kw::diff_order = 0), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(diff_tensors({1_dbl}, diff_args::vars, kw::diff_order = 0), std::invalid_argument,
                            Message("Cannot compute derivatives with respect to an empty set of arguments"));
 
-    auto dt = diff_tensors({1_dbl}, kw::diff_order = 0, kw::diff_args = {x});
+    auto dt = diff_tensors({1_dbl}, {x}, kw::diff_order = 0);
 
     std::ostringstream oss;
     oss << dt;
@@ -100,7 +100,7 @@ TEST_CASE("diff_tensors basic")
         (dt[{0, 2}]), std::out_of_range,
         Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{0, 2})));
 
-    dt = diff_tensors({1_dbl}, kw::diff_order = 1, kw::diff_args = {par[0]});
+    dt = diff_tensors({1_dbl}, {par[0]}, kw::diff_order = 1);
 
     std::vector<expression> diff_vec;
 
@@ -130,7 +130,7 @@ TEST_CASE("diff_tensors basic")
         (dt[{0, 2}]), std::out_of_range,
         Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{0, 2})));
 
-    dt = diff_tensors({1_dbl}, kw::diff_order = 2, kw::diff_args = {par[0]});
+    dt = diff_tensors({1_dbl}, {par[0]}, kw::diff_order = 2);
     REQUIRE(dt.get_nvars() == 1u);
     REQUIRE(dt.size() == 3u);
     assign_sr(dt.get_derivatives(0, 0));
@@ -153,7 +153,7 @@ TEST_CASE("diff_tensors basic")
         (dt[{0, 3}]), std::out_of_range,
         Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{0, 3})));
 
-    dt = diff_tensors({1_dbl}, kw::diff_order = 3, kw::diff_args = {par[0]});
+    dt = diff_tensors({1_dbl}, {par[0]}, kw::diff_order = 3);
     REQUIRE(dt.get_nvars() == 1u);
     REQUIRE(dt.size() == 4u);
     assign_sr(dt.get_derivatives(0, 0));
@@ -181,7 +181,7 @@ TEST_CASE("diff_tensors basic")
         Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{0, 4})));
 
     // Automatically deduced diff variables.
-    dt = diff_tensors({x + y, x * y * y}, kw::diff_order = 2);
+    dt = diff_tensors({x + y, x * y * y}, diff_args::vars, kw::diff_order = 2);
     REQUIRE(dt.get_nvars() == 2u);
     REQUIRE(dt.size() == 12u);
     assign_sr(dt.get_derivatives(0));
@@ -192,7 +192,7 @@ TEST_CASE("diff_tensors basic")
     REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * x});
 
     // Diff wrt all variables.
-    dt = diff_tensors({x + y, x * y * y}, kw::diff_order = 2, kw::diff_args = diff_args::vars);
+    dt = diff_tensors({x + y, x * y * y}, diff_args::vars, kw::diff_order = 2);
     REQUIRE(dt.get_nvars() == 2u);
     REQUIRE(dt.size() == 12u);
     assign_sr(dt.get_derivatives(0));
@@ -203,7 +203,7 @@ TEST_CASE("diff_tensors basic")
     REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * x});
 
     // Diff wrt some variables.
-    dt = diff_tensors({x + y, x * y * y}, kw::diff_order = 2, kw::diff_args = {x});
+    dt = diff_tensors({x + y, x * y * y}, {x}, kw::diff_order = 2);
     REQUIRE(dt.get_nvars() == 1u);
     REQUIRE(dt.size() == 6u);
     assign_sr(dt.get_derivatives(0));
@@ -214,7 +214,7 @@ TEST_CASE("diff_tensors basic")
     REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, 0_dbl});
 
     // Diff wrt all params.
-    dt = diff_tensors({par[0] + y, x * y * par[1]}, kw::diff_order = 2, kw::diff_args = diff_args::params);
+    dt = diff_tensors({par[0] + y, x * y * par[1]}, diff_args::params, kw::diff_order = 2);
     REQUIRE(dt.get_nvars() == 2u);
     REQUIRE(dt.size() == 12u);
     assign_sr(dt.get_derivatives(0));
@@ -225,7 +225,7 @@ TEST_CASE("diff_tensors basic")
     REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl});
 
     // Diff wrt some param.
-    dt = diff_tensors({par[0] + y, x * y * par[1]}, kw::diff_order = 2, kw::diff_args = {par[1]});
+    dt = diff_tensors({par[0] + y, x * y * par[1]}, {par[1]}, kw::diff_order = 2);
     REQUIRE(dt.get_nvars() == 1u);
     REQUIRE(dt.size() == 6u);
     assign_sr(dt.get_derivatives(0));
@@ -236,20 +236,19 @@ TEST_CASE("diff_tensors basic")
     REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl});
 
     // Error modes.
-    REQUIRE_THROWS_MATCHES(diff_tensors({1_dbl}, kw::diff_order = 1, kw::diff_args = {x + y}), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(diff_tensors({1_dbl}, {x + y}, kw::diff_order = 1), std::invalid_argument,
                            Message("Derivatives can be computed only with respect to variables and/or parameters"));
     REQUIRE_THROWS_MATCHES(
-        diff_tensors({1_dbl}, kw::diff_order = 1, kw::diff_args = {x, x}), std::invalid_argument,
+        diff_tensors({1_dbl}, {x, x}, kw::diff_order = 1), std::invalid_argument,
         Message("Duplicate entries detected in the list of variables/parameters with respect to which the "
                 "derivatives are to be computed: [x, x]"));
-    REQUIRE_THROWS_MATCHES(diff_tensors({1_dbl}, kw::diff_order = 1, kw::diff_args = diff_args{100}),
+    REQUIRE_THROWS_MATCHES(diff_tensors({1_dbl}, diff_args{100}, kw::diff_order = 1), std::invalid_argument,
+                           Message("An invalid diff_args enumerator was passed to diff_tensors()"));
+    REQUIRE_THROWS_MATCHES(diff_tensors({}, {x}), std::invalid_argument,
+                           Message("Cannot compute the derivatives of a function with zero components"));
+    REQUIRE_THROWS_MATCHES(diff_tensors({par[0] + y, x * y * par[1]}, diff_args{-1}, kw::diff_order = 2),
                            std::invalid_argument,
                            Message("An invalid diff_args enumerator was passed to diff_tensors()"));
-    REQUIRE_THROWS_MATCHES(diff_tensors({}), std::invalid_argument,
-                           Message("Cannot compute the derivatives of a function with zero components"));
-    REQUIRE_THROWS_MATCHES(
-        diff_tensors({par[0] + y, x * y * par[1]}, kw::diff_order = 2, kw::diff_args = diff_args{-1}),
-        std::invalid_argument, Message("An invalid diff_args enumerator was passed to diff_tensors()"));
 }
 
 // A few tests for the dtens API.
@@ -305,7 +304,7 @@ TEST_CASE("dtens basics")
 
     auto [x, y] = make_vars("x", "y");
 
-    auto dt2 = diff_tensors({x + y, x * y}, kw::diff_order = 1);
+    auto dt2 = diff_tensors({x + y, x * y}, diff_args::vars, kw::diff_order = 1);
 
     REQUIRE(dt2.get_order() == 1u);
     REQUIRE(dt2.get_nvars() == 2u);
@@ -399,7 +398,7 @@ TEST_CASE("fixed centres check")
         kw::masses = {1., 1., 1.},
         kw::positions = {par[0], par[1], par[2], par[3], par[4], par[5], par[6], par[7], par[8]});
 
-    const auto dt = diff_tensors({fc_energy, fc_pot}, kw::diff_order = 3, kw::diff_args = diff_args::all);
+    const auto dt = diff_tensors({fc_energy, fc_pot}, diff_args::all, kw::diff_order = 3);
 
     const auto vars = std::vector{"vx"_var, "vy"_var, "vz"_var, "x"_var, "y"_var, "z"_var};
 
@@ -500,7 +499,7 @@ TEST_CASE("speelpenning check")
         prod *= cur_var;
     }
 
-    const auto dt = diff_tensors({prod}, kw::diff_order = 3);
+    const auto dt = diff_tensors({prod}, diff_args::vars, kw::diff_order = 3);
 
     std::vector<expression> diff_vec;
 
@@ -611,7 +610,7 @@ TEST_CASE("speelpenning complexity")
         auto prod = heyoka::prod(vars);
 
         llvm_state s;
-        auto dt = diff_tensors({prod}, kw::diff_order = 1);
+        auto dt = diff_tensors({prod}, diff_args::vars, kw::diff_order = 1);
         auto sr = dt.get_derivatives(1);
         assign_sr(sr);
 
@@ -649,19 +648,19 @@ TEST_CASE("gradient")
     }
 
     {
-        auto dt = diff_tensors({x + y, x - y});
+        auto dt = diff_tensors({x + y, x - y}, diff_args::vars);
         REQUIRE_THROWS_MATCHES(dt.get_gradient(), std::invalid_argument,
                                Message("The gradient can be requested only for a function with a single "
                                        "output, but the number of outputs is instead 2"));
     }
 
     {
-        auto dt = diff_tensors({x + y}, kw::diff_order = 0u);
+        auto dt = diff_tensors({x + y}, diff_args::vars, kw::diff_order = 0u);
         REQUIRE_THROWS_MATCHES(dt.get_gradient(), std::invalid_argument,
                                Message("First-order derivatives are not available"));
     }
 
-    auto dt = diff_tensors({x + y}, kw::diff_order = 1u);
+    auto dt = diff_tensors({x + y}, diff_args::vars, kw::diff_order = 1u);
     auto grad = dt.get_gradient();
     REQUIRE(grad == std::vector{1_dbl, 1_dbl});
 }
@@ -681,25 +680,25 @@ TEST_CASE("jacobian")
     }
 
     {
-        auto dt = diff_tensors({x + y}, kw::diff_order = 0u);
+        auto dt = diff_tensors({x + y}, diff_args::vars, kw::diff_order = 0u);
         REQUIRE_THROWS_MATCHES(dt.get_jacobian(), std::invalid_argument,
                                Message("First-order derivatives are not available"));
     }
 
     {
-        auto dt = diff_tensors({x + y}, kw::diff_order = 1u);
+        auto dt = diff_tensors({x + y}, diff_args::vars, kw::diff_order = 1u);
         auto jac = dt.get_jacobian();
         REQUIRE(jac == std::vector{1_dbl, 1_dbl});
     }
 
     {
-        auto dt = diff_tensors({x + y, x - y}, kw::diff_order = 1u);
+        auto dt = diff_tensors({x + y, x - y}, diff_args::vars, kw::diff_order = 1u);
         auto jac = dt.get_jacobian();
         REQUIRE(jac == std::vector{1_dbl, 1_dbl, 1_dbl, -1_dbl});
     }
 
     {
-        auto dt = diff_tensors({x + y, x - y, -x - y}, kw::diff_order = 1u);
+        auto dt = diff_tensors({x + y, x - y, -x - y}, diff_args::vars, kw::diff_order = 1u);
         auto jac = dt.get_jacobian();
         REQUIRE(jac == std::vector{1_dbl, 1_dbl, 1_dbl, -1_dbl, -1_dbl, -1_dbl});
     }
@@ -716,6 +715,6 @@ TEST_CASE("nn test")
     auto ffnn = model::ffnn(kw::inputs = {x, y}, kw::nn_hidden = {nn_layer, nn_layer, nn_layer}, kw::n_out = 2,
                             kw::activations = {heyoka::tanh, heyoka::tanh, heyoka::tanh, heyoka::tanh});
 
-    auto dt = diff_tensors(ffnn, kw::diff_args = diff_args::params);
+    auto dt = diff_tensors(ffnn, diff_args::params);
     auto dNdtheta = dt.get_jacobian();
 }

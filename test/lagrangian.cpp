@@ -188,8 +188,8 @@ TEST_CASE("damped wheel")
                       std::back_inserter(yjs));
 
     // Compute the cartesian velocities as functions of the generalised coordinates/velocities.
-    auto v_jac_xjs = diff_tensors(xjs, kw::diff_args = qs).get_jacobian();
-    auto v_jac_yjs = diff_tensors(yjs, kw::diff_args = qs).get_jacobian();
+    auto v_jac_xjs = diff_tensors(xjs, qs).get_jacobian();
+    auto v_jac_yjs = diff_tensors(yjs, qs).get_jacobian();
     auto jac_xjs = xt::adapt(v_jac_xjs, {static_cast<int>(N), static_cast<int>(qs.size())});
     auto jac_yjs = xt::adapt(v_jac_yjs, {static_cast<int>(N), static_cast<int>(qs.size())});
 

@@ -54,6 +54,6 @@ int main(int argc, char *argv[])
     auto ffnn = model::ffnn(kw::inputs = {x, y}, kw::nn_hidden = {nn_layer, nn_layer, nn_layer}, kw::n_out = 2,
                             kw::activations = {heyoka::tanh, heyoka::tanh, heyoka::tanh, heyoka::tanh});
 
-    auto dt = diff_tensors(ffnn, kw::diff_args = diff_args::params);
+    auto dt = diff_tensors(ffnn, diff_args::params);
     auto dNdtheta = dt.get_jacobian();
 }

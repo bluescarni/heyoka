@@ -330,10 +330,10 @@ std::vector<std::pair<expression, expression>> lagrangian(const expression &L_, 
     // NOTE: these next two bits can be run in parallel if needed.
     // Compute the tensor of derivatives of L up to order 2 wrt
     // qs, qdots and time.
-    const auto L_dt = diff_tensors({L}, kw::diff_args = diff_args, kw::diff_order = 2);
+    const auto L_dt = diff_tensors({L}, diff_args, kw::diff_order = 2);
 
     // Compute the tensor of derivatives of D up to order 1 wrt qdots.
-    const auto D_dt = diff_tensors({D}, kw::diff_args = qdots, kw::diff_order = 1);
+    const auto D_dt = diff_tensors({D}, qdots, kw::diff_order = 1);
 
     // Build the linear system.
     auto mat = detail::build_linmat(n_qs, L_dt, D_dt, qdots);

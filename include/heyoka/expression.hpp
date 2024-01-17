@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -546,24 +547,12 @@ HEYOKA_BEGIN_NAMESPACE
 // returned by this function are optimised for evaluation. The users
 // can always unfix() and normalise() these expressions if needed.
 template <typename... KwArgs>
-dtens diff_tensors(const std::vector<expression> &v_ex, const KwArgs &...kw_args)
+dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_args, std::vector<expression>> &d_args,
+                   const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
     static_assert(!p.has_unnamed_arguments(), "diff_tensors() accepts only named arguments in the variadic pack.");
-
-    // Variables and/or params wrt which the derivatives will be computed.
-    // Defaults to all variables.
-    std::variant<diff_args, std::vector<expression>> d_args = diff_args::vars;
-    if constexpr (p.has(kw::diff_args)) {
-        if constexpr (std::is_same_v<detail::uncvref_t<decltype(p(kw::diff_args))>, diff_args>) {
-            d_args = p(kw::diff_args);
-        } else if constexpr (std::is_constructible_v<std::vector<expression>, decltype(p(kw::diff_args))>) {
-            d_args = std::vector<expression>(p(kw::diff_args));
-        } else {
-            static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the diff_args keyword argument.");
-        }
-    }
 
     // Order of derivatives. Defaults to 1.
     std::uint32_t order = 1;
@@ -577,6 +566,13 @@ dtens diff_tensors(const std::vector<expression> &v_ex, const KwArgs &...kw_args
     }
 
     return detail::diff_tensors(v_ex, d_args, order);
+}
+
+template <typename... KwArgs>
+dtens diff_tensors(const std::vector<expression> &v_ex, std::initializer_list<expression> d_args,
+                   const KwArgs &...kw_args)
+{
+    return diff_tensors(v_ex, std::vector(d_args), kw_args...);
 }
 
 namespace detail

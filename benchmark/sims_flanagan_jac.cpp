@@ -129,8 +129,7 @@ int main(int argc, char *argv[])
     std::vector<expression> diff_vars_list = {x0, y0, z0, vx0, vy0, vz0};
     diff_vars_list.insert(diff_vars_list.end(), Dvs_list.begin(), Dvs_list.end());
 
-    auto dt
-        = diff_tensors({pos_f[0], pos_f[1], pos_f[2], vel_f[0], vel_f[1], vel_f[2]}, kw::diff_args = diff_vars_list);
+    auto dt = diff_tensors({pos_f[0], pos_f[1], pos_f[2], vel_f[0], vel_f[1], vel_f[2]}, diff_vars_list);
 
     std::vector<expression> jac;
     auto jac_sr = dt.get_derivatives(1);
