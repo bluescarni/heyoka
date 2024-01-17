@@ -89,6 +89,7 @@ TEST_CASE("diff_tensors basic")
     REQUIRE(dt.get_nvars() == 1u);
     REQUIRE(dt.get_nouts() == 1u);
     REQUIRE(dt[{0, 0}] == 1_dbl);
+    REQUIRE(dt[dtens::sv_idx_t{0, {}}] == 1_dbl);
 
     REQUIRE_THROWS_MATCHES(
         (dt[{1, 0}]), std::out_of_range,
@@ -99,6 +100,12 @@ TEST_CASE("diff_tensors basic")
     REQUIRE_THROWS_MATCHES(
         (dt[{0, 2}]), std::out_of_range,
         Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{0, 2})));
+    REQUIRE_THROWS_MATCHES((dt[{0, {{0, 2}}}]), std::out_of_range,
+                           Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}",
+                                               dtens::sv_idx_t{0, {{0, 2}}})));
+    REQUIRE_THROWS_MATCHES((dt[dtens::sv_idx_t{1, {}}]), std::out_of_range,
+                           Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}",
+                                               dtens::sv_idx_t{1, {}})));
 
     dt = diff_tensors({1_dbl}, {par[0]}, kw::diff_order = 1);
 
@@ -121,7 +128,8 @@ TEST_CASE("diff_tensors basic")
     REQUIRE(diff_vec.size() == 1u);
     REQUIRE(diff_vec[0] == 0_dbl);
     REQUIRE(dt[{0, 0}] == 1_dbl);
-    REQUIRE(dt[{0, 1}] == 0_dbl);
+    REQUIRE(dt[dtens::sv_idx_t{0, {}}] == 1_dbl);
+    REQUIRE(dt[{0, {{0, 1}}}] == 0_dbl);
 
     REQUIRE_THROWS_MATCHES(
         (dt[{1, 0}]), std::out_of_range,
@@ -145,6 +153,9 @@ TEST_CASE("diff_tensors basic")
     REQUIRE(dt[{0, 0}] == 1_dbl);
     REQUIRE(dt[{0, 1}] == 0_dbl);
     REQUIRE(dt[{0, 2}] == 0_dbl);
+    REQUIRE(dt[dtens::sv_idx_t{0, {}}] == 1_dbl);
+    REQUIRE(dt[{0, {{0, 1}}}] == 0_dbl);
+    REQUIRE(dt[{0, {{0, 2}}}] == 0_dbl);
 
     REQUIRE_THROWS_MATCHES(
         (dt[{1, 0}]), std::out_of_range,
@@ -152,6 +163,12 @@ TEST_CASE("diff_tensors basic")
     REQUIRE_THROWS_MATCHES(
         (dt[{0, 3}]), std::out_of_range,
         Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{0, 3})));
+    REQUIRE_THROWS_MATCHES((dt[{0, {{0, 3}}}]), std::out_of_range,
+                           Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}",
+                                               dtens::sv_idx_t{0, {{0, 3}}})));
+    REQUIRE_THROWS_MATCHES((dt[{1, {{1, 3}}}]), std::out_of_range,
+                           Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}",
+                                               dtens::sv_idx_t{1, {{1, 3}}})));
 
     dt = diff_tensors({1_dbl}, {par[0]}, kw::diff_order = 3);
     REQUIRE(dt.get_nvars() == 1u);
@@ -272,10 +289,10 @@ TEST_CASE("dtens basics")
     REQUIRE(dt.index_of(dtens::v_idx_t{1, 2, 3}) == 0u);
 
     REQUIRE(dt.begin() == dt.end());
-    REQUIRE(dt.find({}) == dt.end());
+    REQUIRE(dt.find(dtens::v_idx_t{}) == dt.end());
     REQUIRE(dt.find({0, 1, 2}) == dt.end());
 
-    REQUIRE_THROWS_MATCHES((dt[{}]), std::out_of_range,
+    REQUIRE_THROWS_MATCHES((dt[dtens::v_idx_t{}]), std::out_of_range,
                            Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}",
                                                std::vector<int>{})));
     REQUIRE_THROWS_MATCHES((dt[{0, 1, 2}]), std::out_of_range,

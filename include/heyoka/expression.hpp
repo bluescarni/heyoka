@@ -21,6 +21,7 @@
 #include <memory>
 #include <optional>
 #include <ostream>
+#include <ranges>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -463,6 +464,9 @@ private:
 
     explicit dtens(impl);
 
+    template <typename V>
+    HEYOKA_DLL_LOCAL const expression &index_impl(const V &) const;
+
     // Serialisation.
     friend class boost::serialization::access;
     void save(boost::archive::binary_oarchive &, unsigned) const;
@@ -479,28 +483,6 @@ public:
 
     using iterator = detail::dtens_map_t::const_iterator;
 
-    // Subrange helper class to fetch
-    // ranges into dtens.
-    class HEYOKA_DLL_PUBLIC subrange
-    {
-        friend class dtens;
-
-        iterator m_begin, m_end;
-
-        explicit subrange(const iterator &, const iterator &);
-
-    public:
-        subrange() = delete;
-        subrange(const subrange &);
-        subrange(subrange &&) noexcept;
-        subrange &operator=(const subrange &);
-        subrange &operator=(subrange &&) noexcept;
-        ~subrange();
-
-        [[nodiscard]] iterator begin() const;
-        [[nodiscard]] iterator end() const;
-    };
-
     [[nodiscard]] iterator begin() const;
     [[nodiscard]] iterator end() const;
 
@@ -511,12 +493,16 @@ public:
     [[nodiscard]] const std::vector<expression> &get_args() const;
 
     [[nodiscard]] iterator find(const v_idx_t &) const;
+    [[nodiscard]] iterator find(const sv_idx_t &) const;
     [[nodiscard]] const expression &operator[](const v_idx_t &) const;
+    [[nodiscard]] const expression &operator[](const sv_idx_t &) const;
     [[nodiscard]] size_type index_of(const v_idx_t &) const;
+    [[nodiscard]] size_type index_of(const sv_idx_t &) const;
     [[nodiscard]] size_type index_of(const iterator &) const;
 
-    [[nodiscard]] subrange get_derivatives(std::uint32_t, std::uint32_t) const;
-    [[nodiscard]] subrange get_derivatives(std::uint32_t) const;
+    [[nodiscard]] auto get_derivatives(std::uint32_t order) const -> decltype(std::ranges::subrange(begin(), end()));
+    [[nodiscard]] auto get_derivatives(std::uint32_t component, std::uint32_t order) const
+        -> decltype(std::ranges::subrange(begin(), end()));
     [[nodiscard]] std::vector<expression> get_gradient() const;
     [[nodiscard]] std::vector<expression> get_jacobian() const;
 };
