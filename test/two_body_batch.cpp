@@ -13,7 +13,6 @@
 #include <cmath>
 #include <cstdint>
 #include <initializer_list>
-#include <limits>
 #include <random>
 #include <tuple>
 #include <type_traits>
@@ -72,8 +71,12 @@ TEST_CASE("two body batch")
             = pow(x01 * x01 + y01 * y01 + z01 * z01, expression{number{fp_t{-3}}} / expression{number{fp_t{2}}});
 
         // The system of equations.
-        auto sys = {x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3,
-                    vx0,          vx1,           vy0,          vy1,           vz0,          vz1};
+        std::initializer_list<std::pair<expression, expression>> sys = {{vx0, x01 * r01_m3}, {vx1, -x01 * r01_m3},
+                                                                        {vy0, y01 * r01_m3}, {vy1, -y01 * r01_m3},
+                                                                        {vz0, z01 * r01_m3}, {vz1, -z01 * r01_m3},
+                                                                        {x0, vx0},           {x1, vx1},
+                                                                        {y0, vy0},           {y1, vy1},
+                                                                        {z0, vz0},           {z1, vz1}};
 
         // Generate a bunch of random initial conditions in orbital elements.
         std::vector<std::array<fp_t, 6>> v_kep;

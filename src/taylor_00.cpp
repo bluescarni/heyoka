@@ -528,8 +528,8 @@ void taylor_adaptive_setup_sv_rhs(TA &ta, const U &sys)
 } // namespace detail
 
 template <typename T>
-template <typename U>
-void taylor_adaptive<T>::finalise_ctor_impl(const U &sys, std::vector<T> state,
+void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &sys,
+                                            std::vector<T> state,
                                             // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                             std::optional<T> time, std::optional<T> tol, bool high_accuracy,
                                             bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
@@ -2216,13 +2216,7 @@ const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
 // NOLINTBEGIN
 #define HEYOKA_TAYLOR_ADAPTIVE_INST(F)                                                                                 \
     template class HEYOKA_DLL_PUBLIC detail::taylor_adaptive_base<F, taylor_adaptive<F>>;                              \
-    template class HEYOKA_DLL_PUBLIC taylor_adaptive<F>;                                                               \
-    template HEYOKA_DLL_PUBLIC void taylor_adaptive<F>::finalise_ctor_impl(                                            \
-        const std::vector<expression> &, std::vector<F>, std::optional<F>, std::optional<F>, bool, bool,               \
-        std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);              \
-    template HEYOKA_DLL_PUBLIC void taylor_adaptive<F>::finalise_ctor_impl(                                            \
-        const std::vector<std::pair<expression, expression>> &, std::vector<F>, std::optional<F>, std::optional<F>,    \
-        bool, bool, std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);
+    template class HEYOKA_DLL_PUBLIC taylor_adaptive<F>;
 // NOLINTEND
 
 HEYOKA_TAYLOR_ADAPTIVE_INST(float)
@@ -2244,10 +2238,10 @@ HEYOKA_TAYLOR_ADAPTIVE_INST(mppp::real)
 #undef HEYOKA_TAYLOR_ADAPTIVE_INST
 
 template <typename T>
-template <typename U>
-void taylor_adaptive_batch<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, std::uint32_t batch_size,
-                                                  std::vector<T> time, std::optional<T> tol, bool high_accuracy,
-                                                  bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
+void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &sys,
+                                                  std::vector<T> state, std::uint32_t batch_size, std::vector<T> time,
+                                                  std::optional<T> tol, bool high_accuracy, bool compact_mode,
+                                                  std::vector<T> pars, std::vector<t_event_t> tes,
                                                   std::vector<nt_event_t> ntes, bool parallel_mode)
 {
     // NOTE: this must hold because tol == 0 is interpreted
@@ -4274,14 +4268,7 @@ void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
 }
 
 // Explicit instantiation of the batch implementation classes/functions.
-#define HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(F)                                                                           \
-    template class HEYOKA_DLL_PUBLIC taylor_adaptive_batch<F>;                                                         \
-    template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<F>::finalise_ctor_impl(                                      \
-        const std::vector<expression> &, std::vector<F>, std::uint32_t, std::vector<F>, std::optional<F>, bool, bool,  \
-        std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);                                        \
-    template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch<F>::finalise_ctor_impl(                                      \
-        const std::vector<std::pair<expression, expression>> &, std::vector<F>, std::uint32_t, std::vector<F>,         \
-        std::optional<F>, bool, bool, std::vector<F>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
+#define HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(F) template class HEYOKA_DLL_PUBLIC taylor_adaptive_batch<F>;
 
 HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(float)
 HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(double)

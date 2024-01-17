@@ -1958,7 +1958,7 @@ TEST_CASE("ctad")
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
 
-        ta = taylor_adaptive_batch({v, -x}, std::vector{0., 1.}, 1u);
+        ta = taylor_adaptive_batch({{v, v}, {x, -x}}, std::vector{0., 1.}, 1u);
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
     }
@@ -1971,7 +1971,7 @@ TEST_CASE("ctad")
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
 
-        ta = taylor_adaptive_batch({v, -x}, std::vector{0.l, 1.l}, 1u);
+        ta = taylor_adaptive_batch({{v, v}, {x, -x}}, std::vector{0.l, 1.l}, 1u);
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
     }
@@ -1987,7 +1987,7 @@ TEST_CASE("ctad")
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
 
-        ta = taylor_adaptive_batch({v, -x}, std::vector{0._rq, 1._rq}, 1u);
+        ta = taylor_adaptive_batch({{v, v}, {x, -x}}, std::vector{0._rq, 1._rq}, 1u);
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
     }
@@ -2001,7 +2001,7 @@ TEST_CASE("ctad")
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
 
-        ta = taylor_adaptive_batch({v, -x}, {0., 1.}, 1u);
+        ta = taylor_adaptive_batch({{v, v}, {x, -x}}, {0., 1.}, 1u);
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
     }
@@ -2014,7 +2014,7 @@ TEST_CASE("ctad")
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
 
-        ta = taylor_adaptive_batch({v, -x}, {0.l, 1.l}, 1u);
+        ta = taylor_adaptive_batch({{v, v}, {x, -x}}, {0.l, 1.l}, 1u);
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
     }
@@ -2030,7 +2030,7 @@ TEST_CASE("ctad")
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
 
-        ta = taylor_adaptive_batch({v, -x}, {0._rq, 1._rq}, 1u);
+        ta = taylor_adaptive_batch({{v, v}, {x, -x}}, {0._rq, 1._rq}, 1u);
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
     }
@@ -2099,8 +2099,7 @@ TEST_CASE("state_vars rhs")
 
     REQUIRE(std::get<func>(ta2.get_rhs()[1].value()).get_ptr() == std::get<func>(ta.get_rhs()[1].value()).get_ptr());
 
-    // Check automatic variable deduction.
-    auto ta3 = taylor_adaptive_batch<double>{{rhs_v, rhs_x}, std::vector<double>(4u, 0.), 2u};
+    auto ta3 = taylor_adaptive_batch<double>{{{v, rhs_v}, {x, rhs_x}}, std::vector<double>(4u, 0.), 2u};
 
     REQUIRE(ta3.get_state_vars() == std::vector{v, x});
     REQUIRE(ta3.get_rhs() == std::vector{rhs_v, rhs_x});

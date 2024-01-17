@@ -2059,7 +2059,7 @@ TEST_CASE("ctad")
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
 
-        ta = taylor_adaptive({v, -x}, std::vector{0., 1.});
+        ta = taylor_adaptive({{v, v}, {x, -x}}, std::vector{0., 1.});
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
     }
@@ -2072,7 +2072,7 @@ TEST_CASE("ctad")
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
 
-        ta = taylor_adaptive({v, -x}, std::vector{0.l, 1.l});
+        ta = taylor_adaptive({{v, v}, {x, -x}}, std::vector{0.l, 1.l});
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
     }
@@ -2088,7 +2088,7 @@ TEST_CASE("ctad")
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
 
-        ta = taylor_adaptive({v, -x}, std::vector{0._rq, 1._rq});
+        ta = taylor_adaptive({{v, v}, {x, -x}}, std::vector{0._rq, 1._rq});
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
     }
@@ -2102,7 +2102,7 @@ TEST_CASE("ctad")
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
 
-        ta = taylor_adaptive({v, -x}, {0., 1.});
+        ta = taylor_adaptive({{v, v}, {x, -x}}, {0., 1.});
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
     }
@@ -2115,7 +2115,7 @@ TEST_CASE("ctad")
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
 
-        ta = taylor_adaptive({v, -x}, {0.l, 1.l});
+        ta = taylor_adaptive({{v, v}, {x, -x}}, {0.l, 1.l});
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
     }
@@ -2131,7 +2131,7 @@ TEST_CASE("ctad")
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
 
-        ta = taylor_adaptive({v, -x}, {0._rq, 1._rq});
+        ta = taylor_adaptive({{v, v}, {x, -x}}, {0._rq, 1._rq});
         REQUIRE(ta.get_state()[0] == 0);
         REQUIRE(ta.get_state()[1] == 1);
     }
@@ -2310,8 +2310,7 @@ TEST_CASE("state_vars rhs")
 
     REQUIRE(std::get<func>(ta2.get_rhs()[1].value()).get_ptr() == std::get<func>(ta.get_rhs()[1].value()).get_ptr());
 
-    // Check automatic variable deduction.
-    auto ta3 = taylor_adaptive<double>{{rhs_v, rhs_x}, std::vector<double>(2u, 0.)};
+    auto ta3 = taylor_adaptive<double>{{{v, rhs_v}, {x, rhs_x}}, std::vector<double>(2u, 0.)};
 
     REQUIRE(ta3.get_state_vars() == std::vector{v, x});
     REQUIRE(ta3.get_rhs() == std::vector{rhs_v, rhs_x});
@@ -2326,7 +2325,7 @@ TEST_CASE("taylor prod_to_div")
     {
         llvm_state s;
 
-        auto ta = taylor_adaptive<double>{{prod({3_dbl, pow(y, -1_dbl), pow(x, -1.5_dbl)}), x},
+        auto ta = taylor_adaptive<double>{{{x, prod({3_dbl, pow(y, -1_dbl), pow(x, -1.5_dbl)})}, {y, x}},
                                           std::vector<double>(2u, 0.)};
 
         const auto &dc = ta.get_decomposition();
@@ -2395,7 +2394,7 @@ TEST_CASE("taylor sum_to_sub")
     {
         llvm_state s;
 
-        auto ta = taylor_adaptive<double>{{sum({1_dbl, prod({-1_dbl, x}), prod({-1_dbl, y})}), x},
+        auto ta = taylor_adaptive<double>{{{x, sum({1_dbl, prod({-1_dbl, x}), prod({-1_dbl, y})})}, {y, x}},
                                           std::vector<double>(2u, 0.)};
 
         const auto &dc = ta.get_decomposition();
