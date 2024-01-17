@@ -10,7 +10,106 @@ The :cpp:class:`expression` class
 
 .. cpp:class:: expression
 
+   Class to represent symbolic expressions.
+
+   This is the main class used to represent mathematical expressions in heyoka.
+   It is a union of several types:
+
+   - :ref:`symbolic variables <api_variable>`,
+   - :ref:`numerical constants <api_number>`,
+   - :ref:`runtime parameters <api_param>`,
+   - :ref:`n-ary functions <api_func>`.
+
+   Because expressions are essentially `trees <https://en.wikipedia.org/wiki/Tree_(data_structure)>`__,
+   we refer to these types as the *node types* of an expression.
+
+   Expressions can be created in a variety of ways. After creation, expressions
+   can be combined via :ref:`arithmetic operators <api_ex_arith_ops>` and :ref:`mathematical functions <api_math>`
+   to form new expressions of arbitrary complexity.
+
+   Expressions which consist of a single :ref:`variable <api_variable>` or a single
+   :ref:`constant <api_number>`/:ref:`parameter <api_param>` are referred to as
+   *elementary* expressions.
+
+   Expressions provide an immutable API: after creation, an expression cannot be changed in-place
+   (except via assignment or swapping).
+
    .. cpp:type:: value_type = std::variant<number, variable, func, param>
+
+      The union of node types.
+
+   .. cpp:function:: expression() noexcept
+
+      Default constructor.
+
+      This constructor initialises the expression to a double-precision :ref:`number <api_number>` with a value of zero.
+
+   .. cpp:function:: explicit expression(float x) noexcept
+
+   .. cpp:function:: explicit expression(double x) noexcept
+
+   .. cpp:function:: explicit expression(long double x) noexcept
+
+   .. cpp:function:: explicit expression(mppp::real128 x) noexcept
+
+   .. cpp:function:: explicit expression(mppp::real x)
+
+      Constructors from floating-point objects.
+
+      These constructors initialise the expression to a floating-point :ref:`number <api_number>` with the input value *x*.
+      Expressions can be constructed from objects of any floating-point type supported by :ref:`number <api_number>`.
+
+      :param x: the construction argument.
+
+      :exception: any exception raised by the copy constructor of :cpp:class:`mppp::real`.
+
+   .. cpp:function:: explicit expression(std::string s)
+
+      Constructor from variable name.
+
+      This constructor initialises the expression to a :ref:`variable <api_variable>` constructed from the
+      input string *s*.
+
+      :param s: the variable name.
+
+      :exception: any exception thrown by the copy constructor of ``std::string``.
+
+   .. cpp:function:: explicit expression(number x)
+
+   .. cpp:function:: explicit expression(variable x)
+
+   .. cpp:function:: explicit expression(func x) noexcept
+
+   .. cpp:function:: explicit expression(param x) noexcept
+
+      Constructors from objects of the node types.
+
+      These constructors will initialise the internal union with the input argument *x*.
+
+      :param x: the construction argument.
+
+      :exception: any exception raised by the copy constructor of :cpp:class:`number` or :cpp:class:`variable`.
+
+   .. cpp:function:: expression(const expression &)
+
+   .. cpp:function:: expression(expression &&) noexcept
+
+   .. cpp:function:: expression &operator=(const expression &)
+
+   .. cpp:function:: expression &operator=(expression &&) noexcept
+
+   .. cpp:function:: ~expression()
+
+      Expressions are copy/move constructible/assignable and destructible.
+
+      Note that because :cpp:class:`func` employs reference semantics, copying/assigning
+      a non-elementary expression is a constant-time operation.
+
+      :exception: any exception thrown by the copy constructor/copy assignment operator of the active node types.
+
+   .. cpp:function:: [[nodiscard]] const value_type &value() const noexcept
+
+      Const accessor to the internal union.
 
 Functions
 ---------
@@ -40,6 +139,11 @@ Functions
 
       auto x = make_vars("x");
       auto [y, z] = make_vars("y", "z");
+
+.. _api_ex_arith_ops:
+
+Arithmetic operators
+--------------------
 
 User-defined literals
 ---------------------

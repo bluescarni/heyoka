@@ -64,17 +64,17 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-expression::expression() : expression(number{0.}) {}
+expression::expression() noexcept : expression(number{0.}) {}
 
-expression::expression(float x) : expression(number{x}) {}
+expression::expression(float x) noexcept : expression(number{x}) {}
 
-expression::expression(double x) : expression(number{x}) {}
+expression::expression(double x) noexcept : expression(number{x}) {}
 
-expression::expression(long double x) : expression(number{x}) {}
+expression::expression(long double x) noexcept : expression(number{x}) {}
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-expression::expression(mppp::real128 x) : expression(number{x}) {}
+expression::expression(mppp::real128 x) noexcept : expression(number{x}) {}
 
 #endif
 
@@ -90,9 +90,9 @@ expression::expression(number n) : m_value(std::move(n)) {}
 
 expression::expression(variable var) : m_value(std::move(var)) {}
 
-expression::expression(func f) : m_value(std::move(f)) {}
+expression::expression(func f) noexcept : m_value(std::move(f)) {}
 
-expression::expression(param p) : m_value(std::move(p)) {}
+expression::expression(param p) noexcept : m_value(std::move(p)) {}
 
 expression::expression(const expression &) = default;
 
@@ -138,7 +138,7 @@ void expression::load(boost::archive::binary_iarchive &ar, unsigned)
     ar >> m_value;
 }
 
-const expression::value_type &expression::value() const
+const expression::value_type &expression::value() const noexcept
 {
     return m_value;
 }

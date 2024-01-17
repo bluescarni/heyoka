@@ -369,9 +369,9 @@ public:
     explicit func(T &&f) : m_func(std::forward<T>(f))
     {
     }
-    func(const func &);
+    func(const func &) noexcept;
     func(func &&) noexcept;
-    func &operator=(const func &);
+    func &operator=(const func &) noexcept;
     func &operator=(func &&) noexcept;
     ~func();
 

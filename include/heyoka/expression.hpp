@@ -80,13 +80,13 @@ private:
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 public:
-    expression();
+    expression() noexcept;
 
-    explicit expression(float);
-    explicit expression(double);
-    explicit expression(long double);
+    explicit expression(float) noexcept;
+    explicit expression(double) noexcept;
+    explicit expression(long double) noexcept;
 #if defined(HEYOKA_HAVE_REAL128)
-    explicit expression(mppp::real128);
+    explicit expression(mppp::real128) noexcept;
 #endif
 #if defined(HEYOKA_HAVE_REAL)
     explicit expression(mppp::real);
@@ -95,8 +95,8 @@ public:
 
     explicit expression(number);
     explicit expression(variable);
-    explicit expression(func);
-    explicit expression(param);
+    explicit expression(func) noexcept;
+    explicit expression(param) noexcept;
 
     expression(const expression &);
     expression(expression &&) noexcept;
@@ -106,7 +106,7 @@ public:
     expression &operator=(const expression &);
     expression &operator=(expression &&) noexcept;
 
-    [[nodiscard]] const value_type &value() const;
+    [[nodiscard]] const value_type &value() const noexcept;
 };
 
 HEYOKA_DLL_PUBLIC expression copy(const expression &);

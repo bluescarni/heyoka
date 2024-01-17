@@ -221,11 +221,11 @@ std::vector<expression> func_d_args(const auto &fb, funcptr_map<std::vector<expr
 
 func::func() = default;
 
-func::func(const func &) = default;
+func::func(const func &) noexcept = default;
 
 func::func(func &&) noexcept = default;
 
-func &func::operator=(const func &) = default;
+func &func::operator=(const func &) noexcept = default;
 
 func &func::operator=(func &&) noexcept = default;
 
