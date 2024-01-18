@@ -399,6 +399,23 @@ document.write(`
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-expression-class">The <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">expression</span></code> class</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expressionE"><code class="docutils literal notranslate"><span class="pre">expression</span></code></a><ul class="nav section-nav flex-column">
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10value_typeE"><code class="docutils literal notranslate"><span class="pre">expression::value_type</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionEv"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionEf"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionEd"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionEe"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionEN4mppp7real128E"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionEN4mppp4realE"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionENSt6stringE"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionE6number"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionE8variable"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionE4func"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionE5param"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionERK10expression"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionERR10expression"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expressionaSERK10expression"><code class="docutils literal notranslate"><span class="pre">expression::operator=()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expressionaSERR10expression"><code class="docutils literal notranslate"><span class="pre">expression::operator=()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expressionD0Ev"><code class="docutils literal notranslate"><span class="pre">expression::~expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK6heyoka10expression5valueEv"><code class="docutils literal notranslate"><span class="pre">expression::value()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -407,6 +424,7 @@ document.write(`
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args"><code class="docutils literal notranslate"><span class="pre">make_vars()</span></code></a></li>
 </ul>
 </li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#arithmetic-operators">Arithmetic operators</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#user-defined-literals">User-defined literals</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_fltEe"><code class="docutils literal notranslate"><span class="pre">operator""_flt()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_fltEy"><code class="docutils literal notranslate"><span class="pre">operator""_flt()</span></code></a></li>
@@ -436,10 +454,163 @@ document.write(`
 <dl class="cpp class">
 <dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expressionE">
 <span id="_CPPv3N6heyoka10expressionE"></span><span id="_CPPv2N6heyoka10expressionE"></span><span id="heyoka::expression"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">expression</span></span></span><a class="headerlink" href="#_CPPv4N6heyoka10expressionE" title="Link to this definition">#</a><br /></dt>
-<dd><dl class="cpp type">
+<dd><p>Class to represent symbolic expressions.</p>
+<p>This is the main class used to represent mathematical expressions in heyoka.
+It is a union of several types:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="variable.html#api-variable"><span class="std std-ref">symbolic variables</span></a>,</p></li>
+<li><p><a class="reference internal" href="number.html#api-number"><span class="std std-ref">numerical constants</span></a>,</p></li>
+<li><p><a class="reference internal" href="param.html#api-param"><span class="std std-ref">runtime parameters</span></a>,</p></li>
+<li><p><a class="reference internal" href="func.html#api-func"><span class="std std-ref">n-ary functions</span></a>.</p></li>
+</ul>
+<p>Because expressions are essentially <a class="reference external" href="https://en.wikipedia.org/wiki/Tree_(data_structure)">trees</a>,
+we refer to these types as the <em>node types</em> of an expression.</p>
+<p>Expressions can be created in a variety of ways. After creation, expressions
+can be combined via <a class="reference internal" href="#api-ex-arith-ops"><span class="std std-ref">arithmetic operators</span></a> and <a class="reference internal" href="math.html#api-math"><span class="std std-ref">mathematical functions</span></a>
+to form new expressions of arbitrary complexity.</p>
+<p>Expressions which consist of a single <a class="reference internal" href="variable.html#api-variable"><span class="std std-ref">variable</span></a> or a single
+<a class="reference internal" href="number.html#api-number"><span class="std std-ref">constant</span></a>/<a class="reference internal" href="param.html#api-param"><span class="std std-ref">parameter</span></a> are referred to as
+<em>elementary</em> expressions.</p>
+<p>Expressions provide an immutable API: after creation, an expression cannot be changed in-place
+(except via assignment or swapping).</p>
+<dl class="cpp type">
 <dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expression10value_typeE">
 <span id="_CPPv3N6heyoka10expression10value_typeE"></span><span id="_CPPv2N6heyoka10expression10value_typeE"></span><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">value_type</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">variant</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="number.html#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="variable.html#_CPPv4N6heyoka8variableE" title="heyoka::variable"><span class="n"><span class="pre">variable</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="func.html#_CPPv4N6heyoka4funcE" title="heyoka::func"><span class="n"><span class="pre">func</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="param.html#_CPPv4N6heyoka5paramE" title="heyoka::param"><span class="n"><span class="pre">param</span></span></a><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4N6heyoka10expression10value_typeE" title="Link to this definition">#</a><br /></dt>
+<dd><p>The union of node types.</p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expression10expressionEv">
+<span id="_CPPv3N6heyoka10expression10expressionEv"></span><span id="_CPPv2N6heyoka10expression10expressionEv"></span><span id="heyoka::expression::expression"></span><span class="sig-name descname"><span class="n"><span class="pre">expression</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka10expression10expressionEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Default constructor.</p>
+<p>This constructor initialises the expression to a double-precision <a class="reference internal" href="number.html#api-number"><span class="std std-ref">number</span></a> with a value of zero.</p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expression10expressionEf">
+<span id="_CPPv3N6heyoka10expression10expressionEf"></span><span id="_CPPv2N6heyoka10expression10expressionEf"></span><span id="heyoka::expression::expression__float"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">expression</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">float</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka10expression10expressionEf" title="Link to this definition">#</a><br /></dt>
 <dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expression10expressionEd">
+<span id="_CPPv3N6heyoka10expression10expressionEd"></span><span id="_CPPv2N6heyoka10expression10expressionEd"></span><span id="heyoka::expression::expression__double"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">expression</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka10expression10expressionEd" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expression10expressionEe">
+<span id="_CPPv3N6heyoka10expression10expressionEe"></span><span id="_CPPv2N6heyoka10expression10expressionEe"></span><span id="heyoka::expression::expression__l-double"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">expression</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">long</span></span><span class="w"> </span><span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka10expression10expressionEe" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expression10expressionEN4mppp7real128E">
+<span id="_CPPv3N6heyoka10expression10expressionEN4mppp7real128E"></span><span id="_CPPv2N6heyoka10expression10expressionEN4mppp7real128E"></span><span id="heyoka::expression::expression__mppp::real128"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">expression</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">mppp</span></span><span class="p"><span class="pre">::</span></span><a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.2)"><span class="n"><span class="pre">real128</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka10expression10expressionEN4mppp7real128E" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expression10expressionEN4mppp4realE">
+<span id="_CPPv3N6heyoka10expression10expressionEN4mppp4realE"></span><span id="_CPPv2N6heyoka10expression10expressionEN4mppp4realE"></span><span id="heyoka::expression::expression__mppp::real"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">expression</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">mppp</span></span><span class="p"><span class="pre">::</span></span><a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v1.0.2)"><span class="n"><span class="pre">real</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka10expression10expressionEN4mppp4realE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Constructors from floating-point objects.</p>
+<p>These constructors initialise the expression to a floating-point <a class="reference internal" href="number.html#api-number"><span class="std std-ref">number</span></a> with the input value <em>x</em>.
+Expressions can be constructed from objects of any floating-point type supported by <a class="reference internal" href="number.html#api-number"><span class="std std-ref">number</span></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>x</strong> – the construction argument.</p>
+</dd>
+<dt class="field-even">Exception<span class="colon">:</span></dt>
+<dd class="field-even"><p>any exception raised by the copy constructor of <a class="reference external" href="https://bluescarni.github.io/mppp/real.html#_CPPv4N4mppp4realE" title="(in mp++ v1.0.2)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real</span></code></a>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expression10expressionENSt6stringE">
+<span id="_CPPv3N6heyoka10expression10expressionENSt6stringE"></span><span id="_CPPv2N6heyoka10expression10expressionENSt6stringE"></span><span id="heyoka::expression::expression__ss"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">expression</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">s</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka10expression10expressionENSt6stringE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Constructor from variable name.</p>
+<p>This constructor initialises the expression to a <a class="reference internal" href="variable.html#api-variable"><span class="std std-ref">variable</span></a> constructed from the
+input string <em>s</em>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>s</strong> – the variable name.</p>
+</dd>
+<dt class="field-even">Exception<span class="colon">:</span></dt>
+<dd class="field-even"><p>any exception thrown by the copy constructor of <code class="docutils literal notranslate"><span class="pre">std::string</span></code>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expression10expressionE6number">
+<span id="_CPPv3N6heyoka10expression10expressionE6number"></span><span id="_CPPv2N6heyoka10expression10expressionE6number"></span><span id="heyoka::expression::expression__number"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">expression</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="number.html#_CPPv4N6heyoka6numberE" title="heyoka::number"><span class="n"><span class="pre">number</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka10expression10expressionE6number" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expression10expressionE8variable">
+<span id="_CPPv3N6heyoka10expression10expressionE8variable"></span><span id="_CPPv2N6heyoka10expression10expressionE8variable"></span><span id="heyoka::expression::expression__variable"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">expression</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="variable.html#_CPPv4N6heyoka8variableE" title="heyoka::variable"><span class="n"><span class="pre">variable</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka10expression10expressionE8variable" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expression10expressionE4func">
+<span id="_CPPv3N6heyoka10expression10expressionE4func"></span><span id="_CPPv2N6heyoka10expression10expressionE4func"></span><span id="heyoka::expression::expression__func"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">expression</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="func.html#_CPPv4N6heyoka4funcE" title="heyoka::func"><span class="n"><span class="pre">func</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka10expression10expressionE4func" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expression10expressionE5param">
+<span id="_CPPv3N6heyoka10expression10expressionE5param"></span><span id="_CPPv2N6heyoka10expression10expressionE5param"></span><span id="heyoka::expression::expression__param"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">expression</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="param.html#_CPPv4N6heyoka5paramE" title="heyoka::param"><span class="n"><span class="pre">param</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">x</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka10expression10expressionE5param" title="Link to this definition">#</a><br /></dt>
+<dd><p>Constructors from objects of the node types.</p>
+<p>These constructors will initialise the internal union with the input argument <em>x</em>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>x</strong> – the construction argument.</p>
+</dd>
+<dt class="field-even">Exception<span class="colon">:</span></dt>
+<dd class="field-even"><p>any exception raised by the copy constructor of <a class="reference internal" href="number.html#_CPPv4N6heyoka6numberE" title="heyoka::number"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">number</span></code></a> or <a class="reference internal" href="variable.html#_CPPv4N6heyoka8variableE" title="heyoka::variable"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">variable</span></code></a>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expression10expressionERK10expression">
+<span id="_CPPv3N6heyoka10expression10expressionERK10expression"></span><span id="_CPPv2N6heyoka10expression10expressionERK10expression"></span><span id="heyoka::expression::expression__expressionCR"></span><span class="sig-name descname"><span class="n"><span class="pre">expression</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka10expression10expressionERK10expression" title="heyoka::expression::expression"><span class="n"><span class="pre">expression</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka10expression10expressionERK10expression" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expression10expressionERR10expression">
+<span id="_CPPv3N6heyoka10expression10expressionERR10expression"></span><span id="_CPPv2N6heyoka10expression10expressionERR10expression"></span><span id="heyoka::expression::expression__expressionRR"></span><span class="sig-name descname"><span class="n"><span class="pre">expression</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6heyoka10expression10expressionERR10expression" title="heyoka::expression::expression"><span class="n"><span class="pre">expression</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka10expression10expressionERR10expression" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expressionaSERK10expression">
+<span id="_CPPv3N6heyoka10expressionaSERK10expression"></span><span id="_CPPv2N6heyoka10expressionaSERK10expression"></span><span id="heyoka::expression::assign-operator__expressionCR"></span><a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><span class="n"><span class="pre">expression</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><span class="n"><span class="pre">expression</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka10expressionaSERK10expression" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expressionaSERR10expression">
+<span id="_CPPv3N6heyoka10expressionaSERR10expression"></span><span id="_CPPv2N6heyoka10expressionaSERR10expression"></span><span id="heyoka::expression::assign-operator__expressionRR"></span><a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><span class="n"><span class="pre">expression</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">=</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><span class="n"><span class="pre">expression</span></span></a><span class="p"><span class="pre">&amp;</span></span><span class="p"><span class="pre">&amp;</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyoka10expressionaSERR10expression" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyoka10expressionD0Ev">
+<span id="_CPPv3N6heyoka10expressionD0Ev"></span><span id="_CPPv2N6heyoka10expressionD0Ev"></span><span id="heyoka::expression::~expression"></span><span class="sig-name descname"><span class="n"><span class="pre">~expression</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N6heyoka10expressionD0Ev" title="Link to this definition">#</a><br /></dt>
+<dd><p>Expressions are copy/move constructible/assignable and destructible.</p>
+<p>Note that because <a class="reference internal" href="func.html#_CPPv4N6heyoka4funcE" title="heyoka::func"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">func</span></code></a> employs reference semantics, copying/assigning
+a non-elementary expression is a constant-time operation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Exception<span class="colon">:</span></dt>
+<dd class="field-odd"><p>any exception thrown by the copy constructor/copy assignment operators of the active node types.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4NK6heyoka10expression5valueEv">
+<span id="_CPPv3NK6heyoka10expression5valueEv"></span><span id="_CPPv2NK6heyoka10expression5valueEv"></span><span id="heyoka::expression::valueC"></span><span class="p"><span class="pre">[[</span></span><span class="pre">nodiscard</span><span class="p"><span class="pre">]]</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka10expression10value_typeE" title="heyoka::expression::value_type"><span class="n"><span class="pre">value_type</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="sig-name descname"><span class="n"><span class="pre">value</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4NK6heyoka10expression5valueEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Const accessor to the internal union.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>a const reference to the internal <a class="reference internal" href="#_CPPv4N6heyoka10expression10value_typeE" title="heyoka::expression::value_type"><code class="xref cpp cpp-type docutils literal notranslate"><span class="pre">value_type</span></code></a> instance.</p>
+</dd>
+</dl>
+</dd></dl>
 
 </dd></dl>
 
@@ -478,6 +649,9 @@ expressions (one for each argument) is returned.</p>
 </section>
 </dd></dl>
 
+</section>
+<section id="arithmetic-operators">
+<span id="api-ex-arith-ops"></span><h2>Arithmetic operators<a class="headerlink" href="#arithmetic-operators" title="Link to this heading">#</a></h2>
 </section>
 <section id="user-defined-literals">
 <h2>User-defined literals<a class="headerlink" href="#user-defined-literals" title="Link to this heading">#</a></h2>
@@ -567,6 +741,23 @@ expressions (one for each argument) is returned.</p>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-expression-class">The <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">expression</span></code> class</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expressionE"><code class="docutils literal notranslate"><span class="pre">expression</span></code></a><ul class="nav section-nav flex-column">
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10value_typeE"><code class="docutils literal notranslate"><span class="pre">expression::value_type</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionEv"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionEf"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionEd"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionEe"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionEN4mppp7real128E"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionEN4mppp4realE"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionENSt6stringE"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionE6number"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionE8variable"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionE4func"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionE5param"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionERK10expression"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expression10expressionERR10expression"><code class="docutils literal notranslate"><span class="pre">expression::expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expressionaSERK10expression"><code class="docutils literal notranslate"><span class="pre">expression::operator=()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expressionaSERR10expression"><code class="docutils literal notranslate"><span class="pre">expression::operator=()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka10expressionD0Ev"><code class="docutils literal notranslate"><span class="pre">expression::~expression()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4NK6heyoka10expression5valueEv"><code class="docutils literal notranslate"><span class="pre">expression::value()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -575,6 +766,7 @@ expressions (one for each argument) is returned.</p>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args"><code class="docutils literal notranslate"><span class="pre">make_vars()</span></code></a></li>
 </ul>
 </li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#arithmetic-operators">Arithmetic operators</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#user-defined-literals">User-defined literals</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_fltEe"><code class="docutils literal notranslate"><span class="pre">operator""_flt()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_fltEy"><code class="docutils literal notranslate"><span class="pre">operator""_flt()</span></code></a></li>

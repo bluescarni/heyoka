@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- It is now possible to index into the tensors of derivatives
+  using indices vectors in sparse format
+  (`#389 <https://github.com/bluescarni/heyoka/pull/389>`__).
 - Add support for Lagrangian and Hamiltonian mechanics
   (`#381 <https://github.com/bluescarni/heyoka/pull/381>`__,
   `#379 <https://github.com/bluescarni/heyoka/pull/379>`__).
