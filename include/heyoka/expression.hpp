@@ -462,7 +462,7 @@ private:
 
     std::unique_ptr<impl> p_impl;
 
-    explicit dtens(impl);
+    explicit HEYOKA_DLL_LOCAL dtens(impl);
 
     template <typename V>
     HEYOKA_DLL_LOCAL const expression &index_impl(const V &) const;
