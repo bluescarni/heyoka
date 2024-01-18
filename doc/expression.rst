@@ -105,11 +105,13 @@ The :cpp:class:`expression` class
       Note that because :cpp:class:`func` employs reference semantics, copying/assigning
       a non-elementary expression is a constant-time operation.
 
-      :exception: any exception thrown by the copy constructor/copy assignment operator of the active node types.
+      :exception: any exception thrown by the copy constructor/copy assignment operators of the active node types.
 
    .. cpp:function:: [[nodiscard]] const value_type &value() const noexcept
 
       Const accessor to the internal union.
+
+      :return: a const reference to the internal :cpp:type:`value_type` instance.
 
 Functions
 ---------
