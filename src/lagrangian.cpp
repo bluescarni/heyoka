@@ -8,7 +8,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cstdint>
 #include <stdexcept>
 #include <unordered_set>
 #include <utility>
@@ -157,12 +156,8 @@ linmat build_linmat(T n_qs, const dtens &L_dt, const dtens &D_dt, const std::vec
     assert(n_qs > 0);
     assert(n_qs == qdots.size());
 
-    // Prepare vectors of indices for indexing into L_dt and D_dt.
-    std::vector<std::uint32_t> vidx_L;
-    vidx_L.resize(1 + n_qs * 2 + 1);
-
-    std::vector<std::uint32_t> vidx_D;
-    vidx_D.resize(1 + n_qs);
+    // Prepare a vector of indices in sparse form for indexing into L_dt and D_dt.
+    dtens::sv_idx_t vidx = {0, {}};
 
     // Temporary vector to build the rhs.
     std::vector<expression> rhs_vec;
@@ -173,44 +168,49 @@ linmat build_linmat(T n_qs, const dtens &L_dt, const dtens &D_dt, const std::vec
     // Build row-by-row.
     for (T i = 0; i < n_qs; ++i) {
         // Reset the temp vectors.
-        std::ranges::fill(vidx_L, 0);
-        std::ranges::fill(vidx_D, 0);
+        vidx.second.clear();
         rhs_vec.clear();
 
         // dL/dqi.
-        vidx_L[1 + i] = 1;
-        rhs_vec.push_back(fix_nn(L_dt[vidx_L]));
+        vidx.second.emplace_back(i, 1);
+        rhs_vec.push_back(fix_nn(L_dt[vidx]));
 
         // -d2L/(dqdoti dt).
-        vidx_L[1 + i] = 0;
-        vidx_L[1 + n_qs + i] = 1;
-        vidx_L.back() = 1;
-        rhs_vec.push_back(-fix_nn(L_dt[vidx_L]));
+        vidx.second.clear();
+        vidx.second.emplace_back(n_qs + i, 1);
+        vidx.second.emplace_back(n_qs * 2, 1);
+        rhs_vec.push_back(-fix_nn(L_dt[vidx]));
 
         // -dD/dqdoti
-        vidx_D[1 + i] = 1;
-        rhs_vec.push_back(-fix_nn(D_dt[vidx_D]));
+        vidx.second.clear();
+        vidx.second.emplace_back(i, 1);
+        rhs_vec.push_back(-fix_nn(D_dt[vidx]));
 
         // Iterate over j to compute the -d2L/(dqdoti dqj) * qdotj
         // and the d2L/(dqdoti dqdotj) terms.
         auto &cur_row = mat.m_rows[i];
         for (T j = 0; j < n_qs; ++j) {
             // d2L/(dqdoti dqdotj).
-            std::ranges::fill(vidx_L, 0);
-            // NOTE: need to special case for i == j.
+            vidx.second.clear();
+            // NOTE: need to special case for i == j, and take
+            // care of adding the elements in the correct order
+            // to the sparse vector.
             if (i == j) {
-                vidx_L[1 + n_qs + i] = 2;
+                vidx.second.emplace_back(n_qs + i, 2);
+            } else if (i < j) {
+                vidx.second.emplace_back(n_qs + i, 1);
+                vidx.second.emplace_back(n_qs + j, 1);
             } else {
-                vidx_L[1 + n_qs + i] = 1;
-                vidx_L[1 + n_qs + j] = 1;
+                vidx.second.emplace_back(n_qs + j, 1);
+                vidx.second.emplace_back(n_qs + i, 1);
             }
-            cur_row[j] = fix_nn(L_dt[vidx_L]);
+            cur_row[j] = fix_nn(L_dt[vidx]);
 
             // -d2L/(dqdoti dqj) * qdotj.
-            std::ranges::fill(vidx_L, 0);
-            vidx_L[1 + n_qs + i] = 1;
-            vidx_L[1 + j] = 1;
-            rhs_vec.push_back(fix_nn(-fix_nn(L_dt[vidx_L]) * qdots[j]));
+            vidx.second.clear();
+            vidx.second.emplace_back(j, 1);
+            vidx.second.emplace_back(n_qs + i, 1);
+            rhs_vec.push_back(fix_nn(-fix_nn(L_dt[vidx]) * qdots[j]));
         }
 
         // Assemble the rhs.
@@ -330,10 +330,10 @@ std::vector<std::pair<expression, expression>> lagrangian(const expression &L_, 
     // NOTE: these next two bits can be run in parallel if needed.
     // Compute the tensor of derivatives of L up to order 2 wrt
     // qs, qdots and time.
-    const auto L_dt = diff_tensors({L}, kw::diff_args = diff_args, kw::diff_order = 2);
+    const auto L_dt = diff_tensors({L}, diff_args, kw::diff_order = 2);
 
     // Compute the tensor of derivatives of D up to order 1 wrt qdots.
-    const auto D_dt = diff_tensors({D}, kw::diff_args = qdots, kw::diff_order = 1);
+    const auto D_dt = diff_tensors({D}, qdots, kw::diff_order = 1);
 
     // Build the linear system.
     auto mat = detail::build_linmat(n_qs, L_dt, D_dt, qdots);

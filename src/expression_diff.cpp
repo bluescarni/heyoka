@@ -16,6 +16,7 @@
 #include <memory>
 #include <numeric>
 #include <ostream>
+#include <ranges>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -999,27 +1000,31 @@ void diff_tensors_reverse_impl(
 }
 
 // Utility function to check that a dtens_sv_idx_t is well-formed.
-void sv_sanity_check([[maybe_unused]] const dtens_sv_idx_t &v)
+bool sv_sanity_check(const dtens_sv_idx_t &v)
 {
     // Check sorting according to the derivative indices.
     auto cmp = [](const auto &p1, const auto &p2) { return p1.first < p2.first; };
-    assert(std::is_sorted(v.second.begin(), v.second.end(), cmp));
+    if (!std::ranges::is_sorted(v.second, cmp)) {
+        return false;
+    }
 
     // Check no duplicate derivative indices.
     auto no_dup = [](const auto &p1, const auto &p2) { return p1.first == p2.first; };
-    assert(std::adjacent_find(v.second.begin(), v.second.end(), no_dup) == v.second.end());
+    if (std::ranges::adjacent_find(v.second, no_dup) != v.second.end()) {
+        return false;
+    }
 
     // Check no zero derivative orders.
     auto nz_order = [](const auto &p) { return p.second != 0u; };
-    assert(std::all_of(v.second.begin(), v.second.end(), nz_order));
+    return std::ranges::all_of(v.second, nz_order);
 }
 
 // Implementation of dtens_sv_idx_cmp::operator().
 bool dtens_sv_idx_cmp_impl(const dtens_sv_idx_t &v1, const dtens_sv_idx_t &v2)
 {
     // Sanity checks on the inputs.
-    sv_sanity_check(v1);
-    sv_sanity_check(v2);
+    assert(sv_sanity_check(v1));
+    assert(sv_sanity_check(v2));
 
     // Compute the total derivative order for both v1 and v2.
     // NOTE: here we have to use safe_numerics because this comparison operator
@@ -1500,29 +1505,6 @@ dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_
 
 } // namespace detail
 
-dtens::subrange::subrange(const iterator &begin, const iterator &end) : m_begin(begin), m_end(end) {}
-
-dtens::subrange::subrange(const subrange &) = default;
-
-dtens::subrange::subrange(subrange &&) noexcept = default;
-
-dtens::subrange &dtens::subrange::operator=(const subrange &) = default;
-
-dtens::subrange &dtens::subrange::operator=(subrange &&) noexcept = default;
-
-// NOLINTNEXTLINE(performance-trivially-destructible)
-dtens::subrange::~subrange() = default;
-
-dtens::iterator dtens::subrange::begin() const
-{
-    return m_begin;
-}
-
-dtens::iterator dtens::subrange::end() const
-{
-    return m_end;
-}
-
 dtens::dtens(impl x) : p_impl(std::make_unique<impl>(std::move(x))) {}
 
 dtens::dtens() : dtens(impl{}) {}
@@ -1573,18 +1555,28 @@ std::uint32_t dtens::get_order() const
         // diff order is zero and that we are
         // only storing the original function
         // components in the dtens object.
+
+#if !defined(NDEBUG)
+
+        for (const auto &[v, _] : *this) {
+            assert(v.first == 0u);
+            assert(v.second.empty());
+        }
+
+#endif
+
         return 0;
     } else {
+        assert(sv.size() == 1u);
+
         return sv.back().second;
     }
 }
 
 dtens::iterator dtens::find(const v_idx_t &vidx) const
 {
-    // First we handle the empty case.
-    if (p_impl->m_map.empty()) {
-        return end();
-    }
+    // NOTE: run sanity checks on vidx. If the checks fail,
+    // return end().
 
     // vidx must at least contain the function component index.
     if (vidx.empty()) {
@@ -1609,7 +1601,19 @@ dtens::iterator dtens::find(const v_idx_t &vidx) const
     return p_impl->m_map.find(s_vidx);
 }
 
-const expression &dtens::operator[](const v_idx_t &vidx) const
+dtens::iterator dtens::find(const sv_idx_t &vidx) const
+{
+    // NOTE: run sanity checks on vidx. If the checks fail,
+    // return end().
+    if (!detail::sv_sanity_check(vidx)) {
+        return end();
+    }
+
+    return p_impl->m_map.find(vidx);
+}
+
+template <typename V>
+const expression &dtens::index_impl(const V &vidx) const
 {
     const auto it = find(vidx);
 
@@ -1621,7 +1625,22 @@ const expression &dtens::operator[](const v_idx_t &vidx) const
     return it->second;
 }
 
+const expression &dtens::operator[](const v_idx_t &vidx) const
+{
+    return index_impl(vidx);
+}
+
+const expression &dtens::operator[](const sv_idx_t &vidx) const
+{
+    return index_impl(vidx);
+}
+
 dtens::size_type dtens::index_of(const v_idx_t &vidx) const
+{
+    return index_of(find(vidx));
+}
+
+dtens::size_type dtens::index_of(const sv_idx_t &vidx) const
 {
     return index_of(find(vidx));
 }
@@ -1632,12 +1651,12 @@ dtens::size_type dtens::index_of(const iterator &it) const
 }
 
 // Get a range containing all derivatives of the given order for all components.
-dtens::subrange dtens::get_derivatives(std::uint32_t order) const
+auto dtens::get_derivatives(std::uint32_t order) const -> decltype(std::ranges::subrange(begin(), end()))
 {
     // First we handle the empty case. This will return
     // an empty range.
     if (p_impl->m_map.empty()) {
-        return subrange{begin(), end()};
+        return {begin(), end()};
     }
 
     // Create the indices vector corresponding to the first derivative
@@ -1691,16 +1710,17 @@ dtens::subrange dtens::get_derivatives(std::uint32_t order) const
         ++e;
     }
 
-    return subrange{b, e};
+    return {b, e};
 }
 
 // Get a range containing all derivatives of the given order for a component.
-dtens::subrange dtens::get_derivatives(std::uint32_t component, std::uint32_t order) const
+auto dtens::get_derivatives(std::uint32_t component, std::uint32_t order) const
+    -> decltype(std::ranges::subrange(begin(), end()))
 {
     // First we handle the empty case. This will return
     // an empty range.
     if (p_impl->m_map.empty()) {
-        return subrange{begin(), end()};
+        return {begin(), end()};
     }
 
     // Create the indices vector corresponding to the first derivative
@@ -1750,7 +1770,7 @@ dtens::subrange dtens::get_derivatives(std::uint32_t component, std::uint32_t or
         ++e;
     }
 
-    return subrange{b, e};
+    return {b, e};
 }
 
 std::vector<expression> dtens::get_gradient() const

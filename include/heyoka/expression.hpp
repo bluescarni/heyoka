@@ -17,9 +17,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <ostream>
+#include <ranges>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -79,13 +81,13 @@ private:
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 public:
-    expression();
+    expression() noexcept;
 
-    explicit expression(float);
-    explicit expression(double);
-    explicit expression(long double);
+    explicit expression(float) noexcept;
+    explicit expression(double) noexcept;
+    explicit expression(long double) noexcept;
 #if defined(HEYOKA_HAVE_REAL128)
-    explicit expression(mppp::real128);
+    explicit expression(mppp::real128) noexcept;
 #endif
 #if defined(HEYOKA_HAVE_REAL)
     explicit expression(mppp::real);
@@ -94,8 +96,8 @@ public:
 
     explicit expression(number);
     explicit expression(variable);
-    explicit expression(func);
-    explicit expression(param);
+    explicit expression(func) noexcept;
+    explicit expression(param) noexcept;
 
     expression(const expression &);
     expression(expression &&) noexcept;
@@ -105,7 +107,7 @@ public:
     expression &operator=(const expression &);
     expression &operator=(expression &&) noexcept;
 
-    [[nodiscard]] const value_type &value() const;
+    [[nodiscard]] const value_type &value() const noexcept;
 };
 
 HEYOKA_DLL_PUBLIC expression copy(const expression &);
@@ -460,7 +462,10 @@ private:
 
     std::unique_ptr<impl> p_impl;
 
-    explicit dtens(impl);
+    explicit HEYOKA_DLL_LOCAL dtens(impl);
+
+    template <typename V>
+    HEYOKA_DLL_LOCAL const expression &index_impl(const V &) const;
 
     // Serialisation.
     friend class boost::serialization::access;
@@ -478,28 +483,6 @@ public:
 
     using iterator = detail::dtens_map_t::const_iterator;
 
-    // Subrange helper class to fetch
-    // ranges into dtens.
-    class HEYOKA_DLL_PUBLIC subrange
-    {
-        friend class dtens;
-
-        iterator m_begin, m_end;
-
-        explicit subrange(const iterator &, const iterator &);
-
-    public:
-        subrange() = delete;
-        subrange(const subrange &);
-        subrange(subrange &&) noexcept;
-        subrange &operator=(const subrange &);
-        subrange &operator=(subrange &&) noexcept;
-        ~subrange();
-
-        [[nodiscard]] iterator begin() const;
-        [[nodiscard]] iterator end() const;
-    };
-
     [[nodiscard]] iterator begin() const;
     [[nodiscard]] iterator end() const;
 
@@ -510,12 +493,16 @@ public:
     [[nodiscard]] const std::vector<expression> &get_args() const;
 
     [[nodiscard]] iterator find(const v_idx_t &) const;
+    [[nodiscard]] iterator find(const sv_idx_t &) const;
     [[nodiscard]] const expression &operator[](const v_idx_t &) const;
+    [[nodiscard]] const expression &operator[](const sv_idx_t &) const;
     [[nodiscard]] size_type index_of(const v_idx_t &) const;
+    [[nodiscard]] size_type index_of(const sv_idx_t &) const;
     [[nodiscard]] size_type index_of(const iterator &) const;
 
-    [[nodiscard]] subrange get_derivatives(std::uint32_t, std::uint32_t) const;
-    [[nodiscard]] subrange get_derivatives(std::uint32_t) const;
+    [[nodiscard]] auto get_derivatives(std::uint32_t order) const -> decltype(std::ranges::subrange(begin(), end()));
+    [[nodiscard]] auto get_derivatives(std::uint32_t component, std::uint32_t order) const
+        -> decltype(std::ranges::subrange(begin(), end()));
     [[nodiscard]] std::vector<expression> get_gradient() const;
     [[nodiscard]] std::vector<expression> get_jacobian() const;
 };
@@ -546,24 +533,12 @@ HEYOKA_BEGIN_NAMESPACE
 // returned by this function are optimised for evaluation. The users
 // can always unfix() and normalise() these expressions if needed.
 template <typename... KwArgs>
-dtens diff_tensors(const std::vector<expression> &v_ex, const KwArgs &...kw_args)
+dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_args, std::vector<expression>> &d_args,
+                   const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
     static_assert(!p.has_unnamed_arguments(), "diff_tensors() accepts only named arguments in the variadic pack.");
-
-    // Variables and/or params wrt which the derivatives will be computed.
-    // Defaults to all variables.
-    std::variant<diff_args, std::vector<expression>> d_args = diff_args::vars;
-    if constexpr (p.has(kw::diff_args)) {
-        if constexpr (std::is_same_v<detail::uncvref_t<decltype(p(kw::diff_args))>, diff_args>) {
-            d_args = p(kw::diff_args);
-        } else if constexpr (std::is_constructible_v<std::vector<expression>, decltype(p(kw::diff_args))>) {
-            d_args = std::vector<expression>(p(kw::diff_args));
-        } else {
-            static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the diff_args keyword argument.");
-        }
-    }
 
     // Order of derivatives. Defaults to 1.
     std::uint32_t order = 1;
@@ -577,6 +552,13 @@ dtens diff_tensors(const std::vector<expression> &v_ex, const KwArgs &...kw_args
     }
 
     return detail::diff_tensors(v_ex, d_args, order);
+}
+
+template <typename... KwArgs>
+dtens diff_tensors(const std::vector<expression> &v_ex, std::initializer_list<expression> d_args,
+                   const KwArgs &...kw_args)
+{
+    return diff_tensors(v_ex, std::vector(d_args), kw_args...);
 }
 
 namespace detail
