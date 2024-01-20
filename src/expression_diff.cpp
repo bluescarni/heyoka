@@ -1283,7 +1283,7 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
     assert(nargs > 0u);
 
     // NOTE: check that nargs fits in a 32-bit int, so that
-    // in the dtens API get_nvars() can safely return std::uint32_t.
+    // in the dtens API get_nargs() can safely return std::uint32_t.
     (void)(boost::numeric_cast<std::uint32_t>(nargs));
 
     // Map to associate a dtens_sv_idx_t to a derivative.
@@ -1585,7 +1585,7 @@ dtens::iterator dtens::find(const v_idx_t &vidx) const
 
     // The size of vidx must be consistent with the number
     // of diff args.
-    if (vidx.size() - 1u != get_nvars()) {
+    if (vidx.size() - 1u != get_nargs()) {
         return end();
     }
 
@@ -1687,8 +1687,8 @@ auto dtens::get_derivatives(std::uint32_t order) const -> decltype(std::ranges::
     assert(get_nouts() > 0u);
     s_vidx.first = get_nouts() - 1u;
     if (order != 0u) {
-        assert(get_nvars() > 0u);
-        s_vidx.second[0].first = get_nvars() - 1u;
+        assert(get_nargs() > 0u);
+        s_vidx.second[0].first = get_nargs() - 1u;
     }
 
     // NOTE: this could be end() for invalid order.
@@ -1746,9 +1746,9 @@ auto dtens::get_derivatives(std::uint32_t component, std::uint32_t order) const
 
     // Modify vidx so that it now refers to the last derivative
     // for the given order and component in the map.
-    assert(get_nvars() > 0u);
+    assert(get_nargs() > 0u);
     if (order != 0u) {
-        s_vidx.second[0].first = get_nvars() - 1u;
+        s_vidx.second[0].first = get_nargs() - 1u;
     }
 
     // NOTE: this could be end() for invalid component/order.
@@ -1787,10 +1787,10 @@ std::vector<expression> dtens::get_gradient() const
 
     const auto sr = get_derivatives(0, 1);
     std::vector<expression> retval;
-    retval.reserve(get_nvars());
+    retval.reserve(get_nargs());
     std::transform(sr.begin(), sr.end(), std::back_inserter(retval), [](const auto &p) { return p.second; });
 
-    assert(retval.size() == get_nvars());
+    assert(retval.size() == get_nargs());
 
     return retval;
 }
@@ -1807,15 +1807,15 @@ std::vector<expression> dtens::get_jacobian() const
 
     const auto sr = get_derivatives(1);
     std::vector<expression> retval;
-    retval.reserve(boost::safe_numerics::safe<decltype(retval.size())>(get_nvars()) * get_nouts());
+    retval.reserve(boost::safe_numerics::safe<decltype(retval.size())>(get_nargs()) * get_nouts());
     std::transform(sr.begin(), sr.end(), std::back_inserter(retval), [](const auto &p) { return p.second; });
 
-    assert(retval.size() == boost::safe_numerics::safe<decltype(retval.size())>(get_nvars()) * get_nouts());
+    assert(retval.size() == boost::safe_numerics::safe<decltype(retval.size())>(get_nargs()) * get_nouts());
 
     return retval;
 }
 
-std::uint32_t dtens::get_nvars() const
+std::uint32_t dtens::get_nargs() const
 {
     // NOTE: we ensure in the diff_tensors() implementation
     // that the number of diff variables is representable

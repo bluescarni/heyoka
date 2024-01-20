@@ -487,7 +487,7 @@ public:
     [[nodiscard]] iterator end() const;
 
     [[nodiscard]] std::uint32_t get_order() const;
-    [[nodiscard]] std::uint32_t get_nvars() const;
+    [[nodiscard]] std::uint32_t get_nargs() const;
     [[nodiscard]] std::uint32_t get_nouts() const;
     [[nodiscard]] size_type size() const;
     [[nodiscard]] const std::vector<expression> &get_args() const;

@@ -85,7 +85,7 @@ TEST_CASE("diff_tensors basic")
 
     REQUIRE(dt.size() == 1u);
     REQUIRE(dt.get_order() == 0u);
-    REQUIRE(dt.get_nvars() == 1u);
+    REQUIRE(dt.get_nargs() == 1u);
     REQUIRE(dt.get_nouts() == 1u);
     REQUIRE(dt[dtens::v_idx_t{0, 0}] == 1_dbl);
     REQUIRE(dt[dtens::sv_idx_t{0, {}}] == 1_dbl);
@@ -118,7 +118,7 @@ TEST_CASE("diff_tensors basic")
     };
 
     REQUIRE(dt.size() == 2u);
-    REQUIRE(dt.get_nvars() == 1u);
+    REQUIRE(dt.get_nargs() == 1u);
 
     assign_sr(dt.get_derivatives(0, 0));
     REQUIRE(diff_vec.size() == 1u);
@@ -138,7 +138,7 @@ TEST_CASE("diff_tensors basic")
         Message(fmt::format("Cannot locate the derivative corresponding to the indices vector {}", std::vector{0, 2})));
 
     dt = diff_tensors({1_dbl}, {par[0]}, kw::diff_order = 2);
-    REQUIRE(dt.get_nvars() == 1u);
+    REQUIRE(dt.get_nargs() == 1u);
     REQUIRE(dt.size() == 3u);
     assign_sr(dt.get_derivatives(0, 0));
     REQUIRE(diff_vec.size() == 1u);
@@ -170,7 +170,7 @@ TEST_CASE("diff_tensors basic")
                                                dtens::sv_idx_t{1, {{1, 3}}})));
 
     dt = diff_tensors({1_dbl}, {par[0]}, kw::diff_order = 3);
-    REQUIRE(dt.get_nvars() == 1u);
+    REQUIRE(dt.get_nargs() == 1u);
     REQUIRE(dt.size() == 4u);
     assign_sr(dt.get_derivatives(0, 0));
     REQUIRE(diff_vec.size() == 1u);
@@ -208,7 +208,7 @@ TEST_CASE("diff_tensors basic")
 
     // Diff wrt all variables.
     dt = diff_tensors({x + y, x * y * y}, diff_args::vars, kw::diff_order = 2);
-    REQUIRE(dt.get_nvars() == 2u);
+    REQUIRE(dt.get_nargs() == 2u);
     REQUIRE(dt.size() == 12u);
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{x + y, x * y * y});
@@ -218,7 +218,7 @@ TEST_CASE("diff_tensors basic")
     REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * x});
 
     dt = diff_tensors({x + y, x * y * y}, diff_args::vars, kw::diff_order = 2);
-    REQUIRE(dt.get_nvars() == 2u);
+    REQUIRE(dt.get_nargs() == 2u);
     REQUIRE(dt.size() == 12u);
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{x + y, x * y * y});
@@ -229,7 +229,7 @@ TEST_CASE("diff_tensors basic")
 
     // Diff wrt some variables.
     dt = diff_tensors({x + y, x * y * y}, {x}, kw::diff_order = 2);
-    REQUIRE(dt.get_nvars() == 1u);
+    REQUIRE(dt.get_nargs() == 1u);
     REQUIRE(dt.size() == 6u);
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{x + y, x * y * y});
@@ -240,7 +240,7 @@ TEST_CASE("diff_tensors basic")
 
     // Diff wrt all params.
     dt = diff_tensors({par[0] + y, x * y * par[1]}, diff_args::params, kw::diff_order = 2);
-    REQUIRE(dt.get_nvars() == 2u);
+    REQUIRE(dt.get_nargs() == 2u);
     REQUIRE(dt.size() == 12u);
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{par[0] + y, x * y * par[1]});
@@ -251,7 +251,7 @@ TEST_CASE("diff_tensors basic")
 
     // Diff wrt some param.
     dt = diff_tensors({par[0] + y, x * y * par[1]}, {par[1]}, kw::diff_order = 2);
-    REQUIRE(dt.get_nvars() == 1u);
+    REQUIRE(dt.get_nargs() == 1u);
     REQUIRE(dt.size() == 6u);
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{par[0] + y, x * y * par[1]});
@@ -289,7 +289,7 @@ TEST_CASE("dtens basics")
     REQUIRE(oss.str() == fmt::format("{}", dt));
 
     REQUIRE(dt.get_order() == 0u);
-    REQUIRE(dt.get_nvars() == 0u);
+    REQUIRE(dt.get_nargs() == 0u);
     REQUIRE(dt.get_nouts() == 0u);
     REQUIRE(dt.size() == 0u);
     REQUIRE(dt.index_of(dt.end()) == 0u);
@@ -336,7 +336,7 @@ TEST_CASE("dtens basics")
     auto dt2 = diff_tensors({x + y, x * y}, diff_args::vars, kw::diff_order = 1);
 
     REQUIRE(dt2.get_order() == 1u);
-    REQUIRE(dt2.get_nvars() == 2u);
+    REQUIRE(dt2.get_nargs() == 2u);
     REQUIRE(dt2.get_nouts() == 2u);
     REQUIRE(dt2.get_args() == std::vector{x, y});
     REQUIRE(dt2.find({0, 1, 0}) != dt2.end());
