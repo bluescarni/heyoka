@@ -142,6 +142,7 @@
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -1234,6 +1235,11 @@ void llvm_state::compile()
 {
     check_uncompiled(__func__);
 
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
+
+    auto *logger = detail::get_logger();
+
     // Run a verification on the module before compiling.
     {
         std::string out;
@@ -1246,6 +1252,8 @@ void llvm_state::compile()
             // LCOV_EXCL_STOP
         }
     }
+
+    logger->trace("module verification runtime: {}", sw);
 
     // Add the object materialisation trigger function.
     // NOTE: do it **after** verification, on the assumption
@@ -1280,11 +1288,19 @@ void llvm_state::compile()
             // Assign the object file.
             detail::llvm_state_add_obj_to_jit(*m_jitter, std::move(cached_data->obj));
         } else {
+            sw.reset();
+
             // Run the optimisation pass.
             optimise();
 
+            logger->trace("optimisation runtime: {}", sw);
+
+            sw.reset();
+
             // Run the compilation.
             compile_impl();
+
+            logger->trace("materialisation runtime: {}", sw);
 
             // Try to insert orig_bc into the cache.
             detail::llvm_state_mem_cache_try_insert(std::move(orig_bc), olevel,
