@@ -1374,12 +1374,7 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
     get_logger()->trace("cfunc IR creation compact mode runtime: {}", sw);
 }
 
-// NOTE: add_cfunc() will add two functions, one called 'name'
-// and the other called 'name' + '.strided'. The first function
-// indexes into the input/output/par buffers contiguously (that it,
-// it assumes the input/output/par scalar/vector values are stored one
-// after the other without "holes" between them).
-// The second function has an extra trailing argument, the stride
+// NOTE: in strided mode, the compiled function has an extra trailing argument, the stride
 // value, which indicates the distance between consecutive
 // input/output/par values in the buffers. The stride is measured in the number
 // of *scalar* values between input/output/par values.
@@ -1388,6 +1383,11 @@ void add_cfunc_c_mode(llvm_state &s, llvm::Type *fp_type, llvm::Value *out_ptr, 
 // in the input array. For a batch size of 2 and a stride value of 3,
 // the input vector values (of size 2) will be read from indices
 // [0, 1], [3, 4], [6, 7], [9, 10], ... in the input array.
+//
+// In non-strided mode, the compiled function indexes into the
+// input/output/par buffers contiguously (that is,
+// it assumes the input/output/par scalar/vector values are stored one
+// after the other without "holes" between them).
 template <typename T, typename F>
 auto add_cfunc_impl(llvm_state &s, const std::string &name, const F &fn, std::uint32_t batch_size, bool high_accuracy,
                     bool compact_mode, bool parallel_mode, [[maybe_unused]] long long prec, bool strided)
