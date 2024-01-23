@@ -93,13 +93,6 @@ TEST_CASE("opt level clamping")
     // Opt level clamping on construction.
     auto s = llvm_state(kw::opt_level = 4u, kw::fast_math = true);
     REQUIRE(s.get_opt_level() == 3u);
-
-    // Opt level clamping on setter.
-    s = llvm_state{kw::mname = "foobarizer"};
-    s.set_opt_level(0u);
-    REQUIRE(s.get_opt_level() == 0u);
-    s.set_opt_level(42u);
-    REQUIRE(s.get_opt_level() == 3u);
 }
 
 TEST_CASE("copy semantics")
@@ -381,9 +374,6 @@ TEST_CASE("slp_vectorize")
         llvm_state s5;
         s5 = std::move(s4);
         REQUIRE(!s5.get_slp_vectorize());
-
-        s5.set_slp_vectorize(true);
-        REQUIRE(s5.get_slp_vectorize());
     }
 
     {
@@ -403,9 +393,6 @@ TEST_CASE("slp_vectorize")
         llvm_state s5;
         s5 = std::move(s4);
         REQUIRE(s5.get_slp_vectorize());
-
-        s5.set_slp_vectorize(false);
-        REQUIRE(!s5.get_slp_vectorize());
     }
 }
 

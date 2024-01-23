@@ -909,11 +909,6 @@ unsigned llvm_state::get_opt_level() const
     return m_opt_level;
 }
 
-void llvm_state::set_opt_level(unsigned opt_level)
-{
-    m_opt_level = clamp_opt_level(opt_level);
-}
-
 bool llvm_state::fast_math() const
 {
     return m_fast_math;
@@ -927,11 +922,6 @@ bool llvm_state::force_avx512() const
 bool llvm_state::get_slp_vectorize() const
 {
     return m_slp_vectorize;
-}
-
-void llvm_state::set_slp_vectorize(bool flag)
-{
-    m_slp_vectorize = flag;
 }
 
 unsigned llvm_state::clamp_opt_level(unsigned opt_level)

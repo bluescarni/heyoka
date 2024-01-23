@@ -270,9 +270,7 @@ public:
     [[nodiscard]] bool fast_math() const;
     [[nodiscard]] bool force_avx512() const;
     [[nodiscard]] unsigned get_opt_level() const;
-    void set_opt_level(unsigned);
     [[nodiscard]] bool get_slp_vectorize() const;
-    void set_slp_vectorize(bool);
 
     [[nodiscard]] std::string get_ir() const;
     [[nodiscard]] std::string get_bc() const;
