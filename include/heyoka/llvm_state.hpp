@@ -11,6 +11,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <concepts>
 #include <cstdint>
 #include <initializer_list>
 #include <memory>
@@ -19,6 +20,8 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+
+#include <boost/numeric/conversion/cast.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -147,63 +150,84 @@ class HEYOKA_DLL_PUBLIC llvm_state
 
     // Implementation details for the variadic constructor.
     template <typename... KwArgs>
-    static auto kw_args_ctor_impl(KwArgs &&...kw_args)
+    static auto kw_args_ctor_impl(const KwArgs &...kw_args)
     {
         igor::parser p{kw_args...};
 
-        if constexpr (p.has_unnamed_arguments()) {
-            static_assert(detail::always_false_v<KwArgs...>,
-                          "The variadic arguments in the construction of an llvm_state contain "
-                          "unnamed arguments.");
-        } else {
-            // Module name (defaults to empty string).
-            auto mod_name = [&p]() -> std::string {
-                if constexpr (p.has(kw::mname)) {
+        static_assert(!p.has_unnamed_arguments(), "The variadic arguments in the construction of an llvm_state contain "
+                                                  "unnamed arguments.");
+
+        // Module name (defaults to empty string).
+        auto mod_name = [&p]() -> std::string {
+            if constexpr (p.has(kw::mname)) {
+                if constexpr (std::convertible_to<decltype(p(kw::mname)), std::string>) {
                     return p(kw::mname);
                 } else {
-                    return "";
+                    static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the 'mname' keyword argument.");
                 }
-            }();
+            } else {
+                return {};
+            }
+        }();
 
-            // Optimisation level (defaults to 3).
-            auto opt_level = [&p]() -> unsigned {
-                if constexpr (p.has(kw::opt_level)) {
-                    return p(kw::opt_level);
+        // Optimisation level (defaults to 3).
+        auto opt_level = [&p]() -> unsigned {
+            if constexpr (p.has(kw::opt_level)) {
+                if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::opt_level))>>) {
+                    return boost::numeric_cast<unsigned>(p(kw::opt_level));
                 } else {
-                    return 3;
+                    static_assert(detail::always_false_v<KwArgs...>,
+                                  "Invalid type for the 'opt_level' keyword argument.");
                 }
-            }();
-            opt_level = clamp_opt_level(opt_level);
+            } else {
+                return 3;
+            }
+        }();
+        opt_level = clamp_opt_level(opt_level);
 
-            // Fast math flag (defaults to false).
-            auto fmath = [&p]() -> bool {
-                if constexpr (p.has(kw::fast_math)) {
+        // Fast math flag (defaults to false).
+        auto fmath = [&p]() -> bool {
+            if constexpr (p.has(kw::fast_math)) {
+                if constexpr (std::convertible_to<decltype(p(kw::fast_math)), bool>) {
                     return p(kw::fast_math);
                 } else {
-                    return false;
+                    static_assert(detail::always_false_v<KwArgs...>,
+                                  "Invalid type for the 'fast_math' keyword argument.");
                 }
-            }();
+            } else {
+                return false;
+            }
+        }();
 
-            // Force usage of AVX512 registers (defaults to false).
-            auto force_avx512 = [&p]() -> bool {
-                if constexpr (p.has(kw::force_avx512)) {
+        // Force usage of AVX512 registers (defaults to false).
+        auto force_avx512 = [&p]() -> bool {
+            if constexpr (p.has(kw::force_avx512)) {
+                if constexpr (std::convertible_to<decltype(p(kw::force_avx512)), bool>) {
                     return p(kw::force_avx512);
                 } else {
-                    return false;
+                    static_assert(detail::always_false_v<KwArgs...>,
+                                  "Invalid type for the 'force_avx512' keyword argument.");
                 }
-            }();
+            } else {
+                return false;
+            }
+        }();
 
-            // Enable SLP vectorization (defaults to false).
-            auto slp_vectorize = [&p]() -> bool {
-                if constexpr (p.has(kw::slp_vectorize)) {
+        // Enable SLP vectorization (defaults to false).
+        auto slp_vectorize = [&p]() -> bool {
+            if constexpr (p.has(kw::slp_vectorize)) {
+                if constexpr (std::convertible_to<decltype(p(kw::slp_vectorize)), bool>) {
                     return p(kw::slp_vectorize);
                 } else {
-                    return false;
+                    static_assert(detail::always_false_v<KwArgs...>,
+                                  "Invalid type for the 'slp_vectorize' keyword argument.");
                 }
-            }();
+            } else {
+                return false;
+            }
+        }();
 
-            return std::tuple{std::move(mod_name), opt_level, fmath, force_avx512, slp_vectorize};
-        }
+        return std::tuple{std::move(mod_name), opt_level, fmath, force_avx512, slp_vectorize};
     }
     explicit llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&);
 
@@ -216,21 +240,17 @@ class HEYOKA_DLL_PUBLIC llvm_state
     HEYOKA_DLL_LOCAL void compile_impl();
     HEYOKA_DLL_LOCAL void add_obj_trigger();
 
-    // Meta-programming for the kwargs ctor. Enabled if:
+public:
+    llvm_state();
+    // NOTE: the constructor is enabled if:
     // - there is at least 1 argument (i.e., cannot act as a def ctor),
     // - if there is only 1 argument, it cannot be of type llvm_state
     //   (so that it does not interfere with copy/move ctors).
     template <typename... KwArgs>
-    using kwargs_ctor_enabler = std::enable_if_t<
-        (sizeof...(KwArgs) > 0u)
-            && (sizeof...(KwArgs) > 1u
-                || std::conjunction_v<std::negation<std::is_same<detail::uncvref_t<KwArgs>, llvm_state>>...>),
-        int>;
-
-public:
-    llvm_state();
-    template <typename... KwArgs, kwargs_ctor_enabler<KwArgs...> = 0>
-    explicit llvm_state(KwArgs &&...kw_args) : llvm_state(kw_args_ctor_impl(std::forward<KwArgs>(kw_args)...))
+        requires(sizeof...(KwArgs) > 0u)
+                && ((sizeof...(KwArgs) > 1u) || (!std::same_as<std::remove_cvref_t<KwArgs>, llvm_state> && ...))
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init, hicpp-member-init)
+    explicit llvm_state(const KwArgs &...kw_args) : llvm_state(kw_args_ctor_impl(kw_args...))
     {
     }
     llvm_state(const llvm_state &);
@@ -250,9 +270,7 @@ public:
     [[nodiscard]] bool fast_math() const;
     [[nodiscard]] bool force_avx512() const;
     [[nodiscard]] unsigned get_opt_level() const;
-    void set_opt_level(unsigned);
     [[nodiscard]] bool get_slp_vectorize() const;
-    void set_slp_vectorize(bool);
 
     [[nodiscard]] std::string get_ir() const;
     [[nodiscard]] std::string get_bc() const;

@@ -774,9 +774,7 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
     // Fetch the vector floating-point type.
     auto *val_t = make_vector_type(fp_t, batch_size);
 
-    const auto na_pair = llvm_c_eval_func_name_args(context, fp_t, name, batch_size, fb.args());
-    const auto &fname = na_pair.first;
-    const auto &fargs = na_pair.second;
+    const auto [fname, fargs] = llvm_c_eval_func_name_args(context, fp_t, name, batch_size, fb.args());
 
     // Try to see if we already created the function.
     auto *f = md.getFunction(fname);
