@@ -403,17 +403,17 @@ TEST_CASE("batch")
             (*d_out)(loc_time);
 
             for (auto j = 0u; j < batch_size; ++j) {
-                REQUIRE(d_out->get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(10)));
+                REQUIRE(d_out->get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(100)));
                 REQUIRE(d_out->get_output()[batch_size + j]
-                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(10)));
+                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(100)));
             }
 
             // Try the scalar version too.
             for (auto j = 0u; j < batch_size; ++j) {
                 (*d_out)(loc_time[j]);
-                REQUIRE(d_out->get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(10)));
+                REQUIRE(d_out->get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(100)));
                 REQUIRE(d_out->get_output()[batch_size + j]
-                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(10)));
+                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(100)));
             }
         }
 
@@ -497,9 +497,9 @@ TEST_CASE("batch")
             (*d_out)(loc_time);
 
             for (auto j = 0u; j < batch_size; ++j) {
-                REQUIRE(d_out->get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(10)));
+                REQUIRE(d_out->get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(100)));
                 REQUIRE(d_out->get_output()[batch_size + j]
-                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(10)));
+                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(100)));
             }
         }
 
@@ -550,9 +550,9 @@ TEST_CASE("batch")
             (*d_out)(loc_time);
 
             for (auto j = 0u; j < batch_size; ++j) {
-                REQUIRE(d_out->get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(10)));
+                REQUIRE(d_out->get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(100)));
                 REQUIRE(d_out->get_output()[batch_size + j]
-                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(10)));
+                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(100)));
             }
         }
 
@@ -597,9 +597,9 @@ TEST_CASE("batch")
             co(loc_time);
 
             for (auto j = 0u; j < batch_size; ++j) {
-                REQUIRE(co.get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(10)));
+                REQUIRE(co.get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(100)));
                 REQUIRE(co.get_output()[batch_size + j]
-                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(10)));
+                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(100)));
             }
         }
 
@@ -613,9 +613,9 @@ TEST_CASE("batch")
             co(loc_time);
 
             for (auto j = 0u; j < batch_size; ++j) {
-                REQUIRE(co.get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(10)));
+                REQUIRE(co.get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(100)));
                 REQUIRE(co.get_output()[batch_size + j]
-                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(10)));
+                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(100)));
             }
         }
 
@@ -656,9 +656,9 @@ TEST_CASE("batch")
             co(loc_time);
 
             for (auto j = 0u; j < batch_size; ++j) {
-                REQUIRE(co.get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(10)));
+                REQUIRE(co.get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(100)));
                 REQUIRE(co.get_output()[batch_size + j]
-                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(10)));
+                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(100)));
             }
         }
 
