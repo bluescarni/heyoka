@@ -62,6 +62,7 @@
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/Casting.h>
+#include <llvm/Support/CodeGen.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/SmallVectorMemoryBuffer.h>
 #include <llvm/Support/TargetSelect.h>
@@ -347,8 +348,12 @@ struct llvm_state::jit {
     std::unique_ptr<llvm::orc::ThreadSafeContext> m_ctx;
     std::optional<std::string> m_object_file;
 
-    jit()
+    explicit jit(unsigned opt_level)
     {
+        // NOTE: we assume here the opt level has already been clamped
+        // from the outside.
+        assert(opt_level <= 3u);
+
         // Ensure the native target is inited.
         detail::init_native_target();
 
@@ -359,8 +364,21 @@ struct llvm_state::jit {
             throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
         }
         // LCOV_EXCL_STOP
-        // Set the codegen optimisation level to aggressive.
-        jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::Aggressive);
+        // Set the codegen optimisation level.
+        switch (opt_level) {
+            case 0u:
+                jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::None);
+                break;
+            case 1u:
+                jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::Less);
+                break;
+            case 2u:
+                jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::Default);
+                break;
+            default:
+                assert(opt_level == 3u);
+                jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::Aggressive);
+        }
 
         // Create the jit builder.
         llvm::orc::LLJITBuilder lljit_builder;
@@ -598,7 +616,7 @@ auto llvm_state_bc_to_module(const std::string &module_name, const std::string &
 
 // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
 llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup)
-    : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_fast_math(std::get<2>(tup)),
+    : m_jitter(std::make_unique<jit>(std::get<1>(tup))), m_opt_level(std::get<1>(tup)), m_fast_math(std::get<2>(tup)),
       m_force_avx512(std::get<3>(tup)), m_slp_vectorize(std::get<4>(tup)), m_module_name(std::move(std::get<0>(tup)))
 {
     // Create the module.
@@ -622,8 +640,9 @@ llvm_state::llvm_state(const llvm_state &other)
     // NOTE: start off by:
     // - creating a new jit,
     // - copying over the options from other.
-    : m_jitter(std::make_unique<jit>()), m_opt_level(other.m_opt_level), m_fast_math(other.m_fast_math),
-      m_force_avx512(other.m_force_avx512), m_slp_vectorize(other.m_slp_vectorize), m_module_name(other.m_module_name)
+    : m_jitter(std::make_unique<jit>(other.m_opt_level)), m_opt_level(other.m_opt_level),
+      m_fast_math(other.m_fast_math), m_force_avx512(other.m_force_avx512), m_slp_vectorize(other.m_slp_vectorize),
+      m_module_name(other.m_module_name)
 {
     if (other.is_compiled()) {
         // 'other' was compiled.
@@ -825,7 +844,7 @@ void llvm_state::load_impl(Archive &ar, unsigned version)
         m_builder.reset();
 
         // Reset the jit with a new one.
-        m_jitter = std::make_unique<jit>();
+        m_jitter = std::make_unique<jit>(opt_level);
 
         if (cmp) {
             // Assign the snapshots.
