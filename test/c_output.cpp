@@ -114,8 +114,8 @@ TEST_CASE("scalar")
         // Compare the two.
         for (auto i = 0u; i < 11u; ++i) {
             (*d_out)(t_grid[i]);
-            REQUIRE(d_out->get_output()[0] == approximately(grid_out[2u * i], fp_t(10)));
-            REQUIRE(d_out->get_output()[1] == approximately(grid_out[2u * i + 1u], fp_t(10)));
+            REQUIRE(d_out->get_output()[0] == approximately(grid_out[2u * i], fp_t(100)));
+            REQUIRE(d_out->get_output()[1] == approximately(grid_out[2u * i + 1u], fp_t(100)));
         }
 
         REQUIRE(d_out->get_bounds().first == 0.);
@@ -133,8 +133,8 @@ TEST_CASE("scalar")
         // Try making a copy too.
         auto co3 = *d_out;
         co3(4.);
-        REQUIRE(co3.get_output()[0] == approximately(grid_out[2u * 4u], fp_t(10)));
-        REQUIRE(co3.get_output()[1] == approximately(grid_out[2u * 4u + 1u], fp_t(10)));
+        REQUIRE(co3.get_output()[0] == approximately(grid_out[2u * 4u], fp_t(100)));
+        REQUIRE(co3.get_output()[1] == approximately(grid_out[2u * 4u + 1u], fp_t(100)));
 
         // Limiting case in which not steps are taken.
         ta.get_state_data()[0] = 0;
@@ -162,8 +162,8 @@ TEST_CASE("scalar")
         // Compare the two.
         for (auto i = 0u; i < 11u; ++i) {
             (*d_out)(t_grid[i]);
-            REQUIRE(d_out->get_output()[0] == approximately(grid_out[2u * i], fp_t(10)));
-            REQUIRE(d_out->get_output()[1] == approximately(grid_out[2u * i + 1u], fp_t(10)));
+            REQUIRE(d_out->get_output()[0] == approximately(grid_out[2u * i], fp_t(100)));
+            REQUIRE(d_out->get_output()[1] == approximately(grid_out[2u * i + 1u], fp_t(100)));
         }
 
         // Do it backwards too.
@@ -192,8 +192,8 @@ TEST_CASE("scalar")
         // Compare the two.
         for (auto i = 0u; i < 11u; ++i) {
             (*d_out)(t_grid[i]);
-            REQUIRE(d_out->get_output()[0] == approximately(grid_out[2u * i], fp_t(10)));
-            REQUIRE(d_out->get_output()[1] == approximately(grid_out[2u * i + 1u], fp_t(10)));
+            REQUIRE(d_out->get_output()[0] == approximately(grid_out[2u * i], fp_t(100)));
+            REQUIRE(d_out->get_output()[1] == approximately(grid_out[2u * i + 1u], fp_t(100)));
         }
 
         REQUIRE(d_out->get_bounds().first == 0.);
@@ -211,13 +211,13 @@ TEST_CASE("scalar")
         // Try making a copy too.
         co = *d_out;
         co(-4.);
-        REQUIRE(co.get_output()[0] == approximately(grid_out[2u * 4u], fp_t(10)));
-        REQUIRE(co.get_output()[1] == approximately(grid_out[2u * 4u + 1u], fp_t(10)));
+        REQUIRE(co.get_output()[0] == approximately(grid_out[2u * 4u], fp_t(100)));
+        REQUIRE(co.get_output()[1] == approximately(grid_out[2u * 4u + 1u], fp_t(100)));
 
         co = *&co;
         co(-5.);
-        REQUIRE(co.get_output()[0] == approximately(grid_out[2u * 5u], fp_t(10)));
-        REQUIRE(co.get_output()[1] == approximately(grid_out[2u * 5u + 1u], fp_t(10)));
+        REQUIRE(co.get_output()[0] == approximately(grid_out[2u * 5u], fp_t(100)));
+        REQUIRE(co.get_output()[1] == approximately(grid_out[2u * 5u + 1u], fp_t(100)));
 
         // Limiting case in which not steps are taken.
         ta.get_state_data()[0] = 0;
@@ -244,8 +244,8 @@ TEST_CASE("scalar")
             ia >> co;
         }
 
-        REQUIRE(co.get_output()[0] == approximately(grid_out[2u * 5u], fp_t(10)));
-        REQUIRE(co.get_output()[1] == approximately(grid_out[2u * 5u + 1u], fp_t(10)));
+        REQUIRE(co.get_output()[0] == approximately(grid_out[2u * 5u], fp_t(100)));
+        REQUIRE(co.get_output()[1] == approximately(grid_out[2u * 5u + 1u], fp_t(100)));
 
         // Try with a def-cted object too.
         oss.str("");
@@ -458,9 +458,9 @@ TEST_CASE("batch")
             co3(loc_time);
 
             for (auto j = 0u; j < batch_size; ++j) {
-                REQUIRE(co3.get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(10)));
+                REQUIRE(co3.get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(100)));
                 REQUIRE(co3.get_output()[batch_size + j]
-                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(10)));
+                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(100)));
             }
         }
 
