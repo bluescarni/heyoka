@@ -10,8 +10,8 @@
 
 #include <heyoka/callable.hpp>
 #include <heyoka/config.hpp>
+#include <heyoka/events.hpp>
 #include <heyoka/step_callback.hpp>
-#include <heyoka/taylor.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 

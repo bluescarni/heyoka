@@ -10,11 +10,15 @@
 #define HEYOKA_HEYOKA_HPP
 
 #include <heyoka/callable.hpp>
+#include <heyoka/callbacks.hpp>
 #include <heyoka/ensemble_propagate.hpp>
+#include <heyoka/events.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/hamiltonian.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/lagrangian.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/logging.hpp>
 #include <heyoka/math.hpp>

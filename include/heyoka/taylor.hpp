@@ -45,13 +45,13 @@
 
 #endif
 
-#include <heyoka/callable.hpp>
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/events.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -195,21 +195,14 @@ enum class taylor_outcome : std::int64_t {
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
 
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, event_direction);
-
 HEYOKA_END_NAMESPACE
 
-// fmt formatters for taylor_outcome and event_direction, implemented
-// on top of the streaming operator.
+// fmt formatter for taylor_outcome, implemented on top of the streaming operator.
 namespace fmt
 {
 
 template <>
 struct formatter<heyoka::taylor_outcome> : fmt::ostream_formatter {
-};
-
-template <>
-struct formatter<heyoka::event_direction> : fmt::ostream_formatter {
 };
 
 } // namespace fmt
@@ -343,290 +336,7 @@ inline auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
     return std::tuple{high_accuracy, std::move(tol), compact_mode, std::move(pars), parallel_mode};
 }
 
-template <typename T, bool B>
-class HEYOKA_DLL_PUBLIC_INLINE_CLASS nt_event_impl
-{
-    static_assert(is_supported_fp_v<T>, "Unhandled type.");
-
-public:
-    using callback_t = callable<std::conditional_t<B, void(taylor_adaptive_batch<T> &, T, int, std::uint32_t),
-                                                   void(taylor_adaptive<T> &, T, int)>>;
-
-private:
-    expression eq;
-    callback_t callback;
-    event_direction dir = event_direction::any;
-
-    // Serialization.
-    friend class boost::serialization::access;
-    void save(boost::archive::binary_oarchive &, unsigned) const;
-    void load(boost::archive::binary_iarchive &, unsigned);
-    BOOST_SERIALIZATION_SPLIT_MEMBER()
-
-    void finalise_ctor(event_direction);
-
-public:
-    nt_event_impl();
-
-    template <typename... KwArgs>
-    explicit nt_event_impl(expression e, callback_t cb, const KwArgs &...kw_args)
-        : eq(std::move(e)), callback(std::move(cb))
-    {
-        igor::parser p{kw_args...};
-
-        if constexpr (p.has_unnamed_arguments()) {
-            static_assert(detail::always_false_v<KwArgs...>,
-                          "The variadic arguments in the construction of a non-terminal event contain "
-                          "unnamed arguments.");
-            throw;
-        } else {
-            // Direction (defaults to any).
-            auto d = [&p]() -> event_direction {
-                if constexpr (p.has(kw::direction)) {
-                    return p(kw::direction);
-                } else {
-                    return event_direction::any;
-                }
-            }();
-
-            finalise_ctor(d);
-        }
-    }
-
-    nt_event_impl(const nt_event_impl &);
-    nt_event_impl(nt_event_impl &&) noexcept;
-
-    nt_event_impl &operator=(const nt_event_impl &);
-    nt_event_impl &operator=(nt_event_impl &&) noexcept;
-
-    ~nt_event_impl();
-
-    [[nodiscard]] const expression &get_expression() const;
-    callback_t &get_callback();
-    [[nodiscard]] const callback_t &get_callback() const;
-    [[nodiscard]] event_direction get_direction() const;
-};
-
-// Prevent implicit instantiations.
-#define HEYOKA_NT_EVENT_EXTERN_INST(F)                                                                                 \
-    extern template class nt_event_impl<F, true>;                                                                      \
-    extern template class nt_event_impl<F, false>;
-
-HEYOKA_NT_EVENT_EXTERN_INST(float)
-HEYOKA_NT_EVENT_EXTERN_INST(double)
-HEYOKA_NT_EVENT_EXTERN_INST(long double)
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_NT_EVENT_EXTERN_INST(mppp::real128)
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-HEYOKA_NT_EVENT_EXTERN_INST(mppp::real)
-
-#endif
-
-#undef HEYOKA_NT_EVENT_EXTERN_INST
-
-template <typename T, bool B>
-inline std::ostream &operator<<(std::ostream &os, const nt_event_impl<T, B> &)
-{
-    static_assert(always_false_v<T>, "Unhandled type.");
-
-    return os;
-}
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<float, false> &);
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<float, true> &);
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<double, false> &);
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<double, true> &);
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<long double, false> &);
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<long double, true> &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<mppp::real128, false> &);
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<mppp::real128, true> &);
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<mppp::real, false> &);
-
-#endif
-
-template <typename T, bool B>
-class HEYOKA_DLL_PUBLIC_INLINE_CLASS t_event_impl
-{
-    static_assert(is_supported_fp_v<T>, "Unhandled type.");
-
-public:
-    using callback_t = callable<
-        std::conditional_t<B, bool(taylor_adaptive_batch<T> &, int, std::uint32_t), bool(taylor_adaptive<T> &, int)>>;
-
-private:
-    expression eq;
-    callback_t callback;
-    T cooldown = 0;
-    event_direction dir = event_direction::any;
-
-    // Serialization.
-    friend class boost::serialization::access;
-    void save(boost::archive::binary_oarchive &, unsigned) const;
-    void load(boost::archive::binary_iarchive &, unsigned);
-    BOOST_SERIALIZATION_SPLIT_MEMBER()
-
-    void finalise_ctor(callback_t, T, event_direction);
-
-public:
-    t_event_impl();
-
-    template <typename... KwArgs>
-    explicit t_event_impl(expression e, const KwArgs &...kw_args) : eq(std::move(e))
-    {
-        igor::parser p{kw_args...};
-
-        if constexpr (p.has_unnamed_arguments()) {
-            static_assert(detail::always_false_v<KwArgs...>,
-                          "The variadic arguments in the construction of a terminal event contain "
-                          "unnamed arguments.");
-            throw;
-        } else {
-            // Callback (defaults to empty).
-            auto cb = [&p]() -> callback_t {
-                if constexpr (p.has(kw::callback)) {
-                    return p(kw::callback);
-                } else {
-                    return {};
-                }
-            }();
-
-            // Cooldown (defaults to -1).
-            auto cd = [&p]() -> T {
-                if constexpr (p.has(kw::cooldown)) {
-                    return p(kw::cooldown);
-                } else {
-                    return T(-1);
-                }
-            }();
-
-            // Direction (defaults to any).
-            auto d = [&p]() -> event_direction {
-                if constexpr (p.has(kw::direction)) {
-                    return p(kw::direction);
-                } else {
-                    return event_direction::any;
-                }
-            }();
-
-            finalise_ctor(std::move(cb), cd, d);
-        }
-    }
-
-    t_event_impl(const t_event_impl &);
-    t_event_impl(t_event_impl &&) noexcept;
-
-    t_event_impl &operator=(const t_event_impl &);
-    t_event_impl &operator=(t_event_impl &&) noexcept;
-
-    ~t_event_impl();
-
-    [[nodiscard]] const expression &get_expression() const;
-    callback_t &get_callback();
-    [[nodiscard]] const callback_t &get_callback() const;
-    [[nodiscard]] event_direction get_direction() const;
-    [[nodiscard]] T get_cooldown() const;
-};
-
-// Prevent implicit instantiations.
-#define HEYOKA_T_EVENT_EXTERN_INST(F)                                                                                  \
-    extern template class t_event_impl<F, true>;                                                                       \
-    extern template class t_event_impl<F, false>;
-
-HEYOKA_T_EVENT_EXTERN_INST(float)
-HEYOKA_T_EVENT_EXTERN_INST(double)
-HEYOKA_T_EVENT_EXTERN_INST(long double)
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_T_EVENT_EXTERN_INST(mppp::real128)
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-HEYOKA_T_EVENT_EXTERN_INST(mppp::real)
-
-#endif
-
-#undef HEYOKA_T_EVENT_EXTERN_INST
-
-template <typename T, bool B>
-inline std::ostream &operator<<(std::ostream &os, const t_event_impl<T, B> &)
-{
-    static_assert(detail::always_false_v<T>, "Unhandled type.");
-
-    return os;
-}
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<float, false> &);
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<float, true> &);
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<double, false> &);
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<double, true> &);
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<long double, false> &);
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<long double, true> &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mppp::real128, false> &);
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mppp::real128, true> &);
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mppp::real, false> &);
-
-#endif
-
 } // namespace detail
-
-template <typename T>
-using nt_event = detail::nt_event_impl<T, false>;
-
-template <typename T>
-using t_event = detail::t_event_impl<T, false>;
-
-template <typename T>
-using nt_event_batch = detail::nt_event_impl<T, true>;
-
-template <typename T>
-using t_event_batch = detail::t_event_impl<T, true>;
 
 template <typename>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS continuous_output;
@@ -1989,40 +1699,5 @@ BOOST_CLASS_VERSION(heyoka::taylor_adaptive<mppp::real>, heyoka::detail::taylor_
 BOOST_CLASS_VERSION(heyoka::taylor_adaptive_batch<mppp::real>, heyoka::detail::taylor_adaptive_batch_s11n_version);
 
 #endif
-
-// Export the s11n keys for default-constructed event callbacks.
-#define HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY(T)                                                                      \
-    HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::empty_callable, void, heyoka::taylor_adaptive<T> &, T, int)        \
-    HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::empty_callable, bool, heyoka::taylor_adaptive<T> &, int)
-
-#define HEYOKA_S11N_BATCH_EVENT_CALLBACKS_EXPORT_KEY(T)                                                                \
-    HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::empty_callable, void, heyoka::taylor_adaptive_batch<T> &, T, int,  \
-                                    std::uint32_t)                                                                     \
-    HEYOKA_S11N_CALLABLE_EXPORT_KEY(heyoka::detail::empty_callable, bool, heyoka::taylor_adaptive_batch<T> &, int,     \
-                                    std::uint32_t)
-
-HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY(float)
-HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY(double)
-HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY(long double)
-
-HEYOKA_S11N_BATCH_EVENT_CALLBACKS_EXPORT_KEY(float)
-HEYOKA_S11N_BATCH_EVENT_CALLBACKS_EXPORT_KEY(double)
-HEYOKA_S11N_BATCH_EVENT_CALLBACKS_EXPORT_KEY(long double)
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY(mppp::real128)
-HEYOKA_S11N_BATCH_EVENT_CALLBACKS_EXPORT_KEY(mppp::real128)
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY(mppp::real)
-
-#endif
-
-#undef HEYOKA_S11N_EVENT_CALLBACKS_EXPORT_KEY
-#undef HEYOKA_S11N_BATCH_EVENT_CALLBACKS_EXPORT_KEY
 
 #endif

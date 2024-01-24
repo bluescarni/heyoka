@@ -24,6 +24,7 @@
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/real_helpers.hpp>
+#include <heyoka/events.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
