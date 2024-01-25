@@ -11,6 +11,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <concepts>
 #include <cstdint>
 #include <ostream>
 #include <type_traits>
@@ -83,7 +84,12 @@ public:
         // Callback (defaults to empty).
         auto cb = [&p]() -> callback_t {
             if constexpr (p.has(kw::callback)) {
-                return p(kw::callback);
+                if constexpr (std::convertible_to<decltype(p(kw::callback)), callback_t>) {
+                    return p(kw::callback);
+                } else {
+                    static_assert(detail::always_false_v<KwArgs...>,
+                                  "Invalid type for the 'callback' keyword argument.");
+                }
             } else {
                 return {};
             }
@@ -92,7 +98,12 @@ public:
         // Cooldown (defaults to -1).
         auto cd = [&p]() -> T {
             if constexpr (p.has(kw::cooldown)) {
-                return p(kw::cooldown);
+                if constexpr (std::convertible_to<decltype(p(kw::cooldown)), T>) {
+                    return p(kw::cooldown);
+                } else {
+                    static_assert(detail::always_false_v<KwArgs...>,
+                                  "Invalid type for the 'cooldown' keyword argument.");
+                }
             } else {
                 return T(-1);
             }
@@ -101,7 +112,12 @@ public:
         // Direction (defaults to any).
         auto d = [&p]() -> event_direction {
             if constexpr (p.has(kw::direction)) {
-                return p(kw::direction);
+                if constexpr (std::convertible_to<decltype(p(kw::direction)), event_direction>) {
+                    return p(kw::direction);
+                } else {
+                    static_assert(detail::always_false_v<KwArgs...>,
+                                  "Invalid type for the 'direction' keyword argument.");
+                }
             } else {
                 return event_direction::any;
             }
@@ -186,7 +202,12 @@ public:
         // Direction (defaults to any).
         auto d = [&p]() -> event_direction {
             if constexpr (p.has(kw::direction)) {
-                return p(kw::direction);
+                if constexpr (std::convertible_to<decltype(p(kw::direction)), event_direction>) {
+                    return p(kw::direction);
+                } else {
+                    static_assert(detail::always_false_v<KwArgs...>,
+                                  "Invalid type for the 'direction' keyword argument.");
+                }
             } else {
                 return event_direction::any;
             }
