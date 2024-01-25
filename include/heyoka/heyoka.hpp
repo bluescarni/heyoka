@@ -11,6 +11,7 @@
 
 #include <heyoka/callable.hpp>
 #include <heyoka/callbacks.hpp>
+#include <heyoka/continuous_output.hpp>
 #include <heyoka/ensemble_propagate.hpp>
 #include <heyoka/events.hpp>
 #include <heyoka/exceptions.hpp>

@@ -44,6 +44,12 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS t_event_impl;
 
 } // namespace detail
 
+template <typename>
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS continuous_output;
+
+template <typename>
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS continuous_output_batch;
+
 // Enum to represent the direction of an event.
 // NOTE: put it here because this is currently shared between
 // taylor.hpp and event_detection.hpp.

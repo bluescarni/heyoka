@@ -58,6 +58,7 @@
 
 #endif
 
+#include <heyoka/continuous_output.hpp>
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
