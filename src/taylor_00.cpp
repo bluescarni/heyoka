@@ -200,19 +200,16 @@ std::uint32_t taylor_order_from_tol(T tol)
 // Add to s an adaptive timestepper function with support for events. This timestepper will *not*
 // propagate the state of the system. Instead, its output will be the jet of derivatives
 // of all state variables and event equations, and the deduced timestep value(s).
-template <typename T, typename U>
-auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name, const U &sys, const T &tol,
-                                          std::uint32_t batch_size, bool, bool compact_mode,
-                                          const std::vector<expression> &evs, bool high_accuracy, bool parallel_mode)
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+auto taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t,
+                                          const std::string &name,
+                                          const std::vector<std::pair<expression, expression>> &sys,
+                                          std::uint32_t batch_size, bool compact_mode,
+                                          const std::vector<expression> &evs, bool high_accuracy, bool parallel_mode,
+                                          std::uint32_t order)
 {
-    using std::isfinite;
-
     assert(!s.is_compiled());
     assert(batch_size != 0u);
-    assert(isfinite(tol) && tol > 0);
-
-    // Determine the order from the tolerance.
-    const auto order = taylor_order_from_tol(tol);
 
     // Record the number of equations/variables.
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -236,11 +233,6 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     // - pointer to the array of max timesteps (read & write),
     // - pointer to the max_abs_state output variable (write only).
     // These pointers cannot overlap.
-    auto *ext_fp_t = to_llvm_type<T>(context);
-    // NOTE: in case of mppp::real, before calling taylor_add_adaptive_step_with_events(), we ensured
-    // that the tolerance value has the inferred precision, so that llvm_type_like()
-    // will yield the correct internal type.
-    auto *fp_t = llvm_type_like(s, tol);
     const std::vector<llvm::Type *> fargs(6, llvm::PointerType::getUnqual(ext_fp_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -321,21 +313,16 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     // Verify the function.
     s.verify_function(f);
 
-    return std::tuple{std::move(dc), order};
+    return dc;
 }
 
-template <typename T, typename U>
-auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &sys, const T &tol,
-                              std::uint32_t batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode)
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+auto taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::Type *fp_t, const std::string &name,
+                              const std::vector<std::pair<expression, expression>> &sys, std::uint32_t batch_size,
+                              bool high_accuracy, bool compact_mode, bool parallel_mode, std::uint32_t order)
 {
-    using std::isfinite;
-
     assert(!s.is_compiled());
     assert(batch_size > 0u);
-    assert(isfinite(tol) && tol > 0);
-
-    // Determine the order from the tolerance.
-    const auto order = taylor_order_from_tol(tol);
 
     // Record the number of equations/variables.
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -361,11 +348,6 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
     // - pointer to the array of max timesteps (read & write),
     // - pointer to the Taylor coefficients output (write only).
     // These pointers cannot overlap.
-    auto *ext_fp_t = to_llvm_type<T>(context);
-    // NOTE: in case of mppp::real, before calling taylor_add_adaptive_step(), we ensured
-    // that the tolerance value has the inferred precision, so that llvm_type_like()
-    // will yield the correct internal type.
-    auto *fp_t = llvm_type_like(s, tol);
     auto *fp_vec_t = make_vector_type(fp_t, batch_size);
     const std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(ext_fp_t));
     // The function does not return anything.
@@ -427,10 +409,10 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
     // NOTE: no need to perform overflow check on n_eq * batch_size,
     // as in taylor_compute_jet() we already checked.
     if (compact_mode) {
-        auto new_state = std::get<llvm::Value *>(new_state_var);
+        auto *new_state = std::get<llvm::Value *>(new_state_var);
 
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-            auto val = builder.CreateLoad(fp_vec_t, builder.CreateInBoundsGEP(fp_vec_t, new_state, cur_var_idx));
+            auto *val = builder.CreateLoad(fp_vec_t, builder.CreateInBoundsGEP(fp_vec_t, new_state, cur_var_idx));
             ext_store_vector_to_memory(
                 s,
                 builder.CreateInBoundsGEP(ext_fp_t, state_ptr,
@@ -478,7 +460,7 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
     // Verify the function.
     s.verify_function(f);
 
-    return std::tuple{std::move(dc), order};
+    return dc;
 }
 
 } // namespace
@@ -741,6 +723,17 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
     // Do we have events?
     const auto with_events = !tes.empty() || !ntes.empty();
 
+    // Determine the order from the tolerance.
+    m_order = detail::taylor_order_from_tol(m_tol);
+
+    // Determine the external fp type.
+    auto *ext_fp_t = detail::to_llvm_type<T>(m_llvm.context());
+
+    // Determine the internal fp type.
+    // NOTE: in case of mppp::real, we ensured earlier that the tolerance value
+    // has the correct precision, so that llvm_type_like() will yield the correct internal type.
+    auto *fp_t = detail::llvm_type_like(m_llvm, m_tol);
+
     // Add the stepper function.
     if (with_events) {
         std::vector<expression> ee;
@@ -752,11 +745,11 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
             ee.push_back(ev.get_expression());
         }
 
-        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step_with_events<T>(
-            m_llvm, "step_e", sys, m_tol, 1, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
+        m_dc = detail::taylor_add_adaptive_step_with_events(m_llvm, ext_fp_t, fp_t, "step_e", sys, 1, compact_mode, ee,
+                                                            high_accuracy, parallel_mode, m_order);
     } else {
-        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step<T>(m_llvm, "step", sys, m_tol, 1, high_accuracy,
-                                                                      compact_mode, parallel_mode);
+        m_dc = detail::taylor_add_adaptive_step(m_llvm, ext_fp_t, fp_t, "step", sys, 1, high_accuracy, compact_mode,
+                                                parallel_mode, m_order);
     }
 
     // Fix m_pars' size, if necessary.
@@ -2372,6 +2365,15 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
     // Do we have events?
     const auto with_events = !tes.empty() || !ntes.empty();
 
+    // Determine the order from the tolerance.
+    m_order = detail::taylor_order_from_tol(m_tol);
+
+    // Determine the external fp type.
+    auto *ext_fp_t = detail::to_llvm_type<T>(m_llvm.context());
+
+    // Determine the internal fp type.
+    auto *fp_t = detail::llvm_type_like(m_llvm, m_tol);
+
     // Add the stepper function.
     if (with_events) {
         std::vector<expression> ee;
@@ -2383,11 +2385,11 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
             ee.push_back(ev.get_expression());
         }
 
-        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step_with_events<T>(
-            m_llvm, "step_e", sys, m_tol, batch_size, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
+        m_dc = detail::taylor_add_adaptive_step_with_events(m_llvm, ext_fp_t, fp_t, "step_e", sys, batch_size,
+                                                            compact_mode, ee, high_accuracy, parallel_mode, m_order);
     } else {
-        std::tie(m_dc, m_order) = detail::taylor_add_adaptive_step<T>(m_llvm, "step", sys, m_tol, batch_size,
-                                                                      high_accuracy, compact_mode, parallel_mode);
+        m_dc = detail::taylor_add_adaptive_step(m_llvm, ext_fp_t, fp_t, "step", sys, batch_size, high_accuracy,
+                                                compact_mode, parallel_mode, m_order);
     }
 
     // Fix m_pars' size, if necessary.
