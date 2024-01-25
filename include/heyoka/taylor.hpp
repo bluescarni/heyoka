@@ -208,62 +208,6 @@ struct formatter<heyoka::taylor_outcome> : fmt::ostream_formatter {
 
 } // namespace fmt
 
-// NOTE: implement a workaround for the serialisation of tuples whose first element
-// is a taylor outcome. We need this because Boost.Serialization treats all enums
-// as ints, which is not ok for taylor_outcome (whose underyling type will not
-// be an int on most platforms). Because it is not possible to override Boost's
-// enum implementation, we override the serialisation of tuples with outcomes
-// as first elements, which is all we need in the serialisation of the batch
-// integrator. The implementation below will be preferred over the generic tuple
-// s11n because it is more specialised.
-// NOTE: this workaround is not necessary for the other enums in heyoka because
-// those all have ints as underlying type.
-namespace boost::serialization
-{
-
-template <typename Archive, typename... Args>
-void save(Archive &ar, const std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
-{
-    auto tf = [&ar](const auto &x) {
-        if constexpr (std::is_same_v<decltype(x), const heyoka::taylor_outcome &>) {
-            ar << static_cast<std::underlying_type_t<heyoka::taylor_outcome>>(x);
-        } else {
-            ar << x;
-        }
-    };
-
-    // NOTE: this is a right fold, which, in conjunction with the
-    // builtin comma operator, ensures that the serialisation of
-    // the tuple elements proceeds in the correct order and with
-    // the correct sequencing.
-    std::apply([&tf](const auto &...x) { (tf(x), ...); }, tup);
-}
-
-template <typename Archive, typename... Args>
-void load(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
-{
-    auto tf = [&ar](auto &x) {
-        if constexpr (std::is_same_v<decltype(x), heyoka::taylor_outcome &>) {
-            std::underlying_type_t<heyoka::taylor_outcome> val{};
-            ar >> val;
-
-            x = static_cast<heyoka::taylor_outcome>(val);
-        } else {
-            ar >> x;
-        }
-    };
-
-    std::apply([&tf](auto &...x) { (tf(x), ...); }, tup);
-}
-
-template <typename Archive, typename... Args>
-void serialize(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned v)
-{
-    split_free(ar, tup, v);
-}
-
-} // namespace boost::serialization
-
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
