@@ -202,7 +202,7 @@ namespace detail
 
 // Helper for parsing common options for the Taylor integrators.
 template <typename T, typename... KwArgs>
-inline auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
+auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
@@ -1313,7 +1313,7 @@ HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST(mppp::real)
 #undef HEYOKA_TAYLOR_ADAPTIVE_BATCH_EXTERN_INST
 
 template <typename T>
-inline std::ostream &operator<<(std::ostream &os, const taylor_adaptive<T> &)
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive<T> &)
 {
     static_assert(detail::always_false_v<T>, "Unhandled type.");
 
@@ -1344,7 +1344,7 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive
 #endif
 
 template <typename T>
-inline std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch<T> &)
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch<T> &)
 {
     static_assert(detail::always_false_v<T>, "Unhandled type.");
 
