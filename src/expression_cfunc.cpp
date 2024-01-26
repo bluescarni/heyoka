@@ -1125,13 +1125,6 @@ cfunc_c_make_output_globals(llvm_state &s, llvm::Type *fp_t, const std::vector<e
     return std::pair{std::array{g_var_indices, g_vars, g_num_indices, g_nums, g_par_indices, g_pars}, all_out_vars};
 }
 
-// Small helper to compute the size of a global array.
-std::uint32_t cfunc_c_gl_arr_size(llvm::Value *v)
-{
-    return boost::numeric_cast<std::uint32_t>(
-        llvm::cast<llvm::ArrayType>(llvm::cast<llvm::GlobalVariable>(v)->getValueType())->getNumElements());
-}
-
 // Helper to write the outputs of a compiled function in compact mode.
 // cout_gl is the return value of cfunc_c_make_output_globals(), which contains
 // the indices/constants necessary for the computation.
@@ -1151,9 +1144,9 @@ void cfunc_c_write_outputs(llvm_state &s, llvm::Type *fp_scal_t, llvm::Value *ou
 
     // Recover the number of outputs which are
     // u variables, numbers and params.
-    const auto n_vars = cfunc_c_gl_arr_size(out_gl[0]);
-    const auto n_nums = cfunc_c_gl_arr_size(out_gl[2]);
-    const auto n_pars = cfunc_c_gl_arr_size(out_gl[4]);
+    const auto n_vars = gl_arr_size(out_gl[0]);
+    const auto n_nums = gl_arr_size(out_gl[2]);
+    const auto n_pars = gl_arr_size(out_gl[4]);
 
     // Fetch the type for external loading.
     auto *ext_fp_t = llvm_ext_type(fp_scal_t);
