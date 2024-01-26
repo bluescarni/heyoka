@@ -107,31 +107,10 @@ taylor_dc_t taylor_add_adaptive_step(llvm_state &, llvm::Type *, llvm::Type *, c
 
 llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &, const std::vector<std::uint32_t> &);
 
-llvm::Value *
-taylor_determine_h(llvm_state &, llvm::Type *,
-                   const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &,
-                   const std::vector<std::uint32_t> &, llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t,
-                   std::uint32_t, std::uint32_t, llvm::Value *);
-
 std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>>
 taylor_compute_jet(llvm_state &, llvm::Type *, llvm::Value *, llvm::Value *, llvm::Value *, const taylor_dc_t &,
                    const std::vector<std::uint32_t> &, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool,
                    bool, bool);
-
-void taylor_write_tc(llvm_state &, llvm::Type *,
-                     const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &,
-                     const std::vector<std::uint32_t> &, llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t,
-                     std::uint32_t, std::uint32_t);
-
-std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_run_multihorner(llvm_state &, llvm::Type *,
-                       const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &,
-                       llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t);
-
-std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_run_ceval(llvm_state &, llvm::Type *,
-                 const std::variant<std::pair<llvm::Value *, llvm::Type *>, std::vector<llvm::Value *>> &,
-                 llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, bool, std::uint32_t);
 
 std::pair<std::string, std::vector<llvm::Type *>>
 taylor_c_diff_func_name_args(llvm::LLVMContext &, llvm::Type *, const std::string &, std::uint32_t, std::uint32_t,
