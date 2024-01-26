@@ -40,6 +40,7 @@
 
 #include <heyoka/continuous_output.hpp>
 #include <heyoka/detail/dfloat.hpp>
+#include <heyoka/detail/ed_data.hpp>
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
@@ -110,6 +111,11 @@ void serialize(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, un
 } // namespace boost::serialization
 
 HEYOKA_BEGIN_NAMESPACE
+
+template <typename T>
+taylor_adaptive_batch<T>::taylor_adaptive_batch(private_ctor_t, llvm_state s) : m_llvm(std::move(s))
+{
+}
 
 template <typename T>
 void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &sys,

@@ -56,6 +56,7 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
+#include <heyoka/detail/ed_data.hpp>
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>

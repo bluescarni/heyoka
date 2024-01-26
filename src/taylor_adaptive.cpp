@@ -42,6 +42,7 @@
 
 #include <heyoka/continuous_output.hpp>
 #include <heyoka/detail/dfloat.hpp>
+#include <heyoka/detail/ed_data.hpp>
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
@@ -142,6 +143,11 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
 #endif
 
 } // namespace detail
+
+template <typename T>
+taylor_adaptive<T>::taylor_adaptive(private_ctor_t, llvm_state s) : m_llvm(std::move(s))
+{
+}
 
 template <typename T>
 void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &sys,
