@@ -29,6 +29,7 @@
 #endif
 
 #include <heyoka/callable.hpp>
+#include <heyoka/events.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>

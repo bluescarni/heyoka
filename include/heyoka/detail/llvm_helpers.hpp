@@ -11,7 +11,6 @@
 
 #include <cstdint>
 #include <functional>
-#include <initializer_list>
 #include <map>
 #include <string>
 #include <typeinfo>
@@ -58,6 +57,8 @@ HEYOKA_DLL_PUBLIC std::string llvm_mangle_type(llvm::Type *);
 HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(llvm::Value *);
 
 HEYOKA_DLL_PUBLIC std::uint64_t get_alignment(llvm::Module &, llvm::Type *);
+
+std::uint32_t gl_arr_size(llvm::Value *);
 
 HEYOKA_DLL_PUBLIC std::uint64_t get_size(llvm::Module &, llvm::Type *);
 

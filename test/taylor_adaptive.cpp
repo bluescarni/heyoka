@@ -39,6 +39,7 @@
 #include <heyoka/callable.hpp>
 #include <heyoka/detail/div.hpp>
 #include <heyoka/detail/sub.hpp>
+#include <heyoka/events.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>

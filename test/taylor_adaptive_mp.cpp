@@ -18,7 +18,9 @@
 
 #include <mp++/real.hpp>
 
+#include <heyoka/continuous_output.hpp>
 #include <heyoka/detail/real_helpers.hpp>
+#include <heyoka/events.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>

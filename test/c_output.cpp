@@ -28,6 +28,7 @@
 
 #endif
 
+#include <heyoka/continuous_output.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/s11n.hpp>

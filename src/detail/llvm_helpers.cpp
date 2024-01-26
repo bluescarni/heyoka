@@ -817,6 +817,13 @@ std::uint32_t get_vector_size(llvm::Value *x)
     }
 }
 
+// Small helper to compute the size of a global array.
+std::uint32_t gl_arr_size(llvm::Value *v)
+{
+    return boost::numeric_cast<std::uint32_t>(
+        llvm::cast<llvm::ArrayType>(llvm::cast<llvm::GlobalVariable>(v)->getValueType())->getNumElements());
+}
+
 // Fetch the alignment of a type.
 std::uint64_t get_alignment(llvm::Module &md, llvm::Type *tp)
 {

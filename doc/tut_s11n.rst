@@ -139,7 +139,7 @@ class:
     :language: c++
     :lines: 16-28
 
-This trivial callback function object is meant to be used in a non-terminal event.
+This trivial callback function object ``my_callback`` is meant to be used in a non-terminal event.
 In order to make the callback serialisable we add
 a member function template called ``serialize()`` which, in this specific case,
 also does not perform any action because the callback has no state. If the callback
@@ -147,7 +147,7 @@ contained data members, we would need to serialise them one by one - see the
 `Boost.Serialization docs <https://www.boost.org/doc/libs/release/libs/serialization/doc/index.html>`__
 for details about adding serialisation capabilities to a class.
 
-After having added serialisation capabilities to our ``callback``, we need to register
+After having added serialisation capabilities to our ``my_callback``, we need to register
 it in heyoka's serialisation system. This is accomplished through the use of the
 ``HEYOKA_S11N_CALLABLE_EXPORT()`` macro:
 
@@ -156,14 +156,14 @@ it in heyoka's serialisation system. This is accomplished through the use of the
     :lines: 30-31
 
 The ``HEYOKA_S11N_CALLABLE_EXPORT()`` macro takes as first input argument the name of the class
-being registered (``callback`` in this case). The remaining arguments are the signature
+being registered (``my_callback`` in this case). The remaining arguments are the signature
 of the callback: ``void`` is the return type, ``taylor_adaptive<double> &``, ``double``
 and ``int`` its argument types. Note that this macro must be invoked in the
 root namespace and all arguments should be spelled out as fully-qualified
 names (in this example we can avoid the extra typing due to the ``using namespace heyoka``
 statement).
 
-The ``callback`` class is now ready to be (de)serialised. Let us see a simple
+The ``my_callback`` class is now ready to be (de)serialised. Let us see a simple
 example, again based on the simple pendulum:
 
 .. literalinclude:: ../tutorial/s11n_event.cpp

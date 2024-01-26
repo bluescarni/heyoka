@@ -35,6 +35,7 @@
 
 #endif
 
+#include <heyoka/continuous_output.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/ensemble_propagate.hpp>
 #include <heyoka/kw.hpp>

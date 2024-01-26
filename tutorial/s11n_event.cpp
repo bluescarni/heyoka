@@ -14,7 +14,7 @@
 using namespace heyoka;
 
 // The callback function object.
-struct callback {
+struct my_callback {
     // Leave the callback body empty.
     void operator()(taylor_adaptive<double> &, double, int) const {}
 
@@ -28,7 +28,7 @@ private:
 };
 
 // Register the callback in the serialisation system.
-HEYOKA_S11N_CALLABLE_EXPORT(callback, void, taylor_adaptive<double> &, double, int)
+HEYOKA_S11N_CALLABLE_EXPORT(my_callback, void, taylor_adaptive<double> &, double, int)
 
 int main()
 {
@@ -46,7 +46,7 @@ int main()
                                       {0.05, 0.025},
                                       // Add the non-terminal event v = 0, using
                                       // the callback defined above.
-                                      kw::nt_events = {nt_event<double>(v, callback{})}};
+                                      kw::nt_events = {nt_event<double>(v, my_callback{})}};
 
     std::cout << "Number of events (original)    : " << ta.get_nt_events().size() << '\n';
 

@@ -30,6 +30,7 @@
 
 #endif
 
+#include <heyoka/continuous_output.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
