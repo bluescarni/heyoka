@@ -9,18 +9,32 @@
 #ifndef HEYOKA_DETAIL_TAYLOR_COMMON_HPP
 #define HEYOKA_DETAIL_TAYLOR_COMMON_HPP
 
+#include <heyoka/config.hpp>
+
+#include <algorithm>
+#include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <limits>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
 
-#include <fmt/format.h>
+#include <fmt/core.h>
+
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
@@ -31,13 +45,15 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
-#include <heyoka/config.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/string_conv.hpp>
+#include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/taylor.hpp>
+#include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -134,6 +150,118 @@ inline llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, llvm::Type *fp_t
     }
 
     return f;
+}
+
+// Helper to determine the optimal Taylor order for a given tolerance,
+// following Jorba's prescription.
+// NOTE: when T is mppp::real and tol has a low precision, the use
+// of integer operands in these computations might bump up the working
+// precision due to the way precision propagation works in mp++. I don't
+// think there's any negative consequence here.
+template <typename T>
+std::uint32_t taylor_order_from_tol(T tol)
+{
+    using std::ceil;
+    using std::isfinite;
+    using std::log;
+
+    // Determine the order from the tolerance.
+    auto order_f = ceil(-log(tol) / 2 + 1);
+    // LCOV_EXCL_START
+    if (!isfinite(order_f)) {
+        throw std::invalid_argument(
+            "The computation of the Taylor order in an adaptive Taylor stepper produced a non-finite value");
+    }
+    // LCOV_EXCL_STOP
+    // NOTE: min order is 2.
+    order_f = std::max(static_cast<T>(2), order_f);
+
+    // NOTE: cast to double as that ensures that the
+    // max of std::uint32_t is exactly representable.
+    // LCOV_EXCL_START
+    if (order_f > static_cast<double>(std::numeric_limits<std::uint32_t>::max())) {
+        throw std::overflow_error("The computation of the Taylor order in an adaptive Taylor stepper resulted "
+                                  "in an overflow condition");
+    }
+    // LCOV_EXCL_STOP
+    return static_cast<std::uint32_t>(order_f);
+}
+
+// Small helper to set up the m_state_vars and m_rhs members
+// of an integrator. Shared among scalar and batch integrators.
+template <typename TA, typename U>
+void taylor_adaptive_setup_sv_rhs(TA &ta, const U &sys)
+{
+    for (std::uint32_t i = 0; i < ta.m_dim; ++i) {
+        // NOTE: take the state variables from the
+        // decomposition.
+        assert(std::holds_alternative<variable>(ta.m_dc[i].first.value()));
+        ta.m_state_vars.push_back(ta.m_dc[i].first);
+
+        if constexpr (std::is_same_v<U, std::vector<expression>>) {
+            ta.m_rhs.push_back(sys[i]);
+        } else {
+            ta.m_rhs.push_back(sys[i].second);
+        }
+    }
+}
+
+// Small helper to compare the absolute
+// values of two input values.
+template <typename T>
+bool abs_lt(const T &a, const T &b)
+{
+    using std::abs;
+
+    return abs(a) < abs(b);
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <>
+inline bool abs_lt<mppp::real>(const mppp::real &a, const mppp::real &b)
+{
+    return mppp::cmpabs(a, b) < 0;
+}
+
+#endif
+
+// Custom equality comparison that considers all NaN values equal.
+template <typename T>
+bool cmp_nan_eq(const T &a, const T &b)
+{
+    using std::isnan;
+
+    const auto nan_a = isnan(a);
+    const auto nan_b = isnan(b);
+
+    if (!nan_a && !nan_b) {
+        return a == b;
+    } else {
+        return nan_a && nan_b;
+    }
+}
+
+// NOTE: double-length normalisation assumes abs(hi) >= abs(lo), we need to enforce this
+// when setting the time coordinate in double-length format.
+template <typename T>
+void dtime_checks(const T &hi, const T &lo)
+{
+    using std::abs;
+    using std::isfinite;
+
+    if (!isfinite(hi) || !isfinite(lo)) {
+        throw std::invalid_argument(fmt::format("The components of the double-length representation of the time "
+                                                "coordinate must both be finite, but they are {} and {} instead",
+                                                detail::fp_to_string(hi), detail::fp_to_string(lo)));
+    }
+
+    if (abs(hi) < abs(lo)) {
+        throw std::invalid_argument(
+            fmt::format("The first component of the double-length representation of the time "
+                        "coordinate ({}) must not be smaller in magnitude than the second component ({})",
+                        detail::fp_to_string(hi), detail::fp_to_string(lo)));
+    }
 }
 
 } // namespace detail

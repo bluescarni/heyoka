@@ -97,6 +97,14 @@ HEYOKA_DLL_PUBLIC void taylor_c_store_diff(llvm_state &, llvm::Type *, llvm::Val
 
 std::uint32_t n_pars_in_dc(const taylor_dc_t &);
 
+taylor_dc_t taylor_add_adaptive_step_with_events(llvm_state &, llvm::Type *, llvm::Type *, const std::string &,
+                                                 const std::vector<std::pair<expression, expression>> &, std::uint32_t,
+                                                 bool, const std::vector<expression> &, bool, bool, std::uint32_t);
+
+taylor_dc_t taylor_add_adaptive_step(llvm_state &, llvm::Type *, llvm::Type *, const std::string &,
+                                     const std::vector<std::pair<expression, expression>> &, std::uint32_t, bool, bool,
+                                     bool, std::uint32_t);
+
 llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &, const std::vector<std::uint32_t> &);
 
 llvm::Value *
