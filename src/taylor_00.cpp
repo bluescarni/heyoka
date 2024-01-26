@@ -10,27 +10,14 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cmath>
-#include <cstddef>
 #include <cstdint>
-#include <exception>
-#include <initializer_list>
-#include <limits>
-#include <optional>
-#include <stdexcept>
 #include <string>
 #include <tuple>
-#include <type_traits>
-#include <typeinfo>
 #include <utility>
 #include <variant>
 #include <vector>
 
-#include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/safe_numerics/safe_integer.hpp>
-
-#include <fmt/core.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -44,41 +31,12 @@
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
 
-#if defined(HEYOKA_HAVE_REAL128)
-
-#include <mp++/real128.hpp>
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-#include <mp++/real.hpp>
-
-#include <heyoka/detail/real_helpers.hpp>
-
-#endif
-
-#include <heyoka/continuous_output.hpp>
-#include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/logging_impl.hpp>
-#include <heyoka/detail/num_utils.hpp>
-#include <heyoka/detail/string_conv.hpp>
-#include <heyoka/detail/type_traits.hpp>
-#include <heyoka/detail/visibility.hpp>
-#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/func.hpp>
-#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/number.hpp>
-#include <heyoka/param.hpp>
-#include <heyoka/s11n.hpp>
-#include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
-#include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
