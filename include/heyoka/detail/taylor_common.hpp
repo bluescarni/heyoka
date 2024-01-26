@@ -9,6 +9,12 @@
 #ifndef HEYOKA_DETAIL_TAYLOR_COMMON_HPP
 #define HEYOKA_DETAIL_TAYLOR_COMMON_HPP
 
+#if !defined(HEYOKA_BUILD_LIBRARY)
+
+#error This header can be included only when building heyoka.
+
+#endif
+
 #include <heyoka/config.hpp>
 
 #include <algorithm>
@@ -16,7 +22,6 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
-#include <initializer_list>
 #include <limits>
 #include <stdexcept>
 #include <string>

@@ -560,6 +560,8 @@ private:
         }
     }
 
+    // NOTE: we need to go through a private non-template constructor
+    // in order to avoid having to provide a definition for ed_data.
     struct private_ctor_t {
     };
     explicit taylor_adaptive(private_ctor_t, llvm_state);
@@ -970,6 +972,8 @@ private:
         }
     }
 
+    // NOTE: we need to go through a private non-template constructor
+    // in order to avoid having to provide a definition for ed_data.
     struct private_ctor_t {
     };
     explicit taylor_adaptive_batch(private_ctor_t, llvm_state);

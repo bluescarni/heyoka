@@ -9,6 +9,12 @@
 #ifndef HEYOKA_DETAIL_ED_DATA_HPP
 #define HEYOKA_DETAIL_ED_DATA_HPP
 
+#if !defined(HEYOKA_BUILD_LIBRARY)
+
+#error This header can be included only when building heyoka.
+
+#endif
+
 #include <cstdint>
 #include <optional>
 #include <tuple>
