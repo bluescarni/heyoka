@@ -617,7 +617,7 @@ of a macro (see below).</p></li>
 <p>Let us see a concrete example. We begin with the definition of a simple callback
 class:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// The callback function object.</span>
-<span class="k">struct</span><span class="w"> </span><span class="nc">callback</span><span class="w"> </span><span class="p">{</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">my_callback</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Leave the callback body empty.</span>
 <span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">operator</span><span class="p">()(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{}</span>
 
@@ -631,28 +631,28 @@ class:</p>
 <span class="p">};</span>
 </pre></div>
 </div>
-<p>This trivial callback function object is meant to be used in a non-terminal event.
+<p>This trivial callback function object <code class="docutils literal notranslate"><span class="pre">my_callback</span></code> is meant to be used in a non-terminal event.
 In order to make the callback serialisable we add
 a member function template called <code class="docutils literal notranslate"><span class="pre">serialize()</span></code> which, in this specific case,
 also does not perform any action because the callback has no state. If the callback
 contained data members, we would need to serialise them one by one - see the
 <a class="reference external" href="https://www.boost.org/doc/libs/release/libs/serialization/doc/index.html">Boost.Serialization docs</a>
 for details about adding serialisation capabilities to a class.</p>
-<p>After having added serialisation capabilities to our <code class="docutils literal notranslate"><span class="pre">callback</span></code>, we need to register
+<p>After having added serialisation capabilities to our <code class="docutils literal notranslate"><span class="pre">my_callback</span></code>, we need to register
 it in heyoka’s serialisation system. This is accomplished through the use of the
 <code class="docutils literal notranslate"><span class="pre">HEYOKA_S11N_CALLABLE_EXPORT()</span></code> macro:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// Register the callback in the serialisation system.</span>
-<span class="n">HEYOKA_S11N_CALLABLE_EXPORT</span><span class="p">(</span><span class="n">callback</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="p">,</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span>
+<span class="n">HEYOKA_S11N_CALLABLE_EXPORT</span><span class="p">(</span><span class="n">my_callback</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="p">,</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">HEYOKA_S11N_CALLABLE_EXPORT()</span></code> macro takes as first input argument the name of the class
-being registered (<code class="docutils literal notranslate"><span class="pre">callback</span></code> in this case). The remaining arguments are the signature
+being registered (<code class="docutils literal notranslate"><span class="pre">my_callback</span></code> in this case). The remaining arguments are the signature
 of the callback: <code class="docutils literal notranslate"><span class="pre">void</span></code> is the return type, <code class="docutils literal notranslate"><span class="pre">taylor_adaptive&lt;double&gt;</span> <span class="pre">&amp;</span></code>, <code class="docutils literal notranslate"><span class="pre">double</span></code>
 and <code class="docutils literal notranslate"><span class="pre">int</span></code> its argument types. Note that this macro must be invoked in the
 root namespace and all arguments should be spelled out as fully-qualified
 names (in this example we can avoid the extra typing due to the <code class="docutils literal notranslate"><span class="pre">using</span> <span class="pre">namespace</span> <span class="pre">heyoka</span></code>
 statement).</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">callback</span></code> class is now ready to be (de)serialised. Let us see a simple
+<p>The <code class="docutils literal notranslate"><span class="pre">my_callback</span></code> class is now ready to be (de)serialised. Let us see a simple
 example, again based on the simple pendulum:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create the symbolic variables x and v.</span>
 <span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;v&quot;</span><span class="p">);</span>
@@ -668,7 +668,7 @@ example, again based on the simple pendulum:</p>
 <span class="w">                                      </span><span class="p">{</span><span class="mf">0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.025</span><span class="p">},</span>
 <span class="w">                                      </span><span class="c1">// Add the non-terminal event v = 0, using</span>
 <span class="w">                                      </span><span class="c1">// the callback defined above.</span>
-<span class="w">                                      </span><span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">callback</span><span class="p">{})}};</span>
+<span class="w">                                      </span><span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">my_callback</span><span class="p">{})}};</span>
 
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Number of events (original)    : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">get_nt_events</span><span class="p">().</span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 
@@ -708,7 +708,7 @@ exception would have been raised during the serialisation of the integrator obje
 <span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">heyoka</span><span class="p">;</span>
 
 <span class="c1">// The callback function object.</span>
-<span class="k">struct</span><span class="w"> </span><span class="nc">callback</span><span class="w"> </span><span class="p">{</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">my_callback</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Leave the callback body empty.</span>
 <span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">operator</span><span class="p">()(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{}</span>
 
@@ -722,7 +722,7 @@ exception would have been raised during the serialisation of the integrator obje
 <span class="p">};</span>
 
 <span class="c1">// Register the callback in the serialisation system.</span>
-<span class="n">HEYOKA_S11N_CALLABLE_EXPORT</span><span class="p">(</span><span class="n">callback</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="p">,</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span>
+<span class="n">HEYOKA_S11N_CALLABLE_EXPORT</span><span class="p">(</span><span class="n">my_callback</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="p">,</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span>
 
 <span class="kt">int</span><span class="w"> </span><span class="n">main</span><span class="p">()</span>
 <span class="p">{</span>
@@ -740,7 +740,7 @@ exception would have been raised during the serialisation of the integrator obje
 <span class="w">                                      </span><span class="p">{</span><span class="mf">0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.025</span><span class="p">},</span>
 <span class="w">                                      </span><span class="c1">// Add the non-terminal event v = 0, using</span>
 <span class="w">                                      </span><span class="c1">// the callback defined above.</span>
-<span class="w">                                      </span><span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">callback</span><span class="p">{})}};</span>
+<span class="w">                                      </span><span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">my_callback</span><span class="p">{})}};</span>
 
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Number of events (original)    : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">get_nt_events</span><span class="p">().</span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 
