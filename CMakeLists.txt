@@ -169,6 +169,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor_02.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor_adaptive.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor_adaptive_batch.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor_stream_ops.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/nt_event.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/t_event.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/continuous_output.cpp"
