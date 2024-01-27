@@ -44,6 +44,7 @@
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/ed_data.hpp>
 #include <heyoka/detail/event_detection.hpp>
+#include <heyoka/detail/i_data.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/num_utils.hpp>
@@ -56,6 +57,11 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
+
+// NOTE: this is a helper macro to reduce typing when accessing the
+// data members of i_data.
+// NOLINTNEXTLINE(bugprone-macro-parentheses)
+#define HEYOKA_TAYLOR_REF_FROM_I_DATA(name) auto &name = m_i_data->name
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -106,12 +112,13 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
 
     // Time, tolerance, Taylor coefficients, m_last_h, dense output
     // are all supposed to maintain the original precision after construction.
-    assert(dthis->m_time.hi.get_prec() == prec);
-    assert(dthis->m_time.lo.get_prec() == prec);
-    assert(dthis->m_tol.get_prec() == prec);
-    assert(std::all_of(dthis->m_tc.begin(), dthis->m_tc.end(), [prec](const auto &x) { return x.get_prec() == prec; }));
-    assert(dthis->m_last_h.get_prec() == prec);
-    assert(std::all_of(dthis->m_d_out.begin(), dthis->m_d_out.end(),
+    assert(dthis->m_i_data->m_time.hi.get_prec() == prec);
+    assert(dthis->m_i_data->m_time.lo.get_prec() == prec);
+    assert(dthis->m_i_data->m_tol.get_prec() == prec);
+    assert(std::all_of(dthis->m_i_data->m_tc.begin(), dthis->m_i_data->m_tc.end(),
+                       [prec](const auto &x) { return x.get_prec() == prec; }));
+    assert(dthis->m_i_data->m_last_h.get_prec() == prec);
+    assert(std::all_of(dthis->m_i_data->m_d_out.begin(), dthis->m_i_data->m_d_out.end(),
                        [prec](const auto &x) { return x.get_prec() == prec; }));
 
     // Same goes for the event detection jet data, if present.
@@ -123,7 +130,7 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
 #endif
 
     // State, pars can be changed by the user and thus need to be checked.
-    for (const auto &x : dthis->m_state) {
+    for (const auto &x : dthis->m_i_data->m_state) {
         if (x.get_prec() != prec) {
             throw std::invalid_argument(fmt::format("A state variable with precision {} was detected in the state "
                                                     "vector: this is incompatible with the integrator precision of {}",
@@ -131,7 +138,7 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
         }
     }
 
-    for (const auto &x : dthis->m_pars) {
+    for (const auto &x : dthis->m_i_data->m_pars) {
         if (x.get_prec() != prec) {
             throw std::invalid_argument(fmt::format("A value with precision {} was detected in the parameter "
                                                     "vector: this is incompatible with the integrator precision of {}",
@@ -145,7 +152,7 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
 } // namespace detail
 
 template <typename T>
-taylor_adaptive<T>::taylor_adaptive(private_ctor_t, llvm_state s) : m_llvm(std::move(s))
+taylor_adaptive<T>::taylor_adaptive(private_ctor_t, llvm_state s) : m_i_data(std::make_unique<i_data>(std::move(s)))
 {
 }
 
@@ -158,6 +165,22 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
                                             std::vector<nt_event_t> ntes, bool parallel_mode,
                                             [[maybe_unused]] std::optional<long long> prec)
 {
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_f);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pars);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_high_accuracy);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_compact_mode);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_llvm);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tol);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dc);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
+
     // NOTE: this must hold because tol == 0 is interpreted
     // as undefined in finalise_ctor().
     assert(!tol || *tol != 0);
@@ -375,13 +398,13 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
 
     // Fetch the stepper.
     if (with_events) {
-        m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
+        m_step_f = reinterpret_cast<i_data::step_f_e_t>(m_llvm.jit_lookup("step_e"));
     } else {
-        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+        m_step_f = reinterpret_cast<i_data::step_f_t>(m_llvm.jit_lookup("step"));
     }
 
     // Fetch the function to compute the dense output.
-    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+    m_d_out_f = reinterpret_cast<i_data::d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
 
     // Setup the vector for the Taylor coefficients.
     // LCOV_EXCL_START
@@ -454,19 +477,14 @@ taylor_adaptive<T>::taylor_adaptive()
 
 template <typename T>
 taylor_adaptive<T>::taylor_adaptive(const taylor_adaptive &other)
-    : base_t(static_cast<const base_t &>(other)), m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm),
-      m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_tol(other.m_tol),
-      m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode), m_pars(other.m_pars),
-      m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
-      m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr),
-      m_state_vars(other.m_state_vars), m_rhs(other.m_rhs)
+    : base_t(static_cast<const base_t &>(other)), m_i_data(std::make_unique<i_data>(*other.m_i_data)),
+      m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
 {
     if (m_ed_data) {
-        m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
+        m_i_data->m_step_f = reinterpret_cast<i_data::step_f_e_t>(m_i_data->m_llvm.jit_lookup("step_e"));
     } else {
-        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+        m_i_data->m_step_f = reinterpret_cast<i_data::step_f_t>(m_i_data->m_llvm.jit_lookup("step"));
     }
-    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
 }
 
 template <typename T>
@@ -495,22 +513,8 @@ void taylor_adaptive<T>::save_impl(Archive &ar, unsigned) const
 {
     ar << boost::serialization::base_object<detail::taylor_adaptive_base<T, taylor_adaptive>>(*this);
 
-    ar << m_state;
-    ar << m_time;
-    ar << m_llvm;
-    ar << m_dim;
-    ar << m_dc;
-    ar << m_order;
-    ar << m_tol;
-    ar << m_high_accuracy;
-    ar << m_compact_mode;
-    ar << m_pars;
-    ar << m_tc;
-    ar << m_last_h;
-    ar << m_d_out;
+    ar << m_i_data;
     ar << m_ed_data;
-    ar << m_state_vars;
-    ar << m_rhs;
 }
 
 template <typename T>
@@ -525,32 +529,26 @@ void taylor_adaptive<T>::load_impl(Archive &ar, unsigned version)
     }
     // LCOV_EXCL_STOP
 
-    ar >> boost::serialization::base_object<detail::taylor_adaptive_base<T, taylor_adaptive>>(*this);
+    try {
+        ar >> boost::serialization::base_object<detail::taylor_adaptive_base<T, taylor_adaptive>>(*this);
 
-    ar >> m_state;
-    ar >> m_time;
-    ar >> m_llvm;
-    ar >> m_dim;
-    ar >> m_dc;
-    ar >> m_order;
-    ar >> m_tol;
-    ar >> m_high_accuracy;
-    ar >> m_compact_mode;
-    ar >> m_pars;
-    ar >> m_tc;
-    ar >> m_last_h;
-    ar >> m_d_out;
-    ar >> m_ed_data;
-    ar >> m_state_vars;
-    ar >> m_rhs;
+        ar >> m_i_data;
+        ar >> m_ed_data;
 
-    // Recover the function pointers.
-    if (m_ed_data) {
-        m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
-    } else {
-        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+        // Recover the function pointers.
+        if (m_ed_data) {
+            m_i_data->m_step_f = reinterpret_cast<i_data::step_f_e_t>(m_i_data->m_llvm.jit_lookup("step_e"));
+        } else {
+            m_i_data->m_step_f = reinterpret_cast<i_data::step_f_t>(m_i_data->m_llvm.jit_lookup("step"));
+        }
+        // LCOV_EXCL_START
+    } catch (...) {
+        // Reset to def-cted state in case of exceptions.
+        *this = taylor_adaptive{};
+
+        throw;
     }
-    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+    // LCOV_EXCL_STOP
 }
 
 template <typename T>
@@ -603,6 +601,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
     // NOTE: this is the only precondition on max_delta_t.
     using std::isnan;
     assert(!isnan(max_delta_t)); // LCOV_EXCL_LINE
+
+    assert(m_i_data);
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -615,6 +615,17 @@ std::tuple<taylor_outcome, T> taylor_adaptive<T>::step_impl(T max_delta_t, bool 
     }
 
 #endif
+
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_f);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pars);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tol);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
 
     auto h = max_delta_t;
 
@@ -948,6 +959,13 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
     using std::isfinite;
     using std::isnan;
 
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_llvm);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_high_accuracy);
+
     // Check the current time.
     if (!isfinite(m_time)) {
         throw std::invalid_argument("Cannot invoke the propagate_until() function of an adaptive Taylor integrator if "
@@ -1204,6 +1222,15 @@ taylor_adaptive<T>::propagate_until_impl(detail::dfloat<T> t, std::size_t max_st
     }
 }
 
+template <typename T>
+std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
+taylor_adaptive<T>::propagate_for_impl(T delta_t, std::size_t max_steps, T max_delta_t, step_callback<T> cb, bool wtc,
+                                       bool with_c_out)
+{
+    return propagate_until_impl(m_i_data->m_time + std::move(delta_t), max_steps, std::move(max_delta_t), std::move(cb),
+                                wtc, with_c_out);
+}
+
 // NOTE: possible outcomes:
 // - time_limit (the happy path),
 // - nf_err_state in case of non-finite state
@@ -1219,6 +1246,11 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
     using std::abs;
     using std::isfinite;
     using std::isnan;
+
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
 
     if (!isfinite(m_time)) {
         throw std::invalid_argument(
@@ -1483,12 +1515,7 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
         // Small helper to wrap the invocation of the callback
         // while checking that the callback does not change the
         // time coordinate.
-        auto wrap_cb_call = [this, &cb
-#if defined(_MSC_VER) && !defined(__clang__)
-                             ,
-                             cb_time_errmsg
-#endif
-        ]() {
+        auto wrap_cb_call = [&]() {
             // Store the current time coordinate before
             // executing the cb, so that we can check if
             // the cb changes the time coordinate.
@@ -1556,109 +1583,109 @@ taylor_adaptive<T>::propagate_grid_impl(std::vector<T> grid, std::size_t max_ste
 template <typename T>
 const llvm_state &taylor_adaptive<T>::get_llvm_state() const
 {
-    return m_llvm;
+    return m_i_data->m_llvm;
 }
 
 template <typename T>
 const taylor_dc_t &taylor_adaptive<T>::get_decomposition() const
 {
-    return m_dc;
+    return m_i_data->m_dc;
 }
 
 template <typename T>
 std::uint32_t taylor_adaptive<T>::get_order() const
 {
-    return m_order;
+    return m_i_data->m_order;
 }
 
 template <typename T>
 T taylor_adaptive<T>::get_tol() const
 {
-    return m_tol;
+    return m_i_data->m_tol;
 }
 
 template <typename T>
 bool taylor_adaptive<T>::get_high_accuracy() const
 {
-    return m_high_accuracy;
+    return m_i_data->m_high_accuracy;
 }
 
 template <typename T>
 bool taylor_adaptive<T>::get_compact_mode() const
 {
-    return m_compact_mode;
+    return m_i_data->m_compact_mode;
 }
 
 template <typename T>
 std::uint32_t taylor_adaptive<T>::get_dim() const
 {
-    return m_dim;
+    return m_i_data->m_dim;
 }
 
 template <typename T>
 T taylor_adaptive<T>::get_time() const
 {
-    return static_cast<T>(m_time);
+    return static_cast<T>(m_i_data->m_time);
 }
 
 template <typename T>
 std::pair<T, T> taylor_adaptive<T>::get_dtime() const
 {
-    return {m_time.hi, m_time.lo};
+    return {m_i_data->m_time.hi, m_i_data->m_time.lo};
 }
 
 template <typename T>
 const std::vector<T> &taylor_adaptive<T>::get_state() const
 {
-    return m_state;
+    return m_i_data->m_state;
 }
 
 template <typename T>
 const T *taylor_adaptive<T>::get_state_data() const
 {
-    return m_state.data();
+    return m_i_data->m_state.data();
 }
 
 template <typename T>
 T *taylor_adaptive<T>::get_state_data()
 {
-    return m_state.data();
+    return m_i_data->m_state.data();
 }
 
 template <typename T>
 const std::vector<T> &taylor_adaptive<T>::get_pars() const
 {
-    return m_pars;
+    return m_i_data->m_pars;
 }
 
 template <typename T>
 const T *taylor_adaptive<T>::get_pars_data() const
 {
-    return m_pars.data();
+    return m_i_data->m_pars.data();
 }
 
 template <typename T>
 T *taylor_adaptive<T>::get_pars_data()
 {
-    return m_pars.data();
+    return m_i_data->m_pars.data();
 }
 
 template <typename T>
 const std::vector<T> &taylor_adaptive<T>::get_tc() const
 {
-    return m_tc;
+    return m_i_data->m_tc;
 }
 
 template <typename T>
 T taylor_adaptive<T>::get_last_h() const
 {
-    return m_last_h;
+    return m_i_data->m_last_h;
 }
 
 template <typename T>
 const std::vector<T> &taylor_adaptive<T>::get_d_output() const
 {
-    return m_d_out;
+    return m_i_data->m_d_out;
 }
 
 template <typename T>
@@ -1700,13 +1727,13 @@ const std::vector<typename taylor_adaptive<T>::nt_event_t> &taylor_adaptive<T>::
 template <typename T>
 const std::vector<expression> &taylor_adaptive<T>::get_state_vars() const
 {
-    return m_state_vars;
+    return m_i_data->m_state_vars;
 }
 
 template <typename T>
 const std::vector<expression> &taylor_adaptive<T>::get_rhs() const
 {
-    return m_rhs;
+    return m_i_data->m_rhs;
 }
 
 template <typename T>
@@ -1718,7 +1745,7 @@ void taylor_adaptive<T>::set_time(T t)
     }
 #endif
 
-    m_time = detail::dfloat<T>(std::move(t));
+    m_i_data->m_time = detail::dfloat<T>(std::move(t));
 }
 
 template <typename T>
@@ -1734,7 +1761,7 @@ void taylor_adaptive<T>::set_dtime(T hi, T lo)
     // Check the components.
     detail::dtime_checks(hi, lo);
 
-    m_time = normalise(detail::dfloat<T>(std::move(hi), std::move(lo)));
+    m_i_data->m_time = normalise(detail::dfloat<T>(std::move(hi), std::move(lo)));
 }
 
 template <typename T>
@@ -1759,17 +1786,17 @@ const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
     // the *previous* timestep.
     if (rel_time) {
         // Time coordinate relative to the current time.
-        const auto h = m_last_h + std::move(time);
+        const auto h = m_i_data->m_last_h + std::move(time);
 
-        m_d_out_f(m_d_out.data(), m_tc.data(), &h);
+        m_i_data->m_d_out_f(m_i_data->m_d_out.data(), m_i_data->m_tc.data(), &h);
     } else {
         // Absolute time coordinate.
-        const auto h = std::move(time) - (m_time - m_last_h);
+        const auto h = std::move(time) - (m_i_data->m_time - m_i_data->m_last_h);
 
-        m_d_out_f(m_d_out.data(), m_tc.data(), &h.hi);
+        m_i_data->m_d_out_f(m_i_data->m_d_out.data(), m_i_data->m_tc.data(), &h.hi);
     }
 
-    return m_d_out;
+    return m_i_data->m_d_out;
 }
 
 // Explicit instantiations
@@ -1798,3 +1825,5 @@ HEYOKA_TAYLOR_ADAPTIVE_INST(mppp::real)
 #undef HEYOKA_TAYLOR_ADAPTIVE_INST
 
 HEYOKA_END_NAMESPACE
+
+#undef HEYOKA_TAYLOR_REF_FROM_I_DATA

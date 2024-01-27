@@ -16,6 +16,7 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <initializer_list>
 #include <memory>
 #include <optional>
@@ -443,46 +444,15 @@ public:
     using t_event_t = t_event<T>;
 
 private:
+    // Struct storing the integrator data.
+    struct HEYOKA_DLL_PUBLIC i_data;
+
     // Struct implementing the data/logic for event detection.
     struct HEYOKA_DLL_PUBLIC ed_data;
 
-    // State vector.
-    std::vector<T> m_state;
-    // Time.
-    detail::dfloat<T> m_time;
-    // The LLVM machinery.
-    llvm_state m_llvm;
-    // Dimension of the system.
-    std::uint32_t m_dim{};
-    // Taylor decomposition.
-    taylor_dc_t m_dc;
-    // Taylor order.
-    std::uint32_t m_order{};
-    // Tolerance.
-    T m_tol;
-    // High accuracy.
-    bool m_high_accuracy{};
-    // Compact mode.
-    bool m_compact_mode{};
-    // The steppers.
-    using step_f_t = void (*)(T *, const T *, const T *, T *, T *) noexcept;
-    using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *, T *) noexcept;
-    std::variant<step_f_t, step_f_e_t> m_step_f;
-    // The vector of parameters.
-    std::vector<T> m_pars;
-    // The vector for the Taylor coefficients.
-    std::vector<T> m_tc;
-    // Size of the last timestep taken.
-    T m_last_h = T(0);
-    // The function for computing the dense output.
-    using d_out_f_t = void (*)(T *, const T *, const T *) noexcept;
-    d_out_f_t m_d_out_f;
-    // The vector for the dense output.
-    std::vector<T> m_d_out;
-    // Auxiliary data/functions for event detection.
+    // Pimpls.
+    std::unique_ptr<i_data> m_i_data;
     std::unique_ptr<ed_data> m_ed_data;
-    // The state variables and the rhs.
-    std::vector<expression> m_state_vars, m_rhs;
 
     // Serialization.
     template <typename Archive>
@@ -503,7 +473,7 @@ private:
                             std::vector<nt_event_t>, bool, std::optional<long long>);
     template <typename... KwArgs>
     void finalise_ctor(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
-                       KwArgs &&...kw_args)
+                       const KwArgs &...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -522,7 +492,7 @@ private:
             }();
 
             auto [high_accuracy, tol, compact_mode, pars, parallel_mode]
-                = detail::taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
+                = detail::taylor_adaptive_common_ops<T>(kw_args...);
 
             // Extract the terminal events, if any.
             auto tes = [&p]() -> std::vector<t_event_t> {
@@ -561,7 +531,7 @@ private:
     }
 
     // NOTE: we need to go through a private non-template constructor
-    // in order to avoid having to provide a definition for ed_data.
+    // in order to avoid having to provide definitions for the pimpled data.
     struct private_ctor_t {
     };
     explicit taylor_adaptive(private_ctor_t, llvm_state);
@@ -640,6 +610,8 @@ private:
     // Implementations of the propagate_*() functions.
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
     propagate_until_impl(detail::dfloat<T>, std::size_t, T, step_callback<T>, bool, bool);
+    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
+    propagate_for_impl(T, std::size_t, T, step_callback<T>, bool, bool);
     std::tuple<taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>
         propagate_grid_impl(std::vector<T>, std::size_t, T, step_callback<T>);
 
@@ -681,8 +653,8 @@ public:
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
             = detail::taylor_propagate_common_ops<T, false>(kw_args...);
 
-        return propagate_until_impl(m_time + std::move(delta_t), max_steps, std::move(max_delta_t), std::move(cb),
-                                    write_tc, with_c_out);
+        return propagate_for_impl(std::move(delta_t), max_steps, std::move(max_delta_t), std::move(cb), write_tc,
+                                  with_c_out);
     }
     template <typename... KwArgs>
     std::tuple<taylor_outcome, T, T, std::size_t, step_callback<T>, std::vector<T>>
@@ -754,10 +726,7 @@ auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const KwArgs &.
         // we keep on checking on max_delta_t before invoking
         // the single step function. Hence, we want to avoid
         // any risk of aliasing.
-        auto max_delta_t = [batch_size, &p]() -> std::vector<T> {
-            // NOTE: compiler warning.
-            (void)batch_size;
-
+        auto max_delta_t = [&]() -> std::vector<T> {
             if constexpr (p.has(kw::max_delta_t)) {
                 using type = decltype(p(kw::max_delta_t));
 
@@ -844,70 +813,15 @@ public:
     using t_event_t = t_event_batch<T>;
 
 private:
+    // Struct storing the integrator data.
+    struct HEYOKA_DLL_PUBLIC i_data;
+
     // Struct implementing the data/logic for event detection.
     struct HEYOKA_DLL_PUBLIC ed_data;
 
-    // The batch size.
-    std::uint32_t m_batch_size{};
-    // State vectors.
-    std::vector<T> m_state;
-    // Times.
-    std::vector<T> m_time_hi, m_time_lo;
-    // The LLVM machinery.
-    llvm_state m_llvm;
-    // Dimension of the system.
-    std::uint32_t m_dim{};
-    // Taylor decomposition.
-    taylor_dc_t m_dc;
-    // Taylor order.
-    std::uint32_t m_order{};
-    // Tolerance.
-    T m_tol;
-    // High accuracy.
-    bool m_high_accuracy{};
-    // Compact mode.
-    bool m_compact_mode{};
-    // The steppers.
-    using step_f_t = void (*)(T *, const T *, const T *, T *, T *) noexcept;
-    using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *, T *) noexcept;
-    std::variant<step_f_t, step_f_e_t> m_step_f;
-    // The vector of parameters.
-    std::vector<T> m_pars;
-    // The vector for the Taylor coefficients.
-    std::vector<T> m_tc;
-    // The sizes of the last timesteps taken.
-    std::vector<T> m_last_h;
-    // The function for computing the dense output.
-    using d_out_f_t = void (*)(T *, const T *, const T *) noexcept;
-    d_out_f_t m_d_out_f;
-    // The vector for the dense output.
-    std::vector<T> m_d_out;
-    // Temporary vectors for use
-    // in the timestepping functions.
-    // These two are used as default values,
-    // they must never be modified.
-    std::vector<T> m_pinf, m_minf;
-    // This is used as temporary storage in step_impl().
-    std::vector<T> m_delta_ts;
-    // The vectors used to store the results of the step
-    // and propagate functions.
-    std::vector<std::tuple<taylor_outcome, T>> m_step_res;
-    std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> m_prop_res;
-    // Temporary vectors used in the step()/propagate_*() implementations.
-    std::vector<std::size_t> m_ts_count;
-    std::vector<T> m_min_abs_h, m_max_abs_h;
-    std::vector<T> m_cur_max_delta_ts;
-    std::vector<detail::dfloat<T>> m_pfor_ts;
-    std::vector<int> m_t_dir;
-    std::vector<detail::dfloat<T>> m_rem_time;
-    std::vector<T> m_time_copy_hi, m_time_copy_lo;
-    std::vector<int> m_nf_detected;
-    // Temporary vector used in the dense output implementation.
-    std::vector<T> m_d_out_time;
-    // Auxiliary data/functions for event detection.
+    // Pimpls.
+    std::unique_ptr<i_data> m_i_data;
     std::unique_ptr<ed_data> m_ed_data;
-    // The state variables and the rhs.
-    std::vector<expression> m_state_vars, m_rhs;
 
     // Serialization.
     template <typename Archive>
@@ -928,7 +842,7 @@ private:
                             std::vector<nt_event_t>, bool);
     template <typename... KwArgs>
     void finalise_ctor(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
-                       std::uint32_t batch_size, KwArgs &&...kw_args)
+                       std::uint32_t batch_size, const KwArgs &...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -947,7 +861,7 @@ private:
             }();
 
             auto [high_accuracy, tol, compact_mode, pars, parallel_mode]
-                = detail::taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
+                = detail::taylor_adaptive_common_ops<T>(kw_args...);
 
             // Extract the terminal events, if any.
             auto tes = [&p]() -> std::vector<t_event_t> {
@@ -973,7 +887,7 @@ private:
     }
 
     // NOTE: we need to go through a private non-template constructor
-    // in order to avoid having to provide a definition for ed_data.
+    // in order to avoid having to provide definitions for the pimpled data.
     struct private_ctor_t {
     };
     explicit taylor_adaptive_batch(private_ctor_t, llvm_state);
@@ -1058,14 +972,25 @@ public:
 
 private:
     // Implementations of the propagate_*() functions.
+
+    // NOTE: the argument to the propagate_until_impl() function can be one of these:
+    // - single scalar value,
+    // - vector of values,
+    // - vector of double-length values.
+    // NOTE: the third case can occur only if propagate_until() is being called
+    // from propagate_for().
+    using puntil_arg_t = std::variant<T, std::reference_wrapper<const std::vector<T>>,
+                                      std::reference_wrapper<const std::vector<detail::dfloat<T>>>>;
     std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
-    propagate_until_impl(const std::vector<detail::dfloat<T>> &, std::size_t, const std::vector<T> &,
-                         step_callback_batch<T>, bool, bool);
+    propagate_until_impl(const puntil_arg_t &, std::size_t, const std::vector<T> &, step_callback_batch<T>, bool, bool);
+
+    // NOTE: the argument to the propagate_for_impl() function can be one of these:
+    // - single scalar value,
+    // - vector of values.
+    using pfor_arg_t = std::variant<T, std::reference_wrapper<const std::vector<T>>>;
     std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
-    propagate_until_impl(const std::vector<T> &, std::size_t, const std::vector<T> &, step_callback_batch<T>, bool,
-                         bool);
-    std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
-    propagate_for_impl(const std::vector<T> &, std::size_t, const std::vector<T> &, step_callback_batch<T>, bool, bool);
+    propagate_for_impl(const pfor_arg_t &, std::size_t, const std::vector<T> &, step_callback_batch<T>, bool, bool);
+
     std::tuple<step_callback_batch<T>, std::vector<T>>
     propagate_grid_impl(const std::vector<T> &, std::size_t, const std::vector<T> &, step_callback_batch<T>);
 
@@ -1078,47 +1003,36 @@ public:
     propagate_until(const std::vector<T> &ts, const KwArgs &...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, kw_args...);
+            = detail::taylor_propagate_common_ops_batch<T, false, false>(get_batch_size(), kw_args...);
 
-        return propagate_until_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
-                                    write_tc, with_c_out);
+        return propagate_until_impl(ts, max_steps, max_delta_ts, std::move(cb), write_tc, with_c_out);
     }
     template <typename... KwArgs>
     std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
     propagate_until(T t, const KwArgs &...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, kw_args...);
+            = detail::taylor_propagate_common_ops_batch<T, false, false>(get_batch_size(), kw_args...);
 
-        // NOTE: re-use m_pfor_ts as tmp storage, as the other overload does.
-        assert(m_pfor_ts.size() == m_batch_size);
-        std::fill(m_pfor_ts.begin(), m_pfor_ts.end(), detail::dfloat<T>(t));
-        return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
-                                    write_tc, with_c_out);
+        return propagate_until_impl(std::move(t), max_steps, max_delta_ts, std::move(cb), write_tc, with_c_out);
     }
     template <typename... KwArgs>
     std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
     propagate_for(const std::vector<T> &delta_ts, const KwArgs &...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, kw_args...);
+            = detail::taylor_propagate_common_ops_batch<T, false, false>(get_batch_size(), kw_args...);
 
-        return propagate_for_impl(delta_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
-                                  write_tc, with_c_out);
+        return propagate_for_impl(delta_ts, max_steps, max_delta_ts, std::move(cb), write_tc, with_c_out);
     }
     template <typename... KwArgs>
     std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
     propagate_for(T delta_t, const KwArgs &...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = detail::taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, kw_args...);
+            = detail::taylor_propagate_common_ops_batch<T, false, false>(get_batch_size(), kw_args...);
 
-        // NOTE: this is a slight repetition of the other overload's code.
-        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            m_pfor_ts[i] = detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) + delta_t;
-        }
-        return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
-                                    write_tc, with_c_out);
+        return propagate_for_impl(std::move(delta_t), max_steps, max_delta_ts, std::move(cb), write_tc, with_c_out);
     }
     // NOTE: grid is taken by copy because in the implementation loop we keep on reading from it.
     // Hence, we need to avoid any aliasing issue with other public integrator data.
@@ -1126,14 +1040,11 @@ public:
     std::tuple<step_callback_batch<T>, std::vector<T>> propagate_grid(std::vector<T> grid, const KwArgs &...kw_args)
     {
         auto [max_steps, max_delta_ts, cb]
-            = detail::taylor_propagate_common_ops_batch<T, true, false>(m_batch_size, kw_args...);
+            = detail::taylor_propagate_common_ops_batch<T, true, false>(get_batch_size(), kw_args...);
 
-        return propagate_grid_impl(grid, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb));
+        return propagate_grid_impl(grid, max_steps, max_delta_ts, std::move(cb));
     }
-    [[nodiscard]] const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &get_propagate_res() const
-    {
-        return m_prop_res;
-    }
+    [[nodiscard]] const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &get_propagate_res() const;
 };
 
 // Prevent implicit instantiations.
@@ -1220,13 +1131,15 @@ namespace detail
 // - 2: added the m_state_vars and m_rhs members.
 // - 3: removed the mr flag from the terminal event callback siganture,
 //      which resulted also in changes in the event detection data structure.
-inline constexpr int taylor_adaptive_s11n_version = 3;
+// - 4: switched to pimpl implementation for i_data.
+inline constexpr int taylor_adaptive_s11n_version = 4;
 
 // Boost s11n class version history for taylor_adaptive_batch:
 // - 1: added the m_state_vars and m_rhs members.
 // - 2: removed the mr flag from the terminal event callback siganture,
 //      which resulted also in changes in the event detection data structure.
-inline constexpr int taylor_adaptive_batch_s11n_version = 2;
+// - 3: switched to pimpl implementation for i_data.
+inline constexpr int taylor_adaptive_batch_s11n_version = 3;
 
 } // namespace detail
 
