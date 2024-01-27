@@ -22,7 +22,15 @@ mkdir build
 cd build
 
 # GCC build.
-cmake ../ -DCMAKE_PREFIX_PATH=$deps_dir -DCMAKE_BUILD_TYPE=Debug -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_MPPP=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_WITH_SLEEF=yes -DCMAKE_CXX_FLAGS="--coverage" -DBoost_NO_BOOST_CMAKE=ON
+cmake ../ -G Ninja \
+    -DCMAKE_PREFIX_PATH=$deps_dir \
+    -DCMAKE_BUILD_TYPE=Debug \
+    -DHEYOKA_BUILD_TESTS=yes \
+    -DHEYOKA_WITH_MPPP=yes \
+    -DHEYOKA_BUILD_TUTORIALS=ON \
+    -DHEYOKA_WITH_SLEEF=yes \
+    -DCMAKE_CXX_FLAGS="--coverage" \
+    -DBoost_NO_BOOST_CMAKE=ON
 ninja -v
 # Run the tests.
 ctest -V -j4

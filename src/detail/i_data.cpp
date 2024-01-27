@@ -25,7 +25,6 @@
 #endif
 
 #include <heyoka/detail/i_data.hpp>
-#include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -153,7 +152,7 @@ template <typename T>
 taylor_adaptive<T>::i_data::~i_data() = default;
 
 // Explicit instantiations.
-#define HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(F) template HEYOKA_DLL_PUBLIC struct taylor_adaptive<F>::i_data;
+#define HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(F) template struct taylor_adaptive<F>::i_data;
 
 HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(float)
 HEYOKA_TAYLOR_ADAPTIVE_I_DATA_INST(double)
@@ -280,7 +279,7 @@ template <typename T>
 taylor_adaptive_batch<T>::i_data::~i_data() = default;
 
 // Explicit instantiations.
-#define HEYOKA_TAYLOR_ADAPTIVE_BATCH_I_DATA_INST(F) template HEYOKA_DLL_PUBLIC struct taylor_adaptive_batch<F>::i_data;
+#define HEYOKA_TAYLOR_ADAPTIVE_BATCH_I_DATA_INST(F) template struct taylor_adaptive_batch<F>::i_data;
 
 HEYOKA_TAYLOR_ADAPTIVE_BATCH_I_DATA_INST(float)
 HEYOKA_TAYLOR_ADAPTIVE_BATCH_I_DATA_INST(double)
