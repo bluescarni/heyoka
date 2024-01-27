@@ -473,7 +473,7 @@ private:
                             std::vector<nt_event_t>, bool, std::optional<long long>);
     template <typename... KwArgs>
     void finalise_ctor(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
-                       KwArgs &&...kw_args)
+                       const KwArgs &...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -492,7 +492,7 @@ private:
             }();
 
             auto [high_accuracy, tol, compact_mode, pars, parallel_mode]
-                = detail::taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
+                = detail::taylor_adaptive_common_ops<T>(kw_args...);
 
             // Extract the terminal events, if any.
             auto tes = [&p]() -> std::vector<t_event_t> {
@@ -531,7 +531,7 @@ private:
     }
 
     // NOTE: we need to go through a private non-template constructor
-    // in order to avoid having to provide a definition for ed_data.
+    // in order to avoid having to provide definitions for the pimpled data.
     struct private_ctor_t {
     };
     explicit taylor_adaptive(private_ctor_t, llvm_state);
@@ -726,10 +726,7 @@ auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, const KwArgs &.
         // we keep on checking on max_delta_t before invoking
         // the single step function. Hence, we want to avoid
         // any risk of aliasing.
-        auto max_delta_t = [batch_size, &p]() -> std::vector<T> {
-            // NOTE: compiler warning.
-            (void)batch_size;
-
+        auto max_delta_t = [&]() -> std::vector<T> {
             if constexpr (p.has(kw::max_delta_t)) {
                 using type = decltype(p(kw::max_delta_t));
 
@@ -845,7 +842,7 @@ private:
                             std::vector<nt_event_t>, bool);
     template <typename... KwArgs>
     void finalise_ctor(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
-                       std::uint32_t batch_size, KwArgs &&...kw_args)
+                       std::uint32_t batch_size, const KwArgs &...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -864,7 +861,7 @@ private:
             }();
 
             auto [high_accuracy, tol, compact_mode, pars, parallel_mode]
-                = detail::taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
+                = detail::taylor_adaptive_common_ops<T>(kw_args...);
 
             // Extract the terminal events, if any.
             auto tes = [&p]() -> std::vector<t_event_t> {
@@ -890,7 +887,7 @@ private:
     }
 
     // NOTE: we need to go through a private non-template constructor
-    // in order to avoid having to provide a definition for ed_data.
+    // in order to avoid having to provide definitions for the pimpled data.
     struct private_ctor_t {
     };
     explicit taylor_adaptive_batch(private_ctor_t, llvm_state);
@@ -980,6 +977,8 @@ private:
     // - single scalar value,
     // - vector of values,
     // - vector of double-length values.
+    // NOTE: the third case can occur only if propagate_until() is being called
+    // from propagate_for().
     using puntil_arg_t = std::variant<T, std::reference_wrapper<const std::vector<T>>,
                                       std::reference_wrapper<const std::vector<detail::dfloat<T>>>>;
     std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>

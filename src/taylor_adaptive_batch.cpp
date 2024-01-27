@@ -957,10 +957,13 @@ taylor_adaptive_batch<T>::propagate_for_impl(const pfor_arg_t &delta_ts, std::si
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pfor_ts);
 
     if (const auto *scal_ptr = std::get_if<T>(&delta_ts)) {
+        // Single duration value: add it to the current times
+        // and store the results in m_pfor_ts.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             m_pfor_ts[i] = detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) + *scal_ptr;
         }
     } else {
+        // Vector of single-length durations.
         const auto &vec = std::get<std::reference_wrapper<const std::vector<T>>>(delta_ts).get();
 
         // Check the dimensionality of vec.
@@ -971,6 +974,8 @@ taylor_adaptive_batch<T>::propagate_for_impl(const pfor_arg_t &delta_ts, std::si
                             m_batch_size, vec.size()));
         }
 
+        // Add the durations to the current times and store the result
+        // in m_pfor_ts.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             m_pfor_ts[i] = detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) + vec[i];
         }
@@ -1028,7 +1033,8 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
 
     assert(m_pfor_ts.size() == m_batch_size);
 
-    // Compute the final times and store them in m_pfor_ts, if necessary.
+    // Compute the final times and store them in m_pfor_ts, if they
+    // are not already there.
     std::visit(
         [&]<typename V>(const V &v) {
             if constexpr (std::same_as<V, T>) {
@@ -1038,7 +1044,8 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
                 using vec_t = std::remove_cvref_t<std::unwrap_reference_t<V>>;
 
                 if constexpr (std::same_as<T, typename vec_t::value_type>) {
-                    // Vector of single-length final times. Convert to double-length into m_pfor_ts.
+                    // Vector of single-length final times. Convert to double-length
+                    // and copy into m_pfor_ts.
                     const auto &vec = v.get();
 
                     // Check the dimensionality of v.
@@ -1063,6 +1070,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
         },
         ts_);
 
+    // The final times are now stored in m_pfor_ts.
     const auto &ts = m_pfor_ts;
 
     // Set up max_delta_ts.
