@@ -173,6 +173,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/i_data.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/nt_event.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/t_event.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/dtens.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/continuous_output.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/cm_utils.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection.cpp"

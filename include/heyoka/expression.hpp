@@ -440,6 +440,9 @@ struct dtens_sv_idx_cmp {
 
 using dtens_map_t = boost::container::flat_map<dtens_sv_idx_t, expression, dtens_sv_idx_cmp>;
 
+// Utility function to check that a dtens_sv_idx_t is well-formed.
+bool sv_sanity_check(const dtens_sv_idx_t &);
+
 } // namespace detail
 
 class HEYOKA_DLL_PUBLIC dtens
