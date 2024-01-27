@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -42,6 +43,7 @@
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/ed_data.hpp>
 #include <heyoka/detail/event_detection.hpp>
+#include <heyoka/detail/i_data.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -54,66 +56,16 @@
 #include <heyoka/step_callback.hpp>
 #include <heyoka/taylor.hpp>
 
-// NOTE: implement a workaround for the serialisation of tuples whose first element
-// is a taylor outcome. We need this because Boost.Serialization treats all enums
-// as ints, which is not ok for taylor_outcome (whose underyling type will not
-// be an int on most platforms). Because it is not possible to override Boost's
-// enum implementation, we override the serialisation of tuples with outcomes
-// as first elements, which is all we need in the serialisation of the batch
-// integrator. The implementation below will be preferred over the generic tuple
-// s11n because it is more specialised.
-// NOTE: this workaround is not necessary for the other enums in heyoka because
-// those all have ints as underlying type.
-namespace boost::serialization
-{
-
-template <typename Archive, typename... Args>
-void save(Archive &ar, const std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
-{
-    auto tf = [&ar](const auto &x) {
-        if constexpr (std::is_same_v<decltype(x), const heyoka::taylor_outcome &>) {
-            ar << static_cast<std::underlying_type_t<heyoka::taylor_outcome>>(x);
-        } else {
-            ar << x;
-        }
-    };
-
-    // NOTE: this is a right fold, which, in conjunction with the
-    // builtin comma operator, ensures that the serialisation of
-    // the tuple elements proceeds in the correct order and with
-    // the correct sequencing.
-    std::apply([&tf](const auto &...x) { (tf(x), ...); }, tup);
-}
-
-template <typename Archive, typename... Args>
-void load(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
-{
-    auto tf = [&ar](auto &x) {
-        if constexpr (std::is_same_v<decltype(x), heyoka::taylor_outcome &>) {
-            std::underlying_type_t<heyoka::taylor_outcome> val{};
-            ar >> val;
-
-            x = static_cast<heyoka::taylor_outcome>(val);
-        } else {
-            ar >> x;
-        }
-    };
-
-    std::apply([&tf](auto &...x) { (tf(x), ...); }, tup);
-}
-
-template <typename Archive, typename... Args>
-void serialize(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned v)
-{
-    split_free(ar, tup, v);
-}
-
-} // namespace boost::serialization
+// NOTE: this is a helper macro to reduce typing when accessing the
+// data members of i_data.
+// NOLINTNEXTLINE(bugprone-macro-parentheses)
+#define HEYOKA_TAYLOR_REF_FROM_I_DATA(name) auto &name = m_i_data->name
 
 HEYOKA_BEGIN_NAMESPACE
 
 template <typename T>
-taylor_adaptive_batch<T>::taylor_adaptive_batch(private_ctor_t, llvm_state s) : m_llvm(std::move(s))
+taylor_adaptive_batch<T>::taylor_adaptive_batch(private_ctor_t, llvm_state s)
+    : m_i_data(std::make_unique<i_data>(std::move(s)))
 {
 }
 
@@ -135,6 +87,40 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
 #endif
 
     using std::isfinite;
+
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pars);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_high_accuracy);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_compact_mode);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tol);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_llvm);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dc);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_f);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pinf);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_minf);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_delta_ts);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_res);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_prop_res);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ts_count);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_min_abs_h);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_max_abs_h);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cur_max_delta_ts);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pfor_ts);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_t_dir);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_rem_time);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_hi);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_lo);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_nf_detected);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_time);
 
     // Init the data members.
     m_batch_size = batch_size;
@@ -259,13 +245,13 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
 
     // Fetch the stepper.
     if (with_events) {
-        m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
+        m_step_f = reinterpret_cast<i_data::step_f_e_t>(m_llvm.jit_lookup("step_e"));
     } else {
-        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+        m_step_f = reinterpret_cast<i_data::step_f_t>(m_llvm.jit_lookup("step"));
     }
 
     // Fetch the function to compute the dense output.
-    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+    m_d_out_f = reinterpret_cast<i_data::d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
 
     // Setup the vector for the Taylor coefficients.
     // LCOV_EXCL_START
@@ -342,25 +328,14 @@ taylor_adaptive_batch<T>::taylor_adaptive_batch()
 
 template <typename T>
 taylor_adaptive_batch<T>::taylor_adaptive_batch(const taylor_adaptive_batch &other)
-    // NOTE: make a manual copy of all members, apart from the function pointers.
-    : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time_hi(other.m_time_hi), m_time_lo(other.m_time_lo),
-      m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_tol(other.m_tol),
-      m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode), m_pars(other.m_pars),
-      m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
-      m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
-      m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
-      m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
-      m_rem_time(other.m_rem_time), m_time_copy_hi(other.m_time_copy_hi), m_time_copy_lo(other.m_time_copy_lo),
-      m_nf_detected(other.m_nf_detected), m_d_out_time(other.m_d_out_time),
-      m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr),
-      m_state_vars(other.m_state_vars), m_rhs(other.m_rhs)
+    : m_i_data(std::make_unique<i_data>(*other.m_i_data)),
+      m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
 {
     if (m_ed_data) {
-        m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
+        m_i_data->m_step_f = reinterpret_cast<i_data::step_f_e_t>(m_i_data->m_llvm.jit_lookup("step_e"));
     } else {
-        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+        m_i_data->m_step_f = reinterpret_cast<i_data::step_f_t>(m_i_data->m_llvm.jit_lookup("step"));
     }
-    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
 }
 
 template <typename T>
@@ -387,41 +362,8 @@ template <typename T>
 template <typename Archive>
 void taylor_adaptive_batch<T>::save_impl(Archive &ar, unsigned) const
 {
-    // NOTE: save all members, apart from the function pointers.
-    ar << m_batch_size;
-    ar << m_state;
-    ar << m_time_hi;
-    ar << m_time_lo;
-    ar << m_llvm;
-    ar << m_dim;
-    ar << m_dc;
-    ar << m_order;
-    ar << m_tol;
-    ar << m_high_accuracy;
-    ar << m_compact_mode;
-    ar << m_pars;
-    ar << m_tc;
-    ar << m_last_h;
-    ar << m_d_out;
-    ar << m_pinf;
-    ar << m_minf;
-    ar << m_delta_ts;
-    ar << m_step_res;
-    ar << m_prop_res;
-    ar << m_ts_count;
-    ar << m_min_abs_h;
-    ar << m_max_abs_h;
-    ar << m_cur_max_delta_ts;
-    ar << m_pfor_ts;
-    ar << m_t_dir;
-    ar << m_rem_time;
-    ar << m_time_copy_hi;
-    ar << m_time_copy_lo;
-    ar << m_nf_detected;
-    ar << m_d_out_time;
+    ar << m_i_data;
     ar << m_ed_data;
-    ar << m_state_vars;
-    ar << m_rhs;
 }
 
 template <typename T>
@@ -436,48 +378,24 @@ void taylor_adaptive_batch<T>::load_impl(Archive &ar, unsigned version)
     }
     // LCOV_EXCL_STOP
 
-    ar >> m_batch_size;
-    ar >> m_state;
-    ar >> m_time_hi;
-    ar >> m_time_lo;
-    ar >> m_llvm;
-    ar >> m_dim;
-    ar >> m_dc;
-    ar >> m_order;
-    ar >> m_tol;
-    ar >> m_high_accuracy;
-    ar >> m_compact_mode;
-    ar >> m_pars;
-    ar >> m_tc;
-    ar >> m_last_h;
-    ar >> m_d_out;
-    ar >> m_pinf;
-    ar >> m_minf;
-    ar >> m_delta_ts;
-    ar >> m_step_res;
-    ar >> m_prop_res;
-    ar >> m_ts_count;
-    ar >> m_min_abs_h;
-    ar >> m_max_abs_h;
-    ar >> m_cur_max_delta_ts;
-    ar >> m_pfor_ts;
-    ar >> m_t_dir;
-    ar >> m_rem_time;
-    ar >> m_time_copy_hi;
-    ar >> m_time_copy_lo;
-    ar >> m_nf_detected;
-    ar >> m_d_out_time;
-    ar >> m_ed_data;
-    ar >> m_state_vars;
-    ar >> m_rhs;
+    try {
+        ar >> m_i_data;
+        ar >> m_ed_data;
 
-    // Recover the function pointers.
-    if (m_ed_data) {
-        m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
-    } else {
-        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+        // Recover the function pointers.
+        if (m_ed_data) {
+            m_i_data->m_step_f = reinterpret_cast<i_data::step_f_e_t>(m_i_data->m_llvm.jit_lookup("step_e"));
+        } else {
+            m_i_data->m_step_f = reinterpret_cast<i_data::step_f_t>(m_i_data->m_llvm.jit_lookup("step"));
+        }
+        // LCOV_EXCL_START
+    } catch (...) {
+        // Reset to def-cted state in case of exceptions.
+        *this = taylor_adaptive_batch{};
+
+        throw;
     }
-    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+    // LCOV_EXCL_STOP
 }
 
 template <typename T>
@@ -495,6 +413,10 @@ void taylor_adaptive_batch<T>::load(boost::archive::binary_iarchive &ar, unsigne
 template <typename T>
 void taylor_adaptive_batch<T>::set_time(const std::vector<T> &new_time)
 {
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
+
     // Check the dimensionality of new_time.
     if (new_time.size() != m_batch_size) {
         throw std::invalid_argument(fmt::format(
@@ -516,6 +438,9 @@ void taylor_adaptive_batch<T>::set_time(const std::vector<T> &new_time)
 template <typename T>
 void taylor_adaptive_batch<T>::set_time(T new_time)
 {
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
+
     // Set the hi part.
     std::fill(m_time_hi.begin(), m_time_hi.end(), new_time);
     // Reset the lo part.
@@ -525,6 +450,10 @@ void taylor_adaptive_batch<T>::set_time(T new_time)
 template <typename T>
 void taylor_adaptive_batch<T>::set_dtime(const std::vector<T> &hi, const std::vector<T> &lo)
 {
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
+
     // Check the dimensionalities.
     if (hi.size() != m_batch_size || lo.size() != m_batch_size) {
         throw std::invalid_argument(fmt::format(
@@ -552,6 +481,9 @@ void taylor_adaptive_batch<T>::set_dtime(const std::vector<T> &hi, const std::ve
 template <typename T>
 void taylor_adaptive_batch<T>::set_dtime(T hi, T lo)
 {
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
+
     // Check the components.
     detail::dtime_checks(hi, lo);
 
@@ -588,6 +520,24 @@ void taylor_adaptive_batch<T>::set_dtime(T hi, T lo)
 template <typename T>
 void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
 {
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pars);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tol);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_f);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_delta_ts);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_res);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_hi);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_lo);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_nf_detected);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
+
     using std::abs;
     using std::isfinite;
 
@@ -609,7 +559,7 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
 
     // Helper to check if the state vector of a batch element
     // contains a non-finite value.
-    auto check_nf_batch = [this](std::uint32_t batch_idx) {
+    auto check_nf_batch = [&](std::uint32_t batch_idx) {
         for (std::uint32_t i = 0; i < m_dim; ++i) {
             if (!isfinite(m_state[i * m_batch_size + batch_idx])) {
                 return true;
@@ -956,18 +906,24 @@ void taylor_adaptive_batch<T>::step_impl(const std::vector<T> &max_delta_ts, boo
 template <typename T>
 void taylor_adaptive_batch<T>::step(bool wtc)
 {
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pinf);
+
     step_impl(m_pinf, wtc);
 }
 
 template <typename T>
 void taylor_adaptive_batch<T>::step_backward(bool wtc)
 {
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_minf);
+
     step_impl(m_minf, wtc);
 }
 
 template <typename T>
 void taylor_adaptive_batch<T>::step(const std::vector<T> &max_delta_ts, bool wtc)
 {
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+
     // Check the dimensionality of max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
         throw std::invalid_argument(fmt::format(
@@ -991,20 +947,33 @@ void taylor_adaptive_batch<T>::step(const std::vector<T> &max_delta_ts, bool wtc
 
 template <typename T>
 std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
-taylor_adaptive_batch<T>::propagate_for_impl(const std::vector<T> &delta_ts, std::size_t max_steps,
+taylor_adaptive_batch<T>::propagate_for_impl(const pfor_arg_t &delta_ts, std::size_t max_steps,
                                              const std::vector<T> &max_delta_ts, step_callback_batch<T> cb, bool wtc,
                                              bool with_c_out)
 {
-    // Check the dimensionality of delta_ts.
-    if (delta_ts.size() != m_batch_size) {
-        throw std::invalid_argument(
-            fmt::format("Invalid number of time intervals specified in a Taylor integrator in batch mode: "
-                        "the batch size is {}, but the number of specified time intervals is {}",
-                        m_batch_size, delta_ts.size()));
-    }
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pfor_ts);
 
-    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        m_pfor_ts[i] = detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) + delta_ts[i];
+    if (const auto *scal_ptr = std::get_if<T>(&delta_ts)) {
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            m_pfor_ts[i] = detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) + *scal_ptr;
+        }
+    } else {
+        const auto &vec = std::get<std::reference_wrapper<const std::vector<T>>>(delta_ts).get();
+
+        // Check the dimensionality of vec.
+        if (vec.size() != m_batch_size) {
+            throw std::invalid_argument(
+                fmt::format("Invalid number of time intervals specified in a Taylor integrator in batch mode: "
+                            "the batch size is {}, but the number of specified time intervals is {}",
+                            m_batch_size, vec.size()));
+        }
+
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            m_pfor_ts[i] = detail::dfloat<T>(m_time_hi[i], m_time_lo[i]) + vec[i];
+        }
     }
 
     // NOTE: max_delta_ts is checked in propagate_until_impl().
@@ -1028,17 +997,76 @@ taylor_adaptive_batch<T>::propagate_for_impl(const std::vector<T> &delta_ts, std
 // unless a non-finite state was detected in any batch element.
 template <typename T>
 std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
-taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<detail::dfloat<T>> &ts, std::size_t max_steps,
-                                               const std::vector<T> &max_delta_ts, step_callback_batch<T> cb, bool wtc,
+taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::size_t max_steps,
+                                               const std::vector<T> &max_delta_ts_, step_callback_batch<T> cb, bool wtc,
                                                bool with_c_out)
 {
     using std::abs;
     using std::isfinite;
     using std::isnan;
 
-    // NOTE: this function is called from either the other propagate_until() overload,
-    // or propagate_for(). In both cases, we have already set up correctly the dimension of ts.
-    assert(ts.size() == m_batch_size); // LCOV_EXCL_LINE
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_high_accuracy);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_llvm);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pinf);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_res);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_prop_res);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ts_count);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_min_abs_h);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_max_abs_h);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_cur_max_delta_ts);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pfor_ts);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_t_dir);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_rem_time);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_hi);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_lo);
+
+    assert(m_pfor_ts.size() == m_batch_size);
+
+    // Compute the final times and store them in m_pfor_ts, if necessary.
+    std::visit(
+        [&]<typename V>(const V &v) {
+            if constexpr (std::same_as<V, T>) {
+                // Scalar final time. Splat the value into m_pfor_ts.
+                std::ranges::fill(m_pfor_ts, detail::dfloat<T>(v));
+            } else {
+                using vec_t = std::remove_cvref_t<std::unwrap_reference_t<V>>;
+
+                if constexpr (std::same_as<T, typename vec_t::value_type>) {
+                    // Vector of single-length final times. Convert to double-length into m_pfor_ts.
+                    const auto &vec = v.get();
+
+                    // Check the dimensionality of v.
+                    if (vec.size() != m_batch_size) {
+                        throw std::invalid_argument(fmt::format(
+                            "Invalid number of time limits specified in a Taylor integrator in batch mode: the "
+                            "batch size is {}, but the number of specified time limits is {}",
+                            m_batch_size, vec.size()));
+                    }
+
+                    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+                        m_pfor_ts[i] = detail::dfloat<T>(vec[i]);
+                    }
+                } else {
+                    // Vector of double-length final times.
+                    // NOTE: this is possible only if propagate_until() is called
+                    // from propagate_for(), in which case v must point
+                    // to m_pfor_ts.
+                    assert(&v.get() == &m_pfor_ts);
+                }
+            }
+        },
+        ts_);
+
+    const auto &ts = m_pfor_ts;
+
+    // Set up max_delta_ts.
+    const auto &max_delta_ts = max_delta_ts_.empty() ? m_pinf : max_delta_ts_;
 
     // Check the current times.
     if (std::any_of(m_time_hi.begin(), m_time_hi.end(), [](const auto &t) { return !isfinite(t); })
@@ -1364,30 +1392,6 @@ taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<detail::dfloat<
     // LCOV_EXCL_STOP
 }
 
-template <typename T>
-std::tuple<std::optional<continuous_output_batch<T>>, step_callback_batch<T>>
-taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<T> &ts, std::size_t max_steps,
-                                               const std::vector<T> &max_delta_ts, step_callback_batch<T> cb, bool wtc,
-                                               bool with_c_out)
-{
-    // Check the dimensionality of ts.
-    if (ts.size() != m_batch_size) {
-        throw std::invalid_argument(
-            fmt::format("Invalid number of time limits specified in a Taylor integrator in batch mode: the "
-                        "batch size is {}, but the number of specified time limits is {}",
-                        m_batch_size, ts.size()));
-    }
-
-    // NOTE: re-use m_pfor_ts as tmp storage.
-    assert(m_pfor_ts.size() == m_batch_size); // LCOV_EXCL_LINE
-    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        m_pfor_ts[i] = detail::dfloat<T>(ts[i]);
-    }
-
-    // NOTE: max_delta_ts is checked in the other propagate_until_impl() overload.
-    return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb), wtc, with_c_out);
-}
-
 // NOTE: possible outcomes:
 // - all time_limit (the happy path),
 // - at least 1 err_nf_state if a non-finite state was detected,
@@ -1399,10 +1403,28 @@ taylor_adaptive_batch<T>::propagate_until_impl(const std::vector<T> &ts, std::si
 template <typename T>
 std::tuple<step_callback_batch<T>, std::vector<T>>
 taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
-                                              const std::vector<T> &max_delta_ts, step_callback_batch<T> cb)
+                                              const std::vector<T> &max_delta_ts_, step_callback_batch<T> cb)
 {
     using std::abs;
     using std::isnan;
+
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_pinf);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_res);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_prop_res);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ts_count);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_min_abs_h);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_max_abs_h);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_t_dir);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_rem_time);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_hi);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_lo);
 
     // Helper to detect if an input value is nonfinite.
     auto is_nf = [](const T &t) {
@@ -1429,6 +1451,9 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
         throw std::invalid_argument("Cannot invoke propagate_grid() in an adaptive Taylor integrator in batch mode if "
                                     "the current time is not finite");
     }
+
+    // Set up max_delta_ts.
+    const auto &max_delta_ts = max_delta_ts_.empty() ? m_pinf : max_delta_ts_;
 
     // Check max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
@@ -1488,9 +1513,8 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
                 throw std::invalid_argument(nf_err_msg);
             }
 
-            if (std::any_of(
-                    grid_ptr + i * m_batch_size, grid_ptr + (i + 1u) * m_batch_size,
-                    [this, grid_direction](const T &t) { return (t > *(&t - m_batch_size)) != grid_direction; })) {
+            if (std::any_of(grid_ptr + i * m_batch_size, grid_ptr + (i + 1u) * m_batch_size,
+                            [&](const T &t) { return (t > *(&t - m_batch_size)) != grid_direction; })) {
                 throw std::invalid_argument(ig_err_msg);
             }
         }
@@ -1839,12 +1863,7 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
         // Small helper to wrap the invocation of the callback
         // while checking that the callback does not change the
         // time coordinate.
-        auto wrap_cb_call = [this, &cb
-#if defined(_MSC_VER) && !defined(__clang__)
-                             ,
-                             cb_time_errmsg
-#endif
-        ]() {
+        auto wrap_cb_call = [&]() {
             // Store the current time coordinate before
             // executing the cb, so that we can check if
             // the cb changes the time coordinate.
@@ -1896,127 +1915,127 @@ taylor_adaptive_batch<T>::propagate_grid_impl(const std::vector<T> &grid, std::s
 template <typename T>
 const llvm_state &taylor_adaptive_batch<T>::get_llvm_state() const
 {
-    return m_llvm;
+    return m_i_data->m_llvm;
 }
 
 template <typename T>
 const taylor_dc_t &taylor_adaptive_batch<T>::get_decomposition() const
 {
-    return m_dc;
+    return m_i_data->m_dc;
 }
 
 template <typename T>
 std::uint32_t taylor_adaptive_batch<T>::get_order() const
 {
-    return m_order;
+    return m_i_data->m_order;
 }
 
 template <typename T>
 T taylor_adaptive_batch<T>::get_tol() const
 {
-    return m_tol;
+    return m_i_data->m_tol;
 }
 
 template <typename T>
 bool taylor_adaptive_batch<T>::get_high_accuracy() const
 {
-    return m_high_accuracy;
+    return m_i_data->m_high_accuracy;
 }
 
 template <typename T>
 bool taylor_adaptive_batch<T>::get_compact_mode() const
 {
-    return m_compact_mode;
+    return m_i_data->m_compact_mode;
 }
 
 template <typename T>
 std::uint32_t taylor_adaptive_batch<T>::get_batch_size() const
 {
-    return m_batch_size;
+    return m_i_data->m_batch_size;
 }
 
 template <typename T>
 std::uint32_t taylor_adaptive_batch<T>::get_dim() const
 {
-    return m_dim;
+    return m_i_data->m_dim;
 }
 
 template <typename T>
 const std::vector<T> &taylor_adaptive_batch<T>::get_time() const
 {
-    return m_time_hi;
+    return m_i_data->m_time_hi;
 }
 
 template <typename T>
 const T *taylor_adaptive_batch<T>::get_time_data() const
 {
-    return m_time_hi.data();
+    return m_i_data->m_time_hi.data();
 }
 
 template <typename T>
 std::pair<const std::vector<T> &, const std::vector<T> &> taylor_adaptive_batch<T>::get_dtime() const
 {
-    return std::make_pair(std::cref(m_time_hi), std::cref(m_time_lo));
+    return std::make_pair(std::cref(m_i_data->m_time_hi), std::cref(m_i_data->m_time_lo));
 }
 
 template <typename T>
 std::pair<const T *, const T *> taylor_adaptive_batch<T>::get_dtime_data() const
 {
-    return std::make_pair(m_time_hi.data(), m_time_lo.data());
+    return std::make_pair(m_i_data->m_time_hi.data(), m_i_data->m_time_lo.data());
 }
 
 template <typename T>
 const std::vector<T> &taylor_adaptive_batch<T>::get_state() const
 {
-    return m_state;
+    return m_i_data->m_state;
 }
 
 template <typename T>
 const T *taylor_adaptive_batch<T>::get_state_data() const
 {
-    return m_state.data();
+    return m_i_data->m_state.data();
 }
 
 template <typename T>
 T *taylor_adaptive_batch<T>::get_state_data()
 {
-    return m_state.data();
+    return m_i_data->m_state.data();
 }
 
 template <typename T>
 const std::vector<T> &taylor_adaptive_batch<T>::get_pars() const
 {
-    return m_pars;
+    return m_i_data->m_pars;
 }
 
 template <typename T>
 const T *taylor_adaptive_batch<T>::get_pars_data() const
 {
-    return m_pars.data();
+    return m_i_data->m_pars.data();
 }
 
 template <typename T>
 T *taylor_adaptive_batch<T>::get_pars_data()
 {
-    return m_pars.data();
+    return m_i_data->m_pars.data();
 }
 
 template <typename T>
 const std::vector<T> &taylor_adaptive_batch<T>::get_tc() const
 {
-    return m_tc;
+    return m_i_data->m_tc;
 }
 
 template <typename T>
 const std::vector<T> &taylor_adaptive_batch<T>::get_last_h() const
 {
-    return m_last_h;
+    return m_i_data->m_last_h;
 }
 
 template <typename T>
 const std::vector<T> &taylor_adaptive_batch<T>::get_d_output() const
 {
-    return m_d_out;
+    return m_i_data->m_d_out;
 }
 
 template <typename T>
@@ -2058,24 +2077,39 @@ const std::vector<typename taylor_adaptive_batch<T>::nt_event_t> &taylor_adaptiv
 template <typename T>
 const std::vector<expression> &taylor_adaptive_batch<T>::get_state_vars() const
 {
-    return m_state_vars;
+    return m_i_data->m_state_vars;
 }
 
 template <typename T>
 const std::vector<expression> &taylor_adaptive_batch<T>::get_rhs() const
 {
-    return m_rhs;
+    return m_i_data->m_rhs;
 }
 
 template <typename T>
 const std::vector<std::tuple<taylor_outcome, T>> &taylor_adaptive_batch<T>::get_step_res() const
 {
-    return m_step_res;
+    return m_i_data->m_step_res;
+}
+
+template <typename T>
+const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &taylor_adaptive_batch<T>::get_propagate_res() const
+{
+    return m_i_data->m_prop_res;
 }
 
 template <typename T>
 const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(const std::vector<T> &time, bool rel_time)
 {
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_time);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
+
     // Check the dimensionality of time.
     if (time.size() != m_batch_size) {
         throw std::invalid_argument(fmt::format(
@@ -2109,6 +2143,15 @@ const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(const std::vecto
 template <typename T>
 const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(T time, bool rel_time)
 {
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_time);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_last_h);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_lo);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tc);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
+
     // NOTE: "time" needs to be translated
     // because m_d_out_f expects a time coordinate
     // with respect to the starting time t0 of
@@ -2133,6 +2176,8 @@ const std::vector<T> &taylor_adaptive_batch<T>::update_d_output(T time, bool rel
 template <typename T>
 void taylor_adaptive_batch<T>::reset_cooldowns()
 {
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         reset_cooldowns(i);
     }
@@ -2141,6 +2186,8 @@ void taylor_adaptive_batch<T>::reset_cooldowns()
 template <typename T>
 void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
 {
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
+
     if (!m_ed_data) {
         throw std::invalid_argument("No events were defined for this integrator");
     }
@@ -2172,3 +2219,5 @@ HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(mppp::real128)
 #undef HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST
 
 HEYOKA_END_NAMESPACE
+
+#undef HEYOKA_TAYLOR_REF_FROM_I_DATA

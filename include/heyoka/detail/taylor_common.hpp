@@ -50,6 +50,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
+#include <heyoka/detail/i_data.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
@@ -197,16 +198,16 @@ std::uint32_t taylor_order_from_tol(T tol)
 template <typename TA, typename U>
 void taylor_adaptive_setup_sv_rhs(TA &ta, const U &sys)
 {
-    for (std::uint32_t i = 0; i < ta.m_dim; ++i) {
+    for (std::uint32_t i = 0; i < ta.m_i_data->m_dim; ++i) {
         // NOTE: take the state variables from the
         // decomposition.
-        assert(std::holds_alternative<variable>(ta.m_dc[i].first.value()));
-        ta.m_state_vars.push_back(ta.m_dc[i].first);
+        assert(std::holds_alternative<variable>(ta.m_i_data->m_dc[i].first.value()));
+        ta.m_i_data->m_state_vars.push_back(ta.m_i_data->m_dc[i].first);
 
         if constexpr (std::is_same_v<U, std::vector<expression>>) {
-            ta.m_rhs.push_back(sys[i]);
+            ta.m_i_data->m_rhs.push_back(sys[i]);
         } else {
-            ta.m_rhs.push_back(sys[i].second);
+            ta.m_i_data->m_rhs.push_back(sys[i].second);
         }
     }
 }
