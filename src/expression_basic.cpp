@@ -840,7 +840,7 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex, const s
 // the whole expression, while comparisons can exit early. This becomes
 // important while traversing the expression "e" and checking if its internal
 // subexpressions are contained in smap. With hashing, we run into a quadratic
-// complexity scenarion because for each step of the traversal we have again
+// complexity scenario because for each step of the traversal we have again
 // to traverse whole subexpressions to compute their hash values.
 expression subs(const expression &e, const std::map<expression, expression> &smap, bool normalise)
 {
