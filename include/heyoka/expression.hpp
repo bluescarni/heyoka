@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <map>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -391,11 +392,11 @@ HEYOKA_DLL_PUBLIC std::size_t get_n_nodes(const expression &);
 
 HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &,
                                   bool = false);
-HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<expression, expression> &, bool = false);
+HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::map<expression, expression> &, bool = false);
 HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
                                                const std::unordered_map<std::string, expression> &, bool = false);
 HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
-                                               const std::unordered_map<expression, expression> &, bool = false);
+                                               const std::map<expression, expression> &, bool = false);
 
 HEYOKA_DLL_PUBLIC expression normalise(const expression &);
 HEYOKA_DLL_PUBLIC std::vector<expression> normalise(const std::vector<expression> &);
