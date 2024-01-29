@@ -13,6 +13,7 @@
 #include <deque>
 #include <functional>
 #include <iterator>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -188,7 +189,7 @@ diff_decompose(const std::vector<expression> &v_ex_)
     // The variables will precede the params. The renaming will be
     // done in alphabetical order for the variables and in index order
     // for the params.
-    std::unordered_map<expression, expression> repl_map;
+    std::map<expression, expression> repl_map;
     {
         boost::safe_numerics::safe<std::size_t> u_idx = 0;
 

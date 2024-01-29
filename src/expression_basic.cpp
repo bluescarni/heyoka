@@ -15,6 +15,7 @@
 #include <exception>
 #include <functional>
 #include <iterator>
+#include <map>
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
@@ -781,8 +782,7 @@ namespace
 {
 
 // NOLINTNEXTLINE(misc-no-recursion)
-expression subs(funcptr_map<expression> &func_map, const expression &ex,
-                const std::unordered_map<expression, expression> &smap)
+expression subs(funcptr_map<expression> &func_map, const expression &ex, const std::map<expression, expression> &smap)
 {
     if (auto it = smap.find(ex); it != smap.end()) {
         // ex is in the substitution map, return the value it maps to.
@@ -835,7 +835,14 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
 
 } // namespace detail
 
-expression subs(const expression &e, const std::unordered_map<expression, expression> &smap, bool normalise)
+// NOTE: in the subs() functions we are using a std::map, instead of
+// std::unordered_map, because hashing always requires traversing
+// the whole expression, while comparisons can exit early. This becomes
+// important while traversing the expression "e" and checking if its internal
+// subexpressions are contained in smap. With hashing, we run into a quadratic
+// complexity scenario because at each step of the traversal we have again
+// to traverse the entire subexpression in order to compute its hash value.
+expression subs(const expression &e, const std::map<expression, expression> &smap, bool normalise)
 {
     detail::funcptr_map<expression> func_map;
 
@@ -848,8 +855,8 @@ expression subs(const expression &e, const std::unordered_map<expression, expres
     }
 }
 
-std::vector<expression> subs(const std::vector<expression> &v_ex,
-                             const std::unordered_map<expression, expression> &smap, bool normalise)
+std::vector<expression> subs(const std::vector<expression> &v_ex, const std::map<expression, expression> &smap,
+                             bool normalise)
 {
     detail::funcptr_map<expression> func_map;
 
