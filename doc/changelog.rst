@@ -26,6 +26,8 @@ New
 Changes
 ~~~~~~~
 
+- Speedups for the ``subs()`` primitive
+  (`#394 <https://github.com/bluescarni/heyoka/pull/394>`__).
 - **BREAKING**: the :cpp:func:`~heyoka::make_vars()` function
   now returns a single expression (rather than an array of expressions)
   if a single argument is passed in input
