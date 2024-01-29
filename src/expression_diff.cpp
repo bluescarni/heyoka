@@ -512,13 +512,23 @@ struct diff_map_hasher {
 };
 
 // Forward-mode implementation of diff_tensors().
+// NOTE: the parallelisation of the forward/reverse mode implementations does not seem
+// too difficult, as the iterations over the inputs/outputs are independent from each other.
+// The real question is how to handle the duplicates that can arise for order > 1:
+// either we accept them and we remove them *after* running the impls via
+// sort + std::unique + remove (but what are the consequences
+// in terms of memory utilisation?), or we try to accumulate the derivatives
+// into a global thread-safe map. In the latter case, bulk insertion from local
+// maps could perhaps perform well.
+// NOTE: also, in parallel mode fetch const versions of diff_map with std::as_const()
+// during parallel operations.
 template <typename DiffMap, typename Dep, typename Adj>
 void diff_tensors_forward_impl(
     // The map of derivatives. It will be updated after all the
     // derivatives have been computed.
     DiffMap &diff_map,
     // The number of derivatives in the previous-order tensor.
-    std::vector<expression>::size_type cur_nouts,
+    const std::vector<expression>::size_type cur_nouts,
     // The decomposition of the previous-order tensor.
     const std::vector<expression> &dc,
     // The direct and reverse dependencies for the
@@ -530,17 +540,32 @@ void diff_tensors_forward_impl(
     // The total number of variables in dc (this accounts also
     // for params, as they are turned into variables during the
     // construciton of the decomposition).
-    std::vector<expression>::size_type nvars,
+    const std::vector<expression>::size_type nvars,
     // The diff arguments.
     const std::vector<expression> &args,
     // Iterator in diff_map pointing to the first
     // derivative for the previous order.
-    typename DiffMap::iterator prev_begin,
+    const typename DiffMap::iterator prev_begin,
     // The current derivative order.
-    std::uint32_t cur_order)
+    const std::uint32_t cur_order)
 {
     assert(dc.size() > nvars);
     assert(cur_order > 0u);
+
+    // Create a dictionary mapping an input to its position
+    // in the decomposition. This is used to locate diff arguments
+    // in the decomposition.
+    const auto input_idx_map = [&]() {
+        fast_umap<expression, std::vector<expression>::size_type, std::hash<expression>> retval;
+
+        for (std::vector<expression>::size_type i = 0; i < nvars; ++i) {
+            const auto &cur_in = dc[i];
+            assert(retval.count(cur_in) == 0u);
+            retval[cur_in] = i;
+        }
+
+        return retval;
+    }();
 
     // Local data structures used to temporarily store the derivatives,
     // which will eventually be added to diff_map.
@@ -574,15 +599,8 @@ void diff_tensors_forward_impl(
     // A stack to be used when filling up in_deps/sorted_in_deps.
     std::deque<std::uint32_t> stack;
 
-    // Create a dictionary mapping an input to its position
-    // in the decomposition. This is used to locate diff arguments
-    // in the decomposition.
-    fast_umap<expression, std::vector<expression>::size_type, std::hash<expression>> input_idx_map;
-    for (std::vector<expression>::size_type i = 0; i < nvars; ++i) {
-        const auto &cur_in = dc[i];
-        assert(input_idx_map.count(cur_in) == 0u);
-        input_idx_map[cur_in] = i;
-    }
+    // Vector of expressions used to accumulate sums during the forward pass.
+    std::vector<expression> tmp_sum;
 
     // Run the forward pass for each diff argument. The derivatives
     // wrt the diff argument will be stored into diffs.
@@ -591,7 +609,8 @@ void diff_tensors_forward_impl(
         const auto &cur_diff_arg = args[diff_arg_idx];
 
         // Check if the current diff argument is one of the inputs.
-        if (input_idx_map.count(cur_diff_arg) == 0u) {
+        const auto input_it = input_idx_map.find(cur_diff_arg);
+        if (input_it == input_idx_map.end()) {
             // The diff argument is not one of the inputs:
             // set the derivatives of all outputs wrt to the
             // diff argument to zero.
@@ -617,7 +636,7 @@ void diff_tensors_forward_impl(
         }
 
         // The diff argument is one of the inputs. Fetch its index.
-        const auto input_idx = input_idx_map.find(cur_diff_arg)->second;
+        const auto input_idx = input_it->second;
 
         // Seed the stack and in_deps/sorted_in_deps with the
         // dependees of the current input.
@@ -683,7 +702,7 @@ void diff_tensors_forward_impl(
         // to enable further simplifications involving pars/vars, but, for now, let
         // us play it conservatively.
         for (const auto cur_idx : sorted_in_deps) {
-            std::vector<expression> tmp_sum;
+            tmp_sum.clear();
 
             for (const auto d_idx : dep[cur_idx]) {
                 assert(d_idx < diffs.size());
@@ -755,7 +774,7 @@ void diff_tensors_reverse_impl(
     // derivatives have been computed.
     DiffMap &diff_map,
     // The number of derivatives in the previous-order tensor.
-    std::vector<expression>::size_type cur_nouts,
+    const std::vector<expression>::size_type cur_nouts,
     // The decomposition of the previous-order tensor.
     const std::vector<expression> &dc,
     // The direct and reverse dependencies for the
@@ -767,14 +786,16 @@ void diff_tensors_reverse_impl(
     // The total number of variables in dc (this accounts also
     // for params, as they are turned into variables during the
     // construciton of the decomposition).
-    std::vector<expression>::size_type nvars,
+    const std::vector<expression>::size_type nvars,
     // The diff arguments.
     const std::vector<expression> &args,
     // Iterator in diff_map pointing to the first
     // derivative for the previous order.
+    // NOTE: this needs to remain mutable, need to understand
+    // how to deal with this in case we attempt a parallel implementation.
     typename DiffMap::iterator prev_begin,
     // The current derivative order.
-    std::uint32_t cur_order)
+    const std::uint32_t cur_order)
 {
     assert(dc.size() > nvars);
     assert(cur_order > 0u);
@@ -817,6 +838,9 @@ void diff_tensors_reverse_impl(
 
     // A stack to be used when filling up out_deps/sorted_out_deps.
     std::deque<std::uint32_t> stack;
+
+    // Vector of expressions used to accumulate sums during the forward pass.
+    std::vector<expression> tmp_sum;
 
     // Run the reverse pass for each output. The derivatives
     // wrt the output will be stored into diffs.
@@ -901,7 +925,7 @@ void diff_tensors_reverse_impl(
         // to enable further simplifications involving pars/vars, but, for now, let
         // us play it conservatively.
         for (const auto cur_idx : sorted_out_deps) {
-            std::vector<expression> tmp_sum;
+            tmp_sum.clear();
 
             for (const auto rd_idx : revdep[cur_idx]) {
                 assert(rd_idx < diffs.size());
@@ -1121,7 +1145,7 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
         // of comparing the number of inputs and outputs. A more accurate (yet more expensive) approach
         // would be to do the computation in both modes (e.g., in parallel) and pick the mode which
         // results in the shortest decomposition. Perhaps we can consider this for a future extension.
-        if (cur_nouts >= args.size()) {
+        if (cur_nouts >= nargs) {
             diff_tensors_forward_impl(diff_map, cur_nouts, dc, dep, revdep, adj, nvars, args, prev_begin,
                                       cur_order + 1u);
         } else {
