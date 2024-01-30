@@ -14,7 +14,20 @@
 #define MDSPAN_USE_PAREN_OPERATOR 1
 #define MDSPAN_USE_BRACKET_OPERATOR 0
 
+#if defined(__GNUC__)
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+
+#endif
+
 #include <heyoka/detail/mdspan/mdspan>
+
+#if defined(__GNUC__)
+
+#pragma GCC diagnostic pop
+
+#endif
 
 #undef MDSPAN_USE_PAREN_OPERATOR
 #undef MDSPAN_USE_BRACKET_OPERATOR
