@@ -6,8 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_DETAIL_MDSPAN_HPP
-#define HEYOKA_DETAIL_MDSPAN_HPP
+#ifndef HEYOKA_MDSPAN_HPP
+#define HEYOKA_MDSPAN_HPP
 
 #include <heyoka/config.hpp>
 
