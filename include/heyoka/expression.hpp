@@ -25,6 +25,7 @@
 #include <ranges>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -51,11 +52,14 @@
 
 #include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/llvm_state.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
@@ -672,28 +676,14 @@ HEYOKA_CFUNC_EXTERN_INST(mppp::real)
 
 #undef HEYOKA_CFUNC_EXTERN_INST
 
-} // namespace detail
-
+// Common options for the cfunc constructor and add_cfunc().
 template <typename T, typename... KwArgs>
-std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &fn,
-                                  const std::vector<expression> &vars, const KwArgs &...kw_args)
+auto cfunc_common_opts(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
-    static_assert(!p.has_unnamed_arguments(), "The variadic arguments in add_cfunc() contain unnamed arguments.");
-
-    // Batch size (defaults to 1).
-    const auto batch_size = [&]() -> std::uint32_t {
-        if constexpr (p.has(kw::batch_size)) {
-            if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::batch_size))>>) {
-                return boost::numeric_cast<std::uint32_t>(p(kw::batch_size));
-            } else {
-                static_assert(detail::always_false_v<T>, "Invalid type for the 'batch_size' keyword argument.");
-            }
-        } else {
-            return 1;
-        }
-    }();
+    static_assert(!p.has_unnamed_arguments(),
+                  "Unnamed arguments cannot be passed in the variadic pack for this function.");
 
     // High accuracy mode (defaults to false).
     const auto high_accuracy = [&p]() -> bool {
@@ -753,6 +743,32 @@ std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const 
         }
     }();
 
+    return std::make_tuple(high_accuracy, compact_mode, parallel_mode, prec);
+}
+
+} // namespace detail
+
+template <typename T, typename... KwArgs>
+std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &fn,
+                                  const std::vector<expression> &vars, const KwArgs &...kw_args)
+{
+    igor::parser p{kw_args...};
+
+    static_assert(!p.has_unnamed_arguments(), "The variadic arguments in add_cfunc() contain unnamed arguments.");
+
+    // Batch size (defaults to 1).
+    const auto batch_size = [&]() -> std::uint32_t {
+        if constexpr (p.has(kw::batch_size)) {
+            if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::batch_size))>>) {
+                return boost::numeric_cast<std::uint32_t>(p(kw::batch_size));
+            } else {
+                static_assert(detail::always_false_v<T>, "Invalid type for the 'batch_size' keyword argument.");
+            }
+        } else {
+            return 1;
+        }
+    }();
+
     // Strided mode (defaults to false).
     const auto strided = [&p]() -> bool {
         if constexpr (p.has(kw::strided)) {
@@ -766,6 +782,9 @@ std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const 
         }
     }();
 
+    // Common options.
+    const auto [high_accuracy, compact_mode, parallel_mode, prec] = detail::cfunc_common_opts<T>(kw_args...);
+
     return detail::add_cfunc<T>(s, name, fn, vars, batch_size, high_accuracy, compact_mode, parallel_mode, prec,
                                 strided);
 }
@@ -776,6 +795,83 @@ namespace detail
 HEYOKA_DLL_PUBLIC bool ex_less_than(const expression &, const expression &);
 
 } // namespace detail
+
+template <typename T>
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
+{
+    struct HEYOKA_DLL_PUBLIC impl;
+
+    std::unique_ptr<impl> m_impl;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+
+    // Private implementation-detail helper and ctor.
+    template <typename... KwArgs>
+    static auto parse_ctor_opts(const KwArgs &...kw_args)
+    {
+        igor::parser p{kw_args...};
+
+        // Common options.
+        const auto [high_accuracy, compact_mode, parallel_mode, prec] = detail::cfunc_common_opts<T>(kw_args...);
+
+        // Batch size: defaults to undefined.
+        // NOTE: we want to handle this slightly different from add_cfunc(), thus it does
+        // not go in common options.
+        const auto batch_size = [&]() -> std::optional<std::uint32_t> {
+            if constexpr (p.has(kw::batch_size)) {
+                if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::batch_size))>>) {
+                    return boost::numeric_cast<std::uint32_t>(p(kw::batch_size));
+                } else {
+                    static_assert(detail::always_false_v<T>, "Invalid type for the 'batch_size' keyword argument.");
+                }
+            } else {
+                return {};
+            }
+        }();
+
+        // Build the template llvm_state from the keyword arguments.
+        llvm_state s(kw_args...);
+
+        return std::make_tuple(high_accuracy, compact_mode, parallel_mode, prec, batch_size, std::move(s));
+    }
+    explicit cfunc(std::vector<expression>, std::vector<expression>,
+                   std::tuple<bool, bool, bool, long long, std::optional<std::uint32_t>, llvm_state>);
+
+public:
+    cfunc();
+    template <typename... KwArgs>
+        requires(!igor::has_unnamed_arguments<KwArgs...>())
+    explicit cfunc(std::vector<expression> fn, std::vector<expression> vars, const KwArgs &...kw_args)
+        : cfunc(std::move(fn), std::move(vars), parse_ctor_opts(kw_args...))
+    {
+    }
+    cfunc(const cfunc &);
+    cfunc(cfunc &&) noexcept;
+    cfunc &operator=(const cfunc &);
+    cfunc &operator=(cfunc &&) noexcept;
+    ~cfunc();
+};
+
+// Prevent implicit instantiations.
+extern template class cfunc<float>;
+extern template class cfunc<double>;
+extern template class cfunc<long double>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+extern template class cfunc<mppp::real128>;
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+extern template class cfunc<mppp::real>;
+
+#endif
 
 HEYOKA_END_NAMESPACE
 
