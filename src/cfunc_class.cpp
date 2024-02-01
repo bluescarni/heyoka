@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -17,6 +18,10 @@
 #include <tuple>
 #include <utility>
 #include <vector>
+
+#include <boost/numeric/conversion/cast.hpp>
+
+#include <fmt/core.h>
 
 #include <oneapi/tbb/parallel_invoke.h>
 
@@ -59,6 +64,12 @@ struct cfunc<T>::impl {
     cfunc_ptr_t fptr_batch = nullptr;
     cfunc_ptr_s_t fptr_scal_s = nullptr;
     cfunc_ptr_s_t fptr_batch_s = nullptr;
+    std::uint32_t nparams = 0;
+    bool is_time_dependent = false;
+    std::uint32_t nouts = 0;
+    std::uint32_t nvars = 0;
+    long long prec = 0;
+    bool check_prec = false;
 
     // Serialization.
     void save(boost::archive::binary_oarchive &ar, unsigned) const
@@ -71,6 +82,12 @@ struct cfunc<T>::impl {
         ar << s_batch_s;
         ar << simd_size;
         ar << dc;
+        ar << nparams;
+        ar << is_time_dependent;
+        ar << nouts;
+        ar << nvars;
+        ar << prec;
+        ar << check_prec;
     }
     void load(boost::archive::binary_iarchive &ar, unsigned)
     {
@@ -82,6 +99,12 @@ struct cfunc<T>::impl {
         ar >> s_batch_s;
         ar >> simd_size;
         ar >> dc;
+        ar >> nparams;
+        ar >> is_time_dependent;
+        ar >> nouts;
+        ar >> nvars;
+        ar >> prec;
+        ar >> check_prec;
 
         // Recover the function pointers.
         fptr_scal = reinterpret_cast<cfunc_ptr_t>(s_scal.jit_lookup("cfunc"));
@@ -99,9 +122,9 @@ struct cfunc<T>::impl {
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     explicit impl(std::vector<expression> fn, std::vector<expression> vars, llvm_state s,
                   std::optional<std::uint32_t> batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode,
-                  long long prec)
+                  long long prec, bool check_prec)
         : fn(std::move(fn)), vars(std::move(vars)), s_scal(std::move(s)), s_batch(s_scal), s_scal_s(s_scal),
-          s_batch_s(s_scal)
+          s_batch_s(s_scal), prec(prec), check_prec(check_prec)
     {
         // Compute the SIMD size.
         // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
@@ -158,10 +181,23 @@ struct cfunc<T>::impl {
 
                 fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(s_batch_s.jit_lookup("cfunc.strided"));
             });
+
+        // Let's figure out if fn contains params and if it is time-dependent.
+        nparams = get_param_size(fn);
+        is_time_dependent = heyoka::is_time_dependent(fn);
+
+        // Cache the number of variables and outputs.
+        // NOTE: static casts should also be fine here, because add_cfunc()
+        // succeeded and that guarantees that the number of vars and outputs
+        // fits in a 32-bit int.
+        nouts = boost::numeric_cast<std::uint32_t>(fn.size());
+        nvars = boost::numeric_cast<std::uint32_t>(vars.size());
     }
     impl(const impl &other)
         : fn(other.fn), vars(other.vars), s_scal(other.s_scal), s_batch(other.s_batch), s_scal_s(other.s_scal_s),
-          s_batch_s(other.s_batch_s), simd_size(other.simd_size), dc(other.dc)
+          s_batch_s(other.s_batch_s), simd_size(other.simd_size), dc(other.dc), nparams(other.nparams),
+          is_time_dependent(other.is_time_dependent), nouts(other.nouts), nvars(other.nvars), prec(other.prec),
+          check_prec(other.check_prec)
     {
         // Recover the function pointers.
         fptr_scal = reinterpret_cast<cfunc_ptr_t>(s_scal.jit_lookup("cfunc"));
@@ -185,19 +221,19 @@ template <typename T>
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 cfunc<T>::cfunc(std::vector<expression> fn, std::vector<expression> vars,
                 // NOLINTNEXTLINE(performance-unnecessary-value-param)
-                std::tuple<bool, bool, bool, long long, std::optional<std::uint32_t>, llvm_state> tup)
+                std::tuple<bool, bool, bool, long long, std::optional<std::uint32_t>, llvm_state, bool> tup)
 {
     // Unpack the tuple.
-    auto &[high_accuracy, compact_mode, parallel_mode, prec, batch_size, s] = tup;
+    auto &[high_accuracy, compact_mode, parallel_mode, prec, batch_size, s, check_prec] = tup;
 
     // Construct the impl.
     // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     m_impl = std::make_unique<impl>(std::move(fn), std::move(vars), std::move(s), batch_size, high_accuracy,
-                                    compact_mode, parallel_mode, prec);
+                                    compact_mode, parallel_mode, prec, check_prec);
 }
 
 template <typename T>
-cfunc<T>::cfunc(const cfunc &other) : m_impl(std::make_unique<impl>(*other.m_impl))
+cfunc<T>::cfunc(const cfunc &other) : m_impl(other.m_impl ? std::make_unique<impl>(*other.m_impl) : nullptr)
 {
 }
 
@@ -238,6 +274,81 @@ void cfunc<T>::load(boost::archive::binary_iarchive &ar, unsigned)
         throw;
     }
     // LCOV_EXCL_STOP
+}
+
+template <typename T>
+void cfunc<T>::check_valid(const char *name) const
+{
+    if (!m_impl) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("The function '{}' cannot be invoked on an invalid cfunc object", name));
+    }
+}
+
+template <typename T>
+void cfunc<T>::operator()(out_1d outputs, in_1d inputs, std::optional<in_1d> pars, std::optional<T> time)
+{
+    check_valid(__func__);
+
+    // Check the arguments.
+    if (outputs.size() != m_impl->nouts) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Invalid outputs array passed to a cfunc: the number of function "
+                                                "outputs is {}, but the outputs array has a size of {}",
+                                                m_impl->nouts, outputs.size()));
+    }
+
+    if (inputs.size() != m_impl->nvars) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Invalid inputs array passed to a cfunc: the number of function "
+                                                "inputs is {}, but the inputs array has a size of {}",
+                                                m_impl->nvars, inputs.size()));
+    }
+
+    if (m_impl->nparams != 0u && !pars) [[unlikely]] {
+        throw std::invalid_argument(
+            "An array of parameter values must be passed in order to evaluate a function with parameters");
+    }
+
+    if (pars && pars->size() != m_impl->nparams) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("The array of parameter values provided for the evaluation "
+                                                "of a compiled function has {} element(s), "
+                                                "but the number of parameters in the function is {}",
+                                                pars->size(), m_impl->nparams));
+    }
+
+    if (m_impl->is_time_dependent && !time) [[unlikely]] {
+        throw std::invalid_argument("A time value must be passed in order to evaluate a time-dependent function");
+    }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::same_as<T, mppp::real>) {
+        if (m_impl->check_prec) {
+            const auto prec_checker = [&](const auto &x) {
+                if (x.get_prec() != m_impl->prec) [[unlikely]] {
+                    throw std::invalid_argument(fmt::format(
+                        "An mppp::real with an invalid precision of {} was detected in the arguments to the evaluation "
+                        "of a compiled function - the expected precision value is {}",
+                        x.get_prec(), m_impl->prec));
+                }
+            };
+
+            std::ranges::for_each(outputs, prec_checker);
+            std::ranges::for_each(inputs, prec_checker);
+
+            if (pars) {
+                std::ranges::for_each(*pars, prec_checker);
+            }
+
+            if (time) {
+                prec_checker(*time);
+            }
+        }
+    }
+
+#endif
+
+    // Invoke the compiled function.
+    m_impl->fptr_scal(outputs.data(), inputs.data(), pars ? pars->data() : nullptr, time ? &*time : nullptr);
 }
 
 // Explicit instantiations.

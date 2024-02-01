@@ -23,6 +23,7 @@
 #include <optional>
 #include <ostream>
 #include <ranges>
+#include <span>
 #include <sstream>
 #include <string>
 #include <tuple>
@@ -833,13 +834,28 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
             }
         }();
 
+        // Precision checking for mppp::real. Defaults to true.
+        const auto check_prec = [&p]() -> bool {
+            if constexpr (p.has(kw::check_prec)) {
+                if constexpr (std::convertible_to<decltype(p(kw::check_prec)), bool>) {
+                    return static_cast<bool>(p(kw::check_prec));
+                } else {
+                    static_assert(detail::always_false_v<T>, "Invalid type for the 'check_prec' keyword argument.");
+                }
+            } else {
+                return true;
+            }
+        }();
+
         // Build the template llvm_state from the keyword arguments.
         llvm_state s(kw_args...);
 
-        return std::make_tuple(high_accuracy, compact_mode, parallel_mode, prec, batch_size, std::move(s));
+        return std::make_tuple(high_accuracy, compact_mode, parallel_mode, prec, batch_size, std::move(s), check_prec);
     }
     explicit cfunc(std::vector<expression>, std::vector<expression>,
-                   std::tuple<bool, bool, bool, long long, std::optional<std::uint32_t>, llvm_state>);
+                   std::tuple<bool, bool, bool, long long, std::optional<std::uint32_t>, llvm_state, bool>);
+
+    HEYOKA_DLL_LOCAL void check_valid(const char *) const;
 
 public:
     cfunc();
@@ -854,6 +870,14 @@ public:
     cfunc &operator=(const cfunc &);
     cfunc &operator=(cfunc &&) noexcept;
     ~cfunc();
+
+    using in_1d = std::span<const T>;
+    using out_1d = std::span<T>;
+    void operator()(out_1d, in_1d, std::optional<in_1d> = {}, std::optional<T> = {});
+
+    // using in_2d = mdspan<const T, dextents<std::size_t, 2>>;
+    //  using out_2d = mdspan<T, dextents<std::size_t, 2>>;
+    //  void operator()(out_2d, in_2d, std::optional<in_2d> = {}, std::optional<in_1d> = {});
 };
 
 // Prevent implicit instantiations.

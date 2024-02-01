@@ -37,6 +37,7 @@ IGOR_MAKE_NAMED_ARGUMENT(slp_vectorize);
 // cfunc API.
 IGOR_MAKE_NAMED_ARGUMENT(batch_size);
 IGOR_MAKE_NAMED_ARGUMENT(strided);
+IGOR_MAKE_NAMED_ARGUMENT(check_prec);
 
 // taylor_adaptive and friends.
 IGOR_MAKE_NAMED_ARGUMENT(tol);
