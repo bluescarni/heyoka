@@ -61,18 +61,24 @@ constexpr bool skip_batch_ld =
 #endif
     ;
 
+template <typename T>
+concept has_get_prec = requires(const T &x) { x.get_prec(); };
+
 // Basic API test.
 TEST_CASE("basic")
 {
-    auto [x, y] = make_vars("x", "y");
-
-    auto tester = [&](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using fp_t = decltype(fp_x);
+
+        auto [x, y] = make_vars("x", "y");
 
         const std::uint32_t custom_batch_size = (skip_batch_ld && std::same_as<fp_t, long double>) ? 1 : 2;
 
         const std::array<fp_t, 2> inputs = {1, 2};
         std::array<fp_t, 2> outputs{};
+
+        // Check the get_prec() getter is disabled.
+        REQUIRE(!has_get_prec<cfunc<fp_t>>);
 
         // A few tests for def-cted object.
         cfunc<fp_t> cf0;
@@ -298,3 +304,119 @@ TEST_CASE("s11n")
         REQUIRE(outputs[1] == 1);
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+// mp-specific tests.
+
+TEST_CASE("basic mp")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE_THROWS_AS((cfunc<mppp::real>{{x + y, x - y}, {y, x}, kw::parallel_mode = true}), std::invalid_argument);
+
+    REQUIRE_THROWS_MATCHES((cfunc<mppp::real>{{x + y, x - y}, {y, x}, kw::batch_size = 2}), std::invalid_argument,
+                           Message("Batch size > 1 is not supported for mppp::real"));
+
+    auto cf0 = cfunc<mppp::real>{{x + y, x - y}, {y, x}, kw::prec = 31};
+
+    REQUIRE(cf0.get_prec() == 31);
+
+    const std::array<mppp::real, 2> inputs = {mppp::real{1, 31}, mppp::real{2, 31}};
+    std::array<mppp::real, 2> outputs{mppp::real{0, 31}, mppp::real{0, 31}};
+
+    cf0(outputs, inputs);
+    REQUIRE(outputs[0] == 3);
+    REQUIRE(outputs[1] == 1);
+    std::ranges::fill(outputs, mppp::real{0, 31});
+
+    // Copy constructor.
+    auto cf0_copy = cf0;
+
+    REQUIRE(cf0_copy.get_prec() == 31);
+
+    cf0_copy(outputs, inputs);
+    REQUIRE(outputs[0] == 3);
+    REQUIRE(outputs[1] == 1);
+    std::ranges::fill(outputs, mppp::real{0, 31});
+
+    // Move ctor.
+    auto cf1 = std::move(cf0_copy);
+
+    REQUIRE_THROWS_AS(cf0_copy.get_prec(), std::invalid_argument);
+    REQUIRE(cf1.get_prec() == 31);
+
+    cf1(outputs, inputs);
+    REQUIRE(outputs[0] == 3);
+    REQUIRE(outputs[1] == 1);
+    std::ranges::fill(outputs, mppp::real{0, 31});
+
+    // Copy assignment.
+    cf0_copy = cf1;
+
+    cf0_copy(outputs, inputs);
+    REQUIRE(outputs[0] == 3);
+    REQUIRE(outputs[1] == 1);
+    std::ranges::fill(outputs, mppp::real{0, 31});
+
+    // Move assignment.
+    cfunc<mppp::real> cf2;
+    cf2 = std::move(cf0_copy);
+
+    REQUIRE_THROWS_AS(cf0_copy.get_prec(), std::invalid_argument);
+    REQUIRE(cf2.get_prec() == 31);
+
+    cf2(outputs, inputs);
+    REQUIRE(outputs[0] == 3);
+    REQUIRE(outputs[1] == 1);
+    std::ranges::fill(outputs, mppp::real{0, 31});
+}
+
+TEST_CASE("s11n mp")
+{
+    {
+        const std::array<mppp::real, 2> inputs = {mppp::real{1, 11}, mppp::real{2, 11}};
+        std::array<mppp::real, 2> outputs{mppp::real{0, 11}, mppp::real{0, 11}};
+
+        auto [x, y] = make_vars("x", "y");
+
+        auto cf0 = cfunc<mppp::real>{
+            {x + y, x - y},          {y, x},       kw::batch_size = 1, kw::opt_level = 1, kw::high_accuracy = true,
+            kw::compact_mode = true, kw::prec = 11};
+
+        std::stringstream ss;
+
+        {
+            boost::archive::binary_oarchive oa(ss);
+            oa << cf0;
+        }
+
+        cf0 = cfunc<mppp::real>{};
+        REQUIRE_THROWS_AS(cf0.get_vars(), std::invalid_argument);
+
+        {
+            boost::archive::binary_iarchive ia(ss);
+            ia >> cf0;
+        }
+
+        REQUIRE(cf0.get_fn() == std::vector{x + y, x - y});
+        REQUIRE(cf0.get_vars() == std::vector{y, x});
+        REQUIRE(!cf0.get_dc().empty());
+        REQUIRE(cf0.get_llvm_state_scalar().get_opt_level() == 1);
+        REQUIRE(cf0.get_llvm_state_scalar_s().get_opt_level() == 1);
+        REQUIRE(cf0.get_llvm_state_batch_s().get_opt_level() == 1);
+        REQUIRE(cf0.get_high_accuracy() == true);
+        REQUIRE(cf0.get_compact_mode() == true);
+        REQUIRE(cf0.get_parallel_mode() == false);
+        REQUIRE(cf0.get_batch_size() == 1);
+        REQUIRE(cf0.get_prec() == 11);
+
+        cf0(outputs, inputs);
+        REQUIRE(outputs[0] == 3);
+        REQUIRE(outputs[1] == 1);
+    }
+}
+
+#endif
