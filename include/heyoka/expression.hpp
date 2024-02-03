@@ -871,6 +871,25 @@ public:
     cfunc &operator=(cfunc &&) noexcept;
     ~cfunc();
 
+    // Properties getters.
+    [[nodiscard]] const std::vector<expression> &get_fn() const;
+    [[nodiscard]] const std::vector<expression> &get_vars() const;
+    [[nodiscard]] const std::vector<expression> &get_dc() const;
+    [[nodiscard]] const llvm_state &get_llvm_state_scalar() const;
+    [[nodiscard]] const llvm_state &get_llvm_state_scalar_s() const;
+    [[nodiscard]] const llvm_state &get_llvm_state_batch_s() const;
+    [[nodiscard]] bool get_high_accuracy() const;
+    [[nodiscard]] bool get_compact_mode() const;
+    [[nodiscard]] bool get_parallel_mode() const;
+    [[nodiscard]] std::uint32_t get_batch_size() const;
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    [[nodiscard]] mpfr_prec_t get_prec() const
+        requires std::same_as<T, mppp::real>;
+
+#endif
+
     using in_1d = std::span<const T>;
     using out_1d = std::span<T>;
     void operator()(out_1d, in_1d, std::optional<in_1d> = {}, std::optional<T> = {});

@@ -58,7 +58,7 @@ struct cfunc<T>::impl {
     llvm_state m_s_batch;
     llvm_state m_s_scal_s;
     llvm_state m_s_batch_s;
-    std::uint32_t m_simd_size = 0;
+    std::uint32_t m_batch_size = 0;
     std::vector<expression> m_dc;
     cfunc_ptr_t m_fptr_scal = nullptr;
     cfunc_ptr_t m_fptr_batch = nullptr;
@@ -70,6 +70,9 @@ struct cfunc<T>::impl {
     std::uint32_t m_nvars = 0;
     long long m_prec = 0;
     bool m_check_prec = false;
+    bool m_high_accuracy = false;
+    bool m_compact_mode = false;
+    bool m_parallel_mode = false;
 
     // Serialization.
     void save(boost::archive::binary_oarchive &ar, unsigned) const
@@ -80,7 +83,7 @@ struct cfunc<T>::impl {
         ar << m_s_batch;
         ar << m_s_scal_s;
         ar << m_s_batch_s;
-        ar << m_simd_size;
+        ar << m_batch_size;
         ar << m_dc;
         ar << m_nparams;
         ar << m_is_time_dependent;
@@ -88,6 +91,9 @@ struct cfunc<T>::impl {
         ar << m_nvars;
         ar << m_prec;
         ar << m_check_prec;
+        ar << m_high_accuracy;
+        ar << m_compact_mode;
+        ar << m_parallel_mode;
     }
     void load(boost::archive::binary_iarchive &ar, unsigned)
     {
@@ -97,7 +103,7 @@ struct cfunc<T>::impl {
         ar >> m_s_batch;
         ar >> m_s_scal_s;
         ar >> m_s_batch_s;
-        ar >> m_simd_size;
+        ar >> m_batch_size;
         ar >> m_dc;
         ar >> m_nparams;
         ar >> m_is_time_dependent;
@@ -105,6 +111,9 @@ struct cfunc<T>::impl {
         ar >> m_nvars;
         ar >> m_prec;
         ar >> m_check_prec;
+        ar >> m_high_accuracy;
+        ar >> m_compact_mode;
+        ar >> m_parallel_mode;
 
         // Recover the function pointers.
         m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(m_s_scal.jit_lookup("cfunc"));
@@ -124,16 +133,17 @@ struct cfunc<T>::impl {
                   std::optional<std::uint32_t> batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode,
                   long long prec, bool check_prec)
         : m_fn(std::move(fn)), m_vars(std::move(vars)), m_s_scal(std::move(s)), m_s_batch(m_s_scal),
-          m_s_scal_s(m_s_scal), m_s_batch_s(m_s_scal), m_prec(prec), m_check_prec(check_prec)
+          m_s_scal_s(m_s_scal), m_s_batch_s(m_s_scal), m_prec(prec), m_check_prec(check_prec),
+          m_high_accuracy(high_accuracy), m_compact_mode(compact_mode), m_parallel_mode(parallel_mode)
     {
-        // Compute the SIMD size.
+        // Setup the batch size.
         // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-        m_simd_size = batch_size ? *batch_size : recommended_simd_size<T>();
+        m_batch_size = batch_size ? *batch_size : recommended_simd_size<T>();
 
 #if defined(HEYOKA_HAVE_REAL)
 
         // NOTE: batch size > 1u not supported for real.
-        if (std::same_as<T, mppp::real> && m_simd_size > 1u) {
+        if (std::same_as<T, mppp::real> && m_batch_size > 1u) {
             throw std::invalid_argument("Batch size > 1 is not supported for mppp::real");
         }
 
@@ -146,8 +156,7 @@ struct cfunc<T>::impl {
                 // NOTE: we fetch the decomposition from the scalar
                 // unstrided invocation of add_cfunc().
                 m_dc = add_cfunc<T>(m_s_scal, "cfunc", m_fn, m_vars, kw::high_accuracy = high_accuracy,
-                                    kw::compact_mode = compact_mode, kw::parallel_mode = parallel_mode,
-                                    kw::prec = m_prec);
+                                    kw::compact_mode = compact_mode, kw::prec = prec);
 
                 m_s_scal.compile();
 
@@ -155,9 +164,8 @@ struct cfunc<T>::impl {
             },
             [&]() {
                 // Batch unstrided.
-                add_cfunc<T>(m_s_batch, "cfunc", m_fn, m_vars, kw::batch_size = m_simd_size,
-                             kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode,
-                             kw::parallel_mode = parallel_mode, kw::prec = m_prec);
+                add_cfunc<T>(m_s_batch, "cfunc", m_fn, m_vars, kw::batch_size = m_batch_size,
+                             kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode, kw::prec = prec);
 
                 m_s_batch.compile();
 
@@ -166,8 +174,7 @@ struct cfunc<T>::impl {
             [&]() {
                 // Scalar strided.
                 add_cfunc<T>(m_s_scal_s, "cfunc.strided", m_fn, m_vars, kw::high_accuracy = high_accuracy,
-                             kw::compact_mode = compact_mode, kw::parallel_mode = parallel_mode, kw::prec = m_prec,
-                             kw::strided = true);
+                             kw::compact_mode = compact_mode, kw::prec = prec, kw::strided = true);
 
                 m_s_scal_s.compile();
 
@@ -175,9 +182,9 @@ struct cfunc<T>::impl {
             },
             [&]() {
                 // Batch strided.
-                add_cfunc<T>(m_s_batch_s, "cfunc.strided", m_fn, m_vars, kw::batch_size = m_simd_size,
-                             kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode,
-                             kw::parallel_mode = parallel_mode, kw::prec = m_prec, kw::strided = true);
+                add_cfunc<T>(m_s_batch_s, "cfunc.strided", m_fn, m_vars, kw::batch_size = m_batch_size,
+                             kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode, kw::prec = prec,
+                             kw::strided = true);
 
                 m_s_batch_s.compile();
 
@@ -197,9 +204,11 @@ struct cfunc<T>::impl {
     }
     impl(const impl &other)
         : m_fn(other.m_fn), m_vars(other.m_vars), m_s_scal(other.m_s_scal), m_s_batch(other.m_s_batch),
-          m_s_scal_s(other.m_s_scal_s), m_s_batch_s(other.m_s_batch_s), m_simd_size(other.m_simd_size),
+          m_s_scal_s(other.m_s_scal_s), m_s_batch_s(other.m_s_batch_s), m_batch_size(other.m_batch_size),
           m_dc(other.m_dc), m_nparams(other.m_nparams), m_is_time_dependent(other.m_is_time_dependent),
-          m_nouts(other.m_nouts), m_nvars(other.m_nvars), m_prec(other.m_prec), m_check_prec(other.m_check_prec)
+          m_nouts(other.m_nouts), m_nvars(other.m_nvars), m_prec(other.m_prec), m_check_prec(other.m_check_prec),
+          m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode),
+          m_parallel_mode(other.m_parallel_mode)
     {
         // Recover the function pointers.
         m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(m_s_scal.jit_lookup("cfunc"));
@@ -242,6 +251,8 @@ cfunc<T>::cfunc(const cfunc &other)
 {
 }
 
+// NOTE: document that other is left into the def-cted
+// state afterwards.
 template <typename T>
 cfunc<T>::cfunc(cfunc &&) noexcept = default;
 
@@ -255,11 +266,109 @@ cfunc<T> &cfunc<T>::operator=(const cfunc &other)
     return *this;
 }
 
+// NOTE: document that other is left into the def-cted
+// state afterwards.
 template <typename T>
 cfunc<T> &cfunc<T>::operator=(cfunc &&) noexcept = default;
 
 template <typename T>
 cfunc<T>::~cfunc() = default;
+
+template <typename T>
+const std::vector<expression> &cfunc<T>::get_fn() const
+{
+    check_valid(__func__);
+
+    return m_impl->m_fn;
+}
+
+template <typename T>
+const std::vector<expression> &cfunc<T>::get_vars() const
+{
+    check_valid(__func__);
+
+    return m_impl->m_vars;
+}
+
+template <typename T>
+const std::vector<expression> &cfunc<T>::get_dc() const
+{
+    check_valid(__func__);
+
+    return m_impl->m_dc;
+}
+
+template <typename T>
+const llvm_state &cfunc<T>::get_llvm_state_scalar() const
+{
+    check_valid(__func__);
+
+    return m_impl->m_s_scal;
+}
+
+template <typename T>
+const llvm_state &cfunc<T>::get_llvm_state_scalar_s() const
+{
+    check_valid(__func__);
+
+    return m_impl->m_s_scal_s;
+}
+
+template <typename T>
+const llvm_state &cfunc<T>::get_llvm_state_batch_s() const
+{
+    check_valid(__func__);
+
+    return m_impl->m_s_batch_s;
+}
+
+template <typename T>
+bool cfunc<T>::get_high_accuracy() const
+{
+    check_valid(__func__);
+
+    return m_impl->m_high_accuracy;
+}
+
+template <typename T>
+bool cfunc<T>::get_compact_mode() const
+{
+    check_valid(__func__);
+
+    return m_impl->m_compact_mode;
+}
+
+template <typename T>
+bool cfunc<T>::get_parallel_mode() const
+{
+    check_valid(__func__);
+
+    return m_impl->m_parallel_mode;
+}
+
+template <typename T>
+std::uint32_t cfunc<T>::get_batch_size() const
+{
+    check_valid(__func__);
+
+    return m_impl->m_batch_size;
+}
+
+#if defined(HEYOKA_HAVE_REAL)
+
+template <typename T>
+mpfr_prec_t cfunc<T>::get_prec() const
+    requires std::same_as<T, mppp::real>
+{
+    check_valid(__func__);
+
+    // NOTE: the cast here is safe because the value of
+    // m_prec was checked inside add_cfunc() during the
+    // construction of this object.
+    return static_cast<mpfr_prec_t>(m_impl->m_prec);
+}
+
+#endif
 
 template <typename T>
 void cfunc<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
