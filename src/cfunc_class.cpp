@@ -430,7 +430,7 @@ void cfunc<T>::operator()(out_1d outputs, in_1d inputs, std::optional<in_1d> par
     }
 
     if (m_impl->m_is_time_dependent && !time) [[unlikely]] {
-        throw std::invalid_argument("A time value must be passed in order to evaluate a time-dependent function");
+        throw std::invalid_argument("A time value must be provided in order to evaluate a time-dependent function");
     }
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -463,6 +463,178 @@ void cfunc<T>::operator()(out_1d outputs, in_1d inputs, std::optional<in_1d> par
 
     // Invoke the compiled function.
     m_impl->m_fptr_scal(outputs.data(), inputs.data(), pars ? pars->data() : nullptr, time ? &*time : nullptr);
+}
+
+template <typename T>
+void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times)
+{
+    // Cache the number of evals.
+    const auto nevals = outputs.extent(1);
+
+    // Cache the batch size.
+    const auto batch_size = m_impl->m_batch_size;
+
+    // Cache the function pointers.
+    auto *fptr_batch_s = m_impl->m_fptr_batch_s;
+    auto *fptr_scal_s = m_impl->m_fptr_scal_s;
+
+    // Number of simd blocks in the arrays.
+    const auto n_simd_blocks = nevals / batch_size;
+
+    // Fetch the pointers.
+    auto *out_data = outputs.data_handle();
+    const auto *in_data = inputs.data_handle();
+    const auto *par_data = pars ? pars->data_handle() : nullptr;
+    const auto *time_data = times ? times->data() : nullptr;
+
+    // NOTE: the idea of these booleans is that we want to do arithmetics
+    // on the inputs/pars/time pointers only if we know that we **must** read from them,
+    // in which case the validation steps taken earlier ensure that
+    // arithmetics on them is safe. Otherwise, there are certain corner cases in which
+    // we might end up doing pointer arithmetics which leads to UB. Two examples:
+    //
+    // - the function has no inputs, or
+    // - the function has no params but the user anyway passed an empty
+    //   array of par values.
+    //
+    // In these two cases we are dealing with input and/or pars arrays of shape
+    // (0, nevals). If the pointers stored in the mdspans are null, then we would
+    // be committing UB by doing arithmetic on them.
+    //
+    // NOTE: if nevals is zero, then the two for loops below are never
+    // entered and we never end up doing arithmetics on potentially-null
+    // pointers.
+    //
+    // NOTE: in case of the outputs array, the data pointer can never be null
+    // (unless nevals is zero) because we do not allow to construct a cfunc
+    // object for a function with zero outputs. Hence, no checks are needed.
+    const auto read_inputs = m_impl->m_nvars > 0u;
+    const auto read_pars = m_impl->m_nparams > 0u;
+    const auto read_time = m_impl->m_is_time_dependent;
+    assert(m_impl->m_nouts > 0u);
+
+    // Evaluate over the simd blocks.
+    for (std::size_t k = 0; k < n_simd_blocks; ++k) {
+        const auto start_offset = k * batch_size;
+
+        // Run the evaluation.
+        fptr_batch_s(out_data + start_offset, read_inputs ? in_data + start_offset : nullptr,
+                     read_pars ? par_data + start_offset : nullptr, read_time ? time_data + start_offset : nullptr,
+                     nevals);
+    }
+
+    // Handle the remainder, if present.
+    for (auto k = n_simd_blocks * batch_size; k < nevals; ++k) {
+        fptr_scal_s(out_data + k, read_inputs ? in_data + k : nullptr, read_pars ? par_data + k : nullptr,
+                    read_time ? time_data + k : nullptr, nevals);
+    }
+}
+
+template <typename T>
+void cfunc<T>::operator()(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times)
+{
+    check_valid(__func__);
+
+    // Check the input args.
+    if (outputs.extent(0) != m_impl->m_nouts) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Invalid outputs array passed to a cfunc: the number of function "
+                                                "outputs is {}, but the number of rows in the outputs array is {}",
+                                                m_impl->m_nouts, outputs.extent(0)));
+    }
+
+    // Fetch the number of columns from outputs.
+    const auto ncols = outputs.extent(1);
+
+    if (inputs.extent(0) != m_impl->m_nvars) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Invalid inputs array passed to a cfunc: the number of function "
+                                                "inputs is {}, but the number of rows in the inputs array is {}",
+                                                m_impl->m_nvars, inputs.extent(0)));
+    }
+
+    if (inputs.extent(1) != ncols) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Invalid inputs array passed to a cfunc: the expected number of columns deduced from the "
+                        "outputs array is {}, but the number of columns in the inputs array is {}",
+                        ncols, inputs.extent(1)));
+    }
+
+    if (m_impl->m_nparams != 0u && !pars) [[unlikely]] {
+        throw std::invalid_argument(
+            "An array of parameter values must be passed in order to evaluate a function with parameters");
+    }
+
+    if (pars) {
+        if (pars->extent(0) != m_impl->m_nparams) [[unlikely]] {
+            throw std::invalid_argument(fmt::format("The array of parameter values provided for the evaluation "
+                                                    "of a compiled function has {} row(s), "
+                                                    "but the number of parameters in the function is {}",
+                                                    pars->extent(0), m_impl->m_nparams));
+        }
+
+        if (pars->extent(1) != ncols) [[unlikely]] {
+            throw std::invalid_argument(fmt::format("The array of parameter values provided for the evaluation "
+                                                    "of a compiled function has {} column(s), "
+                                                    "but the expected number of columns deduced from the "
+                                                    "outputs array is {}",
+                                                    pars->extent(1), ncols));
+        }
+    }
+
+    if (m_impl->m_is_time_dependent && !times) [[unlikely]] {
+        throw std::invalid_argument(
+            "An array of time values must be provided in order to evaluate a time-dependent function");
+    }
+
+    if (times && times->size() != ncols) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("The array of time values provided for the evaluation "
+                                                "of a compiled function has a size of {}, "
+                                                "but the expected size deduced from the "
+                                                "outputs array is {}",
+                                                times->size(), ncols));
+    }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::same_as<T, mppp::real>) {
+        if (m_impl->m_check_prec) {
+            const auto prec_checker = [&](const auto &x) {
+                if (x.get_prec() != m_impl->m_prec) [[unlikely]] {
+                    throw std::invalid_argument(fmt::format(
+                        "An mppp::real with an invalid precision of {} was detected in the arguments to the evaluation "
+                        "of a compiled function - the expected precision value is {}",
+                        x.get_prec(), m_impl->m_prec));
+                }
+            };
+
+            for (std::size_t i = 0; i < outputs.extent(0); ++i) {
+                for (std::size_t j = 0; j < outputs.extent(1); ++j) {
+                    prec_checker(outputs(i, j));
+                }
+            }
+
+            for (std::size_t i = 0; i < inputs.extent(0); ++i) {
+                for (std::size_t j = 0; j < inputs.extent(1); ++j) {
+                    prec_checker(inputs(i, j));
+                }
+            }
+
+            if (pars) {
+                for (std::size_t i = 0; i < pars->extent(0); ++i) {
+                    for (std::size_t j = 0; j < pars->extent(1); ++j) {
+                        prec_checker((*pars)(i, j));
+                    }
+                }
+            }
+
+            if (times) {
+                std::ranges::for_each(*times, prec_checker);
+            }
+        }
+    }
+
+#endif
+
+    multi_eval_st(outputs, inputs, pars, times);
 }
 
 // Explicit instantiations.

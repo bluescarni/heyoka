@@ -151,6 +151,7 @@ ADD_HEYOKA_TESTCASE(angle_reducer)
 ADD_HEYOKA_TESTCASE(lagrangian)
 ADD_HEYOKA_TESTCASE(hamiltonian)
 ADD_HEYOKA_TESTCASE(cfunc)
+ADD_HEYOKA_TESTCASE(cfunc_multieval)
 
 if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
   ADD_HEYOKA_TESTCASE(event_detection_mp)

@@ -104,7 +104,7 @@ TEST_CASE("basic")
         REQUIRE_THROWS_AS(cf1.get_vars(), std::invalid_argument);
         REQUIRE_THROWS_AS(cf2.get_vars(), std::invalid_argument);
 
-        REQUIRE_THROWS_AS(cf2({}, {}), std::invalid_argument);
+        REQUIRE_THROWS_AS(cf2(typename cfunc<fp_t>::out_1d{}, {}), std::invalid_argument);
 
         // Main constructor.
         cf0 = cfunc<fp_t>{{x + y, x - y}, {y, x}, kw::parallel_mode = true};
@@ -289,7 +289,7 @@ TEST_CASE("single call operator")
                           kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
 
         REQUIRE_THROWS_MATCHES(cf0(output2, input2, par1), std::invalid_argument,
-                               Message("A time value must be passed in order to evaluate a time-dependent function"));
+                               Message("A time value must be provided in order to evaluate a time-dependent function"));
 
         cf0(output2, input2, par1, fp_t(10));
 

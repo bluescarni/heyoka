@@ -894,9 +894,14 @@ public:
     using out_1d = std::span<T>;
     void operator()(out_1d, in_1d, std::optional<in_1d> = {}, std::optional<T> = {});
 
-    // using in_2d = mdspan<const T, dextents<std::size_t, 2>>;
-    //  using out_2d = mdspan<T, dextents<std::size_t, 2>>;
-    //  void operator()(out_2d, in_2d, std::optional<in_2d> = {}, std::optional<in_1d> = {});
+    using in_2d = mdspan<const T, dextents<std::size_t, 2>>;
+    using out_2d = mdspan<T, dextents<std::size_t, 2>>;
+
+private:
+    HEYOKA_DLL_LOCAL void multi_eval_st(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
+
+public:
+    void operator()(out_2d, in_2d, std::optional<in_2d> = {}, std::optional<in_1d> = {});
 };
 
 // Prevent implicit instantiations.
