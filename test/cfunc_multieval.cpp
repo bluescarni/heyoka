@@ -49,6 +49,9 @@ const auto fp_types = std::tuple<float, double
 
 std::mt19937 rng;
 
+// NOTE: ICE on MSVC.
+#if !defined(_MSC_VER) || defined(__clang__)
+
 // Single-thread test.
 TEST_CASE("multieval st")
 {
@@ -214,3 +217,5 @@ TEST_CASE("multieval st")
         }
     }
 }
+
+#endif
