@@ -219,3 +219,74 @@ TEST_CASE("multieval st")
 }
 
 #endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+TEST_CASE("multieval st mp")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, y] = make_vars("x", "y");
+
+    // Setup the buffers.
+    std::vector<mppp::real> obuf, ibuf, pbuf, tbuf;
+
+    using out_2d = cfunc<mppp::real>::out_2d;
+    using in_2d = cfunc<mppp::real>::in_2d;
+    using in_1d = cfunc<mppp::real>::in_1d;
+
+    const auto prec = 31;
+
+    auto cf0 = cfunc<mppp::real>{{x + y + par[0], x - y + heyoka::time}, {x, y}, kw::prec = prec};
+
+    obuf.resize(20u, mppp::real{0, 30});
+    ibuf.resize(20u, mppp::real{0, 29});
+    pbuf.resize(10u, mppp::real{0, 28});
+    tbuf.resize(10u, mppp::real{0, 27});
+
+    REQUIRE_THROWS_MATCHES(
+        cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, in_2d{pbuf.data(), 1, 10}, in_1d{tbuf.data(), 10}),
+        std::invalid_argument,
+        Message("An mppp::real with an invalid precision of 30 was detected in the arguments to the evaluation "
+                "of a compiled function - the expected precision value is 31"));
+
+    std::ranges::fill(obuf, mppp::real{0, prec});
+
+    REQUIRE_THROWS_MATCHES(
+        cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, in_2d{pbuf.data(), 1, 10}, in_1d{tbuf.data(), 10}),
+        std::invalid_argument,
+        Message("An mppp::real with an invalid precision of 29 was detected in the arguments to the evaluation "
+                "of a compiled function - the expected precision value is 31"));
+
+    std::ranges::fill(ibuf, mppp::real{2, prec});
+
+    REQUIRE_THROWS_MATCHES(
+        cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, in_2d{pbuf.data(), 1, 10}, in_1d{tbuf.data(), 10}),
+        std::invalid_argument,
+        Message("An mppp::real with an invalid precision of 28 was detected in the arguments to the evaluation "
+                "of a compiled function - the expected precision value is 31"));
+
+    std::ranges::fill(pbuf, mppp::real{3, prec});
+
+    REQUIRE_THROWS_MATCHES(
+        cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, in_2d{pbuf.data(), 1, 10}, in_1d{tbuf.data(), 10}),
+        std::invalid_argument,
+        Message("An mppp::real with an invalid precision of 27 was detected in the arguments to the evaluation "
+                "of a compiled function - the expected precision value is 31"));
+
+    std::ranges::fill(tbuf, mppp::real{4, prec});
+
+    cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, in_2d{pbuf.data(), 1, 10}, in_1d{tbuf.data(), 10});
+
+    auto ospan = out_2d{obuf.data(), 2, 10};
+    auto ispan = in_2d{ibuf.data(), 2, 10};
+    auto pspan = in_2d{pbuf.data(), 1, 10};
+    auto tspan = in_1d{tbuf.data(), 10};
+
+    for (std::size_t j = 0; j < ospan.extent(1); ++j) {
+        REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));
+        REQUIRE(ospan(1, j) == approximately(ispan(0, j) - ispan(1, j) + tspan[j]));
+    }
+}
+
+#endif
