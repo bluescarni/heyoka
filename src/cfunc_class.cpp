@@ -55,13 +55,11 @@ struct cfunc<T>::impl {
     std::vector<expression> m_fn;
     std::vector<expression> m_vars;
     llvm_state m_s_scal;
-    llvm_state m_s_batch;
     llvm_state m_s_scal_s;
     llvm_state m_s_batch_s;
     std::uint32_t m_batch_size = 0;
     std::vector<expression> m_dc;
     cfunc_ptr_t m_fptr_scal = nullptr;
-    cfunc_ptr_t m_fptr_batch = nullptr;
     cfunc_ptr_s_t m_fptr_scal_s = nullptr;
     cfunc_ptr_s_t m_fptr_batch_s = nullptr;
     std::uint32_t m_nparams = 0;
@@ -80,7 +78,6 @@ struct cfunc<T>::impl {
         ar << m_fn;
         ar << m_vars;
         ar << m_s_scal;
-        ar << m_s_batch;
         ar << m_s_scal_s;
         ar << m_s_batch_s;
         ar << m_batch_size;
@@ -100,7 +97,6 @@ struct cfunc<T>::impl {
         ar >> m_fn;
         ar >> m_vars;
         ar >> m_s_scal;
-        ar >> m_s_batch;
         ar >> m_s_scal_s;
         ar >> m_s_batch_s;
         ar >> m_batch_size;
@@ -117,7 +113,6 @@ struct cfunc<T>::impl {
 
         // Recover the function pointers.
         m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(m_s_scal.jit_lookup("cfunc"));
-        m_fptr_batch = reinterpret_cast<cfunc_ptr_t>(m_s_batch.jit_lookup("cfunc"));
         m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_scal_s.jit_lookup("cfunc.strided"));
         m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_batch_s.jit_lookup("cfunc.strided"));
     }
@@ -132,9 +127,9 @@ struct cfunc<T>::impl {
     explicit impl(std::vector<expression> fn, std::vector<expression> vars, llvm_state s,
                   std::optional<std::uint32_t> batch_size, bool high_accuracy, bool compact_mode, bool parallel_mode,
                   long long prec, bool check_prec)
-        : m_fn(std::move(fn)), m_vars(std::move(vars)), m_s_scal(std::move(s)), m_s_batch(m_s_scal),
-          m_s_scal_s(m_s_scal), m_s_batch_s(m_s_scal), m_prec(prec), m_check_prec(check_prec),
-          m_high_accuracy(high_accuracy), m_compact_mode(compact_mode), m_parallel_mode(parallel_mode)
+        : m_fn(std::move(fn)), m_vars(std::move(vars)), m_s_scal(std::move(s)), m_s_scal_s(m_s_scal),
+          m_s_batch_s(m_s_scal), m_prec(prec), m_check_prec(check_prec), m_high_accuracy(high_accuracy),
+          m_compact_mode(compact_mode), m_parallel_mode(parallel_mode)
     {
         // Setup the batch size.
         // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
@@ -161,15 +156,6 @@ struct cfunc<T>::impl {
                 m_s_scal.compile();
 
                 m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(m_s_scal.jit_lookup("cfunc"));
-            },
-            [&]() {
-                // Batch unstrided.
-                add_cfunc<T>(m_s_batch, "cfunc", m_fn, m_vars, kw::batch_size = m_batch_size,
-                             kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode, kw::prec = prec);
-
-                m_s_batch.compile();
-
-                m_fptr_batch = reinterpret_cast<cfunc_ptr_t>(m_s_batch.jit_lookup("cfunc"));
             },
             [&]() {
                 // Scalar strided.
@@ -203,16 +189,15 @@ struct cfunc<T>::impl {
         m_nvars = boost::numeric_cast<std::uint32_t>(m_vars.size());
     }
     impl(const impl &other)
-        : m_fn(other.m_fn), m_vars(other.m_vars), m_s_scal(other.m_s_scal), m_s_batch(other.m_s_batch),
-          m_s_scal_s(other.m_s_scal_s), m_s_batch_s(other.m_s_batch_s), m_batch_size(other.m_batch_size),
-          m_dc(other.m_dc), m_nparams(other.m_nparams), m_is_time_dependent(other.m_is_time_dependent),
-          m_nouts(other.m_nouts), m_nvars(other.m_nvars), m_prec(other.m_prec), m_check_prec(other.m_check_prec),
+        : m_fn(other.m_fn), m_vars(other.m_vars), m_s_scal(other.m_s_scal), m_s_scal_s(other.m_s_scal_s),
+          m_s_batch_s(other.m_s_batch_s), m_batch_size(other.m_batch_size), m_dc(other.m_dc),
+          m_nparams(other.m_nparams), m_is_time_dependent(other.m_is_time_dependent), m_nouts(other.m_nouts),
+          m_nvars(other.m_nvars), m_prec(other.m_prec), m_check_prec(other.m_check_prec),
           m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode),
           m_parallel_mode(other.m_parallel_mode)
     {
         // Recover the function pointers.
         m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(m_s_scal.jit_lookup("cfunc"));
-        m_fptr_batch = reinterpret_cast<cfunc_ptr_t>(m_s_batch.jit_lookup("cfunc"));
         m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_scal_s.jit_lookup("cfunc.strided"));
         m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_batch_s.jit_lookup("cfunc.strided"));
     }
