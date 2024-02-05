@@ -899,6 +899,7 @@ public:
 
 private:
     HEYOKA_DLL_LOCAL void multi_eval_st(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
+    HEYOKA_DLL_LOCAL void multi_eval_mt(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
 
 public:
     void operator()(out_2d, in_2d, std::optional<in_2d> = {}, std::optional<in_1d> = {});

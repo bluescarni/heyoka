@@ -10,6 +10,7 @@
 #include <heyoka/config.hpp>
 
 #include <random>
+#include <ranges>
 #include <stdexcept>
 #include <tuple>
 #include <vector>
@@ -220,6 +221,81 @@ TEST_CASE("multieval st")
 
 #endif
 
+// Multi-thread tests.
+TEST_CASE("multieval mt double")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    std::uniform_real_distribution<double> rdist{10, 20};
+
+    const auto nevals = 1'000'000ull;
+
+    // Setup the buffers.
+    std::vector<double> obuf(2u * nevals), ibuf(2u * nevals), pbuf(nevals), tbuf(nevals);
+
+    auto gen = [&rdist]() { return rdist(rng); };
+
+    std::ranges::generate(obuf, gen);
+    std::ranges::generate(ibuf, gen);
+    std::ranges::generate(pbuf, gen);
+    std::ranges::generate(tbuf, gen);
+
+    auto ospan = cfunc<double>::out_2d{obuf.data(), 2, nevals};
+    auto ispan = cfunc<double>::in_2d{ibuf.data(), 2, nevals};
+    auto pspan = cfunc<double>::in_2d{pbuf.data(), 1, nevals};
+    auto tspan = cfunc<double>::in_1d{tbuf.data(), nevals};
+
+    for (auto cm : {false, true}) {
+        auto cf0 = cfunc<double>{{x + y + par[0], x - y + heyoka::time}, {x, y}, kw::compact_mode = cm};
+
+        cf0(ospan, ispan, pspan, tspan);
+
+        for (std::size_t j = 0; j < ospan.extent(1); ++j) {
+            REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));
+            REQUIRE(ospan(1, j) == approximately(ispan(0, j) - ispan(1, j) + tspan[j]));
+        }
+    }
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+TEST_CASE("multieval mt real128")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    std::uniform_real_distribution<double> rdist{10, 20};
+
+    const auto nevals = 10000ull;
+
+    // Setup the buffers.
+    std::vector<mppp::real128> obuf(2u * nevals), ibuf(2u * nevals), pbuf(nevals), tbuf(nevals);
+
+    auto gen = [&rdist]() { return static_cast<mppp::real128>(rdist(rng)); };
+
+    std::ranges::generate(obuf, gen);
+    std::ranges::generate(ibuf, gen);
+    std::ranges::generate(pbuf, gen);
+    std::ranges::generate(tbuf, gen);
+
+    auto ospan = cfunc<mppp::real128>::out_2d{obuf.data(), 2, nevals};
+    auto ispan = cfunc<mppp::real128>::in_2d{ibuf.data(), 2, nevals};
+    auto pspan = cfunc<mppp::real128>::in_2d{pbuf.data(), 1, nevals};
+    auto tspan = cfunc<mppp::real128>::in_1d{tbuf.data(), nevals};
+
+    for (auto cm : {false, true}) {
+        auto cf0 = cfunc<mppp::real128>{{x + y + par[0], x - y + heyoka::time}, {x, y}, kw::compact_mode = cm};
+
+        cf0(ospan, ispan, pspan, tspan);
+
+        for (std::size_t j = 0; j < ospan.extent(1); ++j) {
+            REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));
+            REQUIRE(ospan(1, j) == approximately(ispan(0, j) - ispan(1, j) + tspan[j]));
+        }
+    }
+}
+
+#endif
+
 #if defined(HEYOKA_HAVE_REAL)
 
 TEST_CASE("multieval st mp")
@@ -286,6 +362,44 @@ TEST_CASE("multieval st mp")
     for (std::size_t j = 0; j < ospan.extent(1); ++j) {
         REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));
         REQUIRE(ospan(1, j) == approximately(ispan(0, j) - ispan(1, j) + tspan[j]));
+    }
+}
+
+TEST_CASE("multieval mt real")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    std::uniform_real_distribution<double> rdist{10, 20};
+
+    const auto nevals = 10000ull;
+
+    // Setup the buffers.
+    std::vector<mppp::real> obuf(2u * nevals), ibuf(2u * nevals), pbuf(nevals), tbuf(nevals);
+
+    const auto prec = 128;
+
+    auto gen = [&]() { return mppp::real(rdist(rng), prec); };
+
+    std::ranges::generate(obuf, gen);
+    std::ranges::generate(ibuf, gen);
+    std::ranges::generate(pbuf, gen);
+    std::ranges::generate(tbuf, gen);
+
+    auto ospan = cfunc<mppp::real>::out_2d{obuf.data(), 2, nevals};
+    auto ispan = cfunc<mppp::real>::in_2d{ibuf.data(), 2, nevals};
+    auto pspan = cfunc<mppp::real>::in_2d{pbuf.data(), 1, nevals};
+    auto tspan = cfunc<mppp::real>::in_1d{tbuf.data(), nevals};
+
+    for (auto cm : {false, true}) {
+        auto cf0
+            = cfunc<mppp::real>{{x + y + par[0], x - y + heyoka::time}, {x, y}, kw::compact_mode = cm, kw::prec = prec};
+
+        cf0(ospan, ispan, pspan, tspan);
+
+        for (std::size_t j = 0; j < ospan.extent(1); ++j) {
+            REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));
+            REQUIRE(ospan(1, j) == approximately(ispan(0, j) - ispan(1, j) + tspan[j]));
+        }
     }
 }
 

@@ -23,6 +23,10 @@
 
 #include <fmt/core.h>
 
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/cache_aligned_allocator.h>
+#include <oneapi/tbb/enumerable_thread_specific.h>
+#include <oneapi/tbb/parallel_for.h>
 #include <oneapi/tbb/parallel_invoke.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -37,6 +41,7 @@
 
 #endif
 
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -50,6 +55,11 @@ struct cfunc<T>::impl {
     // The compiled function types.
     using cfunc_ptr_t = void (*)(T *, const T *, const T *, const T *) noexcept;
     using cfunc_ptr_s_t = void (*)(T *, const T *, const T *, const T *, std::size_t) noexcept;
+
+    // Types for parallel operations.
+    using ets_item_t = std::pair<llvm_state, cfunc_ptr_s_t>;
+    using ets_t = oneapi::tbb::enumerable_thread_specific<ets_item_t, oneapi::tbb::cache_aligned_allocator<ets_item_t>,
+                                                          oneapi::tbb::ets_key_usage_type::ets_key_per_instance>;
 
     // Data members.
     std::vector<expression> m_fn;
@@ -516,6 +526,106 @@ void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> 
 }
 
 template <typename T>
+void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times)
+{
+    // Cache the number of evals.
+    const auto nevals = outputs.extent(1);
+
+    // Cache the batch size.
+    const auto batch_size = m_impl->m_batch_size;
+
+    // Fetch the pointers.
+    auto *out_data = outputs.data_handle();
+    const auto *in_data = inputs.data_handle();
+    const auto *par_data = pars ? pars->data_handle() : nullptr;
+    const auto *time_data = times ? times->data() : nullptr;
+
+    // NOTE: the idea of these booleans is that we want to do arithmetics
+    // on the inputs/pars/time pointers only if we know that we **must** read from them,
+    // in which case the validation steps taken earlier ensure that
+    // arithmetics on them is safe. Otherwise, there are certain corner cases in which
+    // we might end up doing pointer arithmetics which leads to UB. Two examples:
+    //
+    // - the function has no inputs, or
+    // - the function has no params but the user anyway passed an empty
+    //   array of par values.
+    //
+    // In these two cases we are dealing with input and/or pars arrays of shape
+    // (0, nevals). If the pointers stored in the mdspans are null, then we would
+    // be committing UB by doing arithmetic on them.
+    //
+    // NOTE: if nevals is zero, then the two for loops below are never
+    // entered and we never end up doing arithmetics on potentially-null
+    // pointers.
+    //
+    // NOTE: in case of the outputs array, the data pointer can never be null
+    // (unless nevals is zero) because we do not allow to construct a cfunc
+    // object for a function with zero outputs. Hence, no checks are needed.
+    const auto read_inputs = m_impl->m_nvars > 0u;
+    const auto read_pars = m_impl->m_nparams > 0u;
+    const auto read_time = m_impl->m_is_time_dependent;
+    assert(m_impl->m_nouts > 0u);
+
+    // Number of simd blocks in the arrays.
+    const auto n_simd_blocks = nevals / batch_size;
+
+    // The functor to evaluate the scalar remainder, if present. It will be run concurrently with
+    // the batch-parallel iterations.
+    const auto scalar_rem = [n_simd_blocks, batch_size, fptr_scal_s = m_impl->m_fptr_scal_s, nevals, out_data,
+                             read_inputs, in_data, read_pars, par_data, read_time, time_data]() {
+        for (auto k = n_simd_blocks * batch_size; k < nevals; ++k) {
+            fptr_scal_s(out_data + k, read_inputs ? in_data + k : nullptr, read_pars ? par_data + k : nullptr,
+                        read_time ? time_data + k : nullptr, nevals);
+        }
+    };
+
+    // The functor to evaluate the batch-parallel iterations.
+    const auto batch_iter = [batch_size, out_data, read_inputs, in_data, read_pars, par_data, read_time, time_data,
+                             nevals](auto *fptr_batch_s, const auto &range) {
+        for (auto k = range.begin(); k != range.end(); ++k) {
+            const auto start_offset = k * batch_size;
+
+            fptr_batch_s(out_data + start_offset, read_inputs ? in_data + start_offset : nullptr,
+                         read_pars ? par_data + start_offset : nullptr, read_time ? time_data + start_offset : nullptr,
+                         nevals);
+        }
+    };
+
+    // NOTE: in compact mode each batch-parallel iteration needs its own copy of the batch strided
+    // function due to the auxiliary global storage employed to accumulate the elementary subexpression
+    // evaluations.
+    if (m_impl->m_compact_mode) {
+        // Construct the thread-specific storage for batch parallel operations.
+        typename impl::ets_t ets_batch([this]() {
+            auto s_batch_s = m_impl->m_s_batch_s;
+            auto *fptr = reinterpret_cast<typename impl::cfunc_ptr_s_t>(s_batch_s.jit_lookup("cfunc.strided"));
+
+            return std::make_pair(std::move(s_batch_s), fptr);
+        });
+
+        oneapi::tbb::parallel_invoke(
+            [&ets_batch, &batch_iter, n_simd_blocks]() {
+                oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0, n_simd_blocks),
+                                          [&ets_batch, &batch_iter](const auto &range) {
+                                              // Fetch the local function pointer.
+                                              auto *fptr_batch_s = ets_batch.local().second;
+
+                                              batch_iter(fptr_batch_s, range);
+                                          });
+            },
+            scalar_rem);
+    } else {
+        oneapi::tbb::parallel_invoke(
+            [fptr_batch_s = m_impl->m_fptr_batch_s, &batch_iter, n_simd_blocks]() {
+                oneapi::tbb::parallel_for(
+                    oneapi::tbb::blocked_range<std::size_t>(0, n_simd_blocks),
+                    [fptr_batch_s, &batch_iter](const auto &range) { batch_iter(fptr_batch_s, range); });
+            },
+            scalar_rem);
+    }
+}
+
+template <typename T>
 void cfunc<T>::operator()(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times)
 {
     check_valid(__func__);
@@ -619,7 +729,79 @@ void cfunc<T>::operator()(out_2d outputs, in_2d inputs, std::optional<in_2d> par
 
 #endif
 
-    multi_eval_st(outputs, inputs, pars, times);
+    // A simple cost model for deciding when to parallelise over ncols. We consider:
+    //
+    // - an estimate of the total number of elementary operations necessary to
+    //   evaluate the function,
+    // - the value of ncols,
+    // - the floating-point type in use,
+    // - the batch size.
+
+    // Cost of a scalar fp operation.
+    constexpr auto fp_unit_cost = []() -> double {
+        if constexpr (std::same_as<float, T> || std::same_as<double, T>) {
+            // float and double.
+            return 1;
+        } else if constexpr (std::same_as<long double, T>) {
+            // long double.
+            if constexpr (detail::is_ieee754_binary64<T>) {
+                return 1;
+            } else if constexpr (detail::is_x86_fp80<T>) {
+                return 5;
+            } else if constexpr (detail::is_ieee754_binary128<T>) {
+#if defined(HEYOKA_ARCH_PPC)
+                return 10;
+#else
+                return 100;
+#endif
+            } else {
+                static_assert(detail::always_false_v<T>, "Unknown fp cost model.");
+            }
+        }
+#if defined(HEYOKA_HAVE_REAL128)
+        else if constexpr (std::same_as<mppp::real128, T>) {
+            // mppp::real128.
+#if defined(HEYOKA_ARCH_PPC)
+            return 10;
+#else
+            return 100;
+#endif
+        }
+#endif
+#if defined(HEYOKA_HAVE_REAL)
+        else if constexpr (std::same_as<mppp::real, T>) {
+            // mppp::real.
+            // NOTE: this should be improved to take into account
+            // the selected precision.
+            // NOTE: for reference, mppp::real with 113 bits of precision
+            // is slightly slower than software-implemented quadmath.
+            return 1000;
+        }
+#endif
+        else {
+            static_assert(detail::always_false_v<T>, "Unknown fp cost model.");
+        }
+    }();
+
+    // Total number of fp operations: number of elementary subexpressions in the
+    // decomposition * ncols.
+    assert(m_impl->m_dc.size() >= m_impl->m_nouts);
+    assert(m_impl->m_dc.size() - m_impl->m_nouts >= m_impl->m_nvars);
+    const auto tot_n_flops
+        = static_cast<double>(m_impl->m_dc.size() - m_impl->m_nouts - m_impl->m_nvars) * static_cast<double>(ncols);
+
+    // The total work.
+    // NOTE: clearly if the user specifies a custom value larger than the native SIMD size here
+    // for m_batch_size the estimation will be off. Using recommended_simd_size() here is not much
+    // better in that respect either (since the user could still specify a smaller batch size), plus
+    // it is going to be somewhat expensive due to accessing a thread-safe static global.
+    const auto tot_work = (fp_unit_cost / m_impl->m_batch_size) * static_cast<double>(tot_n_flops);
+
+    if (tot_work >= 1e5) {
+        multi_eval_mt(outputs, inputs, pars, times);
+    } else {
+        multi_eval_st(outputs, inputs, pars, times);
+    }
 }
 
 // Explicit instantiations.
