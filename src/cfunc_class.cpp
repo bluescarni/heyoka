@@ -141,8 +141,12 @@ struct cfunc<T>::impl {
           m_compact_mode(compact_mode), m_parallel_mode(parallel_mode)
     {
         // Setup the batch size.
-        // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
-        m_batch_size = batch_size ? *batch_size : recommended_simd_size<T>();
+        // NOTE: manually specified batch size of zero is interpreted as undefined.
+        if (batch_size && *batch_size != 0u) {
+            m_batch_size = *batch_size;
+        } else {
+            m_batch_size = recommended_simd_size<T>();
+        }
 
 #if defined(HEYOKA_HAVE_REAL)
 

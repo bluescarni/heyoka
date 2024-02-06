@@ -125,6 +125,10 @@ TEST_CASE("basic")
         REQUIRE(outputs[1] == 1);
         std::ranges::fill(outputs, fp_t(0));
 
+        // Check that batch_size = 0 is interpreted as auto-detected.
+        cf0 = cfunc<fp_t>{{x + y, x - y}, {y, x}, kw::batch_size = 0};
+        REQUIRE(cf0.get_batch_size() == recommended_simd_size<fp_t>());
+
         cf0 = cfunc<fp_t>{{x + y, x - y},
                           {y, x},
                           kw::batch_size = custom_batch_size,
