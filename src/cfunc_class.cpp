@@ -8,7 +8,6 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -441,11 +440,18 @@ void cfunc<T>::operator()(out_1d outputs, in_1d inputs, std::optional<in_1d> par
                 }
             };
 
-            std::ranges::for_each(outputs, prec_checker);
-            std::ranges::for_each(inputs, prec_checker);
+            for (std::size_t i = 0; i < outputs.extent(0); ++i) {
+                prec_checker(outputs(i));
+            }
+
+            for (std::size_t i = 0; i < inputs.extent(0); ++i) {
+                prec_checker(inputs(i));
+            }
 
             if (pars) {
-                std::ranges::for_each(*pars, prec_checker);
+                for (std::size_t i = 0; i < pars->extent(0); ++i) {
+                    prec_checker((*pars)(i));
+                }
             }
 
             if (time) {
@@ -457,7 +463,8 @@ void cfunc<T>::operator()(out_1d outputs, in_1d inputs, std::optional<in_1d> par
 #endif
 
     // Invoke the compiled function.
-    m_impl->m_fptr_scal(outputs.data(), inputs.data(), pars ? pars->data() : nullptr, time ? &*time : nullptr);
+    m_impl->m_fptr_scal(outputs.data_handle(), inputs.data_handle(), pars ? pars->data_handle() : nullptr,
+                        time ? &*time : nullptr);
 }
 
 template <typename T>
@@ -480,7 +487,7 @@ void cfunc<T>::multi_eval_st(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     auto *out_data = outputs.data_handle();
     const auto *in_data = inputs.data_handle();
     const auto *par_data = pars ? pars->data_handle() : nullptr;
-    const auto *time_data = times ? times->data() : nullptr;
+    const auto *time_data = times ? times->data_handle() : nullptr;
 
     // NOTE: the idea of these booleans is that we want to do arithmetics
     // on the inputs/pars/time pointers only if we know that we **must** read from them,
@@ -538,7 +545,7 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
     auto *out_data = outputs.data_handle();
     const auto *in_data = inputs.data_handle();
     const auto *par_data = pars ? pars->data_handle() : nullptr;
-    const auto *time_data = times ? times->data() : nullptr;
+    const auto *time_data = times ? times->data_handle() : nullptr;
 
     // NOTE: the idea of these booleans is that we want to do arithmetics
     // on the inputs/pars/time pointers only if we know that we **must** read from them,
@@ -722,7 +729,9 @@ void cfunc<T>::operator()(out_2d outputs, in_2d inputs, std::optional<in_2d> par
             }
 
             if (times) {
-                std::ranges::for_each(*times, prec_checker);
+                for (std::size_t i = 0; i < times->extent(0); ++i) {
+                    prec_checker((*times)(i));
+                }
             }
         }
     }

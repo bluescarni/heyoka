@@ -23,7 +23,6 @@
 #include <optional>
 #include <ostream>
 #include <ranges>
-#include <span>
 #include <sstream>
 #include <string>
 #include <tuple>
@@ -795,6 +794,31 @@ namespace detail
 
 HEYOKA_DLL_PUBLIC bool ex_less_than(const expression &, const expression &);
 
+// Concepts for the cfunc class.
+template <typename T, typename R>
+concept cfunc_out_range_1d = requires(R &r) {
+    requires std::ranges::contiguous_range<R>;
+    requires std::ranges::sized_range<R>;
+    {
+        std::ranges::data(r)
+    } -> std::same_as<T *>;
+    {
+        std::ranges::size(r)
+    } -> std::integral;
+};
+
+template <typename T, typename R>
+concept cfunc_in_range_1d = requires(R &r) {
+    requires std::ranges::contiguous_range<R>;
+    requires std::ranges::sized_range<R>;
+    {
+        std::ranges::data(r)
+    } -> std::convertible_to<const T *>;
+    {
+        std::ranges::size(r)
+    } -> std::integral;
+};
+
 } // namespace detail
 
 template <typename T>
@@ -890,9 +914,41 @@ public:
 
 #endif
 
-    using in_1d = std::span<const T>;
-    using out_1d = std::span<T>;
+    using in_1d = mdspan<const T, dextents<std::size_t, 1>>;
+    using out_1d = mdspan<T, dextents<std::size_t, 1>>;
     void operator()(out_1d, in_1d, std::optional<in_1d> = {}, std::optional<T> = {});
+
+    template <typename OutRange, typename InRange>
+        requires detail::cfunc_out_range_1d<T, OutRange> && detail::cfunc_in_range_1d<T, InRange>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    void operator()(OutRange &&out, InRange &&in)
+    {
+        operator()(out_1d{std::ranges::data(out), boost::numeric_cast<std::size_t>(std::ranges::size(out))},
+                   in_1d{std::ranges::data(in), boost::numeric_cast<std::size_t>(std::ranges::size(in))});
+    }
+
+    template <typename OutRange, typename InRange, typename ParRange>
+        requires detail::cfunc_out_range_1d<T, OutRange> && detail::cfunc_in_range_1d<T, InRange>
+                 && detail::cfunc_in_range_1d<T, ParRange>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    void operator()(OutRange &&out, InRange &&in, ParRange &&pars)
+    {
+        operator()(out_1d{std::ranges::data(out), boost::numeric_cast<std::size_t>(std::ranges::size(out))},
+                   in_1d{std::ranges::data(in), boost::numeric_cast<std::size_t>(std::ranges::size(in))},
+                   in_1d{std::ranges::data(pars), boost::numeric_cast<std::size_t>(std::ranges::size(pars))});
+    }
+
+    template <typename OutRange, typename InRange, typename ParRange>
+        requires detail::cfunc_out_range_1d<T, OutRange> && detail::cfunc_in_range_1d<T, InRange>
+                 && detail::cfunc_in_range_1d<T, ParRange>
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    void operator()(OutRange &&out, InRange &&in, ParRange &&pars, T time)
+    {
+        operator()(out_1d{std::ranges::data(out), boost::numeric_cast<std::size_t>(std::ranges::size(out))},
+                   in_1d{std::ranges::data(in), boost::numeric_cast<std::size_t>(std::ranges::size(in))},
+                   in_1d{std::ranges::data(pars), boost::numeric_cast<std::size_t>(std::ranges::size(pars))},
+                   std::move(time));
+    }
 
     using in_2d = mdspan<const T, dextents<std::size_t, 2>>;
     using out_2d = mdspan<T, dextents<std::size_t, 2>>;
