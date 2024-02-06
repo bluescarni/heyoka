@@ -916,6 +916,8 @@ public:
 
     using in_1d = mdspan<const T, dextents<std::size_t, 1>>;
     using out_1d = mdspan<T, dextents<std::size_t, 1>>;
+    // NOTE: it is important to document properly the non-overlapping
+    // memory requirement for the input arguments.
     void operator()(out_1d, in_1d, std::optional<in_1d> = {}, std::optional<T> = {});
 
     template <typename OutRange, typename InRange>
@@ -958,6 +960,8 @@ private:
     HEYOKA_DLL_LOCAL void multi_eval_mt(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
 
 public:
+    // NOTE: it is important to document properly the non-overlapping
+    // memory requirement for the input arguments.
     void operator()(out_2d, in_2d, std::optional<in_2d> = {}, std::optional<in_1d> = {});
 };
 
