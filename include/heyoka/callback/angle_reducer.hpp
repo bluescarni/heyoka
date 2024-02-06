@@ -90,12 +90,12 @@ public:
     template <typename R>
         requires(!std::same_as<angle_reducer, std::remove_cvref_t<R>>) && std::ranges::input_range<R>
                 && std::constructible_from<expression, std::iter_reference_t<std::ranges::iterator_t<R>>>
+    // NOTE: the absence of perfect forwarding here is intentional:
+    // https://tristanbrindle.com/posts/ranges-and-forwarding-references
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
     explicit angle_reducer(R &&r) : angle_reducer()
     {
-        // Turn into lvalue.
-        auto &&rl = std::forward<R>(r);
-
-        construct_from_range(std::ranges::begin(rl), std::ranges::end(rl));
+        construct_from_range(std::ranges::begin(r), std::ranges::end(r));
     }
     template <typename T>
         requires std::constructible_from<expression, const T &>
