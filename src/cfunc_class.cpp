@@ -55,7 +55,7 @@ struct cfunc<T>::impl {
     using cfunc_ptr_t = void (*)(T *, const T *, const T *, const T *) noexcept;
     using cfunc_ptr_s_t = void (*)(T *, const T *, const T *, const T *, std::size_t) noexcept;
 
-    // Types for parallel operations.
+    // Thread-local storage for parallel operations.
     using ets_item_t = std::pair<llvm_state, cfunc_ptr_s_t>;
     using ets_t = oneapi::tbb::enumerable_thread_specific<ets_item_t, oneapi::tbb::cache_aligned_allocator<ets_item_t>,
                                                           oneapi::tbb::ets_key_usage_type::ets_key_per_instance>;
@@ -188,7 +188,7 @@ struct cfunc<T>::impl {
 
         // Let's figure out if fn contains params and if it is time-dependent.
         m_nparams = get_param_size(m_fn);
-        m_is_time_dependent = heyoka::is_time_dependent(m_fn);
+        m_is_time_dependent = is_time_dependent(m_fn);
 
         // Cache the number of variables and outputs.
         // NOTE: static casts should also be fine here, because add_cfunc()
