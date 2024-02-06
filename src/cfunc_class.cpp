@@ -122,8 +122,8 @@ struct cfunc<T>::impl {
 
         // Recover the function pointers.
         m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(m_s_scal.jit_lookup("cfunc"));
-        m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_scal_s.jit_lookup("cfunc.strided"));
-        m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_batch_s.jit_lookup("cfunc.strided"));
+        m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_scal_s.jit_lookup("cfunc"));
+        m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_batch_s.jit_lookup("cfunc"));
     }
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
@@ -168,22 +168,22 @@ struct cfunc<T>::impl {
             },
             [&]() {
                 // Scalar strided.
-                add_cfunc<T>(m_s_scal_s, "cfunc.strided", m_fn, m_vars, kw::high_accuracy = high_accuracy,
+                add_cfunc<T>(m_s_scal_s, "cfunc", m_fn, m_vars, kw::high_accuracy = high_accuracy,
                              kw::compact_mode = compact_mode, kw::prec = prec, kw::strided = true);
 
                 m_s_scal_s.compile();
 
-                m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_scal_s.jit_lookup("cfunc.strided"));
+                m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_scal_s.jit_lookup("cfunc"));
             },
             [&]() {
                 // Batch strided.
-                add_cfunc<T>(m_s_batch_s, "cfunc.strided", m_fn, m_vars, kw::batch_size = m_batch_size,
+                add_cfunc<T>(m_s_batch_s, "cfunc", m_fn, m_vars, kw::batch_size = m_batch_size,
                              kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode, kw::prec = prec,
                              kw::strided = true);
 
                 m_s_batch_s.compile();
 
-                m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_batch_s.jit_lookup("cfunc.strided"));
+                m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_batch_s.jit_lookup("cfunc"));
             });
 
         // Let's figure out if fn contains params and if it is time-dependent.
@@ -207,8 +207,8 @@ struct cfunc<T>::impl {
     {
         // Recover the function pointers.
         m_fptr_scal = reinterpret_cast<cfunc_ptr_t>(m_s_scal.jit_lookup("cfunc"));
-        m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_scal_s.jit_lookup("cfunc.strided"));
-        m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_batch_s.jit_lookup("cfunc.strided"));
+        m_fptr_scal_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_scal_s.jit_lookup("cfunc"));
+        m_fptr_batch_s = reinterpret_cast<cfunc_ptr_s_t>(m_s_batch_s.jit_lookup("cfunc"));
     }
 
     // These are never needed.
@@ -605,7 +605,7 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
         // Construct the thread-specific storage for batch parallel operations.
         typename impl::ets_t ets_batch([this]() {
             auto s_batch_s = m_impl->m_s_batch_s;
-            auto *fptr = reinterpret_cast<typename impl::cfunc_ptr_s_t>(s_batch_s.jit_lookup("cfunc.strided"));
+            auto *fptr = reinterpret_cast<typename impl::cfunc_ptr_s_t>(s_batch_s.jit_lookup("cfunc"));
 
             return std::make_pair(std::move(s_batch_s), fptr);
         });
