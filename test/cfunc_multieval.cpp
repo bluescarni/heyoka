@@ -228,7 +228,7 @@ TEST_CASE("multieval mt double")
 
     std::uniform_real_distribution<double> rdist{10, 20};
 
-    const auto nevals = 1'000'000ull;
+    const auto nevals = 1'000'003ull;
 
     // Setup the buffers.
     std::vector<double> obuf(2u * nevals), ibuf(2u * nevals), pbuf(nevals), tbuf(nevals);
@@ -265,7 +265,7 @@ TEST_CASE("multieval mt real128")
 
     std::uniform_real_distribution<double> rdist{10, 20};
 
-    const auto nevals = 10000ull;
+    const auto nevals = 10003ull;
 
     // Setup the buffers.
     std::vector<mppp::real128> obuf(2u * nevals), ibuf(2u * nevals), pbuf(nevals), tbuf(nevals);
@@ -371,7 +371,7 @@ TEST_CASE("multieval mt real")
 
     std::uniform_real_distribution<double> rdist{10, 20};
 
-    const auto nevals = 10000ull;
+    const auto nevals = 10003ull;
 
     // Setup the buffers.
     std::vector<mppp::real> obuf(2u * nevals), ibuf(2u * nevals), pbuf(nevals), tbuf(nevals);
