@@ -24,7 +24,7 @@ The :cpp:class:`expression` class
    we refer to these types as the *node types* of an expression.
 
    Expressions can be created in a variety of ways. After creation, expressions
-   can be combined via :ref:`arithmetic operators <api_ex_arith_ops>` and :ref:`mathematical functions <api_math>`
+   can be combined via :ref:`arithmetic operators <api_ex_ops>` and :ref:`mathematical functions <api_math>`
    to form new expressions of arbitrary complexity.
 
    Expressions which consist of a single :ref:`variable <api_variable>` or a single
@@ -142,10 +142,13 @@ Functions
       auto x = make_vars("x");
       auto [y, z] = make_vars("y", "z");
 
-.. _api_ex_arith_ops:
+.. _api_ex_ops:
+
+Operators
+---------
 
 Arithmetic operators
---------------------
+^^^^^^^^^^^^^^^^^^^^
 
 The :cpp:class:`expression` class provides overloaded arithmetic binary operators and their in-place variants.
 
@@ -157,8 +160,8 @@ The overloaded in-place operators require the first argument to be an :cpp:class
 the second argument can be
 either another :cpp:class:`expression` or any floating-point value supported by :cpp:class:`number`.
 
-Comparisons
------------
+Comparison operators
+^^^^^^^^^^^^^^^^^^^^
 
 .. cpp:function:: bool operator==(const expression &e1, const expression &e2) noexcept
 
