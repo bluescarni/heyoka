@@ -916,40 +916,71 @@ public:
 
     using in_1d = mdspan<const T, dextents<std::size_t, 1>>;
     using out_1d = mdspan<T, dextents<std::size_t, 1>>;
+
+private:
+    void single_eval(out_1d, in_1d, std::optional<in_1d>, std::optional<T>);
+
+public:
     // NOTE: it is important to document properly the non-overlapping
     // memory requirement for the input arguments.
-    void operator()(out_1d, in_1d, std::optional<in_1d> = {}, std::optional<T> = {});
-
-    template <typename OutRange, typename InRange>
-        requires detail::cfunc_out_range_1d<T, OutRange> && detail::cfunc_in_range_1d<T, InRange>
+    template <typename Out, typename In, typename... KwArgs>
+        requires(!igor::has_unnamed_arguments<KwArgs...>())
+                && (detail::cfunc_out_range_1d<T, Out> || std::same_as<out_1d, std::remove_cvref_t<Out>>)
+                && (detail::cfunc_in_range_1d<T, In> || std::same_as<in_1d, std::remove_cvref_t<In>>)
     // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-    void operator()(OutRange &&out, InRange &&in)
+    void operator()(Out &&out, In &&in, const KwArgs &...kw_args)
     {
-        operator()(out_1d{std::ranges::data(out), boost::numeric_cast<std::size_t>(std::ranges::size(out))},
-                   in_1d{std::ranges::data(in), boost::numeric_cast<std::size_t>(std::ranges::size(in))});
-    }
+        igor::parser p{kw_args...};
 
-    template <typename OutRange, typename InRange, typename ParRange>
-        requires detail::cfunc_out_range_1d<T, OutRange> && detail::cfunc_in_range_1d<T, InRange>
-                 && detail::cfunc_in_range_1d<T, ParRange>
-    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-    void operator()(OutRange &&out, InRange &&in, ParRange &&pars)
-    {
-        operator()(out_1d{std::ranges::data(out), boost::numeric_cast<std::size_t>(std::ranges::size(out))},
-                   in_1d{std::ranges::data(in), boost::numeric_cast<std::size_t>(std::ranges::size(in))},
-                   in_1d{std::ranges::data(pars), boost::numeric_cast<std::size_t>(std::ranges::size(pars))});
-    }
+        out_1d oput = [&]() {
+            if constexpr (std::same_as<out_1d, std::remove_cvref_t<Out>>) {
+                return out;
+            } else {
+                return out_1d{std::ranges::data(out), boost::numeric_cast<std::size_t>(std::ranges::size(out))};
+            }
+        }();
 
-    template <typename OutRange, typename InRange, typename ParRange>
-        requires detail::cfunc_out_range_1d<T, OutRange> && detail::cfunc_in_range_1d<T, InRange>
-                 && detail::cfunc_in_range_1d<T, ParRange>
-    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-    void operator()(OutRange &&out, InRange &&in, ParRange &&pars, T time)
-    {
-        operator()(out_1d{std::ranges::data(out), boost::numeric_cast<std::size_t>(std::ranges::size(out))},
-                   in_1d{std::ranges::data(in), boost::numeric_cast<std::size_t>(std::ranges::size(in))},
-                   in_1d{std::ranges::data(pars), boost::numeric_cast<std::size_t>(std::ranges::size(pars))},
-                   std::move(time));
+        in_1d iput = [&]() {
+            if constexpr (std::same_as<in_1d, std::remove_cvref_t<In>>) {
+                return in;
+            } else {
+                return in_1d{std::ranges::data(in), boost::numeric_cast<std::size_t>(std::ranges::size(in))};
+            }
+        }();
+
+        auto pars = [&]() -> std::optional<in_1d> {
+            if constexpr (p.has(kw::pars)) {
+                using pars_t = decltype(p(kw::pars));
+
+                if constexpr (std::same_as<in_1d, std::remove_cvref_t<pars_t>>) {
+                    return p(kw::pars);
+                } else if constexpr (detail::cfunc_in_range_1d<T, pars_t>) {
+                    // NOTE: as usual, we don't want to perfectly forward ranges, hence,
+                    // turn it into an lvalue.
+                    auto &&pars = p(kw::pars);
+
+                    return in_1d{std::ranges::data(pars), boost::numeric_cast<std::size_t>(std::ranges::size(pars))};
+                } else {
+                    static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the 'pars' keyword argument.");
+                }
+            } else {
+                return {};
+            }
+        }();
+
+        auto tm = [&]() -> std::optional<T> {
+            if constexpr (p.has(kw::time)) {
+                if constexpr (std::convertible_to<decltype(p(kw::time)), T>) {
+                    return static_cast<T>(p(kw::time));
+                } else {
+                    static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the 'time' keyword argument.");
+                }
+            } else {
+                return {};
+            }
+        }();
+
+        return single_eval(std::move(oput), std::move(iput), std::move(pars), std::move(tm));
     }
 
     using in_2d = mdspan<const T, dextents<std::size_t, 2>>;
@@ -958,11 +989,43 @@ public:
 private:
     HEYOKA_DLL_LOCAL void multi_eval_st(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
     HEYOKA_DLL_LOCAL void multi_eval_mt(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
+    void multi_eval(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
 
 public:
     // NOTE: it is important to document properly the non-overlapping
     // memory requirement for the input arguments.
-    void operator()(out_2d, in_2d, std::optional<in_2d> = {}, std::optional<in_1d> = {});
+    template <typename... KwArgs>
+        requires(!igor::has_unnamed_arguments<KwArgs...>())
+    void operator()(out_2d out, in_2d in, const KwArgs &...kw_args)
+    {
+        igor::parser p{kw_args...};
+
+        auto pars = [&]() -> std::optional<in_2d> {
+            if constexpr (p.has(kw::pars)) {
+                if constexpr (std::same_as<in_2d, std::remove_cvref_t<decltype(p(kw::pars))>>) {
+                    return p(kw::pars);
+                } else {
+                    static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the 'pars' keyword argument.");
+                }
+            } else {
+                return {};
+            }
+        }();
+
+        auto tm = [&]() -> std::optional<in_1d> {
+            if constexpr (p.has(kw::time)) {
+                if constexpr (std::same_as<in_1d, std::remove_cvref_t<decltype(p(kw::time))>>) {
+                    return p(kw::time);
+                } else {
+                    static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the 'time' keyword argument.");
+                }
+            } else {
+                return {};
+            }
+        }();
+
+        multi_eval(std::move(out), std::move(in), std::move(pars), std::move(tm));
+    }
 };
 
 // Prevent implicit instantiations.

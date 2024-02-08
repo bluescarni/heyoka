@@ -154,9 +154,6 @@ class HEYOKA_DLL_PUBLIC llvm_state
     {
         igor::parser p{kw_args...};
 
-        static_assert(!p.has_unnamed_arguments(), "The variadic arguments in the construction of an llvm_state contain "
-                                                  "unnamed arguments.");
-
         // Module name (defaults to empty string).
         auto mod_name = [&p]() -> std::string {
             if constexpr (p.has(kw::mname)) {

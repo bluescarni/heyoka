@@ -70,16 +70,24 @@ TEST_CASE("multieval st")
         using in_2d = typename cfunc<fp_t>::in_2d;
         using in_1d = typename cfunc<fp_t>::in_1d;
 
-        auto cf0 = cfunc<fp_t>{{x + y, x - y},
-                               {x, y},
-                               kw::opt_level = opt_level,
-                               kw::high_accuracy = high_accuracy,
-                               kw::compact_mode = compact_mode};
+        // Def cted failure.
+        auto cf0 = cfunc<fp_t>{};
+
+        CHECK_THROWS_AS(cf0(out_2d{obuf.data(), 0, 0}, in_2d{ibuf.data(), 0, 0}), std::invalid_argument);
+
+        cf0 = cfunc<fp_t>{{x + y, x - y},
+                          {x, y},
+                          kw::opt_level = opt_level,
+                          kw::high_accuracy = high_accuracy,
+                          kw::compact_mode = compact_mode};
 
         // Error checking.
         REQUIRE_THROWS_MATCHES(cf0(out_2d{obuf.data(), 0, 0}, in_2d{ibuf.data(), 0, 0}), std::invalid_argument,
                                Message("Invalid outputs array passed to a cfunc: the number of function "
                                        "outputs is 2, but the number of rows in the outputs array is 0"));
+
+        // Check with zero nevals.
+        REQUIRE_NOTHROW(cf0(out_2d{obuf.data(), 2, 0}, in_2d{ibuf.data(), 2, 0}));
 
         obuf.resize(20u);
 
@@ -109,34 +117,37 @@ TEST_CASE("multieval st")
 
         pbuf.resize(10u);
 
-        REQUIRE_THROWS_MATCHES(cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, in_2d{pbuf.data(), 0, 0}),
-                               std::invalid_argument,
-                               Message("The array of parameter values provided for the evaluation "
-                                       "of a compiled function has 0 row(s), "
-                                       "but the number of parameters in the function is 1"));
-
-        REQUIRE_THROWS_MATCHES(cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, in_2d{pbuf.data(), 0, 3}),
-                               std::invalid_argument,
-                               Message("The array of parameter values provided for the evaluation "
-                                       "of a compiled function has 0 row(s), "
-                                       "but the number of parameters in the function is 1"));
-
-        REQUIRE_THROWS_MATCHES(cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, in_2d{pbuf.data(), 1, 5}),
-                               std::invalid_argument,
-                               Message("The array of parameter values provided for the evaluation "
-                                       "of a compiled function has 5 column(s), "
-                                       "but the expected number of columns deduced from the "
-                                       "outputs array is 10"));
+        REQUIRE_THROWS_MATCHES(
+            cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, kw::pars = in_2d{pbuf.data(), 0, 0}),
+            std::invalid_argument,
+            Message("The array of parameter values provided for the evaluation "
+                    "of a compiled function has 0 row(s), "
+                    "but the number of parameters in the function is 1"));
 
         REQUIRE_THROWS_MATCHES(
-            cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, in_2d{pbuf.data(), 1, 10}),
+            cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, kw::pars = in_2d{pbuf.data(), 0, 3}),
+            std::invalid_argument,
+            Message("The array of parameter values provided for the evaluation "
+                    "of a compiled function has 0 row(s), "
+                    "but the number of parameters in the function is 1"));
+
+        REQUIRE_THROWS_MATCHES(
+            cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, kw::pars = in_2d{pbuf.data(), 1, 5}),
+            std::invalid_argument,
+            Message("The array of parameter values provided for the evaluation "
+                    "of a compiled function has 5 column(s), "
+                    "but the expected number of columns deduced from the "
+                    "outputs array is 10"));
+
+        REQUIRE_THROWS_MATCHES(
+            cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, kw::pars = in_2d{pbuf.data(), 1, 10}),
             std::invalid_argument,
             Message("An array of time values must be provided in order to evaluate a time-dependent function"));
 
         tbuf.resize(10u);
 
-        REQUIRE_THROWS_MATCHES(cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, in_2d{pbuf.data(), 1, 10},
-                                   in_1d{tbuf.data(), 5}),
+        REQUIRE_THROWS_MATCHES(cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10},
+                                   kw::pars = in_2d{pbuf.data(), 1, 10}, kw::time = in_1d{tbuf.data(), 5}),
                                std::invalid_argument,
                                Message("The array of time values provided for the evaluation "
                                        "of a compiled function has a size of 5, "
@@ -169,7 +180,7 @@ TEST_CASE("multieval st")
         }
 
         // Try also with empty par span.
-        cf0(ospan, ispan, in_2d{nullptr, 0, 10});
+        cf0(ospan, ispan, kw::pars = in_2d{nullptr, 0, 10});
 
         for (std::size_t j = 0; j < ospan.extent(1); ++j) {
             REQUIRE(ospan(0, j) == ispan(0, j) + ispan(1, j));
@@ -183,7 +194,7 @@ TEST_CASE("multieval st")
                           kw::high_accuracy = high_accuracy,
                           kw::compact_mode = compact_mode};
 
-        cf0(ospan, in_2d{nullptr, 0, 10}, in_2d{nullptr, 0, 10});
+        cf0(ospan, in_2d{nullptr, 0, 10}, kw::pars = in_2d{nullptr, 0, 10});
 
         for (std::size_t j = 0; j < ospan.extent(1); ++j) {
             REQUIRE(ospan(0, j) == 3);
@@ -201,11 +212,22 @@ TEST_CASE("multieval st")
                           kw::high_accuracy = high_accuracy,
                           kw::compact_mode = compact_mode};
 
-        cf0(ospan, ispan, pspan, tspan);
+        cf0(ospan, ispan, kw::pars = pspan, kw::time = tspan);
 
         for (std::size_t j = 0; j < ospan.extent(1); ++j) {
             REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));
             REQUIRE(ospan(1, j) == approximately(ispan(0, j) - ispan(1, j) + tspan[j]));
+        }
+
+        // Try function with no inputs.
+        cf0 = cfunc<fp_t>({par[0], 2_dbl - heyoka::time}, {}, kw::opt_level = opt_level,
+                          kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
+
+        cf0(ospan, in_2d{nullptr, 0, 10}, kw::pars = pspan, kw::time = tspan);
+
+        for (std::size_t j = 0; j < ospan.extent(1); ++j) {
+            REQUIRE(ospan(0, j) == pspan(0, j));
+            REQUIRE(ospan(1, j) == 2 - tspan(j));
         }
     };
 
@@ -248,7 +270,7 @@ TEST_CASE("multieval mt double")
     for (auto cm : {false, true}) {
         auto cf0 = cfunc<double>{{x + y + par[0], x - y + heyoka::time}, {x, y}, kw::compact_mode = cm};
 
-        cf0(ospan, ispan, pspan, tspan);
+        cf0(ospan, ispan, kw::pars = pspan, kw::time = tspan);
 
         for (std::size_t j = 0; j < ospan.extent(1); ++j) {
             REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));
@@ -285,7 +307,7 @@ TEST_CASE("multieval mt real128")
     for (auto cm : {false, true}) {
         auto cf0 = cfunc<mppp::real128>{{x + y + par[0], x - y + heyoka::time}, {x, y}, kw::compact_mode = cm};
 
-        cf0(ospan, ispan, pspan, tspan);
+        cf0(ospan, ispan, kw::pars = pspan, kw::time = tspan);
 
         for (std::size_t j = 0; j < ospan.extent(1); ++j) {
             REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));
@@ -321,7 +343,8 @@ TEST_CASE("multieval st mp")
     tbuf.resize(10u, mppp::real{0, 27});
 
     REQUIRE_THROWS_MATCHES(
-        cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, in_2d{pbuf.data(), 1, 10}, in_1d{tbuf.data(), 10}),
+        cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, kw::pars = in_2d{pbuf.data(), 1, 10},
+            kw::time = in_1d{tbuf.data(), 10}),
         std::invalid_argument,
         Message("An mppp::real with an invalid precision of 30 was detected in the arguments to the evaluation "
                 "of a compiled function - the expected precision value is 31"));
@@ -329,7 +352,8 @@ TEST_CASE("multieval st mp")
     std::ranges::fill(obuf, mppp::real{0, prec});
 
     REQUIRE_THROWS_MATCHES(
-        cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, in_2d{pbuf.data(), 1, 10}, in_1d{tbuf.data(), 10}),
+        cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, kw::pars = in_2d{pbuf.data(), 1, 10},
+            kw::time = in_1d{tbuf.data(), 10}),
         std::invalid_argument,
         Message("An mppp::real with an invalid precision of 29 was detected in the arguments to the evaluation "
                 "of a compiled function - the expected precision value is 31"));
@@ -337,7 +361,8 @@ TEST_CASE("multieval st mp")
     std::ranges::fill(ibuf, mppp::real{2, prec});
 
     REQUIRE_THROWS_MATCHES(
-        cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, in_2d{pbuf.data(), 1, 10}, in_1d{tbuf.data(), 10}),
+        cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, kw::pars = in_2d{pbuf.data(), 1, 10},
+            kw::time = in_1d{tbuf.data(), 10}),
         std::invalid_argument,
         Message("An mppp::real with an invalid precision of 28 was detected in the arguments to the evaluation "
                 "of a compiled function - the expected precision value is 31"));
@@ -345,14 +370,16 @@ TEST_CASE("multieval st mp")
     std::ranges::fill(pbuf, mppp::real{3, prec});
 
     REQUIRE_THROWS_MATCHES(
-        cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, in_2d{pbuf.data(), 1, 10}, in_1d{tbuf.data(), 10}),
+        cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, kw::pars = in_2d{pbuf.data(), 1, 10},
+            kw::time = in_1d{tbuf.data(), 10}),
         std::invalid_argument,
         Message("An mppp::real with an invalid precision of 27 was detected in the arguments to the evaluation "
                 "of a compiled function - the expected precision value is 31"));
 
     std::ranges::fill(tbuf, mppp::real{4, prec});
 
-    cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, in_2d{pbuf.data(), 1, 10}, in_1d{tbuf.data(), 10});
+    cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10}, kw::pars = in_2d{pbuf.data(), 1, 10},
+        kw::time = in_1d{tbuf.data(), 10});
 
     auto ospan = out_2d{obuf.data(), 2, 10};
     auto ispan = in_2d{ibuf.data(), 2, 10};
@@ -363,6 +390,17 @@ TEST_CASE("multieval st mp")
         REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));
         REQUIRE(ospan(1, j) == approximately(ispan(0, j) - ispan(1, j) + tspan[j]));
     }
+
+    // Try a case of a function without time which is provided with a time array
+    // with invalid precision for evaluation.
+    cf0 = cfunc<mppp::real>{{x + y, x - y}, {x, y}, kw::prec = prec};
+
+    std::ranges::fill(tbuf, mppp::real(0, 16));
+
+    REQUIRE_THROWS_MATCHES(
+        cf0(ospan, ispan, kw::time = tspan), std::invalid_argument,
+        Message("An mppp::real with an invalid precision of 16 was detected in the arguments to the evaluation "
+                "of a compiled function - the expected precision value is 31"));
 }
 
 TEST_CASE("multieval mt real")
@@ -394,7 +432,7 @@ TEST_CASE("multieval mt real")
         auto cf0
             = cfunc<mppp::real>{{x + y + par[0], x - y + heyoka::time}, {x, y}, kw::compact_mode = cm, kw::prec = prec};
 
-        cf0(ospan, ispan, pspan, tspan);
+        cf0(ospan, ispan, kw::pars = pspan, kw::time = tspan);
 
         for (std::size_t j = 0; j < ospan.extent(1); ++j) {
             REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));

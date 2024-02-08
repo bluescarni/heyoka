@@ -398,7 +398,7 @@ void cfunc<T>::check_valid(const char *name) const
 }
 
 template <typename T>
-void cfunc<T>::operator()(out_1d outputs, in_1d inputs, std::optional<in_1d> pars, std::optional<T> time)
+void cfunc<T>::single_eval(out_1d outputs, in_1d inputs, std::optional<in_1d> pars, std::optional<T> time)
 {
     check_valid(__func__);
 
@@ -637,7 +637,7 @@ void cfunc<T>::multi_eval_mt(out_2d outputs, in_2d inputs, std::optional<in_2d> 
 }
 
 template <typename T>
-void cfunc<T>::operator()(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times)
+void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> pars, std::optional<in_1d> times)
 {
     check_valid(__func__);
 

@@ -16,6 +16,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
+#include <type_traits>
 #include <vector>
 
 #include <llvm/Config/llvm-config.h>
@@ -104,7 +105,12 @@ TEST_CASE("basic")
         REQUIRE_THROWS_AS(cf1.get_vars(), std::invalid_argument);
         REQUIRE_THROWS_AS(cf2.get_vars(), std::invalid_argument);
 
-        REQUIRE_THROWS_AS(cf2(typename cfunc<fp_t>::out_1d{}, {}), std::invalid_argument);
+        auto tmp_obuf = typename cfunc<fp_t>::out_1d{};
+        auto tmp_ibuf = typename cfunc<fp_t>::in_1d{};
+        REQUIRE_THROWS_AS(cf2(tmp_obuf, tmp_ibuf), std::invalid_argument);
+
+        // Function with no outputs.
+        CHECK_THROWS_AS((cfunc<fp_t>{{}, {}}), std::invalid_argument);
 
         // Main constructor.
         cf0 = cfunc<fp_t>{{x + y, x - y}, {y, x}, kw::parallel_mode = true};
@@ -278,12 +284,12 @@ TEST_CASE("single call operator")
             cf0(output2, input2), std::invalid_argument,
             Message("An array of parameter values must be passed in order to evaluate a function with parameters"));
 
-        REQUIRE_THROWS_MATCHES(cf0(output2, input2, par2), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(cf0(output2, input2, kw::pars = par2), std::invalid_argument,
                                Message("The array of parameter values provided for the evaluation "
                                        "of a compiled function has 2 element(s), "
                                        "but the number of parameters in the function is 1"));
 
-        cf0(output2, input2, par1);
+        cf0(output2, input2, kw::pars = par1);
 
         REQUIRE(output2[0] == 3);
         REQUIRE(output2[1] == 41);
@@ -292,14 +298,23 @@ TEST_CASE("single call operator")
         cf0 = cfunc<fp_t>({x + y - heyoka::time, x - y + par[0]}, {x, y}, kw::opt_level = opt_level,
                           kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
 
-        REQUIRE_THROWS_MATCHES(cf0(output2, input2, par1), std::invalid_argument,
+        REQUIRE_THROWS_MATCHES(cf0(output2, input2, kw::pars = par1), std::invalid_argument,
                                Message("A time value must be provided in order to evaluate a time-dependent function"));
 
-        cf0(output2, input2, par1, fp_t(10));
+        cf0(output2, input2, kw::pars = par1, kw::time = fp_t(10));
 
         REQUIRE(output2[0] == -7);
         REQUIRE(output2[1] == 41);
         std::ranges::fill(output2, fp_t(0));
+
+        // Try function with no inputs.
+        cf0 = cfunc<fp_t>({par[0], 2_dbl - heyoka::time}, {}, kw::opt_level = opt_level,
+                          kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
+
+        cf0(output2, std::array<fp_t, 0>{}, kw::pars = par1, kw::time = fp_t(10));
+
+        REQUIRE(output2[0] == par1[0]);
+        REQUIRE(output2[1] == -8);
     };
 
     for (auto cm : {false, true}) {
@@ -507,43 +522,52 @@ TEST_CASE("single call operator mp")
 
     auto cf0 = cfunc<mppp::real>({x + y - heyoka::time, x - y + par[0]}, {x, y}, kw::prec = prec);
 
-    cf0(output2, input2, par1, mppp::real(10, prec));
+    cf0(output2, input2, kw::pars = par1, kw::time = mppp::real(10, prec));
 
     REQUIRE(output2[0] == -7);
     REQUIRE(output2[1] == 41);
 
     output2[0].prec_round(30);
     REQUIRE_THROWS_MATCHES(
-        cf0(output2, input2, par1, mppp::real(10, prec)), std::invalid_argument,
+        cf0(output2, input2, kw::pars = par1, kw::time = mppp::real(10, prec)), std::invalid_argument,
         Message("An mppp::real with an invalid precision of 30 was detected in the arguments to the evaluation "
                 "of a compiled function - the expected precision value is 31"));
     output2[0].prec_round(31);
 
     input2[0].prec_round(29);
     REQUIRE_THROWS_MATCHES(
-        cf0(output2, input2, par1, mppp::real(10, prec)), std::invalid_argument,
+        cf0(output2, input2, kw::pars = par1, kw::time = mppp::real(10, prec)), std::invalid_argument,
         Message("An mppp::real with an invalid precision of 29 was detected in the arguments to the evaluation "
                 "of a compiled function - the expected precision value is 31"));
     input2[0].prec_round(31);
 
     par1[0].prec_round(28);
     REQUIRE_THROWS_MATCHES(
-        cf0(output2, input2, par1, mppp::real(10, prec)), std::invalid_argument,
+        cf0(output2, input2, kw::pars = par1, kw::time = mppp::real(10, prec)), std::invalid_argument,
         Message("An mppp::real with an invalid precision of 28 was detected in the arguments to the evaluation "
                 "of a compiled function - the expected precision value is 31"));
     par1[0].prec_round(31);
 
     REQUIRE_THROWS_MATCHES(
-        cf0(output2, input2, par1, mppp::real(10, 15)), std::invalid_argument,
+        cf0(output2, input2, kw::pars = par1, kw::time = mppp::real(10, 15)), std::invalid_argument,
         Message("An mppp::real with an invalid precision of 15 was detected in the arguments to the evaluation "
                 "of a compiled function - the expected precision value is 31"));
 
     std::ranges::fill(output2, mppp::real(0, prec));
 
-    cf0(output2, input2, par1, mppp::real(10, prec));
+    cf0(output2, input2, kw::time = mppp::real(10, prec), kw::pars = par1);
 
     REQUIRE(output2[0] == -7);
     REQUIRE(output2[1] == 41);
+
+    // Try a case of a function without time which is provided with a time value
+    // with invalid precision for evaluation.
+    cf0 = cfunc<mppp::real>({x + y, x - y}, {x, y}, kw::prec = prec);
+
+    REQUIRE_THROWS_MATCHES(
+        cf0(output2, input2, kw::time = mppp::real(10, 15)), std::invalid_argument,
+        Message("An mppp::real with an invalid precision of 15 was detected in the arguments to the evaluation "
+                "of a compiled function - the expected precision value is 31"));
 }
 
 #endif
