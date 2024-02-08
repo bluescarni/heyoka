@@ -328,14 +328,14 @@ struct HEYOKA_DLL_PUBLIC null_func : func_base {
 
 HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
 
-HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
-HEYOKA_DLL_PUBLIC bool operator!=(const func &, const func &);
+HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &) noexcept;
+HEYOKA_DLL_PUBLIC bool operator!=(const func &, const func &) noexcept;
 HEYOKA_DLL_PUBLIC bool operator<(const func &, const func &);
 
 class HEYOKA_DLL_PUBLIC func
 {
     friend HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
-    friend HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
+    friend HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &) noexcept;
     friend HEYOKA_DLL_PUBLIC bool operator<(const func &, const func &);
 
 #if defined(__GNUC__)

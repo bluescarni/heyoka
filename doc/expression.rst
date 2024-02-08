@@ -147,6 +147,36 @@ Functions
 Arithmetic operators
 --------------------
 
+The :cpp:class:`expression` class provides overloaded arithmetic binary operators and their in-place variants.
+
+The overloaded binary operators require at least one argument to be an :cpp:class:`expression`, while
+the other argument can be
+either another :cpp:class:`expression` or any floating-point value supported by :cpp:class:`number`.
+
+The overloaded in-place operators require the first argument to be an :cpp:class:`expression`, while
+the second argument can be
+either another :cpp:class:`expression` or any floating-point value supported by :cpp:class:`number`.
+
+Comparisons
+-----------
+
+.. cpp:function:: bool operator==(const expression &e1, const expression &e2) noexcept
+
+.. cpp:function:: bool operator!=(const expression &e1, const expression &e2) noexcept
+
+   Expression (in)equality.
+
+   These operators compare *e1* and *e2* for **structural** equality. That is, two expressions are considered
+   equal if the underlying symbolic trees are identical. It is important to emphasise that while structural
+   equality implies mathematical equivalence, the opposite is not true: it is possible to define
+   structurally-different expressions which are mathematically equivalent, such as
+   :math:`\sin^2\left(x\right)+\cos^2\left(x\right)` and :math:`1`.
+
+   :param e1: the first operand.
+   :param e2: the second operand.
+
+   :return: the result of the comparison.
+
 User-defined literals
 ---------------------
 

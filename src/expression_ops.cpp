@@ -234,7 +234,7 @@ HEYOKA_EX_COMPOUND_OP(/=, mppp::real)
 
 #undef HEYOKA_EX_COMPOUND_OP
 
-bool operator==(const expression &e1, const expression &e2)
+bool operator==(const expression &e1, const expression &e2) noexcept
 {
     auto visitor = [](const auto &v1, const auto &v2) {
         using type1 = detail::uncvref_t<decltype(v1)>;
@@ -250,7 +250,7 @@ bool operator==(const expression &e1, const expression &e2)
     return std::visit(visitor, e1.value(), e2.value());
 }
 
-bool operator!=(const expression &e1, const expression &e2)
+bool operator!=(const expression &e1, const expression &e2) noexcept
 {
     return !(e1 == e2);
 }

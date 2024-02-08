@@ -389,8 +389,8 @@ HEYOKA_DLL_PUBLIC expression &operator/=(expression &, mppp::real128);
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, mppp::real);
 #endif
 
-HEYOKA_DLL_PUBLIC bool operator==(const expression &, const expression &);
-HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &);
+HEYOKA_DLL_PUBLIC bool operator==(const expression &, const expression &) noexcept;
+HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &) noexcept;
 
 HEYOKA_DLL_PUBLIC std::size_t get_n_nodes(const expression &);
 
