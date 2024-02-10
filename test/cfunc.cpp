@@ -96,6 +96,10 @@ TEST_CASE("basic")
         REQUIRE_THROWS_AS(cf0.get_compact_mode(), std::invalid_argument);
         REQUIRE_THROWS_AS(cf0.get_parallel_mode(), std::invalid_argument);
         REQUIRE_THROWS_AS(cf0.get_batch_size(), std::invalid_argument);
+        REQUIRE_THROWS_AS(cf0.get_nparams(), std::invalid_argument);
+        REQUIRE_THROWS_AS(cf0.get_nvars(), std::invalid_argument);
+        REQUIRE_THROWS_AS(cf0.get_nouts(), std::invalid_argument);
+        REQUIRE_THROWS_AS(cf0.is_time_dependent(), std::invalid_argument);
 
         {
             std::ostringstream oss;
@@ -139,6 +143,10 @@ TEST_CASE("basic")
         REQUIRE(cf0.get_compact_mode() == false);
         REQUIRE(cf0.get_parallel_mode() == true);
         REQUIRE(cf0.get_batch_size() == recommended_simd_size<fp_t>());
+        REQUIRE(cf0.get_nparams() == 0u);
+        REQUIRE(cf0.get_nvars() == 2u);
+        REQUIRE(cf0.get_nouts() == 2u);
+        REQUIRE(!cf0.is_time_dependent());
 
         cf0(outputs, inputs);
         REQUIRE(outputs[0] == 3);
@@ -294,6 +302,8 @@ TEST_CASE("single call operator")
         cf0 = cfunc<fp_t>({x + y, x - y + par[0]}, {x, y}, kw::opt_level = opt_level, kw::high_accuracy = high_accuracy,
                           kw::compact_mode = compact_mode);
 
+        REQUIRE(cf0.get_nparams() == 1u);
+
         REQUIRE_THROWS_MATCHES(
             cf0(output2, input2), std::invalid_argument,
             Message("An array of parameter values must be passed in order to evaluate a function with parameters"));
@@ -311,6 +321,8 @@ TEST_CASE("single call operator")
 
         cf0 = cfunc<fp_t>({x + y - heyoka::time, x - y + par[0]}, {x, y}, kw::opt_level = opt_level,
                           kw::high_accuracy = high_accuracy, kw::compact_mode = compact_mode);
+
+        REQUIRE(cf0.is_time_dependent());
 
         REQUIRE_THROWS_MATCHES(cf0(output2, input2, kw::pars = par1), std::invalid_argument,
                                Message("A time value must be provided in order to evaluate a time-dependent function"));
