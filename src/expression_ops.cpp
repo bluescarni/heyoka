@@ -234,6 +234,15 @@ HEYOKA_EX_COMPOUND_OP(/=, mppp::real)
 
 #undef HEYOKA_EX_COMPOUND_OP
 
+// NOTE: clang-tidy here is complaining because in principle std::visit()
+// may throw if one of the variants is empty:
+//
+// https://en.cppreference.com/w/cpp/utility/variant/valueless_by_exception
+//
+// I am not entirely sure whether or not this applies to the expression
+// variant, but anyway this seems to be a corner case that we never
+// experienced. Thus, leave the noexcept and disable the warning.
+// NOLINTNEXTLINE(bugprone-exception-escape)
 bool operator==(const expression &e1, const expression &e2) noexcept
 {
     auto visitor = [](const auto &v1, const auto &v2) {
