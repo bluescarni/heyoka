@@ -673,7 +673,7 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
 {
     check_valid(__func__);
 
-    // Check the input args.
+    // Arguments validation.
     if (outputs.extent(0) != m_impl->m_nouts) [[unlikely]] {
         throw std::invalid_argument(fmt::format("Invalid outputs array passed to a cfunc: the number of function "
                                                 "outputs is {}, but the number of rows in the outputs array is {}",
