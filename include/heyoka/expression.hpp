@@ -906,6 +906,10 @@ public:
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] bool get_parallel_mode() const;
     [[nodiscard]] std::uint32_t get_batch_size() const;
+    [[nodiscard]] std::uint32_t get_nparams() const;
+    [[nodiscard]] std::uint32_t get_nvars() const;
+    [[nodiscard]] std::uint32_t get_nouts() const;
+    [[nodiscard]] bool is_time_dependent() const;
 
 #if defined(HEYOKA_HAVE_REAL)
 

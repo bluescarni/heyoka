@@ -192,7 +192,7 @@ struct cfunc<T>::impl {
 
         // Let's figure out if fn contains params and if it is time-dependent.
         m_nparams = get_param_size(m_fn);
-        m_is_time_dependent = is_time_dependent(m_fn);
+        m_is_time_dependent = heyoka::is_time_dependent(m_fn);
 
         // Cache the number of variables and outputs.
         // NOTE: static casts should also be fine here, because add_cfunc()
@@ -350,6 +350,38 @@ std::uint32_t cfunc<T>::get_batch_size() const
     check_valid(__func__);
 
     return m_impl->m_batch_size;
+}
+
+template <typename T>
+std::uint32_t cfunc<T>::get_nparams() const
+{
+    check_valid(__func__);
+
+    return m_impl->m_nparams;
+}
+
+template <typename T>
+std::uint32_t cfunc<T>::get_nvars() const
+{
+    check_valid(__func__);
+
+    return m_impl->m_nvars;
+}
+
+template <typename T>
+std::uint32_t cfunc<T>::get_nouts() const
+{
+    check_valid(__func__);
+
+    return m_impl->m_nouts;
+}
+
+template <typename T>
+bool cfunc<T>::is_time_dependent() const
+{
+    check_valid(__func__);
+
+    return m_impl->m_is_time_dependent;
 }
 
 #if defined(HEYOKA_HAVE_REAL)
