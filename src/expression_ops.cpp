@@ -259,6 +259,7 @@ bool operator==(const expression &e1, const expression &e2) noexcept
     return std::visit(visitor, e1.value(), e2.value());
 }
 
+// NOLINTNEXTLINE(bugprone-exception-escape)
 bool operator!=(const expression &e1, const expression &e2) noexcept
 {
     return !(e1 == e2);
