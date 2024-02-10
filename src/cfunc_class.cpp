@@ -810,7 +810,9 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
     // it is going to be somewhat expensive due to accessing a thread-safe static global.
     const auto tot_work = (fp_unit_cost / m_impl->m_batch_size) * static_cast<double>(tot_n_flops);
 
-    if (tot_work >= 1e5) {
+    // NOTE: the commonly-quoted figure on the internet is a threshold of 10'000 clock cycles
+    // for parallel work.
+    if (tot_work >= 1e4) {
         multi_eval_mt(outputs, inputs, pars, times);
     } else {
         multi_eval_st(outputs, inputs, pars, times);
