@@ -13,14 +13,18 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <ostream>
 #include <stdexcept>
 #include <tuple>
+#include <typeinfo>
 #include <utility>
 #include <vector>
 
+#include <boost/core/demangle.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/core.h>
+#include <fmt/ranges.h>
 
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/cache_aligned_allocator.h>
@@ -271,6 +275,12 @@ cfunc<T> &cfunc<T>::operator=(cfunc &&) noexcept = default;
 
 template <typename T>
 cfunc<T>::~cfunc() = default;
+
+template <typename T>
+bool cfunc<T>::is_valid() const noexcept
+{
+    return static_cast<bool>(m_impl);
+}
 
 template <typename T>
 const std::vector<expression> &cfunc<T>::get_fn() const
@@ -851,21 +861,53 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
     }
 }
 
+template <typename T>
+std::ostream &operator<<(std::ostream &os, const cfunc<T> &cf)
+{
+    os << fmt::format("C++ datatype: {}\n", boost::core::demangle(typeid(T).name()));
+
+    if (cf.is_valid()) {
+#if defined(HEYOKA_HAVE_REAL)
+
+        if constexpr (std::same_as<T, mppp::real>) {
+            os << fmt::format("Precision: {}\n", cf.get_prec());
+        }
+
+#endif
+
+        os << fmt::format("Variables: {}\n", cf.get_vars());
+
+        for (decltype(cf.get_fn().size()) i = 0; i < cf.get_fn().size(); ++i) {
+            os << fmt::format("Output #{}: {}\n", i, cf.get_fn()[i]);
+        }
+    } else {
+        os << "Default-constructed state.\n";
+    }
+
+    return os;
+}
+
 // Explicit instantiations.
-template class HEYOKA_DLL_PUBLIC cfunc<float>;
-template class HEYOKA_DLL_PUBLIC cfunc<double>;
-template class HEYOKA_DLL_PUBLIC cfunc<long double>;
+#define HEYOKA_CFUNC_CLASS_EXPLICIT_INST(T)                                                                            \
+    template class HEYOKA_DLL_PUBLIC cfunc<T>;                                                                         \
+    template HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const cfunc<T> &);
+
+HEYOKA_CFUNC_CLASS_EXPLICIT_INST(float)
+HEYOKA_CFUNC_CLASS_EXPLICIT_INST(double)
+HEYOKA_CFUNC_CLASS_EXPLICIT_INST(long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template class HEYOKA_DLL_PUBLIC cfunc<mppp::real128>;
+HEYOKA_CFUNC_CLASS_EXPLICIT_INST(mppp::real128)
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-template class HEYOKA_DLL_PUBLIC cfunc<mppp::real>;
+HEYOKA_CFUNC_CLASS_EXPLICIT_INST(mppp::real)
 
 #endif
+
+#undef HEYOKA_CFUNC_CLASS_EXPLICIT_INST
 
 HEYOKA_END_NAMESPACE

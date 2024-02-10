@@ -16,8 +16,9 @@
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
-#include <type_traits>
 #include <vector>
+
+#include <boost/algorithm/string/predicate.hpp>
 
 #include <llvm/Config/llvm-config.h>
 
@@ -96,6 +97,12 @@ TEST_CASE("basic")
         REQUIRE_THROWS_AS(cf0.get_parallel_mode(), std::invalid_argument);
         REQUIRE_THROWS_AS(cf0.get_batch_size(), std::invalid_argument);
 
+        {
+            std::ostringstream oss;
+            oss << cf0;
+            REQUIRE(boost::algorithm::contains(oss.str(), "Default-constructed state"));
+        }
+
         auto cf1 = cf0;
 
         REQUIRE_THROWS_AS(cf1.get_vars(), std::invalid_argument);
@@ -114,6 +121,13 @@ TEST_CASE("basic")
 
         // Main constructor.
         cf0 = cfunc<fp_t>{{x + y, x - y}, {y, x}, kw::parallel_mode = true};
+
+        {
+            std::ostringstream oss;
+            oss << cf0;
+            REQUIRE(boost::algorithm::contains(oss.str(), "Variables:"));
+            REQUIRE(boost::algorithm::contains(oss.str(), "Output #"));
+        }
 
         REQUIRE(cf0.get_fn() == std::vector{x + y, x - y});
         REQUIRE(cf0.get_vars() == std::vector{y, x});
@@ -412,6 +426,14 @@ TEST_CASE("basic mp")
     auto cf0 = cfunc<mppp::real>{{x + y, x - y}, {y, x}, kw::prec = 31};
 
     REQUIRE(cf0.get_prec() == 31);
+
+    {
+        std::ostringstream oss;
+        oss << cf0;
+        REQUIRE(boost::algorithm::contains(oss.str(), "Variables:"));
+        REQUIRE(boost::algorithm::contains(oss.str(), "Output #"));
+        REQUIRE(boost::algorithm::contains(oss.str(), "Precision: 31"));
+    }
 
     const std::array<mppp::real, 2> inputs = {mppp::real{1, 31}, mppp::real{2, 31}};
     std::array<mppp::real, 2> outputs{mppp::real{0, 31}, mppp::real{0, 31}};

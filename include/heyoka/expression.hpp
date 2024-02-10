@@ -896,6 +896,7 @@ public:
     ~cfunc();
 
     // Properties getters.
+    [[nodiscard]] bool is_valid() const noexcept;
     [[nodiscard]] const std::vector<expression> &get_fn() const;
     [[nodiscard]] const std::vector<expression> &get_vars() const;
     [[nodiscard]] const std::vector<expression> &get_dc() const;
@@ -1032,22 +1033,31 @@ public:
     }
 };
 
+template <typename T>
+std::ostream &operator<<(std::ostream &, const cfunc<T> &);
+
 // Prevent implicit instantiations.
-extern template class cfunc<float>;
-extern template class cfunc<double>;
-extern template class cfunc<long double>;
+#define HEYOKA_CFUNC_CLASS_EXTERN_INST(T)                                                                              \
+    extern template class cfunc<T>;                                                                                    \
+    extern template std::ostream &operator<<(std::ostream &, const cfunc<T> &);
+
+HEYOKA_CFUNC_CLASS_EXTERN_INST(float)
+HEYOKA_CFUNC_CLASS_EXTERN_INST(double)
+HEYOKA_CFUNC_CLASS_EXTERN_INST(long double)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-extern template class cfunc<mppp::real128>;
+HEYOKA_CFUNC_CLASS_EXTERN_INST(mppp::real128)
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-extern template class cfunc<mppp::real>;
+HEYOKA_CFUNC_CLASS_EXTERN_INST(mppp::real)
 
 #endif
+
+#undef HEYOKA_CFUNC_CLASS_EXTERN_INST
 
 HEYOKA_END_NAMESPACE
 
