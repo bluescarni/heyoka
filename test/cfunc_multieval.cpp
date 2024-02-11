@@ -300,13 +300,16 @@ TEST_CASE("multieval mt double")
     auto tspan = cfunc<double>::in_1d{tbuf.data(), nevals};
 
     for (auto cm : {false, true}) {
-        auto cf0 = cfunc<double>{{x + y + par[0], x - y + heyoka::time}, {x, y}, kw::compact_mode = cm};
+        for (auto batch_size : {0, 2, 4}) {
+            auto cf0 = cfunc<double>{
+                {x + y + par[0], x - y + heyoka::time}, {x, y}, kw::compact_mode = cm, kw::batch_size = batch_size};
 
-        cf0(ospan, ispan, kw::pars = pspan, kw::time = tspan);
+            cf0(ospan, ispan, kw::pars = pspan, kw::time = tspan);
 
-        for (std::size_t j = 0; j < ospan.extent(1); ++j) {
-            REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));
-            REQUIRE(ospan(1, j) == approximately(ispan(0, j) - ispan(1, j) + tspan[j]));
+            for (std::size_t j = 0; j < ospan.extent(1); ++j) {
+                REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));
+                REQUIRE(ospan(1, j) == approximately(ispan(0, j) - ispan(1, j) + tspan[j]));
+            }
         }
     }
 }
