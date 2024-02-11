@@ -89,6 +89,14 @@ TEST_CASE("multieval st")
         // Check with zero nevals.
         REQUIRE_NOTHROW(cf0(out_2d{obuf.data(), 2, 0}, in_2d{ibuf.data(), 2, 0}));
 
+        // Check no error on zero nevals with null outputs span.
+        REQUIRE_NOTHROW(cf0(out_2d{nullptr, 2, 0}, in_2d{ibuf.data(), 2, 0}));
+
+        // Check error with null outputs span and nonzero evals.
+        REQUIRE_THROWS_MATCHES(
+            cf0(out_2d{nullptr, 2, 10}, in_2d{ibuf.data(), 0, 0}), std::invalid_argument,
+            Message("The outputs array passed to a cfunc can be null only if the number of evaluations is zero"));
+
         obuf.resize(20u);
 
         REQUIRE_THROWS_MATCHES(cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 0, 0}), std::invalid_argument,
@@ -104,6 +112,11 @@ TEST_CASE("multieval st")
             cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 5}), std::invalid_argument,
             Message("Invalid inputs array passed to a cfunc: the expected number of columns deduced from the "
                     "outputs array is 10, but the number of columns in the inputs array is 5"));
+
+        // Null input span.
+        REQUIRE_THROWS_MATCHES(cf0(out_2d{obuf.data(), 2, 10}, in_2d{nullptr, 2, 10}), std::invalid_argument,
+                               Message("The inputs array passed to a cfunc can be null only if the number of input "
+                                       "arguments or the number of evaluations is zero"));
 
         cf0 = cfunc<fp_t>{{x + y + par[0], x - y + heyoka::time},
                           {x, y},
@@ -154,6 +167,20 @@ TEST_CASE("multieval st")
                                        "but the expected size deduced from the "
                                        "outputs array is 10"));
 
+        // Null par span.
+        REQUIRE_THROWS_MATCHES(cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10},
+                                   kw::pars = in_2d{nullptr, 1, 10}, kw::time = in_1d{tbuf.data(), 5}),
+                               std::invalid_argument,
+                               Message("The array of parameter values passed to a cfunc can be null only if the "
+                                       "number of parameters or the number of evaluations is zero"));
+
+        // Null time span.
+        REQUIRE_THROWS_MATCHES(cf0(out_2d{obuf.data(), 2, 10}, in_2d{ibuf.data(), 2, 10},
+                                   kw::pars = in_2d{pbuf.data(), 1, 10}, kw::time = in_1d{nullptr, 10}),
+                               std::invalid_argument,
+                               Message("The array of time values passed to a cfunc can be null only if the "
+                                       "number of evaluations is zero"));
+
         // Functional testing.
         cf0 = cfunc<fp_t>{{x + y, x - y},
                           {x, y},
@@ -180,6 +207,7 @@ TEST_CASE("multieval st")
         }
 
         // Try also with empty par span.
+        std::ranges::fill(obuf, fp_t(0));
         cf0(ospan, ispan, kw::pars = in_2d{nullptr, 0, 10});
 
         for (std::size_t j = 0; j < ospan.extent(1); ++j) {
@@ -218,6 +246,10 @@ TEST_CASE("multieval st")
             REQUIRE(ospan(0, j) == approximately(ispan(0, j) + ispan(1, j) + pspan(0, j)));
             REQUIRE(ospan(1, j) == approximately(ispan(0, j) - ispan(1, j) + tspan[j]));
         }
+
+        // Try all null spans, zero nevals.
+        REQUIRE_NOTHROW(cf0(out_2d{nullptr, 2, 0}, in_2d{nullptr, 2, 0}, kw::pars = in_2d{nullptr, 1, 0},
+                            kw::time = in_1d{nullptr, 0}));
 
         // Try function with no inputs.
         cf0 = cfunc<fp_t>({par[0], 2_dbl - heyoka::time}, {}, kw::opt_level = opt_level,
