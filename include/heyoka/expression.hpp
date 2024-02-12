@@ -882,7 +882,7 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
     HEYOKA_DLL_LOCAL void check_valid(const char *) const;
 
 public:
-    cfunc();
+    cfunc() noexcept;
     template <typename... KwArgs>
         requires(!igor::has_unnamed_arguments<KwArgs...>())
     explicit cfunc(std::vector<expression> fn, std::vector<expression> vars, const KwArgs &...kw_args)
@@ -1060,6 +1060,17 @@ HEYOKA_CFUNC_CLASS_EXTERN_INST(mppp::real)
 #undef HEYOKA_CFUNC_CLASS_EXTERN_INST
 
 HEYOKA_END_NAMESPACE
+
+// fmt formatter for cfunc, implemented
+// on top of the streaming operator.
+namespace fmt
+{
+
+template <typename T>
+struct formatter<heyoka::cfunc<T>> : fmt::ostream_formatter {
+};
+
+} // namespace fmt
 
 namespace std
 {

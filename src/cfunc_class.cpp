@@ -228,7 +228,7 @@ struct cfunc<T>::impl {
 };
 
 template <typename T>
-cfunc<T>::cfunc() = default;
+cfunc<T>::cfunc() noexcept = default;
 
 template <typename T>
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)

@@ -13,3 +13,4 @@ The following subsections contain the detailed documentation of all of heyoka's 
    kwargs.rst
    exceptions.rst
    expression_system.rst
+   cfunc.rst
