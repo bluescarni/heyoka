@@ -3,7 +3,7 @@
 Compiled functions
 ==================
 
-heyoka can compile just-in-time multivariate vector functions defined
+heyoka can compile just-in-time (JIT) multivariate vector functions defined
 via the :ref:`expression system <tut_expression_system>`. This feature
 is described and explored in detail in a
 :ref:`dedicated tutorial <hypy:cfunc_tut>` for heyoka.py, the
@@ -20,12 +20,13 @@ Nevertheless, even in C++ heyoka's compiled functions offer
 a few advantages over plain C++ functions:
 
 - because functions are compiled just-in-time, they
-  take advantage of all the features of the
+  can take advantage of all the features of the
   host CPU. Most importantly, heyoka's compiled functions
-  support a batch evaluation mode which takes full advantage
-  of `SIMD instructions <https://en.wikipedia.org/wiki/Single_instruction,_multiple_data>`__;
+  support batch evaluation via `SIMD instructions <https://en.wikipedia.org/wiki/Single_instruction,_multiple_data>`__
+  which can provide a multifold speed boost over
+  plain (scalar) C++ functions;
 - batch mode evaluation of compiled functions also supports
-  multithreaded parallelisation, which can provide a substantial
+  multithreaded parallelisation, which can provide another substantial
   performance boost on modern multicore machines;
 - heyoka's functions support automatic differentiation up to
   arbitrary order, thus it is possible to evaluate the derivatives
@@ -36,7 +37,7 @@ a few advantages over plain C++ functions:
   function at runtime from user-supplied data (e.g., a configuration
   file) and evaluate it with optimal performance.
 
-The main downside of compiled functions is that the 
+The main downside of compiled functions is that the
 compilation process is computationally expensive and thus
 just-in-time compilation is most useful when a function needs to
 be evaluated repeatedly with different input values (so that the
@@ -66,3 +67,57 @@ Next, we create a compiled function via the
 .. literalinclude:: ../tutorial/compiled_functions.cpp
    :language: c++
    :lines: 25-26
+
+Note how ``sym_func`` was passed to the constructor of
+:cpp:class:`~heyoka::cfunc` enclosed in curly brackets:
+this is because in general :cpp:class:`~heyoka::cfunc` expects
+in input a vector function - that is, a list of expressions
+representing the function components.
+In this specific case, we are compiling a vector function with
+only one component.
+
+Like many other heyoka classes, :cpp:class:`~heyoka::cfunc` is
+a class template parametrised over a single type ``T`` representing
+the floating-point type to be used for function evaluation. In this
+case, we are operating in standard ``double`` precision.
+
+Let us inspect the compiled function object by printing
+it to screen:
+
+.. literalinclude:: ../tutorial/compiled_functions.cpp
+   :language: c++
+   :lines: 28-29
+
+.. code-block:: console
+
+   C++ datatype: double
+   Variables: [x, y]
+   Output #0: (x**2.0000000000000000 - y**2.0000000000000000)
+
+We can now proceed to evaluate the compiled function. In order to do
+so, we need to store the input values in a memory buffer and prepare
+a memory buffer to store the result of the evaluation. We can use for
+both ``std::array``:
+
+.. literalinclude:: ../tutorial/compiled_functions.cpp
+   :language: c++
+   :lines: 31-33
+
+We can now proceed to invoke the call operator
+of :cpp:class:`~heyoka::cfunc`, which will write the result of the
+evaluation into ``out``:
+
+.. literalinclude:: ../tutorial/compiled_functions.cpp
+   :language: c++
+   :lines: 35-36
+
+Let us print ``out`` to screen in order to confirm that the evaluation
+was successful:
+
+.. literalinclude:: ../tutorial/compiled_functions.cpp
+   :language: c++
+   :lines: 38-39
+
+.. code-block:: console
+
+   Output: [-3]

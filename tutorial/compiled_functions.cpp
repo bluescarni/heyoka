@@ -36,5 +36,5 @@ int main()
     cf(out, in);
 
     // Print the output.
-    fmt::println("{}", out);
+    fmt::println("Output: {}", out);
 }
