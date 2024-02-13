@@ -14,7 +14,6 @@
 #include <cstddef>
 
 #define MDSPAN_USE_PAREN_OPERATOR 1
-#define MDSPAN_USE_BRACKET_OPERATOR 0
 
 #if defined(__GNUC__)
 
@@ -32,7 +31,6 @@
 #endif
 
 #undef MDSPAN_USE_PAREN_OPERATOR
-#undef MDSPAN_USE_BRACKET_OPERATOR
 
 HEYOKA_BEGIN_NAMESPACE
 
