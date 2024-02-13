@@ -12,5 +12,6 @@ The following subsections contain the detailed documentation of all of heyoka's 
    namespaces.rst
    kwargs.rst
    exceptions.rst
+   mdspan.rst
    expression_system.rst
    cfunc.rst

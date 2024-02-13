@@ -3,6 +3,8 @@
 Compiled functions
 ==================
 
+.. cpp:namespace-push:: heyoka
+
 heyoka can compile just-in-time (JIT) multivariate vector functions defined
 via the :ref:`expression system <tut_expression_system>`. This feature
 is described and explored in detail in a
@@ -22,7 +24,8 @@ a few advantages over plain C++ functions:
 - because functions are compiled just-in-time, they
   can take advantage of all the features of the
   host CPU. Most importantly, heyoka's compiled functions
-  support batch evaluation via `SIMD instructions <https://en.wikipedia.org/wiki/Single_instruction,_multiple_data>`__
+  support :ref:`batch evaluation <tut_cfunc_batch>`
+  via `SIMD instructions <https://en.wikipedia.org/wiki/Single_instruction,_multiple_data>`__
   which can provide a multifold speed boost over
   plain (scalar) C++ functions;
 - batch mode evaluation of compiled functions also supports
@@ -62,21 +65,21 @@ variables and of the symbolic function to be compiled:
    :lines: 19-23
 
 Next, we create a compiled function via the
-:cpp:class:`~heyoka::cfunc` class:
+:cpp:class:`cfunc` class:
 
 .. literalinclude:: ../tutorial/compiled_functions.cpp
    :language: c++
    :lines: 25-26
 
 Note how ``sym_func`` was passed to the constructor of
-:cpp:class:`~heyoka::cfunc` enclosed in curly brackets:
-this is because in general :cpp:class:`~heyoka::cfunc` expects
+:cpp:class:`cfunc` enclosed in curly brackets:
+this is because in general :cpp:class:`cfunc` expects
 in input a vector function - that is, a list of expressions
 representing the function components.
 In this specific case, we are compiling a vector function with
 only one component.
 
-Like many other heyoka classes, :cpp:class:`~heyoka::cfunc` is
+Like many other heyoka classes, :cpp:class:`cfunc` is
 a class template parametrised over a single type ``T`` representing
 the floating-point type to be used for function evaluation. In this
 case, we are operating in standard ``double`` precision.
@@ -103,8 +106,11 @@ both ``std::array``:
    :language: c++
    :lines: 31-33
 
+We stored the values :math:`1` and :math:`2` in the input buffer, which
+means that the function will be evaluated for :math:`x=1` and :math:`y=2`.
+
 We can now proceed to invoke the call operator
-of :cpp:class:`~heyoka::cfunc`, which will write the result of the
+of :cpp:class:`cfunc`, which will write the result of the
 evaluation into ``out``:
 
 .. literalinclude:: ../tutorial/compiled_functions.cpp
@@ -121,3 +127,62 @@ was successful:
 .. code-block:: console
 
    Output: [-3]
+
+.. _tut_cfunc_batch:
+
+Batch evaluation
+----------------
+
+The simple example we have just seen consisted of the evaluation of a function
+over a single value for each variable. :cpp:class:`cfunc` also supports
+evaluation of a function over batches of input values for each variable.
+
+In order to perform batch evaluation, we first have to define new
+memory buffers to store the inputs and outputs of the evaluation.
+We select a batch size of :math:`2`, which means we need storage for
+:math:`2 \times 2 = 4` input values and :math:`2` output values:
+
+.. literalinclude:: ../tutorial/compiled_functions.cpp
+   :language: c++
+   :lines: 41-43
+
+In batch evaluations, input values for a single batch are expected to be stored
+contiguously. That is, the input buffer will be interpreted as a row-major
+bidimensional array in which each row contains the batch of input values for
+a single variable. In this specific example, we will be evaluating the function
+for :math:`x=\left[ 1, 1.1 \right]` and :math:`y=\left[ 2, 2.2 \right]`.
+
+In the next step, we create bidimensional views over the input/output buffers
+with the help of :cpp:type:`mdspan` and the convenience typedefs
+:cpp:type:`cfunc::in_2d` and :cpp:type:`cfunc::out_2d`:
+
+.. literalinclude:: ../tutorial/compiled_functions.cpp
+   :language: c++
+   :lines: 45-47
+
+As we just explained, the input data is interpreted as a :math:`2 \times 2` array while
+the input data is interpreted as a :math:`1 \times 2` array.
+
+We are now ready to perform a batch evaluation:
+
+.. literalinclude:: ../tutorial/compiled_functions.cpp
+   :language: c++
+   :lines: 49-50
+
+Finally, we can print to screen the result of the evaluation:
+
+.. literalinclude:: ../tutorial/compiled_functions.cpp
+   :language: c++
+   :lines: 52-53
+
+.. code-block:: console
+
+   Output: [-3, -3.6300000000000003]
+
+For this simple example, we used a batch size of :math:`2`, but arbitrarily
+large batch sizes are possible. If the batch size is large enough, heyoka
+will parallelise the computation using multiple threads of execution, leading
+to substantial speedups on multicore machines.
+
+While in this tutorial we operated in standard ``double`` precision for simplicity,
+compiled functions can also operate in single, extended, quadruple and multiple precision.

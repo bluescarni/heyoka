@@ -14,8 +14,25 @@ The :cpp:class:`cfunc` class
 
    This class allows to compile just-in-time symbolic functions
    defined via the :ref:`expression system <tut_expression_system>`.
+   The type :cpp:type:`T` is the floating-point type which will be
+   used for the numerical evaluation of the function.
+
    A :ref:`tutorial <tut_cfunc>` showcasing the use of this
    class is available.
+
+   .. cpp:type:: in_1d = mdspan<const T, dextents<std::size_t, 1>>
+
+   .. cpp:type:: out_1d = mdspan<T, dextents<std::size_t, 1>>
+
+   .. cpp:type:: in_2d = mdspan<const T, dextents<std::size_t, 2>>
+
+   .. cpp:type:: out_2d = mdspan<T, dextents<std::size_t, 2>>
+
+      Views over 1D and 2D input/output arrays.
+
+      These are convenience typedefs for dynamically-sized
+      1D and 2D array views. They are used as input and output
+      arguments in the call operators.
 
    .. cpp:function:: cfunc() noexcept
 

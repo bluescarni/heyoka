@@ -37,4 +37,18 @@ int main()
 
     // Print the output.
     fmt::println("Output: {}", out);
+
+    // Prepare input-output buffers for batch evaluation.
+    std::array<double, 4> in_batch{1, 1.1, 2, 2.2};
+    std::array<double, 2> out_batch{};
+
+    // Prepare the views onto the input-output buffers.
+    cfunc<double>::in_2d in_view{in_batch.data(), 2, 2};
+    cfunc<double>::out_2d out_view{out_batch.data(), 1, 2};
+
+    // Invoke the compiled function.
+    cf(out_view, in_view);
+
+    // Print the output.
+    fmt::println("Output: {}", out_batch);
 }
