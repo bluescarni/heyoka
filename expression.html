@@ -40,6 +40,7 @@
     <script src="_static/doctools.js?v=888ff710"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'expression';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -172,6 +173,7 @@
 <li class="toctree-l2"><a class="reference internal" href="tut_s11n.html">Serialisation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_ensemble.html">Ensemble propagations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_parallel_mode.html">Parallel mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_cfunc.html">Compiled functions</a></li>
 </ul>
 </li>
 <li class="toctree-l1 current active has-children"><a class="reference internal" href="api_reference.html">API Reference</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-3"><i class="fa-solid fa-chevron-down"></i></label><ul class="current">
@@ -179,6 +181,7 @@
 <li class="toctree-l2"><a class="reference internal" href="namespaces.html">Namespaces</a></li>
 <li class="toctree-l2"><a class="reference internal" href="kwargs.html">Keyword arguments</a></li>
 <li class="toctree-l2"><a class="reference internal" href="exceptions.html">Exceptions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mdspan.html">mdspan</a></li>
 <li class="toctree-l2 current active has-children"><a class="reference internal" href="expression_system.html">Expression system</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-4"><i class="fa-solid fa-chevron-down"></i></label><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="variable.html">Variables</a></li>
 <li class="toctree-l3"><a class="reference internal" href="number.html">Numerical constants</a></li>
@@ -188,6 +191,7 @@
 <li class="toctree-l3"><a class="reference internal" href="math.html">Mathematical functions</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="cfunc.html">Compiled functions</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a></li>
@@ -420,7 +424,15 @@ document.write(`
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args"><code class="docutils literal notranslate"><span class="pre">make_vars()</span></code></a></li>
 </ul>
 </li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#arithmetic-operators">Arithmetic operators</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#operators">Operators</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#arithmetic-operators">Arithmetic operators</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#comparison-operators">Comparison operators</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyokaeqERK10expressionRK10expression"><code class="docutils literal notranslate"><span class="pre">operator==()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyokaneERK10expressionRK10expression"><code class="docutils literal notranslate"><span class="pre">operator!=()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#user-defined-literals">User-defined literals</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_fltEe"><code class="docutils literal notranslate"><span class="pre">operator""_flt()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_fltEy"><code class="docutils literal notranslate"><span class="pre">operator""_flt()</span></code></a></li>
@@ -462,7 +474,7 @@ It is a union of several types:</p>
 <p>Because expressions are essentially <a class="reference external" href="https://en.wikipedia.org/wiki/Tree_(data_structure)">trees</a>,
 we refer to these types as the <em>node types</em> of an expression.</p>
 <p>Expressions can be created in a variety of ways. After creation, expressions
-can be combined via <a class="reference internal" href="#api-ex-arith-ops"><span class="std std-ref">arithmetic operators</span></a> and <a class="reference internal" href="math.html#api-math"><span class="std std-ref">mathematical functions</span></a>
+can be combined via <a class="reference internal" href="#api-ex-ops"><span class="std std-ref">arithmetic operators</span></a> and <a class="reference internal" href="math.html#api-math"><span class="std std-ref">mathematical functions</span></a>
 to form new expressions of arbitrary complexity.</p>
 <p>Expressions which consist of a single <a class="reference internal" href="variable.html#api-variable"><span class="std std-ref">variable</span></a> or a single
 <a class="reference internal" href="number.html#api-number"><span class="std std-ref">constant</span></a>/<a class="reference internal" href="param.html#api-param"><span class="std std-ref">parameter</span></a> are referred to as
@@ -646,8 +658,48 @@ expressions (one for each argument) is returned.</p>
 </dd></dl>
 
 </section>
+<section id="operators">
+<span id="api-ex-ops"></span><h2>Operators<a class="headerlink" href="#operators" title="Link to this heading">#</a></h2>
 <section id="arithmetic-operators">
-<span id="api-ex-arith-ops"></span><h2>Arithmetic operators<a class="headerlink" href="#arithmetic-operators" title="Link to this heading">#</a></h2>
+<h3>Arithmetic operators<a class="headerlink" href="#arithmetic-operators" title="Link to this heading">#</a></h3>
+<p>The <a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">expression</span></code></a> class provides overloaded arithmetic binary operators and their in-place variants.</p>
+<p>The overloaded binary operators require at least one argument to be an <a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">expression</span></code></a>, while
+the other argument can be
+either another <a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">expression</span></code></a> or any floating-point value supported by <a class="reference internal" href="number.html#_CPPv4N6heyoka6numberE" title="heyoka::number"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">number</span></code></a>.</p>
+<p>The overloaded in-place operators require the first argument to be an <a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">expression</span></code></a>, while
+the second argument can be
+either another <a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">expression</span></code></a> or any floating-point value supported by <a class="reference internal" href="number.html#_CPPv4N6heyoka6numberE" title="heyoka::number"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">number</span></code></a>.</p>
+</section>
+<section id="comparison-operators">
+<h3>Comparison operators<a class="headerlink" href="#comparison-operators" title="Link to this heading">#</a></h3>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyokaeqERK10expressionRK10expression">
+<span id="_CPPv3N6heyokaeqERK10expressionRK10expression"></span><span id="_CPPv2N6heyokaeqERK10expressionRK10expression"></span><span id="heyoka::eq-operator__expressionCR.expressionCR"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">==</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><span class="n"><span class="pre">expression</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">e1</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><span class="n"><span class="pre">expression</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">e2</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyokaeqERK10expressionRK10expression" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N6heyokaneERK10expressionRK10expression">
+<span id="_CPPv3N6heyokaneERK10expressionRK10expression"></span><span id="_CPPv2N6heyokaneERK10expressionRK10expression"></span><span id="heyoka::neq-operator__expressionCR.expressionCR"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="k"><span class="pre">operator</span></span><span class="o"><span class="pre">!=</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><span class="n"><span class="pre">expression</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">e1</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N6heyoka10expressionE" title="heyoka::expression"><span class="n"><span class="pre">expression</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">e2</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><a class="headerlink" href="#_CPPv4N6heyokaneERK10expressionRK10expression" title="Link to this definition">#</a><br /></dt>
+<dd><p>Expression (in)equality.</p>
+<p>These operators compare <em>e1</em> and <em>e2</em> for <strong>structural</strong> equality. That is, two expressions are considered
+equal if the underlying symbolic trees are identical. It is important to emphasise that while structural
+equality implies mathematical equivalence, the opposite is not true: it is possible to define
+structurally-different expressions which are mathematically equivalent, such as
+<span class="math notranslate nohighlight">\(\sin^2\left(x\right)+\cos^2\left(x\right)\)</span> and <span class="math notranslate nohighlight">\(1\)</span>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>e1</strong> – the first operand.</p></li>
+<li><p><strong>e2</strong> – the second operand.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>the result of the comparison.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
 </section>
 <section id="user-defined-literals">
 <h2>User-defined literals<a class="headerlink" href="#user-defined-literals" title="Link to this heading">#</a></h2>
@@ -762,7 +814,15 @@ expressions (one for each argument) is returned.</p>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I0DpEN6heyoka9make_varsEDaRK4Arg0DpRK4Args"><code class="docutils literal notranslate"><span class="pre">make_vars()</span></code></a></li>
 </ul>
 </li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#arithmetic-operators">Arithmetic operators</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#operators">Operators</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#arithmetic-operators">Arithmetic operators</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#comparison-operators">Comparison operators</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyokaeqERK10expressionRK10expression"><code class="docutils literal notranslate"><span class="pre">operator==()</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyokaneERK10expressionRK10expression"><code class="docutils literal notranslate"><span class="pre">operator!=()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#user-defined-literals">User-defined literals</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_fltEe"><code class="docutils literal notranslate"><span class="pre">operator""_flt()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N6heyoka8literalsli4_fltEy"><code class="docutils literal notranslate"><span class="pre">operator""_flt()</span></code></a></li>

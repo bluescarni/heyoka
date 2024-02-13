@@ -7,6 +7,12 @@ Changelog
 New
 ~~~
 
+- New :ref:`tutorial <tut_cfunc>` on compiled functions
+  (`#396 <https://github.com/bluescarni/heyoka/pull/396>`__).
+- New :cpp:class:`~heyoka::cfunc` class to facilitate
+  the creation and evaluation of compiled functions, supporting
+  automatic multithreaded parallelisation
+  (`#396 <https://github.com/bluescarni/heyoka/pull/396>`__).
 - It is now possible to index into the tensors of derivatives
   using indices vectors in sparse format
   (`#389 <https://github.com/bluescarni/heyoka/pull/389>`__).

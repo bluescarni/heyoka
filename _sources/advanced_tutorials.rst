@@ -31,3 +31,4 @@ the tutorials should not be hard to follow.
   tut_s11n
   tut_ensemble
   tut_parallel_mode
+  tut_cfunc

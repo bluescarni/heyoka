@@ -44,7 +44,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Macros and definitions" href="definitions.html" />
-    <link rel="prev" title="Parallel mode" href="tut_parallel_mode.html" />
+    <link rel="prev" title="Compiled functions" href="tut_cfunc.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -172,6 +172,7 @@
 <li class="toctree-l2"><a class="reference internal" href="tut_s11n.html">Serialisation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_ensemble.html">Ensemble propagations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_parallel_mode.html">Parallel mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_cfunc.html">Compiled functions</a></li>
 </ul>
 </li>
 <li class="toctree-l1 current active has-children"><a class="current reference internal" href="#">API Reference</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-3"><i class="fa-solid fa-chevron-down"></i></label><ul>
@@ -179,6 +180,7 @@
 <li class="toctree-l2"><a class="reference internal" href="namespaces.html">Namespaces</a></li>
 <li class="toctree-l2"><a class="reference internal" href="kwargs.html">Keyword arguments</a></li>
 <li class="toctree-l2"><a class="reference internal" href="exceptions.html">Exceptions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mdspan.html">mdspan</a></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="expression_system.html">Expression system</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-4"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="variable.html">Variables</a></li>
 <li class="toctree-l3"><a class="reference internal" href="number.html">Numerical constants</a></li>
@@ -188,6 +190,7 @@
 <li class="toctree-l3"><a class="reference internal" href="math.html">Mathematical functions</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="cfunc.html">Compiled functions</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a></li>
@@ -406,6 +409,12 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="exceptions.html#_CPPv4N6heyoka21not_implemented_errorE"><code class="docutils literal notranslate"><span class="pre">not_implemented_error</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="mdspan.html">mdspan</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="mdspan.html#_CPPv4I0000EN6heyoka6mdspanE"><code class="docutils literal notranslate"><span class="pre">mdspan</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="mdspan.html#_CPPv4I0_DpNSt6size_tEEN6heyoka7extentsE"><code class="docutils literal notranslate"><span class="pre">extents</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="mdspan.html#_CPPv4I0_NSt6size_tEEN6heyoka8dextentsE"><code class="docutils literal notranslate"><span class="pre">dextents</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="expression_system.html">Expression system</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="variable.html">Variables</a></li>
 <li class="toctree-l2"><a class="reference internal" href="number.html">Numerical constants</a></li>
@@ -413,6 +422,10 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="func.html">N-ary functions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="expression.html">Expressions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="math.html">Mathematical functions</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cfunc.html">Compiled functions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cfunc.html#the-cfunc-class">The <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">cfunc</span></code> class</a></li>
 </ul>
 </li>
 </ul>
@@ -431,12 +444,12 @@ document.write(`
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="tut_parallel_mode.html"
+       href="tut_cfunc.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Parallel mode</p>
+        <p class="prev-next-title">Compiled functions</p>
       </div>
     </a>
     <a class="right-next"

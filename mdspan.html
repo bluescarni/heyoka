@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Basic tutorials &#8212; heyoka 4.0.0 documentation</title>
+    <title>mdspan &#8212; heyoka 4.0.0 documentation</title>
   
   
   
@@ -40,11 +40,11 @@
     <script src="_static/doctools.js?v=888ff710"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'basic_tutorials';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'mdspan';</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Taylor’s method" href="tut_taylor_method.html" />
-    <link rel="prev" title="Installation" href="install.html" />
+    <link rel="next" title="Expression system" href="expression_system.html" />
+    <link rel="prev" title="Exceptions" href="exceptions.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -153,7 +153,7 @@
     <div class="bd-toc-item navbar-nav active">
         <ul class="current nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
-<li class="toctree-l1 current active has-children"><a class="current reference internal" href="#">Basic tutorials</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-1"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="basic_tutorials.html">Basic tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-1"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="tut_taylor_method.html">Taylor’s method</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_expression_system.html">The expression system</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_adaptive.html">The adaptive integrator</a></li>
@@ -175,12 +175,12 @@
 <li class="toctree-l2"><a class="reference internal" href="tut_cfunc.html">Compiled functions</a></li>
 </ul>
 </li>
-<li class="toctree-l1 has-children"><a class="reference internal" href="api_reference.html">API Reference</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-3"><i class="fa-solid fa-chevron-down"></i></label><ul>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="api_reference.html">API Reference</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-3"><i class="fa-solid fa-chevron-down"></i></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="definitions.html">Macros and definitions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="namespaces.html">Namespaces</a></li>
 <li class="toctree-l2"><a class="reference internal" href="kwargs.html">Keyword arguments</a></li>
 <li class="toctree-l2"><a class="reference internal" href="exceptions.html">Exceptions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="mdspan.html">mdspan</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">mdspan</a></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="expression_system.html">Expression system</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-4"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="variable.html">Variables</a></li>
 <li class="toctree-l3"><a class="reference internal" href="number.html">Numerical constants</a></li>
@@ -271,7 +271,7 @@
       
       
       
-      <li><a href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fbasic_tutorials.html&body=Your%20issue%20content%20here." target="_blank"
+      <li><a href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fmdspan.html&body=Your%20issue%20content%20here." target="_blank"
    class="btn btn-sm btn-source-issues-button dropdown-item"
    title="Open an issue"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -301,7 +301,7 @@
       
       
       
-      <li><a href="_sources/basic_tutorials.rst" target="_blank"
+      <li><a href="_sources/mdspan.rst" target="_blank"
    class="btn btn-sm btn-download-source-button dropdown-item"
    title="Download source file"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -372,7 +372,9 @@ document.write(`
   </button>
 `);
 </script>
-
+<label class="sidebar-toggle secondary-toggle btn btn-sm" for="__secondary"title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</label>
 </div></div>
       
     </div>
@@ -383,11 +385,21 @@ document.write(`
               
 
 <div id="jb-print-docs-body" class="onlyprint">
-    <h1>Basic tutorials</h1>
+    <h1>mdspan</h1>
     <!-- Table of contents -->
     <div id="print-main-content">
         <div id="jb-print-toc">
             
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I0000EN6heyoka6mdspanE"><code class="docutils literal notranslate"><span class="pre">mdspan</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I0_DpNSt6size_tEEN6heyoka7extentsE"><code class="docutils literal notranslate"><span class="pre">extents</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I0_NSt6size_tEEN6heyoka8dextentsE"><code class="docutils literal notranslate"><span class="pre">dextents</span></code></a></li>
+</ul>
+            </nav>
         </div>
     </div>
 </div>
@@ -397,37 +409,35 @@ document.write(`
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="basic-tutorials">
-<span id="id1"></span><h1>Basic tutorials<a class="headerlink" href="#basic-tutorials" title="Link to this heading">#</a></h1>
-<div class="admonition important">
-<p class="admonition-title">Important</p>
-<p>More tutorials and examples are available in the documentation
-of heyoka’s <a class="reference external" href="https://bluescarni.github.io/heyoka.py">Python bindings</a>.</p>
-</div>
-<p>The code snippets in these tutorials assume the inclusion of the
-global header <code class="docutils literal notranslate"><span class="pre">heyoka/heyoka.hpp</span></code>, and the use of</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">heyoka</span><span class="p">;</span>
-<span class="k">namespace</span><span class="w"> </span><span class="nn">hy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nn">heyoka</span><span class="p">;</span>
-</pre></div>
-</div>
-<p>to import all names from the <code class="docutils literal notranslate"><span class="pre">heyoka</span></code> namespace, and to provide
-a handy shortcut <code class="docutils literal notranslate"><span class="pre">hy</span></code> to the <code class="docutils literal notranslate"><span class="pre">heyoka</span></code> namespace.</p>
-<p>The tutorials’ code is available in the <code class="docutils literal notranslate"><span class="pre">tutorials/</span></code> subdirectory
-of the source tree. The tutorials can be compiled by enabling the
-<code class="docutils literal notranslate"><span class="pre">HEYOKA_BUILD_TUTORIALS</span></code> option when
-<a class="reference internal" href="install.html#installation-from-source"><span class="std std-ref">compiling from source</span></a>.</p>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="tut_taylor_method.html">Taylor’s method</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_expression_system.html">The expression system</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_adaptive.html">The adaptive integrator</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_adaptive_custom.html">Customising the adaptive integrator</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_param.html">Runtime parameters</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_nonauto.html">Non-autonomous systems</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_d_output.html">Dense &amp; continuous output</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_events.html">Event detection</a></li>
-</ul>
-</div>
+  <section id="mdspan">
+<h1>mdspan<a class="headerlink" href="#mdspan" title="Link to this heading">#</a></h1>
+<p><em>#include &lt;heyoka/mdspan.hpp&gt;</em></p>
+<p>In order to interact with and represent multidimensional array views,
+heyoka includes a <a class="reference external" href="https://github.com/kokkos/mdspan">reference implementation</a>
+of the <a class="reference external" href="https://en.cppreference.com/w/cpp/container/mdspan">mdspan</a>
+class from C++23. The implementation in heyoka is fully standard-compliant,
+except for the fact that it supports as an extension indexing via the
+function call operator.</p>
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4I0000EN6heyoka6mdspanE">
+<span id="_CPPv3I0000EN6heyoka6mdspanE"></span><span id="_CPPv2I0000EN6heyoka6mdspanE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">T</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Extents</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">LayoutPolicy</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">experimental</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">layout_right</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AccessorPolicy</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">experimental</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">default_accessor</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0000EN6heyoka6mdspanE" title="heyoka::mdspan::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">mdspan</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">experimental</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">mdspan</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0000EN6heyoka6mdspanE" title="heyoka::mdspan::T"><span class="n"><span class="pre">T</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0000EN6heyoka6mdspanE" title="heyoka::mdspan::Extents"><span class="n"><span class="pre">Extents</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0000EN6heyoka6mdspanE" title="heyoka::mdspan::LayoutPolicy"><span class="n"><span class="pre">LayoutPolicy</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0000EN6heyoka6mdspanE" title="heyoka::mdspan::AccessorPolicy"><span class="n"><span class="pre">AccessorPolicy</span></span></a><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4I0000EN6heyoka6mdspanE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Multidimensional array view.</p>
+<p>See the <a class="reference external" href="https://en.cppreference.com/w/cpp/container/mdspan">mdspan</a> documentation
+and <a class="reference external" href="https://github.com/kokkos/mdspan/wiki/A-Gentle-Introduction-to-mdspan">tutorial</a>.</p>
+</dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4I0_DpNSt6size_tEEN6heyoka7extentsE">
+<span id="_CPPv3I0_DpNSt6size_tEEN6heyoka7extentsE"></span><span id="_CPPv2I0_DpNSt6size_tEEN6heyoka7extentsE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">IndexType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Extents</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">extents</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">experimental</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">extents</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0_DpNSt6size_tEEN6heyoka7extentsE" title="heyoka::extents::IndexType"><span class="n"><span class="pre">IndexType</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_DpNSt6size_tEEN6heyoka7extentsE" title="heyoka::extents::Extents"><span class="n"><span class="pre">Extents</span></span></a><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4I0_DpNSt6size_tEEN6heyoka7extentsE" title="Link to this definition">#</a><br /></dt>
+<dd></dd></dl>
+
+<dl class="cpp type">
+<dt class="sig sig-object cpp" id="_CPPv4I0_NSt6size_tEEN6heyoka8dextentsE">
+<span id="_CPPv3I0_NSt6size_tEEN6heyoka8dextentsE"></span><span id="_CPPv2I0_NSt6size_tEEN6heyoka8dextentsE"></span><span class="k"><span class="pre">template</span></span><span class="p"><span class="pre">&lt;</span></span><span class="k"><span class="pre">typename</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">IndexType</span></span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Rank</span></span></span><span class="p"><span class="pre">&gt;</span></span><br /><span class="k"><span class="pre">using</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dextents</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">experimental</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">dextents</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="#_CPPv4I0_NSt6size_tEEN6heyoka8dextentsE" title="heyoka::dextents::IndexType"><span class="n"><span class="pre">IndexType</span></span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4I0_NSt6size_tEEN6heyoka8dextentsE" title="heyoka::dextents::Rank"><span class="n"><span class="pre">Rank</span></span></a><span class="p"><span class="pre">&gt;</span></span><a class="headerlink" href="#_CPPv4I0_NSt6size_tEEN6heyoka8dextentsE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Classes representing static and dynamic extents.</p>
+<p>See the <a class="reference external" href="https://en.cppreference.com/w/cpp/container/mdspan/extents">documentation</a>.</p>
+</dd></dl>
+
 </section>
 
 
@@ -442,20 +452,20 @@ of the source tree. The tutorials can be compiled by enabling the
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="install.html"
+       href="exceptions.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Installation</p>
+        <p class="prev-next-title">Exceptions</p>
       </div>
     </a>
     <a class="right-next"
-       href="tut_taylor_method.html"
+       href="expression_system.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Taylor’s method</p>
+        <p class="prev-next-title">Expression system</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -466,7 +476,22 @@ of the source tree. The tutorials can be compiled by enabling the
             
             
               
-                <div class="bd-sidebar-secondary bd-toc"></div>
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I0000EN6heyoka6mdspanE"><code class="docutils literal notranslate"><span class="pre">mdspan</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I0_DpNSt6size_tEEN6heyoka7extentsE"><code class="docutils literal notranslate"><span class="pre">extents</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4I0_NSt6size_tEEN6heyoka8dextentsE"><code class="docutils literal notranslate"><span class="pre">dextents</span></code></a></li>
+</ul>
+  </nav></div>
+
+</div></div>
               
             
           </div>

@@ -173,6 +173,7 @@
 <li class="toctree-l2"><a class="reference internal" href="tut_s11n.html">Serialisation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_ensemble.html">Ensemble propagations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tut_parallel_mode.html">Parallel mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_cfunc.html">Compiled functions</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="api_reference.html">API Reference</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-3"><i class="fa-solid fa-chevron-down"></i></label><ul>
@@ -180,6 +181,7 @@
 <li class="toctree-l2"><a class="reference internal" href="namespaces.html">Namespaces</a></li>
 <li class="toctree-l2"><a class="reference internal" href="kwargs.html">Keyword arguments</a></li>
 <li class="toctree-l2"><a class="reference internal" href="exceptions.html">Exceptions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mdspan.html">mdspan</a></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="expression_system.html">Expression system</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label class="toctree-toggle" for="toctree-checkbox-4"><i class="fa-solid fa-chevron-down"></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="variable.html">Variables</a></li>
 <li class="toctree-l3"><a class="reference internal" href="number.html">Numerical constants</a></li>
@@ -189,6 +191,7 @@
 <li class="toctree-l3"><a class="reference internal" href="math.html">Mathematical functions</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="cfunc.html">Compiled functions</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a></li>
@@ -567,6 +570,12 @@ document.write(`
 <section id="new">
 <h3>New<a class="headerlink" href="#new" title="Link to this heading">#</a></h3>
 <ul class="simple">
+<li><p>New <a class="reference internal" href="tut_cfunc.html#tut-cfunc"><span class="std std-ref">tutorial</span></a> on compiled functions
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/396">#396</a>).</p></li>
+<li><p>New <a class="reference internal" href="cfunc.html#_CPPv4I0EN6heyoka5cfuncE" title="heyoka::cfunc"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">cfunc</span></code></a> class to facilitate
+the creation and evaluation of compiled functions, supporting
+automatic multithreaded parallelisation
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/396">#396</a>).</p></li>
 <li><p>It is now possible to index into the tensors of derivatives
 using indices vectors in sparse format
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/389">#389</a>).</p></li>
