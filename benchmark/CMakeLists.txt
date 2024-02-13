@@ -20,7 +20,7 @@ find_package(xtensor-blas REQUIRED CONFIG)
 function(ADD_HEYOKA_BENCHMARK arg1)
   add_executable(${arg1} ${arg1}.cpp)
   # NOTE: fmt was already located in the main CMakeLists.
-  target_link_libraries(${arg1} PRIVATE heyoka Boost::boost Boost::program_options xtensor xtensor-blas fmt::fmt spdlog::spdlog heyoka_llvm_internal)
+  target_link_libraries(${arg1} PRIVATE heyoka Boost::boost Boost::program_options xtensor xtensor-blas fmt::fmt spdlog::spdlog heyoka_llvm_internal TBB::tbb)
   target_compile_definitions(${arg1} PRIVATE XTENSOR_USE_FLENS_BLAS PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
   target_compile_options(${arg1} PRIVATE
     "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
@@ -72,6 +72,7 @@ ADD_HEYOKA_BENCHMARK(bandf_odeint)
 ADD_HEYOKA_BENCHMARK(penc_comparison)
 ADD_HEYOKA_BENCHMARK(large_cfunc)
 ADD_HEYOKA_BENCHMARK(sims_flanagan_jac)
+ADD_HEYOKA_BENCHMARK(cfunc_mt)
 
 if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
   ADD_HEYOKA_BENCHMARK(pendulum_mp)

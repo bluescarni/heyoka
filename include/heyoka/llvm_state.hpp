@@ -154,9 +154,6 @@ class HEYOKA_DLL_PUBLIC llvm_state
     {
         igor::parser p{kw_args...};
 
-        static_assert(!p.has_unnamed_arguments(), "The variadic arguments in the construction of an llvm_state contain "
-                                                  "unnamed arguments.");
-
         // Module name (defaults to empty string).
         auto mod_name = [&p]() -> std::string {
             if constexpr (p.has(kw::mname)) {
@@ -244,11 +241,10 @@ public:
     llvm_state();
     // NOTE: the constructor is enabled if:
     // - there is at least 1 argument (i.e., cannot act as a def ctor),
-    // - if there is only 1 argument, it cannot be of type llvm_state
-    //   (so that it does not interfere with copy/move ctors).
+    // - all KwArgs are named arguments (this also prevents interference
+    //   with the copy/move ctors).
     template <typename... KwArgs>
-        requires(sizeof...(KwArgs) > 0u)
-                && ((sizeof...(KwArgs) > 1u) || (!std::same_as<std::remove_cvref_t<KwArgs>, llvm_state> && ...))
+        requires(sizeof...(KwArgs) > 0u) && (!igor::has_unnamed_arguments<KwArgs...>())
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init, hicpp-member-init)
     explicit llvm_state(const KwArgs &...kw_args) : llvm_state(kw_args_ctor_impl(kw_args...))
     {

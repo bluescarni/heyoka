@@ -555,7 +555,7 @@ std::size_t func::hash(detail::funcptr_map<std::size_t> &func_map) const
     return seed;
 }
 
-bool operator==(const func &a, const func &b)
+bool operator==(const func &a, const func &b) noexcept
 {
     // Check if the underlying object is the same.
     if (same_value(a.m_func, b.m_func)) {
@@ -566,7 +566,7 @@ bool operator==(const func &a, const func &b)
     return a.get_name() == b.get_name() && a.args() == b.args();
 }
 
-bool operator!=(const func &a, const func &b)
+bool operator!=(const func &a, const func &b) noexcept
 {
     return !(a == b);
 }

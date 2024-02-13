@@ -37,10 +37,10 @@ IGOR_MAKE_NAMED_ARGUMENT(slp_vectorize);
 // cfunc API.
 IGOR_MAKE_NAMED_ARGUMENT(batch_size);
 IGOR_MAKE_NAMED_ARGUMENT(strided);
+IGOR_MAKE_NAMED_ARGUMENT(check_prec);
 
 // taylor_adaptive and friends.
 IGOR_MAKE_NAMED_ARGUMENT(tol);
-IGOR_MAKE_NAMED_ARGUMENT(pars);
 IGOR_MAKE_NAMED_ARGUMENT(t_events);
 IGOR_MAKE_NAMED_ARGUMENT(nt_events);
 // NOTE: these are used for constructing events.
@@ -63,6 +63,7 @@ IGOR_MAKE_NAMED_ARGUMENT(prec);
 IGOR_MAKE_NAMED_ARGUMENT(compact_mode);
 IGOR_MAKE_NAMED_ARGUMENT(high_accuracy);
 IGOR_MAKE_NAMED_ARGUMENT(parallel_mode);
+IGOR_MAKE_NAMED_ARGUMENT(pars);
 
 // ffnn model.
 IGOR_MAKE_NAMED_ARGUMENT(inputs);

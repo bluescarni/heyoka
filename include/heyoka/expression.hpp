@@ -25,6 +25,7 @@
 #include <ranges>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -51,11 +52,14 @@
 
 #include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/llvm_state.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
@@ -385,8 +389,8 @@ HEYOKA_DLL_PUBLIC expression &operator/=(expression &, mppp::real128);
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, mppp::real);
 #endif
 
-HEYOKA_DLL_PUBLIC bool operator==(const expression &, const expression &);
-HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &);
+HEYOKA_DLL_PUBLIC bool operator==(const expression &, const expression &) noexcept;
+HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &) noexcept;
 
 HEYOKA_DLL_PUBLIC std::size_t get_n_nodes(const expression &);
 
@@ -672,28 +676,14 @@ HEYOKA_CFUNC_EXTERN_INST(mppp::real)
 
 #undef HEYOKA_CFUNC_EXTERN_INST
 
-} // namespace detail
-
+// Common options for the cfunc constructor and add_cfunc().
 template <typename T, typename... KwArgs>
-std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &fn,
-                                  const std::vector<expression> &vars, const KwArgs &...kw_args)
+auto cfunc_common_opts(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
-    static_assert(!p.has_unnamed_arguments(), "The variadic arguments in add_cfunc() contain unnamed arguments.");
-
-    // Batch size (defaults to 1).
-    const auto batch_size = [&]() -> std::uint32_t {
-        if constexpr (p.has(kw::batch_size)) {
-            if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::batch_size))>>) {
-                return boost::numeric_cast<std::uint32_t>(p(kw::batch_size));
-            } else {
-                static_assert(detail::always_false_v<T>, "Invalid type for the 'batch_size' keyword argument.");
-            }
-        } else {
-            return 1;
-        }
-    }();
+    static_assert(!p.has_unnamed_arguments(),
+                  "Unnamed arguments cannot be passed in the variadic pack for this function.");
 
     // High accuracy mode (defaults to false).
     const auto high_accuracy = [&p]() -> bool {
@@ -753,6 +743,32 @@ std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const 
         }
     }();
 
+    return std::make_tuple(high_accuracy, compact_mode, parallel_mode, prec);
+}
+
+} // namespace detail
+
+template <typename T, typename... KwArgs>
+std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const std::vector<expression> &fn,
+                                  const std::vector<expression> &vars, const KwArgs &...kw_args)
+{
+    igor::parser p{kw_args...};
+
+    static_assert(!p.has_unnamed_arguments(), "The variadic arguments in add_cfunc() contain unnamed arguments.");
+
+    // Batch size (defaults to 1).
+    const auto batch_size = [&]() -> std::uint32_t {
+        if constexpr (p.has(kw::batch_size)) {
+            if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::batch_size))>>) {
+                return boost::numeric_cast<std::uint32_t>(p(kw::batch_size));
+            } else {
+                static_assert(detail::always_false_v<T>, "Invalid type for the 'batch_size' keyword argument.");
+            }
+        } else {
+            return 1;
+        }
+    }();
+
     // Strided mode (defaults to false).
     const auto strided = [&p]() -> bool {
         if constexpr (p.has(kw::strided)) {
@@ -766,6 +782,9 @@ std::vector<expression> add_cfunc(llvm_state &s, const std::string &name, const 
         }
     }();
 
+    // Common options.
+    const auto [high_accuracy, compact_mode, parallel_mode, prec] = detail::cfunc_common_opts<T>(kw_args...);
+
     return detail::add_cfunc<T>(s, name, fn, vars, batch_size, high_accuracy, compact_mode, parallel_mode, prec,
                                 strided);
 }
@@ -775,9 +794,283 @@ namespace detail
 
 HEYOKA_DLL_PUBLIC bool ex_less_than(const expression &, const expression &);
 
+// Concepts for the cfunc class.
+template <typename T, typename R>
+concept cfunc_out_range_1d = requires(R &r) {
+    requires std::ranges::contiguous_range<R>;
+    requires std::ranges::sized_range<R>;
+    {
+        std::ranges::data(r)
+    } -> std::same_as<T *>;
+    {
+        std::ranges::size(r)
+    } -> std::integral;
+};
+
+template <typename T, typename R>
+concept cfunc_in_range_1d = requires(R &r) {
+    requires std::ranges::contiguous_range<R>;
+    requires std::ranges::sized_range<R>;
+    {
+        std::ranges::data(r)
+    } -> std::convertible_to<const T *>;
+    {
+        std::ranges::size(r)
+    } -> std::integral;
+};
+
 } // namespace detail
 
+template <typename T>
+class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
+{
+    struct HEYOKA_DLL_PUBLIC impl;
+
+    std::unique_ptr<impl> m_impl;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+
+    // Private implementation-detail helper and ctor.
+    template <typename... KwArgs>
+    static auto parse_ctor_opts(const KwArgs &...kw_args)
+    {
+        igor::parser p{kw_args...};
+
+        // Common options.
+        const auto [high_accuracy, compact_mode, parallel_mode, prec] = detail::cfunc_common_opts<T>(kw_args...);
+
+        // Batch size: defaults to undefined.
+        // NOTE: we want to handle this slightly different from add_cfunc(), thus it does
+        // not go in common options.
+        const auto batch_size = [&]() -> std::optional<std::uint32_t> {
+            if constexpr (p.has(kw::batch_size)) {
+                if constexpr (std::integral<std::remove_cvref_t<decltype(p(kw::batch_size))>>) {
+                    return boost::numeric_cast<std::uint32_t>(p(kw::batch_size));
+                } else {
+                    static_assert(detail::always_false_v<T>, "Invalid type for the 'batch_size' keyword argument.");
+                }
+            } else {
+                return {};
+            }
+        }();
+
+        // Precision checking for mppp::real. Defaults to true.
+        const auto check_prec = [&p]() -> bool {
+            if constexpr (p.has(kw::check_prec)) {
+                if constexpr (std::convertible_to<decltype(p(kw::check_prec)), bool>) {
+                    return static_cast<bool>(p(kw::check_prec));
+                } else {
+                    static_assert(detail::always_false_v<T>, "Invalid type for the 'check_prec' keyword argument.");
+                }
+            } else {
+                return true;
+            }
+        }();
+
+        // Build the template llvm_state from the keyword arguments.
+        llvm_state s(kw_args...);
+
+        return std::make_tuple(high_accuracy, compact_mode, parallel_mode, prec, batch_size, std::move(s), check_prec);
+    }
+    explicit cfunc(std::vector<expression>, std::vector<expression>,
+                   std::tuple<bool, bool, bool, long long, std::optional<std::uint32_t>, llvm_state, bool>);
+
+    HEYOKA_DLL_LOCAL void check_valid(const char *) const;
+
+public:
+    cfunc() noexcept;
+    template <typename... KwArgs>
+        requires(!igor::has_unnamed_arguments<KwArgs...>())
+    explicit cfunc(std::vector<expression> fn, std::vector<expression> vars, const KwArgs &...kw_args)
+        : cfunc(std::move(fn), std::move(vars), parse_ctor_opts(kw_args...))
+    {
+    }
+    cfunc(const cfunc &);
+    cfunc(cfunc &&) noexcept;
+    cfunc &operator=(const cfunc &);
+    cfunc &operator=(cfunc &&) noexcept;
+    ~cfunc();
+
+    // Properties getters.
+    [[nodiscard]] bool is_valid() const noexcept;
+    [[nodiscard]] const std::vector<expression> &get_fn() const;
+    [[nodiscard]] const std::vector<expression> &get_vars() const;
+    [[nodiscard]] const std::vector<expression> &get_dc() const;
+    [[nodiscard]] const llvm_state &get_llvm_state_scalar() const;
+    [[nodiscard]] const llvm_state &get_llvm_state_scalar_s() const;
+    [[nodiscard]] const llvm_state &get_llvm_state_batch_s() const;
+    [[nodiscard]] bool get_high_accuracy() const;
+    [[nodiscard]] bool get_compact_mode() const;
+    [[nodiscard]] bool get_parallel_mode() const;
+    [[nodiscard]] std::uint32_t get_batch_size() const;
+    [[nodiscard]] std::uint32_t get_nparams() const;
+    [[nodiscard]] std::uint32_t get_nvars() const;
+    [[nodiscard]] std::uint32_t get_nouts() const;
+    [[nodiscard]] bool is_time_dependent() const;
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    [[nodiscard]] mpfr_prec_t get_prec() const
+        requires std::same_as<T, mppp::real>;
+
+#endif
+
+    using in_1d = mdspan<const T, dextents<std::size_t, 1>>;
+    using out_1d = mdspan<T, dextents<std::size_t, 1>>;
+
+private:
+    void single_eval(out_1d, in_1d, std::optional<in_1d>, std::optional<T>);
+
+public:
+    // NOTE: it is important to document properly the non-overlapping
+    // memory requirement for the input arguments.
+    template <typename Out, typename In, typename... KwArgs>
+        requires(!igor::has_unnamed_arguments<KwArgs...>())
+                && (detail::cfunc_out_range_1d<T, Out> || std::same_as<out_1d, std::remove_cvref_t<Out>>)
+                && (detail::cfunc_in_range_1d<T, In> || std::same_as<in_1d, std::remove_cvref_t<In>>)
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    void operator()(Out &&out, In &&in, const KwArgs &...kw_args)
+    {
+        igor::parser p{kw_args...};
+
+        out_1d oput = [&]() {
+            if constexpr (std::same_as<out_1d, std::remove_cvref_t<Out>>) {
+                return out;
+            } else {
+                return out_1d{std::ranges::data(out), boost::numeric_cast<std::size_t>(std::ranges::size(out))};
+            }
+        }();
+
+        in_1d iput = [&]() {
+            if constexpr (std::same_as<in_1d, std::remove_cvref_t<In>>) {
+                return in;
+            } else {
+                return in_1d{std::ranges::data(in), boost::numeric_cast<std::size_t>(std::ranges::size(in))};
+            }
+        }();
+
+        auto pars = [&]() -> std::optional<in_1d> {
+            if constexpr (p.has(kw::pars)) {
+                using pars_t = decltype(p(kw::pars));
+
+                if constexpr (std::same_as<in_1d, std::remove_cvref_t<pars_t>>) {
+                    return p(kw::pars);
+                } else if constexpr (detail::cfunc_in_range_1d<T, pars_t>) {
+                    // NOTE: as usual, we don't want to perfectly forward ranges, hence,
+                    // turn it into an lvalue.
+                    auto &&pars = p(kw::pars);
+
+                    return in_1d{std::ranges::data(pars), boost::numeric_cast<std::size_t>(std::ranges::size(pars))};
+                } else {
+                    static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the 'pars' keyword argument.");
+                }
+            } else {
+                return {};
+            }
+        }();
+
+        auto tm = [&]() -> std::optional<T> {
+            if constexpr (p.has(kw::time)) {
+                if constexpr (std::convertible_to<decltype(p(kw::time)), T>) {
+                    return static_cast<T>(p(kw::time));
+                } else {
+                    static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the 'time' keyword argument.");
+                }
+            } else {
+                return {};
+            }
+        }();
+
+        return single_eval(std::move(oput), std::move(iput), std::move(pars), std::move(tm));
+    }
+
+    using in_2d = mdspan<const T, dextents<std::size_t, 2>>;
+    using out_2d = mdspan<T, dextents<std::size_t, 2>>;
+
+private:
+    HEYOKA_DLL_LOCAL void multi_eval_st(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
+    HEYOKA_DLL_LOCAL void multi_eval_mt(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
+    void multi_eval(out_2d, in_2d, std::optional<in_2d>, std::optional<in_1d>);
+
+public:
+    // NOTE: it is important to document properly the non-overlapping
+    // memory requirement for the input arguments.
+    template <typename... KwArgs>
+        requires(!igor::has_unnamed_arguments<KwArgs...>())
+    void operator()(out_2d out, in_2d in, const KwArgs &...kw_args)
+    {
+        igor::parser p{kw_args...};
+
+        auto pars = [&]() -> std::optional<in_2d> {
+            if constexpr (p.has(kw::pars)) {
+                if constexpr (std::same_as<in_2d, std::remove_cvref_t<decltype(p(kw::pars))>>) {
+                    return p(kw::pars);
+                } else {
+                    static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the 'pars' keyword argument.");
+                }
+            } else {
+                return {};
+            }
+        }();
+
+        auto tm = [&]() -> std::optional<in_1d> {
+            if constexpr (p.has(kw::time)) {
+                if constexpr (std::same_as<in_1d, std::remove_cvref_t<decltype(p(kw::time))>>) {
+                    return p(kw::time);
+                } else {
+                    static_assert(detail::always_false_v<KwArgs...>, "Invalid type for the 'time' keyword argument.");
+                }
+            } else {
+                return {};
+            }
+        }();
+
+        multi_eval(std::move(out), std::move(in), std::move(pars), std::move(tm));
+    }
+};
+
+template <typename T>
+std::ostream &operator<<(std::ostream &, const cfunc<T> &);
+
+// Prevent implicit instantiations.
+#define HEYOKA_CFUNC_CLASS_EXTERN_INST(T)                                                                              \
+    extern template class cfunc<T>;                                                                                    \
+    extern template std::ostream &operator<<(std::ostream &, const cfunc<T> &);
+
+HEYOKA_CFUNC_CLASS_EXTERN_INST(float)
+HEYOKA_CFUNC_CLASS_EXTERN_INST(double)
+HEYOKA_CFUNC_CLASS_EXTERN_INST(long double)
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_CFUNC_CLASS_EXTERN_INST(mppp::real128)
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_CFUNC_CLASS_EXTERN_INST(mppp::real)
+
+#endif
+
+#undef HEYOKA_CFUNC_CLASS_EXTERN_INST
+
 HEYOKA_END_NAMESPACE
+
+// fmt formatter for cfunc, implemented
+// on top of the streaming operator.
+namespace fmt
+{
+
+template <typename T>
+struct formatter<heyoka::cfunc<T>> : fmt::ostream_formatter {
+};
+
+} // namespace fmt
 
 namespace std
 {

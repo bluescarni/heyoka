@@ -292,11 +292,13 @@ void init_native_target()
 // containing info about the host machine.
 const target_features &get_target_features()
 {
-    // NOTE: need to init the native target
-    // in order to get its features.
-    init_native_target();
+    static const target_features retval = []() {
+        // NOTE: need to init the native target
+        // in order to get its features.
+        init_native_target();
 
-    static const target_features retval = get_target_features_impl();
+        return get_target_features_impl();
+    }();
 
     return retval;
 }
