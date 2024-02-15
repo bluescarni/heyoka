@@ -407,22 +407,15 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
     m_d_out_f = reinterpret_cast<i_data::d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
 
     // Setup the vector for the Taylor coefficients.
-    // LCOV_EXCL_START
-    if (m_order == std::numeric_limits<std::uint32_t>::max()
-        || m_state.size() > std::numeric_limits<decltype(m_tc.size())>::max() / (m_order + 1u)) {
-        throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
-                                  "or the state size is too large");
-    }
-    // LCOV_EXCL_STOP
-
 #if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         // NOTE: ensure the Taylor coefficients are all generated
         // with the inferred precision.
-        m_tc.resize(m_state.size() * (m_order + 1u), mppp::real{mppp::real_kind::zero, this->get_prec()});
+        m_tc.resize(m_state.size() * (boost::safe_numerics::safe<std::uint32_t>(m_order) + 1),
+                    mppp::real{mppp::real_kind::zero, this->get_prec()});
     } else {
 #endif
-        m_tc.resize(m_state.size() * (m_order + 1u));
+        m_tc.resize(m_state.size() * (boost::safe_numerics::safe<std::uint32_t>(m_order) + 1));
 #if defined(HEYOKA_HAVE_REAL)
     }
 #endif

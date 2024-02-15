@@ -254,18 +254,9 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
     m_d_out_f = reinterpret_cast<i_data::d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
 
     // Setup the vector for the Taylor coefficients.
-    // LCOV_EXCL_START
-    if (m_order == std::numeric_limits<std::uint32_t>::max()
-        || m_state.size() > std::numeric_limits<decltype(m_tc.size())>::max() / (m_order + 1u)) {
-        throw std::overflow_error(
-            "Overflow detected in the initialisation of an adaptive Taylor integrator in batch mode: the order "
-            "or the state size is too large");
-    }
-    // LCOV_EXCL_STOP
-
     // NOTE: the size of m_state.size() already takes
     // into account the batch size.
-    m_tc.resize(m_state.size() * (m_order + 1u));
+    m_tc.resize(m_state.size() * (boost::safe_numerics::safe<std::uint32_t>(m_order) + 1));
 
     // Setup m_last_h.
     m_last_h.resize(boost::numeric_cast<decltype(m_last_h.size())>(batch_size));
