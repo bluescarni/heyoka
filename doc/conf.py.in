@@ -18,7 +18,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'heyoka'
-copyright = '2020, 2021, 2022, 2023 Francesco Biscani, Dario Izzo'
+copyright = '2020, 2021, 2022, 2023, 2024 Francesco Biscani, Dario Izzo'
 author = 'Francesco Biscani, Dario Izzo'
 
 # The full version, including alpha/beta/rc tags

@@ -145,6 +145,16 @@ heyoka. In order to install heyoka using pkg, execute the following command:
 
    $ pkg install heyoka
 
+spack
+`````
+
+A community-supported `spack <https://github.com/spack/spack>`__ package is available for
+heyoka. In order to install heyoka using spack, execute the following command:
+
+.. code-block:: console
+
+   $ spack install heyoka
+
 .. _installation_from_source:
 
 Installation from source

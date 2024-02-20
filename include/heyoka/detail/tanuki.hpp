@@ -1,4 +1,4 @@
-// Copyright 2023 Francesco Biscani (bluescarni@gmail.com)
+// Copyright 2023, 2024 Francesco Biscani (bluescarni@gmail.com)
 //
 // This file is part of the tanuki library.
 //
