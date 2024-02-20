@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- heyoka is now available in the `spack <https://github.com/spack/spack>`__
+  package manager.
 - New :ref:`tutorial <tut_cfunc>` on compiled functions
   (`#396 <https://github.com/bluescarni/heyoka/pull/396>`__).
 - New :cpp:class:`~heyoka::cfunc` class to facilitate
