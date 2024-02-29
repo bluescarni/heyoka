@@ -582,6 +582,30 @@ std::vector<expression> dtens::get_jacobian() const
     return retval;
 }
 
+std::vector<expression> dtens::get_hessian(std::uint32_t component) const
+{
+    if (component >= get_nouts()) {
+        throw std::invalid_argument(fmt::format(
+            "The Hessian of the function component at index {} was requested, but the function has only {} output(s)",
+            component, get_nouts()));
+    }
+
+    if (get_order() < 2u) {
+        throw std::invalid_argument(
+            fmt::format("Cannot return the Hessian: the maximum differentiation order is {}, but it must be at least 2",
+                        get_order()));
+    }
+
+    const auto sr = get_derivatives(component, 2);
+
+    std::vector<expression> retval;
+    retval.reserve(static_cast<decltype(retval.size())>(std::ranges::size(sr)));
+
+    std::transform(sr.begin(), sr.end(), std::back_inserter(retval), [](const auto &p) { return p.second; });
+
+    return retval;
+}
+
 std::uint32_t dtens::get_nargs() const
 {
     // NOTE: we ensure in the diff_tensors() implementation

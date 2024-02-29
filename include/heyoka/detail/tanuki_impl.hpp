@@ -1,4 +1,4 @@
-// Copyright 2023, 2024 Francesco Biscani (bluescarni@gmail.com)
+// Copyright 2023 Francesco Biscani (bluescarni@gmail.com)
 //
 // This file is part of the tanuki library.
 //
@@ -133,15 +133,6 @@
 
 TANUKI_BEGIN_NAMESPACE
 
-// Semantics for the wrap class.
-// NOTE: this needs to be marked as visibile because
-// the value_iface class depends on it. If we do not, we have
-// the usual s11n-related visibility issues on OSX.
-enum class TANUKI_VISIBLE wrap_semantics { value, reference };
-
-namespace detail
-{
-
 // Helper to demangle a type name.
 inline std::string demangle(const char *s)
 {
@@ -164,6 +155,30 @@ inline std::string demangle(const char *s)
     return std::string(s);
 #endif
 }
+
+// Semantics for the wrap class.
+// NOTE: this needs to be marked as visibile because
+// the value_iface class depends on it. If we do not, we have
+// the usual s11n-related visibility issues on OSX.
+enum class TANUKI_VISIBLE wrap_semantics { value, reference };
+
+namespace detail
+{
+
+// LCOV_EXCL_START
+
+// std::unreachable() implementation:
+// https://en.cppreference.com/w/cpp/utility/unreachable
+[[noreturn]] inline void unreachable()
+{
+#if defined(__GNUC__) || defined(__clang__)
+    __builtin_unreachable();
+#elif defined(_MSC_VER)
+    __assume(false);
+#endif
+}
+
+// LCOV_EXCL_STOP
 
 // Type-trait to detect instances of std::reference_wrapper.
 template <typename T>
@@ -211,16 +226,19 @@ struct TANUKI_VISIBLE value_iface : public IFace, value_iface_base {
     // Access to the value and its type.
     [[nodiscard]] virtual void *_tanuki_value_ptr() noexcept
     {
+        unreachable();
         assert(false);
         return {};
     }
     [[nodiscard]] virtual std::type_index _tanuki_value_type_index() const noexcept
     {
+        unreachable();
         assert(false);
         return typeid(void);
     }
     [[nodiscard]] virtual bool _tanuki_is_reference() const noexcept
     {
+        unreachable();
         assert(false);
         return {};
     }
@@ -228,42 +246,51 @@ struct TANUKI_VISIBLE value_iface : public IFace, value_iface_base {
     // Methods to implement virtual copy/move primitives for the holder class.
     [[nodiscard]] virtual value_iface *_tanuki_clone() const
     {
+        unreachable();
         assert(false);
         return {};
     }
     [[nodiscard]] virtual std::shared_ptr<value_iface> _tanuki_shared_clone() const
     {
+        unreachable();
         assert(false);
         return {};
     }
     [[nodiscard]] virtual value_iface *_tanuki_copy_init_holder(void *) const
     {
+        unreachable();
         assert(false);
         return {};
     }
     [[nodiscard]] virtual value_iface *_tanuki_move_init_holder(void *) && noexcept
     {
+        unreachable();
         assert(false);
         return {};
     }
     virtual void _tanuki_copy_assign_value_to(value_iface *) const
     {
+        unreachable();
         assert(false);
     }
     virtual void _tanuki_move_assign_value_to(value_iface *) && noexcept
     {
+        unreachable();
         assert(false);
     }
     virtual void _tanuki_copy_assign_value_from(const void *)
     {
+        unreachable();
         assert(false);
     }
     virtual void _tanuki_move_assign_value_from(void *) noexcept
     {
+        unreachable();
         assert(false);
     }
     virtual void _tanuki_swap_value(value_iface *) noexcept
     {
+        unreachable();
         assert(false);
     }
     // LCOV_EXCL_STOP
@@ -433,6 +460,7 @@ concept iface_has_impl = requires() {
 // Class for holding an instance of the value type T.
 // The inheritance diagram is:
 // holder -> iface impl -> value_iface -> iface.
+// The holder class implements the value_iface interface.
 // NOTE: this class has several conceptual requirements which
 // are checked in wrap::ctor_impl().
 template <typename T, typename IFace, wrap_semantics Sem>
@@ -1035,6 +1063,15 @@ class TANUKI_VISIBLE wrap
                     // Move-init the value from pv_iface.
                     this->m_pv_iface = std::move(*pv_iface)._tanuki_move_init_holder(this->static_storage);
 
+                    // NOTE: when we loaded the serialised pointer, the value contained in the holder
+                    // was deserialised into the address pv_iface->_tanuki_value_ptr() (i.e., somewhere
+                    // in dynamically-allocated memory). However we now have moved the value
+                    // into this->m_pv_iface->_tanuki_value_ptr() via _tanuki_move_init_holder().
+                    // Inform the archive of the new address of the value, so that the address tracking
+                    // machinery keeps on working. See:
+                    // https://www.boost.org/doc/libs/1_82_0/libs/serialization/doc/special.html#objecttracking
+                    ar.reset_object_address(this->m_pv_iface->_tanuki_value_ptr(), pv_iface->_tanuki_value_ptr());
+
                     // Clean up pv_iface.
                     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
                     delete pv_iface;
@@ -1060,6 +1097,11 @@ class TANUKI_VISIBLE wrap
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 #endif
+
+    // NOTE: store the ctor explicitness into a separate variable.
+    // This helps as a workaround for compiler issues in conditionally
+    // explicit constructors.
+    static constexpr auto explicit_ctor = Cfg.explicit_ctor;
 
 public:
     // Explicit initialisation into the invalid state.
@@ -1125,7 +1167,7 @@ public:
             // We must be able to invoke the construction function.
             w.template ctor_impl<detail::value_t_from_arg<T &&>>(std::forward<T>(x));
         })
-    explicit(Cfg.explicit_ctor < wrap_ctor::always_implicit)
+    explicit(explicit_ctor < wrap_ctor::always_implicit)
         // NOLINTNEXTLINE(bugprone-forwarding-reference-overload,google-explicit-constructor,hicpp-explicit-conversions)
         wrap(T &&x) noexcept(noexcept(this->ctor_impl<detail::value_t_from_arg<T &&>>(std::forward<T>(x)))
                              && detail::nothrow_default_initializable<ref_iface_t>)
@@ -1143,7 +1185,7 @@ public:
             // We must be able to invoke the construction function.
             w.template ctor_impl<std::reference_wrapper<T>>(std::move(ref));
         })
-    explicit(Cfg.explicit_ctor == wrap_ctor::always_explicit)
+    explicit(explicit_ctor == wrap_ctor::always_explicit)
         // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions)
         wrap(std::reference_wrapper<T> ref) noexcept(
             noexcept(this->ctor_impl<std::reference_wrapper<T>>(std::move(ref)))
@@ -1612,6 +1654,8 @@ public:
     }
 
     // Specific functions for reference semantics.
+
+    // Deep copy.
     [[nodiscard]] friend wrap copy(const wrap &w)
         requires(Cfg.semantics == wrap_semantics::reference)
     {
@@ -1619,6 +1663,8 @@ public:
         retval.m_pv_iface = w.m_pv_iface->_tanuki_shared_clone();
         return retval;
     }
+
+    // Check if two wraps point to the same underlying value.
     [[nodiscard]] friend bool same_value(const wrap &w1, const wrap &w2) noexcept
         requires(Cfg.semantics == wrap_semantics::reference)
     {
@@ -1679,7 +1725,7 @@ struct iface_impl_helper : public detail::iface_impl_helper_base {
             if constexpr (std::is_const_v<std::remove_reference_t<std::unwrap_reference_t<T>>>) {
                 // NOLINTNEXTLINE(google-readability-casting)
                 throw std::runtime_error("Invalid access to a const reference of type '"
-                                         + detail::demangle(typeid(std::unwrap_reference_t<T>).name())
+                                         + demangle(typeid(std::unwrap_reference_t<T>).name())
                                          + "' via a non-const member function");
 
                 // LCOV_EXCL_START
@@ -1725,7 +1771,10 @@ bool has_dynamic_storage(const wrap<IFace, Cfg> &w) noexcept
 template <typename T, typename IFace, auto Cfg>
 const T *value_ptr(const wrap<IFace, Cfg> &w) noexcept
 {
-    if constexpr (std::same_as<T, std::remove_cvref_t<T>>) {
+    // NOTE: if T is cv-qualified, always return null.
+    // No need to remove reference as we cannot form pointers
+    // to references in the return value.
+    if constexpr (std::same_as<T, std::remove_cv_t<T>>) {
         return value_type_index(w) == typeid(T) ? static_cast<const T *>(raw_value_ptr(w)) : nullptr;
     } else {
         return nullptr;
@@ -1735,7 +1784,7 @@ const T *value_ptr(const wrap<IFace, Cfg> &w) noexcept
 template <typename T, typename IFace, auto Cfg>
 T *value_ptr(wrap<IFace, Cfg> &w) noexcept
 {
-    if constexpr (std::same_as<T, std::remove_cvref_t<T>>) {
+    if constexpr (std::same_as<T, std::remove_cv_t<T>>) {
         return value_type_index(w) == typeid(T) ? static_cast<T *>(raw_value_ptr(w)) : nullptr;
     } else {
         return nullptr;

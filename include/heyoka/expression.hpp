@@ -513,6 +513,7 @@ public:
         -> decltype(std::ranges::subrange(begin(), end()));
     [[nodiscard]] std::vector<expression> get_gradient() const;
     [[nodiscard]] std::vector<expression> get_jacobian() const;
+    [[nodiscard]] std::vector<expression> get_hessian(std::uint32_t) const;
 };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const dtens &);
