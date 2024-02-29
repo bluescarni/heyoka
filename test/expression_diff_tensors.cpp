@@ -760,3 +760,59 @@ TEST_CASE("nn test")
     auto dt = diff_tensors(ffnn, diff_args::params);
     auto dNdtheta = dt.get_jacobian();
 }
+
+TEST_CASE("hessian")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    // Error modes first.
+    {
+        dtens dt;
+
+        REQUIRE_THROWS_MATCHES(dt.get_hessian(0), std::invalid_argument,
+                               Message("The Hessian of the function component at index 0 was requested, but the "
+                                       "function has only 0 output(s)"));
+    }
+
+    {
+        auto dt = diff_tensors({x + y}, diff_args::vars, kw::diff_order = 0u);
+        REQUIRE_THROWS_MATCHES(
+            dt.get_hessian(0), std::invalid_argument,
+            Message("Cannot return the Hessian: the maximum differentiation order is 0, but it must be at least 2"));
+    }
+
+    {
+        auto dt = diff_tensors({x + y}, diff_args::vars, kw::diff_order = 1u);
+        REQUIRE_THROWS_MATCHES(
+            dt.get_hessian(0), std::invalid_argument,
+            Message("Cannot return the Hessian: the maximum differentiation order is 1, but it must be at least 2"));
+    }
+
+    {
+        auto dt = diff_tensors({x * y * y * z * z * z}, diff_args::vars, kw::diff_order = 2u);
+        const auto h = dt.get_hessian(0);
+        REQUIRE(h.size() == 6u);
+
+        auto cf = cfunc<double>(h, {x, y, z});
+
+        std::vector<double> out(6u);
+        const auto xval = 1., yval = 2., zval = 3.;
+        cf(out, std::vector{xval, yval, zval});
+
+        REQUIRE(out[0] == 0.);
+        REQUIRE(out[1] == 2 * yval * zval * zval * zval);
+        REQUIRE(out[2] == 3 * yval * yval * zval * zval);
+        REQUIRE(out[3] == 2 * xval * zval * zval * zval);
+        REQUIRE(out[4] == 6 * xval * yval * zval * zval);
+        REQUIRE(out[5] == 6 * xval * yval * yval * zval);
+    }
+
+    {
+        auto dt = diff_tensors({x * y * y * z * z * z}, diff_args::vars, kw::diff_order = 2u);
+        REQUIRE_THROWS_MATCHES(dt.get_hessian(1), std::invalid_argument,
+                               Message("The Hessian of the function component at index 1 was requested, but the "
+                                       "function has only 1 output(s)"));
+    }
+}
