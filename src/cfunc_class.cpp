@@ -848,7 +848,12 @@ void cfunc<T>::multi_eval(out_2d outputs, in_2d inputs, std::optional<in_2d> par
                 return 100;
 #endif
             } else {
+#if defined(HEYOKA_ARCH_PPC)
+		// Double-double implementation.
+		return 5;
+#else
                 static_assert(detail::always_false_v<T>, "Unknown fp cost model.");
+#endif
             }
         }
 #if defined(HEYOKA_HAVE_REAL128)
