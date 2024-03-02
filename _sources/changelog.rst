@@ -1,6 +1,15 @@
 Changelog
 =========
 
+4.0.1 (2024-03-02)
+------------------
+
+Fix
+~~~
+
+- Fix compilation on PowerPC
+  (`#401 <https://github.com/bluescarni/heyoka/pull/401>`__).
+
 4.0.0 (2024-03-02)
 ------------------
 
