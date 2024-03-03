@@ -47,8 +47,13 @@ namespace
 {
 
 // Global mutex for thread-safe operations.
+// NOTE: std::mutex constructor not constexpr on MinGW:
+// https://github.com/bluescarni/heyoka/issues/403
+#if !defined(__MINGW32__)
+HEYOKA_CONSTINIT
+#endif
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-HEYOKA_CONSTINIT std::mutex mem_cache_mutex;
+std::mutex mem_cache_mutex;
 
 // Definition of the data structures for the cache.
 using lru_queue_t = std::list<std::pair<std::string, unsigned>>;
