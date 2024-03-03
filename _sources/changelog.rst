@@ -1,6 +1,15 @@
 Changelog
 =========
 
+4.0.2 (2024-03-03)
+------------------
+
+Fix
+~~~
+
+- Fix compilation on MinGW
+  (`#404 <https://github.com/bluescarni/heyoka/pull/404>`__).
+
 4.0.1 (2024-03-02)
 ------------------
 
