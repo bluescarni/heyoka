@@ -31,6 +31,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/tseries.hpp>
 
 // Current archive version is 2.
 // Changelog:
@@ -113,6 +114,13 @@ concept func_has_taylor_decompose = requires(T &&x, taylor_dc_t &dc) {
     {
         std::move(x).taylor_decompose(dc)
     } -> std::same_as<taylor_dc_t::size_type>;
+};
+
+template <typename T>
+concept func_has_to_tseries = requires(const T &x, funcptr_map<tseries> &m, std::uint32_t order) {
+    {
+        x.to_tseries(m, order)
+    } -> std::same_as<tseries>;
 };
 
 // Function interface implementation.
@@ -271,6 +279,22 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base, tanuki::ifa
                 fmt::format("Taylor diff in compact mode is not implemented for the function '{}'", get_name()));
         }
     }
+
+    [[nodiscard]] bool has_to_tseries() const final
+    {
+        return func_has_to_tseries<T>;
+    }
+    [[nodiscard]] tseries to_tseries(funcptr_map<tseries> &m, std::uint32_t order) const final
+    {
+        if constexpr (func_has_to_tseries<T>) {
+            return this->value().to_tseries(m, order);
+        }
+
+        // LCOV_EXCL_START
+        assert(false);
+        throw;
+        // LCOV_EXCL_STOP
+    }
 };
 
 // The function interface.
@@ -317,6 +341,9 @@ struct HEYOKA_DLL_PUBLIC func_iface {
 
     virtual llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const
         = 0;
+
+    [[nodiscard]] virtual bool has_to_tseries() const = 0;
+    [[nodiscard]] virtual tseries to_tseries(funcptr_map<tseries> &, std::uint32_t) const = 0;
 
     template <typename Base, typename Holder, typename T>
     using impl = func_iface_impl<Base, Holder, T>;
@@ -422,6 +449,8 @@ public:
                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
+
+    [[nodiscard]] tseries to_tseries(detail::funcptr_map<tseries> &, std::uint32_t order) const;
 };
 
 namespace detail

@@ -52,6 +52,7 @@
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/tseries.hpp>
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -858,6 +859,24 @@ llvm::Function *llvm_c_eval_func_helper(const std::string &name,
 }
 
 } // namespace detail
+
+tseries func::to_tseries(detail::funcptr_map<tseries> &m, std::uint32_t order) const
+{
+    if (!m_func->has_to_tseries()) [[unlikely]] {
+        throw not_implemented_error(
+            fmt::format("The function '{}' does not support conversion to a Taylor series", get_name()));
+    }
+
+    auto ret = m_func->to_tseries(m, order);
+
+    if (ret.get_order() != order) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("The conversion of the function '{}' to a Taylor series produced a "
+                                                "series of order {}, but a series of order {} was expected instead",
+                                                get_name(), ret.get_order(), order));
+    }
+
+    return ret;
+}
 
 HEYOKA_END_NAMESPACE
 
