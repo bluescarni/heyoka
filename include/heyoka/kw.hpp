@@ -43,6 +43,7 @@ IGOR_MAKE_NAMED_ARGUMENT(check_prec);
 IGOR_MAKE_NAMED_ARGUMENT(tol);
 IGOR_MAKE_NAMED_ARGUMENT(t_events);
 IGOR_MAKE_NAMED_ARGUMENT(nt_events);
+IGOR_MAKE_NAMED_ARGUMENT(ad_mode);
 // NOTE: these are used for constructing events.
 IGOR_MAKE_NAMED_ARGUMENT(callback);
 IGOR_MAKE_NAMED_ARGUMENT(cooldown);
