@@ -26,6 +26,7 @@
 
 #include <fmt/format.h>
 
+#include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
@@ -80,7 +81,13 @@ mpfr_prec_t llvm_is_real(llvm::Type *t)
     if (auto *ptr = llvm::dyn_cast<llvm::StructType>(t)) {
         const auto sname = ptr->getStructName();
 
-        if (sname.startswith("heyoka.real.")) {
+        if (
+#if LLVM_VERSION_MAJOR < 18
+            sname.startswith("heyoka.real.")
+#else
+            sname.starts_with("heyoka.real.")
+#endif
+        ) {
             // LCOV_EXCL_START
             if (sname.size() <= 12u) {
                 throw std::invalid_argument(fmt::format(
