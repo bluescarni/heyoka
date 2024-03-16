@@ -1,6 +1,14 @@
 Changelog
 =========
 
+4.1.0 (unreleased)
+------------------
+
+New
+~~~
+
+- Support LLVM 18 (`#408 <https://github.com/bluescarni/heyoka/pull/408>`__).
+
 4.0.2 (2024-03-03)
 ------------------
 
