@@ -1,4 +1,4 @@
-// Copyright 2023 Francesco Biscani (bluescarni@gmail.com)
+// Copyright 2023, 2024 Francesco Biscani (bluescarni@gmail.com)
 //
 // This file is part of the tanuki library.
 //
@@ -43,6 +43,14 @@
 #include <boost/serialization/split_member.hpp>
 #include <boost/serialization/tracking.hpp>
 
+#if !defined(NDEBUG)
+
+// NOTE: this is used in pointer alignment checks at runtime
+// in debug mode.
+#include <boost/align/is_aligned.hpp>
+
+#endif
+
 #endif
 
 // Versioning.
@@ -53,8 +61,8 @@
 
 // NOTE: indirection to allow token pasting/stringification:
 // https://stackoverflow.com/questions/24991208/expand-a-macro-in-a-macro
-#define TANUKI_VERSION_STRING__(maj, min, pat) #maj "." #min "." #pat
-#define TANUKI_VERSION_STRING_(maj, min, pat) TANUKI_VERSION_STRING__(maj, min, pat)
+#define TANUKI_VERSION_STRING_U(maj, min, pat) #maj "." #min "." #pat
+#define TANUKI_VERSION_STRING_(maj, min, pat) TANUKI_VERSION_STRING_U(maj, min, pat)
 #define TANUKI_VERSION_STRING TANUKI_VERSION_STRING_(TANUKI_VERSION_MAJOR, TANUKI_VERSION_MINOR, TANUKI_VERSION_PATCH)
 
 // No unique address setup.
@@ -79,13 +87,13 @@
 
 #endif
 
-#define TANUKI_BEGIN_NAMESPACE__(abiver)                                                                               \
+#define TANUKI_BEGIN_NAMESPACE_U(abiver)                                                                               \
     namespace tanuki                                                                                                   \
     {                                                                                                                  \
     inline namespace v##abiver TANUKI_ABI_TAG_ATTR                                                                     \
     {
 
-#define TANUKI_BEGIN_NAMESPACE_(abiver) TANUKI_BEGIN_NAMESPACE__(abiver)
+#define TANUKI_BEGIN_NAMESPACE_(abiver) TANUKI_BEGIN_NAMESPACE_U(abiver)
 
 #define TANUKI_BEGIN_NAMESPACE TANUKI_BEGIN_NAMESPACE_(TANUKI_ABI_VERSION)
 
@@ -181,20 +189,17 @@ namespace detail
 // LCOV_EXCL_STOP
 
 // Type-trait to detect instances of std::reference_wrapper.
-template <typename T>
-struct is_reference_wrapper : std::false_type {
-};
+template <typename>
+inline constexpr bool is_reference_wrapper_v = false;
 
 template <typename T>
-struct is_reference_wrapper<std::reference_wrapper<T>> : std::true_type {
-};
+inline constexpr bool is_reference_wrapper_v<std::reference_wrapper<T>> = true;
 
 // Implementation of the concept to detect any wrap instance.
 // This will be specialised after the definition of the
 // wrap class.
 template <typename>
-struct is_any_wrap_impl : std::false_type {
-};
+inline constexpr bool is_any_wrap_v = false;
 
 // This is a base class for value_iface, used
 // to check that an interface implementation
@@ -349,19 +354,17 @@ struct TANUKI_VISIBLE composite_iface : public IFace0, public IFace1, public IFa
 
 // Concept to detect any wrap instance.
 template <typename T>
-concept any_wrap = detail::is_any_wrap_impl<T>::value;
+concept any_wrap = detail::is_any_wrap_v<T>;
 
 namespace detail
 {
 
 // Detection of a composite interface.
 template <typename>
-struct is_composite_interface : std::false_type {
-};
+inline constexpr bool is_composite_interface_v = false;
 
 template <typename IFace0, typename IFace1, typename... IFaceN>
-struct is_composite_interface<composite_iface<IFace0, IFace1, IFaceN...>> : std::true_type {
-};
+inline constexpr bool is_composite_interface_v<composite_iface<IFace0, IFace1, IFaceN...>> = true;
 
 // Private base for the unspecialised iface_impl.
 struct iface_impl_base {
@@ -375,7 +378,7 @@ struct iface_impl_base {
 // NOTE: prohibit the definition of an external implementation
 // for the composite interface.
 template <typename IFace, typename Base, typename Holder, typename T>
-    requires(!detail::is_composite_interface<IFace>::value)
+    requires(!detail::is_composite_interface_v<IFace>)
 struct iface_impl final : detail::iface_impl_base {
 };
 
@@ -481,6 +484,14 @@ struct TANUKI_VISIBLE holder final : public impl_from_iface<IFace, holder<T, IFa
     // throw on destruction, the program will terminate.
     ~holder() final = default;
 
+// NOTE: silence false positives on gcc.
+#if defined(__GNUC__) && !defined(__clang__)
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+
+#endif
+
     // NOTE: special-casing to avoid the single-argument ctor
     // potentially competing with the copy/move ctors.
     template <typename U>
@@ -500,6 +511,12 @@ struct TANUKI_VISIBLE holder final : public impl_from_iface<IFace, holder<T, IFa
     {
     }
 
+#if defined(__GNUC__) && !defined(__clang__)
+
+#pragma GCC diagnostic pop
+
+#endif
+
     // NOTE: mark everything else as private so that it is going to be
     // unreachable from the interface implementation.
 private:
@@ -514,7 +531,7 @@ private:
 
     [[nodiscard]] bool _tanuki_is_reference() const noexcept final
     {
-        return is_reference_wrapper<T>::value;
+        return is_reference_wrapper_v<T>;
     }
 
     // Clone this, and cast the result to the value interface.
@@ -541,7 +558,11 @@ private:
     [[nodiscard]] value_iface<IFace, Sem> *_tanuki_copy_init_holder(void *ptr) const final
     {
         if constexpr (std::copy_constructible<T>) {
-            // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+#if defined(TANUKI_WITH_BOOST_S11N)
+            assert(boost::alignment::is_aligned(ptr, alignof(T)));
+#endif
+
+            // NOLINTNEXTLINE(cppcoreguidelines-owning-memory,clang-analyzer-cplusplus.PlacementNew)
             return ::new (ptr) holder(m_value);
         } else {
             throw std::invalid_argument("Attempting to copy-construct a non-copyable value type");
@@ -554,7 +575,11 @@ private:
     _tanuki_move_init_holder(void *ptr) && noexcept final
     {
         if constexpr (std::move_constructible<T>) {
-            // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+#if defined(TANUKI_WITH_BOOST_S11N)
+            assert(boost::alignment::is_aligned(ptr, alignof(T)));
+#endif
+
+            // NOLINTNEXTLINE(cppcoreguidelines-owning-memory,clang-analyzer-cplusplus.PlacementNew)
             return ::new (ptr) holder(std::move(m_value));
         } else {
             throw std::invalid_argument("Attempting to move-construct a non-movable value type"); // LCOV_EXCL_LINE
@@ -837,12 +862,10 @@ using value_t_from_arg = std::conditional_t<std::is_function_v<std::remove_cvref
 // to avoid ambiguities in the wrap class between the nullary emplace ctor
 // and the generic ctor.
 template <typename>
-struct is_in_place_type : std::false_type {
-};
+inline constexpr bool is_in_place_type_v = false;
 
 template <typename T>
-struct is_in_place_type<std::in_place_type_t<T>> : std::true_type {
-};
+inline constexpr bool is_in_place_type_v<std::in_place_type_t<T>> = true;
 
 // Implementation of the pointer interface for the wrap
 // class, conditionally-enabled depending on the configuration.
@@ -869,16 +892,6 @@ struct wrap_pointer_iface {
 
 template <typename Wrap, typename IFace>
 struct wrap_pointer_iface<false, Wrap, IFace> {
-};
-
-// This is a re-implementation of std::same_as
-// in order to work around a GCC 10 bug.
-template <typename, typename>
-struct same_as : std::false_type {
-};
-
-template <typename T>
-struct same_as<T, T> : std::true_type {
 };
 
 } // namespace detail
@@ -929,16 +942,23 @@ class TANUKI_VISIBLE wrap
     {
         const auto *ptr = reinterpret_cast<const std::byte *>(this->m_pv_iface);
 
-        // NOTE: this is not 100% portable, for the following reasons:
-        // - if ptr is not within static_storage, the results of the comparisons are unspecified;
-        // - even if we used std::less & co. (instead of builtin comparisons), in principle static_storage
-        //   could be interleaved with another object while at the same time respecting the total
-        //   pointer ordering guarantees given by the standard.
+        // NOTE: although we are using std::less and friends here (and thus avoiding the use of
+        // builtin comparison operators, which could in principle be optimised out by the compiler),
+        // this is not 100% portable, because in principle static_storage
+        // could be interleaved with another object while at the same time respecting the total
+        // pointer ordering guarantees given by the standard. This could happen for instance on
+        // segmented memory architectures.
+        //
         // In pratice, this should be ok an all commonly-used platforms.
+        //
+        // NOTE: ptr will be null if the storage type is dynamic, hence another assumption
+        // here is that nullptr is not included in the storage range of static_storage.
+        //
         // NOTE: it seems like the only truly portable way of implementing this is to compare ptr
         // to the addresses of all elements in static_storage. Unfortunately, it seems like compilers
         // are not able to optimise this to a simple pointer comparison.
-        return ptr >= this->static_storage && ptr < this->static_storage + sizeof(this->static_storage);
+        return std::greater_equal<void>{}(ptr, this->static_storage)
+               && std::less<void>{}(ptr, this->static_storage + sizeof(this->static_storage));
     }
 
     // Implementation of generic construction. This will constrcut
@@ -1161,7 +1181,7 @@ public:
             // Make extra sure this does not compete with the invalid ctor.
             requires !std::same_as<invalid_wrap_t, std::remove_cvref_t<T>>;
             // Must not compete with the emplace ctor.
-            requires !detail::is_in_place_type<std::remove_cvref_t<T>>::value;
+            requires !detail::is_in_place_type_v<std::remove_cvref_t<T>>;
             // Must not compete with copy/move.
             requires !std::same_as<std::remove_cvref_t<T>, W>;
             // We must be able to invoke the construction function.
@@ -1477,16 +1497,16 @@ public:
 #if defined(__clang__)
     template <typename T, typename W, typename... Args>
         requires(requires(W &w, Args &&...args) {
-            requires detail::same_as<W, wrap>::value;
+            requires std::is_same_v<W, wrap>;
             // Forbid emplacing a wrap inside a wrap.
-            requires !detail::same_as<T, W>::value;
+            requires(!std::is_same_v<T, W>);
             w.template ctor_impl<T>(std::forward<Args>(args)...);
         })
     friend void
     emplace(W &w,
             Args &&...args) noexcept(noexcept(std::declval<W &>().template ctor_impl<T>(std::forward<Args>(args)...)))
 #elif defined(__GNUC__)
-    template <typename T, std::enable_if_t<!detail::same_as<T, wrap>::value, int> = 0, typename... Args>
+    template <typename T, std::enable_if_t<!std::is_same_v<T, wrap>, int> = 0, typename... Args>
         requires(requires(wrap &w, Args &&...args) { w.ctor_impl<T>(std::forward<Args>(args)...); })
     friend void emplace(wrap &w, Args &&...args) noexcept(noexcept(w.ctor_impl<T>(std::forward<Args>(args)...)))
 #else
@@ -1677,8 +1697,7 @@ namespace detail
 
 // Specialise is_any_wrap_impl.
 template <typename IFace, auto Cfg>
-struct is_any_wrap_impl<wrap<IFace, Cfg>> : std::true_type {
-};
+inline constexpr bool is_any_wrap_v<wrap<IFace, Cfg>> = true;
 
 // Base class for iface_impl_helper.
 struct iface_impl_helper_base {
@@ -1691,7 +1710,7 @@ consteval bool iface_impl_value_getter_is_noexcept()
 {
     using T = typename detail::holder_value<Holder>::type;
 
-    if constexpr (detail::is_reference_wrapper<T>::value) {
+    if constexpr (detail::is_reference_wrapper_v<T>) {
         return !std::is_const_v<std::remove_reference_t<std::unwrap_reference_t<T>>>;
     }
 
@@ -1721,7 +1740,7 @@ struct iface_impl_helper : public detail::iface_impl_helper_base {
 
         auto &val = static_cast<Holder *>(this)->m_value;
 
-        if constexpr (detail::is_reference_wrapper<T>::value) {
+        if constexpr (detail::is_reference_wrapper_v<T>) {
             if constexpr (std::is_const_v<std::remove_reference_t<std::unwrap_reference_t<T>>>) {
                 // NOLINTNEXTLINE(google-readability-casting)
                 throw std::runtime_error("Invalid access to a const reference of type '"
@@ -1744,7 +1763,7 @@ struct iface_impl_helper : public detail::iface_impl_helper_base {
 
         const auto &val = static_cast<const Holder *>(this)->m_value;
 
-        if constexpr (detail::is_reference_wrapper<T>::value) {
+        if constexpr (detail::is_reference_wrapper_v<T>) {
             return val.get();
         } else {
             return val;
