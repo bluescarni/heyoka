@@ -359,10 +359,10 @@ struct llvm_state::jit {
         // Ensure the native target is inited.
         detail::init_native_target();
 
-// NOTE: name change in LLVM 18.
+        // NOTE: codegen opt level changed in LLVM 18.
 #if LLVM_VERSION_MAJOR < 18
 
-        using cg_opt_level = llvm::CodeGenOpt;
+        using cg_opt_level = llvm::CodeGenOpt::Level;
 
 #else
 
