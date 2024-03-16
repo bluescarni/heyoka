@@ -359,6 +359,17 @@ struct llvm_state::jit {
         // Ensure the native target is inited.
         detail::init_native_target();
 
+// NOTE: name change in LLVM 18.
+#if LLVM_VERSION_MAJOR < 18
+
+        using cg_opt_level = llvm::CodeGenOpt;
+
+#else
+
+        using cg_opt_level = llvm::CodeGenOptLevel;
+
+#endif
+
         // Create the target machine builder.
         auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
         // LCOV_EXCL_START
@@ -369,17 +380,17 @@ struct llvm_state::jit {
         // Set the codegen optimisation level.
         switch (opt_level) {
             case 0u:
-                jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::None);
+                jtmb->setCodeGenOptLevel(cg_opt_level::None);
                 break;
             case 1u:
-                jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::Less);
+                jtmb->setCodeGenOptLevel(cg_opt_level::Less);
                 break;
             case 2u:
-                jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::Default);
+                jtmb->setCodeGenOptLevel(cg_opt_level::Default);
                 break;
             default:
                 assert(opt_level == 3u);
-                jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::Aggressive);
+                jtmb->setCodeGenOptLevel(cg_opt_level::Aggressive);
         }
 
         // Create the jit builder.
