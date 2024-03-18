@@ -1197,13 +1197,13 @@ TEST_CASE("propagate for_until")
 
     // Test the callback is moved.
     step_callback<double> f_cb_until(cb_functor_until{});
-    f_cb_until.extract<cb_functor_until>()->n_copies_after = f_cb_until.extract<cb_functor_until>()->n_copies;
+    value_ptr<cb_functor_until>(f_cb_until)->n_copies_after = value_ptr<cb_functor_until>(f_cb_until)->n_copies;
     auto out_cb = std::get<5>(ta.propagate_until(10., kw::callback = std::move(f_cb_until)));
     // Invoke again the callback to ensure no copies have been made.
     out_cb(ta);
 
     step_callback<double> f_cb_for(cb_functor_for{});
-    f_cb_for.extract<cb_functor_for>()->n_copies_after = f_cb_for.extract<cb_functor_for>()->n_copies;
+    value_ptr<cb_functor_for>(f_cb_for)->n_copies_after = value_ptr<cb_functor_for>(f_cb_for)->n_copies;
     out_cb = std::get<5>(ta.propagate_for(10., kw::callback = std::move(f_cb_for)));
     // Invoke again the callback to ensure no copies have been made.
     out_cb(ta);
@@ -1350,7 +1350,7 @@ TEST_CASE("propagate grid")
 
     // Test the callback is moved.
     step_callback<double> f_cb_grid(cb_functor_grid{});
-    f_cb_grid.extract<cb_functor_grid>()->n_copies_after = f_cb_grid.extract<cb_functor_grid>()->n_copies;
+    value_ptr<cb_functor_grid>(f_cb_grid)->n_copies_after = value_ptr<cb_functor_grid>(f_cb_grid)->n_copies;
     auto out_cb = std::get<4>(ta.propagate_grid({1., 5., 10.}, kw::callback = std::move(f_cb_grid)));
     // Invoke again the callback to ensure no copies have been made.
     out_cb(ta);
@@ -1707,13 +1707,13 @@ void s11n_test_impl()
         REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
         REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
 
-        REQUIRE(ta.get_t_events()[0].get_callback().get_type_index()
-                == ta_copy.get_t_events()[0].get_callback().get_type_index());
+        REQUIRE(value_type_index(ta.get_t_events()[0].get_callback())
+                == value_type_index(ta_copy.get_t_events()[0].get_callback()));
         REQUIRE(ta.get_t_events()[0].get_cooldown() == ta_copy.get_t_events()[0].get_cooldown());
         REQUIRE(ta.get_te_cooldowns()[0] == ta_copy.get_te_cooldowns()[0]);
 
-        REQUIRE(ta.get_nt_events()[0].get_callback().get_type_index()
-                == ta_copy.get_nt_events()[0].get_callback().get_type_index());
+        REQUIRE(value_type_index(ta.get_nt_events()[0].get_callback())
+                == value_type_index(ta_copy.get_nt_events()[0].get_callback()));
 
         REQUIRE(ta.get_state_vars() == ta_copy.get_state_vars());
         REQUIRE(ta.get_rhs() == ta_copy.get_rhs());

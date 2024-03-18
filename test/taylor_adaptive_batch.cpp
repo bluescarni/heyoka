@@ -377,7 +377,7 @@ TEST_CASE("propagate grid")
     // Test the callback is moved.
     ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03}, 4};
     step_callback_batch<double> f_cb_grid(cb_functor_grid{});
-    f_cb_grid.extract<cb_functor_grid>()->n_copies_after = f_cb_grid.extract<cb_functor_grid>()->n_copies;
+    value_ptr<cb_functor_grid>(f_cb_grid)->n_copies_after = value_ptr<cb_functor_grid>(f_cb_grid)->n_copies;
     auto [out_cb, _] = ta.propagate_grid({0., 0., 0., 0., 10., 10., 10., 10., 100., 100., 100., 100.},
                                          kw::callback = std::move(f_cb_grid));
     // Invoke again the callback to ensure no copies have been made.
@@ -673,13 +673,13 @@ TEST_CASE("propagate for_until")
 
     // Test the callback is moved.
     step_callback_batch<double> f_cb_until(cb_functor_until{});
-    f_cb_until.extract<cb_functor_until>()->n_copies_after = f_cb_until.extract<cb_functor_until>()->n_copies;
+    value_ptr<cb_functor_until>(f_cb_until)->n_copies_after = value_ptr<cb_functor_until>(f_cb_until)->n_copies;
     auto [_, out_cb] = ta.propagate_until(20., kw::callback = std::move(f_cb_until));
     // Invoke again the callback to ensure no copies have been made.
     out_cb(ta);
 
     step_callback_batch<double> f_cb_for(cb_functor_for{});
-    f_cb_for.extract<cb_functor_for>()->n_copies_after = f_cb_for.extract<cb_functor_for>()->n_copies;
+    value_ptr<cb_functor_for>(f_cb_for)->n_copies_after = value_ptr<cb_functor_for>(f_cb_for)->n_copies;
     std::tie(_, out_cb) = ta.propagate_for(10., kw::callback = std::move(f_cb_for));
     out_cb(ta);
     REQUIRE(value_isa<cb_functor_for>(out_cb));
@@ -1159,13 +1159,13 @@ void s11n_test_impl()
         REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
         REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
 
-        REQUIRE(ta.get_t_events()[0].get_callback().get_type_index()
-                == ta_copy.get_t_events()[0].get_callback().get_type_index());
+        REQUIRE(value_type_index(ta.get_t_events()[0].get_callback())
+                == value_type_index(ta_copy.get_t_events()[0].get_callback()));
         REQUIRE(ta.get_t_events()[0].get_cooldown() == ta_copy.get_t_events()[0].get_cooldown());
         REQUIRE(ta.get_te_cooldowns() == ta_copy.get_te_cooldowns());
 
-        REQUIRE(ta.get_nt_events()[0].get_callback().get_type_index()
-                == ta_copy.get_nt_events()[0].get_callback().get_type_index());
+        REQUIRE(value_type_index(ta.get_nt_events()[0].get_callback())
+                == value_type_index(ta_copy.get_nt_events()[0].get_callback()));
 
         // Take a step in ta and in ta_copy.
         ta.step(true);

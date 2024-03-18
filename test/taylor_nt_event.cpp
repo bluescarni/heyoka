@@ -832,7 +832,7 @@ TEST_CASE("nt s11n")
 
         REQUIRE(ev.get_expression() == v);
         REQUIRE(ev.get_direction() == event_direction::positive);
-        REQUIRE(ev.get_callback().get_type_index() == typeid(s11n_callback));
+        REQUIRE(value_type_index(ev.get_callback()) == typeid(s11n_callback));
     };
 
     tuple_for_each(fp_types, tester);

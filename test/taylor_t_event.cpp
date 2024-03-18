@@ -1094,7 +1094,7 @@ TEST_CASE("t s11n")
 
             REQUIRE(ev.get_expression() == v);
             REQUIRE(ev.get_direction() == event_direction::positive);
-            REQUIRE(ev.get_callback().get_type_index() == typeid(s11n_callback));
+            REQUIRE(value_type_index(ev.get_callback()) == typeid(s11n_callback));
             REQUIRE(ev.get_cooldown() == fp_t(100));
         }
 

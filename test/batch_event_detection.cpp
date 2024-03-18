@@ -1068,7 +1068,7 @@ TEST_CASE("nte s11n")
 
     REQUIRE(ev.get_expression() == v);
     REQUIRE(ev.get_direction() == event_direction::positive);
-    REQUIRE(ev.get_callback().get_type_index() == typeid(s11n_nte_callback));
+    REQUIRE(value_type_index(ev.get_callback()) == typeid(s11n_nte_callback));
 }
 
 TEST_CASE("te identical")
@@ -1812,7 +1812,7 @@ TEST_CASE("te s11n")
 
     REQUIRE(ev.get_expression() == v);
     REQUIRE(ev.get_direction() == event_direction::positive);
-    REQUIRE(ev.get_callback().get_type_index() == typeid(s11n_te_callback));
+    REQUIRE(value_type_index(ev.get_callback()) == typeid(s11n_te_callback));
     REQUIRE(ev.get_cooldown() == fp_t(100));
 }
 
