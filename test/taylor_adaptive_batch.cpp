@@ -84,6 +84,23 @@ TEST_CASE("dc copy")
     }
 }
 
+TEST_CASE("state pars range")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive_batch<double>{
+        {prime(x) = v, prime(v) = -par[0] * sin(x)}, {1.1, 1.11, 2.2, 2.21}, 2u, kw::pars = {3.3, 3.31}};
+
+    REQUIRE(std::ranges::equal(ta.get_state(), ta.get_state_range()));
+    REQUIRE(std::ranges::equal(ta.get_pars(), ta.get_pars_range()));
+
+    std::ranges::copy(std::vector{4.4, 4.41, 5.5, 5.51}, ta.get_state_range().begin());
+    REQUIRE(std::ranges::equal(ta.get_state(), std::vector{4.4, 4.41, 5.5, 5.51}));
+
+    std::ranges::copy(std::vector{6.6, 6.61}, ta.get_pars_range().begin());
+    REQUIRE(std::ranges::equal(ta.get_pars(), std::vector{6.6, 6.61}));
+}
+
 TEST_CASE("batch consistency")
 {
     auto [x, v] = make_vars("x", "v");

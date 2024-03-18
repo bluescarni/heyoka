@@ -120,6 +120,22 @@ TEST_CASE("batch init outcome")
     }));
 }
 
+TEST_CASE("state pars range")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -par[0] * sin(x)}, {1.1, 2.2}, kw::pars = {3.3}};
+
+    REQUIRE(std::ranges::equal(ta.get_state(), ta.get_state_range()));
+    REQUIRE(std::ranges::equal(ta.get_pars(), ta.get_pars_range()));
+
+    std::ranges::copy(std::vector{4.4, 5.5}, ta.get_state_range().begin());
+    REQUIRE(std::ranges::equal(ta.get_state(), std::vector{4.4, 5.5}));
+
+    std::ranges::copy(std::vector{6.6}, ta.get_pars_range().begin());
+    REQUIRE(std::ranges::equal(ta.get_pars(), std::vector{6.6}));
+}
+
 TEST_CASE("propagate grid scalar")
 {
     using Catch::Matchers::Message;

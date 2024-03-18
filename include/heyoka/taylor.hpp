@@ -580,11 +580,13 @@ public:
 
     [[nodiscard]] const std::vector<T> &get_state() const;
     [[nodiscard]] const T *get_state_data() const;
-    T *get_state_data();
+    [[nodiscard]] T *get_state_data();
+    [[nodiscard]] std::ranges::subrange<typename std::vector<T>::iterator> get_state_range();
 
     [[nodiscard]] const std::vector<T> &get_pars() const;
     [[nodiscard]] const T *get_pars_data() const;
-    T *get_pars_data();
+    [[nodiscard]] T *get_pars_data();
+    [[nodiscard]] std::ranges::subrange<typename std::vector<T>::iterator> get_pars_range();
 
     [[nodiscard]] const std::vector<T> &get_tc() const;
 
@@ -941,11 +943,13 @@ public:
 
     [[nodiscard]] const std::vector<T> &get_state() const;
     [[nodiscard]] const T *get_state_data() const;
-    T *get_state_data();
+    [[nodiscard]] T *get_state_data();
+    [[nodiscard]] std::ranges::subrange<typename std::vector<T>::iterator> get_state_range();
 
     [[nodiscard]] const std::vector<T> &get_pars() const;
     [[nodiscard]] const T *get_pars_data() const;
-    T *get_pars_data();
+    [[nodiscard]] T *get_pars_data();
+    [[nodiscard]] std::ranges::subrange<typename std::vector<T>::iterator> get_pars_range();
 
     [[nodiscard]] const std::vector<T> &get_tc() const;
 
