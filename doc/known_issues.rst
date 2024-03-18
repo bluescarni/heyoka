@@ -6,7 +6,7 @@ Known issues
   to incorrect results. This is due to code generation issues in LLVM with
   ``long double`` vector types. This problem seems to have been rectified in
   LLVM 18. Note that, in practice, there is no reason to attempt to use batch
-  mode with ``long double`` as currently there are no CPUs implements SIMD operations
+  mode with ``long double`` as currently there are no CPUs implementing SIMD operations
   on extended-precision datatypes.
 * Due to an upstream bug, if you compile heyoka linking statically against LLVM 17
   while enabling the ``HEYOKA_HIDE_LLVM_SYMBOLS`` option (see the
