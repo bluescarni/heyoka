@@ -440,6 +440,8 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive : public detail::taylor_ada
     friend void detail::taylor_adaptive_setup_sv_rhs(TA &, const U &);
 
 public:
+    using value_type = T;
+
     using nt_event_t = nt_event<T>;
     using t_event_t = t_event<T>;
 
@@ -811,6 +813,8 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_batch
     friend void detail::taylor_adaptive_setup_sv_rhs(TA &, const U &);
 
 public:
+    using value_type = T;
+
     using nt_event_t = nt_event_batch<T>;
     using t_event_t = t_event_batch<T>;
 
