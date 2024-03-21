@@ -287,7 +287,7 @@ concept input_rangeT = std::ranges::input_range<R> && std::constructible_from<T,
 // NOTE: in any case, we end up creating a new object either by copying
 // or moving the input argument(s).
 template <typename Callback, typename CallbackSet, typename Parser>
-Callback parse_propagate_cb(Parser &p)
+Callback parse_propagate_cb(const Parser &p)
 {
     if constexpr (Parser::has(kw::callback)) {
         using cb_arg_t = decltype(p(kw::callback));
