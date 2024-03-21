@@ -377,7 +377,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
     } else if (m_pars.size() > npars) {
         throw std::invalid_argument(fmt::format(
             "Excessive number of parameter values passed to the constructor of an adaptive "
-            "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters",
+            "Taylor integrator: {} parameter value(s) were passed, but the ODE system contains only {} parameter(s)",
             m_pars.size(), npars));
     }
 

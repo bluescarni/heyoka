@@ -840,8 +840,7 @@ TEST_CASE("cb interrupt")
         auto ta
             = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2u};
 
-        ta.propagate_until(
-            {1., 1.1}, kw::callback = [](auto &) { return false; });
+        ta.propagate_until({1., 1.1}, kw::callback = [](auto &) { return false; });
 
         REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
         REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::cb_stop);
@@ -853,8 +852,7 @@ TEST_CASE("cb interrupt")
         REQUIRE(ta.get_time()[1] < 1.);
 
         auto counter = 0u;
-        ta.propagate_for(
-            {10., 10.1}, kw::callback = [&counter](auto &) { return counter++ != 5u; });
+        ta.propagate_for({10., 10.1}, kw::callback = [&counter](auto &) { return counter++ != 5u; });
 
         REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
         REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::cb_stop);
@@ -871,8 +869,7 @@ TEST_CASE("cb interrupt")
         auto ta
             = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2u};
 
-        auto [cb, res] = ta.propagate_grid(
-            {0., 0., 11., 11.1, 12., 12.1}, kw::callback = [](auto &) { return false; });
+        auto [cb, res] = ta.propagate_grid({0., 0., 11., 11.1, 12., 12.1}, kw::callback = [](auto &) { return false; });
 
         REQUIRE(cb);
         REQUIRE(std::all_of(res.begin() + 4, res.end(), [](double val) { return std::isnan(val); }));
@@ -908,8 +905,8 @@ TEST_CASE("cb interrupt")
         auto ta
             = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2u};
 
-        auto [cb, res] = ta.propagate_grid(
-            {0., 0., 1e-6, 21.1, 2e-6, 32.1}, kw::callback = [](auto &) { return false; });
+        auto [cb, res]
+            = ta.propagate_grid({0., 0., 1e-6, 21.1, 2e-6, 32.1}, kw::callback = [](auto &) { return false; });
 
         REQUIRE(cb);
         REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
@@ -948,8 +945,8 @@ TEST_CASE("param too many")
                                                                 kw::pars = std::vector{1., 2., 3.}}),
                            std::invalid_argument,
                            Message("Excessive number of parameter values passed to the constructor of an adaptive "
-                                   "Taylor integrator in batch mode: 3 parameter values were passed, but the ODE "
-                                   "system contains only 1 parameters "
+                                   "Taylor integrator in batch mode: 3 parameter value(s) were passed, but the ODE "
+                                   "system contains only 1 parameter(s) "
                                    "(in batches of 2)"));
 
     REQUIRE_THROWS_MATCHES((void)(taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
@@ -959,8 +956,8 @@ TEST_CASE("param too many")
                                                                 kw::t_events = {t_event_batch<double>(v - par[0])}}),
                            std::invalid_argument,
                            Message("Excessive number of parameter values passed to the constructor of an adaptive "
-                                   "Taylor integrator in batch mode: 3 parameter values were passed, but the ODE "
-                                   "system contains only 1 parameters "
+                                   "Taylor integrator in batch mode: 3 parameter value(s) were passed, but the ODE "
+                                   "system contains only 1 parameter(s) "
                                    "(in batches of 2)"));
 }
 
@@ -1682,8 +1679,8 @@ TEST_CASE("reset cooldowns")
     auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                           {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
                                           4,
-                                          kw::t_events = {te_t(
-                                              v, kw::callback = [](auto &, int, std::uint32_t) { return false; })}};
+                                          kw::t_events
+                                          = {te_t(v, kw::callback = [](auto &, int, std::uint32_t) { return false; })}};
 
     ta.propagate_until({100., 100., 100., 100.});
 

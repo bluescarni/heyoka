@@ -221,8 +221,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
     } else if (m_pars.size() > npars * m_batch_size) {
         throw std::invalid_argument(
             fmt::format("Excessive number of parameter values passed to the constructor of an adaptive "
-                        "Taylor integrator in batch mode: {} parameter values were passed, but the ODE "
-                        "system contains only {} parameters "
+                        "Taylor integrator in batch mode: {} parameter value(s) were passed, but the ODE "
+                        "system contains only {} parameter(s) "
                         "(in batches of {})",
                         m_pars.size(), npars, m_batch_size));
     }

@@ -316,12 +316,11 @@ TEST_CASE("propagate grid scalar")
 
     // A case in which we have a callback which never stops and a terminal event
     // which triggers.
-    ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -x},
-                                 {0., 1.},
-                                 kw::t_events = {t_event<double>(
-                                     v - .1, kw::callback = [](taylor_adaptive<double> &, int) { return false; })}};
-    out = ta.propagate_grid(
-        {0., 10.}, kw::callback = [](const auto &) { return true; });
+    ta = taylor_adaptive<double>{
+        {prime(x) = v, prime(v) = -x},
+        {0., 1.},
+        kw::t_events = {t_event<double>(v - .1, kw::callback = [](taylor_adaptive<double> &, int) { return false; })}};
+    out = ta.propagate_grid({0., 10.}, kw::callback = [](const auto &) { return true; });
     REQUIRE(std::get<0>(out) == taylor_outcome{-1});
     REQUIRE(std::get<4>(out));
 
@@ -1237,8 +1236,7 @@ TEST_CASE("propagate for_until")
     }
 
     // Test interruption via callback.
-    oc = std::get<0>(ta.propagate_for(
-        100., kw::callback = [n = 0](auto &) mutable { return n++ == 2; }));
+    oc = std::get<0>(ta.propagate_for(100., kw::callback = [n = 0](auto &) mutable { return n++ == 2; }));
     REQUIRE(oc == taylor_outcome::cb_stop);
 }
 
@@ -1371,8 +1369,7 @@ TEST_CASE("propagate grid")
     REQUIRE(value_isa<cb_functor_grid>(value_ref<step_callback_set<double>>(out_cb)[0]));
 
     // Test interruption via callback.
-    oc = std::get<0>(ta.propagate_grid(
-        {12., 13., 24.}, kw::callback = [n = 0](auto &) mutable { return n++ == 2; }));
+    oc = std::get<0>(ta.propagate_grid({12., 13., 24.}, kw::callback = [n = 0](auto &) mutable { return n++ == 2; }));
     REQUIRE(oc == taylor_outcome::cb_stop);
 }
 
@@ -1513,16 +1510,14 @@ TEST_CASE("cb interrupt")
 
     // propagate_for/until().
     {
-        auto res = ta.propagate_until(
-            1., kw::callback = [](auto &) { return false; });
+        auto res = ta.propagate_until(1., kw::callback = [](auto &) { return false; });
 
         REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
         REQUIRE(std::get<3>(res) == 1u);
         REQUIRE(ta.get_time() < 1.);
 
         auto counter = 0u;
-        res = ta.propagate_for(
-            10., kw::callback = [&counter](auto &) { return counter++ != 5u; });
+        res = ta.propagate_for(10., kw::callback = [&counter](auto &) { return counter++ != 5u; });
 
         REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
         REQUIRE(std::get<3>(res) == 6u);
@@ -1532,8 +1527,7 @@ TEST_CASE("cb interrupt")
     // propagate_grid().
     {
         ta.set_time(10.);
-        auto res = ta.propagate_grid(
-            {10., 11., 12.}, kw::callback = [](auto &) { return false; });
+        auto res = ta.propagate_grid({10., 11., 12.}, kw::callback = [](auto &) { return false; });
 
         REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
         REQUIRE(std::get<3>(res) == 1u);
@@ -1580,8 +1574,9 @@ TEST_CASE("param too many")
                                        kw::pars = std::vector{1., 2.},
                                        kw::t_events = {t_event<double>(v - par[0])}}),
         std::invalid_argument,
-        Message("Excessive number of parameter values passed to the constructor of an adaptive "
-                "Taylor integrator: 2 parameter values were passed, but the ODE system contains only 1 parameters"));
+        Message(
+            "Excessive number of parameter values passed to the constructor of an adaptive "
+            "Taylor integrator: 2 parameter value(s) were passed, but the ODE system contains only 1 parameter(s)"));
 }
 
 // Test case for bug: parameters in event equations are ignored
