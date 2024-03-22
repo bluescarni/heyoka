@@ -105,8 +105,6 @@ TEST_CASE("taylor acos")
 
         using fp_t = decltype(fp_x);
 
-        using Catch::Matchers::Message;
-
         auto x = "x"_var, y = "y"_var;
 
         // Number tests.
