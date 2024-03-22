@@ -25,7 +25,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/acos.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/number.hpp>

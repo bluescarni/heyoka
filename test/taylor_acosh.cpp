@@ -25,7 +25,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/acosh.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/number.hpp>
@@ -60,8 +59,6 @@ constexpr bool skip_batch_ld =
 
 TEST_CASE("taylor acosh decompose bug 00")
 {
-    llvm_state s;
-
     auto x = "x"_var;
 
     auto ta = taylor_adaptive<double>({prime(x) = acosh(0_dbl) - x}, {0.}, kw::tol = 1.);
@@ -450,8 +447,6 @@ TEST_CASE("taylor acosh")
             ta.step(true);
 
             const auto jet = tc_to_jet(ta);
-
-            llvm_state s{kw::opt_level = opt_level};
 
             REQUIRE(jet[0] == fp_t(1.2));
             REQUIRE(jet[1] == fp_t(1.1));
