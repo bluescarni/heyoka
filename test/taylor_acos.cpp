@@ -8,14 +8,12 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <cmath>
 #include <initializer_list>
 #include <limits>
 #include <random>
 #include <tuple>
 #include <type_traits>
-#include <vector>
 
 #include <llvm/Config/llvm-config.h>
 
@@ -59,52 +57,6 @@ constexpr bool skip_batch_ld =
     false
 #endif
     ;
-
-template <typename T, typename U>
-void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
-{
-    std::uniform_real_distribution<float> dist(-.9f, .9f);
-
-    for (auto batch_size : {2u, 4u, 8u, 5u}) {
-        // Randomly-generate the batch initial state.
-        std::vector<T> orig_batch_state(batch_size * 2u);
-        std::ranges::generate(orig_batch_state, [&dist]() { return T{dist(rng)}; });
-
-        auto ta = taylor_adaptive<T>{sys,
-                                     std::vector<T>(2u),
-                                     kw::tol = .1,
-                                     kw::high_accuracy = high_accuracy,
-                                     kw::compact_mode = compact_mode,
-                                     kw::opt_level = opt_level};
-
-        auto ta_batch = taylor_adaptive_batch<T>{sys,
-                                                 orig_batch_state,
-                                                 batch_size,
-                                                 kw::tol = .1,
-                                                 kw::high_accuracy = high_accuracy,
-                                                 kw::compact_mode = compact_mode,
-                                                 kw::opt_level = opt_level};
-
-        // Take the batch step.
-        ta_batch.step(true);
-
-        // Fetch the Taylor coefficients.
-        const auto jet_batch = tc_to_jet(ta_batch);
-
-        for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
-            ta.get_state_data()[0] = orig_batch_state[batch_idx];
-            ta.get_state_data()[1] = orig_batch_state[batch_size + batch_idx];
-
-            ta.step(true);
-
-            const auto jet_scalar = tc_to_jet(ta);
-
-            for (auto i = 0u; i < 8u; ++i) {
-                REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx], T(1000)));
-            }
-        }
-    }
-}
 
 // Issue in the verification of a Taylor decomposition
 // in presence of NaNs.
@@ -396,7 +348,7 @@ TEST_CASE("taylor acos")
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>({prime(x) = acos(expression{number{fp_t{.625}}}), prime(y) = x + y}, opt_level,
-                                       high_accuracy, compact_mode);
+                                       high_accuracy, compact_mode, rng, -.9f, .9f);
         }
 
         // Variable tests.
@@ -562,8 +514,8 @@ TEST_CASE("taylor acos")
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             // Do the batch/scalar comparison.
-            compare_batch_scalar<fp_t>({prime(x) = acos(y), prime(y) = acos(x)}, opt_level, high_accuracy,
-                                       compact_mode);
+            compare_batch_scalar<fp_t>({prime(x) = acos(y), prime(y) = acos(x)}, opt_level, high_accuracy, compact_mode,
+                                       rng, -.9f, .9f);
         }
     };
 

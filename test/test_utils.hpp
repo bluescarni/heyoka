@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <limits>
 #include <ostream>
+#include <random>
 #include <sstream>
 #include <tuple>
 #include <type_traits>
@@ -32,6 +33,7 @@
 
 #endif
 
+#include <heyoka/expression.hpp>
 #include <heyoka/taylor.hpp>
 
 namespace heyoka_test
@@ -276,6 +278,12 @@ std::vector<T> tc_to_jet(const heyoka::taylor_adaptive<T> &);
 
 template <typename T>
 std::vector<T> tc_to_jet(const heyoka::taylor_adaptive_batch<T> &);
+
+// Helper to compare the results of the computation of Taylor coefficients
+// in scalar and batch integrations.
+template <typename>
+void compare_batch_scalar(const std::vector<std::pair<heyoka::expression, heyoka::expression>> &, unsigned, bool, bool,
+                          std::mt19937 &, float, float);
 
 } // namespace heyoka_test
 
