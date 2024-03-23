@@ -139,17 +139,17 @@ void compare_batch_scalar(const std::vector<std::pair<heyoka::expression, heyoka
 {
     namespace kw = heyoka::kw;
 
-    assert(sys.size() == 2u);
+    const auto dim = sys.size();
 
     std::uniform_real_distribution<float> dist(lb, ub);
 
     for (auto batch_size : {2u, 4u, 8u, 5u}) {
         // Randomly-generate the batch initial state.
-        std::vector<T> orig_batch_state(batch_size * 2u);
+        std::vector<T> orig_batch_state(batch_size * dim);
         std::ranges::generate(orig_batch_state, [&dist, &rng]() { return T{dist(rng)}; });
 
         auto ta = heyoka::taylor_adaptive<T>{sys,
-                                             std::vector<T>(2u),
+                                             std::vector<T>(dim),
                                              kw::tol = .1,
                                              kw::high_accuracy = high_accuracy,
                                              kw::compact_mode = compact_mode,
@@ -177,7 +177,7 @@ void compare_batch_scalar(const std::vector<std::pair<heyoka::expression, heyoka
 
             const auto jet_scalar = tc_to_jet(ta);
 
-            for (auto i = 0u; i < 8u; ++i) {
+            for (auto i = 0ul; i < dim * 4ul; ++i) {
                 REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx], T(1000)));
             }
         }
