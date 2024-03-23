@@ -170,8 +170,9 @@ void compare_batch_scalar(const std::vector<std::pair<heyoka::expression, heyoka
         const auto jet_batch = tc_to_jet(ta_batch);
 
         for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
-            ta.get_state_data()[0] = orig_batch_state[batch_idx];
-            ta.get_state_data()[1] = orig_batch_state[batch_size + batch_idx];
+            for (auto i = 0ul; i < dim; ++i) {
+                ta.get_state_data()[i] = orig_batch_state[i * batch_size + batch_idx];
+            }
 
             ta.step(true);
 
