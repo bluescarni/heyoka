@@ -135,7 +135,7 @@ template std::vector<mppp::real> tc_to_jet(const heyoka::taylor_adaptive<mppp::r
 
 template <typename T>
 void compare_batch_scalar(const std::vector<std::pair<heyoka::expression, heyoka::expression>> &sys, unsigned opt_level,
-                          bool high_accuracy, bool compact_mode, std::mt19937 &rng, float lb, float ub)
+                          bool high_accuracy, bool compact_mode, std::mt19937 &rng, float lb, float ub, T tol)
 {
     namespace kw = heyoka::kw;
 
@@ -179,24 +179,24 @@ void compare_batch_scalar(const std::vector<std::pair<heyoka::expression, heyoka
             const auto jet_scalar = tc_to_jet(ta);
 
             for (auto i = 0ul; i < dim * 4ul; ++i) {
-                REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx], T(1000)));
+                REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx], tol));
             }
         }
     }
 }
 
 template void compare_batch_scalar<float>(const std::vector<std::pair<heyoka::expression, heyoka::expression>> &,
-                                          unsigned, bool, bool, std::mt19937 &, float, float);
+                                          unsigned, bool, bool, std::mt19937 &, float, float, float);
 template void compare_batch_scalar<double>(const std::vector<std::pair<heyoka::expression, heyoka::expression>> &,
-                                           unsigned, bool, bool, std::mt19937 &, float, float);
+                                           unsigned, bool, bool, std::mt19937 &, float, float, double);
 template void compare_batch_scalar<long double>(const std::vector<std::pair<heyoka::expression, heyoka::expression>> &,
-                                                unsigned, bool, bool, std::mt19937 &, float, float);
+                                                unsigned, bool, bool, std::mt19937 &, float, float, long double);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template void
 compare_batch_scalar<mppp::real128>(const std::vector<std::pair<heyoka::expression, heyoka::expression>> &, unsigned,
-                                    bool, bool, std::mt19937 &, float, float);
+                                    bool, bool, std::mt19937 &, float, float, mppp::real128);
 
 #endif
 

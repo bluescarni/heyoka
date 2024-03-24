@@ -293,7 +293,7 @@ TEST_CASE("taylor kepE")
 
         // Do the batch/scalar comparison.
         compare_batch_scalar<fp_t>({prime(x) = kepE(expression{number{a}}, expression{number{b}}), prime(y) = x + y},
-                                   opt_level, high_accuracy, compact_mode, rng, .1f, .9f);
+                                   opt_level, high_accuracy, compact_mode, rng, .1f, .9f, fp_t(10000));
 
         // Variable-number tests.
         {
@@ -539,7 +539,7 @@ TEST_CASE("taylor kepE")
         // Do the batch/scalar comparison.
         compare_batch_scalar<fp_t>(
             {prime(x) = kepE(y, expression{number{b}}), prime(y) = kepE(x, expression{number{b}})}, opt_level,
-            high_accuracy, compact_mode, rng, .1f, .9f);
+            high_accuracy, compact_mode, rng, .1f, .9f, fp_t(10000));
 
         // Number-variable tests.
         {
@@ -761,7 +761,7 @@ TEST_CASE("taylor kepE")
         // Do the batch/scalar comparison.
         compare_batch_scalar<fp_t>(
             {prime(x) = kepE(expression{number{a}}, y), prime(y) = kepE(expression{number{c}}, x)}, opt_level,
-            high_accuracy, compact_mode, rng, .1f, .9f);
+            high_accuracy, compact_mode, rng, .1f, .9f, fp_t(10000));
 
         // Variable-variable tests.
         {
@@ -962,7 +962,7 @@ TEST_CASE("taylor kepE")
 
         // Do the batch/scalar comparison.
         compare_batch_scalar<fp_t>({prime(x) = kepE(x, y), prime(y) = kepE(y, x)}, opt_level, high_accuracy,
-                                   compact_mode, rng, .1f, .9f);
+                                   compact_mode, rng, .1f, .9f, fp_t(10000));
     };
 
     for (auto cm : {true, false}) {

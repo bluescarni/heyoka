@@ -281,9 +281,9 @@ std::vector<T> tc_to_jet(const heyoka::taylor_adaptive_batch<T> &);
 
 // Helper to compare the results of the computation of Taylor coefficients
 // in scalar and batch integrations.
-template <typename>
+template <typename T>
 void compare_batch_scalar(const std::vector<std::pair<heyoka::expression, heyoka::expression>> &, unsigned, bool, bool,
-                          std::mt19937 &, float, float);
+                          std::mt19937 &, float, float, T = T(1000.));
 
 } // namespace heyoka_test
 
