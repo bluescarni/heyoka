@@ -8,12 +8,10 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <initializer_list>
 #include <random>
 #include <stdexcept>
 #include <tuple>
-#include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
 
@@ -26,7 +24,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -54,45 +51,6 @@ auto prod_mul_wrapper(const expression &x, const expression &y)
     return expression{func{detail::prod_impl({x, y})}};
 }
 
-template <typename T, typename U>
-void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
-{
-    const auto batch_size = 5u;
-
-    llvm_state s{kw::opt_level = opt_level};
-
-    taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy, compact_mode);
-    taylor_add_jet<T>(s, "jet_scalar", sys, 3, 1, high_accuracy, compact_mode);
-
-    s.compile();
-
-    auto jptr_batch = reinterpret_cast<void (*)(T *, const T *, const T *)>(s.jit_lookup("jet_batch"));
-    auto jptr_scalar = reinterpret_cast<void (*)(T *, const T *, const T *)>(s.jit_lookup("jet_scalar"));
-
-    std::vector<T> jet_batch;
-    jet_batch.resize(8 * batch_size);
-    std::uniform_real_distribution<float> dist(-10.f, 10.f);
-    std::generate(jet_batch.begin(), jet_batch.end(), [&dist]() { return T{dist(rng)}; });
-
-    std::vector<T> jet_scalar;
-    jet_scalar.resize(8);
-
-    jptr_batch(jet_batch.data(), nullptr, nullptr);
-
-    for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
-        // Assign the initial values of x and y.
-        for (auto i = 0u; i < 2u; ++i) {
-            jet_scalar[i] = jet_batch[i * batch_size + batch_idx];
-        }
-
-        jptr_scalar(jet_scalar.data(), nullptr, nullptr);
-
-        for (auto i = 2u; i < 8u; ++i) {
-            REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx], T(1e4)));
-        }
-    }
-}
-
 TEST_CASE("taylor mul")
 {
     using Catch::Matchers::Message;
@@ -106,18 +64,16 @@ TEST_CASE("taylor mul")
 
         // Number-number tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = prod_mul_wrapper(2_dbl, 3_dbl), prime(y) = x + y},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {prod_mul_wrapper(2_dbl, 3_dbl), x + y}, 1, 1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(4);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -126,20 +82,17 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = prod_mul_wrapper(par[0], 3_dbl), prime(y) = x + y},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level,
+                                            kw::pars = {fp_t{2}}};
 
-            taylor_add_jet<fp_t>(s, "jet", {prod_mul_wrapper(par[0], 3_dbl), x + y}, 1, 1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(4);
-
-            std::vector<fp_t> pars{fp_t{2}};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -148,18 +101,17 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = prod_mul_wrapper(2_dbl, 3_dbl), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {prod_mul_wrapper(2_dbl, 3_dbl), x + y}, 1, 2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}};
-            jet.resize(8);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);
@@ -172,20 +124,18 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = prod_mul_wrapper(2_dbl, par[1]), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t{0}, fp_t{0}, fp_t{3}, fp_t{3}}};
 
-            taylor_add_jet<fp_t>(s, "jet", {prod_mul_wrapper(2_dbl, par[1]), x + y}, 1, 2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}};
-            jet.resize(8);
-
-            std::vector<fp_t> pars{fp_t{0}, fp_t{0}, fp_t{3}, fp_t{3}};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);
@@ -198,25 +148,22 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {prod_mul_wrapper(-1_dbl, par[1]), x + y}, 1, 2, high_accuracy,
-                                 compact_mode);
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = prod_mul_wrapper(-1_dbl, par[1]), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t{0}, fp_t{0}, fp_t{3}, fp_t{3}}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.prod_neg."));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.prod_neg."));
             }
 
-            s.compile();
+            ta.step(true);
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}};
-            jet.resize(8);
-
-            std::vector<fp_t> pars{fp_t{0}, fp_t{0}, fp_t{3}, fp_t{3}};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);
@@ -229,18 +176,16 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = prod_mul_wrapper(2_dbl, 3_dbl), prime(y) = x + y},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = .5,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {prod_mul_wrapper(2_dbl, 3_dbl), x + y}, 2, 1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(6);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -251,24 +196,21 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {prod_mul_wrapper(-1_dbl, par[0]), x + y}, 2, 1, high_accuracy,
-                                 compact_mode);
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = prod_mul_wrapper(-1_dbl, par[0]), prime(y) = x + y},
+                                            {fp_t{2}, fp_t{3}},
+                                            kw::tol = .5,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level,
+                                            kw::pars = {fp_t{-2}}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.prod_neg."));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.prod_neg."));
             }
 
-            s.compile();
+            ta.step(true);
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            std::vector<fp_t> pars{fp_t{-2}};
-            jet.resize(6);
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -279,18 +221,17 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = prod_mul_wrapper(2_dbl, 3_dbl), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}},
+                                                  2,
+                                                  kw::tol = .5,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {prod_mul_wrapper(2_dbl, 3_dbl), x + y}, 2, 2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}};
-            jet.resize(12);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);
@@ -307,18 +248,17 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = prod_mul_wrapper(2_dbl, 3_dbl), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-2}, fp_t{-1}, fp_t{3}, fp_t{2}, fp_t{4}},
+                                                  3,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {prod_mul_wrapper(2_dbl, 3_dbl), x + y}, 3, 3, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{-1}, fp_t{3}, fp_t{2}, fp_t{4}};
-            jet.resize(24);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);
@@ -347,21 +287,18 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = prod_mul_wrapper(par[0], par[1]), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-2}, fp_t{-1}, fp_t{3}, fp_t{2}, fp_t{4}},
+                                                  3,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t{2}, fp_t{2}, fp_t{2}, fp_t{3}, fp_t{3}, fp_t{3}}};
 
-            taylor_add_jet<fp_t>(s, "jet", {prod_mul_wrapper(par[0], par[1]), x + y}, 3, 3, high_accuracy,
-                                 compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{-1}, fp_t{3}, fp_t{2}, fp_t{4}};
-            jet.resize(24);
-
-            std::vector<fp_t> pars{fp_t{2}, fp_t{2}, fp_t{2}, fp_t{3}, fp_t{3}, fp_t{3}};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);
@@ -390,25 +327,22 @@ TEST_CASE("taylor mul")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({prod_mul_wrapper(2_dbl, 3_dbl), x + y}, opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({prime(x) = prod_mul_wrapper(2_dbl, 3_dbl), prime(y) = x + y}, opt_level,
+                                   high_accuracy, compact_mode, rng, -10.f, 10.f);
 
         // Variable-number tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = expression{func{detail::prod_impl({y, 2_dbl})}},
+                                             prime(y) = expression{func{detail::prod_impl({x, -4_dbl})}}},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({y, 2_dbl})}}, expression{func{detail::prod_impl({x, -4_dbl})}}}, 1,
-                1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(4);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -417,23 +351,18 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = expression{func{detail::prod_impl({y, par[0]})}},
+                                             prime(y) = expression{func{detail::prod_impl({x, -4_dbl})}}},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level,
+                                            kw::pars = {fp_t{2}}};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({y, par[0]})}}, expression{func{detail::prod_impl({x, -4_dbl})}}}, 1,
-                1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(4);
-
-            std::vector<fp_t> pars{fp_t{2}};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -442,21 +371,18 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = expression{func{detail::prod_impl({y, 2_dbl})}},
+                                                   prime(y) = expression{func{detail::prod_impl({-4_dbl, x})}}},
+                                                  {fp_t{2}, fp_t{1}, fp_t{3}, fp_t{-4}},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({y, 2_dbl})}}, expression{func{detail::prod_impl({-4_dbl, x})}}}, 1,
-                2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{1}, fp_t{3}, fp_t{-4}};
-            jet.resize(8);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 1);
@@ -472,23 +398,19 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = expression{func{detail::prod_impl({y, 2_dbl})}},
+                                                   prime(y) = expression{func{detail::prod_impl({x, par[1]})}}},
+                                                  {fp_t{2}, fp_t{1}, fp_t{3}, fp_t{-4}},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t{0}, fp_t{0}, fp_t{-4}, fp_t{-4}}};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({y, 2_dbl})}}, expression{func{detail::prod_impl({x, par[1]})}}}, 1,
-                2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{1}, fp_t{3}, fp_t{-4}};
-            jet.resize(8);
-
-            std::vector<fp_t> pars{fp_t{0}, fp_t{0}, fp_t{-4}, fp_t{-4}};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 1);
@@ -504,21 +426,17 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = expression{func{detail::prod_impl({y, 2_dbl})}},
+                                             prime(y) = expression{func{detail::prod_impl({x, -4_dbl})}}},
+                                            {fp_t{2}, fp_t{3}},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({y, 2_dbl})}}, expression{func{detail::prod_impl({x, -4_dbl})}}}, 2,
-                1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(6);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -529,21 +447,18 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = expression{func{detail::prod_impl({y, 2_dbl})}},
+                                                   prime(y) = expression{func{detail::prod_impl({x, -4_dbl})}}},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{4}},
+                                                  2,
+                                                  kw::tol = .5,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({y, 2_dbl})}}, expression{func{detail::prod_impl({x, -4_dbl})}}}, 2,
-                2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{4}};
-            jet.resize(12);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -560,21 +475,18 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = expression{func{detail::prod_impl({y, 2_dbl})}},
+                                                   prime(y) = expression{func{detail::prod_impl({x, -4_dbl})}}},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{0}, fp_t{3}, fp_t{4}, fp_t{-5}},
+                                                  3,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({y, 2_dbl})}}, expression{func{detail::prod_impl({x, -4_dbl})}}}, 3,
-                3, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{0}, fp_t{3}, fp_t{4}, fp_t{-5}};
-            jet.resize(24);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -610,23 +522,19 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = expression{func{detail::prod_impl({y, par[0]})}},
+                                                   prime(y) = expression{func{detail::prod_impl({x, par[1]})}}},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{0}, fp_t{3}, fp_t{4}, fp_t{-5}},
+                                                  3,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t{2}, fp_t{2}, fp_t{2}, fp_t{-4}, fp_t{-4}, fp_t{-4}}};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({y, par[0]})}}, expression{func{detail::prod_impl({x, par[1]})}}}, 3,
-                3, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{0}, fp_t{3}, fp_t{4}, fp_t{-5}};
-            jet.resize(24);
-
-            std::vector<fp_t> pars{fp_t{2}, fp_t{2}, fp_t{2}, fp_t{-4}, fp_t{-4}, fp_t{-4}};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -661,27 +569,23 @@ TEST_CASE("taylor mul")
             REQUIRE(jet[23] == approximately(-1 / fp_t{6} * 8 * jet[14]));
         }
 
-        compare_batch_scalar<fp_t>(
-            {expression{func{detail::prod_impl({y, 2_dbl})}}, expression{func{detail::prod_impl({x, -4_dbl})}}},
-            opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({prime(x) = expression{func{detail::prod_impl({y, 2_dbl})}},
+                                    prime(y) = expression{func{detail::prod_impl({x, -4_dbl})}}},
+                                   opt_level, high_accuracy, compact_mode, rng, -10.f, 10.f);
 
         // Number/variable tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = expression{func{detail::prod_impl({2_dbl, y})}},
+                                             prime(y) = expression{func{detail::prod_impl({-4_dbl, x})}}},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({2_dbl, y})}}, expression{func{detail::prod_impl({-4_dbl, x})}}}, 1,
-                1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(4);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -690,26 +594,22 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({-1_dbl, y})}}, expression{func{detail::prod_impl({-4_dbl, x})}}}, 1,
-                1, high_accuracy, compact_mode);
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = expression{func{detail::prod_impl({-1_dbl, y})}},
+                                             prime(y) = expression{func{detail::prod_impl({-4_dbl, x})}}},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.prod_neg."));
-                REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.prod."));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.prod_neg."));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.prod."));
             }
 
-            s.compile();
+            ta.step(true);
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(4);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -718,23 +618,18 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = expression{func{detail::prod_impl({par[0], y})}},
+                                             prime(y) = expression{func{detail::prod_impl({-4_dbl, x})}}},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level,
+                                            kw::pars = {fp_t{2}}};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({par[0], y})}}, expression{func{detail::prod_impl({-4_dbl, x})}}}, 1,
-                1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(4);
-
-            std::vector<fp_t> pars{fp_t{2}};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -743,21 +638,18 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = expression{func{detail::prod_impl({2_dbl, y})}},
+                                                   prime(y) = expression{func{detail::prod_impl({-4_dbl, x})}}},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{4}},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({2_dbl, y})}}, expression{func{detail::prod_impl({-4_dbl, x})}}}, 1,
-                2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{4}};
-            jet.resize(8);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -773,26 +665,23 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({-1_dbl, y})}}, expression{func{detail::prod_impl({-4_dbl, x})}}}, 1,
-                2, high_accuracy, compact_mode);
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = expression{func{detail::prod_impl({-1_dbl, y})}},
+                                                   prime(y) = expression{func{detail::prod_impl({-4_dbl, x})}}},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{4}},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.prod_neg."));
-                REQUIRE(boost::contains(s.get_ir(), "taylor_c_diff.prod."));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.prod_neg."));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "taylor_c_diff.prod."));
             }
 
-            s.compile();
+            ta.step(true);
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{4}};
-            jet.resize(8);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -808,23 +697,19 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = expression{func{detail::prod_impl({2_dbl, y})}},
+                                                   prime(y) = expression{func{detail::prod_impl({par[1], x})}}},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{4}},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t{0}, fp_t{0}, fp_t{-4}, fp_t{-4}}};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({2_dbl, y})}}, expression{func{detail::prod_impl({par[1], x})}}}, 1,
-                2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{4}};
-            jet.resize(8);
-
-            std::vector<fp_t> pars{fp_t{0}, fp_t{0}, fp_t{-4}, fp_t{-4}};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -840,21 +725,17 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = expression{func{detail::prod_impl({2_dbl, y})}},
+                                             prime(y) = expression{func{detail::prod_impl({-4_dbl, x})}}},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({2_dbl, y})}}, expression{func{detail::prod_impl({-4_dbl, x})}}}, 2,
-                1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(6);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -865,21 +746,18 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = expression{func{detail::prod_impl({2_dbl, y})}},
+                                                   prime(y) = expression{func{detail::prod_impl({-4_dbl, x})}}},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{4}},
+                                                  2,
+                                                  kw::tol = .5,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({2_dbl, y})}}, expression{func{detail::prod_impl({-4_dbl, x})}}}, 2,
-                2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{4}};
-            jet.resize(12);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -896,21 +774,18 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = expression{func{detail::prod_impl({2_dbl, y})}},
+                                                   prime(y) = expression{func{detail::prod_impl({-4_dbl, x})}}},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{0}, fp_t{3}, fp_t{4}, fp_t{-5}},
+                                                  3,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({2_dbl, y})}}, expression{func{detail::prod_impl({-4_dbl, x})}}}, 3,
-                3, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{0}, fp_t{3}, fp_t{4}, fp_t{-5}};
-            jet.resize(24);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -946,23 +821,19 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = expression{func{detail::prod_impl({par[0], y})}},
+                                                   prime(y) = expression{func{detail::prod_impl({par[1], x})}}},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{0}, fp_t{3}, fp_t{4}, fp_t{-5}},
+                                                  3,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t{2}, fp_t{2}, fp_t{2}, fp_t{-4}, fp_t{-4}, fp_t{-4}}};
 
-            taylor_add_jet<fp_t>(
-                s, "jet",
-                {expression{func{detail::prod_impl({par[0], y})}}, expression{func{detail::prod_impl({par[1], x})}}}, 3,
-                3, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{0}, fp_t{3}, fp_t{4}, fp_t{-5}};
-            jet.resize(24);
-
-            std::vector<fp_t> pars{fp_t{2}, fp_t{2}, fp_t{2}, fp_t{-4}, fp_t{-4}, fp_t{-4}};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -997,26 +868,23 @@ TEST_CASE("taylor mul")
             REQUIRE(jet[23] == approximately(-1 / fp_t{6} * 8 * jet[14]));
         }
 
-        compare_batch_scalar<fp_t>(
-            {expression{func{detail::prod_impl({2_dbl, y})}}, expression{func{detail::prod_impl({-4_dbl, x})}}},
-            opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({prime(x) = expression{func{detail::prod_impl({2_dbl, y})}},
+                                    prime(y) = expression{func{detail::prod_impl({-4_dbl, x})}}},
+                                   opt_level, high_accuracy, compact_mode, rng, -10.f, 10.f);
 
         // Variable/variable tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = expression{func{detail::prod_impl({x, y})}},
+                                             prime(y) = expression{func{detail::prod_impl({y, x})}}},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(
-                s, "jet", {expression{func{detail::prod_impl({x, y})}}, expression{func{detail::prod_impl({y, x})}}}, 1,
-                1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(4);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -1025,20 +893,18 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = expression{func{detail::prod_impl({x, y})}},
+                                                   prime(y) = expression{func{detail::prod_impl({y, x})}}},
+                                                  {fp_t{2}, fp_t{1}, fp_t{3}, fp_t{-4}},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(
-                s, "jet", {expression{func{detail::prod_impl({x, y})}}, expression{func{detail::prod_impl({y, x})}}}, 1,
-                2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{1}, fp_t{3}, fp_t{-4}};
-            jet.resize(8);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 1);
@@ -1054,20 +920,17 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = expression{func{detail::prod_impl({x, y})}},
+                                             prime(y) = expression{func{detail::prod_impl({y, x})}}},
+                                            {fp_t{2}, fp_t{3}},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(
-                s, "jet", {expression{func{detail::prod_impl({x, y})}}, expression{func{detail::prod_impl({y, x})}}}, 2,
-                1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(6);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -1078,20 +941,18 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = expression{func{detail::prod_impl({x, y})}},
+                                                   prime(y) = expression{func{detail::prod_impl({y, x})}}},
+                                                  {fp_t{2}, fp_t{1}, fp_t{3}, fp_t{-4}},
+                                                  2,
+                                                  kw::tol = .5,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(
-                s, "jet", {expression{func{detail::prod_impl({x, y})}}, expression{func{detail::prod_impl({y, x})}}}, 2,
-                2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{1}, fp_t{3}, fp_t{-4}};
-            jet.resize(12);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 1);
@@ -1113,20 +974,18 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = expression{func{detail::prod_impl({x, y})}},
+                                                   prime(y) = expression{func{detail::prod_impl({y, x})}}},
+                                                  {fp_t{2}, fp_t{1}, fp_t{3}, fp_t{3}, fp_t{-4}, fp_t{6}},
+                                                  3,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(
-                s, "jet", {expression{func{detail::prod_impl({x, y})}}, expression{func{detail::prod_impl({y, x})}}}, 3,
-                3, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{1}, fp_t{3}, fp_t{3}, fp_t{-4}, fp_t{6}};
-            jet.resize(24);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 1);
@@ -1163,9 +1022,9 @@ TEST_CASE("taylor mul")
             REQUIRE(jet[23] == approximately(1 / fp_t{6} * (2 * jet[14] * 6 + 2 * jet[8] * jet[11] + 2 * 3 * jet[17])));
         }
 
-        compare_batch_scalar<fp_t>(
-            {expression{func{detail::prod_impl({x, y})}}, expression{func{detail::prod_impl({y, x})}}}, opt_level,
-            high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({prime(x) = expression{func{detail::prod_impl({x, y})}},
+                                    prime(y) = expression{func{detail::prod_impl({y, x})}}},
+                                   opt_level, high_accuracy, compact_mode, rng, -10.f, 10.f);
     };
 
     for (auto cm : {false, true}) {
@@ -1179,37 +1038,33 @@ TEST_CASE("taylor mul")
 
     // Error throwing if prod() is not a binary function.
     {
-        llvm_state s;
-        REQUIRE_THROWS_MATCHES(taylor_add_jet<double>(s, "jet",
-                                                      {prime("x"_var) = expression{func{detail::prod_impl()}}}, 3, 3,
-                                                      false, false),
-                               std::invalid_argument,
-                               Message("The Taylor derivative of a product can be computed only for products "
-                                       "of 2 terms, but the current product has 0 term(s) instead"));
+        REQUIRE_THROWS_MATCHES(
+            (taylor_adaptive_batch{{prime("x"_var) = expression{func{detail::prod_impl()}}}, {0., 0., 0.}, 3}),
+            std::invalid_argument,
+            Message("The Taylor derivative of a product can be computed only for products "
+                    "of 2 terms, but the current product has 0 term(s) instead"));
     }
     {
-        llvm_state s;
         REQUIRE_THROWS_MATCHES(
-            taylor_add_jet<double>(s, "jet", {prime("x"_var) = expression{func{detail::prod_impl()}}}, 3, 3, false,
-                                   true),
+            (taylor_adaptive_batch{
+                {prime("x"_var) = expression{func{detail::prod_impl()}}}, {0., 0., 0.}, 3, kw::compact_mode = true}),
             std::invalid_argument,
             Message("The Taylor derivative of a product in compact mode can be computed only for products "
                     "of 2 terms, but the current product has 0 term(s) instead"));
     }
     {
-        llvm_state s;
-        REQUIRE_THROWS_MATCHES(taylor_add_jet<double>(s, "jet",
-                                                      {prime("x"_var) = expression{func{detail::prod_impl({par[0]})}}},
-                                                      3, 3, false, false),
-                               std::invalid_argument,
-                               Message("The Taylor derivative of a product can be computed only for products "
-                                       "of 2 terms, but the current product has 1 term(s) instead"));
+        REQUIRE_THROWS_MATCHES(
+            (taylor_adaptive_batch{{prime("x"_var) = expression{func{detail::prod_impl({par[0]})}}}, {0., 0., 0.}, 3}),
+            std::invalid_argument,
+            Message("The Taylor derivative of a product can be computed only for products "
+                    "of 2 terms, but the current product has 1 term(s) instead"));
     }
     {
-        llvm_state s;
         REQUIRE_THROWS_MATCHES(
-            taylor_add_jet<double>(s, "jet", {prime("x"_var) = expression{func{detail::prod_impl({par[0]})}}}, 3, 3,
-                                   false, true),
+            (taylor_adaptive_batch{{prime("x"_var) = expression{func{detail::prod_impl({par[0]})}}},
+                                   {0., 0., 0.},
+                                   3,
+                                   kw::compact_mode = true}),
             std::invalid_argument,
             Message("The Taylor derivative of a product in compact mode can be computed only for products "
                     "of 2 terms, but the current product has 1 term(s) instead"));
