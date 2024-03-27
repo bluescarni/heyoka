@@ -198,13 +198,13 @@ TEST_CASE("callable type idx")
 {
     callable<void()> c;
 
-    REQUIRE(c.get_type_index() == typeid(detail::empty_callable));
+    REQUIRE(value_type_index(c) == typeid(detail::empty_callable));
 
     auto f = []() {};
 
     c = callable<void()>{f};
 
-    REQUIRE(c.get_type_index() == typeid(f));
+    REQUIRE(value_type_index(c) == typeid(f));
 }
 
 struct foo_s11n {
@@ -276,33 +276,4 @@ TEST_CASE("callable s11n")
 
         REQUIRE(!c);
     }
-}
-
-struct vfunc {
-    void operator()() const {}
-    int n = 0;
-};
-
-TEST_CASE("callable extract")
-{
-    callable<void()> c;
-    REQUIRE(c.extract<void (*)()>() == nullptr);
-    REQUIRE(c.extract<detail::empty_callable>() != nullptr);
-    REQUIRE(std::as_const(c).extract<void (*)()>() == nullptr);
-
-    c = callable<void()>(blap);
-    REQUIRE(c.extract<void (*)()>() != nullptr);
-    REQUIRE(c.extract<vfunc>() == nullptr);
-    REQUIRE(std::as_const(c).extract<void (*)()>() != nullptr);
-    REQUIRE(std::as_const(c).extract<vfunc>() == nullptr);
-
-    c = callable<void()>(vfunc{});
-    REQUIRE(c.extract<void (*)()>() == nullptr);
-    REQUIRE(c.extract<vfunc>() != nullptr);
-    REQUIRE(std::as_const(c).extract<void (*)()>() == nullptr);
-    REQUIRE(std::as_const(c).extract<vfunc>() != nullptr);
-
-    c = callable<void()>(vfunc{42});
-    ++(c.extract<vfunc>()->n);
-    REQUIRE(c.extract<vfunc>()->n == 43);
 }

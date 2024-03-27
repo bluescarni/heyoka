@@ -163,24 +163,6 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_ref_iface {
                 return static_cast<bool>(*iface_ptr(*static_cast<const Wrap *>(this)));
             }
         }
-
-        // NOTE: these are part of the old callable interface, and they are not
-        // strictly needed as there are equivalent functions in tanuki. Consider removing
-        // them in the future.
-        auto get_type_index() const noexcept
-        {
-            return value_type_index(*static_cast<const Wrap *>(this));
-        }
-        template <typename T>
-        T *extract() noexcept
-        {
-            return value_ptr<T>(*static_cast<Wrap *>(this));
-        }
-        template <typename T>
-        const T *extract() const noexcept
-        {
-            return value_ptr<T>(*static_cast<const Wrap *>(this));
-        }
     };
 };
 

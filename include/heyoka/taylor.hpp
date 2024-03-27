@@ -287,7 +287,7 @@ concept input_rangeT = std::ranges::input_range<R> && std::constructible_from<T,
 // NOTE: in any case, we end up creating a new object either by copying
 // or moving the input argument(s).
 template <typename Callback, typename CallbackSet, typename Parser>
-Callback parse_propagate_cb(Parser &p)
+Callback parse_propagate_cb(const Parser &p)
 {
     if constexpr (Parser::has(kw::callback)) {
         using cb_arg_t = decltype(p(kw::callback));
@@ -440,6 +440,8 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive : public detail::taylor_ada
     friend void detail::taylor_adaptive_setup_sv_rhs(TA &, const U &);
 
 public:
+    using value_type = T;
+
     using nt_event_t = nt_event<T>;
     using t_event_t = t_event<T>;
 
@@ -580,11 +582,13 @@ public:
 
     [[nodiscard]] const std::vector<T> &get_state() const;
     [[nodiscard]] const T *get_state_data() const;
-    T *get_state_data();
+    [[nodiscard]] T *get_state_data();
+    [[nodiscard]] std::ranges::subrange<typename std::vector<T>::iterator> get_state_range();
 
     [[nodiscard]] const std::vector<T> &get_pars() const;
     [[nodiscard]] const T *get_pars_data() const;
-    T *get_pars_data();
+    [[nodiscard]] T *get_pars_data();
+    [[nodiscard]] std::ranges::subrange<typename std::vector<T>::iterator> get_pars_range();
 
     [[nodiscard]] const std::vector<T> &get_tc() const;
 
@@ -809,6 +813,8 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_batch
     friend void detail::taylor_adaptive_setup_sv_rhs(TA &, const U &);
 
 public:
+    using value_type = T;
+
     using nt_event_t = nt_event_batch<T>;
     using t_event_t = t_event_batch<T>;
 
@@ -941,11 +947,13 @@ public:
 
     [[nodiscard]] const std::vector<T> &get_state() const;
     [[nodiscard]] const T *get_state_data() const;
-    T *get_state_data();
+    [[nodiscard]] T *get_state_data();
+    [[nodiscard]] std::ranges::subrange<typename std::vector<T>::iterator> get_state_range();
 
     [[nodiscard]] const std::vector<T> &get_pars() const;
     [[nodiscard]] const T *get_pars_data() const;
-    T *get_pars_data();
+    [[nodiscard]] T *get_pars_data();
+    [[nodiscard]] std::ranges::subrange<typename std::vector<T>::iterator> get_pars_range();
 
     [[nodiscard]] const std::vector<T> &get_tc() const;
 

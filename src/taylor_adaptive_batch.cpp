@@ -221,8 +221,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
     } else if (m_pars.size() > npars * m_batch_size) {
         throw std::invalid_argument(
             fmt::format("Excessive number of parameter values passed to the constructor of an adaptive "
-                        "Taylor integrator in batch mode: {} parameter values were passed, but the ODE "
-                        "system contains only {} parameters "
+                        "Taylor integrator in batch mode: {} parameter value(s) were passed, but the ODE "
+                        "system contains only {} parameter(s) "
                         "(in batches of {})",
                         m_pars.size(), npars, m_batch_size));
     }
@@ -1996,6 +1996,12 @@ const T *taylor_adaptive_batch<T>::get_state_data() const
 }
 
 template <typename T>
+std::ranges::subrange<typename std::vector<T>::iterator> taylor_adaptive_batch<T>::get_state_range()
+{
+    return std::ranges::subrange(m_i_data->m_state.begin(), m_i_data->m_state.end());
+}
+
+template <typename T>
 T *taylor_adaptive_batch<T>::get_state_data()
 {
     return m_i_data->m_state.data();
@@ -2011,6 +2017,12 @@ template <typename T>
 const T *taylor_adaptive_batch<T>::get_pars_data() const
 {
     return m_i_data->m_pars.data();
+}
+
+template <typename T>
+std::ranges::subrange<typename std::vector<T>::iterator> taylor_adaptive_batch<T>::get_pars_range()
+{
+    return std::ranges::subrange(m_i_data->m_pars.begin(), m_i_data->m_pars.end());
 }
 
 template <typename T>

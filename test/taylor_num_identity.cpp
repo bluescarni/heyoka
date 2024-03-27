@@ -13,7 +13,6 @@
 #include <heyoka/detail/num_identity.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -33,20 +32,15 @@ TEST_CASE("taylor num_identity")
     for (auto cm : {false, true}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             {
-                llvm_state s{kw::opt_level = opt_level};
+                auto ta = taylor_adaptive<fp_t>{{prime(x) = hy::detail::num_identity(42_dbl), prime(y) = x + y},
+                                                {fp_t(2), fp_t(3)},
+                                                kw::tol = 1,
+                                                kw::compact_mode = cm,
+                                                kw::opt_level = opt_level};
 
-                taylor_add_jet<fp_t>(s, "jet", {hy::detail::num_identity(42_dbl), x + y}, 1, 1, false, cm);
+                ta.step(true);
 
-                s.compile();
-
-                auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-                jet.resize(4);
-
-                fp_t t(4);
-
-                jptr(jet.data(), nullptr, &t);
+                const auto jet = tc_to_jet(ta);
 
                 REQUIRE(jet[0] == 2);
                 REQUIRE(jet[1] == 3);
@@ -55,20 +49,15 @@ TEST_CASE("taylor num_identity")
             }
 
             {
-                llvm_state s{kw::opt_level = opt_level};
+                auto ta = taylor_adaptive<fp_t>{{prime(x) = hy::detail::num_identity(42_dbl), prime(y) = x + y},
+                                                {fp_t(2), fp_t(3)},
+                                                kw::tol = .1,
+                                                kw::compact_mode = cm,
+                                                kw::opt_level = opt_level};
 
-                taylor_add_jet<fp_t>(s, "jet", {hy::detail::num_identity(42_dbl), x + y}, 3, 1, false, cm);
+                ta.step(true);
 
-                s.compile();
-
-                auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-                jet.resize(8);
-
-                fp_t t(-4);
-
-                jptr(jet.data(), nullptr, &t);
+                const auto jet = tc_to_jet(ta);
 
                 REQUIRE(jet[0] == 2);
                 REQUIRE(jet[1] == 3);

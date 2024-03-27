@@ -121,9 +121,9 @@ template <typename Base, typename Holder, typename T>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base, tanuki::iface_impl_helper<Base, Holder> {
     [[nodiscard]] const std::string &get_name() const final
     {
-        // NOTE: make sure we are invoking the member functions
-        // from func_base (these functions could have been overriden
-        // in the derived class).
+        // NOTE: make sure we are invoking the member function from func_base,
+        // as in principle there could be a get_name() function in the derived
+        // function class that hides it.
         return static_cast<const func_base &>(this->value()).get_name();
     }
 
@@ -153,6 +153,9 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base, tanuki::ifa
 
     [[nodiscard]] const std::vector<expression> &args() const final
     {
+        // NOTE: make sure we are invoking the member function from func_base,
+        // as in principle there could be an args() function in the derived
+        // function class that hides it.
         return static_cast<const func_base &>(this->value()).args();
     }
     std::pair<expression *, expression *> get_mutable_args_range() final

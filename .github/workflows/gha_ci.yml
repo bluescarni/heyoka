@@ -24,8 +24,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v1.1
-      - uses: conda-incubator/setup-miniconda@v2
+        uses: microsoft/setup-msbuild@v2
+      - uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
           python-version: "3.10"
@@ -46,8 +46,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v1.1
-      - uses: conda-incubator/setup-miniconda@v2
+        uses: microsoft/setup-msbuild@v2
+      - uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
           python-version: "3.10"
@@ -92,48 +92,39 @@ jobs:
           fetch-depth: 2
       - name: Build
         run: bash tools/gha_conda_coverage.sh
+  conda_ubsan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: bash tools/gha_conda_ubsan.sh
   conda_llvm17_asan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # See: https://github.com/actions/runner-images/issues/9491
-      - name: Fix kernel mmap rnd bits
-        run: sudo sysctl vm.mmap_rnd_bits=28
       - name: Build
         run: bash tools/gha_llvm17_conda_asan.sh
   conda_llvm16_asan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # See: https://github.com/actions/runner-images/issues/9491
-      - name: Fix kernel mmap rnd bits
-        run: sudo sysctl vm.mmap_rnd_bits=28
       - name: Build
         run: bash tools/gha_llvm16_conda_asan.sh
   conda_llvm15_asan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # See: https://github.com/actions/runner-images/issues/9491
-      - name: Fix kernel mmap rnd bits
-        run: sudo sysctl vm.mmap_rnd_bits=28
       - name: Build
         run: bash tools/gha_llvm15_conda_asan.sh
   conda_llvm14_asan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # See: https://github.com/actions/runner-images/issues/9491
-      - name: Fix kernel mmap rnd bits
-        run: sudo sysctl vm.mmap_rnd_bits=28
       - name: Build
         run: bash tools/gha_llvm14_conda_asan.sh
   conda_llvm13_asan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # See: https://github.com/actions/runner-images/issues/9491
-      - name: Fix kernel mmap rnd bits
-        run: sudo sysctl vm.mmap_rnd_bits=28
       - name: Build
         run: bash tools/gha_llvm13_conda_asan.sh

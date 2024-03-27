@@ -79,6 +79,13 @@ template <typename Base, typename Holder, typename T, typename TA>
     }
 };
 
+#if defined(__GNUC__) && !defined(__clang__)
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsuggest-final-methods"
+
+#endif
+
 // Definition of the step_cb interface.
 template <typename TA>
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
@@ -89,6 +96,12 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface : callable_iface<bool, TA &>
     template <typename Base, typename Holder, typename T>
     using impl = step_cb_iface_impl<Base, Holder, T, TA>;
 };
+
+#if defined(__GNUC__) && !defined(__clang__)
+
+#pragma GCC diagnostic pop
+
+#endif
 
 // Implementation of the reference interface.
 template <typename TA>
@@ -125,6 +138,7 @@ using step_cb_wrap_t = tanuki::wrap<step_cb_iface<TA>, step_cb_wrap_config<TA>>;
 // Hopefully this will be fixed - in the meantime if necessary we could do
 // the explicit instantiation only on clang (where this seems to work without
 // issues) and MSVC.
+// NOTE: this issue seems now to be fixed for GCC >= 13.3.
 template <typename T>
 using step_callback = detail::step_cb_wrap_t<taylor_adaptive<T>>;
 

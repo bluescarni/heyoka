@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
@@ -119,8 +118,6 @@ taylor_determine_h(llvm_state &s, llvm::Type *fp_t,
         assert(svf_ptr == nullptr);
     }
 #endif
-
-    using std::exp;
 
     auto &builder = s.builder();
 

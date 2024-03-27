@@ -84,6 +84,23 @@ TEST_CASE("dc copy")
     }
 }
 
+TEST_CASE("state pars range")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive_batch<double>{
+        {prime(x) = v, prime(v) = -par[0] * sin(x)}, {1.1, 1.11, 2.2, 2.21}, 2u, kw::pars = {3.3, 3.31}};
+
+    REQUIRE(std::ranges::equal(ta.get_state(), ta.get_state_range()));
+    REQUIRE(std::ranges::equal(ta.get_pars(), ta.get_pars_range()));
+
+    std::ranges::copy(std::vector{4.4, 4.41, 5.5, 5.51}, ta.get_state_range().begin());
+    REQUIRE(std::ranges::equal(ta.get_state(), std::vector{4.4, 4.41, 5.5, 5.51}));
+
+    std::ranges::copy(std::vector{6.6, 6.61}, ta.get_pars_range().begin());
+    REQUIRE(std::ranges::equal(ta.get_pars(), std::vector{6.6, 6.61}));
+}
+
 TEST_CASE("batch consistency")
 {
     auto [x, v] = make_vars("x", "v");
@@ -360,7 +377,7 @@ TEST_CASE("propagate grid")
     // Test the callback is moved.
     ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03}, 4};
     step_callback_batch<double> f_cb_grid(cb_functor_grid{});
-    f_cb_grid.extract<cb_functor_grid>()->n_copies_after = f_cb_grid.extract<cb_functor_grid>()->n_copies;
+    value_ptr<cb_functor_grid>(f_cb_grid)->n_copies_after = value_ptr<cb_functor_grid>(f_cb_grid)->n_copies;
     auto [out_cb, _] = ta.propagate_grid({0., 0., 0., 0., 10., 10., 10., 10., 100., 100., 100., 100.},
                                          kw::callback = std::move(f_cb_grid));
     // Invoke again the callback to ensure no copies have been made.
@@ -656,13 +673,13 @@ TEST_CASE("propagate for_until")
 
     // Test the callback is moved.
     step_callback_batch<double> f_cb_until(cb_functor_until{});
-    f_cb_until.extract<cb_functor_until>()->n_copies_after = f_cb_until.extract<cb_functor_until>()->n_copies;
+    value_ptr<cb_functor_until>(f_cb_until)->n_copies_after = value_ptr<cb_functor_until>(f_cb_until)->n_copies;
     auto [_, out_cb] = ta.propagate_until(20., kw::callback = std::move(f_cb_until));
     // Invoke again the callback to ensure no copies have been made.
     out_cb(ta);
 
     step_callback_batch<double> f_cb_for(cb_functor_for{});
-    f_cb_for.extract<cb_functor_for>()->n_copies_after = f_cb_for.extract<cb_functor_for>()->n_copies;
+    value_ptr<cb_functor_for>(f_cb_for)->n_copies_after = value_ptr<cb_functor_for>(f_cb_for)->n_copies;
     std::tie(_, out_cb) = ta.propagate_for(10., kw::callback = std::move(f_cb_for));
     out_cb(ta);
     REQUIRE(value_isa<cb_functor_for>(out_cb));
@@ -823,8 +840,7 @@ TEST_CASE("cb interrupt")
         auto ta
             = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2u};
 
-        ta.propagate_until(
-            {1., 1.1}, kw::callback = [](auto &) { return false; });
+        ta.propagate_until({1., 1.1}, kw::callback = [](auto &) { return false; });
 
         REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
         REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::cb_stop);
@@ -836,8 +852,7 @@ TEST_CASE("cb interrupt")
         REQUIRE(ta.get_time()[1] < 1.);
 
         auto counter = 0u;
-        ta.propagate_for(
-            {10., 10.1}, kw::callback = [&counter](auto &) { return counter++ != 5u; });
+        ta.propagate_for({10., 10.1}, kw::callback = [&counter](auto &) { return counter++ != 5u; });
 
         REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
         REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::cb_stop);
@@ -854,8 +869,7 @@ TEST_CASE("cb interrupt")
         auto ta
             = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2u};
 
-        auto [cb, res] = ta.propagate_grid(
-            {0., 0., 11., 11.1, 12., 12.1}, kw::callback = [](auto &) { return false; });
+        auto [cb, res] = ta.propagate_grid({0., 0., 11., 11.1, 12., 12.1}, kw::callback = [](auto &) { return false; });
 
         REQUIRE(cb);
         REQUIRE(std::all_of(res.begin() + 4, res.end(), [](double val) { return std::isnan(val); }));
@@ -891,8 +905,8 @@ TEST_CASE("cb interrupt")
         auto ta
             = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2u};
 
-        auto [cb, res] = ta.propagate_grid(
-            {0., 0., 1e-6, 21.1, 2e-6, 32.1}, kw::callback = [](auto &) { return false; });
+        auto [cb, res]
+            = ta.propagate_grid({0., 0., 1e-6, 21.1, 2e-6, 32.1}, kw::callback = [](auto &) { return false; });
 
         REQUIRE(cb);
         REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
@@ -931,8 +945,8 @@ TEST_CASE("param too many")
                                                                 kw::pars = std::vector{1., 2., 3.}}),
                            std::invalid_argument,
                            Message("Excessive number of parameter values passed to the constructor of an adaptive "
-                                   "Taylor integrator in batch mode: 3 parameter values were passed, but the ODE "
-                                   "system contains only 1 parameters "
+                                   "Taylor integrator in batch mode: 3 parameter value(s) were passed, but the ODE "
+                                   "system contains only 1 parameter(s) "
                                    "(in batches of 2)"));
 
     REQUIRE_THROWS_MATCHES((void)(taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
@@ -942,8 +956,8 @@ TEST_CASE("param too many")
                                                                 kw::t_events = {t_event_batch<double>(v - par[0])}}),
                            std::invalid_argument,
                            Message("Excessive number of parameter values passed to the constructor of an adaptive "
-                                   "Taylor integrator in batch mode: 3 parameter values were passed, but the ODE "
-                                   "system contains only 1 parameters "
+                                   "Taylor integrator in batch mode: 3 parameter value(s) were passed, but the ODE "
+                                   "system contains only 1 parameter(s) "
                                    "(in batches of 2)"));
 }
 
@@ -1142,13 +1156,13 @@ void s11n_test_impl()
         REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
         REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
 
-        REQUIRE(ta.get_t_events()[0].get_callback().get_type_index()
-                == ta_copy.get_t_events()[0].get_callback().get_type_index());
+        REQUIRE(value_type_index(ta.get_t_events()[0].get_callback())
+                == value_type_index(ta_copy.get_t_events()[0].get_callback()));
         REQUIRE(ta.get_t_events()[0].get_cooldown() == ta_copy.get_t_events()[0].get_cooldown());
         REQUIRE(ta.get_te_cooldowns() == ta_copy.get_te_cooldowns());
 
-        REQUIRE(ta.get_nt_events()[0].get_callback().get_type_index()
-                == ta_copy.get_nt_events()[0].get_callback().get_type_index());
+        REQUIRE(value_type_index(ta.get_nt_events()[0].get_callback())
+                == value_type_index(ta_copy.get_nt_events()[0].get_callback()));
 
         // Take a step in ta and in ta_copy.
         ta.step(true);
@@ -1665,8 +1679,8 @@ TEST_CASE("reset cooldowns")
     auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                           {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
                                           4,
-                                          kw::t_events = {te_t(
-                                              v, kw::callback = [](auto &, int, std::uint32_t) { return false; })}};
+                                          kw::t_events
+                                          = {te_t(v, kw::callback = [](auto &, int, std::uint32_t) { return false; })}};
 
     ta.propagate_until({100., 100., 100., 100.});
 

@@ -120,6 +120,22 @@ TEST_CASE("batch init outcome")
     }));
 }
 
+TEST_CASE("state pars range")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -par[0] * sin(x)}, {1.1, 2.2}, kw::pars = {3.3}};
+
+    REQUIRE(std::ranges::equal(ta.get_state(), ta.get_state_range()));
+    REQUIRE(std::ranges::equal(ta.get_pars(), ta.get_pars_range()));
+
+    std::ranges::copy(std::vector{4.4, 5.5}, ta.get_state_range().begin());
+    REQUIRE(std::ranges::equal(ta.get_state(), std::vector{4.4, 5.5}));
+
+    std::ranges::copy(std::vector{6.6}, ta.get_pars_range().begin());
+    REQUIRE(std::ranges::equal(ta.get_pars(), std::vector{6.6}));
+}
+
 TEST_CASE("propagate grid scalar")
 {
     using Catch::Matchers::Message;
@@ -300,12 +316,11 @@ TEST_CASE("propagate grid scalar")
 
     // A case in which we have a callback which never stops and a terminal event
     // which triggers.
-    ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -x},
-                                 {0., 1.},
-                                 kw::t_events = {t_event<double>(
-                                     v - .1, kw::callback = [](taylor_adaptive<double> &, int) { return false; })}};
-    out = ta.propagate_grid(
-        {0., 10.}, kw::callback = [](const auto &) { return true; });
+    ta = taylor_adaptive<double>{
+        {prime(x) = v, prime(v) = -x},
+        {0., 1.},
+        kw::t_events = {t_event<double>(v - .1, kw::callback = [](taylor_adaptive<double> &, int) { return false; })}};
+    out = ta.propagate_grid({0., 10.}, kw::callback = [](const auto &) { return true; });
     REQUIRE(std::get<0>(out) == taylor_outcome{-1});
     REQUIRE(std::get<4>(out));
 
@@ -1181,13 +1196,13 @@ TEST_CASE("propagate for_until")
 
     // Test the callback is moved.
     step_callback<double> f_cb_until(cb_functor_until{});
-    f_cb_until.extract<cb_functor_until>()->n_copies_after = f_cb_until.extract<cb_functor_until>()->n_copies;
+    value_ptr<cb_functor_until>(f_cb_until)->n_copies_after = value_ptr<cb_functor_until>(f_cb_until)->n_copies;
     auto out_cb = std::get<5>(ta.propagate_until(10., kw::callback = std::move(f_cb_until)));
     // Invoke again the callback to ensure no copies have been made.
     out_cb(ta);
 
     step_callback<double> f_cb_for(cb_functor_for{});
-    f_cb_for.extract<cb_functor_for>()->n_copies_after = f_cb_for.extract<cb_functor_for>()->n_copies;
+    value_ptr<cb_functor_for>(f_cb_for)->n_copies_after = value_ptr<cb_functor_for>(f_cb_for)->n_copies;
     out_cb = std::get<5>(ta.propagate_for(10., kw::callback = std::move(f_cb_for)));
     // Invoke again the callback to ensure no copies have been made.
     out_cb(ta);
@@ -1221,8 +1236,7 @@ TEST_CASE("propagate for_until")
     }
 
     // Test interruption via callback.
-    oc = std::get<0>(ta.propagate_for(
-        100., kw::callback = [n = 0](auto &) mutable { return n++ == 2; }));
+    oc = std::get<0>(ta.propagate_for(100., kw::callback = [n = 0](auto &) mutable { return n++ == 2; }));
     REQUIRE(oc == taylor_outcome::cb_stop);
 }
 
@@ -1334,7 +1348,7 @@ TEST_CASE("propagate grid")
 
     // Test the callback is moved.
     step_callback<double> f_cb_grid(cb_functor_grid{});
-    f_cb_grid.extract<cb_functor_grid>()->n_copies_after = f_cb_grid.extract<cb_functor_grid>()->n_copies;
+    value_ptr<cb_functor_grid>(f_cb_grid)->n_copies_after = value_ptr<cb_functor_grid>(f_cb_grid)->n_copies;
     auto out_cb = std::get<4>(ta.propagate_grid({1., 5., 10.}, kw::callback = std::move(f_cb_grid)));
     // Invoke again the callback to ensure no copies have been made.
     out_cb(ta);
@@ -1355,8 +1369,7 @@ TEST_CASE("propagate grid")
     REQUIRE(value_isa<cb_functor_grid>(value_ref<step_callback_set<double>>(out_cb)[0]));
 
     // Test interruption via callback.
-    oc = std::get<0>(ta.propagate_grid(
-        {12., 13., 24.}, kw::callback = [n = 0](auto &) mutable { return n++ == 2; }));
+    oc = std::get<0>(ta.propagate_grid({12., 13., 24.}, kw::callback = [n = 0](auto &) mutable { return n++ == 2; }));
     REQUIRE(oc == taylor_outcome::cb_stop);
 }
 
@@ -1497,16 +1510,14 @@ TEST_CASE("cb interrupt")
 
     // propagate_for/until().
     {
-        auto res = ta.propagate_until(
-            1., kw::callback = [](auto &) { return false; });
+        auto res = ta.propagate_until(1., kw::callback = [](auto &) { return false; });
 
         REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
         REQUIRE(std::get<3>(res) == 1u);
         REQUIRE(ta.get_time() < 1.);
 
         auto counter = 0u;
-        res = ta.propagate_for(
-            10., kw::callback = [&counter](auto &) { return counter++ != 5u; });
+        res = ta.propagate_for(10., kw::callback = [&counter](auto &) { return counter++ != 5u; });
 
         REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
         REQUIRE(std::get<3>(res) == 6u);
@@ -1516,8 +1527,7 @@ TEST_CASE("cb interrupt")
     // propagate_grid().
     {
         ta.set_time(10.);
-        auto res = ta.propagate_grid(
-            {10., 11., 12.}, kw::callback = [](auto &) { return false; });
+        auto res = ta.propagate_grid({10., 11., 12.}, kw::callback = [](auto &) { return false; });
 
         REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
         REQUIRE(std::get<3>(res) == 1u);
@@ -1564,8 +1574,9 @@ TEST_CASE("param too many")
                                        kw::pars = std::vector{1., 2.},
                                        kw::t_events = {t_event<double>(v - par[0])}}),
         std::invalid_argument,
-        Message("Excessive number of parameter values passed to the constructor of an adaptive "
-                "Taylor integrator: 2 parameter values were passed, but the ODE system contains only 1 parameters"));
+        Message(
+            "Excessive number of parameter values passed to the constructor of an adaptive "
+            "Taylor integrator: 2 parameter value(s) were passed, but the ODE system contains only 1 parameter(s)"));
 }
 
 // Test case for bug: parameters in event equations are ignored
@@ -1691,13 +1702,13 @@ void s11n_test_impl()
         REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
         REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
 
-        REQUIRE(ta.get_t_events()[0].get_callback().get_type_index()
-                == ta_copy.get_t_events()[0].get_callback().get_type_index());
+        REQUIRE(value_type_index(ta.get_t_events()[0].get_callback())
+                == value_type_index(ta_copy.get_t_events()[0].get_callback()));
         REQUIRE(ta.get_t_events()[0].get_cooldown() == ta_copy.get_t_events()[0].get_cooldown());
         REQUIRE(ta.get_te_cooldowns()[0] == ta_copy.get_te_cooldowns()[0]);
 
-        REQUIRE(ta.get_nt_events()[0].get_callback().get_type_index()
-                == ta_copy.get_nt_events()[0].get_callback().get_type_index());
+        REQUIRE(value_type_index(ta.get_nt_events()[0].get_callback())
+                == value_type_index(ta_copy.get_nt_events()[0].get_callback()));
 
         REQUIRE(ta.get_state_vars() == ta_copy.get_state_vars());
         REQUIRE(ta.get_rhs() == ta_copy.get_rhs());

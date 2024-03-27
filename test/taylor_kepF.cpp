@@ -46,11 +46,10 @@ const auto fp_types = std::tuple<float, double
 // Issue in the decomposition when h/k = 0.
 TEST_CASE("taylor kepF decompose bug 00")
 {
-    llvm_state s;
 
     auto lam = make_vars("lam");
 
-    taylor_add_jet<double>(s, "jet", {kepF(0_dbl, 0_dbl, lam)}, 1, 1, false, false);
+    auto ta = taylor_adaptive<double>({prime(lam) = kepF(0_dbl, 0_dbl, lam)}, {0.}, kw::tol = 1.);
 }
 
 TEST_CASE("taylor kepF")
@@ -84,23 +83,24 @@ TEST_CASE("taylor kepF")
 
         // Number-number-number test.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {kepF(fp_t(.1), par[0], .3_dbl), x + y}, 2, 2, high_accuracy, compact_mode);
-            taylor_add_jet<fp_t>(s, "jet2", {kepF(fp_t(.1), par[0], .3_dbl), x + y}, 2, 2, high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = kepF(fp_t(.1), par[0], .3_dbl), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}},
+                                                  2,
+                                                  kw::tol = .5,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t(.1), fp_t(.2)}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepF.num_par_num"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepF.num_par_num"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}}, pars{fp_t(.1), fp_t(.2)};
-            jet.resize(12);
+            const auto jet = tc_to_jet(ta);
 
-            jptr(jet.data(), pars.data(), nullptr);
+            const std::vector pars = {fp_t(.1), fp_t(.2)};
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -123,23 +123,24 @@ TEST_CASE("taylor kepF")
 
         // Number-number-var test.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {kepF(fp_t(.1), par[0], x), x + y}, 3, 2, high_accuracy, compact_mode);
-            taylor_add_jet<fp_t>(s, "jet2", {kepF(fp_t(.1), par[0], x), x + y}, 3, 2, high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = kepF(fp_t(.1), par[0], x), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}},
+                                                  2,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t(.1), fp_t(.2)}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepF.num_par_var"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepF.num_par_var"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}}, pars{fp_t(.1), fp_t(.2)};
-            jet.resize(16);
+            const auto jet = tc_to_jet(ta);
 
-            jptr(jet.data(), pars.data(), nullptr);
+            const std::vector pars = {fp_t(.1), fp_t(.2)};
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -174,23 +175,24 @@ TEST_CASE("taylor kepF")
 
         // Number-var-number test.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {kepF(fp_t(.1), x, par[0]), x + y}, 3, 2, high_accuracy, compact_mode);
-            taylor_add_jet<fp_t>(s, "jet2", {kepF(fp_t(.1), x, par[0]), x + y}, 3, 2, high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = kepF(fp_t(.1), x, par[0]), prime(y) = x + y},
+                                                  {fp_t{.5}, fp_t{-.125}, fp_t{3}, fp_t{5}},
+                                                  2,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t(.2), fp_t(.2)}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepF.num_var_par"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepF.num_var_par"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t{.5}, fp_t{-.125}, fp_t{3}, fp_t{5}}, pars{fp_t(.2), fp_t(.2)};
-            jet.resize(16);
+            const auto jet = tc_to_jet(ta);
 
-            jptr(jet.data(), pars.data(), nullptr);
+            const std::vector pars = {fp_t(.2), fp_t(.2)};
 
             REQUIRE(jet[0] == .5);
             REQUIRE(jet[1] == -.125);
@@ -234,23 +236,24 @@ TEST_CASE("taylor kepF")
 
         // Var-number-number test.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {kepF(x, fp_t(.1), par[0]), x + y}, 3, 2, high_accuracy, compact_mode);
-            taylor_add_jet<fp_t>(s, "jet2", {kepF(x, fp_t(.1), par[0]), x + y}, 3, 2, high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = kepF(x, fp_t(.1), par[0]), prime(y) = x + y},
+                                                  {fp_t{.5}, fp_t{-.125}, fp_t{3}, fp_t{5}},
+                                                  2,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t(.2), fp_t(.2)}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepF.var_num_par"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepF.var_num_par"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t{.5}, fp_t{-.125}, fp_t{3}, fp_t{5}}, pars{fp_t(.2), fp_t(.2)};
-            jet.resize(16);
+            const auto jet = tc_to_jet(ta);
 
-            jptr(jet.data(), pars.data(), nullptr);
+            const std::vector pars = {fp_t(.2), fp_t(.2)};
 
             REQUIRE(jet[0] == .5);
             REQUIRE(jet[1] == -.125);
@@ -294,23 +297,24 @@ TEST_CASE("taylor kepF")
 
         // Number-var-var test.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {kepF(par[0], x, y), x + y}, 3, 2, high_accuracy, compact_mode);
-            taylor_add_jet<fp_t>(s, "jet2", {kepF(par[0], x, y), x + y}, 3, 2, high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = kepF(par[0], x, y), prime(y) = x + y},
+                                                  {fp_t{.5}, fp_t{-.125}, fp_t{3}, fp_t{5}},
+                                                  2,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t(.2), fp_t(.2)}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepF.par_var_var"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepF.par_var_var"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t{.5}, fp_t{-.125}, fp_t{3}, fp_t{5}}, pars{fp_t(.2), fp_t(.2)};
-            jet.resize(16);
+            const auto jet = tc_to_jet(ta);
 
-            jptr(jet.data(), pars.data(), nullptr);
+            const std::vector pars = {fp_t(.2), fp_t(.2)};
 
             REQUIRE(jet[0] == .5);
             REQUIRE(jet[1] == -.125);
@@ -354,23 +358,24 @@ TEST_CASE("taylor kepF")
 
         // Var-number-var test.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {kepF(x, par[0], y), x + y}, 3, 2, high_accuracy, compact_mode);
-            taylor_add_jet<fp_t>(s, "jet2", {kepF(x, par[0], y), x + y}, 3, 2, high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = kepF(x, par[0], y), prime(y) = x + y},
+                                                  {fp_t{.5}, fp_t{-.125}, fp_t{3}, fp_t{5}},
+                                                  2,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t(.2), fp_t(.2)}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepF.var_par_var"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepF.var_par_var"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t{.5}, fp_t{-.125}, fp_t{3}, fp_t{5}}, pars{fp_t(.2), fp_t(.2)};
-            jet.resize(16);
+            const auto jet = tc_to_jet(ta);
 
-            jptr(jet.data(), pars.data(), nullptr);
+            const std::vector pars = {fp_t(.2), fp_t(.2)};
 
             REQUIRE(jet[0] == .5);
             REQUIRE(jet[1] == -.125);
@@ -414,23 +419,24 @@ TEST_CASE("taylor kepF")
 
         // Var-var-number test.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {kepF(x, y, par[0]), x + y}, 3, 2, high_accuracy, compact_mode);
-            taylor_add_jet<fp_t>(s, "jet2", {kepF(x, y, par[0]), x + y}, 3, 2, high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = kepF(x, y, par[0]), prime(y) = x + y},
+                                                  {fp_t{.5}, fp_t{-.125}, fp_t{0.1875}, fp_t{-0.3125}},
+                                                  2,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t(.2), fp_t(.2)}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepF.var_var_par"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepF.var_var_par"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t{.5}, fp_t{-.125}, fp_t{0.1875}, fp_t{-0.3125}}, pars{fp_t(.2), fp_t(.2)};
-            jet.resize(16);
+            const auto jet = tc_to_jet(ta);
 
-            jptr(jet.data(), pars.data(), nullptr);
+            const std::vector pars = {fp_t(.2), fp_t(.2)};
 
             REQUIRE(jet[0] == .5);
             REQUIRE(jet[1] == -.125);
@@ -480,23 +486,22 @@ TEST_CASE("taylor kepF")
 
         // Var-var-var test.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {kepF(x, y, z), x + y, y}, 3, 2, high_accuracy, compact_mode);
-            taylor_add_jet<fp_t>(s, "jet2", {kepF(x, y, z), x + y, y}, 3, 2, high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta
+                = taylor_adaptive_batch<fp_t>{{prime(x) = kepF(x, y, z), prime(y) = x + y, prime(z) = y},
+                                              {fp_t{.5}, fp_t{-.125}, fp_t{0.1875}, fp_t{-0.3125}, fp_t{1}, fp_t{2}},
+                                              2,
+                                              kw::tol = .1,
+                                              kw::high_accuracy = high_accuracy,
+                                              kw::compact_mode = compact_mode,
+                                              kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepF.var_var_var"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepF.var_var_var"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t{.5}, fp_t{-.125}, fp_t{0.1875}, fp_t{-0.3125}, fp_t{1}, fp_t{2}};
-            jet.resize(24);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             // Order 0.
             REQUIRE(jet[0] == .5);
