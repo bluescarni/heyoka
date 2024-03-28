@@ -21,7 +21,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/relu.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -63,24 +62,25 @@ TEST_CASE("taylor relu relup")
 
         // Number tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet2", {relu(par[0]) + relup(par[1]), x + y}, 3, 2, high_accuracy, compact_mode);
-            taylor_add_jet<fp_t>(s, "jet", {relu(par[0]) + relup(par[1]), x + y}, 3, 2, high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = relu(par[0]) + relup(par[1]), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}},
+                                                  2,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t{-1}, fp_t{2}, fp_t{4}, fp_t{-3}}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.relu.par"));
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.relup.par"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relu.par"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relup.par"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}}, pars{fp_t{-1}, fp_t{2}, fp_t{4}, fp_t{-3}};
-            jet.resize(16);
+            const auto jet = tc_to_jet(ta);
 
-            jptr(jet.data(), pars.data(), nullptr);
+            const std::vector pars = {fp_t{-1}, fp_t{2}, fp_t{4}, fp_t{-3}};
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -109,24 +109,22 @@ TEST_CASE("taylor relu relup")
 
         // Variable tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet2", {relu(x) + relup(y), x + y}, 3, 2, high_accuracy, compact_mode);
-            taylor_add_jet<fp_t>(s, "jet", {relu(x) + relup(y), x + y}, 3, 2, high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = relu(x) + relup(y), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}},
+                                                  2,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.relu.var"));
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.relup.var"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relu.var"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relup.var"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}};
-            jet.resize(16);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -173,27 +171,27 @@ TEST_CASE("taylor relu relup leaky")
 
         // Number tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet2", {relu(par[0], 0.01) + relup(par[1], 0.02), x + y}, 3, 2, high_accuracy,
-                                 compact_mode);
-            taylor_add_jet<fp_t>(s, "jet", {relu(par[0], 0.01) + relup(par[1], 0.02), x + y}, 3, 2, high_accuracy,
-                                 compact_mode);
-
-            s.compile();
+            auto ta
+                = taylor_adaptive_batch<fp_t>{{prime(x) = relu(par[0], 0.01) + relup(par[1], 0.02), prime(y) = x + y},
+                                              {fp_t{2}, fp_t{-1}, fp_t{-3}, fp_t{5}},
+                                              2,
+                                              kw::tol = .1,
+                                              kw::high_accuracy = high_accuracy,
+                                              kw::compact_mode = compact_mode,
+                                              kw::opt_level = opt_level,
+                                              kw::pars = {fp_t{-1}, fp_t{2}, fp_t{4}, fp_t{-3}}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.relu_0x"));
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.relup_0x"));
-                REQUIRE(boost::contains(s.get_ir(), ".par"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relu_0x"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relup_0x"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), ".par"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{-3}, fp_t{5}}, pars{fp_t{-1}, fp_t{2}, fp_t{4}, fp_t{-3}};
-            jet.resize(16);
+            const auto jet = tc_to_jet(ta);
 
-            jptr(jet.data(), pars.data(), nullptr);
+            const std::vector pars = {fp_t{-1}, fp_t{2}, fp_t{4}, fp_t{-3}};
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -222,25 +220,23 @@ TEST_CASE("taylor relu relup leaky")
 
         // Variable tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet2", {relu(x, 0.01) + relup(y, 0.02), x + y}, 3, 2, high_accuracy, compact_mode);
-            taylor_add_jet<fp_t>(s, "jet", {relu(x, 0.01) + relup(y, 0.02), x + y}, 3, 2, high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = relu(x, 0.01) + relup(y, 0.02), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{-3}, fp_t{5}},
+                                                  2,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.relu_0x"));
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.relup_0x"));
-                REQUIRE(boost::contains(s.get_ir(), ".var"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relu_0x"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.relup_0x"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), ".var"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{-3}, fp_t{5}};
-            jet.resize(16);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
