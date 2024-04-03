@@ -509,8 +509,8 @@ public:
     [[nodiscard]] size_type index_of(const iterator &) const;
 
     [[nodiscard]] auto get_derivatives(std::uint32_t order) const -> decltype(std::ranges::subrange(begin(), end()));
-    [[nodiscard]] auto get_derivatives(std::uint32_t component, std::uint32_t order) const
-        -> decltype(std::ranges::subrange(begin(), end()));
+    [[nodiscard]] auto get_derivatives(std::uint32_t component,
+                                       std::uint32_t order) const -> decltype(std::ranges::subrange(begin(), end()));
     [[nodiscard]] std::vector<expression> get_gradient() const;
     [[nodiscard]] std::vector<expression> get_jacobian() const;
     [[nodiscard]] std::vector<expression> get_hessian(std::uint32_t) const;
@@ -800,24 +800,16 @@ template <typename T, typename R>
 concept cfunc_out_range_1d = requires(R &r) {
     requires std::ranges::contiguous_range<R>;
     requires std::ranges::sized_range<R>;
-    {
-        std::ranges::data(r)
-    } -> std::same_as<T *>;
-    {
-        std::ranges::size(r)
-    } -> std::integral;
+    { std::ranges::data(r) } -> std::same_as<T *>;
+    { std::ranges::size(r) } -> std::integral;
 };
 
 template <typename T, typename R>
 concept cfunc_in_range_1d = requires(R &r) {
     requires std::ranges::contiguous_range<R>;
     requires std::ranges::sized_range<R>;
-    {
-        std::ranges::data(r)
-    } -> std::convertible_to<const T *>;
-    {
-        std::ranges::size(r)
-    } -> std::integral;
+    { std::ranges::data(r) } -> std::convertible_to<const T *>;
+    { std::ranges::size(r) } -> std::integral;
 };
 
 } // namespace detail

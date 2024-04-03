@@ -66,6 +66,8 @@ using namespace heyoka;
 using namespace heyoka_test;
 using namespace Catch::literals;
 
+using smap_t = std::unordered_map<std::string, expression>;
+
 // Helper to ease the removal of neg() in the test code.
 auto neg(const expression &e)
 {
@@ -611,7 +613,7 @@ TEST_CASE("subs str")
 
     auto foo_a = ((a + y) * (z + a)) * ((z - a) * (y + a)), bar_a = (foo_a - a) / (2. * foo_a);
 
-    auto bar_subs = subs(bar, {{"x", a}});
+    auto bar_subs = subs(bar, smap_t{{"x", a}});
 
     // Ensure foo/bar were not modified.
     REQUIRE(foo == ((x + y) * (z + x)) * ((z - x) * (y + x)));
@@ -623,9 +625,9 @@ TEST_CASE("subs str")
     REQUIRE(bar_subs == bar_a);
 
     // Check normalisation.
-    REQUIRE(subs(x + y, {{"x", "b"_var}, {"y", "a"_var}}, true) == "a"_var + "b"_var);
-    REQUIRE(subs(std::vector{x + y}, {{"x", "b"_var}, {"y", "a"_var}}, true)[0] == "a"_var + "b"_var);
-    REQUIRE(subs(std::vector{x + y}, {{"x", "b"_var}, {"y", "a"_var}})[0] != "a"_var + "b"_var);
+    REQUIRE(subs(x + y, smap_t{{"x", "b"_var}, {"y", "a"_var}}, true) == "a"_var + "b"_var);
+    REQUIRE(subs(std::vector{x + y}, smap_t{{"x", "b"_var}, {"y", "a"_var}}, true)[0] == "a"_var + "b"_var);
+    REQUIRE(subs(std::vector{x + y}, smap_t{{"x", "b"_var}, {"y", "a"_var}})[0] != "a"_var + "b"_var);
 }
 
 TEST_CASE("subs")
