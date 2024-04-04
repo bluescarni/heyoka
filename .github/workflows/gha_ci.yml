@@ -7,14 +7,14 @@ on:
     branches:
       - master
 jobs:
-  osx_11:
-    runs-on: macos-11
+  osx_13:
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
       - name: Build
         run: bash tools/gha_osx.sh
-  osx_11_static:
-    runs-on: macos-11
+  osx_13_static:
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
       - name: Build
