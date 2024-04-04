@@ -43,7 +43,7 @@ cmake ../ -G Ninja \
 ninja -v
 
 # Run the tests.
-ctest -V -j4
+ctest -VV -j4
 
 # Upload coverage data.
 bash <(curl -s https://codecov.io/bash) -x $deps_dir/bin/gcov

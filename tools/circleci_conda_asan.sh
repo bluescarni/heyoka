@@ -44,7 +44,7 @@ cmake ../ -G Ninja \
 ninja -v -j4
 
 # Run the tests.
-ctest -V -j4
+ctest -VV -j4
 
 # Build the docs.
 cd ../doc

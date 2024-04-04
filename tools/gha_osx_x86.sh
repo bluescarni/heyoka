@@ -39,7 +39,7 @@ CXX=clang++ CC=clang cmake ../ -G Ninja \
 ninja -v
 
 # Run the tests.
-ctest -V -j4
+ctest -VV -j4
 
 set +e
 set +x
