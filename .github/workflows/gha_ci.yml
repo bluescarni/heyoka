@@ -7,18 +7,24 @@ on:
     branches:
       - master
 jobs:
-  osx_13:
+  osx_13_x86:
     runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        run: bash tools/gha_osx.sh
-  osx_13_static:
+        run: bash tools/gha_osx_x86.sh
+  osx_13_static_x86:
     runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        run: bash tools/gha_osx_static.sh
+        run: bash tools/gha_osx_x86_static.sh
+  osx_14_static_arm64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: bash tools/gha_osx_arm64_static.sh
   windows_2022_llvm13:
     runs-on: windows-2022
     steps:
