@@ -10,7 +10,7 @@ set -e
 sudo apt-get install wget
 
 # Install conda+deps.
-wget https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Linux-aarch64.sh -O miniconda.sh
+wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh -O miniconda.sh
 export deps_dir=$HOME/local
 export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
@@ -21,7 +21,11 @@ source activate $deps_dir
 mkdir build
 cd build
 
-# GCC build.
+# Setup compilation flags.
+export CXXFLAGS="-Og"
+export CFLAGS="-Og"
+
+# Configure.
 cmake ../ -G Ninja \
     -DCMAKE_PREFIX_PATH=$deps_dir \
     -DCMAKE_BUILD_TYPE=Debug \
@@ -31,7 +35,10 @@ cmake ../ -G Ninja \
     -DHEYOKA_WITH_SLEEF=yes \
     -DCMAKE_CXX_FLAGS="--coverage" \
     -DBoost_NO_BOOST_CMAKE=ON
+
+# Build.
 ninja -v
+
 # Run the tests.
 ctest -V -j4
 
