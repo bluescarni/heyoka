@@ -21,9 +21,9 @@ source activate $deps_dir
 mkdir build
 cd build
 
-# Setup compilation flags.
-export CXXFLAGS="-Og"
-export CFLAGS="-Og"
+# Clear the compilation flags set up by conda.
+unset CXXFLAGS
+unset CFLAGS
 
 # Configure.
 cmake ../ -G Ninja \
@@ -34,6 +34,7 @@ cmake ../ -G Ninja \
     -DHEYOKA_BUILD_TUTORIALS=ON \
     -DHEYOKA_WITH_SLEEF=yes \
     -DCMAKE_CXX_FLAGS="--coverage" \
+    -DCMAKE_CXX_FLAGS_DEBUG="-g -Og" \
     -DBoost_NO_BOOST_CMAKE=ON
 
 # Build.
