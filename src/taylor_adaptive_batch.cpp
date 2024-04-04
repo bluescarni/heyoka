@@ -245,13 +245,13 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
 
     // Fetch the stepper.
     if (with_events) {
-        m_step_f = reinterpret_cast<i_data::step_f_e_t>(m_llvm.jit_lookup("step_e"));
+        m_step_f = reinterpret_cast<typename i_data::step_f_e_t>(m_llvm.jit_lookup("step_e"));
     } else {
-        m_step_f = reinterpret_cast<i_data::step_f_t>(m_llvm.jit_lookup("step"));
+        m_step_f = reinterpret_cast<typename i_data::step_f_t>(m_llvm.jit_lookup("step"));
     }
 
     // Fetch the function to compute the dense output.
-    m_d_out_f = reinterpret_cast<i_data::d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+    m_d_out_f = reinterpret_cast<typename i_data::d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
 
     // Setup the vector for the Taylor coefficients.
     // NOTE: the size of m_state.size() already takes
@@ -323,9 +323,9 @@ taylor_adaptive_batch<T>::taylor_adaptive_batch(const taylor_adaptive_batch &oth
       m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
 {
     if (m_ed_data) {
-        m_i_data->m_step_f = reinterpret_cast<i_data::step_f_e_t>(m_i_data->m_llvm.jit_lookup("step_e"));
+        m_i_data->m_step_f = reinterpret_cast<typename i_data::step_f_e_t>(m_i_data->m_llvm.jit_lookup("step_e"));
     } else {
-        m_i_data->m_step_f = reinterpret_cast<i_data::step_f_t>(m_i_data->m_llvm.jit_lookup("step"));
+        m_i_data->m_step_f = reinterpret_cast<typename i_data::step_f_t>(m_i_data->m_llvm.jit_lookup("step"));
     }
 }
 
@@ -375,9 +375,9 @@ void taylor_adaptive_batch<T>::load_impl(Archive &ar, unsigned version)
 
         // Recover the function pointers.
         if (m_ed_data) {
-            m_i_data->m_step_f = reinterpret_cast<i_data::step_f_e_t>(m_i_data->m_llvm.jit_lookup("step_e"));
+            m_i_data->m_step_f = reinterpret_cast<typename i_data::step_f_e_t>(m_i_data->m_llvm.jit_lookup("step_e"));
         } else {
-            m_i_data->m_step_f = reinterpret_cast<i_data::step_f_t>(m_i_data->m_llvm.jit_lookup("step"));
+            m_i_data->m_step_f = reinterpret_cast<typename i_data::step_f_t>(m_i_data->m_llvm.jit_lookup("step"));
         }
         // LCOV_EXCL_START
     } catch (...) {

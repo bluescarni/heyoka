@@ -11,6 +11,18 @@ New
   integrators (`#409 <https://github.com/bluescarni/heyoka/pull/409>`__).
 - Support LLVM 18 (`#408 <https://github.com/bluescarni/heyoka/pull/408>`__).
 
+4.0.3 (2024-04-04)
+------------------
+
+Fix
+~~~
+
+- Workaround compilation failures in the unit tests
+  when using GCC 13
+  (`#409 <https://github.com/bluescarni/heyoka/pull/409>`__).
+- Fix compilation on FreeBSD
+  (`#407 <https://github.com/bluescarni/heyoka/pull/407>`__).
+
 4.0.2 (2024-03-03)
 ------------------
 
