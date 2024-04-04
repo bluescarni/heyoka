@@ -514,8 +514,9 @@ TEST_CASE("taylor acosh")
                                         + 1 / sqrt(-1 + jet[4] * jet[4]) * 2 * jet[16])));
             REQUIRE(jet[20]
                     == approximately(fp_t{1} / 6
-                                     * (-jet[5] * pow(-1 + jet[5] * jet[5], fp_t{-3} / 2) * jet[11] * jet[11]
-                                        + 1 / sqrt(-1 + jet[5] * jet[5]) * 2 * jet[17])));
+                                         * (-jet[5] * pow(-1 + jet[5] * jet[5], fp_t{-3} / 2) * jet[11] * jet[11]
+                                            + 1 / sqrt(-1 + jet[5] * jet[5]) * 2 * jet[17]),
+                                     fp_t(1000)));
 
             REQUIRE(jet[21]
                     == approximately(fp_t{1} / 6
