@@ -10,15 +10,13 @@ set -e
 sudo apt-get install wget
 
 # Install conda+deps.
-wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O miniconda.sh
 export deps_dir=$HOME/local
 export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
-conda config --add channels conda-forge
-conda config --set channel_priority strict
-conda create -y -q -p $deps_dir c-compiler cxx-compiler cmake \
+mamba create -y -p $deps_dir c-compiler cxx-compiler cmake \
     llvmdev tbb-devel tbb libboost-devel 'mppp=1.*' sleef xtensor \
-    xtensor-blas blas blas-devel fmt spdlog \
+    xtensor-blas blas blas-devel fmt spdlog ninja \
     'sphinxcontrib-bibtex=2.6.*' 'sphinx=7.*' 'sphinx-book-theme=1.*'
 source activate $deps_dir
 
@@ -26,10 +24,27 @@ source activate $deps_dir
 mkdir build
 cd build
 
-# GCC build.
-cmake ../ -DCMAKE_PREFIX_PATH=$deps_dir -DCMAKE_BUILD_TYPE=Debug -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_WITH_MPPP=yes -DHEYOKA_WITH_SLEEF=yes -DCMAKE_CXX_FLAGS="-fsanitize=address" -DBoost_NO_BOOST_CMAKE=ON
-make -j4 VERBOSE=1
-ctest -V -j4 -E vsop2013
+# Clear the compilation flags set up by conda.
+unset CXXFLAGS
+unset CFLAGS
+
+# Configure.
+cmake ../ -G Ninja \
+    -DCMAKE_PREFIX_PATH=$deps_dir \
+    -DCMAKE_BUILD_TYPE=Debug \
+    -DHEYOKA_BUILD_TESTS=yes \
+    -DHEYOKA_BUILD_TUTORIALS=ON \
+    -DHEYOKA_WITH_MPPP=yes \
+    -DHEYOKA_WITH_SLEEF=yes \
+    -DCMAKE_CXX_FLAGS="-fsanitize=address" \
+    -DCMAKE_CXX_FLAGS_DEBUG="-g -Og" \
+    -DBoost_NO_BOOST_CMAKE=ON
+
+# Build.
+ninja -v
+
+# Run the tests.
+ctest -V -j4
 
 # Build the docs.
 cd ../doc
