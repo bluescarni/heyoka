@@ -32,7 +32,6 @@ CXX=clang++ CC=clang cmake -G Ninja ../ \
     -DHEYOKA_WITH_MPPP=yes \
     -DHEYOKA_BUILD_TUTORIALS=ON \
     -DHEYOKA_WITH_SLEEF=yes \
-    -DHEYOKA_ENABLE_IPO=yes \
     -DBoost_NO_BOOST_CMAKE=ON \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -Og" \
     -DHEYOKA_FORCE_STATIC_LLVM=yes \
