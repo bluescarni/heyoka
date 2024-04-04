@@ -41,7 +41,7 @@ cmake ../ -G Ninja \
     -DBoost_NO_BOOST_CMAKE=ON
 
 # Build.
-ninja -v
+ninja -v -j4
 
 # Run the tests.
 ctest -V -j4
