@@ -40,10 +40,10 @@ cmake ../ -G Ninja \
     -DBoost_NO_BOOST_CMAKE=ON
 
 # Build.
-ninja -v -j2
+ninja -v
 
 # Run the tests.
-ctest -V -j2
+ctest -V -j4
 
 # Create lcov report
 lcov --capture --directory . --output-file coverage.info

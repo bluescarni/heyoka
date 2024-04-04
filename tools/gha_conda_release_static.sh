@@ -23,7 +23,7 @@ source activate $deps_dir
 mkdir build
 cd build
 
-# GCC build.
+# Configure.
 cmake ../ -G Ninja \
     -DCMAKE_PREFIX_PATH=$deps_dir \
     -DCMAKE_BUILD_TYPE=Release \
@@ -37,10 +37,10 @@ cmake ../ -G Ninja \
     -DHEYOKA_HIDE_LLVM_SYMBOLS=yes
 
 # Build.
-ninja -v -j2
+ninja -v
 
 # Run the tests.
-ctest -V -j2
+ctest -V -j4
 
 set +e
 set +x
