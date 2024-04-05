@@ -11,6 +11,12 @@ New
   integrators (`#409 <https://github.com/bluescarni/heyoka/pull/409>`__).
 - Support LLVM 18 (`#408 <https://github.com/bluescarni/heyoka/pull/408>`__).
 
+Fix
+~~~
+
+- Fix test failures on OSX arm64
+  (`#409 <https://github.com/bluescarni/heyoka/pull/409>`__).
+
 4.0.3 (2024-04-04)
 ------------------
 
