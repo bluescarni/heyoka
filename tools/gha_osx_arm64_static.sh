@@ -41,9 +41,7 @@ CXX=clang++ CC=clang cmake -G Ninja ../ \
 ninja -v
 
 # Run the tests.
-# NOTE: test failure on ensemble_propagate_mp,
-# under investigation.
-ctest -VV -j4 -E ensemble_propagate_mp
+ctest -VV -j4
 
 set +e
 set +x
