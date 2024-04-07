@@ -16,8 +16,8 @@ Unsolved
     was executed,
   * the "fast math" flag was enabled during JIT compilation.
 
-  The root cause is most likely a code-generation issue in LLVM. This issue
-  is currently under investigation.
+  The root cause is most likely a code-generation/optimisation problem in LLVM.
+  This issue is currently under investigation.
 
 Solved
 ======
