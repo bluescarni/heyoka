@@ -148,6 +148,10 @@ void compare_batch_scalar(const std::vector<std::pair<heyoka::expression, heyoka
         std::vector<T> orig_batch_state(batch_size * dim);
         std::ranges::generate(orig_batch_state, [&dist, &rng]() { return T{dist(rng)}; });
 
+        // Randomly-generate the batch initial time.
+        std::vector<T> orig_batch_time(batch_size);
+        std::ranges::generate(orig_batch_time, [&dist, &rng]() { return T{dist(rng)}; });
+
         auto ta = heyoka::taylor_adaptive<T>{sys,
                                              std::vector<T>(dim),
                                              kw::tol = .1,
@@ -161,7 +165,8 @@ void compare_batch_scalar(const std::vector<std::pair<heyoka::expression, heyoka
                                                          kw::tol = .1,
                                                          kw::high_accuracy = high_accuracy,
                                                          kw::compact_mode = compact_mode,
-                                                         kw::opt_level = opt_level};
+                                                         kw::opt_level = opt_level,
+                                                         kw::time = orig_batch_time};
 
         // Take the batch step.
         ta_batch.step(true);
@@ -173,6 +178,8 @@ void compare_batch_scalar(const std::vector<std::pair<heyoka::expression, heyoka
             for (auto i = 0ul; i < dim; ++i) {
                 ta.get_state_data()[i] = orig_batch_state[i * batch_size + batch_idx];
             }
+
+            ta.set_time(orig_batch_time[batch_idx]);
 
             ta.step(true);
 
