@@ -860,6 +860,8 @@ private:
             // Initial times (defaults to a vector of zeroes).
             auto tm = [&p, batch_size]() -> std::vector<T> {
                 if constexpr (p.has(kw::time)) {
+                    // NOTE: silence clang warning.
+                    (void)batch_size;
                     return p(kw::time);
                 } else {
                     return std::vector<T>(static_cast<typename std::vector<T>::size_type>(batch_size), T(0));
