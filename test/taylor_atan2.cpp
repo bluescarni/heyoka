@@ -306,7 +306,7 @@ TEST_CASE("taylor atan2")
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             compare_batch_scalar<fp_t>(
                 {prime(x) = atan2(expression{number{a}}, expression{number{b}}), prime(y) = x + y}, opt_level,
-                high_accuracy, compact_mode, rng, -8.f, 8.f, fp_t(10000));
+                high_accuracy, compact_mode, rng, -10.f, 10.f, fp_t(10000));
         }
 
         // Variable-number tests.
@@ -530,7 +530,7 @@ TEST_CASE("taylor atan2")
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>(
                 {prime(x) = atan2(y, expression{number{b}}), prime(y) = atan2(x, expression{number{b}})}, opt_level,
-                high_accuracy, compact_mode, rng, -8.f, 8.f, fp_t(10000));
+                high_accuracy, compact_mode, rng, -10.f, 10.f, fp_t(10000));
         }
 
         // Number-variable tests.
@@ -756,7 +756,7 @@ TEST_CASE("taylor atan2")
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>(
                 {prime(x) = atan2(expression{number{a}}, y), prime(y) = atan2(expression{number{c}}, x)}, opt_level,
-                high_accuracy, compact_mode, rng, -8.f, 8.f, fp_t(10000));
+                high_accuracy, compact_mode, rng, -10.f, 10.f, fp_t(10000));
         }
 
         // Variable-variable tests.
@@ -961,7 +961,7 @@ TEST_CASE("taylor atan2")
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>({prime(x) = atan2(x, y), prime(y) = atan2(y, x)}, opt_level, high_accuracy,
-                                       compact_mode, rng, -8.f, 8.f, fp_t(10000));
+                                       compact_mode, rng, -10.f, 10.f, fp_t(10000));
         }
     };
 
