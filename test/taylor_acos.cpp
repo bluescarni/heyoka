@@ -345,7 +345,7 @@ TEST_CASE("taylor acos")
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>({prime(x) = acos(expression{number{fp_t{.625}}}), prime(y) = x + y}, opt_level,
-                                       high_accuracy, compact_mode, rng, -.9f, .9f);
+                                       high_accuracy, compact_mode, rng, -.9f, .9f, fp_t(1000));
         }
 
         // Variable tests.
@@ -512,7 +512,7 @@ TEST_CASE("taylor acos")
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>({prime(x) = acos(y), prime(y) = acos(x)}, opt_level, high_accuracy, compact_mode,
-                                       rng, -.9f, .9f);
+                                       rng, -.9f, .9f, fp_t(1000));
         }
     };
 
