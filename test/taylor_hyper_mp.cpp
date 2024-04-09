@@ -7,12 +7,10 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <initializer_list>
-#include <vector>
 
 #include <mp++/real.hpp>
 
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/acosh.hpp>
 #include <heyoka/math/asinh.hpp>
 #include <heyoka/math/atanh.hpp>
