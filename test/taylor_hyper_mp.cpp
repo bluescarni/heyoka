@@ -40,47 +40,43 @@ TEST_CASE("cosh")
                 for (auto prec : {30, 123}) {
                     // Test with param.
                     {
-                        llvm_state s{kw::opt_level = opt_level};
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = cosh(par[0]), prime(y) = x + y},
+                                                        {fp_t{2, prec}, fp_t{3, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level,
+                                                        kw::pars = {fp_t{3, prec}}};
 
-                        taylor_add_jet<fp_t>(s, "jet", {cosh(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
+                        ta.step(true);
 
-                        s.compile();
-
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                        std::vector<fp_t> jet{fp_t{2, prec}, fp_t{3, prec}};
-                        std::vector<fp_t> pars{fp_t{3, prec}};
-                        jet.resize(6, fp_t{0, prec});
-
-                        jptr(jet.data(), pars.data(), nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == 2);
                         REQUIRE(jet[1] == 3);
-                        REQUIRE(jet[2] == approximately(cosh(pars[0])));
+                        REQUIRE(jet[2] == approximately(cosh(ta.get_pars()[0])));
                         REQUIRE(jet[3] == approximately(fp_t{5, prec}));
                         REQUIRE(jet[4] == 0);
                         REQUIRE(jet[5] == approximately(fp_t{1, prec} / fp_t{2, prec} * (jet[2] + jet[3])));
                     }
                     // Test with variable.
                     {
-                        llvm_state s{kw::opt_level = opt_level};
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = cosh(y + 2_dbl), prime(y) = par[0] + x},
+                                                        {fp_t{2, prec}, fp_t{3, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level,
+                                                        kw::pars = {fp_t{-4, prec}}};
 
-                        taylor_add_jet<fp_t>(s, "jet", {cosh(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
+                        ta.step(true);
 
-                        s.compile();
-
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                        std::vector<fp_t> jet{fp_t{2, prec}, fp_t{3, prec}};
-                        std::vector<fp_t> pars{fp_t{-4, prec}};
-                        jet.resize(6, fp_t{0, prec});
-
-                        jptr(jet.data(), pars.data(), nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == 2);
                         REQUIRE(jet[1] == 3);
                         REQUIRE(jet[2] == approximately(cosh(jet[1] + fp_t(2, prec))));
-                        REQUIRE(jet[3] == approximately(pars[0] + jet[0]));
+                        REQUIRE(jet[3] == approximately(ta.get_pars()[0] + jet[0]));
                         REQUIRE(jet[4] == approximately(fp_t(.5, prec) * sinh(jet[1] + fp_t(2, prec)) * jet[3]));
                         REQUIRE(jet[5] == approximately(fp_t(.5, prec) * jet[2]));
                     }
@@ -102,47 +98,43 @@ TEST_CASE("sinh")
                 for (auto prec : {30, 123}) {
                     // Test with param.
                     {
-                        llvm_state s{kw::opt_level = opt_level};
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = sinh(par[0]), prime(y) = x + y},
+                                                        {fp_t{2, prec}, fp_t{3, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level,
+                                                        kw::pars = {fp_t{3, prec}}};
 
-                        taylor_add_jet<fp_t>(s, "jet", {sinh(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
+                        ta.step(true);
 
-                        s.compile();
-
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                        std::vector<fp_t> jet{fp_t{2, prec}, fp_t{3, prec}};
-                        std::vector<fp_t> pars{fp_t{3, prec}};
-                        jet.resize(6, fp_t{0, prec});
-
-                        jptr(jet.data(), pars.data(), nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == 2);
                         REQUIRE(jet[1] == 3);
-                        REQUIRE(jet[2] == approximately(sinh(pars[0])));
+                        REQUIRE(jet[2] == approximately(sinh(ta.get_pars()[0])));
                         REQUIRE(jet[3] == approximately(fp_t{5, prec}));
                         REQUIRE(jet[4] == 0);
                         REQUIRE(jet[5] == approximately(fp_t{1, prec} / fp_t{2, prec} * (jet[2] + jet[3])));
                     }
                     // Test with variable.
                     {
-                        llvm_state s{kw::opt_level = opt_level};
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = sinh(y + 2_dbl), prime(y) = par[0] + x},
+                                                        {fp_t{2, prec}, fp_t{3, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level,
+                                                        kw::pars = {fp_t{-4, prec}}};
 
-                        taylor_add_jet<fp_t>(s, "jet", {sinh(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
+                        ta.step(true);
 
-                        s.compile();
-
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                        std::vector<fp_t> jet{fp_t{2, prec}, fp_t{3, prec}};
-                        std::vector<fp_t> pars{fp_t{-4, prec}};
-                        jet.resize(6, fp_t{0, prec});
-
-                        jptr(jet.data(), pars.data(), nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == 2);
                         REQUIRE(jet[1] == 3);
                         REQUIRE(jet[2] == approximately(sinh(jet[1] + fp_t(2, prec))));
-                        REQUIRE(jet[3] == approximately(pars[0] + jet[0]));
+                        REQUIRE(jet[3] == approximately(ta.get_pars()[0] + jet[0]));
                         REQUIRE(jet[4] == approximately(fp_t(.5, prec) * cosh(jet[1] + fp_t(2, prec)) * jet[3]));
                         REQUIRE(jet[5] == approximately(fp_t(.5, prec) * jet[2]));
                     }
@@ -164,47 +156,43 @@ TEST_CASE("tanh")
                 for (auto prec : {30, 123}) {
                     // Test with param.
                     {
-                        llvm_state s{kw::opt_level = opt_level};
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = tanh(par[0]), prime(y) = x + y},
+                                                        {fp_t{2, prec}, fp_t{3, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level,
+                                                        kw::pars = {fp_t{3, prec}}};
 
-                        taylor_add_jet<fp_t>(s, "jet", {tanh(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
+                        ta.step(true);
 
-                        s.compile();
-
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                        std::vector<fp_t> jet{fp_t{2, prec}, fp_t{3, prec}};
-                        std::vector<fp_t> pars{fp_t{3, prec}};
-                        jet.resize(6, fp_t{0, prec});
-
-                        jptr(jet.data(), pars.data(), nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == 2);
                         REQUIRE(jet[1] == 3);
-                        REQUIRE(jet[2] == approximately(tanh(pars[0])));
+                        REQUIRE(jet[2] == approximately(tanh(ta.get_pars()[0])));
                         REQUIRE(jet[3] == approximately(fp_t{5, prec}));
                         REQUIRE(jet[4] == 0);
                         REQUIRE(jet[5] == approximately(fp_t{1, prec} / fp_t{2, prec} * (jet[2] + jet[3])));
                     }
                     // Test with variable.
                     {
-                        llvm_state s{kw::opt_level = opt_level};
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = tanh(y + .2_dbl), prime(y) = par[0] + x},
+                                                        {fp_t{2, prec}, fp_t{3, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level,
+                                                        kw::pars = {fp_t{-4, prec}}};
 
-                        taylor_add_jet<fp_t>(s, "jet", {tanh(y + .2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
+                        ta.step(true);
 
-                        s.compile();
-
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                        std::vector<fp_t> jet{fp_t{2, prec}, fp_t{3, prec}};
-                        std::vector<fp_t> pars{fp_t{-4, prec}};
-                        jet.resize(6, fp_t{0, prec});
-
-                        jptr(jet.data(), pars.data(), nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == 2);
                         REQUIRE(jet[1] == 3);
                         REQUIRE(jet[2] == approximately(tanh(jet[1] + fp_t(.2, prec))));
-                        REQUIRE(jet[3] == approximately(pars[0] + jet[0]));
+                        REQUIRE(jet[3] == approximately(ta.get_pars()[0] + jet[0]));
                         REQUIRE(jet[4]
                                 == approximately(fp_t(.5, prec)
                                                  / (cosh(jet[1] + fp_t(.2, prec)) * cosh(jet[1] + fp_t(.2, prec)))
@@ -229,47 +217,43 @@ TEST_CASE("acosh")
                 for (auto prec : {30, 123}) {
                     // Test with param.
                     {
-                        llvm_state s{kw::opt_level = opt_level};
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = acosh(par[0]), prime(y) = x + y},
+                                                        {fp_t{2, prec}, fp_t{3, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level,
+                                                        kw::pars = {fp_t{1.3, prec}}};
 
-                        taylor_add_jet<fp_t>(s, "jet", {acosh(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
+                        ta.step(true);
 
-                        s.compile();
-
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                        std::vector<fp_t> jet{fp_t{2, prec}, fp_t{3, prec}};
-                        std::vector<fp_t> pars{fp_t{1.3, prec}};
-                        jet.resize(6, fp_t{0, prec});
-
-                        jptr(jet.data(), pars.data(), nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == 2);
                         REQUIRE(jet[1] == 3);
-                        REQUIRE(jet[2] == approximately(acosh(pars[0])));
+                        REQUIRE(jet[2] == approximately(acosh(ta.get_pars()[0])));
                         REQUIRE(jet[3] == approximately(fp_t{5, prec}));
                         REQUIRE(jet[4] == 0);
                         REQUIRE(jet[5] == approximately(fp_t{1, prec} / fp_t{2, prec} * (jet[2] + jet[3])));
                     }
                     // Test with variable.
                     {
-                        llvm_state s{kw::opt_level = opt_level};
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = acosh(y + 2_dbl), prime(y) = par[0] + x},
+                                                        {fp_t{2, prec}, fp_t{.3, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level,
+                                                        kw::pars = {fp_t{-4, prec}}};
 
-                        taylor_add_jet<fp_t>(s, "jet", {acosh(y + 2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
+                        ta.step(true);
 
-                        s.compile();
-
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                        std::vector<fp_t> jet{fp_t{2, prec}, fp_t{.3, prec}};
-                        std::vector<fp_t> pars{fp_t{-4, prec}};
-                        jet.resize(6, fp_t{0, prec});
-
-                        jptr(jet.data(), pars.data(), nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == 2);
                         REQUIRE(jet[1] == fp_t(.3, prec));
                         REQUIRE(jet[2] == approximately(acosh(jet[1] + fp_t(2, prec))));
-                        REQUIRE(jet[3] == approximately(pars[0] + jet[0]));
+                        REQUIRE(jet[3] == approximately(ta.get_pars()[0] + jet[0]));
                         REQUIRE(
                             jet[4]
                             == approximately(fp_t(.5, prec)
@@ -295,47 +279,43 @@ TEST_CASE("asinh")
                 for (auto prec : {30, 123}) {
                     // Test with param.
                     {
-                        llvm_state s{kw::opt_level = opt_level};
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = asinh(par[0]), prime(y) = x + y},
+                                                        {fp_t{2, prec}, fp_t{3, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level,
+                                                        kw::pars = {fp_t{.3, prec}}};
 
-                        taylor_add_jet<fp_t>(s, "jet", {asinh(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
+                        ta.step(true);
 
-                        s.compile();
-
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                        std::vector<fp_t> jet{fp_t{2, prec}, fp_t{3, prec}};
-                        std::vector<fp_t> pars{fp_t{.3, prec}};
-                        jet.resize(6, fp_t{0, prec});
-
-                        jptr(jet.data(), pars.data(), nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == 2);
                         REQUIRE(jet[1] == 3);
-                        REQUIRE(jet[2] == approximately(asinh(pars[0])));
+                        REQUIRE(jet[2] == approximately(asinh(ta.get_pars()[0])));
                         REQUIRE(jet[3] == approximately(fp_t{5, prec}));
                         REQUIRE(jet[4] == 0);
                         REQUIRE(jet[5] == approximately(fp_t{1, prec} / fp_t{2, prec} * (jet[2] + jet[3])));
                     }
                     // Test with variable.
                     {
-                        llvm_state s{kw::opt_level = opt_level};
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = asinh(y + .2_dbl), prime(y) = par[0] + x},
+                                                        {fp_t{2, prec}, fp_t{.3, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level,
+                                                        kw::pars = {fp_t{-4, prec}}};
 
-                        taylor_add_jet<fp_t>(s, "jet", {asinh(y + .2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
+                        ta.step(true);
 
-                        s.compile();
-
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                        std::vector<fp_t> jet{fp_t{2, prec}, fp_t{.3, prec}};
-                        std::vector<fp_t> pars{fp_t{-4, prec}};
-                        jet.resize(6, fp_t{0, prec});
-
-                        jptr(jet.data(), pars.data(), nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == 2);
                         REQUIRE(jet[1] == fp_t(.3, prec));
                         REQUIRE(jet[2] == approximately(asinh(jet[1] + fp_t(.2, prec))));
-                        REQUIRE(jet[3] == approximately(pars[0] + jet[0]));
+                        REQUIRE(jet[3] == approximately(ta.get_pars()[0] + jet[0]));
                         REQUIRE(jet[4]
                                 == approximately(
                                     fp_t(.5, prec)
@@ -361,47 +341,43 @@ TEST_CASE("atanh")
                 for (auto prec : {30, 123}) {
                     // Test with param.
                     {
-                        llvm_state s{kw::opt_level = opt_level};
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = atanh(par[0]), prime(y) = x + y},
+                                                        {fp_t{2, prec}, fp_t{3, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level,
+                                                        kw::pars = {fp_t{.3, prec}}};
 
-                        taylor_add_jet<fp_t>(s, "jet", {atanh(par[0]), x + y}, 2, 1, ha, cm, {}, false, prec);
+                        ta.step(true);
 
-                        s.compile();
-
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                        std::vector<fp_t> jet{fp_t{2, prec}, fp_t{3, prec}};
-                        std::vector<fp_t> pars{fp_t{.3, prec}};
-                        jet.resize(6, fp_t{0, prec});
-
-                        jptr(jet.data(), pars.data(), nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == 2);
                         REQUIRE(jet[1] == 3);
-                        REQUIRE(jet[2] == approximately(atanh(pars[0])));
+                        REQUIRE(jet[2] == approximately(atanh(ta.get_pars()[0])));
                         REQUIRE(jet[3] == approximately(fp_t{5, prec}));
                         REQUIRE(jet[4] == 0);
                         REQUIRE(jet[5] == approximately(fp_t{1, prec} / fp_t{2, prec} * (jet[2] + jet[3])));
                     }
                     // Test with variable.
                     {
-                        llvm_state s{kw::opt_level = opt_level};
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = atanh(y + .2_dbl), prime(y) = par[0] + x},
+                                                        {fp_t{2, prec}, fp_t{.3, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level,
+                                                        kw::pars = {fp_t{-4, prec}}};
 
-                        taylor_add_jet<fp_t>(s, "jet", {atanh(y + .2_dbl), par[0] + x}, 2, 1, ha, cm, {}, false, prec);
+                        ta.step(true);
 
-                        s.compile();
-
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                        std::vector<fp_t> jet{fp_t{2, prec}, fp_t{.3, prec}};
-                        std::vector<fp_t> pars{fp_t{-4, prec}};
-                        jet.resize(6, fp_t{0, prec});
-
-                        jptr(jet.data(), pars.data(), nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == 2);
                         REQUIRE(jet[1] == fp_t(.3, prec));
                         REQUIRE(jet[2] == approximately(atanh(jet[1] + fp_t(.2, prec))));
-                        REQUIRE(jet[3] == approximately(pars[0] + jet[0]));
+                        REQUIRE(jet[3] == approximately(ta.get_pars()[0] + jet[0]));
                         REQUIRE(
                             jet[4]
                             == approximately(fp_t(.5, prec)
