@@ -11,6 +11,13 @@ New
   integrators (`#409 <https://github.com/bluescarni/heyoka/pull/409>`__).
 - Support LLVM 18 (`#408 <https://github.com/bluescarni/heyoka/pull/408>`__).
 
+Changes
+~~~~~~~
+
+- Remove the (undocumented) ``taylor_add_jet()`` function and rework
+  the unit test code to use ``taylor_adaptive`` instead
+  (`#409 <https://github.com/bluescarni/heyoka/pull/409>`__).
+
 Fix
 ~~~
 

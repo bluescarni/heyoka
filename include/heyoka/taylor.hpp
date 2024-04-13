@@ -129,43 +129,6 @@ HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_deco
 HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>>
 taylor_decompose(const std::vector<std::pair<expression, expression>> &, const std::vector<expression> &);
 
-template <typename>
-taylor_dc_t taylor_add_jet(llvm_state &, const std::string &, const std::vector<expression> &, std::uint32_t,
-                           std::uint32_t, bool, bool, const std::vector<expression> & = {}, bool = false,
-                           long long = 0);
-
-template <typename>
-taylor_dc_t taylor_add_jet(llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &,
-                           std::uint32_t, std::uint32_t, bool, bool, const std::vector<expression> & = {}, bool = false,
-                           long long = 0);
-
-// Prevent implicit instantiations.
-#define HEYOKA_TAYLOR_ADD_JET_EXTERN_INST(F)                                                                           \
-    extern template taylor_dc_t taylor_add_jet<F>(llvm_state &, const std::string &, const std::vector<expression> &,  \
-                                                  std::uint32_t, std::uint32_t, bool, bool,                            \
-                                                  const std::vector<expression> &, bool, long long);                   \
-    extern template taylor_dc_t taylor_add_jet<F>(                                                                     \
-        llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &, std::uint32_t,      \
-        std::uint32_t, bool, bool, const std::vector<expression> &, bool, long long);
-
-HEYOKA_TAYLOR_ADD_JET_EXTERN_INST(float)
-HEYOKA_TAYLOR_ADD_JET_EXTERN_INST(double)
-HEYOKA_TAYLOR_ADD_JET_EXTERN_INST(long double)
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_TAYLOR_ADD_JET_EXTERN_INST(mppp::real128)
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-HEYOKA_TAYLOR_ADD_JET_EXTERN_INST(mppp::real)
-
-#endif
-
-#undef HEYOKA_TAYLOR_ADD_JET_EXTERN_INST
-
 // Enum to represent the outcome of a stepping/propagate function.
 enum class taylor_outcome : std::int64_t {
     // NOTE: we make these enums start at -2**32 - 1,
