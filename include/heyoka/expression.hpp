@@ -166,7 +166,7 @@ template <typename Base, typename Holder, typename T>
 inline expression func_iface_impl<Base, Holder, T>::diff(funcptr_map<expression> &func_map, const std::string &s) const
 {
     if constexpr (func_has_diff_var<T>) {
-        return this->value().diff(func_map, s);
+        return getval<Holder>(this).diff(func_map, s);
     }
 
     // LCOV_EXCL_START
@@ -180,7 +180,7 @@ template <typename Base, typename Holder, typename T>
 inline expression func_iface_impl<Base, Holder, T>::diff(funcptr_map<expression> &func_map, const param &p) const
 {
     if constexpr (func_has_diff_par<T>) {
-        return this->value().diff(func_map, p);
+        return getval<Holder>(this).diff(func_map, p);
     }
 
     // LCOV_EXCL_START
@@ -194,7 +194,7 @@ template <typename Base, typename Holder, typename T>
 inline expression func_iface_impl<Base, Holder, T>::normalise() const
 {
     if constexpr (func_has_normalise<T>) {
-        return this->value().normalise();
+        return getval<Holder>(this).normalise();
     }
 
     // LCOV_EXCL_START

@@ -69,13 +69,12 @@ template <typename Base, typename Holder, typename T, typename TA>
     // implementing pre_hook() *without* a valid callable_iface_impl
     // triggering a hard error due to pre_hook() being marked final.
     std::derived_from<callable_iface_impl<Base, Holder, T, bool, TA &>, step_cb_iface<TA>>
-        && with_pre_hook<std::remove_reference_t<std::unwrap_reference_t<T>>, TA>
-        struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface_impl<Base, Holder, T, TA>
-    : callable_iface_impl<Base, Holder, T, bool, TA &>,
-    tanuki::iface_impl_helper<callable_iface_impl<Base, Holder, T, bool, TA &>, Holder> {
+    && with_pre_hook<std::remove_reference_t<std::unwrap_reference_t<T>>, TA>
+    struct HEYOKA_DLL_PUBLIC_INLINE_CLASS step_cb_iface_impl<Base, Holder, T, TA>
+    : callable_iface_impl<Base, Holder, T, bool, TA &> {
     void pre_hook(TA &ta) final
     {
-        static_cast<void>(this->value().pre_hook(ta));
+        static_cast<void>(getval<Holder>(this).pre_hook(ta));
     }
 };
 
