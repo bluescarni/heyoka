@@ -7,14 +7,12 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <initializer_list>
-#include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
 
 #include <mp++/real.hpp>
 
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/kepF.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -55,29 +53,23 @@ TEST_CASE("kepF")
                 for (auto opt_level : {0u, 3u}) {
                     // Test with num/param/var.
                     {
-                        llvm_state s{kw::opt_level = opt_level};
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = kepF(fp_t(.1, prec), par[0], x), prime(y) = x + y},
+                                                        {fp_t{2, prec}, fp_t{-1, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level,
+                                                        kw::pars = {fp_t(.1, prec)}};
 
-                        taylor_add_jet<fp_t>(s, "jet", {kepF(fp_t(.1, prec), par[0], x), x + y}, 2, 1, ha, cm, {},
-                                             false, prec);
+                        ta.step(true);
 
-                        s.compile();
-
-                        if (opt_level == 0u && cm) {
-                            REQUIRE(boost::contains(s.get_ir(), "heyoka.taylor_c_diff.kepF.num_par_var"));
-                        }
-
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                        std::vector<fp_t> jet{fp_t{2, prec}, fp_t{-1, prec}}, pars{fp_t(.1, prec)};
-                        jet.resize(6, fp_t(0, prec));
-
-                        jptr(jet.data(), pars.data(), nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == 2);
                         REQUIRE(jet[1] == -1);
-                        REQUIRE(jet[2] == approximately(kepF_num(fp_t(.1, prec), pars[0], jet[0])));
+                        REQUIRE(jet[2] == approximately(kepF_num(fp_t(.1, prec), ta.get_pars()[0], jet[0])));
                         REQUIRE(jet[3] == 1);
-                        auto den0 = fp_t(1, prec) - fp_t(.1, prec) * sin(jet[2]) - pars[0] * cos(jet[2]);
+                        auto den0 = fp_t(1, prec) - fp_t(.1, prec) * sin(jet[2]) - ta.get_pars()[0] * cos(jet[2]);
                         REQUIRE(jet[4] == approximately((jet[2] / den0) / fp_t(2, prec)));
                         REQUIRE(jet[5] == (jet[2] + jet[3]) / fp_t(2, prec));
                     }
