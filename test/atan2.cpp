@@ -163,11 +163,9 @@ TEST_CASE("atan2 cse")
 {
     auto x = "x"_var, y = "y"_var;
 
-    llvm_state s;
+    auto ta = taylor_adaptive<double>{{prime(x) = atan2(y, x) + (x * x + y * y), prime(y) = x}, {0., 0.}, kw::tol = 1.};
 
-    auto dc = taylor_add_jet<double>(s, "jet", {atan2(y, x) + (x * x + y * y), x}, 1, 1, false, false);
-
-    REQUIRE(dc.size() == 9u);
+    REQUIRE(ta.get_decomposition().size() == 9u);
 }
 
 TEST_CASE("atan2 const fold")

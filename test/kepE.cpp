@@ -190,11 +190,10 @@ TEST_CASE("kepE cse")
 {
     auto x = "x"_var, y = "y"_var;
 
-    llvm_state s;
+    auto ta = taylor_adaptive<double>{
+        {prime(x) = cos(kepE(x, y)) + sin(kepE(x, y)) + kepE(x, y), prime(y) = x}, {0., 0.}, kw::tol = 1.};
 
-    auto dc = taylor_add_jet<double>(s, "jet", {cos(kepE(x, y)) + sin(kepE(x, y)) + kepE(x, y), x}, 1, 1, false, false);
-
-    REQUIRE(dc.size() == 9u);
+    REQUIRE(ta.get_decomposition().size() == 9u);
 }
 
 // NOTE: this test checks a numerical integration of the Stark problem using kepE vs

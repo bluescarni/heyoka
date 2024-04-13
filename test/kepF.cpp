@@ -254,12 +254,12 @@ TEST_CASE("kepF cse")
 {
     auto [x, y, z] = make_vars("x", "y", "z");
 
-    llvm_state s;
+    auto ta = taylor_adaptive<double>{
+        {prime(x) = cos(kepF(x, y, z)) + sin(kepF(x, y, z)) + kepF(x, y, z), prime(y) = x, prime(z) = y},
+        {0., 0., 0.},
+        kw::tol = 1.};
 
-    auto dc = taylor_add_jet<double>(s, "jet", {cos(kepF(x, y, z)) + sin(kepF(x, y, z)) + kepF(x, y, z), x, y}, 1, 1,
-                                     false, false);
-
-    REQUIRE(dc.size() == 12u);
+    REQUIRE(ta.get_decomposition().size() == 12u);
 }
 
 TEST_CASE("kepF s11n")
