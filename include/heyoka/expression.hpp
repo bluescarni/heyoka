@@ -166,7 +166,7 @@ template <typename Base, typename Holder, typename T>
 inline expression func_iface_impl<Base, Holder, T>::diff(funcptr_map<expression> &func_map, const std::string &s) const
 {
     if constexpr (func_has_diff_var<T>) {
-        return this->value().diff(func_map, s);
+        return getval<Holder>(this).diff(func_map, s);
     }
 
     // LCOV_EXCL_START
@@ -180,7 +180,7 @@ template <typename Base, typename Holder, typename T>
 inline expression func_iface_impl<Base, Holder, T>::diff(funcptr_map<expression> &func_map, const param &p) const
 {
     if constexpr (func_has_diff_par<T>) {
-        return this->value().diff(func_map, p);
+        return getval<Holder>(this).diff(func_map, p);
     }
 
     // LCOV_EXCL_START
@@ -194,7 +194,7 @@ template <typename Base, typename Holder, typename T>
 inline expression func_iface_impl<Base, Holder, T>::normalise() const
 {
     if constexpr (func_has_normalise<T>) {
-        return this->value().normalise();
+        return getval<Holder>(this).normalise();
     }
 
     // LCOV_EXCL_START
@@ -509,8 +509,8 @@ public:
     [[nodiscard]] size_type index_of(const iterator &) const;
 
     [[nodiscard]] auto get_derivatives(std::uint32_t order) const -> decltype(std::ranges::subrange(begin(), end()));
-    [[nodiscard]] auto get_derivatives(std::uint32_t component, std::uint32_t order) const
-        -> decltype(std::ranges::subrange(begin(), end()));
+    [[nodiscard]] auto get_derivatives(std::uint32_t component,
+                                       std::uint32_t order) const -> decltype(std::ranges::subrange(begin(), end()));
     [[nodiscard]] std::vector<expression> get_gradient() const;
     [[nodiscard]] std::vector<expression> get_jacobian() const;
     [[nodiscard]] std::vector<expression> get_hessian(std::uint32_t) const;
@@ -800,24 +800,16 @@ template <typename T, typename R>
 concept cfunc_out_range_1d = requires(R &r) {
     requires std::ranges::contiguous_range<R>;
     requires std::ranges::sized_range<R>;
-    {
-        std::ranges::data(r)
-    } -> std::same_as<T *>;
-    {
-        std::ranges::size(r)
-    } -> std::integral;
+    { std::ranges::data(r) } -> std::same_as<T *>;
+    { std::ranges::size(r) } -> std::integral;
 };
 
 template <typename T, typename R>
 concept cfunc_in_range_1d = requires(R &r) {
     requires std::ranges::contiguous_range<R>;
     requires std::ranges::sized_range<R>;
-    {
-        std::ranges::data(r)
-    } -> std::convertible_to<const T *>;
-    {
-        std::ranges::size(r)
-    } -> std::integral;
+    { std::ranges::data(r) } -> std::convertible_to<const T *>;
+    { std::ranges::size(r) } -> std::integral;
 };
 
 } // namespace detail

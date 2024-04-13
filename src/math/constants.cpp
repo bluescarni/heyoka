@@ -162,7 +162,7 @@ void constant::load(boost::archive::binary_iarchive &ar, unsigned)
 // different constants.
 std::type_index constant::get_str_func_t() const
 {
-    return m_str_func.get_type_index();
+    return value_type_index(m_str_func);
 }
 
 void constant::to_stream(std::ostringstream &oss) const

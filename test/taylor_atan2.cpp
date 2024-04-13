@@ -8,14 +8,12 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <cmath>
 #include <initializer_list>
 #include <limits>
 #include <random>
 #include <tuple>
 #include <type_traits>
-#include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
 
@@ -29,7 +27,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/atan2.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
@@ -61,52 +58,13 @@ constexpr bool skip_batch_ld =
 #endif
     ;
 
-template <typename T, typename U>
-void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
-{
-    for (auto batch_size : {2u, 4u, 8u, 5u}) {
-        llvm_state s{kw::opt_level = opt_level};
-
-        taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy, compact_mode);
-        taylor_add_jet<T>(s, "jet_scalar", sys, 3, 1, high_accuracy, compact_mode);
-
-        s.compile();
-
-        auto jptr_batch = reinterpret_cast<void (*)(T *, const T *, const T *)>(s.jit_lookup("jet_batch"));
-        auto jptr_scalar = reinterpret_cast<void (*)(T *, const T *, const T *)>(s.jit_lookup("jet_scalar"));
-
-        std::vector<T> jet_batch;
-        jet_batch.resize(8 * batch_size);
-        std::uniform_real_distribution<float> dist(.1f, 1.f);
-        std::generate(jet_batch.begin(), jet_batch.end(), [&dist]() { return T{dist(rng)}; });
-
-        std::vector<T> jet_scalar;
-        jet_scalar.resize(8);
-
-        jptr_batch(jet_batch.data(), nullptr, nullptr);
-
-        for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
-            // Assign the initial values of x and y.
-            for (auto i = 0u; i < 2u; ++i) {
-                jet_scalar[i] = jet_batch[i * batch_size + batch_idx];
-            }
-
-            jptr_scalar(jet_scalar.data(), nullptr, nullptr);
-
-            for (auto i = 2u; i < 8u; ++i) {
-                REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx], T(10000)));
-            }
-        }
-    }
-}
-
 TEST_CASE("taylor atan2 decompose bug 00")
 {
-    llvm_state s;
 
     auto x = "x"_var;
 
-    taylor_add_jet<double>(s, "jet", {atan2(0_dbl, x) + atan2(x, 0_dbl) + atan2(0_dbl, 0_dbl) - x}, 1, 1, false, false);
+    auto ta = taylor_adaptive<double>({prime(x) = atan2(0_dbl, x) + atan2(x, 0_dbl) + atan2(0_dbl, 0_dbl) - x}, {0.},
+                                      kw::tol = 1.);
 }
 
 // Test CSE involving hidden dependencies.
@@ -116,20 +74,14 @@ TEST_CASE("taylor atan2 test simplifications")
 
     auto x = "x"_var, y = "y"_var;
 
-    llvm_state s{kw::opt_level = 0u};
+    auto ta = taylor_adaptive<double>{
+        {prime(x) = atan2(x, y), prime(y) = x * x + y * y}, {.2, -.3}, kw::opt_level = 0, kw::tol = 1.};
 
-    const auto dc = taylor_add_jet<double>(s, "jet", {atan2(x, y), x * x + y * y}, 2, 1, false, false);
+    REQUIRE(ta.get_decomposition().size() == 6u);
 
-    REQUIRE(dc.size() == 6u);
+    ta.step(true);
 
-    s.compile();
-
-    auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("jet"));
-
-    std::vector<double> jet{double{.2}, double{-.3}};
-    jet.resize(6);
-
-    jptr(jet.data(), nullptr, nullptr);
+    const auto jet = tc_to_jet(ta);
 
     REQUIRE(jet[0] == .2);
     REQUIRE(jet[1] == -.3);
@@ -154,23 +106,21 @@ TEST_CASE("taylor atan2")
 
         // Number-number tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, par[0]), x + y}, 1, 1, high_accuracy,
-                                 compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = atan2(expression{number{a}}, par[0]), prime(y) = x + y},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level,
+                                            kw::pars = {b}};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.atan2.num_par"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.atan2.num_par"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}}, pars = {b};
-            jet.resize(4);
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -179,21 +129,17 @@ TEST_CASE("taylor atan2")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = atan2(par[0], expression{number{b}}), prime(y) = x + y},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level,
+                                            kw::pars = {a}};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(par[0], expression{number{b}}), x + y}, 1, 1, high_accuracy,
-                                 compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(4);
-
-            std::vector<fp_t> pars{a};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -202,19 +148,18 @@ TEST_CASE("taylor atan2")
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = atan2(expression{number{a}}, expression{number{b}}), prime(y) = x + y},
+                {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}},
+                2,
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, expression{number{b}}), x + y}, 1, 2,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}};
-            jet.resize(8);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -230,21 +175,18 @@ TEST_CASE("taylor atan2")
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = atan2(expression{number{a}}, par[1]), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t{0}, fp_t{0}, b, b}};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, par[1]), x + y}, 1, 2, high_accuracy,
-                                 compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}};
-            jet.resize(8);
-
-            std::vector<fp_t> pars{fp_t{0}, fp_t{0}, b, b};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -260,19 +202,17 @@ TEST_CASE("taylor atan2")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = atan2(expression{number{a}}, expression{number{b}}), prime(y) = x + y},
+                {fp_t(2), fp_t(3)},
+                kw::tol = .5,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, expression{number{b}}), x + y}, 2, 1,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(6);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -283,19 +223,18 @@ TEST_CASE("taylor atan2")
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = atan2(expression{number{a}}, expression{number{b}}), prime(y) = x + y},
+                {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}},
+                2,
+                kw::tol = .5,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, expression{number{b}}), x + y}, 2, 2,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}};
-            jet.resize(12);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -317,20 +256,18 @@ TEST_CASE("taylor atan2")
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = atan2(par[0], par[1]), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{-4}, fp_t{3}, fp_t{5}, fp_t{6}},
+                                                  3,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {a, a, a, b, b, b}};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(par[0], par[1]), x + y}, 3, 3, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{-4}, fp_t{3}, fp_t{5}, fp_t{6}};
-            jet.resize(24);
-
-            std::vector<fp_t> pars{a, a, a, b, b, b};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -367,29 +304,28 @@ TEST_CASE("taylor atan2")
 
         // Do the batch/scalar comparison.
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            compare_batch_scalar<fp_t>({atan2(expression{number{a}}, expression{number{b}}), x + y}, opt_level,
-                                       high_accuracy, compact_mode);
+            compare_batch_scalar<fp_t>(
+                {prime(x) = atan2(expression{number{a}}, expression{number{b}}), prime(y) = x + y}, opt_level,
+                high_accuracy, compact_mode, rng, -10.f, 10.f, fp_t(10000));
         }
 
         // Variable-number tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {atan2(y, expression{number{a}}), atan2(x, expression{number{b}})}, 1, 1,
-                                 high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = atan2(y, expression{number{a}}), prime(y) = atan2(x, expression{number{b}})},
+                {fp_t(.2), fp_t(.3)},
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.atan2.var_num"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.atan2.var_num"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(4);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -398,21 +334,17 @@ TEST_CASE("taylor atan2")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = atan2(y, par[0]), prime(y) = atan2(x, expression{number{b}})},
+                                            {fp_t(.2), fp_t(.3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level,
+                                            kw::pars = {a}};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(y, par[0]), atan2(x, expression{number{b}})}, 1, 1, high_accuracy,
-                                 compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(4);
-
-            std::vector<fp_t> pars{a};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -421,19 +353,18 @@ TEST_CASE("taylor atan2")
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = atan2(y, expression{number{b}}), prime(y) = atan2(x, expression{number{b}})},
+                {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                2,
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(y, expression{number{b}}), atan2(x, expression{number{b}})}, 1, 2,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(8);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -449,21 +380,19 @@ TEST_CASE("taylor atan2")
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta
+                = taylor_adaptive_batch<fp_t>{{prime(x) = atan2(y, expression{number{b}}), prime(y) = atan2(x, par[1])},
+                                              {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                                              2,
+                                              kw::tol = 1,
+                                              kw::high_accuracy = high_accuracy,
+                                              kw::compact_mode = compact_mode,
+                                              kw::opt_level = opt_level,
+                                              kw::pars = {fp_t{0}, fp_t{0}, b, b}};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(y, expression{number{b}}), atan2(x, par[1])}, 1, 2, high_accuracy,
-                                 compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(8);
-
-            std::vector<fp_t> pars{fp_t{0}, fp_t{0}, b, b};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -479,19 +408,17 @@ TEST_CASE("taylor atan2")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = atan2(y, expression{number{b}}), prime(y) = atan2(x, expression{number{b}})},
+                {fp_t(.2), fp_t(.3)},
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(y, expression{number{b}}), atan2(x, expression{number{b}})}, 2, 1,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(6);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -502,19 +429,18 @@ TEST_CASE("taylor atan2")
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = atan2(y, expression{number{b}}), prime(y) = atan2(x, expression{number{b}})},
+                {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                2,
+                kw::tol = .5,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(y, expression{number{b}}), atan2(x, expression{number{b}})}, 2, 2,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(12);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -536,19 +462,18 @@ TEST_CASE("taylor atan2")
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = atan2(y, expression{number{b}}), prime(y) = atan2(x, expression{number{b}})},
+                {fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)},
+                3,
+                kw::tol = .1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(y, expression{number{b}}), atan2(x, expression{number{b}})}, 3, 3,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)};
-            jet.resize(24);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -603,29 +528,28 @@ TEST_CASE("taylor atan2")
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             // Do the batch/scalar comparison.
-            compare_batch_scalar<fp_t>({atan2(y, expression{number{b}}), atan2(x, expression{number{b}})}, opt_level,
-                                       high_accuracy, compact_mode);
+            compare_batch_scalar<fp_t>(
+                {prime(x) = atan2(y, expression{number{b}}), prime(y) = atan2(x, expression{number{b}})}, opt_level,
+                high_accuracy, compact_mode, rng, -10.f, 10.f, fp_t(10000));
         }
 
         // Number-variable tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, 1, 1,
-                                 high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = atan2(expression{number{a}}, y), prime(y) = atan2(expression{number{c}}, x)},
+                {fp_t(.2), fp_t(.3)},
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.atan2.num_var"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.atan2.num_var"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(4);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -634,21 +558,17 @@ TEST_CASE("taylor atan2")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = atan2(par[0], y), prime(y) = atan2(expression{number{c}}, x)},
+                                            {fp_t(.2), fp_t(.3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level,
+                                            kw::pars = {a}};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(par[0], y), atan2(expression{number{c}}, x)}, 1, 1, high_accuracy,
-                                 compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(4);
-
-            std::vector<fp_t> pars{a};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -657,19 +577,18 @@ TEST_CASE("taylor atan2")
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = atan2(expression{number{a}}, y), prime(y) = atan2(expression{number{c}}, x)},
+                {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                2,
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, 1, 2,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(8);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -685,21 +604,19 @@ TEST_CASE("taylor atan2")
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta
+                = taylor_adaptive_batch<fp_t>{{prime(x) = atan2(expression{number{a}}, y), prime(y) = atan2(par[1], x)},
+                                              {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                                              2,
+                                              kw::tol = 1,
+                                              kw::high_accuracy = high_accuracy,
+                                              kw::compact_mode = compact_mode,
+                                              kw::opt_level = opt_level,
+                                              kw::pars = {fp_t{0}, fp_t{0}, c, c}};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(par[1], x)}, 1, 2, high_accuracy,
-                                 compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(8);
-
-            std::vector<fp_t> pars{fp_t{0}, fp_t{0}, c, c};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -715,19 +632,17 @@ TEST_CASE("taylor atan2")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = atan2(expression{number{a}}, y), prime(y) = atan2(expression{number{c}}, x)},
+                {fp_t(.2), fp_t(.3)},
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, 2, 1,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(6);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -738,19 +653,18 @@ TEST_CASE("taylor atan2")
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = atan2(expression{number{a}}, y), prime(y) = atan2(expression{number{c}}, x)},
+                {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                2,
+                kw::tol = .5,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, 2, 2,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(12);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -772,19 +686,18 @@ TEST_CASE("taylor atan2")
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = atan2(expression{number{a}}, y), prime(y) = atan2(expression{number{c}}, x)},
+                {fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)},
+                3,
+                kw::tol = .1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, 3, 3,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)};
-            jet.resize(24);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -841,28 +754,27 @@ TEST_CASE("taylor atan2")
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             // Do the batch/scalar comparison.
-            compare_batch_scalar<fp_t>({atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, opt_level,
-                                       high_accuracy, compact_mode);
+            compare_batch_scalar<fp_t>(
+                {prime(x) = atan2(expression{number{a}}, y), prime(y) = atan2(expression{number{c}}, x)}, opt_level,
+                high_accuracy, compact_mode, rng, -10.f, 10.f, fp_t(10000));
         }
 
         // Variable-variable tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {atan2(x, y), atan2(y, x)}, 1, 1, high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = atan2(x, y), prime(y) = atan2(y, x)},
+                                            {fp_t(.2), fp_t(.3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.atan2.var_var"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.atan2.var_var"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(4);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -871,18 +783,17 @@ TEST_CASE("taylor atan2")
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = atan2(x, y), prime(y) = atan2(y, x)},
+                                                  {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(x, y), atan2(y, x)}, 1, 2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(8);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -898,18 +809,16 @@ TEST_CASE("taylor atan2")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = atan2(x, y), prime(y) = atan2(y, x)},
+                                            {fp_t(.2), fp_t(.3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(x, y), atan2(y, x)}, 2, 1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(6);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -924,18 +833,17 @@ TEST_CASE("taylor atan2")
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = atan2(x, y), prime(y) = atan2(y, x)},
+                                                  {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                                                  2,
+                                                  kw::tol = .5,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(x, y), atan2(y, x)}, 2, 2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(12);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -965,18 +873,17 @@ TEST_CASE("taylor atan2")
         }
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = atan2(x, y), prime(y) = atan2(y, x)},
+                                                  {fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)},
+                                                  3,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {atan2(x, y), atan2(y, x)}, 3, 3, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)};
-            jet.resize(24);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -1053,7 +960,8 @@ TEST_CASE("taylor atan2")
 
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             // Do the batch/scalar comparison.
-            compare_batch_scalar<fp_t>({atan2(x, y), atan2(y, x)}, opt_level, high_accuracy, compact_mode);
+            compare_batch_scalar<fp_t>({prime(x) = atan2(x, y), prime(y) = atan2(y, x)}, opt_level, high_accuracy,
+                                       compact_mode, rng, -10.f, 10.f, fp_t(10000));
         }
     };
 

@@ -8,12 +8,11 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <cmath>
 #include <initializer_list>
+#include <limits>
 #include <random>
 #include <tuple>
-#include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -23,7 +22,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
@@ -47,55 +45,13 @@ const auto fp_types = std::tuple<float, double
 #endif
                                  >{};
 
-template <typename T, typename U>
-void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode,
-                          bool fast_math)
-{
-    for (auto batch_size : {2u, 4u, 8u, 5u}) {
-        llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
-
-        taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy, compact_mode);
-        taylor_add_jet<T>(s, "jet_scalar", sys, 3, 1, high_accuracy, compact_mode);
-
-        s.compile();
-
-        auto jptr_batch = reinterpret_cast<void (*)(T *, const T *, const T *)>(s.jit_lookup("jet_batch"));
-        auto jptr_scalar = reinterpret_cast<void (*)(T *, const T *, const T *)>(s.jit_lookup("jet_scalar"));
-
-        std::vector<T> jet_batch;
-        jet_batch.resize(8 * batch_size);
-        std::uniform_real_distribution<float> dist(-10.f, 10.f);
-        std::generate(jet_batch.begin(), jet_batch.end(), [&dist]() { return T{dist(rng)}; });
-
-        std::vector<T> jet_scalar;
-        jet_scalar.resize(8);
-
-        jptr_batch(jet_batch.data(), nullptr, nullptr);
-
-        for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
-            // Assign the initial values of x and y.
-            for (auto i = 0u; i < 2u; ++i) {
-                jet_scalar[i] = jet_batch[i * batch_size + batch_idx];
-            }
-
-            jptr_scalar(jet_scalar.data(), nullptr, nullptr);
-
-            for (auto i = 2u; i < 8u; ++i) {
-                REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx], T(1000)));
-            }
-        }
-    }
-}
-
 // Potential issue in the decomposition when x = 0 (not
 // currently the case).
 TEST_CASE("taylor sincos decompose bug 00")
 {
-    llvm_state s;
-
     auto x = "x"_var;
 
-    taylor_add_jet<double>(s, "jet", {sin(0_dbl) + cos(0_dbl) - x}, 1, 1, false, false);
+    auto ta = taylor_adaptive<double>({prime(x) = sin(0_dbl) + cos(0_dbl) - x}, {0.}, kw::tol = 1.);
 }
 
 TEST_CASE("taylor sincos")
@@ -110,41 +66,18 @@ TEST_CASE("taylor sincos")
 
         // Number-number tests.
         {
-            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), prime(y) = x + y},
+                {fp_t(2), fp_t(3)},
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level,
+                kw::fast_math = fast_math};
 
-            taylor_add_jet<fp_t>(s, "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y},
-                                 1, 1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(4);
-
-            jptr(jet.data(), nullptr, nullptr);
-
-            REQUIRE(jet[0] == 2);
-            REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
-            REQUIRE(jet[3] == approximately(jet[0] + jet[1]));
-        }
-
-        {
-            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
-
-            taylor_add_jet<fp_t>(s, "jet", {sin(par[0]) + cos(par[1]), x + y}, 1, 1, high_accuracy, compact_mode);
-
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(4);
-
-            std::vector<fp_t> pars{fp_t{2}, fp_t{3}};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -153,19 +86,39 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = sin(par[0]) + cos(par[1]), prime(y) = x + y},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level,
+                                            kw::fast_math = fast_math,
+                                            kw::pars = {fp_t{2}, fp_t{3}}};
 
-            taylor_add_jet<fp_t>(s, "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y},
-                                 1, 2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
+            const auto jet = tc_to_jet(ta);
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
+            REQUIRE(jet[3] == approximately(jet[0] + jet[1]));
+        }
 
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}};
-            jet.resize(8);
+        {
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), prime(y) = x + y},
+                {fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}},
+                2,
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level,
+                kw::fast_math = fast_math};
 
-            jptr(jet.data(), nullptr, nullptr);
+            ta.step(true);
+
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -4);
@@ -181,20 +134,19 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = sin(par[0]) + cos(par[1]), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::fast_math = fast_math,
+                                                  kw::pars = {fp_t{2}, fp_t{2}, fp_t{3}, fp_t{3}}};
 
-            taylor_add_jet<fp_t>(s, "jet", {sin(par[0]) + cos(par[1]), x + y}, 1, 2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}};
-            jet.resize(8);
-
-            std::vector<fp_t> pars{fp_t{2}, fp_t{2}, fp_t{3}, fp_t{3}};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -4);
@@ -210,19 +162,18 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), prime(y) = x + y},
+                {fp_t(2), fp_t(3)},
+                kw::tol = .5,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level,
+                kw::fast_math = fast_math};
 
-            taylor_add_jet<fp_t>(s, "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y},
-                                 2, 1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(6);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -233,19 +184,19 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), prime(y) = x + y},
+                {fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}},
+                2,
+                kw::tol = .5,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level,
+                kw::fast_math = fast_math};
 
-            taylor_add_jet<fp_t>(s, "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y},
-                                 2, 2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}};
-            jet.resize(12);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -4);
@@ -267,19 +218,19 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), prime(y) = x + y},
+                {fp_t{2}, fp_t{-4}, fp_t{-1}, fp_t{3}, fp_t{5}, fp_t{-2}},
+                3,
+                kw::tol = .1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level,
+                kw::fast_math = fast_math};
 
-            taylor_add_jet<fp_t>(s, "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y},
-                                 3, 3, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-4}, fp_t{-1}, fp_t{3}, fp_t{5}, fp_t{-2}};
-            jet.resize(24);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -4);
@@ -315,20 +266,19 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = sin(par[0]) + cos(par[1]), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-4}, fp_t{-1}, fp_t{3}, fp_t{5}, fp_t{-2}},
+                                                  3,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::fast_math = fast_math,
+                                                  kw::pars = {fp_t{2}, fp_t{2}, fp_t{2}, fp_t{3}, fp_t{3}, fp_t{3}}};
 
-            taylor_add_jet<fp_t>(s, "jet", {sin(par[0]) + cos(par[1]), x + y}, 3, 3, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-4}, fp_t{-1}, fp_t{3}, fp_t{5}, fp_t{-2}};
-            jet.resize(24);
-
-            std::vector<fp_t> pars{fp_t{2}, fp_t{2}, fp_t{2}, fp_t{3}, fp_t{3}, fp_t{3}};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -4);
@@ -364,23 +314,23 @@ TEST_CASE("taylor sincos")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y},
-                                   opt_level, high_accuracy, compact_mode, fast_math);
+        compare_batch_scalar<fp_t>(
+            {prime(x) = sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), prime(y) = x + y},
+            opt_level, high_accuracy, compact_mode, rng, -10.f, 10.f);
 
         // Variable tests.
         {
-            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = sin(y + 1_dbl), prime(y) = cos(x + 1_dbl)},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level,
+                                            kw::fast_math = fast_math};
 
-            taylor_add_jet<fp_t>(s, "jet", {sin(y + 1_dbl), cos(x + 1_dbl)}, 1, 1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(4);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -389,18 +339,18 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = sin(y + 1_dbl), prime(y) = cos(x + 1_dbl)},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{-4}},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::fast_math = fast_math};
 
-            taylor_add_jet<fp_t>(s, "jet", {sin(y + 1_dbl), cos(x + 1_dbl)}, 1, 2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{-4}};
-            jet.resize(8);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -416,18 +366,17 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = sin(y + 1_dbl), prime(y) = cos(x + 1_dbl)},
+                                            {fp_t{2}, fp_t{3}},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level,
+                                            kw::fast_math = fast_math};
 
-            taylor_add_jet<fp_t>(s, "jet", {sin(y + 1_dbl), cos(x + 1_dbl)}, 2, 1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(6);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -438,18 +387,18 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = sin(y), prime(y) = cos(x)},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{-4}},
+                                                  2,
+                                                  kw::tol = .5,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::fast_math = fast_math};
 
-            taylor_add_jet<fp_t>(s, "jet", {sin(y), cos(x)}, 2, 2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{-4}};
-            jet.resize(12);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -471,18 +420,18 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level, kw::fast_math = fast_math};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = sin(y), prime(y) = cos(x)},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{-5}, fp_t{3}, fp_t{-4}, fp_t{6}},
+                                                  3,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::fast_math = fast_math};
 
-            taylor_add_jet<fp_t>(s, "jet", {sin(y), cos(x)}, 3, 3, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{-5}, fp_t{3}, fp_t{-4}, fp_t{6}};
-            jet.resize(24);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -524,12 +473,33 @@ TEST_CASE("taylor sincos")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({sin(y), cos(x)}, opt_level, high_accuracy, compact_mode, fast_math);
+        compare_batch_scalar<fp_t>({prime(x) = sin(y), prime(y) = cos(x)}, opt_level, high_accuracy, compact_mode, rng,
+                                   -10.f, 10.f);
     };
 
     for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
-            for (auto fm : {false, true}) {
+            // NOTE: when enabling the fast math flag, we are observing buggy behaviour
+            // on x86 with 80-bit long double/real128. Specifically, it seems like C++ code
+            // such as sin(expression{number{fp_t{2}}}) (which ultimately just invokes
+            // std::sin() due to constant folding) returns sometimes a value of NaN.
+            // This happens when both 80-bit long double and real128 are available,
+            // and it is triggered when both the no-signed-zeros and no-nans fast math
+            // flags are activated. Disabling either the long double or real128 testing
+            // makes the problem go away.
+            //
+            // My impression is that there is some code generation bug in LLVM which leaks
+            // out into the surrounding C++ code - perhaps some register not being properly
+            // restored or something like that. For now, let us implement this workaround.
+            constexpr bool enable_fm_test =
+#if defined(HEYOKA_ARCH_PPC)
+                true
+#else
+                std::numeric_limits<long double>::digits != 64
+#endif
+                ;
+
+            for (auto fm : {false, enable_fm_test}) {
                 tuple_for_each(fp_types, [&tester, f, cm, fm](auto x) { tester(x, 0, f, cm, fm); });
                 tuple_for_each(fp_types, [&tester, f, cm, fm](auto x) { tester(x, 1, f, cm, fm); });
                 tuple_for_each(fp_types, [&tester, f, cm, fm](auto x) { tester(x, 2, f, cm, fm); });
@@ -547,19 +517,17 @@ TEST_CASE("taylor sincos cse")
 
     auto x = "x"_var, y = "y"_var;
 
-    llvm_state s;
+    auto ta = taylor_adaptive<double>{
+        {prime(x) = sin(y) + cos(x) + sin(x) + cos(y), prime(y) = sin(y) + cos(x) + sin(x) + cos(y)},
+        {2., 3.},
+        kw::opt_level = 0,
+        kw::tol = 1.};
 
-    auto dc = taylor_add_jet<double>(s, "jet", {sin(y) + cos(x) + sin(x) + cos(y), sin(y) + cos(x) + sin(x) + cos(y)},
-                                     2, 1, false, false);
+    REQUIRE(ta.get_decomposition().size() == 9u);
 
-    s.compile();
+    ta.step(true);
 
-    auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("jet"));
-
-    std::vector<double> jet{2., 3.};
-    jet.resize(6);
-
-    jptr(jet.data(), nullptr, nullptr);
+    const auto jet = tc_to_jet(ta);
 
     REQUIRE(jet[0] == 2);
     REQUIRE(jet[1] == 3);

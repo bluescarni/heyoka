@@ -14,13 +14,14 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
-#include <initializer_list>
 #include <limits>
 #include <ostream>
+#include <random>
 #include <sstream>
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 #include <xtensor-blas/xlinalg.hpp>
 #include <xtensor/xfixed.hpp>
@@ -31,6 +32,9 @@
 #include <mp++/real.hpp>
 
 #endif
+
+#include <heyoka/expression.hpp>
+#include <heyoka/taylor.hpp>
 
 namespace heyoka_test
 {
@@ -58,7 +62,7 @@ struct approximately<mppp::real> {
 #endif
 
 template <typename T>
-inline bool operator==(const T &cmp, const approximately<T> &a)
+bool operator==(const T &cmp, const approximately<T> &a)
 {
     using std::abs;
 
@@ -74,12 +78,12 @@ inline bool operator==(const T &cmp, const approximately<T> &a)
 #if defined(HEYOKA_HAVE_REAL)
 
 template <>
-bool operator==<mppp::real>(const mppp::real &, const approximately<mppp::real> &);
+bool operator== <mppp::real>(const mppp::real &, const approximately<mppp::real> &);
 
 #endif
 
 template <typename T>
-inline std::ostream &operator<<(std::ostream &os, const approximately<T> &a)
+std::ostream &operator<<(std::ostream &os, const approximately<T> &a)
 {
     std::ostringstream oss;
     oss.precision(std::numeric_limits<T>::max_digits10);
@@ -98,7 +102,7 @@ std::ostream &operator<< <mppp::real>(std::ostream &, const approximately<mppp::
 // Tuple for_each(). It will apply the input functor f to each element of
 // the input tuple tup, sequentially.
 template <typename Tuple, typename F>
-inline void tuple_for_each(Tuple &&tup, F &&f)
+void tuple_for_each(Tuple &&tup, F &&f)
 {
     std::apply(
         [&f](auto &&...items) {
@@ -120,7 +124,7 @@ inline void tuple_for_each(Tuple &&tup, F &&f)
 }
 
 template <typename T>
-inline std::array<T, 3> cross(std::array<T, 3> a, std::array<T, 3> b)
+std::array<T, 3> cross(std::array<T, 3> a, std::array<T, 3> b)
 {
     auto [a1, a2, a3] = a;
     auto [b1, b2, b3] = b;
@@ -129,19 +133,19 @@ inline std::array<T, 3> cross(std::array<T, 3> a, std::array<T, 3> b)
 }
 
 template <typename T>
-inline T dot(std::array<T, 3> a, std::array<T, 3> b)
+T dot(std::array<T, 3> a, std::array<T, 3> b)
 {
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
 template <typename T>
-inline T norm2(std::array<T, 3> x)
+T norm2(std::array<T, 3> x)
 {
     return x[0] * x[0] + x[1] * x[1] + x[2] * x[2];
 }
 
 template <typename T>
-inline T norm(std::array<T, 3> x)
+T norm(std::array<T, 3> x)
 {
     using std::sqrt;
 
@@ -149,19 +153,19 @@ inline T norm(std::array<T, 3> x)
 }
 
 template <typename T>
-inline std::array<T, 3> sub(std::array<T, 3> a, std::array<T, 3> b)
+std::array<T, 3> sub(std::array<T, 3> a, std::array<T, 3> b)
 {
     return {a[0] - b[0], a[1] - b[1], a[2] - b[2]};
 }
 
 template <typename T>
-inline std::array<T, 3> div(std::array<T, 3> a, T c)
+std::array<T, 3> div(std::array<T, 3> a, T c)
 {
     return {a[0] / c, a[1] / c, a[2] / c};
 }
 
 template <typename T>
-inline std::array<T, 6> cart_to_kep(std::array<T, 3> x, std::array<T, 3> v, T mu)
+std::array<T, 6> cart_to_kep(std::array<T, 3> x, std::array<T, 3> v, T mu)
 {
     using std::acos;
 
@@ -194,7 +198,7 @@ inline std::array<T, 6> cart_to_kep(std::array<T, 3> x, std::array<T, 3> v, T mu
 }
 
 template <typename T>
-inline std::pair<std::array<T, 3>, std::array<T, 3>> kep_to_cart(std::array<T, 6> kep, T mu)
+std::pair<std::array<T, 3>, std::array<T, 3>> kep_to_cart(std::array<T, 6> kep, T mu)
 {
     using std::atan;
     using std::cos;
@@ -229,7 +233,7 @@ template <typename T, std::size_t N>
 using vNd = xt::xtensor_fixed<T, xt::xshape<N>>;
 
 template <typename E1, typename E2, typename T>
-inline vNd<T, 6> cart_to_kep(const E1 &x, const E2 &v, T mu)
+vNd<T, 6> cart_to_kep(const E1 &x, const E2 &v, T mu)
 {
     static_assert(std::is_same_v<typename E1::value_type, T>);
     static_assert(std::is_same_v<typename E2::value_type, T>);
@@ -263,6 +267,23 @@ inline vNd<T, 6> cart_to_kep(const E1 &x, const E2 &v, T mu)
 
     return {a, e, i, om, Om, nu};
 }
+
+// Helpers to convert the list of Taylor coefficients as provided by the
+// get_tc() member function of an adaptive integrator to the format used
+// by taylor_add_jet(). This is needed to transition the unit tests of the
+// Taylor derivatives away from taylor_add_jet().
+// NOTE: this is basically a transposition from row-major to column-major.
+template <typename T>
+std::vector<T> tc_to_jet(const heyoka::taylor_adaptive<T> &);
+
+template <typename T>
+std::vector<T> tc_to_jet(const heyoka::taylor_adaptive_batch<T> &);
+
+// Helper to compare the results of the computation of Taylor coefficients
+// in scalar and batch integrations.
+template <typename T>
+void compare_batch_scalar(const std::vector<std::pair<heyoka::expression, heyoka::expression>> &, unsigned, bool, bool,
+                          std::mt19937 &, float, float, T = T(1000.));
 
 } // namespace heyoka_test
 

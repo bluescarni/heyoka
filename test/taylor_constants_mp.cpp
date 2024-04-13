@@ -7,12 +7,10 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <initializer_list>
-#include <vector>
 
 #include <mp++/real.hpp>
 
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/constants.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -33,19 +31,16 @@ TEST_CASE("pi")
             for (auto ha : {false, true}) {
                 for (auto prec : {30, 123}) {
                     {
-                        llvm_state s{kw::opt_level = opt_level};
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = y + pi, prime(y) = pi + x},
+                                                        {fp_t{2, prec}, fp_t{3, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level};
 
-                        taylor_add_jet<fp_t>(s, "jet", {y + pi, pi + x}, 2, 1, ha, cm, {}, false, prec);
+                        ta.step(true);
 
-                        s.compile();
-
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-                        std::vector<fp_t> jet{fp_t{2, prec}, fp_t{3, prec}};
-                        std::vector<fp_t> pars{fp_t{-4, prec}};
-                        jet.resize(6, fp_t{0, prec});
-
-                        jptr(jet.data(), pars.data(), nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == 2);
                         REQUIRE(jet[1] == 3);

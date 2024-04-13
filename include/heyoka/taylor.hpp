@@ -129,43 +129,6 @@ HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_deco
 HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>>
 taylor_decompose(const std::vector<std::pair<expression, expression>> &, const std::vector<expression> &);
 
-template <typename>
-taylor_dc_t taylor_add_jet(llvm_state &, const std::string &, const std::vector<expression> &, std::uint32_t,
-                           std::uint32_t, bool, bool, const std::vector<expression> & = {}, bool = false,
-                           long long = 0);
-
-template <typename>
-taylor_dc_t taylor_add_jet(llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &,
-                           std::uint32_t, std::uint32_t, bool, bool, const std::vector<expression> & = {}, bool = false,
-                           long long = 0);
-
-// Prevent implicit instantiations.
-#define HEYOKA_TAYLOR_ADD_JET_EXTERN_INST(F)                                                                           \
-    extern template taylor_dc_t taylor_add_jet<F>(llvm_state &, const std::string &, const std::vector<expression> &,  \
-                                                  std::uint32_t, std::uint32_t, bool, bool,                            \
-                                                  const std::vector<expression> &, bool, long long);                   \
-    extern template taylor_dc_t taylor_add_jet<F>(                                                                     \
-        llvm_state &, const std::string &, const std::vector<std::pair<expression, expression>> &, std::uint32_t,      \
-        std::uint32_t, bool, bool, const std::vector<expression> &, bool, long long);
-
-HEYOKA_TAYLOR_ADD_JET_EXTERN_INST(float)
-HEYOKA_TAYLOR_ADD_JET_EXTERN_INST(double)
-HEYOKA_TAYLOR_ADD_JET_EXTERN_INST(long double)
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_TAYLOR_ADD_JET_EXTERN_INST(mppp::real128)
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL)
-
-HEYOKA_TAYLOR_ADD_JET_EXTERN_INST(mppp::real)
-
-#endif
-
-#undef HEYOKA_TAYLOR_ADD_JET_EXTERN_INST
-
 // Enum to represent the outcome of a stepping/propagate function.
 enum class taylor_outcome : std::int64_t {
     // NOTE: we make these enums start at -2**32 - 1,
@@ -287,7 +250,7 @@ concept input_rangeT = std::ranges::input_range<R> && std::constructible_from<T,
 // NOTE: in any case, we end up creating a new object either by copying
 // or moving the input argument(s).
 template <typename Callback, typename CallbackSet, typename Parser>
-Callback parse_propagate_cb(Parser &p)
+Callback parse_propagate_cb(const Parser &p)
 {
     if constexpr (Parser::has(kw::callback)) {
         using cb_arg_t = decltype(p(kw::callback));
@@ -440,6 +403,8 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive : public detail::taylor_ada
     friend void detail::taylor_adaptive_setup_sv_rhs(TA &, const U &);
 
 public:
+    using value_type = T;
+
     using nt_event_t = nt_event<T>;
     using t_event_t = t_event<T>;
 
@@ -580,11 +545,13 @@ public:
 
     [[nodiscard]] const std::vector<T> &get_state() const;
     [[nodiscard]] const T *get_state_data() const;
-    T *get_state_data();
+    [[nodiscard]] T *get_state_data();
+    [[nodiscard]] std::ranges::subrange<typename std::vector<T>::iterator> get_state_range();
 
     [[nodiscard]] const std::vector<T> &get_pars() const;
     [[nodiscard]] const T *get_pars_data() const;
-    T *get_pars_data();
+    [[nodiscard]] T *get_pars_data();
+    [[nodiscard]] std::ranges::subrange<typename std::vector<T>::iterator> get_pars_range();
 
     [[nodiscard]] const std::vector<T> &get_tc() const;
 
@@ -809,6 +776,8 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_batch
     friend void detail::taylor_adaptive_setup_sv_rhs(TA &, const U &);
 
 public:
+    using value_type = T;
+
     using nt_event_t = nt_event_batch<T>;
     using t_event_t = t_event_batch<T>;
 
@@ -854,6 +823,8 @@ private:
             // Initial times (defaults to a vector of zeroes).
             auto tm = [&p, batch_size]() -> std::vector<T> {
                 if constexpr (p.has(kw::time)) {
+                    // NOTE: silence clang warning.
+                    (void)batch_size;
                     return p(kw::time);
                 } else {
                     return std::vector<T>(static_cast<typename std::vector<T>::size_type>(batch_size), T(0));
@@ -941,11 +912,13 @@ public:
 
     [[nodiscard]] const std::vector<T> &get_state() const;
     [[nodiscard]] const T *get_state_data() const;
-    T *get_state_data();
+    [[nodiscard]] T *get_state_data();
+    [[nodiscard]] std::ranges::subrange<typename std::vector<T>::iterator> get_state_range();
 
     [[nodiscard]] const std::vector<T> &get_pars() const;
     [[nodiscard]] const T *get_pars_data() const;
-    T *get_pars_data();
+    [[nodiscard]] T *get_pars_data();
+    [[nodiscard]] std::ranges::subrange<typename std::vector<T>::iterator> get_pars_range();
 
     [[nodiscard]] const std::vector<T> &get_tc() const;
 

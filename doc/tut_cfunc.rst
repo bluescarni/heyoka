@@ -3,6 +3,8 @@
 Compiled functions
 ==================
 
+.. versionadded:: 4.0.0
+
 .. cpp:namespace-push:: heyoka
 
 heyoka can compile just-in-time (JIT) multivariate vector functions defined

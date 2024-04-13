@@ -37,6 +37,8 @@
 
 using namespace heyoka;
 
+using smap_t = std::unordered_map<std::string, expression>;
+
 struct func_00 : func_base {
     func_00() : func_base("f", {}) {}
     func_00(const std::string &name) : func_base(name, {}) {}
@@ -444,10 +446,10 @@ TEST_CASE("func subs")
     auto f2 = subs(expression{f1}, std::unordered_map<std::string, expression>{});
     REQUIRE(f2 == expression{f1});
 
-    f2 = subs(expression{f1}, {{"x", "z"_var}});
+    f2 = subs(expression{f1}, smap_t{{"x", "z"_var}});
     REQUIRE(f2 == expression{func(func_15{{"z"_var, "y"_var}})});
 
-    f2 = subs(expression{f1}, {{"x", "z"_var}, {"y", 42_dbl}});
+    f2 = subs(expression{f1}, smap_t{{"x", "z"_var}, {"y", 42_dbl}});
     REQUIRE(f2 == expression{func(func_15{{"z"_var, 42_dbl}})});
 }
 
