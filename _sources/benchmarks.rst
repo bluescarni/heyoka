@@ -220,7 +220,7 @@ heyoka uses the `MPFR library <https://www.mpfr.org/>`__ for multiprecision floa
 computations under the hood. DifferentialEquations.jl can also use MPFR (via the
 `BigFloat <https://docs.julialang.org/en/v1/manual/integers-and-floating-point-numbers/#Arbitrary-Precision-Arithmetic>`__
 type) or, alternatively the `Arb <https://arblib.org/>`__ library (via the
-`ArbNumerics.jl <https://juliapackages.com/p/arbnumerics>`__ package).
+`ArbNumerics.jl <https://github.com/JeffreySarnoff/ArbNumerics.jl>`__ package).
 
 Here are the results of a numerical integration of the simple pendulum with a 256-bit significand
 and a tolerance of :math:`10^{-77}`:

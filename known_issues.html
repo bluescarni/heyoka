@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Known issues &#8212; heyoka 4.0.2 documentation</title>
+    <title>Known issues &#8212; heyoka 4.1.0 documentation</title>
   
   
   
@@ -36,7 +36,7 @@
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=8d27b9dea8ad943066ae" />
   <script src="_static/vendor/fontawesome/6.5.1/js/all.min.js?digest=8d27b9dea8ad943066ae"></script>
 
-    <script src="_static/documentation_options.js?v=0d40523b"></script>
+    <script src="_static/documentation_options.js?v=5d1265ac"></script>
     <script src="_static/doctools.js?v=888ff710"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
@@ -133,8 +133,8 @@
       
     
     
-    <img src="_static/white_logo.png" class="logo__image only-light" alt="heyoka 4.0.2 documentation - Home"/>
-    <script>document.write(`<img src="_static/white_logo.png" class="logo__image only-dark" alt="heyoka 4.0.2 documentation - Home"/>`);</script>
+    <img src="_static/white_logo.png" class="logo__image only-light" alt="heyoka 4.1.0 documentation - Home"/>
+    <script>document.write(`<img src="_static/white_logo.png" class="logo__image only-dark" alt="heyoka 4.1.0 documentation - Home"/>`);</script>
   
   
 </a></div>
@@ -198,6 +198,8 @@
 <li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="breaking_changes.html">Breaking changes</a></li>
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">Known issues</a></li>
+
+
 <li class="toctree-l1"><a class="reference internal" href="acknowledgement.html">Acknowledgement</a></li>
 <li class="toctree-l1"><a class="reference internal" href="bibliography.html">Bibliography</a></li>
 </ul>
@@ -372,7 +374,9 @@ document.write(`
   </button>
 `);
 </script>
-
+<label class="sidebar-toggle secondary-toggle btn btn-sm" for="__secondary"title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</label>
 </div></div>
       
     </div>
@@ -388,6 +392,17 @@ document.write(`
     <div id="print-main-content">
         <div id="jb-print-toc">
             
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#">Known issues</a></li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#unsolved">Unsolved</a></li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#solved">Solved</a></li>
+</ul>
+
+            </nav>
         </div>
     </div>
 </div>
@@ -399,13 +414,48 @@ document.write(`
                   
   <section id="known-issues">
 <h1>Known issues<a class="headerlink" href="#known-issues" title="Link to this heading">#</a></h1>
+</section>
+<section id="unsolved">
+<h1>Unsolved<a class="headerlink" href="#unsolved" title="Link to this heading">#</a></h1>
+<ul>
+<li><p>Under very specific circumstances, C++ code executed right after
+code that was JIT-compiled by heyoka might produce nonsensical results.
+This happens only if <strong>all</strong> the following conditions are met:</p>
 <ul class="simple">
+<li><p>you are on an Intel x86 platform where <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> corresponds
+to the extended-precision 80-bit x86 floating-point type,</p></li>
+<li><p>heyoka was compiled with support for quadruple-precision computations
+via <a class="reference external" href="https://bluescarni.github.io/mppp/real128.html#_CPPv4N4mppp7real128E" title="(in mp++ v1.0.2)"><code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">mppp::real128</span></code></a>,</p></li>
+<li><p>JIT-compiled code using <strong>both</strong> 80-bit and quadruple-precision datatypes
+was executed,</p></li>
+<li><p>the “fast math” flag was enabled during JIT compilation.</p></li>
+</ul>
+<p>The root cause is most likely a code-generation/optimisation problem in LLVM.
+This issue is currently under investigation.</p>
+</li>
+</ul>
+</section>
+<section id="solved">
+<h1>Solved<a class="headerlink" href="#solved" title="Link to this heading">#</a></h1>
+<ul class="simple">
+<li><p>In several LLVM versions, attempting to use <a class="reference internal" href="tut_batch_mode.html#tut-batch-mode"><span class="std std-ref">batch mode</span></a>
+with the extended precision <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> type on x86 processors will lead
+to incorrect results. This is due to code generation issues in LLVM with
+<code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> vector types. This problem seems to have been rectified in
+LLVM 18. Note that, in practice, there is no reason to attempt to use batch
+mode with <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> as currently there are no CPUs implementing SIMD operations
+on extended-precision datatypes.</p></li>
 <li><p>Due to an upstream bug, if you compile heyoka linking statically against LLVM 17
 while enabling the <code class="docutils literal notranslate"><span class="pre">HEYOKA_HIDE_LLVM_SYMBOLS</span></code> option (see the
 <a class="reference internal" href="install.html#installation-from-source"><span class="std std-ref">installation instructions</span></a>), you may experience
 runtime errors due to missing symbols. This problem should be fixed in LLVM 18.
 A patch fixing the issue in LLVM 17
 is available <a class="reference external" href="https://github.com/llvm/llvm-project/commit/122ebe3b500190b1f408e2e6db753853e297ba28">here</a>.</p></li>
+<li><p>Due to an <a class="reference external" href="https://github.com/conda-forge/mpfr-feedstock/issues/44">upstream bug</a>,
+multiprecision <a class="reference internal" href="tut_ensemble.html#tut-ensemble"><span class="std std-ref">ensemble propagations</span></a>
+crash on OSX arm64 when using heyoka’s conda-forge package. This is due to the conda-forge
+package for the MPFR library not being compiled in thread-safe mode. The solution is to update
+to the latest version of the MPFR package, which includes a fix for this issue.</p></li>
 </ul>
 </section>
 
@@ -445,7 +495,23 @@ is available <a class="reference external" href="https://github.com/llvm/llvm-pr
             
             
               
-                <div class="bd-sidebar-secondary bd-toc"></div>
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#">Known issues</a></li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#unsolved">Unsolved</a></li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#solved">Solved</a></li>
+</ul>
+
+  </nav></div>
+
+</div></div>
               
             
           </div>

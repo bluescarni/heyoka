@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Benchmarks &#8212; heyoka 4.0.2 documentation</title>
+    <title>Benchmarks &#8212; heyoka 4.1.0 documentation</title>
   
   
   
@@ -36,7 +36,7 @@
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=8d27b9dea8ad943066ae" />
   <script src="_static/vendor/fontawesome/6.5.1/js/all.min.js?digest=8d27b9dea8ad943066ae"></script>
 
-    <script src="_static/documentation_options.js?v=0d40523b"></script>
+    <script src="_static/documentation_options.js?v=5d1265ac"></script>
     <script src="_static/doctools.js?v=888ff710"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
@@ -134,8 +134,8 @@
       
     
     
-    <img src="_static/white_logo.png" class="logo__image only-light" alt="heyoka 4.0.2 documentation - Home"/>
-    <script>document.write(`<img src="_static/white_logo.png" class="logo__image only-dark" alt="heyoka 4.0.2 documentation - Home"/>`);</script>
+    <img src="_static/white_logo.png" class="logo__image only-light" alt="heyoka 4.1.0 documentation - Home"/>
+    <script>document.write(`<img src="_static/white_logo.png" class="logo__image only-dark" alt="heyoka 4.1.0 documentation - Home"/>`);</script>
   
   
 </a></div>
@@ -199,6 +199,8 @@
 <li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="breaking_changes.html">Breaking changes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="known_issues.html">Known issues</a></li>
+
+
 <li class="toctree-l1"><a class="reference internal" href="acknowledgement.html">Acknowledgement</a></li>
 <li class="toctree-l1"><a class="reference internal" href="bibliography.html">Bibliography</a></li>
 </ul>
@@ -573,7 +575,7 @@ heyoka uses the <a class="reference external" href="https://www.mpfr.org/">MPFR 
 computations under the hood. DifferentialEquations.jl can also use MPFR (via the
 <a class="reference external" href="https://docs.julialang.org/en/v1/manual/integers-and-floating-point-numbers/#Arbitrary-Precision-Arithmetic">BigFloat</a>
 type) or, alternatively the <a class="reference external" href="https://arblib.org/">Arb</a> library (via the
-<a class="reference external" href="https://juliapackages.com/p/arbnumerics">ArbNumerics.jl</a> package).</p>
+<a class="reference external" href="https://github.com/JeffreySarnoff/ArbNumerics.jl">ArbNumerics.jl</a> package).</p>
 <p>Here are the results of a numerical integration of the simple pendulum with a 256-bit significand
 and a tolerance of <span class="math notranslate nohighlight">\(10^{-77}\)</span>:</p>
 <img alt="Arbitrary-precision pendulum" class="align-center" src="_images/mp_cmp.png" />
