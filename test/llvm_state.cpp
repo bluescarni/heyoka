@@ -99,18 +99,21 @@ TEST_CASE("copy semantics")
 {
     auto [x, y] = make_vars("x", "y");
 
-    // Copy without compilation.
+    // Copy with compilation.
     {
-        std::vector<double> jet{2, 3, 0, 0};
+        auto ta = taylor_adaptive{{prime(x) = x * y, prime(y) = y * x},
+                                  std::vector<double>{2, 3},
+                                  kw::tol = 1,
+                                  kw::opt_level = 2,
+                                  kw::fast_math = true,
+                                  kw::mname = "sample state"};
 
-        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
-
-        taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
+        const auto &s = ta.get_llvm_state();
 
         REQUIRE(s.module_name() == "sample state");
         REQUIRE(s.get_opt_level() == 2u);
         REQUIRE(s.fast_math());
-        REQUIRE(!s.is_compiled());
+        REQUIRE(s.is_compiled());
         REQUIRE(!s.get_slp_vectorize());
 
         const auto orig_ir = s.get_ir();
@@ -121,17 +124,15 @@ TEST_CASE("copy semantics")
         REQUIRE(s2.module_name() == "sample state");
         REQUIRE(s2.get_opt_level() == 2u);
         REQUIRE(s2.fast_math());
-        REQUIRE(!s2.is_compiled());
+        REQUIRE(s2.is_compiled());
         REQUIRE(!s2.get_slp_vectorize());
 
         REQUIRE(s2.get_ir() == orig_ir);
         REQUIRE(s2.get_bc() == orig_bc);
 
-        s2.compile();
+        ta.step(true);
 
-        auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s2.jit_lookup("jet"));
-
-        jptr(jet.data(), nullptr, nullptr);
+        const auto jet = tc_to_jet(ta);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
@@ -139,19 +140,14 @@ TEST_CASE("copy semantics")
         REQUIRE(jet[3] == 6);
     }
 
-    // Compile and copy.
+    // Copy without compilation.
     {
-        std::vector<double> jet{2, 3, 0, 0};
-
         llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::slp_vectorize = true};
 
-        taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
-
-        s.compile();
+        detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, false, false, 0, false);
 
         REQUIRE(s.get_slp_vectorize());
-
-        auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("jet"));
+        REQUIRE(!s.is_compiled());
 
         const auto orig_ir = s.get_ir();
         const auto orig_bc = s.get_bc();
@@ -161,20 +157,24 @@ TEST_CASE("copy semantics")
         REQUIRE(s2.module_name() == "sample state");
         REQUIRE(s2.get_opt_level() == 2u);
         REQUIRE(s2.fast_math());
-        REQUIRE(s2.is_compiled());
+        REQUIRE(!s2.is_compiled());
         REQUIRE(s2.get_slp_vectorize());
 
         REQUIRE(s2.get_ir() == orig_ir);
         REQUIRE(s2.get_bc() == orig_bc);
 
-        jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s2.jit_lookup("jet"));
+        s.compile();
 
-        jptr(jet.data(), nullptr, nullptr);
+        auto *cf_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cf"));
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 6);
-        REQUIRE(jet[3] == 6);
+        const std::vector<double> inputs{2, 3};
+        std::vector<double> outputs{0, 0};
+
+        cf_ptr(outputs.data(), inputs.data(), nullptr, nullptr);
+
+        REQUIRE(outputs[0] == 6);
+        REQUIRE(outputs[1] == 6);
     }
 }
 
@@ -187,7 +187,7 @@ TEST_CASE("get object code")
     {
         llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
 
-        taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
+        detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, false, false, 0, false);
 
         REQUIRE_THROWS_MATCHES(
             s.get_object_code(), std::invalid_argument,
@@ -243,7 +243,7 @@ TEST_CASE("s11n")
 
         llvm_state s{kw::mname = "foo", kw::slp_vectorize = true};
 
-        taylor_add_jet<double>(s, "jet", {-1_dbl, x + y}, 1, 1, true, false);
+        detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, false, false, 0, false);
 
         s.compile();
 
@@ -272,17 +272,16 @@ TEST_CASE("s11n")
         REQUIRE(s.fast_math() == false);
         REQUIRE(s.get_slp_vectorize());
 
-        auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("jet"));
+        auto *cf_ptr
+            = reinterpret_cast<void (*)(double *, const double *, const double *, const double *)>(s.jit_lookup("cf"));
 
-        std::vector<double> jet{2, 3};
-        jet.resize(4);
+        const std::vector<double> inputs{2, 3};
+        std::vector<double> outputs{0, 0};
 
-        jptr(jet.data(), nullptr, nullptr);
+        cf_ptr(outputs.data(), inputs.data(), nullptr, nullptr);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(-1.));
-        REQUIRE(jet[3] == approximately(5.));
+        REQUIRE(outputs[0] == 6);
+        REQUIRE(outputs[1] == 6);
     }
 }
 
@@ -292,7 +291,8 @@ TEST_CASE("make_similar")
 
     llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::force_avx512 = true,
                  kw::slp_vectorize = true};
-    taylor_add_jet<double>(s, "jet", {-1_dbl, x + y}, 1, 1, true, false);
+
+    detail::add_cfunc<double>(s, "cf", {x * y, y * x}, {x, y}, 1, false, false, false, 0, false);
 
     s.compile();
 
