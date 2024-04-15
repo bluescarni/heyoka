@@ -1190,7 +1190,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
                 const detail::dfloat<T> new_time(c_out_times_hi[c_out_times_hi.size() - m_batch_size + i],
                                                  c_out_times_lo[c_out_times_lo.size() - m_batch_size + i]);
-                assert(isfinite(new_time));
+                assert(isfinite(new_time)); // LCOV_EXCL_LINE
                 if (m_t_dir[i] != 0) {
                     assert(!(new_time < prev_times[i]));
                 } else {
