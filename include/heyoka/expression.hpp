@@ -119,7 +119,9 @@ HEYOKA_DLL_PUBLIC expression copy(const expression &);
 HEYOKA_DLL_PUBLIC std::vector<expression> copy(const std::vector<expression> &);
 
 HEYOKA_DLL_PUBLIC expression fix(expression);
+HEYOKA_DLL_PUBLIC std::vector<expression> fix(const std::vector<expression> &);
 HEYOKA_DLL_PUBLIC expression fix_nn(expression);
+HEYOKA_DLL_PUBLIC std::vector<expression> fix_nn(const std::vector<expression> &);
 HEYOKA_DLL_PUBLIC expression unfix(const expression &);
 HEYOKA_DLL_PUBLIC std::vector<expression> unfix(const std::vector<expression> &);
 
@@ -426,8 +428,11 @@ HEYOKA_DLL_PUBLIC dtens diff_tensors(const std::vector<expression> &,
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const param &);
+HEYOKA_DLL_PUBLIC std::vector<expression> diff(const std::vector<expression> &, const param &);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
+HEYOKA_DLL_PUBLIC std::vector<expression> diff(const std::vector<expression> &, const std::string &);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &);
+HEYOKA_DLL_PUBLIC std::vector<expression> diff(const std::vector<expression> &, const expression &);
 
 namespace detail
 {
