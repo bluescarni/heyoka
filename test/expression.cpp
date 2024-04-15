@@ -126,6 +126,14 @@ TEST_CASE("diff var")
 
     REQUIRE(diff(par[42], "x") == 0_dbl);
     REQUIRE(std::holds_alternative<double>(std::get<number>(diff(par[42], "x").value()).value()));
+
+    // Vectorised overload.
+    auto a = x + y;
+    auto res = diff({cosh(a), sinh(a)}, "y");
+    REQUIRE(res[0] == sinh(a));
+    REQUIRE(res[1] == cosh(a));
+    REQUIRE(std::get<func>(std::get<func>(res[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(res[1].value()).args()[0].value()).get_ptr());
 }
 
 TEST_CASE("diff par")
@@ -148,6 +156,27 @@ TEST_CASE("diff par")
 
     REQUIRE(diff("x"_var, par[42]) == 0_dbl);
     REQUIRE(std::holds_alternative<double>(std::get<number>(diff("x"_var, par[42]).value()).value()));
+
+    // Vectorised overload.
+    auto a = par[0] + par[1];
+    auto res = diff({cosh(a), sinh(a)}, param(0));
+    REQUIRE(res[0] == sinh(a));
+    REQUIRE(res[1] == cosh(a));
+    REQUIRE(std::get<func>(std::get<func>(res[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(res[1].value()).args()[0].value()).get_ptr());
+}
+
+TEST_CASE("diff ex")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    // Vectorised overload.
+    auto a = par[0] + par[1];
+    auto res = diff({cosh(a), sinh(a)}, par[0]);
+    REQUIRE(res[0] == sinh(a));
+    REQUIRE(res[1] == cosh(a));
+    REQUIRE(std::get<func>(std::get<func>(res[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(res[1].value()).args()[0].value()).get_ptr());
 }
 
 TEST_CASE("get_param_size")

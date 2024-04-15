@@ -150,21 +150,66 @@ expression diff(const expression &e, const param &p)
     return detail::diff(func_map, e, p);
 }
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-expression diff(const expression &e, const expression &x)
+namespace detail
+{
+
+namespace
+{
+
+std::vector<expression> diff_vec_impl(const std::vector<expression> &v_ex, const auto &x)
+{
+    funcptr_map<expression> func_map;
+
+    std::vector<expression> retval;
+    retval.reserve(v_ex.size());
+
+    for (const auto &ex : v_ex) {
+        retval.push_back(diff(func_map, ex, x));
+    }
+
+    return retval;
+}
+
+template <typename T>
+T diff_ex_impl(const T &input, const expression &x)
 {
     return std::visit(
-        [&e](const auto &v) -> expression {
-            if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
-                return diff(e, v.name());
-            } else if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, param>) {
-                return diff(e, v);
+        [&input](const auto &v) -> T {
+            if constexpr (std::is_same_v<std::remove_cvref_t<decltype(v)>, variable>) {
+                return diff(input, v.name());
+            } else if constexpr (std::is_same_v<std::remove_cvref_t<decltype(v)>, param>) {
+                return diff(input, v);
             } else {
                 throw std::invalid_argument(
                     "Derivatives are currently supported only with respect to variables and parameters");
             }
         },
         x.value());
+}
+
+} // namespace
+
+} // namespace detail
+
+std::vector<expression> diff(const std::vector<expression> &v_ex, const std::string &s)
+{
+    return detail::diff_vec_impl(v_ex, s);
+}
+
+std::vector<expression> diff(const std::vector<expression> &v_ex, const param &p)
+{
+    return detail::diff_vec_impl(v_ex, p);
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+expression diff(const expression &e, const expression &x)
+{
+    return detail::diff_ex_impl(e, x);
+}
+
+std::vector<expression> diff(const std::vector<expression> &v_ex, const expression &x)
+{
+    return detail::diff_ex_impl(v_ex, x);
 }
 
 namespace detail

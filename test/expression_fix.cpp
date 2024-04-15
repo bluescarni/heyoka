@@ -100,6 +100,19 @@ TEST_CASE("fix")
     REQUIRE(cos(fix(1_dbl)) != cos(1_dbl));
 
     REQUIRE(fix(fix(fix(fix(x)))) == fix(x));
+
+    // Vectorised overloads.
+    auto a = x + y;
+    auto res = fix({a, a, x - y});
+    REQUIRE(std::get<func>(std::get<func>(res[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(res[1].value()).args()[0].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(res[0].value()).args()[0].value()).get_ptr()
+            != std::get<func>(std::get<func>(res[2].value()).args()[0].value()).get_ptr());
+
+    res = fix_nn({a, a, 3_dbl});
+    REQUIRE(std::get<func>(std::get<func>(res[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(res[1].value()).args()[0].value()).get_ptr());
+    REQUIRE(res[2] == 3_dbl);
 }
 
 TEST_CASE("unfix")

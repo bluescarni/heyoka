@@ -106,6 +106,64 @@ namespace detail
 namespace
 {
 
+std::vector<expression> fix_vec_impl(const std::vector<expression> &v_ex, auto fixer)
+{
+    // NOTE: fixing does not requires traversing the expression tree.
+    // We just have to apply fix to each expression in v_ex making sure
+    // that, if the same expression appears more than once in v_ex,
+    // we fetch the result from the cache rather than creating a new
+    // expression.
+
+    funcptr_map<expression> func_map;
+
+    std::vector<expression> retval;
+    retval.reserve(v_ex.size());
+
+    for (const auto &ex : v_ex) {
+        if (const auto *func_ptr = std::get_if<func>(&ex.value())) {
+            const auto f_id = func_ptr->get_ptr();
+
+            if (auto it = func_map.find(f_id); it != func_map.end()) {
+                // We already fixed the current expression,
+                // fetch the result from the cache.
+                retval.push_back(it->second);
+            } else {
+                auto ret = fixer(ex);
+
+                // Put the return value in the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
+                assert(flag);
+
+                retval.push_back(std::move(ret));
+            }
+        } else {
+            retval.push_back(fixer(ex));
+        }
+    }
+
+    return retval;
+}
+
+} // namespace
+
+} // namespace detail
+
+std::vector<expression> fix(const std::vector<expression> &v_ex)
+{
+    return detail::fix_vec_impl(v_ex, [](auto ex) { return fix(std::move(ex)); });
+}
+
+std::vector<expression> fix_nn(const std::vector<expression> &v_ex)
+{
+    return detail::fix_vec_impl(v_ex, [](auto ex) { return fix_nn(std::move(ex)); });
+}
+
+namespace detail
+{
+
+namespace
+{
+
 // NOLINTNEXTLINE(misc-no-recursion)
 expression unfix_impl(funcptr_map<expression> &func_map, const expression &ex)
 {
