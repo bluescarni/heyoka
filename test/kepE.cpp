@@ -26,9 +26,6 @@
 
 #include <llvm/Config/llvm-config.h>
 
-#include <fmt/format.h>
-#include <fmt/ranges.h>
-
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -122,7 +119,7 @@ TEST_CASE("kepE diff")
         REQUIRE(diff(kepE(x, y), x) == sin(kepE(x, y)) / (1_dbl - x * cos(kepE(x, y))));
         REQUIRE(diff(kepE(x, y), y) == 1_dbl / (1_dbl - x * cos(kepE(x, y))));
         auto E = kepE(x * x, x * y);
-        REQUIRE(diff(E, x) == (2_dbl * x * sin(E) + y) / (1_dbl - x * x * cos(E)));
+        REQUIRE(diff(E, x) == ((x + x) * sin(E) + y) / (1_dbl - x * x * cos(E)));
         REQUIRE(diff(E, y) == x / (1_dbl - x * x * cos(E)));
     }
 
@@ -130,7 +127,7 @@ TEST_CASE("kepE diff")
         REQUIRE(diff(kepE(par[0], y), par[0]) == sin(kepE(par[0], y)) / (1_dbl - par[0] * cos(kepE(par[0], y))));
         REQUIRE(diff(kepE(x, par[1]), par[1]) == 1_dbl / (1_dbl - x * cos(kepE(x, par[1]))));
         auto E = kepE(par[0] * par[0], par[0] * par[1]);
-        REQUIRE(diff(E, par[0]) == (2_dbl * par[0] * sin(E) + par[1]) / (1_dbl - par[0] * par[0] * cos(E)));
+        REQUIRE(diff(E, par[0]) == ((par[0] + par[0]) * sin(E) + par[1]) / (1_dbl - par[0] * par[0] * cos(E)));
         REQUIRE(diff(E, par[1]) == par[0] / (1_dbl - par[0] * par[0] * cos(E)));
     }
 }
@@ -193,7 +190,7 @@ TEST_CASE("kepE cse")
     auto ta = taylor_adaptive<double>{
         {prime(x) = cos(kepE(x, y)) + sin(kepE(x, y)) + kepE(x, y), prime(y) = x}, {0., 0.}, kw::tol = 1.};
 
-    REQUIRE(ta.get_decomposition().size() == 9u);
+    REQUIRE(ta.get_decomposition().size() == 10u);
 }
 
 // NOTE: this test checks a numerical integration of the Stark problem using kepE vs

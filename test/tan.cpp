@@ -81,11 +81,11 @@ TEST_CASE("tan diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(tan(x * x - y), x) == (1. + square_wrapper(tan(square_wrapper(x) - y))) * (2. * x));
+    REQUIRE(diff(tan(x * x - y), x) == (1. + square_wrapper(tan(square_wrapper(x) - y))) * (x + x));
     REQUIRE(diff(tan(x * x + y), y) == (1. + square_wrapper(tan(square_wrapper(x) + y))));
 
     REQUIRE(diff(tan(par[0] * par[0] - y), par[0])
-            == (1. + square_wrapper(tan(square_wrapper(par[0]) - y))) * (2. * par[0]));
+            == (1. + square_wrapper(tan(square_wrapper(par[0]) - y))) * (par[0] + par[0]));
     REQUIRE(diff(tan(x * x + par[1]), par[1]) == (1. + square_wrapper(tan(square_wrapper(x) + par[1]))));
 }
 

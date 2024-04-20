@@ -67,7 +67,7 @@ expression sum_to_sum_sq(const expression &);
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression sum(const std::vector<expression> &);
+HEYOKA_DLL_PUBLIC expression sum(std::vector<expression>);
 
 HEYOKA_END_NAMESPACE
 

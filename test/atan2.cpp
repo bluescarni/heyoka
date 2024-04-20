@@ -43,6 +43,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/atan2.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
@@ -98,13 +99,13 @@ TEST_CASE("atan2 diff")
     REQUIRE(diff(atan2(y, x), "y") == x / (x * x + y * y));
     REQUIRE(diff(atan2(y, x), "z") == 0_dbl);
     REQUIRE(diff(atan2(x * y, y / x), "x")
-            == (y / x * y - (x * y) * (-y / (x * x))) / ((y / x) * (y / x) + (x * y) * (x * y)));
+            == (y / x * y - (x * y) * (y * -pow(x, -2_dbl))) / ((y / x) * (y / x) + (x * y) * (x * y)));
 
     REQUIRE(diff(atan2(y, par[0]), par[0]) == (-y) / (par[0] * par[0] + y * y));
     REQUIRE(diff(atan2(par[1], x), par[1]) == x / (x * x + par[1] * par[1]));
     REQUIRE(diff(atan2(y, x), par[2]) == 0_dbl);
     REQUIRE(diff(atan2(par[0] * par[1], par[1] / par[0]), par[0])
-            == (par[1] / par[0] * par[1] - (par[0] * par[1]) * (-par[1] / (par[0] * par[0])))
+            == (par[1] / par[0] * par[1] - (par[0] * par[1]) * (par[1] * -pow(par[0], -2_dbl)))
                    / ((par[1] / par[0]) * (par[1] / par[0]) + (par[0] * par[1]) * (par[0] * par[1])));
 }
 
@@ -163,9 +164,10 @@ TEST_CASE("atan2 cse")
 {
     auto x = "x"_var, y = "y"_var;
 
-    auto ta = taylor_adaptive<double>{{prime(x) = atan2(y, x) + (x * x + y * y), prime(y) = x}, {0., 0.}, kw::tol = 1.};
+    auto ta = taylor_adaptive<double>{
+        {prime(x) = atan2(y, x) + (pow(y, 2_dbl) + pow(x, 2_dbl)), prime(y) = x}, {0., 0.}, kw::tol = 1.};
 
-    REQUIRE(ta.get_decomposition().size() == 9u);
+    REQUIRE(ta.get_decomposition().size() == 7u);
 }
 
 TEST_CASE("atan2 const fold")

@@ -15,6 +15,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/model/rotating.hpp>
 
@@ -113,7 +114,9 @@ expression rotating_potential_impl(const std::vector<expression> &omega)
         const auto tmp = fix_nn(sum({pe * x, qe * y, re * z}));
 
         return 0.5_dbl
-               * fix_nn(tmp * tmp - fix_nn(sum({pe * pe, qe * qe, re * re})) * fix_nn(sum({x * x, y * y, z * z})));
+               * fix_nn(tmp * tmp
+                        - fix_nn(sum({pow(pe, 2_dbl), pow(qe, 2_dbl), pow(re, 2_dbl)}))
+                              * fix_nn(sum({pow(x, 2_dbl), pow(y, 2_dbl), pow(z, 2_dbl)})));
     }
 }
 
@@ -122,7 +125,7 @@ expression rotating_energy_impl(const std::vector<expression> &omega)
     // Init the velocity variables.
     auto [vx, vy, vz] = make_vars("vx", "vy", "vz");
 
-    return 0.5_dbl * fix_nn(sum({vx * vx, vy * vy, vz * vz})) + rotating_potential_impl(omega);
+    return 0.5_dbl * fix_nn(sum({pow(vx, 2_dbl), pow(vy, 2_dbl), pow(vz, 2_dbl)})) + rotating_potential_impl(omega);
 }
 
 } // namespace model::detail

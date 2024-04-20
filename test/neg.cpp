@@ -79,7 +79,7 @@ TEST_CASE("neg ostream")
     std::ostringstream oss;
     oss << neg(x + y);
 
-    REQUIRE(oss.str() == "(-x - y)");
+    REQUIRE(oss.str() == "-(x + y)");
 
     oss.str("");
     oss << -x;
@@ -93,7 +93,7 @@ TEST_CASE("neg diff")
 
     REQUIRE(diff(neg(x + y), "x") == -1_dbl);
     REQUIRE(diff(-(x + y), "x") == -1_dbl);
-    REQUIRE(diff(-(x * x + y * x), "x") == -(2. * x + y));
+    REQUIRE(diff(-(x * x + y * x), "x") == -(x + x + y));
 
     REQUIRE(diff(neg(par[0] + y), par[0]) == -1_dbl);
     REQUIRE(diff(-(par[0] + y), par[0]) == -1_dbl);
@@ -108,15 +108,6 @@ TEST_CASE("unary minus simpl")
     auto x = make_vars("x");
 
     REQUIRE(-x == neg(x));
-}
-
-TEST_CASE("unary minus minus simpl")
-{
-    auto [x, y] = make_vars("x", "y");
-
-    REQUIRE(-(-(x + y)) == x + y);
-    REQUIRE(-(-sin(x + y)) == sin(x + y));
-    REQUIRE(-sin(x + y) == neg(sin(x + y)));
 }
 
 TEST_CASE("neg s11n")

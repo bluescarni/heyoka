@@ -244,13 +244,13 @@ TEST_CASE("diff")
     REQUIRE(diff(relup(x), x) == 0_dbl);
     REQUIRE(diff(relup(x, 0.01), x) == 0_dbl);
 
-    REQUIRE(diff(relu(x * y), x) == y * relup(x * y));
+    REQUIRE(diff(relu(x * y), x) == relup(x * y) * y);
     REQUIRE(diff(relu(x * y), par[0]) == 0_dbl);
-    REQUIRE(diff(relu(x * par[0]), par[0]) == x * relup(x * par[0]));
+    REQUIRE(diff(relu(x * par[0]), par[0]) == relup(x * par[0]) * x);
 
-    REQUIRE(diff(relu(x * y, 0.02), x) == y * relup(x * y, 0.02));
+    REQUIRE(diff(relu(x * y, 0.02), x) == relup(x * y, 0.02) * y);
     REQUIRE(diff(relu(x * y, 0.03), par[0]) == 0_dbl);
-    REQUIRE(diff(relu(x * par[0], 0.04), par[0]) == x * relup(x * par[0], 0.04));
+    REQUIRE(diff(relu(x * par[0], 0.04), par[0]) == relup(x * par[0], 0.04) * x);
 
     REQUIRE(diff(relup(x * y), x) == 0_dbl);
     REQUIRE(diff(relup(x * y), par[0]) == 0_dbl);

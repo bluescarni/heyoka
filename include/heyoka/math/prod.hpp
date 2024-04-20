@@ -69,7 +69,7 @@ HEYOKA_DLL_PUBLIC std::vector<expression> prod_to_div_taylor_diff(const std::vec
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression prod(const std::vector<expression> &);
+HEYOKA_DLL_PUBLIC expression prod(std::vector<expression>);
 
 HEYOKA_END_NAMESPACE
 

@@ -64,11 +64,11 @@ std::vector<std::pair<expression, expression>> cr3bp_impl(const expression &mu)
     // x - mu + 1.
     const auto x_m_mu_p1 = x_m_mu + 1.;
     // y**2 + z**2.
-    const auto y_p_z_2 = fix_nn(y * y + z * z);
+    const auto y_p_z_2 = fix_nn(pow(y, 2_dbl) + pow(z, 2_dbl));
     // rp1**2.
-    const auto rp1_2 = x_m_mu * x_m_mu + y_p_z_2;
+    const auto rp1_2 = pow(x_m_mu, 2_dbl) + y_p_z_2;
     // rp2**2.
-    const auto rp2_2 = x_m_mu_p1 * x_m_mu_p1 + y_p_z_2;
+    const auto rp2_2 = pow(x_m_mu_p1, 2_dbl) + y_p_z_2;
     // (1 - mu) / rp1**3.
     const auto g1 = fix_nn((1. - mu) * pow(rp1_2, -3. / 2));
     // mu / rp2**3.
@@ -98,17 +98,17 @@ expression cr3bp_jacobi_impl(const expression &mu)
     // x - mu + 1.
     const auto x_m_mu_p1 = x_m_mu + 1.;
     // y**2 + z**2.
-    const auto y_p_z_2 = fix_nn(y * y + z * z);
+    const auto y_p_z_2 = fix_nn(pow(y, 2_dbl) + pow(z, 2_dbl));
     // rp1**2.
-    const auto rp1_2 = x_m_mu * x_m_mu + y_p_z_2;
+    const auto rp1_2 = pow(x_m_mu, 2_dbl) + y_p_z_2;
     // rp2**2.
-    const auto rp2_2 = x_m_mu_p1 * x_m_mu_p1 + y_p_z_2;
+    const auto rp2_2 = pow(x_m_mu_p1, 2_dbl) + y_p_z_2;
     // (1 - mu) / rp1.
     const auto g1 = fix_nn((1. - mu) / sqrt(rp1_2));
     // mu / rp2.
     const auto g2 = fix_nn(mu / sqrt(rp2_2));
 
-    const auto kin = 0.5 * fix_nn(px * px + py * py + pz * pz);
+    const auto kin = 0.5 * fix_nn(pow(px, 2_dbl) + pow(py, 2_dbl) + pow(pz, 2_dbl));
 
     return kin + y * px - x * py - g1 - g2;
 }

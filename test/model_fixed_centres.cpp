@@ -14,6 +14,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/model/fixed_centres.hpp>
 #include <heyoka/model/nbody.hpp>
@@ -33,7 +34,7 @@ auto sum_sq(const std::vector<expression> &args)
     new_args.reserve(args.size());
 
     for (const auto &arg : args) {
-        new_args.push_back(arg * arg);
+        new_args.push_back(pow(arg, 2_dbl));
     }
 
     return sum(new_args);

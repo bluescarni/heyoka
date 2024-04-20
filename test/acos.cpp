@@ -82,7 +82,7 @@ TEST_CASE("acos diff var")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(acos(x * x - y), x) == -pow(1. - square_wrapper(square_wrapper(x) - y), -.5) * (2. * x));
+    REQUIRE(diff(acos(x * x - y), x) == -pow(1. - square_wrapper(square_wrapper(x) - y), -.5) * (x + x));
     REQUIRE(diff(acos(x * x + y), y) == -pow(1. - square_wrapper(square_wrapper(x) + y), -.5));
 }
 
@@ -91,7 +91,7 @@ TEST_CASE("acos diff par")
     auto [x, y] = make_vars("x", "y");
 
     REQUIRE(diff(acos(par[0] * par[0] - y), par[0])
-            == -pow(1. - square_wrapper(square_wrapper(par[0]) - y), -.5) * (2. * par[0]));
+            == -pow(1. - square_wrapper(square_wrapper(par[0]) - y), -.5) * (par[0] + par[0]));
     REQUIRE(diff(acos(x * x + par[1]), par[1]) == -pow(1. - square_wrapper(square_wrapper(x) + par[1]), -.5));
 }
 

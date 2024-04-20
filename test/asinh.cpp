@@ -82,7 +82,7 @@ TEST_CASE("asinh diff var")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(asinh(x * x - y), x) == pow(square_wrapper(square_wrapper(x) - y) + 1., -.5) * (2. * x));
+    REQUIRE(diff(asinh(x * x - y), x) == pow(square_wrapper(square_wrapper(x) - y) + 1., -.5) * (x + x));
     REQUIRE(diff(asinh(x * x + y), y) == pow(square_wrapper(square_wrapper(x) + y) + 1., -.5));
 }
 
@@ -91,7 +91,7 @@ TEST_CASE("asinh diff par")
     auto [x, y] = make_vars("x", "y");
 
     REQUIRE(diff(asinh(par[0] * par[0] - y), par[0])
-            == pow(square_wrapper(square_wrapper(par[0]) - y) + 1., -.5) * (2. * par[0]));
+            == pow(square_wrapper(square_wrapper(par[0]) - y) + 1., -.5) * (par[0] + par[0]));
     REQUIRE(diff(asinh(x * x + par[1]), par[1]) == pow(square_wrapper(square_wrapper(x) + par[1]) + 1., -.5));
 }
 

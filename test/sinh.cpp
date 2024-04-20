@@ -82,10 +82,10 @@ TEST_CASE("sinh diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(sinh(x * x - y), x) == cosh(square_wrapper(x) - y) * (2. * x));
+    REQUIRE(diff(sinh(x * x - y), x) == cosh(square_wrapper(x) - y) * (x + x));
     REQUIRE(diff(sinh(x * x + y), y) == cosh(square_wrapper(x) + y));
 
-    REQUIRE(diff(sinh(par[0] * par[0] - y), par[0]) == cosh(square_wrapper(par[0]) - y) * (2. * par[0]));
+    REQUIRE(diff(sinh(par[0] * par[0] - y), par[0]) == cosh(square_wrapper(par[0]) - y) * (par[0] + par[0]));
     REQUIRE(diff(sinh(x * x + par[1]), par[1]) == cosh(square_wrapper(x) + par[1]));
 }
 

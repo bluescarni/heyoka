@@ -82,7 +82,9 @@ TEST_CASE("impl")
     {
         auto my_net = model::detail::ffnn_impl({x, y}, {2}, 1, {heyoka::sin, heyoka::cos},
                                                {1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl, 1_dbl});
-        REQUIRE(my_net[0] == expression(heyoka::cos(1_dbl + 2_dbl * heyoka::sin(1_dbl + x + y))));
+        REQUIRE(
+            my_net[0]
+            == expression(heyoka::cos(sum({1_dbl, heyoka::sin(sum({1_dbl, x, y})), heyoka::sin(sum({1_dbl, x, y}))}))));
     }
 
     // Check overflow detection.

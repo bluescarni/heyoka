@@ -10,7 +10,6 @@
 #include <cassert>
 #include <cstdint>
 #include <functional>
-#include <iterator>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -20,8 +19,6 @@
 #include <vector>
 
 #include <fmt/core.h>
-
-#include <oneapi/tbb/parallel_sort.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -498,7 +495,6 @@ const expression *is_square(const expression &ex)
 
     if (const auto *expo_num_ptr = std::get_if<number>(&expo.value())) {
         // The exponent is a number.
-
         if (std::visit([](const auto &v) { return v == 2; }, expo_num_ptr->value())) {
             // Exponent is 2, return the base.
             return &base;
@@ -544,134 +540,6 @@ expression sum_to_sum_sq(const expression &e)
     }
 
     return expression{func{sum_sq_impl{std::move(new_args)}}};
-}
-
-// Simplify the arguments for a sum(). This function returns either the simplified vector of arguments,
-// or a single expression directly representing the result of the sum.
-std::variant<std::vector<expression>, expression> sum_simplify_args(const std::vector<expression> &args_)
-{
-    // Step 1: flatten sums in args.
-    std::vector<expression> args;
-    args.reserve(args_.size());
-    for (const auto &arg : args_) {
-        if (const auto *fptr = std::get_if<func>(&arg.value());
-            fptr != nullptr && fptr->extract<detail::sum_impl>() != nullptr) {
-            // Nested sum.
-            for (const auto &sum_arg : fptr->args()) {
-                args.push_back(sum_arg);
-            }
-        } else {
-            args.push_back(arg);
-        }
-    }
-
-    // Step 2: gather equal expressions and common products with numerical coefficients.
-    // NOTE: we perform this step using a flat map that is sorted manually after
-    // construction. This allows us to use the less-than operator, which, wrt to hashing,
-    // can be more performant because it can exit early. Additionally, doing the sort
-    // afterwards is more parallelisable wrt using a std::map.
-    std::vector<std::pair<expression, number>> coeff_mul_map;
-    coeff_mul_map.reserve(args.size());
-
-    // NOTE: this does not seem to take long, we can always make it parallel if needed.
-    std::transform(args.begin(), args.end(), std::back_inserter(coeff_mul_map), [](const expression &arg) {
-        if (const auto *fptr = std::get_if<func>(&arg.value());
-            fptr != nullptr && fptr->extract<detail::prod_impl>() != nullptr && fptr->args().size() >= 2u
-            && std::holds_alternative<number>(fptr->args()[0].value())) {
-            // The current argument is of the form cf*a*b*c*..., where cf is a number.
-            const auto &cf = std::get<number>(fptr->args()[0].value());
-
-            // Construct the new product without cf: a*b*c*....
-            auto new_prod = prod(std::vector(fptr->args().begin() + 1, fptr->args().end()));
-
-            // Pair it to cf.
-            return std::make_pair(std::move(new_prod), cf);
-        } else {
-            // The current argument is *NOT* a product with a numerical coefficient, return
-            // it paired to a coefficient of 1.
-            // NOTE: we are using double precision here, which guarantees a reasonable range
-            // of exactly-representable coefficients (in case arg shows up many times).
-            return std::make_pair(arg, number{1.});
-        }
-    });
-
-    // Sort the map.
-    oneapi::tbb::parallel_sort(coeff_mul_map.begin(), coeff_mul_map.end(), [](const auto &p1, const auto &p2) {
-        return std::less<expression>{}(p1.first, p2.first);
-    });
-
-    // Gather duplicate products.
-    std::vector<std::pair<expression, number>> new_coeff_mul_map;
-    new_coeff_mul_map.reserve(coeff_mul_map.size());
-
-    for (auto it = coeff_mul_map.begin(); it != coeff_mul_map.end(); ++it) {
-        // Add the current product-coefficient pair.
-        new_coeff_mul_map.push_back(*it);
-
-        // Look forward for duplicate products and gather them.
-        while (it + 1 != coeff_mul_map.end() && (it + 1)->first == it->first) {
-            new_coeff_mul_map.back().second = new_coeff_mul_map.back().second + (it + 1)->second;
-            ++it;
-        }
-    }
-
-    // Swap in the gathered products.
-    new_coeff_mul_map.swap(coeff_mul_map);
-
-    // Reconstruct args from coeff_mul_map.
-    args.clear();
-    for (const auto &[pr, cf] : coeff_mul_map) {
-        args.push_back(prod({expression{cf}, pr}));
-    }
-
-    // Step 3: partition args so that all numbers are at the end.
-    const auto n_end_it = std::stable_partition(
-        args.begin(), args.end(), [](const expression &ex) { return !std::holds_alternative<number>(ex.value()); });
-
-    // Constant fold the numbers.
-    if (n_end_it != args.end()) {
-        for (auto it = n_end_it + 1; it != args.end(); ++it) {
-            // NOTE: do not use directly operator+() on expressions in order
-            // to avoid recursion.
-            *n_end_it = expression{std::get<number>(n_end_it->value()) + std::get<number>(it->value())};
-        }
-
-        // Remove all numbers but the first one.
-        args.erase(n_end_it + 1, args.end());
-
-        // Handle the special case in which the remaining number is zero.
-        if (is_zero(std::get<number>(n_end_it->value()))) {
-            if (args.size() == 1u) {
-                assert(n_end_it == args.begin());
-
-                // This is also the only remaining term in the sum,
-                // return it.
-                // NOTE: it is important to special-case this, because otherwise
-                // we will fall into the args().empty() special case below, which will
-                // forcibly convert the folded 0 constant into double precision.
-                return *n_end_it;
-            } else {
-                // Besides the number 0, there are other
-                // non-number terms in the sum. Remove
-                // the number 0.
-                args.pop_back();
-            }
-        }
-    }
-
-    // Special cases.
-    if (args.empty()) {
-        return 0_dbl;
-    }
-
-    if (args.size() == 1u) {
-        return std::move(args[0]);
-    }
-
-    // Sort the operands in canonical order.
-    oneapi::tbb::parallel_sort(args.begin(), args.end(), std::less<expression>{});
-
-    return args;
 }
 
 namespace
@@ -800,15 +668,57 @@ std::vector<expression> sum_to_sub(const std::vector<expression> &v_ex)
 
 } // namespace detail
 
-expression sum(const std::vector<expression> &args_)
+expression sum(std::vector<expression> args)
 {
-    auto args = detail::sum_simplify_args(args_);
+    // Partition args so that all numbers are at the end.
+    const auto n_end_it = std::stable_partition(
+        args.begin(), args.end(), [](const expression &ex) { return !std::holds_alternative<number>(ex.value()); });
 
-    if (std::holds_alternative<expression>(args)) {
-        return std::move(std::get<expression>(args));
-    } else {
-        return expression{func{detail::sum_impl{std::move(std::get<std::vector<expression>>(args))}}};
+    // Constant fold the numbers.
+    if (n_end_it != args.end()) {
+        for (auto it = n_end_it + 1; it != args.end(); ++it) {
+            *n_end_it = expression{std::get<number>(n_end_it->value()) + std::get<number>(it->value())};
+        }
+
+        // Remove all numbers but the first one.
+        args.erase(n_end_it + 1, args.end());
+
+        // Handle the special case in which the remaining number is zero.
+        if (is_zero(std::get<number>(n_end_it->value()))) {
+            if (args.size() == 1u) {
+                assert(n_end_it == args.begin());
+
+                // This is also the only remaining term in the sum,
+                // return it.
+                // NOTE: it is important to special-case this, because otherwise
+                // we will fall into the args().empty() special case below, which will
+                // forcibly convert the folded 0 constant into double precision.
+                return *n_end_it;
+            } else {
+                // Besides the number 0, there are other
+                // non-number terms in the sum. Remove
+                // the number 0.
+                args.pop_back();
+            }
+        }
     }
+
+    // Special cases.
+    if (args.empty()) {
+        return 0_dbl;
+    }
+
+    if (args.size() == 1u) {
+        return std::move(args[0]);
+    }
+
+    // Re-partition args so that all numbers are at the beginning.
+    // NOTE: this results in a semi-canonical representation of sums
+    // in which numbers are at the beginning.
+    std::stable_partition(args.begin(), args.end(),
+                          [](const expression &ex) { return std::holds_alternative<number>(ex.value()); });
+
+    return expression{func{detail::sum_impl{std::move(args)}}};
 }
 
 HEYOKA_END_NAMESPACE

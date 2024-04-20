@@ -530,12 +530,12 @@ TEST_CASE("taylor sinhcosh cse")
     auto x = "x"_var, y = "y"_var;
 
     auto ta = taylor_adaptive<double>{
-        {prime(x) = sinh(y) + cosh(x) + sinh(x) + cosh(y), prime(y) = sinh(y) + cosh(x) + sinh(x) + cosh(y)},
+        {prime(x) = (sinh(x) + cosh(y)) + (sinh(y) + cosh(x)), prime(y) = (sinh(x) + cosh(y)) + (sinh(y) + cosh(x))},
         {2., 3.},
         kw::opt_level = 0,
         kw::tol = 1.};
 
-    REQUIRE(ta.get_decomposition().size() == 9u);
+    REQUIRE(ta.get_decomposition().size() == 11u);
 
     ta.step(true);
 

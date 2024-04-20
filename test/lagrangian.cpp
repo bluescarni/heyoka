@@ -279,7 +279,7 @@ TEST_CASE("error handling")
 
     REQUIRE_THROWS_MATCHES(
         lagrangian(x, {x + v}, {v}), std::invalid_argument,
-        Message("The list of generalised coordinates contains the expression '(v + x)' which is not a variable"));
+        Message("The list of generalised coordinates contains the expression '(x + v)' which is not a variable"));
     REQUIRE_THROWS_MATCHES(
         lagrangian(x, {"__x"_var}, {v}), std::invalid_argument,
         Message("The list of generalised coordinates contains a variable with the invalid name '__x': names "
@@ -287,7 +287,7 @@ TEST_CASE("error handling")
 
     REQUIRE_THROWS_MATCHES(
         lagrangian(x, {v}, {x + v}), std::invalid_argument,
-        Message("The list of generalised velocities contains the expression '(v + x)' which is not a variable"));
+        Message("The list of generalised velocities contains the expression '(x + v)' which is not a variable"));
     REQUIRE_THROWS_MATCHES(
         lagrangian(x, {v}, {"__x"_var}), std::invalid_argument,
         Message("The list of generalised velocities contains a variable with the invalid name '__x': names "

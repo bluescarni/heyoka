@@ -100,7 +100,8 @@ std::vector<std::pair<expression, expression>> nbody_impl(std::uint32_t n, const
             const auto diff_z = z_vars[j] - z_vars[i];
 
             // Compute r_ij**-3.
-            const auto r_m3 = pow(sum({diff_x * diff_x, diff_y * diff_y, diff_z * diff_z}), expression{-3. / 2});
+            const auto r_m3
+                = pow(sum({pow(diff_x, 2_dbl), pow(diff_y, 2_dbl), pow(diff_z, 2_dbl)}), expression{-3. / 2});
 
             // If:
             //
@@ -198,7 +199,7 @@ expression nbody_potential_impl([[maybe_unused]] std::uint32_t n, const expressi
             const auto diff_z = z_vars[j] - z_vars[i];
 
             pot.push_back(masses_vec[i] * masses_vec[j]
-                          / sqrt(sum({diff_x * diff_x, diff_y * diff_y, diff_z * diff_z})));
+                          / sqrt(sum({pow(diff_x, 2_dbl), pow(diff_y, 2_dbl), pow(diff_z, 2_dbl)})));
         }
     }
 
@@ -235,7 +236,7 @@ expression nbody_energy_impl([[maybe_unused]] std::uint32_t n, const expression 
         kin.push_back(masses_vec[i]
                       // NOTE: need the fix() here to prevent distribution
                       // in case masses_vec[i] is a number.
-                      * fix_nn(sum({vx_vars[i] * vx_vars[i], vy_vars[i] * vy_vars[i], vz_vars[i] * vz_vars[i]})));
+                      * fix_nn(sum({pow(vx_vars[i], 2_dbl), pow(vy_vars[i], 2_dbl), pow(vz_vars[i], 2_dbl)})));
     }
 
     return .5_dbl * fix_nn(sum(kin)) + nbody_potential_impl(n, Gconst, masses_vec);
@@ -266,7 +267,7 @@ std::vector<std::pair<expression, expression>> np1body_impl(std::uint32_t n, con
     std::vector<expression> x_r3, y_r3, z_r3;
     for (std::uint32_t i = 0; i < n - 1u; ++i) {
         const auto rm3
-            = pow(sum({x_vars[i] * x_vars[i], y_vars[i] * y_vars[i], z_vars[i] * z_vars[i]}), expression{-3. / 2});
+            = pow(sum({pow(x_vars[i], 2_dbl), pow(y_vars[i], 2_dbl), pow(z_vars[i], 2_dbl)}), expression{-3. / 2});
 
         x_r3.push_back(x_vars[i] * rm3);
         y_r3.push_back(y_vars[i] * rm3);
@@ -316,7 +317,7 @@ std::vector<std::pair<expression, expression>> np1body_impl(std::uint32_t n, con
             const auto diff_z = j_gt_i ? z_vars[j] - z_vars[i] : z_vars[i] - z_vars[j];
 
             // This is r_ij**-3 if j > i, -(r_ij**-3) otherwise.
-            const auto diff_rm3 = pow(sum({diff_x * diff_x, diff_y * diff_y, diff_z * diff_z}), -1.5);
+            const auto diff_rm3 = pow(sum({pow(diff_x, 2_dbl), pow(diff_y, 2_dbl), pow(diff_z, 2_dbl)}), -1.5);
 
             // mu_j.
             const auto cur_mu = Gconst * masses_vec[j + 1u];
@@ -384,7 +385,7 @@ expression np1body_potential_impl([[maybe_unused]] std::uint32_t n, const expres
     // Add the potential between the zeroth body and the rest.
     for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
         pot.push_back(masses_vec[0] * masses_vec[i + 1u]
-                      / sqrt(sum({x_vars[i] * x_vars[i], y_vars[i] * y_vars[i], z_vars[i] * z_vars[i]})));
+                      / sqrt(sum({pow(x_vars[i], 2_dbl), pow(y_vars[i], 2_dbl), pow(z_vars[i], 2_dbl)})));
     }
 
     // Add the mutual potentials.
@@ -395,7 +396,7 @@ expression np1body_potential_impl([[maybe_unused]] std::uint32_t n, const expres
             const auto diff_z = z_vars[j] - z_vars[i];
 
             pot.push_back(masses_vec[i + 1u] * masses_vec[j + 1u]
-                          / sqrt(sum({diff_x * diff_x, diff_y * diff_y, diff_z * diff_z})));
+                          / sqrt(sum({pow(diff_x, 2_dbl), pow(diff_y, 2_dbl), pow(diff_z, 2_dbl)})));
         }
     }
 
@@ -445,18 +446,20 @@ expression np1body_energy_impl([[maybe_unused]] std::uint32_t n, const expressio
 
     const auto tot_mass = sum(tot_mass_terms);
 
-    const auto ud0_x = -sum(ud0_x_terms) / tot_mass;
-    const auto ud0_y = -sum(ud0_y_terms) / tot_mass;
-    const auto ud0_z = -sum(ud0_z_terms) / tot_mass;
+    // NOTE: negating the total mass (instead of the whole expression)
+    // helps in the common case in which tot_mass is a number.
+    const auto ud0_x = sum(ud0_x_terms) / -tot_mass;
+    const auto ud0_y = sum(ud0_y_terms) / -tot_mass;
+    const auto ud0_z = sum(ud0_z_terms) / -tot_mass;
 
     // The kinetic terms.
-    std::vector<expression> kin{masses_vec[0] * fix_nn(sum({ud0_x * ud0_x, ud0_y * ud0_y, ud0_z * ud0_z}))};
+    std::vector<expression> kin{masses_vec[0] * fix_nn(sum({pow(ud0_x, 2_dbl), pow(ud0_y, 2_dbl), pow(ud0_z, 2_dbl)}))};
     for (std::uint32_t i = 0; i < n_massive - 1u; ++i) {
         const auto tmp_vx = vx_vars[i] + fix_nn(ud0_x);
         const auto tmp_vy = vy_vars[i] + fix_nn(ud0_y);
         const auto tmp_vz = vz_vars[i] + fix_nn(ud0_z);
 
-        kin.push_back(masses_vec[i + 1u] * fix_nn(sum({tmp_vx * tmp_vx, tmp_vy * tmp_vy, tmp_vz * tmp_vz})));
+        kin.push_back(masses_vec[i + 1u] * fix_nn(sum({pow(tmp_vx, 2_dbl), pow(tmp_vy, 2_dbl), pow(tmp_vz, 2_dbl)})));
     }
 
     return .5_dbl * fix_nn(sum(kin)) + np1body_potential_impl(n, Gconst, masses_vec);

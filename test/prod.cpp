@@ -336,7 +336,7 @@ TEST_CASE("stream test")
 
         oss << prod({pow(pow(x, y), -2_dbl), z});
 
-        REQUIRE(boost::starts_with(oss.str(), "(z / x**(2.00000000"));
+        REQUIRE(boost::starts_with(oss.str(), "(z / x**-(-2.00000000"));
         REQUIRE(boost::ends_with(oss.str(), "0000000000 * y))"));
     }
 
@@ -353,18 +353,10 @@ TEST_CASE("args simpl")
 {
     auto [x, y, z] = make_vars("x", "y", "z");
 
-    // Flattening.
-    REQUIRE(prod({prod({x, y}), z}) == prod({x, y, z}));
-
-    // Gathering of common bases with numerical exponents.
-    REQUIRE(prod({x, pow(y, 3.), pow(x, 2.), pow(y, 4.)}) == prod({pow(x, 3.), pow(y, 7.)}));
-    REQUIRE(prod({pow(y, 3.), pow(x, 2.), x, pow(y, 4.)}) == prod({pow(x, 3.), pow(y, 7.)}));
-
     // Constant folding.
     REQUIRE(prod({3_dbl, 4_dbl}) == 12_dbl);
     REQUIRE(prod({3_dbl, 4_dbl, x, -2_dbl}) == prod({x, -24_dbl}));
     REQUIRE(prod({.5_dbl, 2_dbl, x}) == x);
-    REQUIRE(prod({pow(y, 3.), pow(x, -1.), x, pow(y, -3.)}) == 1_dbl);
     REQUIRE(prod({pow(y, 3.), pow(x, -1.), x, pow(y, -3.), 0_dbl}) == 0_dbl);
 
     // Special cases.
@@ -372,11 +364,7 @@ TEST_CASE("args simpl")
     REQUIRE(prod({x}) == x);
 
     // Sorting.
-    REQUIRE(prod({y, z, x, 1_dbl}) == prod({1_dbl, x, y, z}));
-
-    // cf * sum(a, ...) to sum(cf * a, ...), where cf is a number.
-    REQUIRE(prod({2_dbl, sum({x, y})}) == sum({prod({2_dbl, x}), prod({2_dbl, y})}));
-    REQUIRE(prod({sum({x, y}), 6_dbl, 2_dbl}) == sum({prod({12_dbl, x}), prod({12_dbl, y})}));
+    REQUIRE(prod({y, z, x, 1_dbl}) == prod({1_dbl, y, z, x}));
 }
 
 TEST_CASE("diff")
@@ -676,12 +664,4 @@ TEST_CASE("prod_to_div")
 
     ret = detail::prod_to_div_taylor_diff({prod({x, pow(x, y)})});
     REQUIRE(ret[0] == prod({x, pow(x, y)}));
-}
-
-TEST_CASE("normalise")
-{
-    auto [x, y] = make_vars("x", "y");
-
-    REQUIRE(normalise(x * y) == x * y);
-    REQUIRE(normalise(subs(x * y, {{y, 3. * x}})) == 3. * pow(x, 2.));
 }

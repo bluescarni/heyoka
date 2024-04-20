@@ -74,10 +74,10 @@ TEST_CASE("sin diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(sin(x * x - y), x) == cos(x * x - y) * (2. * x));
+    REQUIRE(diff(sin(x * x - y), x) == cos(x * x - y) * (x + x));
     REQUIRE(diff(sin(x * x - y), y) == -cos(x * x - y));
 
-    REQUIRE(diff(sin(par[0] * par[0] - y), par[0]) == cos(par[0] * par[0] - y) * (2. * par[0]));
+    REQUIRE(diff(sin(par[0] * par[0] - y), par[0]) == cos(par[0] * par[0] - y) * (par[0] + par[0]));
     REQUIRE(diff(sin(x * x - par[1]), par[1]) == -cos(x * x - par[1]));
 }
 

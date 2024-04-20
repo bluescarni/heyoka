@@ -81,11 +81,11 @@ TEST_CASE("atanh diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(atanh(x * x - y), x) == (2. * x) / (1. - square_wrapper(square_wrapper(x) - y)));
+    REQUIRE(diff(atanh(x * x - y), x) == (x + x) / (1. - square_wrapper(square_wrapper(x) - y)));
     REQUIRE(diff(atanh(x * x + y), y) == 1. / (1. - square_wrapper(square_wrapper(x) + y)));
 
     REQUIRE(diff(atanh(par[0] * par[0] - y), par[0])
-            == (2. * par[0]) / (1. - square_wrapper(square_wrapper(par[0]) - y)));
+            == (par[0] + par[0]) / (1. - square_wrapper(square_wrapper(par[0]) - y)));
     REQUIRE(diff(atanh(x * x + par[1]), par[1]) == 1. / (1. - square_wrapper(square_wrapper(x) + par[1])));
 }
 

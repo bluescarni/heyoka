@@ -296,7 +296,7 @@ TEST_CASE("basic cmp")
 
         auto ta = taylor_adaptive{dyn, init_state, kw::compact_mode = true};
 
-        REQUIRE(ta.get_decomposition().size() == 45u);
+        REQUIRE(ta.get_decomposition().size() == 64u);
 
         auto ta_old = taylor_adaptive{dyn_old, init_state, kw::compact_mode = true};
 
@@ -328,7 +328,7 @@ TEST_CASE("basic cmp")
             {"x"_var, "y"_var, "z"_var, "vx"_var, "vy"_var, "vz"_var});
 
         REQUIRE(dc1.size() == 27u);
-        REQUIRE(dc2.size() == 30u);
+        REQUIRE(dc2.size() == 31u);
 
         s.compile();
 
