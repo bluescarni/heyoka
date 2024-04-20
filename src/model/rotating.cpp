@@ -111,12 +111,12 @@ expression rotating_potential_impl(const std::vector<expression> &omega)
         const auto &qe = omega[1];
         const auto &re = omega[2];
 
-        const auto tmp = fix_nn(sum({pe * x, qe * y, re * z}));
+        const auto tmp = sum({pe * x, qe * y, re * z});
 
         return 0.5_dbl
-               * fix_nn(tmp * tmp
-                        - fix_nn(sum({pow(pe, 2_dbl), pow(qe, 2_dbl), pow(re, 2_dbl)}))
-                              * fix_nn(sum({pow(x, 2_dbl), pow(y, 2_dbl), pow(z, 2_dbl)})));
+               * (tmp * tmp
+                  - sum({pow(pe, 2_dbl), pow(qe, 2_dbl), pow(re, 2_dbl)})
+                        * sum({pow(x, 2_dbl), pow(y, 2_dbl), pow(z, 2_dbl)}));
     }
 }
 
@@ -125,7 +125,7 @@ expression rotating_energy_impl(const std::vector<expression> &omega)
     // Init the velocity variables.
     auto [vx, vy, vz] = make_vars("vx", "vy", "vz");
 
-    return 0.5_dbl * fix_nn(sum({pow(vx, 2_dbl), pow(vy, 2_dbl), pow(vz, 2_dbl)})) + rotating_potential_impl(omega);
+    return 0.5_dbl * sum({pow(vx, 2_dbl), pow(vy, 2_dbl), pow(vz, 2_dbl)}) + rotating_potential_impl(omega);
 }
 
 } // namespace model::detail

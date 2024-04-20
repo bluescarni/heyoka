@@ -82,7 +82,7 @@ TEST_CASE("basic")
         const auto dc = add_cfunc<double>(
             s, "en",
             // NOTE: need to add the kinetic energy per unit of mass.
-            {0.5 * fix(vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {.1, .2, .3})},
+            {0.5 * (vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {.1, .2, .3})},
             {x, y, z, vx, vy, vz});
 
         REQUIRE(dc.size() == 23u);
@@ -99,7 +99,7 @@ TEST_CASE("basic")
 
         REQUIRE(E == approximately(E0));
 
-        REQUIRE(0.5 * fix_nn(sum_sq({vx, vy, vz})) + model::rotating_potential(kw::omega = {.1, .2, .3})
+        REQUIRE(0.5 * sum_sq({vx, vy, vz}) + model::rotating_potential(kw::omega = {.1, .2, .3})
                 == model::rotating_energy(kw::omega = {.1, .2, .3}));
     }
 
@@ -123,7 +123,7 @@ TEST_CASE("basic")
         const auto dc = add_cfunc<double>(
             s, "en",
             // NOTE: need to add the kinetic energy per unit of mass.
-            {0.5 * fix(vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {par[0], par[1], par[2]})},
+            {0.5 * (vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {par[0], par[1], par[2]})},
             {x, y, z, vx, vy, vz});
 
         REQUIRE(dc.size() == 24u);
@@ -140,7 +140,7 @@ TEST_CASE("basic")
 
         REQUIRE(E == approximately(E0));
 
-        REQUIRE(0.5 * fix_nn(sum_sq({vx, vy, vz})) + model::rotating_potential(kw::omega = {par[0], par[1], par[2]})
+        REQUIRE(0.5 * sum_sq({vx, vy, vz}) + model::rotating_potential(kw::omega = {par[0], par[1], par[2]})
                 == model::rotating_energy(kw::omega = {par[0], par[1], par[2]}));
     }
 

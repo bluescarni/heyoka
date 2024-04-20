@@ -73,7 +73,7 @@ fixed_centres_impl(const expression &G, const std::vector<expression> &masses, c
         const auto diff_z = positions[3u * i + 2u] - z;
 
         const auto dist2 = sum({pow(diff_x, 2_dbl), pow(diff_y, 2_dbl), pow(diff_z, 2_dbl)});
-        const auto Mrm3 = fix_nn(masses[i] * pow(dist2, -1.5));
+        const auto Mrm3 = masses[i] * pow(dist2, -1.5);
 
         acc_x.push_back(diff_x * Mrm3);
         acc_y.push_back(diff_y * Mrm3);
@@ -87,9 +87,9 @@ fixed_centres_impl(const expression &G, const std::vector<expression> &masses, c
     ret.push_back(prime(x) = vx);
     ret.push_back(prime(y) = vy);
     ret.push_back(prime(z) = vz);
-    ret.push_back(prime(vx) = G * fix_nn(sum(acc_x)));
-    ret.push_back(prime(vy) = G * fix_nn(sum(acc_y)));
-    ret.push_back(prime(vz) = G * fix_nn(sum(acc_z)));
+    ret.push_back(prime(vx) = G * sum(acc_x));
+    ret.push_back(prime(vy) = G * sum(acc_y));
+    ret.push_back(prime(vz) = G * sum(acc_z));
 
     return ret;
 }
@@ -120,7 +120,7 @@ expression fixed_centres_potential_impl(const expression &G, const std::vector<e
         pot.push_back(masses[i] / dist);
     }
 
-    return -G * fix_nn(sum(pot));
+    return -G * sum(pot);
 }
 
 expression fixed_centres_energy_impl(const expression &G, const std::vector<expression> &masses,
@@ -130,7 +130,7 @@ expression fixed_centres_energy_impl(const expression &G, const std::vector<expr
     auto [vx, vy, vz] = make_vars("vx", "vy", "vz");
 
     // Kinetic energy.
-    auto kin = 0.5_dbl * fix_nn(sum({pow(vx, 2_dbl), pow(vy, 2_dbl), pow(vz, 2_dbl)}));
+    auto kin = 0.5_dbl * sum({pow(vx, 2_dbl), pow(vy, 2_dbl), pow(vz, 2_dbl)});
 
     return kin + fixed_centres_potential_impl(G, masses, positions);
 }
