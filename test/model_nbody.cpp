@@ -360,8 +360,8 @@ TEST_CASE("nbody")
         }
 
         REQUIRE(n_sum_sqs == 15);
-        REQUIRE(n_sums == 18);
-        REQUIRE(ta.get_decomposition().size() == 255u);
+        REQUIRE(n_sums == 24);
+        REQUIRE(ta.get_decomposition().size() == 231u);
 
         llvm_state s;
         std::vector<expression> vars;
@@ -492,7 +492,7 @@ TEST_CASE("np1body")
 
         auto ta = heyoka::taylor_adaptive{dyn, std::vector(n_ic.begin() + 6, n_ic.end()), kw::compact_mode = true};
 
-        REQUIRE(ta.get_decomposition().size() == 315u);
+        REQUIRE(ta.get_decomposition().size() == 294u);
 
         llvm_state s;
         std::vector<expression> vars;

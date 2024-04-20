@@ -208,33 +208,6 @@ TEST_CASE("invalid slopes")
                                                std::numeric_limits<double>::quiet_NaN())));
 }
 
-TEST_CASE("normalise")
-{
-    {
-        auto ex = relu(fix(.1_dbl));
-        ex = normalise(unfix(ex));
-        REQUIRE(ex == .1_dbl);
-    }
-
-    {
-        auto ex = relu(fix(-.1_dbl), 0.01);
-        ex = normalise(unfix(ex));
-        REQUIRE(ex == expression(-.1 * 0.01));
-    }
-
-    {
-        auto ex = relup(fix(-.1_dbl));
-        ex = normalise(unfix(ex));
-        REQUIRE(ex == 0_dbl);
-    }
-
-    {
-        auto ex = relup(fix(-.1_dbl), 0.01);
-        ex = normalise(unfix(ex));
-        REQUIRE(ex == 0.01_dbl);
-    }
-}
-
 TEST_CASE("diff")
 {
     auto [x, y] = make_vars("x", "y");
