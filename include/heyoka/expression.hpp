@@ -177,20 +177,6 @@ inline expression func_iface_impl<Base, Holder, T>::diff(funcptr_map<expression>
     // LCOV_EXCL_STOP
 }
 
-template <typename Base, typename Holder, typename T>
-    requires is_udf<T>
-inline expression func_iface_impl<Base, Holder, T>::normalise() const
-{
-    if constexpr (func_has_normalise<T>) {
-        return getval<Holder>(this).normalise();
-    }
-
-    // LCOV_EXCL_START
-    assert(false);
-    throw;
-    // LCOV_EXCL_STOP
-}
-
 struct HEYOKA_DLL_PUBLIC prime_wrapper {
     std::string m_str;
 
@@ -382,16 +368,12 @@ HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &) noexce
 
 HEYOKA_DLL_PUBLIC std::size_t get_n_nodes(const expression &);
 
-HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &,
-                                  bool = false);
-HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::map<expression, expression> &, bool = false);
+HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &);
+HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::map<expression, expression> &);
 HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
-                                               const std::unordered_map<std::string, expression> &, bool = false);
+                                               const std::unordered_map<std::string, expression> &);
 HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
-                                               const std::map<expression, expression> &, bool = false);
-
-HEYOKA_DLL_PUBLIC expression normalise(const expression &);
-HEYOKA_DLL_PUBLIC std::vector<expression> normalise(const std::vector<expression> &);
+                                               const std::map<expression, expression> &);
 
 enum class diff_args { vars, params, all };
 

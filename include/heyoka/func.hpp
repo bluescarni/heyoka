@@ -81,11 +81,6 @@ namespace detail
 HEYOKA_DLL_PUBLIC void func_default_to_stream_impl(std::ostringstream &, const func_base &);
 
 template <typename T>
-concept func_has_normalise = requires(const T &x) {
-    { x.normalise() } -> std::same_as<expression>;
-};
-
-template <typename T>
 concept func_has_diff_var = requires(const T &x, funcptr_map<expression> &m, const std::string &name) {
     { x.diff(m, name) } -> std::same_as<expression>;
 };
@@ -134,12 +129,6 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
             return false;
         }
     }
-
-    [[nodiscard]] bool has_normalise() const final
-    {
-        return func_has_normalise<T>;
-    }
-    [[nodiscard]] expression normalise() const final;
 
     [[nodiscard]] const std::vector<expression> &args() const final
     {
@@ -273,9 +262,6 @@ struct HEYOKA_DLL_PUBLIC func_iface {
 
     [[nodiscard]] virtual bool is_time_dependent() const = 0;
 
-    [[nodiscard]] virtual bool has_normalise() const = 0;
-    [[nodiscard]] virtual expression normalise() const = 0;
-
     [[nodiscard]] virtual const std::vector<expression> &args() const = 0;
     virtual std::pair<expression *, expression *> get_mutable_args_range() = 0;
 
@@ -384,8 +370,6 @@ public:
     }
 
     [[nodiscard]] bool is_time_dependent() const;
-
-    [[nodiscard]] expression normalise() const;
 
     [[nodiscard]] const std::string &get_name() const;
 

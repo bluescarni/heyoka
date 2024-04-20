@@ -213,14 +213,6 @@ TEST_CASE("cfunc_mp")
 
 #endif
 
-TEST_CASE("normalise")
-{
-    auto x = make_vars("x");
-
-    REQUIRE(normalise(sinh(x)) == sinh(x));
-    REQUIRE(normalise(subs(sinh(x), {{x, 1.5_dbl}})) == sinh(1.5_dbl));
-}
-
 // Tests to check vectorisation via the vector-function-abi-variant machinery.
 TEST_CASE("vfabi double")
 {

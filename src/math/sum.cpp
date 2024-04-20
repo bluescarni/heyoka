@@ -170,11 +170,6 @@ std::vector<expression> sum_impl::gradient() const
     return {args().size(), 1_dbl};
 }
 
-[[nodiscard]] expression sum_impl::normalise() const
-{
-    return sum(args());
-}
-
 namespace
 {
 

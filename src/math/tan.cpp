@@ -342,12 +342,6 @@ std::vector<expression> tan_impl::gradient() const
     return {1_dbl + tmp * tmp};
 }
 
-[[nodiscard]] expression tan_impl::normalise() const
-{
-    assert(args().size() == 1u);
-    return tan(args()[0]);
-}
-
 } // namespace detail
 
 expression tan(expression e)

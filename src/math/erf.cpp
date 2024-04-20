@@ -400,12 +400,6 @@ std::vector<expression> erf_impl::gradient() const
     return {2_dbl / sqrt(pi) * exp(-args()[0] * args()[0])};
 }
 
-[[nodiscard]] expression erf_impl::normalise() const
-{
-    assert(args().size() == 1u);
-    return erf(args()[0]);
-}
-
 } // namespace detail
 
 expression erf(expression e)

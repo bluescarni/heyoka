@@ -386,12 +386,6 @@ std::vector<expression> sigmoid_impl::gradient() const
     return {(1_dbl - sigmoid(args()[0])) * sigmoid(args()[0])};
 }
 
-[[nodiscard]] expression sigmoid_impl::normalise() const
-{
-    assert(args().size() == 1u);
-    return sigmoid(args()[0]);
-}
-
 } // namespace detail
 
 expression sigmoid(expression e)

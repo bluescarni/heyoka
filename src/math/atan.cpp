@@ -76,12 +76,6 @@ expression atan_impl::diff(funcptr_map<expression> &func_map, const param &p) co
     return detail::diff(func_map, args()[0], p) / (1_dbl + args()[0] * args()[0]);
 }
 
-[[nodiscard]] expression atan_impl::normalise() const
-{
-    assert(args().size() == 1u);
-    return atan(args()[0]);
-}
-
 llvm::Value *atan_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
                                   llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                   bool high_accuracy) const

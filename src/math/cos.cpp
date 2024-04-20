@@ -349,12 +349,6 @@ std::vector<expression> cos_impl::gradient() const
     return {-sin(args()[0])};
 }
 
-[[nodiscard]] expression cos_impl::normalise() const
-{
-    assert(args().size() == 1u);
-    return cos(args()[0]);
-}
-
 } // namespace detail
 
 // NOLINTNEXTLINE(misc-no-recursion)

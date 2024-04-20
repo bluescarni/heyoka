@@ -317,12 +317,6 @@ std::vector<expression> exp_impl::gradient() const
     return {exp(args()[0])};
 }
 
-[[nodiscard]] expression exp_impl::normalise() const
-{
-    assert(args().size() == 1u);
-    return exp(args()[0]);
-}
-
 } // namespace detail
 
 expression exp(expression e)

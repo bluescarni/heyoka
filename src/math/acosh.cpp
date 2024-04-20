@@ -68,12 +68,6 @@ std::vector<expression> acosh_impl::gradient() const
     return {pow(args()[0] * args()[0] - 1_dbl, -.5)};
 }
 
-[[nodiscard]] expression acosh_impl::normalise() const
-{
-    assert(args().size() == 1u);
-    return acosh(args()[0]);
-}
-
 llvm::Value *acosh_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
                                    llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                    bool high_accuracy) const

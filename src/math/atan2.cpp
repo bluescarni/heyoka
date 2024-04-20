@@ -95,12 +95,6 @@ expression atan2_impl::diff(funcptr_map<expression> &func_map, const param &p) c
     return (x * detail::diff(func_map, y, p) - y * detail::diff(func_map, x, p)) / den;
 }
 
-[[nodiscard]] expression atan2_impl::normalise() const
-{
-    assert(args().size() == 2u);
-    return atan2(args()[0], args()[1]);
-}
-
 llvm::Value *atan2_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
                                    llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                    bool high_accuracy) const

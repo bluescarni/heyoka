@@ -69,12 +69,6 @@ std::vector<expression> acos_impl::gradient() const
     return {-pow(1_dbl - args()[0] * args()[0], -.5)};
 }
 
-[[nodiscard]] expression acos_impl::normalise() const
-{
-    assert(args().size() == 1u);
-    return acos(args()[0]);
-}
-
 llvm::Value *acos_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
                                   llvm::Value *par_ptr, llvm::Value *, llvm::Value *stride, std::uint32_t batch_size,
                                   bool high_accuracy) const
