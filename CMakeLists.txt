@@ -201,7 +201,6 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_diff.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_ops.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_cfunc.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_fix.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lagrangian.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/hamiltonian.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"

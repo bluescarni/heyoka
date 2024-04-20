@@ -118,20 +118,6 @@ public:
 HEYOKA_DLL_PUBLIC expression copy(const expression &);
 HEYOKA_DLL_PUBLIC std::vector<expression> copy(const std::vector<expression> &);
 
-HEYOKA_DLL_PUBLIC expression fix(expression);
-HEYOKA_DLL_PUBLIC std::vector<expression> fix(const std::vector<expression> &);
-HEYOKA_DLL_PUBLIC expression fix_nn(expression);
-HEYOKA_DLL_PUBLIC std::vector<expression> fix_nn(const std::vector<expression> &);
-HEYOKA_DLL_PUBLIC expression unfix(const expression &);
-HEYOKA_DLL_PUBLIC std::vector<expression> unfix(const std::vector<expression> &);
-
-namespace detail
-{
-
-HEYOKA_DLL_PUBLIC bool is_fixed(const expression &);
-
-} // namespace detail
-
 inline namespace literals
 {
 
@@ -543,9 +529,6 @@ struct formatter<heyoka::dtens> : fmt::ostream_formatter {
 
 HEYOKA_BEGIN_NAMESPACE
 
-// NOTE: when documenting, we need to point out that the expressions
-// returned by this function are optimised for evaluation. The users
-// can always unfix() and normalise() these expressions if needed.
 template <typename... KwArgs>
 dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_args, std::vector<expression>> &d_args,
                    const KwArgs &...kw_args)

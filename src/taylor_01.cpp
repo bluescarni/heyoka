@@ -855,11 +855,6 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
     // binary multiplications.
     all_ex = detail::split_prods_for_decompose(all_ex, 2);
 
-    // Unfix.
-    // NOTE: unfix is the last step, as we want to keep expressions
-    // fixed in the previous preprocessing steps.
-    all_ex = unfix(all_ex);
-
 #if !defined(NDEBUG)
 
     // Save copies for checking in debug mode.
@@ -1089,11 +1084,6 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
     // NOTE: split must be 2 here as the Taylor diff formulae require
     // binary multiplications.
     all_ex = detail::split_prods_for_decompose(all_ex, 2);
-
-    // Unfix.
-    // NOTE: unfix is the last step, as we want to keep expressions
-    // fixed in the previous preprocessing steps.
-    all_ex = unfix(all_ex);
 
 #if !defined(NDEBUG)
 
