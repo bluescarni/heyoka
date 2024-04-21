@@ -688,7 +688,7 @@ expression sum(std::vector<expression> args)
                 // NOTE: it is important to special-case this, because otherwise
                 // we will fall into the args().empty() special case below, which will
                 // forcibly convert the folded 0 constant into double precision.
-                return *n_end_it;
+                return std::move(*n_end_it);
             } else {
                 // Besides the number 0, there are other
                 // non-number terms in the sum. Remove

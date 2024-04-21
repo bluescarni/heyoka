@@ -1047,7 +1047,7 @@ expression prod(std::vector<expression> args)
                 // NOTE: it is important to special-case this, because otherwise
                 // we will fall into the args().empty() special case below, which will
                 // forcibly convert the folded 1 constant into double precision.
-                return *n_end_it;
+                return std::move(*n_end_it);
             } else {
                 // Besides the number 1, there are other
                 // non-number terms in the product. Remove
@@ -1057,7 +1057,7 @@ expression prod(std::vector<expression> args)
         } else if (is_zero(std::get<number>(n_end_it->value()))) {
             // The only remaining number is zero, the result
             // of the multiplication will be zero too.
-            return *n_end_it;
+            return std::move(*n_end_it);
         }
     }
 
