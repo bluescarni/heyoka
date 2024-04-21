@@ -55,8 +55,6 @@ public:
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
 };
 
-std::variant<std::vector<expression>, expression> prod_simplify_args(const std::vector<expression> &);
-
 bool is_negation_prod(const expression &);
 
 HEYOKA_DLL_PUBLIC expression prod_split(const expression &, std::uint32_t);
