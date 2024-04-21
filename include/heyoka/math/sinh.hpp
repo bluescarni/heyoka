@@ -10,7 +10,6 @@
 #define HEYOKA_MATH_SINH_HPP
 
 #include <cstdint>
-#include <unordered_map>
 #include <vector>
 
 #include <heyoka/config.hpp>

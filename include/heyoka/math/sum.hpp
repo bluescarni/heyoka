@@ -11,7 +11,6 @@
 
 #include <cstdint>
 #include <sstream>
-#include <variant>
 #include <vector>
 
 #include <heyoka/config.hpp>
