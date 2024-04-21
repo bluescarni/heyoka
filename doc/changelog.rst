@@ -1,13 +1,13 @@
 Changelog
 =========
 
-4.1.0 (unreleased)
+5.0.0 (unreleased)
 ------------------
 
 New
 ~~~
 
-- Add vectorised implementations of ``diff()`` and ``fix()``
+- Add a vectorised implementation for ``diff()``
   (`#411 <https://github.com/bluescarni/heyoka/pull/411>`__).
 - Add mutable ranges getters for the state and pars data of the adaptive
   integrators (`#409 <https://github.com/bluescarni/heyoka/pull/409>`__).
