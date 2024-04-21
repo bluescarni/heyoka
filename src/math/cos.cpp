@@ -354,26 +354,17 @@ std::vector<expression> cos_impl::gradient() const
 // NOLINTNEXTLINE(misc-no-recursion)
 expression cos(expression e)
 {
-    if (detail::is_negation_prod(e)) {
-        // Simplify cos(-x) to cos(x).
-        const auto &fn = std::get<func>(e.value());
+    // Simplify cos(number) to its value.
+    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
+        return std::visit(
+            [](const auto &x) {
+                using std::cos;
 
-        assert(fn.args().size() >= 2u);
-
-        return cos(prod(std::vector(fn.args().begin() + 1, fn.args().end())));
+                return expression{cos(x)};
+            },
+            num_ptr->value());
     } else {
-        // Simplify cos(number) to its value.
-        if (const auto *num_ptr = std::get_if<number>(&e.value())) {
-            return std::visit(
-                [](const auto &x) {
-                    using std::cos;
-
-                    return expression{cos(x)};
-                },
-                num_ptr->value());
-        } else {
-            return expression{func{detail::cos_impl(std::move(e))}};
-        }
+        return expression{func{detail::cos_impl(std::move(e))}};
     }
 }
 

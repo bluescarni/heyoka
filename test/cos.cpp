@@ -76,15 +76,6 @@ auto neg(const expression &e)
     return -e;
 }
 
-TEST_CASE("cos neg simpl")
-{
-    auto [x, y] = make_vars("x", "y");
-
-    REQUIRE(cos(-x) == cos(x));
-    REQUIRE(cos(neg(neg(x + y))) == cos(x + y));
-    REQUIRE(cos(neg(neg(par[0]))) == cos(par[0]));
-}
-
 TEST_CASE("cos diff")
 {
     auto [x, y] = make_vars("x", "y");
