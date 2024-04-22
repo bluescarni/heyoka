@@ -16,6 +16,10 @@ New
 Changes
 ~~~~~~~
 
+- Several automatic simplifications and normalisations in the expression
+  system have been removed as they caused drastic slowdowns in symbolic operations
+  when working with large and highly recursive computational graphs
+  (`#412 <https://github.com/bluescarni/heyoka/pull/412>`__).
 - Remove the (undocumented) ``taylor_add_jet()`` function and rework
   the unit test code to use ``taylor_adaptive`` instead
   (`#409 <https://github.com/bluescarni/heyoka/pull/409>`__).
