@@ -326,7 +326,7 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
     // from the definitions in the VSOP2013 readme, and we thus need to convert.
 
     // sin(i/2)**2 = q_**2 + p_**2.
-    auto si22 = q_ * q_ + p_ * p_;
+    auto si22 = pow(q_, 2_dbl) + pow(p_, 2_dbl);
 
     // cos(i/2).
     auto ci2 = sqrt(1_dbl - si22);
@@ -337,7 +337,7 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
     auto p = p_ / ci2;
 
     // Now follow https://articles.adsabs.harvard.edu//full/1972CeMec...5..303B/0000309.000.html.
-    auto e2 = h * h + k * k;
+    auto e2 = pow(h, 2_dbl) + pow(k, 2_dbl);
     auto e_quot = 1_dbl + sqrt(1_dbl - e2);
     auto F = kepF(h, k, lam);
     auto cF = cos(F), sF = sin(F);
@@ -347,8 +347,8 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
     auto X1 = a * (cF - k - h * lam_F_e_quot);
     auto Y1 = a * (sF - h + k * lam_F_e_quot);
 
-    auto p2 = p * p;
-    auto q2 = q * q;
+    auto p2 = pow(p, 2_dbl);
+    auto q2 = pow(q, 2_dbl);
     auto p2_m_q2 = p2 - q2;
     auto p2_p_q2 = p2 + q2;
     auto two_p = p + p;
@@ -360,7 +360,7 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
     auto z = two_q * Y1 - two_p * X1;
 
     // Velocities.
-    auto n = sqrt(mu / (a * a * a));
+    auto n = sqrt(mu / pow(a, 3_dbl));
     auto Fp = n / (1_dbl - h * sF - k * cF);
     auto n_Fp = n - Fp;
     auto n_Fp_equot = n_Fp / e_quot;

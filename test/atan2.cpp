@@ -95,18 +95,18 @@ TEST_CASE("atan2 diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(atan2(y, x), "x") == (-y) / (x * x + y * y));
-    REQUIRE(diff(atan2(y, x), "y") == x / (x * x + y * y));
+    REQUIRE(diff(atan2(y, x), "x") == (-y) / (pow(x, 2_dbl) + pow(y, 2_dbl)));
+    REQUIRE(diff(atan2(y, x), "y") == x / (pow(x, 2_dbl) + pow(y, 2_dbl)));
     REQUIRE(diff(atan2(y, x), "z") == 0_dbl);
     REQUIRE(diff(atan2(x * y, y / x), "x")
-            == (y / x * y - (x * y) * (y * -pow(x, -2_dbl))) / ((y / x) * (y / x) + (x * y) * (x * y)));
+            == (y / x * y - (x * y) * (y * -pow(x, -2_dbl))) / (pow(y / x, 2_dbl) + pow(x * y, 2_dbl)));
 
-    REQUIRE(diff(atan2(y, par[0]), par[0]) == (-y) / (par[0] * par[0] + y * y));
-    REQUIRE(diff(atan2(par[1], x), par[1]) == x / (x * x + par[1] * par[1]));
+    REQUIRE(diff(atan2(y, par[0]), par[0]) == (-y) / (pow(par[0], 2_dbl) + pow(y, 2_dbl)));
+    REQUIRE(diff(atan2(par[1], x), par[1]) == x / (pow(x, 2_dbl) + pow(par[1], 2_dbl)));
     REQUIRE(diff(atan2(y, x), par[2]) == 0_dbl);
     REQUIRE(diff(atan2(par[0] * par[1], par[1] / par[0]), par[0])
             == (par[1] / par[0] * par[1] - (par[0] * par[1]) * (par[1] * -pow(par[0], -2_dbl)))
-                   / ((par[1] / par[0]) * (par[1] / par[0]) + (par[0] * par[1]) * (par[0] * par[1])));
+                   / (pow(par[1] / par[0], 2_dbl) + pow(par[0] * par[1], 2_dbl)));
 }
 
 TEST_CASE("atan2 overloads")

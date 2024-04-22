@@ -66,7 +66,7 @@ std::vector<expression> tanh_impl::gradient() const
 {
     assert(args().size() == 1u);
     const auto tmp = tanh(args()[0]);
-    return {1_dbl - tmp * tmp};
+    return {1_dbl - pow(tmp, 2_dbl)};
 }
 
 llvm::Value *tanh_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,

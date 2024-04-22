@@ -57,6 +57,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/atan2.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -78,7 +79,7 @@ expression atan2_impl::diff(funcptr_map<expression> &func_map, const std::string
     const auto &y = args()[0];
     const auto &x = args()[1];
 
-    auto den = x * x + y * y;
+    auto den = pow(x, 2_dbl) + pow(y, 2_dbl);
 
     return (x * detail::diff(func_map, y, s) - y * detail::diff(func_map, x, s)) / den;
 }
@@ -90,7 +91,7 @@ expression atan2_impl::diff(funcptr_map<expression> &func_map, const param &p) c
     const auto &y = args()[0];
     const auto &x = args()[1];
 
-    auto den = x * x + y * y;
+    auto den = pow(x, 2_dbl) + pow(y, 2_dbl);
 
     return (x * detail::diff(func_map, y, p) - y * detail::diff(func_map, x, p)) / den;
 }

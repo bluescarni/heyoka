@@ -398,7 +398,7 @@ llvm::Function *erf_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
 std::vector<expression> erf_impl::gradient() const
 {
     assert(args().size() == 1u);
-    return {2_dbl / sqrt(pi) * exp(-args()[0] * args()[0])};
+    return {2_dbl / sqrt(pi) * exp(-pow(args()[0], 2_dbl))};
 }
 
 } // namespace detail

@@ -31,6 +31,7 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/sum.hpp>
@@ -116,7 +117,7 @@ std::array<expression, 2> ex_cinv(const std::array<expression, 2> &c)
 {
     const auto &[a, b] = c;
 
-    const auto den = a * a + b * b;
+    const auto den = pow(a, 2_dbl) + pow(b, 2_dbl);
 
     return {a / den, -b / den};
 }
@@ -1372,19 +1373,19 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         [&]() {
             expression a, b, c;
             oneapi::tbb::parallel_invoke([&]() { a = sum(r_terms); }, [&]() { b = tm * sum(r_terms_t1); },
-                                         [&]() { c = tm * tm * sum(r_terms_t2); });
+                                         [&]() { c = pow(tm, 2_dbl) * sum(r_terms_t2); });
             retval[0] = sum({a, b, c});
         },
         [&]() {
             expression a, b, c;
             oneapi::tbb::parallel_invoke([&]() { a = sum(U_terms); }, [&]() { b = tm * sum(U_terms_t1); },
-                                         [&]() { c = tm * tm * sum(U_terms_t2); });
+                                         [&]() { c = pow(tm, 2_dbl) * sum(U_terms_t2); });
             retval[1] = sum({a, b, c});
         },
         [&]() {
             expression a, b, c;
             oneapi::tbb::parallel_invoke([&]() { a = sum(V_terms); }, [&]() { b = tm * sum(V_terms_t1); },
-                                         [&]() { c = tm * tm * sum(V_terms_t2); });
+                                         [&]() { c = pow(tm, 2_dbl) * sum(V_terms_t2); });
             retval[2] = sum({a, b, c});
         });
 
@@ -1435,8 +1436,8 @@ std::vector<expression> elp2000_cartesian_e2000_impl(const expression &tm, doubl
     const auto P = horner_eval(LP, tm);
     const auto Q = horner_eval(LQ, tm);
 
-    const auto P2 = P * P;
-    const auto Q2 = Q * Q;
+    const auto P2 = pow(P, 2_dbl);
+    const auto Q2 = pow(Q, 2_dbl);
     const auto PQ = P * Q;
     const auto sqrP2Q2 = sqrt(1. - P2 - Q2);
 

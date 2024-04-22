@@ -65,7 +65,7 @@ asinh_impl::asinh_impl() : asinh_impl(0_dbl) {}
 std::vector<expression> asinh_impl::gradient() const
 {
     assert(args().size() == 1u);
-    return {pow(args()[0] * args()[0] + 1_dbl, -.5)};
+    return {pow(pow(args()[0], 2_dbl) + 1_dbl, -.5)};
 }
 
 llvm::Value *asinh_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,

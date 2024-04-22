@@ -75,24 +75,26 @@ constexpr bool skip_batch_ld =
 // as a special case of multiplication.
 auto square_wrapper(const expression &x)
 {
-    return x * x;
+    return pow(x, 2_dbl);
 }
 
 TEST_CASE("acosh diff var")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(acosh(x * x - y), x) == pow(square_wrapper(square_wrapper(x) - y) - 1., -.5) * (x + x));
-    REQUIRE(diff(acosh(x * x + y), y) == pow(square_wrapper(square_wrapper(x) + y) - 1., -.5));
+    REQUIRE(diff(acosh(square_wrapper(x) - y), x)
+            == pow(square_wrapper(square_wrapper(x) - y) - 1., -.5) * (2_dbl * x));
+    REQUIRE(diff(acosh(square_wrapper(x) + y), y) == pow(square_wrapper(square_wrapper(x) + y) - 1., -.5));
 }
 
 TEST_CASE("acosh diff par")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(acosh(par[0] * par[0] - y), par[0])
-            == pow(square_wrapper(square_wrapper(par[0]) - y) - 1., -.5) * (par[0] + par[0]));
-    REQUIRE(diff(acosh(x * x + par[1]), par[1]) == pow(square_wrapper(square_wrapper(x) + par[1]) - 1., -.5));
+    REQUIRE(diff(acosh(square_wrapper(par[0]) - y), par[0])
+            == pow(square_wrapper(square_wrapper(par[0]) - y) - 1., -.5) * (2_dbl * par[0]));
+    REQUIRE(diff(acosh(square_wrapper(x) + par[1]), par[1])
+            == pow(square_wrapper(square_wrapper(x) + par[1]) - 1., -.5));
 }
 
 TEST_CASE("acosh s11n")

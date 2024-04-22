@@ -65,13 +65,13 @@ std::vector<std::pair<expression, expression>> rotating_impl(const std::vector<e
         acc_x.push_back(-(pe * qe_y));
         acc_x.push_back(-(pe * re_z));
 
-        acc_y.push_back(pe * pe * y);
-        acc_y.push_back(re * re * y);
+        acc_y.push_back(pow(pe, 2_dbl) * y);
+        acc_y.push_back(pow(re, 2_dbl) * y);
         acc_y.push_back(-(pe * qe_x));
         acc_y.push_back(-(qe * re_z));
 
-        acc_z.push_back(pe * pe * z);
-        acc_z.push_back(qe * qe * z);
+        acc_z.push_back(pow(pe, 2_dbl) * z);
+        acc_z.push_back(pow(qe, 2_dbl) * z);
         acc_z.push_back(-(pe * re_x));
         acc_z.push_back(-(re * qe_y));
 
@@ -114,7 +114,7 @@ expression rotating_potential_impl(const std::vector<expression> &omega)
         const auto tmp = sum({pe * x, qe * y, re * z});
 
         return 0.5_dbl
-               * (tmp * tmp
+               * (pow(tmp, 2_dbl)
                   - sum({pow(pe, 2_dbl), pow(qe, 2_dbl), pow(re, 2_dbl)})
                         * sum({pow(x, 2_dbl), pow(y, 2_dbl), pow(z, 2_dbl)}));
     }

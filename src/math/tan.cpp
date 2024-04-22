@@ -340,7 +340,7 @@ std::vector<expression> tan_impl::gradient() const
 {
     assert(args().size() == 1u);
     const auto tmp = tan(args()[0]);
-    return {1_dbl + tmp * tmp};
+    return {1_dbl + pow(tmp, 2_dbl)};
 }
 
 } // namespace detail

@@ -39,6 +39,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/tan.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -74,19 +75,19 @@ constexpr bool skip_batch_ld =
 // as a special case of multiplication.
 auto square_wrapper(const expression &x)
 {
-    return x * x;
+    return pow(x, 2_dbl);
 }
 
 TEST_CASE("tan diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(tan(x * x - y), x) == (1. + square_wrapper(tan(square_wrapper(x) - y))) * (x + x));
-    REQUIRE(diff(tan(x * x + y), y) == (1. + square_wrapper(tan(square_wrapper(x) + y))));
+    REQUIRE(diff(tan(square_wrapper(x) - y), x) == (1. + square_wrapper(tan(square_wrapper(x) - y))) * (2_dbl * x));
+    REQUIRE(diff(tan(square_wrapper(x) + y), y) == (1. + square_wrapper(tan(square_wrapper(x) + y))));
 
-    REQUIRE(diff(tan(par[0] * par[0] - y), par[0])
-            == (1. + square_wrapper(tan(square_wrapper(par[0]) - y))) * (par[0] + par[0]));
-    REQUIRE(diff(tan(x * x + par[1]), par[1]) == (1. + square_wrapper(tan(square_wrapper(x) + par[1]))));
+    REQUIRE(diff(tan(square_wrapper(par[0]) - y), par[0])
+            == (1. + square_wrapper(tan(square_wrapper(par[0]) - y))) * (2_dbl * par[0]));
+    REQUIRE(diff(tan(square_wrapper(x) + par[1]), par[1]) == (1. + square_wrapper(tan(square_wrapper(x) + par[1]))));
 }
 
 TEST_CASE("tan s11n")

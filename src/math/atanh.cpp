@@ -66,13 +66,13 @@ atanh_impl::atanh_impl() : atanh_impl(0_dbl) {}
 expression atanh_impl::diff(funcptr_map<expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 1u);
-    return detail::diff(func_map, args()[0], s) / (1_dbl - args()[0] * args()[0]);
+    return detail::diff(func_map, args()[0], s) / (1_dbl - pow(args()[0], 2_dbl));
 }
 
 expression atanh_impl::diff(funcptr_map<expression> &func_map, const param &p) const
 {
     assert(args().size() == 1u);
-    return detail::diff(func_map, args()[0], p) / (1_dbl - args()[0] * args()[0]);
+    return detail::diff(func_map, args()[0], p) / (1_dbl - pow(args()[0], 2_dbl));
 }
 
 llvm::Value *atanh_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
