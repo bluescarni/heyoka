@@ -100,7 +100,7 @@ taylor_dc_t::size_type asinh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 1u);
 
     // Append arg * arg.
-    u_vars_defs.emplace_back(args()[0] * args()[0], std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(pow(args()[0], 2_dbl), std::vector<std::uint32_t>{});
 
     // Append 1 + arg * arg.
     u_vars_defs.emplace_back(1_dbl + expression{fmt::format("u_{}", u_vars_defs.size() - 1u)},

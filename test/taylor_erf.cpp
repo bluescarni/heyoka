@@ -29,6 +29,7 @@
 #include <heyoka/kw.hpp>
 #include <heyoka/math/erf.hpp>
 #include <heyoka/math/exp.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -109,7 +110,7 @@ TEST_CASE("taylor erf test simplifications")
     auto x = "x"_var, y = "y"_var;
 
     auto ta = taylor_adaptive<double>{
-        {prime(x) = exp(-((x + y) * (x + y))) + erf(x + y), prime(y) = x}, {2., 3.}, kw::opt_level = 0, kw::tol = 1.};
+        {prime(x) = exp(-(pow(x + y, 2_dbl))) + erf(x + y), prime(y) = x}, {2., 3.}, kw::opt_level = 0, kw::tol = 1.};
 
     REQUIRE(ta.get_decomposition().size() == 10u);
 

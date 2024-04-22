@@ -46,6 +46,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/tanh.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
@@ -104,7 +105,7 @@ taylor_dc_t::size_type tanh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 
     // Append the auxiliary function tanh(arg) * tanh(arg).
     const auto arg = expression{fmt::format("u_{}", u_vars_defs.size() - 1u)};
-    u_vars_defs.emplace_back(arg * arg, std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(pow(arg, 2_dbl), std::vector<std::uint32_t>{});
 
     // Add the hidden dep.
     (u_vars_defs.end() - 2)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
