@@ -334,15 +334,6 @@ TEST_CASE("stream test")
     {
         std::ostringstream oss;
 
-        oss << prod({pow(pow(x, y), -2_dbl), z});
-
-        REQUIRE(boost::starts_with(oss.str(), "(z / x**-(-2.00000000"));
-        REQUIRE(boost::ends_with(oss.str(), "0000000000 * y))"));
-    }
-
-    {
-        std::ostringstream oss;
-
         oss << prod({x, pow(x, expression{func{detail::prod_impl({y})}})});
 
         REQUIRE(oss.str() == "(x * x**y)");

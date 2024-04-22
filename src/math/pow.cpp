@@ -1068,22 +1068,6 @@ expression pow_wrapper_impl(expression b, expression e)
         if (is_one(*e_num_ptr)) {
             return b;
         }
-
-        // Handle special cases when the base is a pow().
-        if (const auto *fptr = std::get_if<func>(&b.value()); fptr != nullptr && fptr->extract<pow_impl>() != nullptr) {
-            assert(fptr->args().size() == 2u);
-
-            const auto &b_base = fptr->args()[0];
-            const auto &b_exp = fptr->args()[1];
-
-            if (const auto *b_exp_num_ptr = std::get_if<number>(&b_exp.value())) {
-                // b's exponent is a number, fold it together with e.
-                return pow(b_base, expression{*b_exp_num_ptr * *e_num_ptr});
-            } else {
-                // b's exponent is not a number, multiply it by e.
-                return pow(b_base, prod({b_exp, e}));
-            }
-        }
     }
 
     // The general case.

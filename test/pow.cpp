@@ -392,13 +392,6 @@ TEST_CASE("pow special cases")
     REQUIRE(pow(2_dbl, mppp::real{"1.1", 123}) == expression{mppp::pow(2., mppp::real{"1.1", 123})});
 
 #endif
-
-    REQUIRE(pow(pow("x"_var, 3_dbl), 2_dbl) == pow("x"_var, 6_dbl));
-    REQUIRE(pow(pow("x"_var, .5_dbl), 2_dbl) == "x"_var);
-
-    auto [x, y] = make_vars("x", "y");
-
-    REQUIRE(pow(pow(x, y), -5.) == pow(x, prod({-5._dbl, y})));
 }
 
 TEST_CASE("pow overloads")

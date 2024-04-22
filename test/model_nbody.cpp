@@ -371,7 +371,7 @@ TEST_CASE("nbody")
 
         const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
-        REQUIRE(dc.size() == 124u);
+        REQUIRE(dc.size() == 139u);
 
         s.compile();
 
@@ -715,7 +715,7 @@ TEST_CASE("np1body")
 
         const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
-        REQUIRE(dc.size() == 124u);
+        REQUIRE(dc.size() == 139u);
 
         s.compile();
 
