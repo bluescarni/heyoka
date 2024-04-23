@@ -38,6 +38,9 @@ void rotating_check_omega(const std::vector<expression> &omega)
 
 } // namespace
 
+// NOTE: after the removal of automatic simplifications, this now creates noticeably
+// longer expressions than it used to. Are there ways of reformulating the centr./coriolis
+// accelerations in better ways (e.g., exploiting some triple product identity)?
 std::vector<std::pair<expression, expression>> rotating_impl(const std::vector<expression> &omega)
 {
     // Check the angular velocity vector.
