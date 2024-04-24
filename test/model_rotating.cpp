@@ -13,6 +13,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/model/rotating.hpp>
 #include <heyoka/taylor.hpp>
@@ -31,7 +32,7 @@ auto sum_sq(const std::vector<expression> &args)
     new_args.reserve(args.size());
 
     for (const auto &arg : args) {
-        new_args.push_back(arg * arg);
+        new_args.push_back(pow(arg, 2_dbl));
     }
 
     return sum(new_args);
@@ -70,7 +71,7 @@ TEST_CASE("basic")
 
         auto ta = taylor_adaptive{dyn, init_state, kw::compact_mode = true};
 
-        REQUIRE(ta.get_decomposition().size() == 30u);
+        REQUIRE(ta.get_decomposition().size() == 49u);
 
         ta.propagate_until(20.);
 
@@ -81,10 +82,10 @@ TEST_CASE("basic")
         const auto dc = add_cfunc<double>(
             s, "en",
             // NOTE: need to add the kinetic energy per unit of mass.
-            {0.5 * fix(vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {.1, .2, .3})},
+            {0.5 * (vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {.1, .2, .3})},
             {x, y, z, vx, vy, vz});
 
-        REQUIRE(dc.size() == 19u);
+        REQUIRE(dc.size() == 23u);
 
         s.compile();
 
@@ -98,7 +99,7 @@ TEST_CASE("basic")
 
         REQUIRE(E == approximately(E0));
 
-        REQUIRE(0.5 * fix_nn(sum_sq({vx, vy, vz})) + model::rotating_potential(kw::omega = {.1, .2, .3})
+        REQUIRE(0.5 * sum_sq({vx, vy, vz}) + model::rotating_potential(kw::omega = {.1, .2, .3})
                 == model::rotating_energy(kw::omega = {.1, .2, .3}));
     }
 
@@ -111,7 +112,7 @@ TEST_CASE("basic")
 
         auto ta = taylor_adaptive{dyn, init_state, kw::compact_mode = true, kw::pars = omega_vals};
 
-        REQUIRE(ta.get_decomposition().size() == 51u);
+        REQUIRE(ta.get_decomposition().size() == 52u);
 
         ta.propagate_until(20.);
 
@@ -122,10 +123,10 @@ TEST_CASE("basic")
         const auto dc = add_cfunc<double>(
             s, "en",
             // NOTE: need to add the kinetic energy per unit of mass.
-            {0.5 * fix(vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {par[0], par[1], par[2]})},
+            {0.5 * (vx * vx + vy * vy + vz * vz) + model::rotating_potential(kw::omega = {par[0], par[1], par[2]})},
             {x, y, z, vx, vy, vz});
 
-        REQUIRE(dc.size() == 20u);
+        REQUIRE(dc.size() == 24u);
 
         s.compile();
 
@@ -139,7 +140,7 @@ TEST_CASE("basic")
 
         REQUIRE(E == approximately(E0));
 
-        REQUIRE(0.5 * fix_nn(sum_sq({vx, vy, vz})) + model::rotating_potential(kw::omega = {par[0], par[1], par[2]})
+        REQUIRE(0.5 * sum_sq({vx, vy, vz}) + model::rotating_potential(kw::omega = {par[0], par[1], par[2]})
                 == model::rotating_energy(kw::omega = {par[0], par[1], par[2]}));
     }
 

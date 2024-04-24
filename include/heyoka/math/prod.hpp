@@ -11,7 +11,6 @@
 
 #include <cstdint>
 #include <sstream>
-#include <variant>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -43,8 +42,6 @@ public:
 
     [[nodiscard]] std::vector<expression> gradient() const;
 
-    [[nodiscard]] expression normalise() const;
-
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
@@ -57,8 +54,6 @@ public:
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
 };
 
-std::variant<std::vector<expression>, expression> prod_simplify_args(const std::vector<expression> &);
-
 bool is_negation_prod(const expression &);
 
 HEYOKA_DLL_PUBLIC expression prod_split(const expression &, std::uint32_t);
@@ -69,7 +64,7 @@ HEYOKA_DLL_PUBLIC std::vector<expression> prod_to_div_taylor_diff(const std::vec
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression prod(const std::vector<expression> &);
+HEYOKA_DLL_PUBLIC expression prod(std::vector<expression>);
 
 HEYOKA_END_NAMESPACE
 

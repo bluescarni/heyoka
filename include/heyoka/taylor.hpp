@@ -124,8 +124,6 @@ void taylor_add_d_out_function(llvm_state &, llvm::Type *, std::uint32_t, std::u
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::vector<expression> &,
-                                                                                      const std::vector<expression> &);
 HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>>
 taylor_decompose(const std::vector<std::pair<expression, expression>> &, const std::vector<expression> &);
 

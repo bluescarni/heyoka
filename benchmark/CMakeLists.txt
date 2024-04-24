@@ -71,6 +71,7 @@ ADD_HEYOKA_BENCHMARK(penc_comparison)
 ADD_HEYOKA_BENCHMARK(large_cfunc)
 ADD_HEYOKA_BENCHMARK(sims_flanagan_jac)
 ADD_HEYOKA_BENCHMARK(cfunc_mt)
+ADD_HEYOKA_BENCHMARK(diff_tensors)
 
 if(HEYOKA_WITH_MPPP AND mp++_WITH_MPFR)
   ADD_HEYOKA_BENCHMARK(pendulum_mp)

@@ -220,7 +220,7 @@ TEST_CASE("diff test")
 
     {
         REQUIRE(diff(sum({x, y, z}), "x") == 1_dbl);
-        REQUIRE(diff(sum({x, x * x, z}), "x") == sum({1_dbl, 2_dbl * x}));
+        REQUIRE(diff(sum({x, x * x, z}), "x") == sum({1_dbl, x + x}));
         REQUIRE(diff(sum({x, x * x, -z}), "z") == -1_dbl);
     }
 }
@@ -281,7 +281,7 @@ TEST_CASE("sum number compress")
     REQUIRE(sum({1_dbl, "y"_var, -21_dbl, "x"_var, 20_dbl}) == sum({"y"_var, "x"_var}));
 
     REQUIRE(std::get<func>(sum({"y"_var, 1_dbl, "x"_var, -21_dbl}).value()).args()
-            == std::vector{-20_dbl, "x"_var, "y"_var});
+            == std::vector{-20_dbl, "y"_var, "x"_var});
 }
 
 TEST_CASE("cfunc")
@@ -475,17 +475,6 @@ TEST_CASE("sum split")
                              + std::cos(1. + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10)));
 }
 
-TEST_CASE("sum simpls")
-{
-    auto [x, y, z, t] = make_vars("x", "y", "z", "t");
-
-    REQUIRE(sum({sum({x, y}), sum({z, t})}) == sum({x, y, z, t}));
-    REQUIRE(sum({x, x}) == prod({2_dbl, x}));
-
-    REQUIRE(sum({sum({x, y}), y, z, t, prod({2_dbl, x}), y, z, t})
-            == sum({prod({2_dbl, t}), prod({3_dbl, x}), prod({3_dbl, y}), prod({2_dbl, z})}));
-}
-
 TEST_CASE("sum_to_sub")
 {
     auto [x, y] = make_vars("x", "y");
@@ -500,21 +489,13 @@ TEST_CASE("sum_to_sub")
     REQUIRE(ret[0] == sum({5_dbl, x, cos(y)}));
 
     ret = detail::sum_to_sub({sum({-5_dbl, prod({-2_dbl, x}), prod({-1_dbl, cos(y)})})});
-    REQUIRE(ret[0] == detail::sub((-5. - (2. * x)), cos(y)));
+    REQUIRE(ret[0] == detail::sub((-5. + (-2. * x)), cos(y)));
 
     ret = detail::sum_to_sub({cos(sum({-5_dbl, prod({-2_dbl, x}), prod({-1_dbl, cos(y)})}))});
-    REQUIRE(ret[0] == cos(detail::sub((-5. - (2. * x)), cos(y))));
+    REQUIRE(ret[0] == cos(detail::sub((-5. + (-2. * x)), cos(y))));
 
     auto tmp = sum({x, prod({-1_dbl, cos(x)})});
 
     ret = detail::sum_to_sub({sum({prod({-1_dbl, y}), sin(tmp), cos(tmp)})});
     REQUIRE(ret[0] == detail::sub(sum({sin(detail::sub(x, cos(x))), cos(detail::sub(x, cos(x)))}), y));
-}
-
-TEST_CASE("normalise")
-{
-    auto [x, y] = make_vars("x", "y");
-
-    REQUIRE(normalise(x + y) == x + y);
-    REQUIRE(normalise(subs(x + y, {{x, 2_dbl * y}})) == 3. * y);
 }

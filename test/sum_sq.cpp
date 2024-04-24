@@ -62,7 +62,7 @@ auto sum_sq(const std::vector<expression> &args)
     new_args.reserve(args.size());
 
     for (const auto &arg : args) {
-        new_args.push_back(arg * arg);
+        new_args.push_back(pow(arg, 2_dbl));
     }
 
     return sum(new_args);
@@ -113,7 +113,7 @@ TEST_CASE("basic test")
     {
         auto ss = sum_sq({0_dbl, 0_dbl, x, 0_dbl});
 
-        REQUIRE(ss == x * x);
+        REQUIRE(ss == pow(x, 2_dbl));
     }
 }
 
@@ -165,7 +165,7 @@ TEST_CASE("sum_sq function")
     auto [x, y, z, t] = make_vars("x", "y", "z", "t");
 
     REQUIRE(sum_sq({}) == 0_dbl);
-    REQUIRE(sum_sq({x}) == x * x);
+    REQUIRE(sum_sq({x}) == pow(x, 2_dbl));
 }
 
 TEST_CASE("sum_sq s11n")

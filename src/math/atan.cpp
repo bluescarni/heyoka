@@ -48,6 +48,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/atan.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -66,20 +67,14 @@ expression atan_impl::diff(funcptr_map<expression> &func_map, const std::string 
 {
     assert(args().size() == 1u);
 
-    return detail::diff(func_map, args()[0], s) / (1_dbl + args()[0] * args()[0]);
+    return detail::diff(func_map, args()[0], s) / (1_dbl + pow(args()[0], 2_dbl));
 }
 
 expression atan_impl::diff(funcptr_map<expression> &func_map, const param &p) const
 {
     assert(args().size() == 1u);
 
-    return detail::diff(func_map, args()[0], p) / (1_dbl + args()[0] * args()[0]);
-}
-
-[[nodiscard]] expression atan_impl::normalise() const
-{
-    assert(args().size() == 1u);
-    return atan(args()[0]);
+    return detail::diff(func_map, args()[0], p) / (1_dbl + pow(args()[0], 2_dbl));
 }
 
 llvm::Value *atan_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
@@ -114,7 +109,7 @@ taylor_dc_t::size_type atan_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 1u);
 
     // Append arg * arg.
-    u_vars_defs.emplace_back(args()[0] * args()[0], std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(pow(args()[0], 2_dbl), std::vector<std::uint32_t>{});
 
     // Append the atan decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});

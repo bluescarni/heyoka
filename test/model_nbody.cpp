@@ -264,7 +264,7 @@ TEST_CASE("nbody")
 
         REQUIRE(n_sum_sqs == 15);
         REQUIRE(n_sums == 18);
-        REQUIRE(ta.get_decomposition().size() == 287u);
+        REQUIRE(ta.get_decomposition().size() == 288u);
 
         llvm_state s;
         std::vector<expression> vars;
@@ -360,8 +360,8 @@ TEST_CASE("nbody")
         }
 
         REQUIRE(n_sum_sqs == 15);
-        REQUIRE(n_sums == 18);
-        REQUIRE(ta.get_decomposition().size() == 255u);
+        REQUIRE(n_sums == 24);
+        REQUIRE(ta.get_decomposition().size() == 231u);
 
         llvm_state s;
         std::vector<expression> vars;
@@ -371,7 +371,7 @@ TEST_CASE("nbody")
 
         const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
-        REQUIRE(dc.size() == 124u);
+        REQUIRE(dc.size() == 139u);
 
         s.compile();
 
@@ -492,7 +492,7 @@ TEST_CASE("np1body")
 
         auto ta = heyoka::taylor_adaptive{dyn, std::vector(n_ic.begin() + 6, n_ic.end()), kw::compact_mode = true};
 
-        REQUIRE(ta.get_decomposition().size() == 285u);
+        REQUIRE(ta.get_decomposition().size() == 294u);
 
         llvm_state s;
         std::vector<expression> vars;
@@ -502,7 +502,7 @@ TEST_CASE("np1body")
 
         const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
-        REQUIRE(dc.size() == 158u);
+        REQUIRE(dc.size() == 161u);
 
         s.compile();
 
@@ -537,7 +537,7 @@ TEST_CASE("np1body")
 
         const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
-        REQUIRE(dc.size() == 123u);
+        REQUIRE(dc.size() == 126u);
 
         s.compile();
 
@@ -572,7 +572,7 @@ TEST_CASE("np1body")
 
         const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
-        REQUIRE(dc.size() == 158u);
+        REQUIRE(dc.size() == 161u);
 
         s.compile();
 
@@ -607,7 +607,7 @@ TEST_CASE("np1body")
 
         const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
-        REQUIRE(dc.size() == 123u);
+        REQUIRE(dc.size() == 126u);
 
         s.compile();
 
@@ -644,7 +644,7 @@ TEST_CASE("np1body")
 
         const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
-        REQUIRE(dc.size() == 158u);
+        REQUIRE(dc.size() == 161u);
 
         s.compile();
 
@@ -682,7 +682,7 @@ TEST_CASE("np1body")
 
         const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
-        REQUIRE(dc.size() == 123u);
+        REQUIRE(dc.size() == 126u);
 
         s.compile();
 
@@ -715,7 +715,7 @@ TEST_CASE("np1body")
 
         const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
-        REQUIRE(dc.size() == 136u);
+        REQUIRE(dc.size() == 139u);
 
         s.compile();
 
@@ -752,7 +752,7 @@ TEST_CASE("np1body")
 
         const auto dc = add_cfunc<double>(s, "cf", {en_ex}, vars);
 
-        REQUIRE(dc.size() == 141u);
+        REQUIRE(dc.size() == 144u);
 
         s.compile();
 

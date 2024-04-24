@@ -62,7 +62,7 @@ TEST_CASE("mercury")
         auto merc_a = vsop2013_elliptic(1, 1, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = merc_a}, {0.}, kw::compact_mode = true};
 
-        REQUIRE(ta.get_decomposition().size() == 845u);
+        REQUIRE(ta.get_decomposition().size() == 897u);
 
         const std::vector values = {0.3870979635, 0.3870966235, 0.3870965607, 0.3870975307, 0.3870971271, 0.3870990120,
                                     0.3870991050, 0.3870986764, 0.3870984073, 0.3870985734, 0.3870982122};
@@ -82,7 +82,7 @@ TEST_CASE("mercury")
         auto merc_lam = vsop2013_elliptic(1, 2, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = merc_lam}, {0.}, kw::compact_mode = true};
 
-        REQUIRE(ta.get_decomposition().size() == 2127u);
+        REQUIRE(ta.get_decomposition().size() == 2271u);
 
         const std::vector values = {6.2605163414, 2.9331298264, 5.8889006181, 2.5615070697, 5.5172901512, 2.1899138863,
                                     5.1457263304, 1.8183546988, 4.7741673767, 1.4467914533, 4.4026055470};
@@ -103,7 +103,7 @@ TEST_CASE("mercury")
         auto merc_k = vsop2013_elliptic(1, 3, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = merc_k}, {0.}, kw::compact_mode = true};
 
-        REQUIRE(ta.get_decomposition().size() == 1674u);
+        REQUIRE(ta.get_decomposition().size() == 1769);
 
         const std::vector values = {0.0452614144, 0.0452099977, 0.0451485382, 0.0450934263, 0.0450275900, 0.0449601649,
                                     0.0448988996, 0.0448363569, 0.0447776649, 0.0447224543, 0.0446647836};
@@ -634,7 +634,7 @@ TEST_CASE("cartesian")
                                           {0., 0., 0.},
                                           kw::compact_mode = true};
 
-        REQUIRE(ta.get_decomposition().size() == 2258u);
+        REQUIRE(ta.get_decomposition().size() == 2137);
 
         const std::vector x_values
             = {0.3493879042, -0.3953232516, 0.2950960732,  -0.3676232510, 0.2077238852, -0.2846205582,
@@ -711,7 +711,7 @@ TEST_CASE("cartesian icrf")
                                           {0., 0., 0.},
                                           kw::compact_mode = true};
 
-        REQUIRE(ta.get_decomposition().size() == 2296u);
+        REQUIRE(ta.get_decomposition().size() == 2150);
 
         const std::vector x_values
             = {0.3493878714, -0.3953232726, 0.2950960118,  -0.3676232407, 0.2077238019, -0.2846205184,

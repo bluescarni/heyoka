@@ -43,6 +43,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/atan2.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
@@ -94,18 +95,18 @@ TEST_CASE("atan2 diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(atan2(y, x), "x") == (-y) / (x * x + y * y));
-    REQUIRE(diff(atan2(y, x), "y") == x / (x * x + y * y));
+    REQUIRE(diff(atan2(y, x), "x") == (-y) / (pow(x, 2_dbl) + pow(y, 2_dbl)));
+    REQUIRE(diff(atan2(y, x), "y") == x / (pow(x, 2_dbl) + pow(y, 2_dbl)));
     REQUIRE(diff(atan2(y, x), "z") == 0_dbl);
     REQUIRE(diff(atan2(x * y, y / x), "x")
-            == (y / x * y - (x * y) * (-y / (x * x))) / ((y / x) * (y / x) + (x * y) * (x * y)));
+            == (y / x * y - (x * y) * (y * -pow(x, -2_dbl))) / (pow(y / x, 2_dbl) + pow(x * y, 2_dbl)));
 
-    REQUIRE(diff(atan2(y, par[0]), par[0]) == (-y) / (par[0] * par[0] + y * y));
-    REQUIRE(diff(atan2(par[1], x), par[1]) == x / (x * x + par[1] * par[1]));
+    REQUIRE(diff(atan2(y, par[0]), par[0]) == (-y) / (pow(par[0], 2_dbl) + pow(y, 2_dbl)));
+    REQUIRE(diff(atan2(par[1], x), par[1]) == x / (pow(x, 2_dbl) + pow(par[1], 2_dbl)));
     REQUIRE(diff(atan2(y, x), par[2]) == 0_dbl);
     REQUIRE(diff(atan2(par[0] * par[1], par[1] / par[0]), par[0])
-            == (par[1] / par[0] * par[1] - (par[0] * par[1]) * (-par[1] / (par[0] * par[0])))
-                   / ((par[1] / par[0]) * (par[1] / par[0]) + (par[0] * par[1]) * (par[0] * par[1])));
+            == (par[1] / par[0] * par[1] - (par[0] * par[1]) * (par[1] * -pow(par[0], -2_dbl)))
+                   / (pow(par[1] / par[0], 2_dbl) + pow(par[0] * par[1], 2_dbl)));
 }
 
 TEST_CASE("atan2 overloads")
@@ -163,9 +164,10 @@ TEST_CASE("atan2 cse")
 {
     auto x = "x"_var, y = "y"_var;
 
-    auto ta = taylor_adaptive<double>{{prime(x) = atan2(y, x) + (x * x + y * y), prime(y) = x}, {0., 0.}, kw::tol = 1.};
+    auto ta = taylor_adaptive<double>{
+        {prime(x) = atan2(y, x) + (pow(y, 2_dbl) + pow(x, 2_dbl)), prime(y) = x}, {0., 0.}, kw::tol = 1.};
 
-    REQUIRE(ta.get_decomposition().size() == 9u);
+    REQUIRE(ta.get_decomposition().size() == 7u);
 }
 
 TEST_CASE("atan2 const fold")
@@ -321,14 +323,6 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
-
-TEST_CASE("normalise")
-{
-    auto [x, y] = make_vars("x", "y");
-
-    REQUIRE(normalise(atan2(x, y)) == atan2(x, y));
-    REQUIRE(normalise(subs(atan2(x, y), {{x, .1_dbl}, {y, .2_dbl}})) == atan2(.1_dbl, .2_dbl));
-}
 
 // Tests to check vectorisation via the vector-function-abi-variant machinery.
 TEST_CASE("vfabi double")

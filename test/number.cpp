@@ -191,7 +191,7 @@ TEST_CASE("number hash eq")
         auto ta = taylor_adaptive<double>{
             {prime(x) = (y + 1.) + (y + 1.l), prime(y) = x}, {0., 0.}, kw::opt_level = 0u, kw::tol = 1.};
 
-        REQUIRE(ta.get_decomposition().size() == 6u);
+        REQUIRE(ta.get_decomposition().size() == 7u);
     }
 
     {
@@ -200,9 +200,7 @@ TEST_CASE("number hash eq")
                                           kw::opt_level = 0u,
                                           kw::tol = 1.};
 
-        llvm_state s{kw::opt_level = 0u};
-
-        REQUIRE(ta.get_decomposition().size() == 6u);
+        REQUIRE(ta.get_decomposition().size() == 7u);
     }
 }
 

@@ -11,8 +11,6 @@
 
 #include <cstdint>
 #include <sstream>
-#include <string>
-#include <unordered_map>
 #include <vector>
 
 #include <heyoka/config.hpp>

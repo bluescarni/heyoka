@@ -743,21 +743,17 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
 
 } // namespace detail
 
-expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap, bool normalise)
+expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
 {
     detail::funcptr_map<expression> func_map;
 
     auto ret = detail::subs(func_map, e, smap);
 
-    if (normalise) {
-        return heyoka::normalise(ret);
-    } else {
-        return ret;
-    }
+    return ret;
 }
 
 std::vector<expression> subs(const std::vector<expression> &v_ex,
-                             const std::unordered_map<std::string, expression> &smap, bool normalise)
+                             const std::unordered_map<std::string, expression> &smap)
 {
     detail::funcptr_map<expression> func_map;
 
@@ -768,11 +764,7 @@ std::vector<expression> subs(const std::vector<expression> &v_ex,
         ret.push_back(detail::subs(func_map, e, smap));
     }
 
-    if (normalise) {
-        return heyoka::normalise(ret);
-    } else {
-        return ret;
-    }
+    return ret;
 }
 
 namespace detail
@@ -842,21 +834,16 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex, const s
 // subexpressions are contained in smap. With hashing, we run into a quadratic
 // complexity scenario because at each step of the traversal we have again
 // to traverse the entire subexpression in order to compute its hash value.
-expression subs(const expression &e, const std::map<expression, expression> &smap, bool normalise)
+expression subs(const expression &e, const std::map<expression, expression> &smap)
 {
     detail::funcptr_map<expression> func_map;
 
     auto ret = detail::subs(func_map, e, smap);
 
-    if (normalise) {
-        return heyoka::normalise(ret);
-    } else {
-        return ret;
-    }
+    return ret;
 }
 
-std::vector<expression> subs(const std::vector<expression> &v_ex, const std::map<expression, expression> &smap,
-                             bool normalise)
+std::vector<expression> subs(const std::vector<expression> &v_ex, const std::map<expression, expression> &smap)
 {
     detail::funcptr_map<expression> func_map;
 
@@ -867,85 +854,7 @@ std::vector<expression> subs(const std::vector<expression> &v_ex, const std::map
         ret.push_back(detail::subs(func_map, e, smap));
     }
 
-    if (normalise) {
-        return heyoka::normalise(ret);
-    } else {
-        return ret;
-    }
-}
-
-namespace detail
-{
-
-namespace
-{
-
-// NOLINTNEXTLINE(misc-no-recursion)
-expression normalise_impl(detail::funcptr_map<expression> &func_map, const expression &ex)
-{
-    return std::visit(
-        // NOLINTNEXTLINE(misc-no-recursion)
-        [&](const auto &arg) {
-            using type = uncvref_t<decltype(arg)>;
-
-            if constexpr (std::is_same_v<type, func>) {
-                const auto f_id = arg.get_ptr();
-
-                // Check if we already normalised ex.
-                if (auto it = func_map.find(f_id); it != func_map.end()) {
-                    return it->second;
-                }
-
-                // Create the new args vector by running the
-                // normalisation on all arguments.
-                std::vector<expression> new_args;
-                new_args.reserve(arg.args().size());
-                for (const auto &orig_arg : arg.args()) {
-                    new_args.push_back(normalise_impl(func_map, orig_arg));
-                }
-
-                // Create a copy of arg with the new arguments.
-                auto tmp = arg.copy(new_args);
-
-                // Create the return value by normalising tmp.
-                auto ret = tmp.normalise();
-
-                // Put the return value in the cache.
-                [[maybe_unused]] const auto [_, flag] = func_map.emplace(f_id, ret);
-                // NOTE: an expression cannot contain itself.
-                assert(flag);
-
-                return ret;
-            } else {
-                return expression{arg};
-            }
-        },
-        ex.value());
-}
-
-} // namespace
-
-} // namespace detail
-
-expression normalise(const expression &ex)
-{
-    detail::funcptr_map<expression> func_map;
-
-    return detail::normalise_impl(func_map, ex);
-}
-
-std::vector<expression> normalise(const std::vector<expression> &v_ex)
-{
-    detail::funcptr_map<expression> func_map;
-
-    std::vector<expression> retval;
-    retval.reserve(v_ex.size());
-
-    for (const auto &ex : v_ex) {
-        retval.push_back(detail::normalise_impl(func_map, ex));
-    }
-
-    return retval;
+    return ret;
 }
 
 namespace detail

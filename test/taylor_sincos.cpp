@@ -518,12 +518,12 @@ TEST_CASE("taylor sincos cse")
     auto x = "x"_var, y = "y"_var;
 
     auto ta = taylor_adaptive<double>{
-        {prime(x) = sin(y) + cos(x) + sin(x) + cos(y), prime(y) = sin(y) + cos(x) + sin(x) + cos(y)},
+        {prime(x) = (sin(x) + cos(y)) + (sin(y) + cos(x)), prime(y) = (sin(x) + cos(y)) + (sin(y) + cos(x))},
         {2., 3.},
         kw::opt_level = 0,
         kw::tol = 1.};
 
-    REQUIRE(ta.get_decomposition().size() == 9u);
+    REQUIRE(ta.get_decomposition().size() == 11u);
 
     ta.step(true);
 

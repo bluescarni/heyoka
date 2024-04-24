@@ -11,6 +11,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/model/pendulum.hpp>
 
@@ -33,7 +34,7 @@ TEST_CASE("basic")
 
         auto E = model::pendulum_energy();
 
-        REQUIRE(E == .5 * ("v"_var * "v"_var) + (1. - cos("x"_var)));
+        REQUIRE(E == .5 * pow("v"_var, 2_dbl) + (1. - cos("x"_var)));
     }
 
     {
@@ -49,7 +50,7 @@ TEST_CASE("basic")
 
         auto E = model::pendulum_energy(kw::gconst = .1l, kw::length = .3);
 
-        REQUIRE(E == (.5 * .3 * .3) * ("v"_var * "v"_var) + (.1l * .3) * (1. - cos("x"_var)));
+        REQUIRE(E == (.5 * .3 * .3) * pow("v"_var, 2_dbl) + (.1l * .3) * (1. - cos("x"_var)));
     }
 
     {
@@ -65,6 +66,6 @@ TEST_CASE("basic")
 
         auto E = model::pendulum_energy(kw::gconst = par[0], kw::length = .3);
 
-        REQUIRE(E == (.5 * .3 * .3) * ("v"_var * "v"_var) + (par[0] * .3) * (1. - cos("x"_var)));
+        REQUIRE(E == (.5 * .3 * .3) * pow("v"_var, 2_dbl) + (par[0] * .3) * (1. - cos("x"_var)));
     }
 }

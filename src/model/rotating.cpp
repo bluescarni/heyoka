@@ -15,6 +15,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/model/rotating.hpp>
 
@@ -37,6 +38,9 @@ void rotating_check_omega(const std::vector<expression> &omega)
 
 } // namespace
 
+// NOTE: after the removal of automatic simplifications, this now creates noticeably
+// longer expressions than it used to. Are there ways of reformulating the centr./coriolis
+// accelerations in better ways (e.g., exploiting some triple product identity)?
 std::vector<std::pair<expression, expression>> rotating_impl(const std::vector<expression> &omega)
 {
     // Check the angular velocity vector.
@@ -64,13 +68,13 @@ std::vector<std::pair<expression, expression>> rotating_impl(const std::vector<e
         acc_x.push_back(-(pe * qe_y));
         acc_x.push_back(-(pe * re_z));
 
-        acc_y.push_back(pe * pe * y);
-        acc_y.push_back(re * re * y);
+        acc_y.push_back(pow(pe, 2_dbl) * y);
+        acc_y.push_back(pow(re, 2_dbl) * y);
         acc_y.push_back(-(pe * qe_x));
         acc_y.push_back(-(qe * re_z));
 
-        acc_z.push_back(pe * pe * z);
-        acc_z.push_back(qe * qe * z);
+        acc_z.push_back(pow(pe, 2_dbl) * z);
+        acc_z.push_back(pow(qe, 2_dbl) * z);
         acc_z.push_back(-(pe * re_x));
         acc_z.push_back(-(re * qe_y));
 
@@ -110,10 +114,12 @@ expression rotating_potential_impl(const std::vector<expression> &omega)
         const auto &qe = omega[1];
         const auto &re = omega[2];
 
-        const auto tmp = fix_nn(sum({pe * x, qe * y, re * z}));
+        const auto tmp = sum({pe * x, qe * y, re * z});
 
         return 0.5_dbl
-               * fix_nn(tmp * tmp - fix_nn(sum({pe * pe, qe * qe, re * re})) * fix_nn(sum({x * x, y * y, z * z})));
+               * (pow(tmp, 2_dbl)
+                  - sum({pow(pe, 2_dbl), pow(qe, 2_dbl), pow(re, 2_dbl)})
+                        * sum({pow(x, 2_dbl), pow(y, 2_dbl), pow(z, 2_dbl)}));
     }
 }
 
@@ -122,7 +128,7 @@ expression rotating_energy_impl(const std::vector<expression> &omega)
     // Init the velocity variables.
     auto [vx, vy, vz] = make_vars("vx", "vy", "vz");
 
-    return 0.5_dbl * fix_nn(sum({vx * vx, vy * vy, vz * vz})) + rotating_potential_impl(omega);
+    return 0.5_dbl * sum({pow(vx, 2_dbl), pow(vy, 2_dbl), pow(vz, 2_dbl)}) + rotating_potential_impl(omega);
 }
 
 } // namespace model::detail

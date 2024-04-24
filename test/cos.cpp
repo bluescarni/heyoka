@@ -76,24 +76,15 @@ auto neg(const expression &e)
     return -e;
 }
 
-TEST_CASE("cos neg simpl")
-{
-    auto [x, y] = make_vars("x", "y");
-
-    REQUIRE(cos(-x) == cos(x));
-    REQUIRE(cos(neg(neg(x + y))) == cos(x + y));
-    REQUIRE(cos(neg(neg(par[0]))) == cos(par[0]));
-}
-
 TEST_CASE("cos diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(cos(x * x - y), x) == -sin(x * x - y) * (2. * x));
-    REQUIRE(diff(cos(x * x - y), y) == sin(x * x - y));
+    REQUIRE(diff(cos(x * x - y), x) == -sin(x * x - y) * (x + x));
+    REQUIRE(diff(cos(x * x - y), y) == -(-sin(x * x - y)));
 
-    REQUIRE(diff(cos(par[0] * par[0] - y), par[0]) == -sin(par[0] * par[0] - y) * (2. * par[0]));
-    REQUIRE(diff(cos(x * x - par[1]), par[1]) == sin(x * x - par[1]));
+    REQUIRE(diff(cos(par[0] * par[0] - y), par[0]) == -sin(par[0] * par[0] - y) * (par[0] + par[0]));
+    REQUIRE(diff(cos(x * x - par[1]), par[1]) == -(-sin(x * x - par[1])));
 }
 
 TEST_CASE("cos number simpl")
@@ -236,14 +227,6 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
-
-TEST_CASE("normalise")
-{
-    auto x = make_vars("x");
-
-    REQUIRE(normalise(cos(x)) == cos(x));
-    REQUIRE(normalise(subs(cos(x), {{x, .1_dbl}})) == cos(.1_dbl));
-}
 
 // Tests to check vectorisation via the vector-function-abi-variant machinery.
 TEST_CASE("vfabi double")

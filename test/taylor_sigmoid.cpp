@@ -25,6 +25,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sigmoid.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
@@ -114,7 +115,7 @@ TEST_CASE("taylor sigmoid test simplifications")
 {
     auto x = "x"_var, y = "y"_var;
 
-    auto ta = taylor_adaptive<double>{{prime(x) = sigmoid(x + y) * sigmoid(x + y) + sigmoid(x + y), prime(y) = x},
+    auto ta = taylor_adaptive<double>{{prime(x) = pow(sigmoid(x + y), 2_dbl) + sigmoid(x + y), prime(y) = x},
                                       {2., 3.},
                                       kw::opt_level = 0,
                                       kw::tol = 1.};

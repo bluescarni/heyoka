@@ -28,6 +28,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/math/atan2.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -75,7 +76,7 @@ TEST_CASE("taylor atan2 test simplifications")
     auto x = "x"_var, y = "y"_var;
 
     auto ta = taylor_adaptive<double>{
-        {prime(x) = atan2(x, y), prime(y) = x * x + y * y}, {.2, -.3}, kw::opt_level = 0, kw::tol = 1.};
+        {prime(x) = atan2(x, y), prime(y) = pow(x, 2_dbl) + pow(y, 2_dbl)}, {.2, -.3}, kw::opt_level = 0, kw::tol = 1.};
 
     REQUIRE(ta.get_decomposition().size() == 6u);
 

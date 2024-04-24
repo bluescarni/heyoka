@@ -65,13 +65,7 @@ asinh_impl::asinh_impl() : asinh_impl(0_dbl) {}
 std::vector<expression> asinh_impl::gradient() const
 {
     assert(args().size() == 1u);
-    return {pow(args()[0] * args()[0] + 1_dbl, -.5)};
-}
-
-[[nodiscard]] expression asinh_impl::normalise() const
-{
-    assert(args().size() == 1u);
-    return asinh(args()[0]);
+    return {pow(pow(args()[0], 2_dbl) + 1_dbl, -.5)};
 }
 
 llvm::Value *asinh_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
@@ -106,7 +100,7 @@ taylor_dc_t::size_type asinh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 1u);
 
     // Append arg * arg.
-    u_vars_defs.emplace_back(args()[0] * args()[0], std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(pow(args()[0], 2_dbl), std::vector<std::uint32_t>{});
 
     // Append 1 + arg * arg.
     u_vars_defs.emplace_back(1_dbl + expression{fmt::format("u_{}", u_vars_defs.size() - 1u)},

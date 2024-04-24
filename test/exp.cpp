@@ -83,10 +83,10 @@ TEST_CASE("exp diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(exp(x * x - y), x) == exp(x * x - y) * (2. * x));
+    REQUIRE(diff(exp(x * x - y), x) == exp(x * x - y) * (x + x));
     REQUIRE(diff(exp(x * x - y), y) == -exp(x * x - y));
 
-    REQUIRE(diff(exp(par[0] * par[0] - y), par[0]) == exp(par[0] * par[0] - y) * (2. * par[0]));
+    REQUIRE(diff(exp(par[0] * par[0] - y), par[0]) == exp(par[0] * par[0] - y) * (par[0] + par[0]));
     REQUIRE(diff(exp(x * x - par[1]), par[1]) == -exp(x * x - par[1]));
 }
 
@@ -213,14 +213,6 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
-
-TEST_CASE("normalise")
-{
-    auto x = make_vars("x");
-
-    REQUIRE(normalise(exp(x)) == exp(x));
-    REQUIRE(normalise(subs(exp(x), {{x, .1_dbl}})) == exp(.1_dbl));
-}
 
 // Tests to check vectorisation via the vector-function-abi-variant machinery.
 TEST_CASE("vfabi double")

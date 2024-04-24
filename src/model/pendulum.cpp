@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/model/pendulum.hpp>
 
@@ -31,7 +32,7 @@ expression pendulum_energy_impl(const expression &gconst, const expression &l)
 {
     auto [x, v] = make_vars("x", "v");
 
-    return 0.5_dbl * (l * l) * (v * v) + gconst * l * (1_dbl - cos(x));
+    return 0.5_dbl * pow(l, 2_dbl) * pow(v, 2_dbl) + gconst * l * (1_dbl - cos(x));
 }
 
 } // namespace model::detail

@@ -11,7 +11,6 @@
 
 #include <cstdint>
 #include <sstream>
-#include <variant>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -43,8 +42,6 @@ public:
 
     [[nodiscard]] std::vector<expression> gradient() const;
 
-    [[nodiscard]] expression normalise() const;
-
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
 
@@ -61,13 +58,11 @@ HEYOKA_DLL_PUBLIC expression sum_split(const expression &, std::uint32_t);
 
 HEYOKA_DLL_PUBLIC std::vector<expression> sum_to_sub(const std::vector<expression> &);
 
-std::variant<std::vector<expression>, expression> sum_simplify_args(const std::vector<expression> &);
-
 expression sum_to_sum_sq(const expression &);
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression sum(const std::vector<expression> &);
+HEYOKA_DLL_PUBLIC expression sum(std::vector<expression>);
 
 HEYOKA_END_NAMESPACE
 

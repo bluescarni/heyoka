@@ -1013,12 +1013,6 @@ std::vector<expression> pow_impl::gradient() const
     return {args()[1] * pow(args()[0], args()[1] - 1_dbl), pow(args()[0], args()[1]) * log(args()[0])};
 }
 
-[[nodiscard]] expression pow_impl::normalise() const
-{
-    assert(args().size() == 2u);
-    return pow(args()[0], args()[1]);
-}
-
 namespace
 {
 
@@ -1042,8 +1036,10 @@ using is_exponentiable = is_detected<pow_detail::pow_t, T, U>;
 expression pow_wrapper_impl(expression b, expression e)
 {
     // Attempt constant folding first.
-    if (const auto *b_num_ptr = std::get_if<number>(&b.value()), *e_num_ptr = std::get_if<number>(&e.value());
-        (b_num_ptr != nullptr) && (e_num_ptr != nullptr)) {
+    const auto *b_num_ptr = std::get_if<number>(&b.value());
+    const auto *e_num_ptr = std::get_if<number>(&e.value());
+
+    if ((b_num_ptr != nullptr) && (e_num_ptr != nullptr)) {
         return std::visit(
             [](const auto &x, const auto &y) -> expression {
                 if constexpr (detail::is_exponentiable<decltype(x), decltype(y)>::value) {
@@ -1062,42 +1058,15 @@ expression pow_wrapper_impl(expression b, expression e)
     }
 
     // Handle special cases for a numerical exponent.
-    if (const auto *num_ptr = std::get_if<number>(&e.value())) {
-        if (is_zero(*num_ptr)) {
+    if (e_num_ptr != nullptr) {
+        // b**0 == 1.
+        if (is_zero(*e_num_ptr)) {
             return 1_dbl;
         }
 
-        if (is_one(*num_ptr)) {
+        // b**1 == b.
+        if (is_one(*e_num_ptr)) {
             return b;
-        }
-
-        // Handle special cases when the base is a pow().
-        if (const auto *fptr = std::get_if<func>(&b.value()); fptr != nullptr && fptr->extract<pow_impl>() != nullptr) {
-            assert(fptr->args().size() == 2u);
-
-            const auto &b_base = fptr->args()[0];
-            const auto &b_exp = fptr->args()[1];
-
-            if (const auto *b_exp_num_ptr = std::get_if<number>(&b_exp.value())) {
-                // b's exponent is a number, fold it together with e.
-                return pow(b_base, expression{*b_exp_num_ptr * *num_ptr});
-            } else {
-                // b's exponent is not a number, multiply it by e.
-                return pow(b_base, prod({b_exp, e}));
-            }
-        }
-
-        // Handle special cases when the base is a prod() and the exponent is an integral value:
-        // (x*y)**n -> x**n * y**n.
-        if (const auto *fptr = std::get_if<func>(&b.value());
-            fptr != nullptr && fptr->extract<prod_impl>() != nullptr && is_integer(*num_ptr)) {
-            std::vector<expression> new_prod_args;
-            new_prod_args.reserve(fptr->args().size());
-            for (const auto &arg : fptr->args()) {
-                new_prod_args.push_back(pow(arg, expression{*num_ptr}));
-            }
-
-            return prod(new_prod_args);
         }
     }
 

@@ -173,18 +173,18 @@ linmat build_linmat(T n_qs, const dtens &L_dt, const dtens &D_dt, const std::vec
 
         // dL/dqi.
         vidx.second.emplace_back(i, 1);
-        rhs_vec.push_back(fix_nn(L_dt[vidx]));
+        rhs_vec.push_back(L_dt[vidx]);
 
         // -d2L/(dqdoti dt).
         vidx.second.clear();
         vidx.second.emplace_back(n_qs + i, 1);
         vidx.second.emplace_back(n_qs * 2, 1);
-        rhs_vec.push_back(-fix_nn(L_dt[vidx]));
+        rhs_vec.push_back(-L_dt[vidx]);
 
         // -dD/dqdoti
         vidx.second.clear();
         vidx.second.emplace_back(i, 1);
-        rhs_vec.push_back(-fix_nn(D_dt[vidx]));
+        rhs_vec.push_back(-D_dt[vidx]);
 
         // Iterate over j to compute the -d2L/(dqdoti dqj) * qdotj
         // and the d2L/(dqdoti dqdotj) terms.
@@ -204,13 +204,13 @@ linmat build_linmat(T n_qs, const dtens &L_dt, const dtens &D_dt, const std::vec
                 vidx.second.emplace_back(n_qs + j, 1);
                 vidx.second.emplace_back(n_qs + i, 1);
             }
-            cur_row[j] = fix_nn(L_dt[vidx]);
+            cur_row[j] = L_dt[vidx];
 
             // -d2L/(dqdoti dqj) * qdotj.
             vidx.second.clear();
             vidx.second.emplace_back(j, 1);
             vidx.second.emplace_back(n_qs + i, 1);
-            rhs_vec.push_back(fix_nn(-fix_nn(L_dt[vidx]) * qdots[j]));
+            rhs_vec.push_back(-L_dt[vidx] * qdots[j]);
         }
 
         // Assemble the rhs.
@@ -266,14 +266,14 @@ void solve_linmat(linmat &mat)
 
         // Do for all rows below pivot.
         for (auto i = h + 1u; i < m; ++i) {
-            const auto f = fix_nn(fix_nn(mat(i, k)) / fix_nn(mat(h, k)));
+            const auto f = mat(i, k) / mat(h, k);
 
             // Fill with zeros the lower part of pivot column.
             mat(i, k) = 0_dbl;
 
             // Do for all remaining elements in current row.
             for (auto j = k + 1u; j < n; ++j) {
-                mat(i, j) = fix_nn(fix_nn(mat(i, j)) - fix_nn(mat(h, j)) * f);
+                mat(i, j) = mat(i, j) - mat(h, j) * f;
             }
         }
 
@@ -294,12 +294,12 @@ void solve_linmat(linmat &mat)
 
         // Move the terms to the rhs.
         for (linmat::col_idx_t j = i + 1u; j < m; ++j) {
-            new_rhs.push_back(fix_nn(-mat(i, j) * mat(j, n - 1u)));
+            new_rhs.push_back(-mat(i, j) * mat(j, n - 1u));
         }
 
         // Divide the new rhs by the coefficient of the current variable
         // and assign it.
-        mat(i, n - 1u) = fix_nn(fix_nn(sum(new_rhs)) / mat(i, i));
+        mat(i, n - 1u) = sum(new_rhs) / mat(i, i);
     }
 }
 

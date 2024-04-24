@@ -90,7 +90,7 @@ TEST_CASE("kepF diff")
                 == sin(kepF(x, y, z)) / (1_dbl - x * sin(kepF(x, y, z)) - y * cos(kepF(x, y, z))));
         REQUIRE(diff(kepF(x, y, z), z) == 1_dbl / (1_dbl - x * sin(kepF(x, y, z)) - y * cos(kepF(x, y, z))));
         auto F = kepF(x * x, x * y, x * z);
-        REQUIRE(diff(F, x) == (y * sin(F) - 2_dbl * x * cos(F) + z) / (1_dbl - x * x * sin(F) - x * y * cos(F)));
+        REQUIRE(diff(F, x) == (y * sin(F) - (x + x) * cos(F) + z) / (1_dbl - x * x * sin(F) - x * y * cos(F)));
         REQUIRE(diff(F, y) == (x * sin(F)) / (1_dbl - x * x * sin(F) - x * y * cos(F)));
     }
 
@@ -103,7 +103,7 @@ TEST_CASE("kepF diff")
                 == 1_dbl / (1_dbl - x * sin(kepF(x, y, par[2])) - y * cos(kepF(x, y, par[2]))));
         auto F = kepF(par[0] * par[0], par[0] * par[1], par[0] * par[2]);
         REQUIRE(diff(F, par[0])
-                == (par[1] * sin(F) - 2_dbl * par[0] * cos(F) + par[2])
+                == (par[1] * sin(F) - (par[0] + par[0]) * cos(F) + par[2])
                        / (1_dbl - par[0] * par[0] * sin(F) - par[0] * par[1] * cos(F)));
         REQUIRE(diff(F, par[1]) == (par[0] * sin(F)) / (1_dbl - par[0] * par[0] * sin(F) - par[0] * par[1] * cos(F)));
     }
@@ -259,7 +259,7 @@ TEST_CASE("kepF cse")
         {0., 0., 0.},
         kw::tol = 1.};
 
-    REQUIRE(ta.get_decomposition().size() == 12u);
+    REQUIRE(ta.get_decomposition().size() == 13u);
 }
 
 TEST_CASE("kepF s11n")
