@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Batch mode &#8212; heyoka 4.1.0 documentation</title>
+    <title>Batch mode &#8212; heyoka 5.0.0 documentation</title>
   
   
   
@@ -36,8 +36,8 @@
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=8d27b9dea8ad943066ae" />
   <script src="_static/vendor/fontawesome/6.5.1/js/all.min.js?digest=8d27b9dea8ad943066ae"></script>
 
-    <script src="_static/documentation_options.js?v=5d1265ac"></script>
-    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/documentation_options.js?v=05b0d459"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
@@ -134,8 +134,8 @@
       
     
     
-    <img src="_static/white_logo.png" class="logo__image only-light" alt="heyoka 4.1.0 documentation - Home"/>
-    <script>document.write(`<img src="_static/white_logo.png" class="logo__image only-dark" alt="heyoka 4.1.0 documentation - Home"/>`);</script>
+    <img src="_static/white_logo.png" class="logo__image only-light" alt="heyoka 5.0.0 documentation - Home"/>
+    <script>document.write(`<img src="_static/white_logo.png" class="logo__image only-dark" alt="heyoka 5.0.0 documentation - Home"/>`);</script>
   
   
 </a></div>
@@ -446,7 +446,7 @@ processor in use. Because at this time the most widespread SIMD instruction set 
 most x86 processors sold since 2011), in this tutorial we will be using a
 batch size <span class="math notranslate nohighlight">\(n=4\)</span>.</p>
 <div class="versionadded">
-<p><span class="versionmodified added">New in version 0.17.0.</span></p>
+<p><span class="versionmodified added">Added in version 0.17.0.</span></p>
 </div>
 <p>The recommended SIMD width for the processor in use can be fetched
 via the <code class="docutils literal notranslate"><span class="pre">recommended_simd_size()</span></code> function.</p>
@@ -808,7 +808,7 @@ at different time coordinates:</p>
 </pre></div>
 </div>
 <div class="versionadded">
-<p><span class="versionmodified added">New in version 0.16.0.</span></p>
+<p><span class="versionmodified added">Added in version 0.16.0.</span></p>
 </div>
 <p>Support for <a class="reference internal" href="tut_d_output.html#tut-c-output"><span class="std std-ref">continuous output</span></a> is also available in batch mode.
 Like in scalar mode, continuous output is requested via the <code class="docutils literal notranslate"><span class="pre">c_output</span></code> boolean keyword flag,
@@ -821,7 +821,7 @@ rather than a single scalar time coordinate.</p>
 <section id="event-detection">
 <h3>Event detection<a class="headerlink" href="#event-detection" title="Link to this heading">#</a></h3>
 <div class="versionadded">
-<p><span class="versionmodified added">New in version 0.16.0.</span></p>
+<p><span class="versionmodified added">Added in version 0.16.0.</span></p>
 </div>
 <p><a class="reference internal" href="tut_events.html#tut-events"><span class="std std-ref">Event detection</span></a> in also available in batch mode. The API is similar
 to the scalar mode API, with the following differences:</p>
@@ -904,7 +904,7 @@ regime.</p>
 <section id="ensemble-propagations">
 <h3>Ensemble propagations<a class="headerlink" href="#ensemble-propagations" title="Link to this heading">#</a></h3>
 <div class="versionadded">
-<p><span class="versionmodified added">New in version 0.17.0.</span></p>
+<p><span class="versionmodified added">Added in version 0.17.0.</span></p>
 </div>
 <p><a class="reference internal" href="tut_ensemble.html#tut-ensemble"><span class="std std-ref">Ensemble propagations</span></a> are also available in batch mode. The API is identical
 to scalar mode ensemble propagations. Specifically, the following functions are available:</p>

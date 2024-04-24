@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Changelog &#8212; heyoka 4.1.0 documentation</title>
+    <title>Changelog &#8212; heyoka 5.0.0 documentation</title>
   
   
   
@@ -36,8 +36,8 @@
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=8d27b9dea8ad943066ae" />
   <script src="_static/vendor/fontawesome/6.5.1/js/all.min.js?digest=8d27b9dea8ad943066ae"></script>
 
-    <script src="_static/documentation_options.js?v=5d1265ac"></script>
-    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/documentation_options.js?v=05b0d459"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=efea14e4"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
@@ -134,8 +134,8 @@
       
     
     
-    <img src="_static/white_logo.png" class="logo__image only-light" alt="heyoka 4.1.0 documentation - Home"/>
-    <script>document.write(`<img src="_static/white_logo.png" class="logo__image only-dark" alt="heyoka 4.1.0 documentation - Home"/>`);</script>
+    <img src="_static/white_logo.png" class="logo__image only-light" alt="heyoka 5.0.0 documentation - Home"/>
+    <script>document.write(`<img src="_static/white_logo.png" class="logo__image only-dark" alt="heyoka 5.0.0 documentation - Home"/>`);</script>
   
   
 </a></div>
@@ -398,7 +398,7 @@ document.write(`
             </div>
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">4.1.0 (unreleased)</a><ul class="nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">5.0.0 (unreleased)</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#new">New</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#changes">Changes</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fix">Fix</a></li>
@@ -586,11 +586,11 @@ document.write(`
   <section id="changelog">
 <h1>Changelog<a class="headerlink" href="#changelog" title="Link to this heading">#</a></h1>
 <section id="unreleased">
-<h2>4.1.0 (unreleased)<a class="headerlink" href="#unreleased" title="Link to this heading">#</a></h2>
+<h2>5.0.0 (unreleased)<a class="headerlink" href="#unreleased" title="Link to this heading">#</a></h2>
 <section id="new">
 <h3>New<a class="headerlink" href="#new" title="Link to this heading">#</a></h3>
 <ul class="simple">
-<li><p>Add vectorised implementations of <code class="docutils literal notranslate"><span class="pre">diff()</span></code> and <code class="docutils literal notranslate"><span class="pre">fix()</span></code>
+<li><p>Add a vectorised implementation for <code class="docutils literal notranslate"><span class="pre">diff()</span></code>
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/411">#411</a>).</p></li>
 <li><p>Add mutable ranges getters for the state and pars data of the adaptive
 integrators (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/409">#409</a>).</p></li>
@@ -600,6 +600,10 @@ integrators (<a class="reference external" href="https://github.com/bluescarni/h
 <section id="changes">
 <h3>Changes<a class="headerlink" href="#changes" title="Link to this heading">#</a></h3>
 <ul class="simple">
+<li><p>Several automatic simplifications and normalisations in the expression
+system have been removed as they caused drastic slowdowns in symbolic operations
+when working with large and highly recursive computational graphs
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/412">#412</a>).</p></li>
 <li><p>Remove the (undocumented) <code class="docutils literal notranslate"><span class="pre">taylor_add_jet()</span></code> function and rework
 the unit test code to use <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> instead
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/409">#409</a>).</p></li>
@@ -1764,7 +1768,7 @@ on more general classes of functions, and add
   </div>
   <nav class="bd-toc-nav page-toc">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">4.1.0 (unreleased)</a><ul class="nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">5.0.0 (unreleased)</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#new">New</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#changes">Changes</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fix">Fix</a></li>
