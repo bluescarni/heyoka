@@ -173,11 +173,6 @@ std::vector<tseries> to_tseries(const std::vector<expression> &v_ex_, std::uint3
     // binary multiplication for tseries.
     v_ex = detail::split_prods_for_decompose(v_ex, 2);
 
-    // Unfix.
-    // NOTE: unfix is the last step, as we want to keep expressions
-    // fixed in the previous preprocessing steps.
-    v_ex = unfix(v_ex);
-
     detail::funcptr_map<tseries> func_map;
 
     std::vector<tseries> ret;

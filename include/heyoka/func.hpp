@@ -263,7 +263,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
     [[nodiscard]] tseries to_tseries(funcptr_map<tseries> &m, std::uint32_t order) const final
     {
         if constexpr (func_has_to_tseries<T>) {
-            return this->value().to_tseries(m, order);
+            return getval<Holder>(this).to_tseries(m, order);
         }
 
         // LCOV_EXCL_START
