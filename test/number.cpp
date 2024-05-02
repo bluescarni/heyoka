@@ -188,20 +188,19 @@ TEST_CASE("number hash eq")
     auto [x, y] = make_vars("x", "y");
 
     {
-        llvm_state s{kw::opt_level = 0u};
+        auto ta = taylor_adaptive<double>{
+            {prime(x) = (y + 1.) + (y + 1.l), prime(y) = x}, {0., 0.}, kw::opt_level = 0u, kw::tol = 1.};
 
-        auto dc = taylor_add_jet<double>(s, "jet", {prime(x) = (y + 1.) + (y + 1.l), prime(y) = x}, 1, 1, false, true);
-
-        REQUIRE(dc.size() == 6u);
+        REQUIRE(ta.get_decomposition().size() == 7u);
     }
 
     {
-        llvm_state s{kw::opt_level = 0u};
+        auto ta = taylor_adaptive<double>{{prime(x) = (y + 1.) + (y + expression{number{1.f}}), prime(y) = x},
+                                          {0., 0.},
+                                          kw::opt_level = 0u,
+                                          kw::tol = 1.};
 
-        auto dc = taylor_add_jet<double>(s, "jet", {prime(x) = (y + 1.) + (y + expression{number{1.f}}), prime(y) = x},
-                                         1, 1, false, true);
-
-        REQUIRE(dc.size() == 6u);
+        REQUIRE(ta.get_decomposition().size() == 7u);
     }
 }
 

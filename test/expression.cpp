@@ -66,6 +66,8 @@ using namespace heyoka;
 using namespace heyoka_test;
 using namespace Catch::literals;
 
+using smap_t = std::unordered_map<std::string, expression>;
+
 // Helper to ease the removal of neg() in the test code.
 auto neg(const expression &e)
 {
@@ -101,14 +103,6 @@ TEST_CASE("operator == and !=")
         REQUIRE(ex1 != ex4);
         REQUIRE(ex1 != ex5);
     }
-    {
-        expression ex1 = 1_dbl + cos("x"_var);
-        expression ex2 = cos("x"_var) + 1_dbl;
-        expression ex3 = cos("x"_var) + 1_dbl + ex1 - ex1;
-
-        REQUIRE(ex1 == ex2);
-        REQUIRE(ex3 == ex2);
-    }
 }
 
 TEST_CASE("diff var")
@@ -124,6 +118,14 @@ TEST_CASE("diff var")
 
     REQUIRE(diff(par[42], "x") == 0_dbl);
     REQUIRE(std::holds_alternative<double>(std::get<number>(diff(par[42], "x").value()).value()));
+
+    // Vectorised overload.
+    auto a = x + y;
+    auto res = diff({cosh(a), sinh(a)}, "y");
+    REQUIRE(res[0] == sinh(a));
+    REQUIRE(res[1] == cosh(a));
+    REQUIRE(std::get<func>(std::get<func>(res[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(res[1].value()).args()[0].value()).get_ptr());
 }
 
 TEST_CASE("diff par")
@@ -146,6 +148,27 @@ TEST_CASE("diff par")
 
     REQUIRE(diff("x"_var, par[42]) == 0_dbl);
     REQUIRE(std::holds_alternative<double>(std::get<number>(diff("x"_var, par[42]).value()).value()));
+
+    // Vectorised overload.
+    auto a = par[0] + par[1];
+    auto res = diff({cosh(a), sinh(a)}, param(0));
+    REQUIRE(res[0] == sinh(a));
+    REQUIRE(res[1] == cosh(a));
+    REQUIRE(std::get<func>(std::get<func>(res[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(res[1].value()).args()[0].value()).get_ptr());
+}
+
+TEST_CASE("diff ex")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    // Vectorised overload.
+    auto a = par[0] + par[1];
+    auto res = diff({cosh(a), sinh(a)}, par[0]);
+    REQUIRE(res[0] == sinh(a));
+    REQUIRE(res[1] == cosh(a));
+    REQUIRE(std::get<func>(std::get<func>(res[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(res[1].value()).args()[0].value()).get_ptr());
 }
 
 TEST_CASE("get_param_size")
@@ -222,10 +245,6 @@ TEST_CASE("add simpls")
 
     REQUIRE(0_dbl + (x + y) == x + y);
 
-    REQUIRE(1_dbl + (1_dbl + x) == 2_dbl + x);
-    REQUIRE(1_dbl + (1_dbl + (x + 3_dbl)) == 5_dbl + x);
-    REQUIRE(1_dbl + (1_dbl + (4_dbl + (x + 3_dbl))) == 9_dbl + x);
-
     REQUIRE(x + 0_dbl == x);
     REQUIRE(x + 1_dbl == 1_dbl + x);
 }
@@ -256,16 +275,9 @@ TEST_CASE("mul simpls")
     REQUIRE(1_dbl * (x + y) == x + y);
 
     REQUIRE(1_dbl * (1_dbl * x) == x);
-    REQUIRE(1_dbl * (2_dbl * (x * 3_dbl)) == 6_dbl * x);
-    REQUIRE(1_dbl * (1_dbl * (-4_dbl * (x * 3_dbl))) == -12_dbl * x);
 
     REQUIRE(x * 2_dbl == 2_dbl * x);
     REQUIRE(x * -1_dbl == -1_dbl * x);
-
-    REQUIRE(2_dbl * -x == -2_dbl * x);
-    REQUIRE(2_dbl * (-3_dbl * -x) == 6_dbl * x);
-    REQUIRE(2_dbl * (-x * -3_dbl) == 6_dbl * x);
-    REQUIRE(2_dbl * (-3_dbl * (-x * -4_dbl)) == -24_dbl * x);
 
     REQUIRE(-1_dbl * (x + y) == -(x + y));
     REQUIRE((x - y) * -1_dbl == -(x - y));
@@ -276,19 +288,6 @@ TEST_CASE("neg simpls")
     auto [x, y] = make_vars("x", "y");
 
     REQUIRE(x + (-y) == x - y);
-    REQUIRE(x - (-y) == x + y);
-    REQUIRE(x + (neg(neg(y))) == x + y);
-    REQUIRE(x - (neg(neg(y))) == x - y);
-    REQUIRE(x + (neg(neg(par[0]))) == x + par[0]);
-    REQUIRE(x - (neg(neg(par[0]))) == x - par[0]);
-
-    REQUIRE((-x) * (-y) == x * y);
-    REQUIRE((-x) / (-y) == x / y);
-
-    REQUIRE(neg(neg(x)) * neg(neg(y)) == x * y);
-    REQUIRE(neg(neg(x)) / neg(neg(y)) == x / y);
-    REQUIRE(neg(neg(x)) * neg(neg(par[0])) == x * par[0]);
-    REQUIRE(neg(neg(x)) / neg(neg(par[0])) == x / par[0]);
 }
 
 TEST_CASE("div simpls")
@@ -297,22 +296,12 @@ TEST_CASE("div simpls")
 
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(-x / -y == x / y);
-
     REQUIRE(1_dbl / 2_dbl == 0.5_dbl);
     REQUIRE(1_dbl / -2_dbl == -0.5_dbl);
 
     REQUIRE(x / 1_dbl == x);
     REQUIRE(-x / 1_dbl == -x);
     REQUIRE(x / -1_dbl == -x);
-    REQUIRE(-x / -1_dbl == x);
-    REQUIRE(-x / 2_dbl == x / -2_dbl);
-
-    REQUIRE(0_dbl / -x == 0_dbl);
-    REQUIRE(1_dbl / -x == -1_dbl / x);
-    REQUIRE(-2_dbl / -x == 2_dbl / x);
-
-    REQUIRE(x / 2_dbl / 2_dbl == x / 4_dbl);
 }
 
 // Check that compound ops correctly
@@ -512,14 +501,14 @@ TEST_CASE("get_n_nodes")
     REQUIRE(get_n_nodes(-z) == 3u);
     REQUIRE(get_n_nodes(heyoka::time) == 1u);
     REQUIRE(get_n_nodes(x + (y * z)) == 5u);
-    REQUIRE(get_n_nodes((x - y - z) + (y * z)) == 11u);
+    REQUIRE(get_n_nodes((x - y - z) + (y * z)) == 13u);
 
     // Try with subexpressions repeating in the tree.
     auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo),
          bar2 = (copy(foo) - x) / (2. * copy(foo));
 
-    REQUIRE(get_n_nodes(bar) == 37u);
-    REQUIRE(get_n_nodes(bar2) == 37u);
+    REQUIRE(get_n_nodes(bar) == 43u);
+    REQUIRE(get_n_nodes(bar2) == 43u);
 
     // Build a very large expression such that
     // get_n_nodes() will return 0.
@@ -611,7 +600,7 @@ TEST_CASE("subs str")
 
     auto foo_a = ((a + y) * (z + a)) * ((z - a) * (y + a)), bar_a = (foo_a - a) / (2. * foo_a);
 
-    auto bar_subs = subs(bar, {{"x", a}});
+    auto bar_subs = subs(bar, smap_t{{"x", a}});
 
     // Ensure foo/bar were not modified.
     REQUIRE(foo == ((x + y) * (z + x)) * ((z - x) * (y + x)));
@@ -621,11 +610,6 @@ TEST_CASE("subs str")
 
     // Check the substitution.
     REQUIRE(bar_subs == bar_a);
-
-    // Check normalisation.
-    REQUIRE(subs(x + y, {{"x", "b"_var}, {"y", "a"_var}}, true) == "a"_var + "b"_var);
-    REQUIRE(subs(std::vector{x + y}, {{"x", "b"_var}, {"y", "a"_var}}, true)[0] == "a"_var + "b"_var);
-    REQUIRE(subs(std::vector{x + y}, {{"x", "b"_var}, {"y", "a"_var}})[0] != "a"_var + "b"_var);
 }
 
 TEST_CASE("subs")
@@ -645,12 +629,7 @@ TEST_CASE("subs")
     auto ex = tmp - par[0] * tmp;
     auto subs_res = subs(ex, {{tmp, tmp2}});
 
-    REQUIRE(subs_res == tmp - par[0] * tmp2);
-
-    // Check normalisation.
-    REQUIRE(subs(x + y, {{x, "b"_var}, {y, "a"_var}}, true) == "a"_var + "b"_var);
-    REQUIRE(subs(std::vector{x + y}, {{x, "b"_var}, {y, "a"_var}}, true)[0] == "a"_var + "b"_var);
-    REQUIRE(subs(std::vector{x + y}, {{x, "b"_var}, {y, "a"_var}})[0] != "a"_var + "b"_var);
+    REQUIRE(subs_res == tmp2 - par[0] * tmp2);
 }
 
 // cfunc N-body with fixed masses.
@@ -1663,16 +1642,6 @@ TEST_CASE("less than")
     REQUIRE(!std::less<expression>{}(par[0], 2_dbl));
     REQUIRE(std::less<expression>{}(par[0], "x"_var));
     REQUIRE(std::less<expression>{}(par[0], "x"_var + "y"_var));
-}
-
-TEST_CASE("mul compress")
-{
-    auto x = make_vars("x");
-
-    REQUIRE(2_dbl * x + 3_dbl * x == 5_dbl * x);
-    REQUIRE(2_dbl * x + x == 3_dbl * x);
-    REQUIRE(x + 2_dbl * x == 3_dbl * x);
-    REQUIRE(x - 2_dbl * x == -1_dbl * x);
 }
 
 TEST_CASE("cfunc prod_to_div")

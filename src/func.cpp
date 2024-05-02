@@ -384,15 +384,6 @@ bool func::is_time_dependent() const
     return m_func->is_time_dependent();
 }
 
-expression func::normalise() const
-{
-    if (m_func->has_normalise()) {
-        return m_func->normalise();
-    } else {
-        return expression{*this};
-    }
-}
-
 const std::string &func::get_name() const
 {
     return m_func->get_name();

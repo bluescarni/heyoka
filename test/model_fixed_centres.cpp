@@ -14,6 +14,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/model/fixed_centres.hpp>
 #include <heyoka/model/nbody.hpp>
@@ -33,7 +34,7 @@ auto sum_sq(const std::vector<expression> &args)
     new_args.reserve(args.size());
 
     for (const auto &arg : args) {
-        new_args.push_back(arg * arg);
+        new_args.push_back(pow(arg, 2_dbl));
     }
 
     return sum(new_args);
@@ -61,7 +62,7 @@ TEST_CASE("basic")
         REQUIRE(dyn[5].second == 0_dbl);
 
         auto en = model::fixed_centres_energy();
-        REQUIRE(en == 0.5_dbl * fix_nn(sum_sq({"vx"_var, "vy"_var, "vz"_var})));
+        REQUIRE(en == 0.5_dbl * sum_sq({"vx"_var, "vy"_var, "vz"_var}));
     }
 
     // Test equivalence between two-body and fixed centres when the
@@ -159,7 +160,7 @@ TEST_CASE("basic")
         REQUIRE(E == approximately(E0));
 
         // Test also the fixed_centres_potential implementation.
-        auto kin = 0.5_dbl * fix_nn(sum_sq({"vx"_var, "vy"_var, "vz"_var}));
+        auto kin = 0.5_dbl * sum_sq({"vx"_var, "vy"_var, "vz"_var});
         REQUIRE(model::fixed_centres_energy(kw::Gconst = 1.2, kw::masses = masses, kw::positions = pos)
                 == kin + model::fixed_centres_potential(kw::masses = masses, kw::positions = pos, kw::Gconst = 1.2));
     }

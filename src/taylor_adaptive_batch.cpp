@@ -230,8 +230,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
     } else if (m_pars.size() > npars * m_batch_size) {
         throw std::invalid_argument(
             fmt::format("Excessive number of parameter values passed to the constructor of an adaptive "
-                        "Taylor integrator in batch mode: {} parameter values were passed, but the ODE "
-                        "system contains only {} parameters "
+                        "Taylor integrator in batch mode: {} parameter value(s) were passed, but the ODE "
+                        "system contains only {} parameter(s) "
                         "(in batches of {})",
                         m_pars.size(), npars, m_batch_size));
     }
@@ -254,13 +254,13 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
 
     // Fetch the stepper.
     if (with_events) {
-        m_step_f = reinterpret_cast<i_data::step_f_e_t>(m_llvm.jit_lookup("step_e"));
+        m_step_f = reinterpret_cast<typename i_data::step_f_e_t>(m_llvm.jit_lookup("step_e"));
     } else {
-        m_step_f = reinterpret_cast<i_data::step_f_t>(m_llvm.jit_lookup("step"));
+        m_step_f = reinterpret_cast<typename i_data::step_f_t>(m_llvm.jit_lookup("step"));
     }
 
     // Fetch the function to compute the dense output.
-    m_d_out_f = reinterpret_cast<i_data::d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+    m_d_out_f = reinterpret_cast<typename i_data::d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
 
     // Setup the vector for the Taylor coefficients.
     // NOTE: the size of m_state.size() already takes
@@ -332,9 +332,9 @@ taylor_adaptive_batch<T>::taylor_adaptive_batch(const taylor_adaptive_batch &oth
       m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
 {
     if (m_ed_data) {
-        m_i_data->m_step_f = reinterpret_cast<i_data::step_f_e_t>(m_i_data->m_llvm.jit_lookup("step_e"));
+        m_i_data->m_step_f = reinterpret_cast<typename i_data::step_f_e_t>(m_i_data->m_llvm.jit_lookup("step_e"));
     } else {
-        m_i_data->m_step_f = reinterpret_cast<i_data::step_f_t>(m_i_data->m_llvm.jit_lookup("step"));
+        m_i_data->m_step_f = reinterpret_cast<typename i_data::step_f_t>(m_i_data->m_llvm.jit_lookup("step"));
     }
 }
 
@@ -384,9 +384,9 @@ void taylor_adaptive_batch<T>::load_impl(Archive &ar, unsigned version)
 
         // Recover the function pointers.
         if (m_ed_data) {
-            m_i_data->m_step_f = reinterpret_cast<i_data::step_f_e_t>(m_i_data->m_llvm.jit_lookup("step_e"));
+            m_i_data->m_step_f = reinterpret_cast<typename i_data::step_f_e_t>(m_i_data->m_llvm.jit_lookup("step_e"));
         } else {
-            m_i_data->m_step_f = reinterpret_cast<i_data::step_f_t>(m_i_data->m_llvm.jit_lookup("step"));
+            m_i_data->m_step_f = reinterpret_cast<typename i_data::step_f_t>(m_i_data->m_llvm.jit_lookup("step"));
         }
         // LCOV_EXCL_START
     } catch (...) {
@@ -1199,7 +1199,7 @@ taylor_adaptive_batch<T>::propagate_until_impl(const puntil_arg_t &ts_, std::siz
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
                 const detail::dfloat<T> new_time(c_out_times_hi[c_out_times_hi.size() - m_batch_size + i],
                                                  c_out_times_lo[c_out_times_lo.size() - m_batch_size + i]);
-                assert(isfinite(new_time));
+                assert(isfinite(new_time)); // LCOV_EXCL_LINE
                 if (m_t_dir[i] != 0) {
                     assert(!(new_time < prev_times[i]));
                 } else {
@@ -2011,6 +2011,12 @@ const T *taylor_adaptive_batch<T>::get_state_data() const
 }
 
 template <typename T>
+std::ranges::subrange<typename std::vector<T>::iterator> taylor_adaptive_batch<T>::get_state_range()
+{
+    return std::ranges::subrange(m_i_data->m_state.begin(), m_i_data->m_state.end());
+}
+
+template <typename T>
 T *taylor_adaptive_batch<T>::get_state_data()
 {
     return m_i_data->m_state.data();
@@ -2026,6 +2032,12 @@ template <typename T>
 const T *taylor_adaptive_batch<T>::get_pars_data() const
 {
     return m_i_data->m_pars.data();
+}
+
+template <typename T>
+std::ranges::subrange<typename std::vector<T>::iterator> taylor_adaptive_batch<T>::get_pars_range()
+{
+    return std::ranges::subrange(m_i_data->m_pars.begin(), m_i_data->m_pars.end());
 }
 
 template <typename T>

@@ -105,12 +105,6 @@ void relu_impl::to_stream(std::ostringstream &oss) const
     }
 }
 
-[[nodiscard]] expression relu_impl::normalise() const
-{
-    assert(args().size() == 1u);
-    return relu(args()[0], m_slope);
-}
-
 [[nodiscard]] std::vector<expression> relu_impl::gradient() const
 {
     assert(args().size() == 1u);
@@ -377,12 +371,6 @@ void relup_impl::to_stream(std::ostringstream &oss) const
         stream_expression(oss, args()[0]);
         oss << fmt::format(", {})", m_slope);
     }
-}
-
-[[nodiscard]] expression relup_impl::normalise() const
-{
-    assert(args().size() == 1u);
-    return relup(args()[0], m_slope);
 }
 
 [[nodiscard]] std::vector<expression> relup_impl::gradient() const

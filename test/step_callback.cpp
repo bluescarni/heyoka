@@ -97,7 +97,7 @@ TEST_CASE("step_callback basics")
             REQUIRE(!std::is_constructible_v<step_callback<fp_t>, int, int>);
             REQUIRE(!std::is_constructible_v<step_callback<fp_t>, only_ph>);
 
-            REQUIRE(step_cb.get_type_index() == typeid(detail::empty_callable));
+            REQUIRE(value_type_index(step_cb) == typeid(detail::empty_callable));
 
             // Copy construction of empty callback.
             auto step_cb2 = step_cb;
@@ -130,35 +130,10 @@ TEST_CASE("step_callback basics")
             REQUIRE(step_cb(ta));
             REQUIRE_NOTHROW(step_cb.pre_hook(ta));
 
-            REQUIRE(step_cb.get_type_index() == typeid(decltype(lam)));
+            REQUIRE(value_type_index(step_cb) == typeid(decltype(lam)));
 
-            REQUIRE(step_cb.template extract<decltype(lam)>() != nullptr);
-            REQUIRE(std::as_const(step_cb).template extract<decltype(lam)>() != nullptr);
-
-            // Copy construction.
-            auto step_cb2 = step_cb;
-            REQUIRE(step_cb2);
-            REQUIRE(step_cb2.template extract<decltype(lam)>() != nullptr);
-            REQUIRE(step_cb2.template extract<decltype(lam)>() != step_cb.template extract<decltype(lam)>());
-
-            // Move construction.
-            auto step_cb3 = std::move(step_cb);
-            REQUIRE(step_cb3);
-            REQUIRE(step_cb3.template extract<decltype(lam)>() != nullptr);
-
-            // Revive step_cb via copy assignment.
-            step_cb = step_cb3;
-            REQUIRE(step_cb);
-            REQUIRE(step_cb.template extract<decltype(lam)>() != nullptr);
-            REQUIRE(step_cb.template extract<decltype(lam)>() != step_cb3.template extract<decltype(lam)>());
-
-            // Revive step_cb via move assignment.
-            const auto *orig_ptr = step_cb.template extract<decltype(lam)>();
-            auto step_cb4 = std::move(step_cb);
-            step_cb = std::move(step_cb4);
-            REQUIRE(step_cb.template extract<decltype(lam)>() != nullptr);
-            REQUIRE(step_cb.template extract<decltype(lam)>() != step_cb3.template extract<decltype(lam)>());
-            REQUIRE(step_cb.template extract<decltype(lam)>() == orig_ptr);
+            REQUIRE(value_ptr<decltype(lam)>(step_cb) != nullptr);
+            REQUIRE(value_ptr<decltype(lam)>(std::as_const(step_cb)) != nullptr);
         }
 
         {
@@ -166,7 +141,7 @@ TEST_CASE("step_callback basics")
 
             REQUIRE(static_cast<bool>(step_cb));
 
-            REQUIRE(step_cb.get_type_index() == typeid(decltype(&cb0<taylor_adaptive<fp_t>>)));
+            REQUIRE(value_type_index(step_cb) == typeid(decltype(&cb0<taylor_adaptive<fp_t>>)));
 
             REQUIRE(step_cb(ta));
             REQUIRE_NOTHROW(step_cb.pre_hook(ta));
@@ -245,8 +220,8 @@ TEST_CASE("step_callback basics")
             REQUIRE(static_cast<bool>(step_cb2));
             REQUIRE(!static_cast<bool>(step_cb1));
 
-            REQUIRE(step_cb2.template extract<cb1>() != nullptr);
-            REQUIRE(step_cb1.template extract<cb1>() == nullptr);
+            REQUIRE(value_ptr<cb1>(step_cb2) != nullptr);
+            REQUIRE(value_ptr<cb1>(step_cb1) == nullptr);
         }
     };
 
@@ -312,7 +287,6 @@ TEST_CASE("step_callback s11n")
             }
 
             REQUIRE(!!step_cb);
-            REQUIRE(step_cb.template extract<cb2>() != nullptr);
         }
 
         // Empty step callback test.
@@ -360,7 +334,6 @@ TEST_CASE("step_callback s11n")
             }
 
             REQUIRE(!!step_cb);
-            REQUIRE(step_cb.template extract<cb2>() != nullptr);
         }
 
         // Empty step callback test.
@@ -744,7 +717,6 @@ TEST_CASE("step_callback_set")
             }
 
             REQUIRE(static_cast<bool>(scs));
-            REQUIRE(scs.template extract<step_callback_set<fp_t>>() != nullptr);
         }
     };
 

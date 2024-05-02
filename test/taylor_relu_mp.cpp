@@ -7,14 +7,12 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <initializer_list>
-#include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
 
 #include <mp++/real.hpp>
 
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/relu.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -48,23 +46,21 @@ TEST_CASE("relu")
                 for (auto opt_level : {0u, 3u}) {
                     // Test with num/param/var.
                     {
-                        llvm_state s{kw::opt_level = opt_level};
-
-                        taylor_add_jet<fp_t>(s, "jet", {relu(x) + relup(y), x + y}, 2, 1, ha, cm, {}, false, prec);
-
-                        s.compile();
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = relu(x) + relup(y), prime(y) = x + y},
+                                                        {fp_t{2, prec}, fp_t{-1, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level};
 
                         if (opt_level == 0u && cm) {
-                            REQUIRE(boost::contains(s.get_ir(), "heyoka.taylor_c_diff.relu.var"));
-                            REQUIRE(boost::contains(s.get_ir(), "heyoka.taylor_c_diff.relup.var"));
+                            REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.relu.var"));
+                            REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.relup.var"));
                         }
 
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+                        ta.step(true);
 
-                        std::vector<fp_t> jet{fp_t{2, prec}, fp_t{-1, prec}};
-                        jet.resize(6, fp_t(0, prec));
-
-                        jptr(jet.data(), nullptr, nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == 2);
                         REQUIRE(jet[1] == -1);
@@ -91,25 +87,22 @@ TEST_CASE("relu leaky")
                 for (auto opt_level : {0u, 3u}) {
                     // Test with num/param/var.
                     {
-                        llvm_state s{kw::opt_level = opt_level};
-
-                        taylor_add_jet<fp_t>(s, "jet", {relu(x, 0.01) + relup(y, 0.02), x + y}, 2, 1, ha, cm, {}, false,
-                                             prec);
-
-                        s.compile();
+                        auto ta = taylor_adaptive<fp_t>{{prime(x) = relu(x, 0.01) + relup(y, 0.02), prime(y) = x + y},
+                                                        {fp_t{-2, prec}, fp_t{-1, prec}},
+                                                        kw::tol = 1,
+                                                        kw::high_accuracy = ha,
+                                                        kw::compact_mode = cm,
+                                                        kw::opt_level = opt_level};
 
                         if (opt_level == 0u && cm) {
-                            REQUIRE(boost::contains(s.get_ir(), "heyoka.taylor_c_diff.relu_0x"));
-                            REQUIRE(boost::contains(s.get_ir(), "heyoka.taylor_c_diff.relup_0x"));
-                            REQUIRE(boost::contains(s.get_ir(), ".var"));
+                            REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.relu_0x"));
+                            REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.relup_0x"));
+                            REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), ".var"));
                         }
 
-                        auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+                        ta.step(true);
 
-                        std::vector<fp_t> jet{fp_t{-2, prec}, fp_t{-1, prec}};
-                        jet.resize(6, fp_t(0, prec));
-
-                        jptr(jet.data(), nullptr, nullptr);
+                        const auto jet = tc_to_jet(ta);
 
                         REQUIRE(jet[0] == -2);
                         REQUIRE(jet[1] == -1);

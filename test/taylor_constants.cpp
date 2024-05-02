@@ -8,13 +8,10 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <cmath>
 #include <initializer_list>
 #include <random>
-#include <sstream>
 #include <tuple>
-#include <vector>
 
 #include <boost/math/constants/constants.hpp>
 
@@ -26,7 +23,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/constants.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/taylor.hpp>
@@ -62,51 +58,6 @@ const mppp::real128 pi_const<mppp::real128> = mppp::pi_128;
 
 #endif
 
-template <typename T, typename U>
-void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
-{
-    for (auto batch_size : {2u, 4u, 8u, 5u}) {
-        llvm_state s{kw::opt_level = opt_level};
-
-        taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy, compact_mode);
-        taylor_add_jet<T>(s, "jet_scalar", sys, 3, 1, high_accuracy, compact_mode);
-
-        s.compile();
-
-        auto jptr_batch = reinterpret_cast<void (*)(T *, const T *, const T *)>(s.jit_lookup("jet_batch"));
-        auto jptr_scalar = reinterpret_cast<void (*)(T *, const T *, const T *)>(s.jit_lookup("jet_scalar"));
-
-        std::vector<T> jet_batch, time_batch;
-        jet_batch.resize(8 * batch_size);
-        time_batch.resize(batch_size);
-        std::uniform_real_distribution<float> dist(.1f, 20.f);
-        std::generate(jet_batch.begin(), jet_batch.end(), [&dist]() { return T{dist(rng)}; });
-        std::generate(time_batch.begin(), time_batch.end(), [&dist]() { return T{dist(rng)}; });
-
-        std::vector<T> jet_scalar;
-        T time_scalar(0);
-        jet_scalar.resize(8);
-
-        jptr_batch(jet_batch.data(), nullptr, time_batch.data());
-
-        for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
-            // Assign the initial values of x and y.
-            for (auto i = 0u; i < 2u; ++i) {
-                jet_scalar[i] = jet_batch[i * batch_size + batch_idx];
-            }
-
-            // Assign the time.
-            time_scalar = time_batch[batch_idx];
-
-            jptr_scalar(jet_scalar.data(), nullptr, &time_scalar);
-
-            for (auto i = 2u; i < 8u; ++i) {
-                REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx]));
-            }
-        }
-    }
-}
-
 TEST_CASE("taylor constant")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
@@ -115,20 +66,16 @@ TEST_CASE("taylor constant")
         auto x = "x"_var, y = "y"_var;
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = hy::pi, prime(y) = x + y},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {hy::pi, x + y}, 1, 1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(4);
-
-            fp_t t(4);
-
-            jptr(jet.data(), nullptr, &t);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -137,20 +84,17 @@ TEST_CASE("taylor constant")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = hy::pi, prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {hy::pi, x + y}, 1, 2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}};
-            jet.resize(8);
-
-            std::vector<fp_t> t{fp_t{-5}, fp_t{6}};
-
-            jptr(jet.data(), nullptr, t.data());
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);
@@ -166,20 +110,16 @@ TEST_CASE("taylor constant")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = hy::pi, prime(y) = x + y},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = .5,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {hy::pi, x + y}, 2, 1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(6);
-
-            fp_t t(-4);
-
-            jptr(jet.data(), nullptr, &t);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -190,20 +130,17 @@ TEST_CASE("taylor constant")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = hy::pi + x, prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}},
+                                                  2,
+                                                  kw::tol = .5,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {hy::pi + x, x + y}, 2, 2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}};
-            jet.resize(12);
-
-            std::vector<fp_t> t{fp_t{-5}, fp_t{6}};
-
-            jptr(jet.data(), nullptr, t.data());
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);
@@ -225,20 +162,17 @@ TEST_CASE("taylor constant")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = hy::pi + x, prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-2}, fp_t{1}, fp_t{3}, fp_t{-3}, fp_t{0}},
+                                                  3,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x + hy::pi, x + y}, 3, 3, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{1}, fp_t{3}, fp_t{-3}, fp_t{0}};
-            jet.resize(24);
-
-            std::vector<fp_t> t{fp_t{-5}, fp_t{6}, fp_t{-1}};
-
-            jptr(jet.data(), nullptr, t.data());
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);
@@ -274,7 +208,8 @@ TEST_CASE("taylor constant")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({x + hy::pi, x + y}, opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({prime(x) = x + hy::pi, prime(y) = x + y}, opt_level, high_accuracy, compact_mode,
+                                   rng, .1f, 20.f);
     };
 
     for (auto cm : {false, true}) {

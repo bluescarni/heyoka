@@ -8,14 +8,12 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <cmath>
 #include <initializer_list>
 #include <limits>
 #include <random>
 #include <tuple>
 #include <utility>
-#include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/cstdint.hpp>
@@ -30,7 +28,6 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/kepE.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
@@ -72,53 +69,12 @@ auto bmt_inv_kep_E = [](auto ecc, auto M) {
                                                       std::numeric_limits<fp_t>::digits - 2, max_iter);
 };
 
-template <typename T, typename U>
-void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
-{
-    for (auto batch_size : {2u, 4u, 8u, 5u}) {
-        llvm_state s{kw::opt_level = opt_level};
-
-        taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy, compact_mode);
-        taylor_add_jet<T>(s, "jet_scalar", sys, 3, 1, high_accuracy, compact_mode);
-
-        s.compile();
-
-        auto jptr_batch = reinterpret_cast<void (*)(T *, const T *, const T *)>(s.jit_lookup("jet_batch"));
-        auto jptr_scalar = reinterpret_cast<void (*)(T *, const T *, const T *)>(s.jit_lookup("jet_scalar"));
-
-        std::vector<T> jet_batch;
-        jet_batch.resize(8 * batch_size);
-        std::uniform_real_distribution<float> dist(.1f, .9f);
-        std::generate(jet_batch.begin(), jet_batch.end(), [&dist]() { return T{dist(rng)}; });
-
-        std::vector<T> jet_scalar;
-        jet_scalar.resize(8);
-
-        jptr_batch(jet_batch.data(), nullptr, nullptr);
-
-        for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
-            // Assign the initial values of x and y.
-            for (auto i = 0u; i < 2u; ++i) {
-                jet_scalar[i] = jet_batch[i * batch_size + batch_idx];
-            }
-
-            jptr_scalar(jet_scalar.data(), nullptr, nullptr);
-
-            for (auto i = 2u; i < 8u; ++i) {
-                REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx], T(10000)));
-            }
-        }
-    }
-}
-
 // Issue in the decomposition when e = 0.
 TEST_CASE("taylor kepE decompose bug 00")
 {
-    llvm_state s;
-
     auto M = "M"_var;
 
-    taylor_add_jet<double>(s, "jet", {kepE(0_dbl, M)}, 1, 1, false, false);
+    auto ta = taylor_adaptive<double>({prime(M) = kepE(0_dbl, M)}, {0.}, kw::tol = 1.);
 }
 
 TEST_CASE("taylor kepE")
@@ -139,23 +95,21 @@ TEST_CASE("taylor kepE")
 
         // Number-number tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, expression{number{b}}), x + y}, 1, 1,
-                                 high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = kepE(expression{number{a}}, expression{number{b}}), prime(y) = x + y},
+                {fp_t(2), fp_t(3)},
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepE.num_num"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepE.num_num"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(4);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -164,21 +118,17 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = kepE(par[0], expression{number{b}}), prime(y) = x + y},
+                                            {fp_t(2), fp_t(3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level,
+                                            kw::pars = {a}};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(par[0], expression{number{b}}), x + y}, 1, 1, high_accuracy,
-                                 compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(4);
-
-            std::vector<fp_t> pars{a};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -187,19 +137,18 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = kepE(expression{number{a}}, expression{number{b}}), prime(y) = x + y},
+                {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}},
+                2,
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, expression{number{b}}), x + y}, 1, 2,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}};
-            jet.resize(8);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -215,21 +164,18 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = kepE(expression{number{a}}, par[1]), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {fp_t{0}, fp_t{0}, b, b}};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, par[1]), x + y}, 1, 2, high_accuracy,
-                                 compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}};
-            jet.resize(8);
-
-            std::vector<fp_t> pars{fp_t{0}, fp_t{0}, b, b};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -245,19 +191,17 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = kepE(expression{number{a}}, expression{number{b}}), prime(y) = x + y},
+                {fp_t(2), fp_t(3)},
+                kw::tol = .5,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, expression{number{b}}), x + y}, 2, 1,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
-            jet.resize(6);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -268,19 +212,18 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = kepE(expression{number{a}}, expression{number{b}}), prime(y) = x + y},
+                {fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}},
+                2,
+                kw::tol = .5,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, expression{number{b}}), x + y}, 2, 2,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}};
-            jet.resize(12);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -302,20 +245,18 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = kepE(par[0], par[1]), prime(y) = x + y},
+                                                  {fp_t{2}, fp_t{-1}, fp_t{-4}, fp_t{3}, fp_t{5}, fp_t{6}},
+                                                  3,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level,
+                                                  kw::pars = {a, a, a, b, b, b}};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(par[0], par[1]), x + y}, 3, 3, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{-4}, fp_t{3}, fp_t{5}, fp_t{6}};
-            jet.resize(24);
-
-            std::vector<fp_t> pars{a, a, a, b, b, b};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -1);
@@ -351,28 +292,26 @@ TEST_CASE("taylor kepE")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({kepE(expression{number{a}}, expression{number{b}}), x + y}, opt_level,
-                                   high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({prime(x) = kepE(expression{number{a}}, expression{number{b}}), prime(y) = x + y},
+                                   opt_level, high_accuracy, compact_mode, rng, .2f, .9f, fp_t(10000));
 
         // Variable-number tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {kepE(y, expression{number{a}}), kepE(x, expression{number{b}})}, 1, 1,
-                                 high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = kepE(y, expression{number{a}}), prime(y) = kepE(x, expression{number{b}})},
+                {fp_t(.2), fp_t(.3)},
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepE.var_num"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepE.var_num"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(4);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -381,21 +320,17 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = kepE(y, par[0]), prime(y) = kepE(x, expression{number{b}})},
+                                            {fp_t(.2), fp_t(.3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level,
+                                            kw::pars = {a}};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(y, par[0]), kepE(x, expression{number{b}})}, 1, 1, high_accuracy,
-                                 compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(4);
-
-            std::vector<fp_t> pars{a};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -404,19 +339,18 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = kepE(y, expression{number{b}}), prime(y) = kepE(x, expression{number{b}})},
+                {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                2,
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(y, expression{number{b}}), kepE(x, expression{number{b}})}, 1, 2,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(8);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -432,21 +366,19 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta
+                = taylor_adaptive_batch<fp_t>{{prime(x) = kepE(y, expression{number{b}}), prime(y) = kepE(x, par[1])},
+                                              {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                                              2,
+                                              kw::tol = 1,
+                                              kw::high_accuracy = high_accuracy,
+                                              kw::compact_mode = compact_mode,
+                                              kw::opt_level = opt_level,
+                                              kw::pars = {fp_t{0}, fp_t{0}, b, b}};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(y, expression{number{b}}), kepE(x, par[1])}, 1, 2, high_accuracy,
-                                 compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(8);
-
-            std::vector<fp_t> pars{fp_t{0}, fp_t{0}, b, b};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -462,19 +394,17 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = kepE(y, expression{number{b}}), prime(y) = kepE(x, expression{number{b}})},
+                {fp_t(.2), fp_t(.3)},
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(y, expression{number{b}}), kepE(x, expression{number{b}})}, 2, 1,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(6);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -485,19 +415,18 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = kepE(y, expression{number{b}}), prime(y) = kepE(x, expression{number{b}})},
+                {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                2,
+                kw::tol = .5,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(y, expression{number{b}}), kepE(x, expression{number{b}})}, 2, 2,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(12);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -519,19 +448,18 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = kepE(y, expression{number{b}}), prime(y) = kepE(x, expression{number{b}})},
+                {fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)},
+                3,
+                kw::tol = .1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(y, expression{number{b}}), kepE(x, expression{number{b}})}, 3, 3,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)};
-            jet.resize(24);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -609,28 +537,27 @@ TEST_CASE("taylor kepE")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({kepE(y, expression{number{b}}), kepE(x, expression{number{b}})}, opt_level,
-                                   high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>(
+            {prime(x) = kepE(y, expression{number{b}}), prime(y) = kepE(x, expression{number{b}})}, opt_level,
+            high_accuracy, compact_mode, rng, .2f, .9f, fp_t(10000));
 
         // Number-variable tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, y), kepE(expression{number{c}}, x)}, 1, 1,
-                                 high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = kepE(expression{number{a}}, y), prime(y) = kepE(expression{number{c}}, x)},
+                {fp_t(.2), fp_t(.3)},
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepE.num_var"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepE.num_var"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(4);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -639,21 +566,17 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = kepE(par[0], y), prime(y) = kepE(expression{number{c}}, x)},
+                                            {fp_t(.2), fp_t(.3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level,
+                                            kw::pars = {a}};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(par[0], y), kepE(expression{number{c}}, x)}, 1, 1, high_accuracy,
-                                 compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(4);
-
-            std::vector<fp_t> pars{a};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -662,19 +585,18 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = kepE(expression{number{a}}, y), prime(y) = kepE(expression{number{c}}, x)},
+                {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                2,
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, y), kepE(expression{number{c}}, x)}, 1, 2,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(8);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -690,21 +612,19 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta
+                = taylor_adaptive_batch<fp_t>{{prime(x) = kepE(expression{number{a}}, y), prime(y) = kepE(par[1], x)},
+                                              {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                                              2,
+                                              kw::tol = 1,
+                                              kw::high_accuracy = high_accuracy,
+                                              kw::compact_mode = compact_mode,
+                                              kw::opt_level = opt_level,
+                                              kw::pars = {fp_t{0}, fp_t{0}, c, c}};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, y), kepE(par[1], x)}, 1, 2, high_accuracy,
-                                 compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(8);
-
-            std::vector<fp_t> pars{fp_t{0}, fp_t{0}, c, c};
-
-            jptr(jet.data(), pars.data(), nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -720,19 +640,17 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = kepE(expression{number{a}}, y), prime(y) = kepE(expression{number{c}}, x)},
+                {fp_t(.2), fp_t(.3)},
+                kw::tol = 1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, y), kepE(expression{number{c}}, x)}, 2, 1,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(6);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -743,19 +661,18 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = kepE(expression{number{a}}, y), prime(y) = kepE(expression{number{c}}, x)},
+                {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                2,
+                kw::tol = .5,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, y), kepE(expression{number{c}}, x)}, 2, 2,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(12);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -777,19 +694,18 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{
+                {prime(x) = kepE(expression{number{a}}, y), prime(y) = kepE(expression{number{c}}, x)},
+                {fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)},
+                3,
+                kw::tol = .1,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, y), kepE(expression{number{c}}, x)}, 3, 3,
-                                 high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)};
-            jet.resize(24);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -843,27 +759,26 @@ TEST_CASE("taylor kepE")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({kepE(expression{number{a}}, y), kepE(expression{number{c}}, x)}, opt_level,
-                                   high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>(
+            {prime(x) = kepE(expression{number{a}}, y), prime(y) = kepE(expression{number{c}}, x)}, opt_level,
+            high_accuracy, compact_mode, rng, .2f, .9f, fp_t(10000));
 
         // Variable-variable tests.
         {
-            llvm_state s{kw::opt_level = opt_level};
-
-            taylor_add_jet<fp_t>(s, "jet", {kepE(x, y), kepE(y, x)}, 1, 1, high_accuracy, compact_mode);
-
-            s.compile();
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = kepE(x, y), prime(y) = kepE(y, x)},
+                                            {fp_t(.2), fp_t(.3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level};
 
             if (opt_level == 0u && compact_mode) {
-                REQUIRE(boost::contains(s.get_ir(), "@heyoka.taylor_c_diff.kepE.var_var"));
+                REQUIRE(boost::contains(ta.get_llvm_state().get_ir(), "@heyoka.taylor_c_diff.kepE.var_var"));
             }
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+            ta.step(true);
 
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(4);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -872,18 +787,17 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = kepE(x, y), prime(y) = kepE(y, x)},
+                                                  {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                                                  2,
+                                                  kw::tol = 1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(x, y), kepE(y, x)}, 1, 2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(8);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -899,18 +813,16 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive<fp_t>{{prime(x) = kepE(x, y), prime(y) = kepE(y, x)},
+                                            {fp_t(.2), fp_t(.3)},
+                                            kw::tol = 1,
+                                            kw::high_accuracy = high_accuracy,
+                                            kw::compact_mode = compact_mode,
+                                            kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(x, y), kepE(y, x)}, 2, 1, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t(.3)};
-            jet.resize(6);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.3));
@@ -923,18 +835,17 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = kepE(x, y), prime(y) = kepE(y, x)},
+                                                  {fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)},
+                                                  2,
+                                                  kw::tol = .5,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(x, y), kepE(y, x)}, 2, 2, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.3), fp_t(.4)};
-            jet.resize(12);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -960,18 +871,17 @@ TEST_CASE("taylor kepE")
         }
 
         {
-            llvm_state s{kw::opt_level = opt_level};
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = kepE(x, y), prime(y) = kepE(y, x)},
+                                                  {fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)},
+                                                  3,
+                                                  kw::tol = .1,
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::compact_mode = compact_mode,
+                                                  kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(x, y), kepE(y, x)}, 3, 3, high_accuracy, compact_mode);
+            ta.step(true);
 
-            s.compile();
-
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
-
-            std::vector<fp_t> jet{fp_t(.2), fp_t{.5}, fp_t(.1), fp_t(.3), fp_t(.4), fp_t(.6)};
-            jet.resize(24);
-
-            jptr(jet.data(), nullptr, nullptr);
+            const auto jet = tc_to_jet(ta);
 
             REQUIRE(jet[0] == fp_t(.2));
             REQUIRE(jet[1] == fp_t(.5));
@@ -1049,6 +959,10 @@ TEST_CASE("taylor kepE")
                                           * (jet[5] * 2 * jet[17] * sin(jet[11]) - jet[11] * cos(jet[11])))
                                  / ((1 - jet[5] * cos(jet[11])) * (1 - jet[5] * cos(jet[11])))));
         }
+
+        // Do the batch/scalar comparison.
+        compare_batch_scalar<fp_t>({prime(x) = kepE(x, y), prime(y) = kepE(y, x)}, opt_level, high_accuracy,
+                                   compact_mode, rng, .2f, .9f, fp_t(10000));
     };
 
     for (auto cm : {true, false}) {

@@ -75,24 +75,25 @@ constexpr bool skip_batch_ld =
 // as a special case of multiplication.
 auto square_wrapper(const expression &x)
 {
-    return x * x;
+    return pow(x, 2_dbl);
 }
 
 TEST_CASE("asin diff var")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(asin(x * x - y), x) == pow(1. - square_wrapper(square_wrapper(x) - y), -.5) * (2. * x));
-    REQUIRE(diff(asin(x * x + y), y) == pow(1. - square_wrapper(square_wrapper(x) + y), -.5));
+    REQUIRE(diff(asin(square_wrapper(x) - y), x) == pow(1. - square_wrapper(square_wrapper(x) - y), -.5) * (2_dbl * x));
+    REQUIRE(diff(asin(square_wrapper(x) + y), y) == pow(1. - square_wrapper(square_wrapper(x) + y), -.5));
 }
 
 TEST_CASE("asin diff par")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(asin(par[0] * par[0] - y), par[0])
-            == pow(1. - square_wrapper(square_wrapper(par[0]) - y), -.5) * (2. * par[0]));
-    REQUIRE(diff(asin(x * x + par[1]), par[1]) == pow(1. - square_wrapper(square_wrapper(x) + par[1]), -.5));
+    REQUIRE(diff(asin(square_wrapper(par[0]) - y), par[0])
+            == pow(1. - square_wrapper(square_wrapper(par[0]) - y), -.5) * (2_dbl * par[0]));
+    REQUIRE(diff(asin(square_wrapper(x) + par[1]), par[1])
+            == pow(1. - square_wrapper(square_wrapper(x) + par[1]), -.5));
 }
 
 TEST_CASE("asin s11n")
@@ -218,14 +219,6 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
-
-TEST_CASE("normalise")
-{
-    auto x = make_vars("x");
-
-    REQUIRE(normalise(asin(x)) == asin(x));
-    REQUIRE(normalise(subs(asin(x), {{x, .1_dbl}})) == asin(.1_dbl));
-}
 
 // Tests to check vectorisation via the vector-function-abi-variant machinery.
 TEST_CASE("vfabi double")

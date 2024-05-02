@@ -48,22 +48,17 @@ TEST_CASE("diff decompose")
     REQUIRE(detail::diff_decompose({par[0]}).first == std::vector{par[0], "u_0"_var});
     REQUIRE(detail::diff_decompose({par[0]}).second == 1u);
 
-    REQUIRE(detail::diff_decompose({par[0] + x}).first
-            == std::vector{x, par[0], subs("u_1"_var + "u_0"_var, {{"u_1"_var, "u_0"_var}, {"u_0"_var, "u_1"_var}}),
-                           "u_2"_var});
+    REQUIRE(detail::diff_decompose({par[0] + x}).first == std::vector{x, par[0], "u_1"_var + "u_0"_var, "u_2"_var});
     REQUIRE(detail::diff_decompose({par[0] + x}).second == 2u);
 
     REQUIRE(detail::diff_decompose({(par[1] + y) * (par[0] + x)}).first
-            == std::vector{x, y, par[0], par[1],
-                           subs("u_2"_var + "u_0"_var, {{"u_2"_var, "u_0"_var}, {"u_0"_var, "u_2"_var}}),
-                           subs("u_3"_var + "u_1"_var, {{"u_1"_var, "u_3"_var}, {"u_3"_var, "u_1"_var}}),
-                           "u_5"_var * "u_4"_var, "u_6"_var});
+            == std::vector{x, y, par[0], par[1], "u_2"_var + "u_0"_var, "u_3"_var + "u_1"_var, "u_5"_var * "u_4"_var,
+                           "u_6"_var});
     REQUIRE(detail::diff_decompose({(par[1] + y) * (par[0] + x)}).second == 4u);
 
     REQUIRE(detail::diff_decompose({subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})}).first
-            == std::vector{x, par[0], par[1],
-                           subs("u_1"_var + "u_0"_var, {{"u_1"_var, "u_0"_var}, {"u_0"_var, "u_1"_var}}),
-                           subs("u_2"_var + y, {{y, 1_dbl}}), "u_4"_var * "u_3"_var, "u_5"_var});
+            == std::vector{x, par[0], par[1], "u_1"_var + "u_0"_var, subs("u_2"_var + y, {{y, 1_dbl}}),
+                           "u_4"_var * "u_3"_var, "u_5"_var});
     REQUIRE(detail::diff_decompose({subs((par[1] + y) * (par[0] + x), {{y, 1_dbl}})}).second == 3u);
 }
 
@@ -212,20 +207,12 @@ TEST_CASE("diff_tensors basic")
     REQUIRE(dt.size() == 12u);
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{x + y, x * y * y});
-    assign_sr(dt.get_derivatives(1));
-    REQUIRE(normalise(unfix(diff_vec)) == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
-    assign_sr(dt.get_derivatives(2));
-    REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * x});
 
     dt = diff_tensors({x + y, x * y * y}, diff_args::vars, kw::diff_order = 2);
     REQUIRE(dt.get_nargs() == 2u);
     REQUIRE(dt.size() == 12u);
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{x + y, x * y * y});
-    assign_sr(dt.get_derivatives(1));
-    REQUIRE(normalise(unfix(diff_vec)) == std::vector{1_dbl, 1_dbl, y * y, sum({(y * x), (x * y)})});
-    assign_sr(dt.get_derivatives(2));
-    REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 2. * y, 2. * x});
 
     // Diff wrt some variables.
     dt = diff_tensors({x + y, x * y * y}, {x}, kw::diff_order = 2);
@@ -233,10 +220,6 @@ TEST_CASE("diff_tensors basic")
     REQUIRE(dt.size() == 6u);
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{x + y, x * y * y});
-    assign_sr(dt.get_derivatives(1));
-    REQUIRE(normalise(unfix(diff_vec)) == std::vector{1_dbl, y * y});
-    assign_sr(dt.get_derivatives(2));
-    REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, 0_dbl});
 
     // Diff wrt all params.
     dt = diff_tensors({par[0] + y, x * y * par[1]}, diff_args::params, kw::diff_order = 2);
@@ -244,8 +227,6 @@ TEST_CASE("diff_tensors basic")
     REQUIRE(dt.size() == 12u);
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{par[0] + y, x * y * par[1]});
-    assign_sr(dt.get_derivatives(1));
-    REQUIRE(normalise(unfix(diff_vec)) == std::vector{1_dbl, 0_dbl, 0_dbl, x * y});
     assign_sr(dt.get_derivatives(2));
     REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl, 0_dbl});
 
@@ -255,8 +236,6 @@ TEST_CASE("diff_tensors basic")
     REQUIRE(dt.size() == 6u);
     assign_sr(dt.get_derivatives(0));
     REQUIRE(diff_vec == std::vector{par[0] + y, x * y * par[1]});
-    assign_sr(dt.get_derivatives(1));
-    REQUIRE(normalise(unfix(diff_vec)) == std::vector{0_dbl, x * y});
     assign_sr(dt.get_derivatives(2));
     REQUIRE(diff_vec == std::vector{0_dbl, 0_dbl});
 

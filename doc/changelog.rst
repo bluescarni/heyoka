@@ -1,13 +1,46 @@
 Changelog
 =========
 
-4.1.0 (unreleased)
+5.0.0 (unreleased)
 ------------------
 
 New
 ~~~
 
+- Add a vectorised implementation for ``diff()``
+  (`#411 <https://github.com/bluescarni/heyoka/pull/411>`__).
+- Add mutable ranges getters for the state and pars data of the adaptive
+  integrators (`#409 <https://github.com/bluescarni/heyoka/pull/409>`__).
 - Support LLVM 18 (`#408 <https://github.com/bluescarni/heyoka/pull/408>`__).
+
+Changes
+~~~~~~~
+
+- Several automatic simplifications and normalisations in the expression
+  system have been removed as they caused drastic slowdowns in symbolic operations
+  when working with large and highly recursive computational graphs
+  (`#412 <https://github.com/bluescarni/heyoka/pull/412>`__).
+- Remove the (undocumented) ``taylor_add_jet()`` function and rework
+  the unit test code to use ``taylor_adaptive`` instead
+  (`#409 <https://github.com/bluescarni/heyoka/pull/409>`__).
+
+Fix
+~~~
+
+- Fix test failures on OSX arm64
+  (`#409 <https://github.com/bluescarni/heyoka/pull/409>`__).
+
+4.0.3 (2024-04-04)
+------------------
+
+Fix
+~~~
+
+- Workaround compilation failures in the unit tests
+  when using GCC 13
+  (`#409 <https://github.com/bluescarni/heyoka/pull/409>`__).
+- Fix compilation on FreeBSD
+  (`#407 <https://github.com/bluescarni/heyoka/pull/407>`__).
 
 4.0.2 (2024-03-03)
 ------------------

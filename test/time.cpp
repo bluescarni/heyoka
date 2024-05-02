@@ -85,10 +85,10 @@ TEST_CASE("time diff")
     auto x = "x"_var;
 
     REQUIRE(diff(heyoka::time * cos(2. * x + 2. * heyoka::time), "x")
-            == heyoka::time * (-2. * sin(2. * x + 2. * heyoka::time)));
+            == heyoka::time * (2. * -sin(2. * x + 2. * heyoka::time)));
 
     REQUIRE(diff(heyoka::time * cos(2. * par[0] + 2. * heyoka::time), par[0])
-            == heyoka::time * (-2. * sin(2. * par[0] + 2. * heyoka::time)));
+            == heyoka::time * (2. * -sin(2. * par[0] + 2. * heyoka::time)));
 }
 
 TEST_CASE("time s11n")

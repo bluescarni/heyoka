@@ -42,6 +42,7 @@
 #include <heyoka/math/constants.hpp>
 #include <heyoka/math/erf.hpp>
 #include <heyoka/math/exp.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -86,12 +87,12 @@ TEST_CASE("erf diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(erf(x * x - y), x) == (2_dbl / sqrt(pi) * exp((-(x * x - y) * (x * x - y)))) * (2. * x));
-    REQUIRE(diff(erf(x * x + y), y) == (2_dbl / sqrt(pi) * exp((-(x * x + y) * (x * x + y)))));
+    REQUIRE(diff(erf(x * x - y), x) == (2_dbl / sqrt(pi) * exp(-pow(x * x - y, 2_dbl))) * (x + x));
+    REQUIRE(diff(erf(x * x + y), y) == (2_dbl / sqrt(pi) * exp(-pow(x * x + y, 2_dbl))));
 
     REQUIRE(diff(erf(par[0] * par[0] - y), par[0])
-            == (2_dbl / sqrt(pi) * exp((-(par[0] * par[0] - y) * (par[0] * par[0] - y)))) * (2. * par[0]));
-    REQUIRE(diff(erf(x * x + par[1]), par[1]) == (2_dbl / sqrt(pi) * exp((-(x * x + par[1]) * (x * x + par[1])))));
+            == (2_dbl / sqrt(pi) * exp((-pow(par[0] * par[0] - y, 2_dbl)))) * (par[0] + par[0]));
+    REQUIRE(diff(erf(x * x + par[1]), par[1]) == (2_dbl / sqrt(pi) * exp((-pow(x * x + par[1], 2_dbl)))));
 }
 
 TEST_CASE("erf s11n")
@@ -217,14 +218,6 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
-
-TEST_CASE("normalise")
-{
-    auto x = make_vars("x");
-
-    REQUIRE(normalise(erf(x)) == erf(x));
-    REQUIRE(normalise(subs(erf(x), {{x, 1.5_dbl}})) == erf(1.5_dbl));
-}
 
 // Tests to check vectorisation via the vector-function-abi-variant machinery.
 TEST_CASE("vfabi double")

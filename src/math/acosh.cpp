@@ -65,13 +65,7 @@ acosh_impl::acosh_impl() : acosh_impl(0_dbl) {}
 std::vector<expression> acosh_impl::gradient() const
 {
     assert(args().size() == 1u);
-    return {pow(args()[0] * args()[0] - 1_dbl, -.5)};
-}
-
-[[nodiscard]] expression acosh_impl::normalise() const
-{
-    assert(args().size() == 1u);
-    return acosh(args()[0]);
+    return {pow(pow(args()[0], 2_dbl) - 1_dbl, -.5)};
 }
 
 llvm::Value *acosh_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
@@ -106,7 +100,7 @@ taylor_dc_t::size_type acosh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 1u);
 
     // Append arg * arg.
-    u_vars_defs.emplace_back(args()[0] * args()[0], std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(pow(args()[0], 2_dbl), std::vector<std::uint32_t>{});
 
     // Append arg * arg - 1.
     u_vars_defs.emplace_back(expression{fmt::format("u_{}", u_vars_defs.size() - 1u)} - 1_dbl,

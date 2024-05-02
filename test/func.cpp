@@ -37,6 +37,8 @@
 
 using namespace heyoka;
 
+using smap_t = std::unordered_map<std::string, expression>;
+
 struct func_00 : func_base {
     func_00() : func_base("f", {}) {}
     func_00(const std::string &name) : func_base(name, {}) {}
@@ -444,10 +446,10 @@ TEST_CASE("func subs")
     auto f2 = subs(expression{f1}, std::unordered_map<std::string, expression>{});
     REQUIRE(f2 == expression{f1});
 
-    f2 = subs(expression{f1}, {{"x", "z"_var}});
+    f2 = subs(expression{f1}, smap_t{{"x", "z"_var}});
     REQUIRE(f2 == expression{func(func_15{{"z"_var, "y"_var}})});
 
-    f2 = subs(expression{f1}, {{"x", "z"_var}, {"y", 42_dbl}});
+    f2 = subs(expression{f1}, smap_t{{"x", "z"_var}, {"y", 42_dbl}});
     REQUIRE(f2 == expression{func(func_15{{"z"_var, 42_dbl}})});
 }
 
@@ -573,17 +575,17 @@ TEST_CASE("copy")
 
     // Error mode.
     REQUIRE_THROWS_MATCHES(
-        expression{std::get<func>(foo.value()).copy({x, y})}, std::invalid_argument,
-        Message("The set of new arguments passed to func::copy() has a size of 2, but the number of arguments "
-                "of the original function is 3 (the two sizes must be equal)"));
+        expression{std::get<func>(foo.value()).copy({x})}, std::invalid_argument,
+        Message("The set of new arguments passed to func::copy() has a size of 1, but the number of arguments "
+                "of the original function is 2 (the two sizes must be equal)"));
 
-    auto foo_copy = expression{std::get<func>(foo.value()).copy({x, y, z})};
+    auto foo_copy = expression{std::get<func>(foo.value()).copy({x, y})};
 
     // Check that copy creates a new obejct.
     REQUIRE(std::get<func>(foo_copy.value()).get_ptr() != std::get<func>(foo.value()).get_ptr());
 
     // Check the new arguments.
-    REQUIRE(std::get<func>(foo_copy.value()).args() == std::vector{x, y, z});
+    REQUIRE(std::get<func>(foo_copy.value()).args() == std::vector{x, y});
 }
 
 // Bug: a default-constructed function is not serialisable.

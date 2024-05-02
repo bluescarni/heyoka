@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 4.0.2 LANGUAGES CXX C)
+project(heyoka VERSION 5.0.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -202,7 +202,6 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_diff.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_ops.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_cfunc.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/expression_fix.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lagrangian.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/hamiltonian.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
@@ -323,7 +322,7 @@ if(HEYOKA_WITH_SLEEF)
 endif()
 
 # Setup the heyoka ABI version number.
-set(HEYOKA_ABI_VERSION 27)
+set(HEYOKA_ABI_VERSION 28)
 
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.

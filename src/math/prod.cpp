@@ -20,8 +20,6 @@
 
 #include <fmt/core.h>
 
-#include <oneapi/tbb/parallel_sort.h>
-
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
@@ -272,11 +270,6 @@ std::vector<expression> prod_impl::gradient() const
     }
 
     return retval;
-}
-
-[[nodiscard]] expression prod_impl::normalise() const
-{
-    return prod(args());
 }
 
 llvm::Value *prod_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
@@ -778,136 +771,6 @@ llvm::Function *prod_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, s
         args()[0].value(), args()[1].value());
 }
 
-// Simplify the arguments for a prod(). This function returns either the simplified vector of arguments,
-// or a single expression directly representing the result of the product.
-std::variant<std::vector<expression>, expression> prod_simplify_args(const std::vector<expression> &args_)
-{
-    // Step 1: flatten products in args.
-    std::vector<expression> args;
-    args.reserve(args_.size());
-    for (const auto &arg : args_) {
-        if (const auto *fptr = std::get_if<func>(&arg.value());
-            fptr != nullptr && fptr->extract<detail::prod_impl>() != nullptr) {
-            // Nested product.
-            for (const auto &prod_arg : fptr->args()) {
-                args.push_back(prod_arg);
-            }
-        } else {
-            args.push_back(arg);
-        }
-    }
-
-    // Step 2: gather equal expressions and common bases with numerical exponents.
-    // NOTE: we perform this step using a flat map that is sorted manually after
-    // construction. This allows us to use the less-than operator, which, wrt to hashing,
-    // can be more performant because it can exit early. Additionally, doing the sort
-    // afterwards is more parallelisable wrt using a std::map.
-    std::vector<std::pair<expression, number>> base_exp_map;
-    base_exp_map.reserve(args.size());
-
-    // NOTE: this does not seem to take long, we can always make it parallel if needed.
-    std::transform(args.begin(), args.end(), std::back_inserter(base_exp_map), [](const expression &arg) {
-        if (const auto *fptr = std::get_if<func>(&arg.value());
-            fptr != nullptr && fptr->extract<detail::pow_impl>() != nullptr
-            && std::holds_alternative<number>(fptr->args()[1].value())) {
-            // The current argument is of the form x**exp, where exp is a number.
-            const auto &exp = std::get<number>(fptr->args()[1].value());
-
-            return std::make_pair(fptr->args()[0], exp);
-        } else {
-            // The current arugment is *NOT* a base with numerical exponent,
-            // return it paired to an exponent of 1.
-            // NOTE: we are using double precision here, which guarantees a reasonable range
-            // of exactly-representable exponents (in case arg shows up many times).
-            return std::make_pair(arg, number{1.});
-        }
-    });
-
-    // Sort the map.
-    oneapi::tbb::parallel_sort(base_exp_map.begin(), base_exp_map.end(), [](const auto &p1, const auto &p2) {
-        return std::less<expression>{}(p1.first, p2.first);
-    });
-
-    // Gather duplicate bases.
-    std::vector<std::pair<expression, number>> new_base_exp_map;
-    new_base_exp_map.reserve(base_exp_map.size());
-
-    for (auto it = base_exp_map.begin(); it != base_exp_map.end(); ++it) {
-        // Add the current base-exponent pair.
-        new_base_exp_map.push_back(*it);
-
-        // Look forward for duplicate bases and gather them.
-        while (it + 1 != base_exp_map.end() && (it + 1)->first == it->first) {
-            new_base_exp_map.back().second = new_base_exp_map.back().second + (it + 1)->second;
-            ++it;
-        }
-    }
-
-    // Swap in the gathered bases.
-    new_base_exp_map.swap(base_exp_map);
-
-    // Reconstruct args from base_exp_map.
-    args.clear();
-    for (const auto &[base, exp] : base_exp_map) {
-        args.push_back(pow(base, expression{exp}));
-    }
-
-    // Step 3: partition args so that all numbers are at the end.
-    const auto n_end_it = std::stable_partition(
-        args.begin(), args.end(), [](const expression &ex) { return !std::holds_alternative<number>(ex.value()); });
-
-    // Constant fold the numbers.
-    if (n_end_it != args.end()) {
-        for (auto it = n_end_it + 1; it != args.end(); ++it) {
-            // NOTE: do not use directly operator*() on expressions in order
-            // to avoid recursion.
-            *n_end_it = expression{std::get<number>(n_end_it->value()) * std::get<number>(it->value())};
-        }
-
-        // Remove all numbers but the first one.
-        args.erase(n_end_it + 1, args.end());
-
-        // Handle the special cases in which the remaining number
-        // is zero or one.
-        if (is_one(std::get<number>(n_end_it->value()))) {
-            // The only remaining number is equal to one.
-            if (args.size() == 1u) {
-                assert(n_end_it == args.begin());
-
-                // This is also the only remaining term in the product,
-                // return it.
-                // NOTE: it is important to special-case this, because otherwise
-                // we will fall into the args().empty() special case below, which will
-                // forcibly convert the folded 1 constant into double precision.
-                return *n_end_it;
-            } else {
-                // Besides the number 1, there are other
-                // non-number terms in the product. Remove
-                // the number 1.
-                args.pop_back();
-            }
-        } else if (is_zero(std::get<number>(n_end_it->value()))) {
-            // The only remaining number is zero, the result
-            // of the multiplication will be zero too.
-            return *n_end_it;
-        }
-    }
-
-    // Special cases.
-    if (args.empty()) {
-        return 1_dbl;
-    }
-
-    if (args.size() == 1u) {
-        return std::move(args[0]);
-    }
-
-    // Sort the operands in canonical order.
-    oneapi::tbb::parallel_sort(args.begin(), args.end(), std::less<expression>{});
-
-    return args;
-}
-
 // Helper to split the input prod 'e' into nested prods, each
 // of which will have at most 'split' arguments.
 // If 'e' is not a prod, or if it is a prod with no more than
@@ -1157,35 +1020,64 @@ std::vector<expression> prod_to_div_taylor_diff(const std::vector<expression> &v
 } // namespace detail
 
 // NOLINTNEXTLINE(misc-no-recursion)
-expression prod(const std::vector<expression> &args_)
+expression prod(std::vector<expression> args)
 {
-    auto args = detail::prod_simplify_args(args_);
+    // Partition args so that all numbers are at the end.
+    const auto n_end_it = std::stable_partition(
+        args.begin(), args.end(), [](const expression &ex) { return !std::holds_alternative<number>(ex.value()); });
 
-    if (std::holds_alternative<expression>(args)) {
-        return std::move(std::get<expression>(args));
-    } else {
-        auto &v_args = std::get<std::vector<expression>>(args);
-
-        assert(v_args.size() >= 2u);
-
-        if (const auto *fptr = std::get_if<func>(&v_args[1].value());
-            fptr != nullptr && v_args.size() == 2u && std::holds_alternative<number>(v_args[0].value())
-            && fptr->extract<detail::sum_impl>() != nullptr) {
-            // Binary product of the form cf * sum(a, ...), with cf a numerical coefficient.
-            // Transform into sum(cf * a, ...).
-            const auto &cf = v_args[0];
-
-            std::vector<expression> new_sum_args;
-            new_sum_args.reserve(fptr->args().size());
-            for (const auto &orig_sum_arg : fptr->args()) {
-                new_sum_args.push_back(prod({cf, orig_sum_arg}));
-            }
-
-            return sum(new_sum_args);
+    // Constant fold the numbers.
+    if (n_end_it != args.end()) {
+        for (auto it = n_end_it + 1; it != args.end(); ++it) {
+            *n_end_it = expression{std::get<number>(n_end_it->value()) * std::get<number>(it->value())};
         }
 
-        return expression{func{detail::prod_impl{std::move(v_args)}}};
+        // Remove all numbers but the first one.
+        args.erase(n_end_it + 1, args.end());
+
+        // Handle the special cases in which the remaining number
+        // is zero or one.
+        if (is_one(std::get<number>(n_end_it->value()))) {
+            // The only remaining number is equal to one.
+            if (args.size() == 1u) {
+                assert(n_end_it == args.begin());
+
+                // This is also the only remaining term in the product,
+                // return it.
+                // NOTE: it is important to special-case this, because otherwise
+                // we will fall into the args().empty() special case below, which will
+                // forcibly convert the folded 1 constant into double precision.
+                return std::move(*n_end_it);
+            } else {
+                // Besides the number 1, there are other
+                // non-number terms in the product. Remove
+                // the number 1.
+                args.pop_back();
+            }
+        } else if (is_zero(std::get<number>(n_end_it->value()))) {
+            // The only remaining number is zero, the result
+            // of the multiplication will be zero too.
+            return std::move(*n_end_it);
+        }
     }
+
+    // Special cases.
+    if (args.empty()) {
+        return 1_dbl;
+    }
+
+    if (args.size() == 1u) {
+        return std::move(args[0]);
+    }
+
+    // Re-partition args so that all numbers are at the beginning.
+    // NOTE: this results in a semi-canonical representation of products
+    // in which numbers are at the beginning. This enables the detection
+    // of negations by checking if the first argument is -1.
+    std::stable_partition(args.begin(), args.end(),
+                          [](const expression &ex) { return std::holds_alternative<number>(ex.value()); });
+
+    return expression{func{detail::prod_impl{std::move(args)}}};
 }
 
 HEYOKA_END_NAMESPACE

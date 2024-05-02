@@ -150,21 +150,66 @@ expression diff(const expression &e, const param &p)
     return detail::diff(func_map, e, p);
 }
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-expression diff(const expression &e, const expression &x)
+namespace detail
+{
+
+namespace
+{
+
+std::vector<expression> diff_vec_impl(const std::vector<expression> &v_ex, const auto &x)
+{
+    funcptr_map<expression> func_map;
+
+    std::vector<expression> retval;
+    retval.reserve(v_ex.size());
+
+    for (const auto &ex : v_ex) {
+        retval.push_back(diff(func_map, ex, x));
+    }
+
+    return retval;
+}
+
+template <typename T>
+T diff_ex_impl(const T &input, const expression &x)
 {
     return std::visit(
-        [&e](const auto &v) -> expression {
-            if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
-                return diff(e, v.name());
-            } else if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, param>) {
-                return diff(e, v);
+        [&input](const auto &v) -> T {
+            if constexpr (std::is_same_v<std::remove_cvref_t<decltype(v)>, variable>) {
+                return diff(input, v.name());
+            } else if constexpr (std::is_same_v<std::remove_cvref_t<decltype(v)>, param>) {
+                return diff(input, v);
             } else {
                 throw std::invalid_argument(
                     "Derivatives are currently supported only with respect to variables and parameters");
             }
         },
         x.value());
+}
+
+} // namespace
+
+} // namespace detail
+
+std::vector<expression> diff(const std::vector<expression> &v_ex, const std::string &s)
+{
+    return detail::diff_vec_impl(v_ex, s);
+}
+
+std::vector<expression> diff(const std::vector<expression> &v_ex, const param &p)
+{
+    return detail::diff_vec_impl(v_ex, p);
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+expression diff(const expression &e, const expression &x)
+{
+    return detail::diff_ex_impl(e, x);
+}
+
+std::vector<expression> diff(const std::vector<expression> &v_ex, const expression &x)
+{
+    return detail::diff_ex_impl(v_ex, x);
 }
 
 namespace detail
@@ -214,12 +259,6 @@ diff_decompose(const std::vector<expression> &v_ex_)
     // of binary multiplications necessary to reconstruct an n-ary product
     // increases only linearly with the number of arguments.
     auto v_ex = detail::split_prods_for_decompose(v_ex_, 2u);
-
-    // Unfix: fix() calls are not necessary any more, they will just increase
-    // the decomposition's size and mess up the derivatives.
-    // NOTE: unfix is the last step, as we want to keep expressions
-    // fixed in the previous preprocessing steps.
-    v_ex = unfix(v_ex);
 
 #if !defined(NDEBUG)
 
@@ -687,20 +726,6 @@ void diff_tensors_forward_impl(
         std::fill(diffs.data() + diffs.size() - cur_nouts, diffs.data() + diffs.size(), 0_dbl);
 
         // Run the forward pass.
-        //
-        // NOTE: we need to tread lightly here. The forward pass consists
-        // of iteratively building up an expression from a seed value via
-        // multiplications and summations involving the adjoints. In order
-        // for the resulting expression to be able to be evaluated with
-        // optimal performance by heyoka, several automated simplifications in sums
-        // and products need to be disabled. One such example is the flattening
-        // of nested products, which destroys heyoka's ability to identify and
-        // eliminate redundant subexpressions via CSE. In order to disable automatic
-        // simplifications, we use fix(), with the caveat that fix() is *not*
-        // applied to number expressions (so that constant
-        // folding can still take place). Perhaps in the future it will be possible
-        // to enable further simplifications involving pars/vars, but, for now, let
-        // us play it conservatively.
         for (const auto cur_idx : sorted_in_deps) {
             tmp_sum.clear();
 
@@ -719,14 +744,14 @@ void diff_tensors_forward_impl(
                 if (d_idx != input_idx && in_deps.count(d_idx) == 0u) {
                     tmp_sum.push_back(0_dbl);
                 } else {
-                    auto new_term = fix_nn(fix_nn(diffs[d_idx]) * fix_nn(adj[cur_idx].find(d_idx)->second));
+                    auto new_term = diffs[d_idx] * adj[cur_idx].find(d_idx)->second;
                     tmp_sum.push_back(std::move(new_term));
                 }
             }
 
             assert(!tmp_sum.empty());
 
-            diffs[cur_idx] = fix_nn(sum(tmp_sum));
+            diffs[cur_idx] = sum(tmp_sum);
         }
 
         // Add the derivatives of all outputs wrt the current input
@@ -910,20 +935,6 @@ void diff_tensors_reverse_impl(
 
         // Run the reverse pass on all subexpressions which
         // the current output depends on.
-        //
-        // NOTE: we need to tread lightly here. The reverse pass consists
-        // of iteratively building up an expression from a seed value via
-        // multiplications and summations involving the adjoints. In order
-        // for the resulting expression to be able to be evaluated with
-        // optimal performance by heyoka, several automated simplifications in sums
-        // and products need to be disabled. One such example is the flattening
-        // of nested products, which destroys heyoka's ability to identify and
-        // eliminate redundant subexpressions via CSE. In order to disable automatic
-        // simplifications, we use fix(), with the caveat that fix() is *not*
-        // applied to number expressions (so that constant
-        // folding can still take place). Perhaps in the future it will be possible
-        // to enable further simplifications involving pars/vars, but, for now, let
-        // us play it conservatively.
         for (const auto cur_idx : sorted_out_deps) {
             tmp_sum.clear();
 
@@ -941,14 +952,14 @@ void diff_tensors_reverse_impl(
                 if (rd_idx != out_idx && out_deps.count(rd_idx) == 0u) {
                     tmp_sum.push_back(0_dbl);
                 } else {
-                    auto new_term = fix_nn(fix_nn(diffs[rd_idx]) * fix_nn(adj[rd_idx].find(cur_idx)->second));
+                    auto new_term = diffs[rd_idx] * adj[rd_idx].find(cur_idx)->second;
                     tmp_sum.push_back(std::move(new_term));
                 }
             }
 
             assert(!tmp_sum.empty());
 
-            diffs[cur_idx] = fix_nn(sum(tmp_sum));
+            diffs[cur_idx] = sum(tmp_sum);
         }
 
         // Create a dict mapping the vars/params in the decomposition
@@ -1186,20 +1197,6 @@ auto diff_tensors_impl(const std::vector<expression> &v_ex, const std::vector<ex
     }
 
     get_logger()->trace("dtens creation runtime: {}", sw);
-
-    // NOTE: it is unclear at this time if it makes sense here to unfix() the derivatives.
-    // This would have only a cosmetic purpose, as 1) if these derivatives are iterated to higher orders,
-    // during decomposition we will be unfixing anyway and 2) unfixing does not
-    // imply normalisation, thus we are not changing the symbolic structure
-    // of the expressions and pessimising their evaluation.
-    //
-    // Keep also in mind that at this time the derivatives are not
-    // *fully* fixed, in the sense that the entries in subs_map are not themselves fixed, and thus when we do the
-    // substition to create the final expressions, we have inserting unfixed expressions in the result. This ultimately
-    // does not matter as subs() does not do any normalisation by default, but it would matter if we wanted to
-    // manipulate further the expression of the derivatives while relying on fix() being applied correctly everywhere.
-    // In any case, if we decide to unfix() here at some point we should also consider unfixing
-    // the expressions returned by models, for consistency.
 
     // Assemble and return the result.
     dtens_map_t retval;

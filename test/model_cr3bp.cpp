@@ -46,7 +46,7 @@ TEST_CASE("basic")
 
         auto ta = taylor_adaptive{dyn, init_state};
 
-        REQUIRE(ta.get_decomposition().size() == 36u);
+        REQUIRE(ta.get_decomposition().size() == 35u);
 
         ta.propagate_until(20.);
 
@@ -56,7 +56,7 @@ TEST_CASE("basic")
 
         const auto dc = add_cfunc<double>(s, "jac", {model::cr3bp_jacobi()}, {x, y, z, px, py, pz});
 
-        REQUIRE(dc.size() == 25u);
+        REQUIRE(dc.size() == 28u);
 
         s.compile();
 
@@ -79,7 +79,7 @@ TEST_CASE("basic")
 
         auto ta = taylor_adaptive{dyn, init_state};
 
-        REQUIRE(ta.get_decomposition().size() == 36u);
+        REQUIRE(ta.get_decomposition().size() == 35u);
 
         ta.propagate_until(20.);
 
@@ -89,7 +89,7 @@ TEST_CASE("basic")
 
         const auto dc = add_cfunc<double>(s, "jac", {model::cr3bp_jacobi(kw::mu = 1e-2)}, {x, y, z, px, py, pz});
 
-        REQUIRE(dc.size() == 25u);
+        REQUIRE(dc.size() == 28u);
 
         s.compile();
 

@@ -35,7 +35,7 @@ std::vector<std::pair<expression, expression>> mascon_impl(const expression &Gco
 
     // NOTE: need to alter only the accelerations.
     for (auto i = 3u; i < 6u; ++i) {
-        fc_dyn[i].second = fix_nn(std::move(fc_dyn[i].second)) + fix_nn(std::move(rot_dyn[i].second));
+        fc_dyn[i].second = std::move(fc_dyn[i].second) + std::move(rot_dyn[i].second);
     }
 
     return fc_dyn;
@@ -48,7 +48,7 @@ expression mascon_energy_impl(const expression &Gconst, const std::vector<expres
     auto fc_en = fixed_centres_energy_impl(Gconst, masses, positions);
     auto rot_pot = rotating_potential_impl(omega);
 
-    return fix_nn(std::move(fc_en)) + fix_nn(std::move(rot_pot));
+    return std::move(fc_en) + std::move(rot_pot);
 }
 
 expression mascon_potential_impl(const expression &Gconst, const std::vector<expression> &masses,
@@ -58,7 +58,7 @@ expression mascon_potential_impl(const expression &Gconst, const std::vector<exp
     auto fc_pot = fixed_centres_potential_impl(Gconst, masses, positions);
     auto rot_pot = rotating_potential_impl(omega);
 
-    return fix_nn(std::move(fc_pot)) + fix_nn(std::move(rot_pot));
+    return std::move(fc_pot) + std::move(rot_pot);
 }
 
 } // namespace model::detail

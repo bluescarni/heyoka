@@ -75,24 +75,26 @@ constexpr bool skip_batch_ld =
 // as a special case of multiplication.
 auto square_wrapper(const expression &x)
 {
-    return x * x;
+    return pow(x, 2_dbl);
 }
 
 TEST_CASE("asinh diff var")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(asinh(x * x - y), x) == pow(square_wrapper(square_wrapper(x) - y) + 1., -.5) * (2. * x));
-    REQUIRE(diff(asinh(x * x + y), y) == pow(square_wrapper(square_wrapper(x) + y) + 1., -.5));
+    REQUIRE(diff(asinh(square_wrapper(x) - y), x)
+            == pow(square_wrapper(square_wrapper(x) - y) + 1., -.5) * (2_dbl * x));
+    REQUIRE(diff(asinh(square_wrapper(x) + y), y) == pow(square_wrapper(square_wrapper(x) + y) + 1., -.5));
 }
 
 TEST_CASE("asinh diff par")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(asinh(par[0] * par[0] - y), par[0])
-            == pow(square_wrapper(square_wrapper(par[0]) - y) + 1., -.5) * (2. * par[0]));
-    REQUIRE(diff(asinh(x * x + par[1]), par[1]) == pow(square_wrapper(square_wrapper(x) + par[1]) + 1., -.5));
+    REQUIRE(diff(asinh(square_wrapper(par[0]) - y), par[0])
+            == pow(square_wrapper(square_wrapper(par[0]) - y) + 1., -.5) * (2_dbl * par[0]));
+    REQUIRE(diff(asinh(square_wrapper(x) + par[1]), par[1])
+            == pow(square_wrapper(square_wrapper(x) + par[1]) + 1., -.5));
 }
 
 TEST_CASE("asinh s11n")
@@ -218,14 +220,6 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
-
-TEST_CASE("normalise")
-{
-    auto x = make_vars("x");
-
-    REQUIRE(normalise(asinh(x)) == asinh(x));
-    REQUIRE(normalise(subs(asinh(x), {{x, -.5_dbl}})) == asinh(-.5_dbl));
-}
 
 // Tests to check vectorisation via the vector-function-abi-variant machinery.
 TEST_CASE("vfabi double")

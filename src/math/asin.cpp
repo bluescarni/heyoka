@@ -66,13 +66,7 @@ asin_impl::asin_impl() : asin_impl(0_dbl) {}
 std::vector<expression> asin_impl::gradient() const
 {
     assert(args().size() == 1u);
-    return {pow(1_dbl - args()[0] * args()[0], -.5)};
-}
-
-[[nodiscard]] expression asin_impl::normalise() const
-{
-    assert(args().size() == 1u);
-    return asin(args()[0]);
+    return {pow(1_dbl - pow(args()[0], 2_dbl), -.5)};
 }
 
 llvm::Value *asin_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,
@@ -107,7 +101,7 @@ taylor_dc_t::size_type asin_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 1u);
 
     // Append arg * arg.
-    u_vars_defs.emplace_back(args()[0] * args()[0], std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(pow(args()[0], 2_dbl), std::vector<std::uint32_t>{});
 
     // Append 1 - arg * arg.
     // NOTE: need to manually use sub() here because:

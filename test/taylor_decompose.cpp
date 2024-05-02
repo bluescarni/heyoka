@@ -30,68 +30,6 @@ auto square_wrapper(const expression &x)
     return x * x;
 }
 
-TEST_CASE("decompose auto")
-{
-    using Catch::Matchers::Message;
-
-    auto [x, y] = make_vars("x", "y");
-
-    REQUIRE_THROWS_MATCHES(taylor_decompose(std::vector<expression>{}, std::vector<expression>{}),
-                           std::invalid_argument, Message("Cannot decompose a system of zero equations"));
-
-    REQUIRE_THROWS_MATCHES(
-        taylor_decompose(std::vector<expression>{x + y}, std::vector<expression>{}), std::invalid_argument,
-        Message(
-            "The number of deduced variables for a Taylor decomposition (2) differs from the number of equations (1)"));
-
-    REQUIRE_THROWS_MATCHES(taylor_decompose(std::vector<expression>{x}, std::vector<expression>{y}),
-                           std::invalid_argument,
-                           Message("The extra functions in a Taylor decomposition contain the variable 'y', "
-                                   "which is not a state variable"));
-
-    REQUIRE_THROWS_MATCHES(taylor_decompose(std::vector<expression>{x}, std::vector<expression>{1_dbl}),
-                           std::invalid_argument,
-                           Message("The extra functions in a Taylor decomposition cannot be constants or parameters"));
-
-    REQUIRE_THROWS_MATCHES(taylor_decompose(std::vector<expression>{x}, std::vector<expression>{par[42]}),
-                           std::invalid_argument,
-                           Message("The extra functions in a Taylor decomposition cannot be constants or parameters"));
-
-    auto [dc, sv_funcs_dc] = taylor_decompose(std::vector<expression>{x}, std::vector<expression>{x + 1.});
-
-    REQUIRE(dc.size() == 3u);
-    REQUIRE(sv_funcs_dc.size() == 1u);
-    REQUIRE(sv_funcs_dc[0] == 1u);
-
-    std::tie(dc, sv_funcs_dc)
-        = taylor_decompose(std::vector<expression>{x + y, x - y}, std::vector<expression>{x, x * y});
-
-    REQUIRE(dc.size() == 7u);
-    REQUIRE(sv_funcs_dc.size() == 2u);
-    REQUIRE(sv_funcs_dc[0] == 0u);
-    REQUIRE(sv_funcs_dc[1] == 4u);
-
-    std::tie(dc, sv_funcs_dc)
-        = taylor_decompose(std::vector<expression>{x + y, x - y}, std::vector<expression>{x, x, y, y});
-
-    REQUIRE(dc.size() == 6u);
-    REQUIRE(sv_funcs_dc.size() == 4u);
-    REQUIRE(sv_funcs_dc[0] == 0u);
-    REQUIRE(sv_funcs_dc[1] == 0u);
-    REQUIRE(sv_funcs_dc[2] == 1u);
-    REQUIRE(sv_funcs_dc[3] == 1u);
-
-    std::tie(dc, sv_funcs_dc)
-        = taylor_decompose(std::vector<expression>{x + y, x - y}, std::vector<expression>{x + y, x, y, x - y});
-
-    REQUIRE(dc.size() == 6u);
-    REQUIRE(sv_funcs_dc.size() == 4u);
-    REQUIRE(sv_funcs_dc[0] == 2u);
-    REQUIRE(sv_funcs_dc[1] == 0u);
-    REQUIRE(sv_funcs_dc[2] == 1u);
-    REQUIRE(sv_funcs_dc[3] == 3u);
-}
-
 TEST_CASE("decompose sys")
 {
     using Catch::Matchers::Message;

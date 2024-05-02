@@ -118,18 +118,6 @@ public:
 HEYOKA_DLL_PUBLIC expression copy(const expression &);
 HEYOKA_DLL_PUBLIC std::vector<expression> copy(const std::vector<expression> &);
 
-HEYOKA_DLL_PUBLIC expression fix(expression);
-HEYOKA_DLL_PUBLIC expression fix_nn(expression);
-HEYOKA_DLL_PUBLIC expression unfix(const expression &);
-HEYOKA_DLL_PUBLIC std::vector<expression> unfix(const std::vector<expression> &);
-
-namespace detail
-{
-
-HEYOKA_DLL_PUBLIC bool is_fixed(const expression &);
-
-} // namespace detail
-
 inline namespace literals
 {
 
@@ -166,7 +154,7 @@ template <typename Base, typename Holder, typename T>
 inline expression func_iface_impl<Base, Holder, T>::diff(funcptr_map<expression> &func_map, const std::string &s) const
 {
     if constexpr (func_has_diff_var<T>) {
-        return this->value().diff(func_map, s);
+        return getval<Holder>(this).diff(func_map, s);
     }
 
     // LCOV_EXCL_START
@@ -180,21 +168,7 @@ template <typename Base, typename Holder, typename T>
 inline expression func_iface_impl<Base, Holder, T>::diff(funcptr_map<expression> &func_map, const param &p) const
 {
     if constexpr (func_has_diff_par<T>) {
-        return this->value().diff(func_map, p);
-    }
-
-    // LCOV_EXCL_START
-    assert(false);
-    throw;
-    // LCOV_EXCL_STOP
-}
-
-template <typename Base, typename Holder, typename T>
-    requires is_udf<T>
-inline expression func_iface_impl<Base, Holder, T>::normalise() const
-{
-    if constexpr (func_has_normalise<T>) {
-        return this->value().normalise();
+        return getval<Holder>(this).diff(func_map, p);
     }
 
     // LCOV_EXCL_START
@@ -394,16 +368,12 @@ HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &) noexce
 
 HEYOKA_DLL_PUBLIC std::size_t get_n_nodes(const expression &);
 
-HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &,
-                                  bool = false);
-HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::map<expression, expression> &, bool = false);
+HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &);
+HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::map<expression, expression> &);
 HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
-                                               const std::unordered_map<std::string, expression> &, bool = false);
+                                               const std::unordered_map<std::string, expression> &);
 HEYOKA_DLL_PUBLIC std::vector<expression> subs(const std::vector<expression> &,
-                                               const std::map<expression, expression> &, bool = false);
-
-HEYOKA_DLL_PUBLIC expression normalise(const expression &);
-HEYOKA_DLL_PUBLIC std::vector<expression> normalise(const std::vector<expression> &);
+                                               const std::map<expression, expression> &);
 
 enum class diff_args { vars, params, all };
 
@@ -426,8 +396,11 @@ HEYOKA_DLL_PUBLIC dtens diff_tensors(const std::vector<expression> &,
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const param &);
+HEYOKA_DLL_PUBLIC std::vector<expression> diff(const std::vector<expression> &, const param &);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
+HEYOKA_DLL_PUBLIC std::vector<expression> diff(const std::vector<expression> &, const std::string &);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &);
+HEYOKA_DLL_PUBLIC std::vector<expression> diff(const std::vector<expression> &, const expression &);
 
 namespace detail
 {
@@ -509,8 +482,8 @@ public:
     [[nodiscard]] size_type index_of(const iterator &) const;
 
     [[nodiscard]] auto get_derivatives(std::uint32_t order) const -> decltype(std::ranges::subrange(begin(), end()));
-    [[nodiscard]] auto get_derivatives(std::uint32_t component, std::uint32_t order) const
-        -> decltype(std::ranges::subrange(begin(), end()));
+    [[nodiscard]] auto get_derivatives(std::uint32_t component,
+                                       std::uint32_t order) const -> decltype(std::ranges::subrange(begin(), end()));
     [[nodiscard]] std::vector<expression> get_gradient() const;
     [[nodiscard]] std::vector<expression> get_jacobian() const;
     [[nodiscard]] std::vector<expression> get_hessian(std::uint32_t) const;
@@ -538,9 +511,6 @@ struct formatter<heyoka::dtens> : fmt::ostream_formatter {
 
 HEYOKA_BEGIN_NAMESPACE
 
-// NOTE: when documenting, we need to point out that the expressions
-// returned by this function are optimised for evaluation. The users
-// can always unfix() and normalise() these expressions if needed.
 template <typename... KwArgs>
 dtens diff_tensors(const std::vector<expression> &v_ex, const std::variant<diff_args, std::vector<expression>> &d_args,
                    const KwArgs &...kw_args)
@@ -800,24 +770,16 @@ template <typename T, typename R>
 concept cfunc_out_range_1d = requires(R &r) {
     requires std::ranges::contiguous_range<R>;
     requires std::ranges::sized_range<R>;
-    {
-        std::ranges::data(r)
-    } -> std::same_as<T *>;
-    {
-        std::ranges::size(r)
-    } -> std::integral;
+    { std::ranges::data(r) } -> std::same_as<T *>;
+    { std::ranges::size(r) } -> std::integral;
 };
 
 template <typename T, typename R>
 concept cfunc_in_range_1d = requires(R &r) {
     requires std::ranges::contiguous_range<R>;
     requires std::ranges::sized_range<R>;
-    {
-        std::ranges::data(r)
-    } -> std::convertible_to<const T *>;
-    {
-        std::ranges::size(r)
-    } -> std::integral;
+    { std::ranges::data(r) } -> std::convertible_to<const T *>;
+    { std::ranges::size(r) } -> std::integral;
 };
 
 } // namespace detail

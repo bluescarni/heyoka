@@ -31,6 +31,7 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/sum.hpp>
@@ -96,7 +97,7 @@ expression horner_eval(const std::array<T, N> &cfs, const expression &x)
     auto ret = expression(cfs[N - 1u]);
 
     for (std::size_t i = 1; i < N; ++i) {
-        ret = fix_nn(cfs[N - i - 1u] + ret * x);
+        ret = cfs[N - i - 1u] + ret * x;
     }
 
     return ret;
@@ -108,7 +109,7 @@ std::array<expression, 2> ex_cmul(const std::array<expression, 2> &c1, const std
     const auto &[a, b] = c1;
     const auto &[c, d] = c2;
 
-    return {fix_nn(a * c - b * d), fix_nn(b * c + a * d)};
+    return {a * c - b * d, b * c + a * d};
 }
 
 // Complex inversion.
@@ -116,9 +117,9 @@ std::array<expression, 2> ex_cinv(const std::array<expression, 2> &c)
 {
     const auto &[a, b] = c;
 
-    const auto den = fix_nn(a * a + b * b);
+    const auto den = pow(a, 2_dbl) + pow(b, 2_dbl);
 
-    return {fix_nn(a / den), fix_nn(-b / den)};
+    return {a / den, -b / den};
 }
 
 // Dictionary to map an integral exponent to the corresponding integral power of a complex expression.
@@ -327,7 +328,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
                 auto corr = (B1 + B5 * alpha2_m3) * B15_fac + B2_fac * B2 + B3_fac * B3 + B4_fac * B4;
                 corr *= arcsec;
 
-                V_terms.push_back(fix_nn((cur_A + corr) * cprod[1]));
+                V_terms.push_back((cur_A + corr) * cprod[1]);
             }
         }
     }
@@ -356,7 +357,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                V_terms.push_back(fix_nn(cur_A * cprod[1]));
+                V_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -385,7 +386,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                V_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+                V_terms_t1.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -415,7 +416,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                V_terms.push_back(fix_nn(cur_A * cprod[1]));
+                V_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -445,7 +446,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                V_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+                V_terms_t1.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -475,7 +476,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                V_terms.push_back(fix_nn(cur_A * cprod[1]));
+                V_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -505,7 +506,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                V_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+                V_terms_t1.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -534,7 +535,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                V_terms.push_back(fix_nn(cur_A * cprod[1]));
+                V_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -563,7 +564,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                V_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+                V_terms_t1.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -592,7 +593,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                V_terms.push_back(fix_nn(cur_A * cprod[1]));
+                V_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -621,7 +622,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                V_terms.push_back(fix_nn(cur_A * cprod[1]));
+                V_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -650,7 +651,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                V_terms_t2.push_back(fix_nn(cur_A * cprod[1]));
+                V_terms_t2.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -682,7 +683,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
                 auto corr = (B1 + B5 * alpha2_m3) * B15_fac + B2_fac * B2 + B3_fac * B3 + B4_fac * B4;
                 corr *= arcsec;
 
-                U_terms.push_back(fix_nn((cur_A + corr) * cprod[1]));
+                U_terms.push_back((cur_A + corr) * cprod[1]);
             }
         }
     }
@@ -711,7 +712,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                U_terms.push_back(fix_nn(cur_A * cprod[1]));
+                U_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -740,7 +741,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                U_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+                U_terms_t1.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -770,7 +771,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                U_terms.push_back(fix_nn(cur_A * cprod[1]));
+                U_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -800,7 +801,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                U_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+                U_terms_t1.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -830,7 +831,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                U_terms.push_back(fix_nn(cur_A * cprod[1]));
+                U_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -860,7 +861,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                U_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+                U_terms_t1.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -889,7 +890,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                U_terms.push_back(fix_nn(cur_A * cprod[1]));
+                U_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -918,7 +919,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                U_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+                U_terms_t1.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -947,7 +948,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                U_terms.push_back(fix_nn(cur_A * cprod[1]));
+                U_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -976,7 +977,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                U_terms.push_back(fix_nn(cur_A * cprod[1]));
+                U_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -1005,7 +1006,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                U_terms_t2.push_back(fix_nn(cur_A * cprod[1]));
+                U_terms_t2.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -1037,7 +1038,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
                 auto corr = (B1 + B5 * alpha2_m3) * B15_fac + B2_fac * B2 + B3_fac * B3 + B4_fac * B4;
                 corr -= 2 * cur_A * dnu / (3 * nu);
 
-                r_terms.push_back(fix_nn((cur_A + corr) * cprod[0]));
+                r_terms.push_back((cur_A + corr) * cprod[0]);
             }
         }
     }
@@ -1066,7 +1067,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                r_terms.push_back(fix_nn(cur_A * cprod[1]));
+                r_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -1095,7 +1096,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                r_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+                r_terms_t1.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -1125,7 +1126,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                r_terms.push_back(fix_nn(cur_A * cprod[1]));
+                r_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -1155,7 +1156,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                r_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+                r_terms_t1.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -1185,7 +1186,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                r_terms.push_back(fix_nn(cur_A * cprod[1]));
+                r_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -1215,7 +1216,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                r_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+                r_terms_t1.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -1244,7 +1245,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                r_terms.push_back(fix_nn(cur_A * cprod[1]));
+                r_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -1273,7 +1274,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                r_terms_t1.push_back(fix_nn(cur_A * cprod[1]));
+                r_terms_t1.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -1302,7 +1303,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                r_terms.push_back(fix_nn(cur_A * cprod[1]));
+                r_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -1331,7 +1332,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                r_terms.push_back(fix_nn(cur_A * cprod[1]));
+                r_terms.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -1360,7 +1361,7 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
 
                 auto cprod = pairwise_cmul(tmp_cprod);
 
-                r_terms_t2.push_back(fix_nn(cur_A * cprod[1]));
+                r_terms_t2.push_back(cur_A * cprod[1]);
             }
         }
     }
@@ -1372,19 +1373,19 @@ std::vector<expression> elp2000_spherical_impl(const expression &tm, double thre
         [&]() {
             expression a, b, c;
             oneapi::tbb::parallel_invoke([&]() { a = sum(r_terms); }, [&]() { b = tm * sum(r_terms_t1); },
-                                         [&]() { c = tm * tm * sum(r_terms_t2); });
+                                         [&]() { c = pow(tm, 2_dbl) * sum(r_terms_t2); });
             retval[0] = sum({a, b, c});
         },
         [&]() {
             expression a, b, c;
             oneapi::tbb::parallel_invoke([&]() { a = sum(U_terms); }, [&]() { b = tm * sum(U_terms_t1); },
-                                         [&]() { c = tm * tm * sum(U_terms_t2); });
+                                         [&]() { c = pow(tm, 2_dbl) * sum(U_terms_t2); });
             retval[1] = sum({a, b, c});
         },
         [&]() {
             expression a, b, c;
             oneapi::tbb::parallel_invoke([&]() { a = sum(V_terms); }, [&]() { b = tm * sum(V_terms_t1); },
-                                         [&]() { c = tm * tm * sum(V_terms_t2); });
+                                         [&]() { c = pow(tm, 2_dbl) * sum(V_terms_t2); });
             retval[2] = sum({a, b, c});
         });
 
@@ -1408,7 +1409,7 @@ std::vector<expression> elp2000_cartesian_impl(const expression &tm, double thre
     const auto cV = cos(V);
     const auto sV = sin(V);
 
-    const auto rcU = fix_nn(r * cU);
+    const auto rcU = r * cU;
 
     return {rcU * cV, rcU * sV, r * sU};
 }
@@ -1435,8 +1436,8 @@ std::vector<expression> elp2000_cartesian_e2000_impl(const expression &tm, doubl
     const auto P = horner_eval(LP, tm);
     const auto Q = horner_eval(LQ, tm);
 
-    const auto P2 = P * P;
-    const auto Q2 = Q * Q;
+    const auto P2 = pow(P, 2_dbl);
+    const auto Q2 = pow(Q, 2_dbl);
     const auto PQ = P * Q;
     const auto sqrP2Q2 = sqrt(1. - P2 - Q2);
 

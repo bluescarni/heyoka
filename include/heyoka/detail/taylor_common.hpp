@@ -222,12 +222,7 @@ void taylor_adaptive_setup_sv_rhs(TA &ta, const U &sys)
         // decomposition.
         assert(std::holds_alternative<variable>(ta.m_i_data->m_dc[i].first.value()));
         ta.m_i_data->m_state_vars.push_back(ta.m_i_data->m_dc[i].first);
-
-        if constexpr (std::is_same_v<U, std::vector<expression>>) {
-            ta.m_i_data->m_rhs.push_back(sys[i]);
-        } else {
-            ta.m_i_data->m_rhs.push_back(sys[i].second);
-        }
+        ta.m_i_data->m_rhs.push_back(sys[i].second);
     }
 }
 

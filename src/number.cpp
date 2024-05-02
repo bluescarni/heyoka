@@ -250,18 +250,6 @@ bool is_negative(const number &n)
     return std::visit([](const auto &arg) { return arg < 0; }, n.value());
 }
 
-bool is_integer(const number &n)
-{
-    return std::visit(
-        [](const auto &arg) {
-            using std::trunc;
-            using std::isfinite;
-
-            return isfinite(arg) && trunc(arg) == arg;
-        },
-        n.value());
-}
-
 number operator+(number n)
 {
     return n;

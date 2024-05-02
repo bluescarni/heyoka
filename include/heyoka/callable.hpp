@@ -69,19 +69,18 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl {
 // Implementation of the callable interface for invocable objects.
 template <typename Base, typename Holder, typename T, typename R, typename... Args>
     requires std::is_invocable_r_v<R, std::remove_reference_t<std::unwrap_reference_t<T>> &, Args...>
-                 // NOTE: also require copy constructibility like
-                 // std::function does.
-                 && std::copy_constructible<T>
-struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl<Base, Holder, T, R, Args...>
-    : public Base, tanuki::iface_impl_helper<Base, Holder> {
+             // NOTE: also require copy constructibility like
+             // std::function does.
+             && std::copy_constructible<T>
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl<Base, Holder, T, R, Args...> : public Base {
     explicit operator bool() const noexcept final
     {
         using unrefT = std::remove_reference_t<std::unwrap_reference_t<T>>;
 
         if constexpr (std::is_pointer_v<unrefT> || std::is_member_pointer_v<unrefT>) {
-            return this->value() != nullptr;
+            return getval<Holder>(this) != nullptr;
         } else if constexpr (is_any_callable<unrefT>::value || is_any_std_func_v<unrefT>) {
-            return static_cast<bool>(this->value());
+            return static_cast<bool>(getval<Holder>(this));
         } else {
             return true;
         }
@@ -95,15 +94,15 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl<Base, Holder, T, R, Ar
         // of an empty object, the std::bad_function_call exception will be
         // thrown by the call operator of the object.
         if constexpr (std::is_pointer_v<unrefT> || std::is_member_pointer_v<unrefT>) {
-            if (this->value() == nullptr) {
+            if (getval<Holder>(this) == nullptr) {
                 throw std::bad_function_call{};
             }
         }
 
         if constexpr (std::is_same_v<R, void>) {
-            static_cast<void>(std::invoke(this->value(), std::forward<Args>(args)...));
+            static_cast<void>(std::invoke(getval<Holder>(this), std::forward<Args>(args)...));
         } else {
-            return std::invoke(this->value(), std::forward<Args>(args)...);
+            return std::invoke(getval<Holder>(this), std::forward<Args>(args)...);
         }
     }
 };
@@ -162,24 +161,6 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_ref_iface {
             } else {
                 return static_cast<bool>(*iface_ptr(*static_cast<const Wrap *>(this)));
             }
-        }
-
-        // NOTE: these are part of the old callable interface, and they are not
-        // strictly needed as there are equivalent functions in tanuki. Consider removing
-        // them in the future.
-        auto get_type_index() const noexcept
-        {
-            return value_type_index(*static_cast<const Wrap *>(this));
-        }
-        template <typename T>
-        T *extract() noexcept
-        {
-            return value_ptr<T>(*static_cast<Wrap *>(this));
-        }
-        template <typename T>
-        const T *extract() const noexcept
-        {
-            return value_ptr<T>(*static_cast<const Wrap *>(this));
         }
     };
 };

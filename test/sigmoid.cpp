@@ -79,11 +79,11 @@ TEST_CASE("sigmoid diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(sigmoid(x * x - y), x) == (1_dbl - sigmoid(x * x - y)) * sigmoid(x * x - y) * (2. * x));
+    REQUIRE(diff(sigmoid(x * x - y), x) == (1_dbl - sigmoid(x * x - y)) * sigmoid(x * x - y) * (x + x));
     REQUIRE(diff(sigmoid(x * x - y), y) == -((1_dbl - sigmoid(x * x - y)) * sigmoid(x * x - y)));
 
     REQUIRE(diff(sigmoid(par[0] * par[0] - y), par[0])
-            == (1_dbl - sigmoid(par[0] * par[0] - y)) * sigmoid(par[0] * par[0] - y) * (2. * par[0]));
+            == (1_dbl - sigmoid(par[0] * par[0] - y)) * sigmoid(par[0] * par[0] - y) * (par[0] + par[0]));
     REQUIRE(diff(sigmoid(x * x - par[1]), par[1]) == -((1_dbl - sigmoid(x * x - par[1])) * sigmoid(x * x - par[1])));
 }
 
@@ -208,11 +208,3 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
-
-TEST_CASE("normalise")
-{
-    auto x = make_vars("x");
-
-    REQUIRE(normalise(sigmoid(x)) == sigmoid(x));
-    REQUIRE(normalise(subs(sigmoid(x), {{x, 1.5_dbl}})) == sigmoid(1.5_dbl));
-}

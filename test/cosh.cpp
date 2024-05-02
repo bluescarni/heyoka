@@ -82,10 +82,10 @@ TEST_CASE("cosh diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(cosh(x * x - y), x) == sinh(square_wrapper(x) - y) * (2. * x));
+    REQUIRE(diff(cosh(x * x - y), x) == sinh(square_wrapper(x) - y) * (x + x));
     REQUIRE(diff(cosh(x * x + y), y) == sinh(square_wrapper(x) + y));
 
-    REQUIRE(diff(cosh(par[0] * par[0] - y), par[0]) == sinh(square_wrapper(par[0]) - y) * (2. * par[0]));
+    REQUIRE(diff(cosh(par[0] * par[0] - y), par[0]) == sinh(square_wrapper(par[0]) - y) * (par[0] + par[0]));
     REQUIRE(diff(cosh(x * x + par[1]), par[1]) == sinh(square_wrapper(x) + par[1]));
 }
 
@@ -212,14 +212,6 @@ TEST_CASE("cfunc_mp")
 }
 
 #endif
-
-TEST_CASE("normalise")
-{
-    auto x = make_vars("x");
-
-    REQUIRE(normalise(cosh(x)) == cosh(x));
-    REQUIRE(normalise(subs(cosh(x), {{x, 1.5_dbl}})) == cosh(1.5_dbl));
-}
 
 // Tests to check vectorisation via the vector-function-abi-variant machinery.
 TEST_CASE("vfabi double")
