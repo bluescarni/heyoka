@@ -15,6 +15,7 @@
 #include <functional>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <typeindex>
 #include <utility>
@@ -52,6 +53,7 @@ class HEYOKA_DLL_PUBLIC func_base
 
 public:
     explicit func_base(std::string, std::vector<expression>);
+    explicit func_base(std::tuple<std::string, std::vector<expression>>);
 
     func_base(const func_base &);
     func_base(func_base &&) noexcept;

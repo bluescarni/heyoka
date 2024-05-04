@@ -19,6 +19,7 @@
 #include <heyoka/math/constants.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/cosh.hpp>
+#include <heyoka/math/dfun.hpp>
 #include <heyoka/math/erf.hpp>
 #include <heyoka/math/exp.hpp>
 #include <heyoka/math/kepDE.hpp>
