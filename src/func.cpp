@@ -129,10 +129,13 @@ const std::vector<expression> &func_base::args() const noexcept
 
 void func_base::replace_args(std::vector<expression> new_args)
 {
+    // LCOV_EXCL_START
     if (new_args.size() != m_args.size()) [[unlikely]] {
-        // TODO
-        throw std::invalid_argument("");
+        throw std::invalid_argument(fmt::format("func_base::replace_args() was invoked with a new_args argument of "
+                                                "size {}, but the current argument size is {}",
+                                                new_args.size(), m_args.size()));
     }
+    // LCOV_EXCL_STOP
 
     m_args = std::move(new_args);
 }

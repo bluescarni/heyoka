@@ -66,6 +66,8 @@ public:
 
     // NOTE: this is supposed to be private, but there are issues making friends
     // with concept constraints on clang. Leave it public and undocumented for now.
+    // NOTE: this is the only non-const function in the interface, and it is supposed
+    // to be used only in the implementation of the func::copy() function.
     void replace_args(std::vector<expression>);
 };
 
