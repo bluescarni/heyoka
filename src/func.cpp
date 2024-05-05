@@ -127,9 +127,14 @@ const std::vector<expression> &func_base::args() const noexcept
     return m_args;
 }
 
-std::pair<expression *, expression *> func_base::get_mutable_args_range()
+void func_base::replace_args(std::vector<expression> new_args)
 {
-    return {m_args.data(), m_args.data() + m_args.size()};
+    if (new_args.size() != m_args.size()) [[unlikely]] {
+        // TODO
+        throw std::invalid_argument("");
+    }
+
+    m_args = std::move(new_args);
 }
 
 namespace detail
@@ -257,7 +262,7 @@ const std::vector<expression> &func::args() const
     return m_func->args();
 }
 
-func func::copy(const std::vector<expression> &new_args) const
+func func::copy(std::vector<expression> new_args) const
 {
     const auto orig_size = args().size();
 
@@ -286,11 +291,8 @@ func func::copy(const std::vector<expression> &new_args) const
     }
     // LCOV_EXCL_STOP
 
-    // Copy over the new arguments.
-    auto *it = ret.m_func->get_mutable_args_range().first;
-    for (decltype(new_args.size()) i = 0; i < new_args.size(); ++i, ++it) {
-        *it = new_args[i];
-    }
+    // Replace the arguments.
+    ret.m_func->replace_args(std::move(new_args));
 
     return ret;
 }

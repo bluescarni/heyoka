@@ -186,7 +186,7 @@ expression copy_impl(funcptr_map<expression> &func_map, const expression &e)
                 }
 
                 // Create a copy of v with the new arguments.
-                auto f_copy = v.copy(new_args);
+                auto f_copy = v.copy(std::move(new_args));
 
                 // Construct the return value and put it into the cache.
                 auto ex = expression{std::move(f_copy)};
@@ -423,7 +423,7 @@ expression rename_variables(detail::funcptr_map<expression> &func_map, const exp
                 }
 
                 // Create a copy of arg with the new arguments.
-                auto tmp = arg.copy(new_args);
+                auto tmp = arg.copy(std::move(new_args));
 
                 // Put the return value in the cache.
                 auto ret = expression{std::move(tmp)};
@@ -725,7 +725,7 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex,
                 }
 
                 // Create a copy of arg with the new arguments.
-                auto tmp = arg.copy(new_args);
+                auto tmp = arg.copy(std::move(new_args));
 
                 // Put the return value in the cache.
                 auto ret = expression{std::move(tmp)};
@@ -804,7 +804,7 @@ expression subs(funcptr_map<expression> &func_map, const expression &ex, const s
                 }
 
                 // Create a copy of arg with the new arguments.
-                auto tmp = arg.copy(new_args);
+                auto tmp = arg.copy(std::move(new_args));
 
                 // Put the return value in the cache.
                 auto ret = expression{std::move(tmp)};
@@ -1181,7 +1181,7 @@ expression split_sums_for_decompose(funcptr_map<expression> &func_map, const exp
                 }
 
                 // Create a copy of v with the split arguments.
-                auto f_copy = v.copy(new_args);
+                auto f_copy = v.copy(std::move(new_args));
 
                 // After having taken care of the arguments, split
                 // v itself.
@@ -1241,7 +1241,7 @@ expression split_prods_for_decompose(funcptr_map<expression> &func_map, const ex
                 }
 
                 // Create a copy of v with the split arguments.
-                auto f_copy = v.copy(new_args);
+                auto f_copy = v.copy(std::move(new_args));
 
                 // After having taken care of the arguments, split
                 // v itself.
@@ -1301,7 +1301,7 @@ expression sums_to_sum_sqs_for_decompose(funcptr_map<expression> &func_map, cons
                 }
 
                 // Create a copy of v with the split arguments.
-                auto f_copy = v.copy(new_args);
+                auto f_copy = v.copy(std::move(new_args));
 
                 // After having taken care of the arguments, convert
                 // v itself.

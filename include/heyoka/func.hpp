@@ -66,7 +66,7 @@ public:
 
     // NOTE: this is supposed to be private, but there are issues making friends
     // with concept constraints on clang. Leave it public and undocumented for now.
-    std::pair<expression *, expression *> get_mutable_args_range();
+    void replace_args(std::vector<expression>);
 };
 
 // UDF concept.
@@ -137,10 +137,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
         // function class that hides it.
         return static_cast<const func_base &>(getval<Holder>(this)).args();
     }
-    std::pair<expression *, expression *> get_mutable_args_range() final
-    {
-        return static_cast<func_base &>(getval<Holder>(this)).get_mutable_args_range();
-    }
+    void replace_args(std::vector<expression>) final;
 
     // diff.
     [[nodiscard]] bool has_diff_var() const final
@@ -263,7 +260,7 @@ struct HEYOKA_DLL_PUBLIC func_iface {
     [[nodiscard]] virtual bool is_time_dependent() const = 0;
 
     [[nodiscard]] virtual const std::vector<expression> &args() const = 0;
-    virtual std::pair<expression *, expression *> get_mutable_args_range() = 0;
+    virtual void replace_args(std::vector<expression>) = 0;
 
     [[nodiscard]] virtual bool has_diff_var() const = 0;
     virtual expression diff(funcptr_map<expression> &, const std::string &) const = 0;
@@ -361,7 +358,7 @@ public:
     // a copy of the inner object in which the original
     // function arguments have been replaced by the
     // provided vector of arguments.
-    [[nodiscard]] func copy(const std::vector<expression> &) const;
+    [[nodiscard]] func copy(std::vector<expression>) const;
 
     template <typename T>
     [[nodiscard]] const T *extract() const noexcept
