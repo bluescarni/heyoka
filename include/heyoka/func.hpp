@@ -244,7 +244,6 @@ struct HEYOKA_DLL_PUBLIC func_iface {
 
     [[nodiscard]] virtual bool has_gradient() const = 0;
     [[nodiscard]] virtual std::vector<expression> gradient() const = 0;
-    [[nodiscard]] std::vector<expression> fetch_gradient() const;
 
     [[nodiscard]] virtual llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &,
                                                  llvm::Value *, llvm::Value *, llvm::Value *, std::uint32_t, bool) const
@@ -355,6 +354,7 @@ public:
 
     [[nodiscard]] std::size_t hash(detail::funcptr_map<std::size_t> &) const;
 
+    [[nodiscard]] std::vector<expression> gradient() const;
     [[nodiscard]] expression diff(detail::funcptr_map<expression> &, const std::string &) const;
     [[nodiscard]] expression diff(detail::funcptr_map<expression> &, const param &) const;
 

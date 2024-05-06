@@ -61,29 +61,6 @@ namespace detail
 
 func_iface::~func_iface() = default;
 
-std::vector<expression> func_iface::fetch_gradient() const
-{
-    // Check if we have the gradient.
-    if (!has_gradient()) [[unlikely]] {
-        throw not_implemented_error(fmt::format("Cannot compute derivatives for the function '{}', because "
-                                                "the function does not provide a gradient() member function",
-                                                get_name()));
-    }
-
-    // Fetch the gradient.
-    auto grad = gradient();
-
-    // Check it.
-    const auto arity = args().size();
-    if (grad.size() != arity) {
-        throw std::invalid_argument(fmt::format("Inconsistent gradient returned by the function '{}': a vector of {} "
-                                                "elements was expected, but the number of elements is {} instead",
-                                                get_name(), arity, grad.size()));
-    }
-
-    return grad;
-}
-
 } // namespace detail
 
 func_base::func_base(std::string name, std::vector<expression> args) : m_name(std::move(name)), m_args(std::move(args))
@@ -303,13 +280,36 @@ std::type_index func::get_type_index() const
     return value_type_index(m_func);
 }
 
+std::vector<expression> func::gradient() const
+{
+    // Check if we have the gradient.
+    if (!m_func->has_gradient()) [[unlikely]] {
+        throw not_implemented_error(fmt::format("Cannot compute derivatives for the function '{}', because "
+                                                "the function does not provide a gradient() member function",
+                                                get_name()));
+    }
+
+    // Fetch the gradient.
+    auto grad = m_func->gradient();
+
+    // Check it.
+    const auto arity = args().size();
+    if (grad.size() != arity) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Inconsistent gradient returned by the function '{}': a vector of {} "
+                                                "elements was expected, but the number of elements is {} instead",
+                                                get_name(), arity, grad.size()));
+    }
+
+    return grad;
+}
+
 template <typename T>
 expression func::diff_impl(detail::funcptr_map<expression> &func_map, const T &arg) const
 {
     const auto arity = args().size();
 
     // Fetch the gradient.
-    auto grad = m_func->fetch_gradient();
+    auto grad = gradient();
 
     // Compute the total derivative.
     std::vector<expression> prod;
