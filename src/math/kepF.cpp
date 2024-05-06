@@ -12,7 +12,6 @@
 #include <cstdint>
 #include <initializer_list>
 #include <stdexcept>
-#include <string>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -43,7 +42,6 @@
 
 #endif
 
-#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -53,9 +51,9 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepF.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
@@ -78,30 +76,18 @@ void kepF_impl::serialize(Archive &ar, unsigned)
     ar &boost::serialization::base_object<func_base>(*this);
 }
 
-template <typename T>
-expression kepF_impl::diff_impl(funcptr_map<expression> &func_map, const T &s) const
+std::vector<expression> kepF_impl::gradient() const
 {
     assert(args().size() == 3u);
 
     const auto &h = args()[0];
     const auto &k = args()[1];
-    const auto &lam = args()[2];
 
     const expression F{func{*this}};
 
-    return (detail::diff(func_map, k, s) * sin(F) - detail::diff(func_map, h, s) * cos(F)
-            + detail::diff(func_map, lam, s))
-           / (1_dbl - h * sin(F) - k * cos(F));
-}
+    const auto den = pow(1_dbl - h * sin(F) - k * cos(F), -1_dbl);
 
-expression kepF_impl::diff(funcptr_map<expression> &func_map, const std::string &s) const
-{
-    return diff_impl(func_map, s);
-}
-
-expression kepF_impl::diff(funcptr_map<expression> &func_map, const param &p) const
-{
-    return diff_impl(func_map, p);
+    return {-cos(F) * den, sin(F) * den, den};
 }
 
 namespace

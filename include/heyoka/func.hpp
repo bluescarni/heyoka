@@ -83,16 +83,6 @@ namespace detail
 HEYOKA_DLL_PUBLIC void func_default_to_stream_impl(std::ostringstream &, const func_base &);
 
 template <typename T>
-concept func_has_diff_var = requires(const T &x, funcptr_map<expression> &m, const std::string &name) {
-    { x.diff(m, name) } -> std::same_as<expression>;
-};
-
-template <typename T>
-concept func_has_diff_par = requires(const T &x, funcptr_map<expression> &m, const param &p) {
-    { x.diff(m, p) } -> std::same_as<expression>;
-};
-
-template <typename T>
 concept func_has_gradient = requires(const T &x) {
     { x.gradient() } -> std::same_as<std::vector<expression>>;
 };
@@ -140,18 +130,6 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
         return static_cast<const func_base &>(getval<Holder>(this)).args();
     }
     void replace_args(std::vector<expression>) final;
-
-    // diff.
-    [[nodiscard]] bool has_diff_var() const final
-    {
-        return func_has_diff_var<T>;
-    }
-    expression diff(funcptr_map<expression> &, const std::string &) const final;
-    [[nodiscard]] bool has_diff_par() const final
-    {
-        return func_has_diff_par<T>;
-    }
-    expression diff(funcptr_map<expression> &, const param &) const final;
 
     // gradient.
     [[nodiscard]] bool has_gradient() const final
@@ -264,13 +242,9 @@ struct HEYOKA_DLL_PUBLIC func_iface {
     [[nodiscard]] virtual const std::vector<expression> &args() const = 0;
     virtual void replace_args(std::vector<expression>) = 0;
 
-    [[nodiscard]] virtual bool has_diff_var() const = 0;
-    virtual expression diff(funcptr_map<expression> &, const std::string &) const = 0;
-    [[nodiscard]] virtual bool has_diff_par() const = 0;
-    virtual expression diff(funcptr_map<expression> &, const param &) const = 0;
     [[nodiscard]] virtual bool has_gradient() const = 0;
     [[nodiscard]] virtual std::vector<expression> gradient() const = 0;
-    [[nodiscard]] std::vector<expression> fetch_gradient(const std::string &) const;
+    [[nodiscard]] std::vector<expression> fetch_gradient() const;
 
     [[nodiscard]] virtual llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &,
                                                  llvm::Value *, llvm::Value *, llvm::Value *, std::uint32_t, bool) const
@@ -338,6 +312,9 @@ class HEYOKA_DLL_PUBLIC func
     void save(boost::archive::binary_oarchive &, unsigned) const;
     void load(boost::archive::binary_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
+
+    template <typename T>
+    HEYOKA_DLL_LOCAL expression diff_impl(detail::funcptr_map<expression> &, const T &) const;
 
 public:
     func();

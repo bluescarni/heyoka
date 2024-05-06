@@ -61,15 +61,13 @@ namespace detail
 
 func_iface::~func_iface() = default;
 
-std::vector<expression> func_iface::fetch_gradient(const std::string &target) const
+std::vector<expression> func_iface::fetch_gradient() const
 {
     // Check if we have the gradient.
-    if (!has_gradient()) {
-        throw not_implemented_error(
-            fmt::format("Cannot compute the derivative of the function '{}' with respect to a {}, because "
-                        "the function does not provide neither a diff() "
-                        "nor a gradient() member function",
-                        get_name(), target));
+    if (!has_gradient()) [[unlikely]] {
+        throw not_implemented_error(fmt::format("Cannot compute derivatives for the function '{}', because "
+                                                "the function does not provide a gradient() member function",
+                                                get_name()));
     }
 
     // Fetch the gradient.
@@ -305,50 +303,32 @@ std::type_index func::get_type_index() const
     return value_type_index(m_func);
 }
 
-expression func::diff(detail::funcptr_map<expression> &func_map, const std::string &s) const
+template <typename T>
+expression func::diff_impl(detail::funcptr_map<expression> &func_map, const T &arg) const
 {
-    // Run the specialised diff implementation,
-    // if available.
-    if (m_func->has_diff_var()) {
-        return m_func->diff(func_map, s);
-    }
-
     const auto arity = args().size();
 
     // Fetch the gradient.
-    auto grad = m_func->fetch_gradient("variable");
+    auto grad = m_func->fetch_gradient();
 
     // Compute the total derivative.
     std::vector<expression> prod;
     prod.reserve(arity);
     for (decltype(args().size()) i = 0; i < arity; ++i) {
-        prod.push_back(grad[i] * detail::diff(func_map, args()[i], s));
+        prod.push_back(grad[i] * detail::diff(func_map, args()[i], arg));
     }
 
-    return sum(prod);
+    return sum(std::move(prod));
+}
+
+expression func::diff(detail::funcptr_map<expression> &func_map, const std::string &s) const
+{
+    return this->diff_impl(func_map, s);
 }
 
 expression func::diff(detail::funcptr_map<expression> &func_map, const param &p) const
 {
-    // Run the specialised diff implementation,
-    // if available.
-    if (m_func->has_diff_par()) {
-        return m_func->diff(func_map, p);
-    }
-
-    const auto arity = args().size();
-
-    // Fetch the gradient.
-    auto grad = m_func->fetch_gradient("parameter");
-
-    // Compute the total derivative.
-    std::vector<expression> prod;
-    prod.reserve(arity);
-    for (decltype(args().size()) i = 0; i < arity; ++i) {
-        prod.push_back(grad[i] * detail::diff(func_map, args()[i], p));
-    }
-
-    return sum(prod);
+    return this->diff_impl(func_map, p);
 }
 
 std::vector<expression>::size_type func::decompose(detail::funcptr_map<std::vector<expression>::size_type> &func_map,
