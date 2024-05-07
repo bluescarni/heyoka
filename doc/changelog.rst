@@ -16,6 +16,8 @@ New
 Changes
 ~~~~~~~
 
+- Speedups in the computation of symbolic derivatives
+  (`#414 <https://github.com/bluescarni/heyoka/pull/414>`__).
 - Several automatic simplifications and normalisations in the expression
   system have been removed as they caused drastic slowdowns in symbolic operations
   when working with large and highly recursive computational graphs

@@ -404,6 +404,8 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
     // NOTE: this map is used in the next loop (see comments there).
     // NOTE: as usual, use a sorted map (instead of a hash map) in order
     // to avoid non-deterministic ordering of operations.
+    // NOTE: if this turns out to be a bottleneck, we can always
+    // re-implement in terms of fast_umap and manually sort after construction.
     std::map<std::string, std::vector<expression>> grad_map;
 
     // Elementary subexpressions.
