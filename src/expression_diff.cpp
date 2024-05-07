@@ -388,20 +388,28 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
 
     std::unordered_map<std::string, expression> subs_map;
 
+    // Initial definitions.
     for (idx_t i = 0; i < nvars; ++i) {
+        // The initial definitions must all consist of
+        // variables or parameters.
+        assert(std::holds_alternative<variable>(dc[i].value()) || std::holds_alternative<param>(dc[i].value()));
         assert(subs(dc[i], subs_map) == dc[i]);
 
         // NOTE: no adjoints or direct/reverse dependencies needed for the initial definitions,
         // we only need to fill in subs_map.
-        [[maybe_unused]] const auto flag = subs_map.emplace(fmt::format("u_{}", i), dc[i]).second;
-
-        assert(flag);
+        assert(!subs_map.contains(fmt::format("u_{}", i)));
+        subs_map.emplace(fmt::format("u_{}", i), dc[i]);
     }
 
-    for (idx_t i = nvars; i < dc.size(); ++i) {
+    // Elementary subexpressions.
+    for (idx_t i = nvars; i < dc.size() - nouts; ++i) {
+        // The elementary subexpressions must all be functions.
+        assert(std::holds_alternative<func>(dc[i].value()));
+
         auto &cur_adj_dict = adj[i];
         auto &cur_dep = dep[i];
 
+        // Fill in the adjoints and the direct/reverse dependencies.
         for (const auto &var : get_variables(dc[i])) {
             const auto idx = uname_to_index(var);
 
@@ -414,7 +422,41 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
             cur_dep.push_back(idx);
         }
 
+        assert(!subs_map.contains(fmt::format("u_{}", i)));
         subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map));
+    }
+
+    // Outputs.
+    for (idx_t i = dc.size() - nouts; i < dc.size(); ++i) {
+        if (const auto *var_ptr = std::get_if<variable>(&dc[i].value())) {
+            // The current output is a variable.
+            auto &cur_adj_dict = adj[i];
+            auto &cur_dep = dep[i];
+
+            // The variable index must preceed the index of the first output.
+            const auto idx = uname_to_index(var_ptr->name());
+            assert(idx < dc.size() - nouts);
+
+            assert(cur_adj_dict.empty());
+            cur_adj_dict[idx] = 1_dbl;
+
+            assert(idx < revdep.size());
+            revdep[idx].push_back(boost::numeric_cast<std::uint32_t>(i));
+
+            assert(cur_dep.empty());
+            cur_dep.push_back(idx);
+
+            assert(subs_map.contains(var_ptr->name()));
+            assert(!subs_map.contains(fmt::format("u_{}", i)));
+            subs_map.emplace(fmt::format("u_{}", i), subs_map.find(var_ptr->name())->second);
+        } else {
+            // The outputs must all be variables or numbers.
+            assert(std::holds_alternative<number>(dc[i].value()));
+
+            // The current output is a number.
+            assert(!subs_map.contains(fmt::format("u_{}", i)));
+            subs_map.emplace(fmt::format("u_{}", i), dc[i]);
+        }
     }
 
     // Sort the vectors of reverse dependencies.
@@ -422,6 +464,8 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
     // of the algorithm. It will just ensure that when we eventually
     // compute the derivative of the output wrt a subexpression, the
     // summation over the reverse dependencies happens in index order.
+    // NOTE: should we do this for the direct deps as well?
+    // NOTE: this can be easily parallelised if needed.
     for (auto &rvec : revdep) {
         std::sort(rvec.begin(), rvec.end());
 
