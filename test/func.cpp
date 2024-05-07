@@ -45,6 +45,12 @@ struct func_00 : func_base {
     explicit func_00(std::vector<expression> args) : func_base("f", std::move(args)) {}
 };
 
+struct func_00_s : shared_func_base {
+    func_00_s() : shared_func_base("f", {}) {}
+    func_00_s(const std::string &name) : shared_func_base(name, {}) {}
+    explicit func_00_s(std::vector<expression> args) : shared_func_base("f", std::move(args)) {}
+};
+
 struct func_01 {
 };
 
@@ -65,6 +71,15 @@ TEST_CASE("func minimal")
     REQUIRE(f.args() == std::vector{"x"_var, "y"_var});
 
     REQUIRE_THROWS_MATCHES(func{func_00{""}}, std::invalid_argument, Message("Cannot create a function with no name"));
+
+    func f_s(func_00_s{{"x"_var, "y"_var}});
+    REQUIRE(f_s.get_type_index() == typeid(func_00_s));
+    REQUIRE(f_s.get_name() == "f");
+    REQUIRE(f_s.args() == std::vector{"x"_var, "y"_var});
+    REQUIRE(f_s.args().data() == f_s.extract<func_00_s>()->get_args_ptr()->data());
+
+    REQUIRE_THROWS_MATCHES(func{func_00_s{""}}, std::invalid_argument,
+                           Message("Cannot create a function with no name"));
 
     llvm_state s;
 
@@ -137,6 +152,31 @@ TEST_CASE("func minimal")
     f = func{func_00{{"x"_var, "y"_var}}};
     detail::funcptr_map<taylor_dc_t::size_type> func_map2;
     f.taylor_decompose(func_map2, dec);
+}
+
+TEST_CASE("shared func copy move")
+{
+    func_00_s f{{"x"_var, "y"_var}};
+
+    auto f2 = f;
+
+    REQUIRE(f.args().data() == f2.args().data());
+
+    auto f3 = std::move(f2);
+
+    REQUIRE(f.args().data() == f3.args().data());
+
+    // Revive f2 via copy assignment.
+    f2 = f3;
+    REQUIRE(f.args().data() == f2.args().data());
+
+    func_00_s f4;
+    f4 = std::move(f2);
+    REQUIRE(f.args().data() == f4.args().data());
+
+    // Revive f2 via move assignment.
+    f2 = std::move(f3);
+    REQUIRE(f.args().data() == f2.args().data());
 }
 
 struct func_05 : func_base {
@@ -309,6 +349,24 @@ TEST_CASE("func ostream")
     oss.str("");
 
     f1 = func(func_10{{"y"_var}});
+
+    oss << expression{f1};
+
+    REQUIRE(oss.str() == "f(y)");
+}
+
+TEST_CASE("shared func ostream")
+{
+    auto f1 = func(func_00_s{{"x"_var, "y"_var}});
+
+    std::ostringstream oss;
+    oss << expression{f1};
+
+    REQUIRE(oss.str() == "f(x, y)");
+
+    oss.str("");
+
+    f1 = func(func_00_s{{"y"_var}});
 
     oss << expression{f1};
 
@@ -506,13 +564,55 @@ private:
     }
 };
 
+struct func_19_s : shared_func_base {
+    func_19_s(std::string name = "pippo", std::vector<expression> args = {})
+        : shared_func_base(std::move(name), std::move(args))
+    {
+    }
+
+private:
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<shared_func_base>(*this);
+    }
+};
+
 HEYOKA_S11N_FUNC_EXPORT(func_19)
+
+HEYOKA_S11N_FUNC_EXPORT(func_19_s)
 
 TEST_CASE("func s11n")
 {
     std::stringstream ss;
 
     func f{func_19{"pluto", {"x"_var}}};
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << f;
+    }
+
+    f = func{};
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> f;
+    }
+
+    REQUIRE(f.get_name() == "pluto");
+    REQUIRE(f.args().size() == 1u);
+    REQUIRE(f.args()[0] == "x"_var);
+}
+
+TEST_CASE("shared func s11n")
+{
+    std::stringstream ss;
+
+    func f{func_19_s{"pluto", {"x"_var}}};
 
     {
         boost::archive::binary_oarchive oa(ss);
@@ -561,13 +661,36 @@ TEST_CASE("copy")
         Message("The set of new arguments passed to func::copy() has a size of 1, but the number of arguments "
                 "of the original function is 2 (the two sizes must be equal)"));
 
-    auto foo_copy = expression{std::get<func>(foo.value()).copy({x, y})};
+    std::vector new_args = {x, y};
+
+    auto new_args_ptr = new_args.data();
+
+    auto foo_copy = expression{std::get<func>(foo.value()).copy(std::move(new_args))};
 
     // Check that copy creates a new obejct.
     REQUIRE(std::get<func>(foo_copy.value()).get_ptr() != std::get<func>(foo.value()).get_ptr());
 
     // Check the new arguments.
     REQUIRE(std::get<func>(foo_copy.value()).args() == std::vector{x, y});
+    REQUIRE(std::get<func>(foo_copy.value()).args().data() == new_args_ptr);
+}
+
+TEST_CASE("shared_func_base copy")
+{
+    func f_s(func_00_s{{"y"_var, "x"_var}});
+
+    std::vector new_args = {"x"_var, "y"_var};
+
+    auto new_args_ptr = new_args.data();
+
+    auto foo_copy = f_s.copy(std::move(new_args));
+
+    // Check that copy creates a new obejct.
+    REQUIRE(foo_copy.get_ptr() != f_s.get_ptr());
+
+    // Check the new arguments.
+    REQUIRE(foo_copy.args() == std::vector{"x"_var, "y"_var});
+    REQUIRE(foo_copy.args().data() == new_args_ptr);
 }
 
 // Bug: a default-constructed function is not serialisable.

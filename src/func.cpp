@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -65,7 +66,7 @@ func_iface::~func_iface() = default;
 
 func_base::func_base(std::string name, std::vector<expression> args) : m_name(std::move(name)), m_args(std::move(args))
 {
-    if (m_name.empty()) {
+    if (m_name.empty()) [[unlikely]] {
         throw std::invalid_argument("Cannot create a function with no name");
     }
 }
@@ -115,11 +116,80 @@ void func_base::replace_args(std::vector<expression> new_args)
     m_args = std::move(new_args);
 }
 
+shared_func_base::shared_func_base(std::string name, std::vector<expression> args)
+    : m_name(std::move(name)), m_args(std::make_shared<const std::vector<expression>>(std::move(args)))
+{
+    if (m_name.empty()) [[unlikely]] {
+        throw std::invalid_argument("Cannot create a function with no name");
+    }
+}
+
+shared_func_base::shared_func_base(const shared_func_base &) = default;
+
+shared_func_base::shared_func_base(shared_func_base &&) noexcept = default;
+
+shared_func_base &shared_func_base::operator=(const shared_func_base &) = default;
+
+shared_func_base &shared_func_base::operator=(shared_func_base &&) noexcept = default;
+
+shared_func_base::~shared_func_base() = default;
+
+void shared_func_base::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << m_name;
+    ar << m_args;
+}
+
+void shared_func_base::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> m_name;
+    ar >> m_args;
+}
+
+const std::string &shared_func_base::get_name() const noexcept
+{
+    return m_name;
+}
+
+const std::vector<expression> &shared_func_base::args() const noexcept
+{
+    assert(m_args != nullptr);
+
+    return *m_args;
+}
+
+void shared_func_base::replace_args(std::vector<expression> new_args)
+{
+    assert(m_args != nullptr);
+
+    // LCOV_EXCL_START
+    if (new_args.size() != m_args->size()) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("shared_func_base::replace_args() was invoked with a new_args argument of "
+                        "size {}, but the current argument size is {}",
+                        new_args.size(), m_args->size()));
+    }
+    // LCOV_EXCL_STOP
+
+    m_args = std::make_shared<const std::vector<expression>>(std::move(new_args));
+}
+
+shared_func_base::args_ptr_t shared_func_base::get_args_ptr() const noexcept
+{
+    assert(m_args != nullptr);
+
+    return m_args;
+}
+
 namespace detail
 {
 
+namespace
+{
+
 // Default implementation of to_stream() for func.
-void func_default_to_stream_impl(std::ostringstream &oss, const func_base &f)
+template <typename Base>
+void func_default_to_stream_impl(std::ostringstream &oss, const Base &f)
 {
     oss << f.get_name() << '(';
 
@@ -132,6 +202,18 @@ void func_default_to_stream_impl(std::ostringstream &oss, const func_base &f)
     }
 
     oss << ')';
+}
+
+} // namespace
+
+void func_default_to_stream(std::ostringstream &oss, const func_base &f)
+{
+    func_default_to_stream_impl(oss, f);
+}
+
+void func_default_to_stream(std::ostringstream &oss, const shared_func_base &f)
+{
+    func_default_to_stream_impl(oss, f);
 }
 
 null_func::null_func() : func_base("null_func", {}) {}
