@@ -23,6 +23,8 @@
 #include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/atan2.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/math/tanh.hpp>
@@ -794,4 +796,32 @@ TEST_CASE("hessian")
                                Message("The Hessian of the function component at index 1 was requested, but the "
                                        "function has only 1 output(s)"));
     }
+}
+
+// This is a test to check correct behaviour with multivariate functions
+// with identical arguments.
+TEST_CASE("grad_map")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    auto a = x * x - y;
+    auto b = y * y - x;
+    auto c = x * x - y * y;
+
+    auto dt = diff_tensors({atan2(a, a), sum({b, b}), prod({c, c})}, diff_args::vars, kw::diff_order = 1u);
+
+    REQUIRE(
+        dt.get_derivatives(0, 1)[0].second
+        == (x + x)
+               * (a * pow(pow(a, 2_dbl) + pow(a, 2_dbl), -1_dbl) + -a * pow(pow(a, 2_dbl) + pow(a, 2_dbl), -1_dbl)));
+    REQUIRE(
+        dt.get_derivatives(0, 1)[1].second
+        == (-1_dbl)
+               * (a * pow(pow(a, 2_dbl) + pow(a, 2_dbl), -1_dbl) + -a * pow(pow(a, 2_dbl) + pow(a, 2_dbl), -1_dbl)));
+
+    REQUIRE(dt.get_derivatives(1, 1)[0].second == -2_dbl);
+    REQUIRE(dt.get_derivatives(1, 1)[1].second == 2_dbl * (y + y));
+
+    REQUIRE(dt.get_derivatives(2, 1)[0].second == (x + x) * (c + c));
+    REQUIRE(dt.get_derivatives(2, 1)[1].second == -(y + y) * (c + c));
 }
