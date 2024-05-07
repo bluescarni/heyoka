@@ -13,7 +13,6 @@
 #include <cstdint>
 #include <initializer_list>
 #include <stdexcept>
-#include <string>
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
@@ -46,7 +45,6 @@
 
 #endif
 
-#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -72,28 +70,16 @@ atan2_impl::atan2_impl(expression y, expression x) : func_base("atan2", std::vec
 
 atan2_impl::atan2_impl() : atan2_impl(0_dbl, 1_dbl) {}
 
-expression atan2_impl::diff(funcptr_map<expression> &func_map, const std::string &s) const
+std::vector<expression> atan2_impl::gradient() const
 {
     assert(args().size() == 2u);
 
     const auto &y = args()[0];
     const auto &x = args()[1];
 
-    auto den = pow(x, 2_dbl) + pow(y, 2_dbl);
+    const auto den = pow(pow(x, 2_dbl) + pow(y, 2_dbl), -1_dbl);
 
-    return (x * detail::diff(func_map, y, s) - y * detail::diff(func_map, x, s)) / den;
-}
-
-expression atan2_impl::diff(funcptr_map<expression> &func_map, const param &p) const
-{
-    assert(args().size() == 2u);
-
-    const auto &y = args()[0];
-    const auto &x = args()[1];
-
-    auto den = pow(x, 2_dbl) + pow(y, 2_dbl);
-
-    return (x * detail::diff(func_map, y, p) - y * detail::diff(func_map, x, p)) / den;
+    return {x * den, -y * den};
 }
 
 llvm::Value *atan2_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,

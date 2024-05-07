@@ -66,7 +66,9 @@ public:
 
     // NOTE: this is supposed to be private, but there are issues making friends
     // with concept constraints on clang. Leave it public and undocumented for now.
-    std::pair<expression *, expression *> get_mutable_args_range();
+    // NOTE: this is the only non-const function in the interface, and it is supposed
+    // to be used only in the implementation of the func::copy() function.
+    void replace_args(std::vector<expression>);
 };
 
 // UDF concept.
@@ -79,16 +81,6 @@ namespace detail
 
 // Default implementation of output streaming for func.
 HEYOKA_DLL_PUBLIC void func_default_to_stream_impl(std::ostringstream &, const func_base &);
-
-template <typename T>
-concept func_has_diff_var = requires(const T &x, funcptr_map<expression> &m, const std::string &name) {
-    { x.diff(m, name) } -> std::same_as<expression>;
-};
-
-template <typename T>
-concept func_has_diff_par = requires(const T &x, funcptr_map<expression> &m, const param &p) {
-    { x.diff(m, p) } -> std::same_as<expression>;
-};
 
 template <typename T>
 concept func_has_gradient = requires(const T &x) {
@@ -137,22 +129,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
         // function class that hides it.
         return static_cast<const func_base &>(getval<Holder>(this)).args();
     }
-    std::pair<expression *, expression *> get_mutable_args_range() final
-    {
-        return static_cast<func_base &>(getval<Holder>(this)).get_mutable_args_range();
-    }
-
-    // diff.
-    [[nodiscard]] bool has_diff_var() const final
-    {
-        return func_has_diff_var<T>;
-    }
-    expression diff(funcptr_map<expression> &, const std::string &) const final;
-    [[nodiscard]] bool has_diff_par() const final
-    {
-        return func_has_diff_par<T>;
-    }
-    expression diff(funcptr_map<expression> &, const param &) const final;
+    void replace_args(std::vector<expression>) final;
 
     // gradient.
     [[nodiscard]] bool has_gradient() const final
@@ -263,15 +240,10 @@ struct HEYOKA_DLL_PUBLIC func_iface {
     [[nodiscard]] virtual bool is_time_dependent() const = 0;
 
     [[nodiscard]] virtual const std::vector<expression> &args() const = 0;
-    virtual std::pair<expression *, expression *> get_mutable_args_range() = 0;
+    virtual void replace_args(std::vector<expression>) = 0;
 
-    [[nodiscard]] virtual bool has_diff_var() const = 0;
-    virtual expression diff(funcptr_map<expression> &, const std::string &) const = 0;
-    [[nodiscard]] virtual bool has_diff_par() const = 0;
-    virtual expression diff(funcptr_map<expression> &, const param &) const = 0;
     [[nodiscard]] virtual bool has_gradient() const = 0;
     [[nodiscard]] virtual std::vector<expression> gradient() const = 0;
-    [[nodiscard]] std::vector<expression> fetch_gradient(const std::string &) const;
 
     [[nodiscard]] virtual llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &,
                                                  llvm::Value *, llvm::Value *, llvm::Value *, std::uint32_t, bool) const
@@ -340,6 +312,9 @@ class HEYOKA_DLL_PUBLIC func
     void load(boost::archive::binary_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
+    template <typename T>
+    HEYOKA_DLL_LOCAL expression diff_impl(detail::funcptr_map<expression> &, const T &) const;
+
 public:
     func();
     template <typename T>
@@ -361,7 +336,7 @@ public:
     // a copy of the inner object in which the original
     // function arguments have been replaced by the
     // provided vector of arguments.
-    [[nodiscard]] func copy(const std::vector<expression> &) const;
+    [[nodiscard]] func copy(std::vector<expression>) const;
 
     template <typename T>
     [[nodiscard]] const T *extract() const noexcept
@@ -379,6 +354,7 @@ public:
 
     [[nodiscard]] std::size_t hash(detail::funcptr_map<std::size_t> &) const;
 
+    [[nodiscard]] std::vector<expression> gradient() const;
     [[nodiscard]] expression diff(detail::funcptr_map<expression> &, const std::string &) const;
     [[nodiscard]] expression diff(detail::funcptr_map<expression> &, const param &) const;
 

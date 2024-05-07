@@ -867,7 +867,7 @@ expression prod_to_div_impl(funcptr_map<expression> &func_map, const expression 
                 if (v.template extract<prod_impl>() == nullptr) {
                     // The current function is not a prod(). Just create
                     // a copy of it with the new args.
-                    retval.emplace(v.copy(new_args));
+                    retval.emplace(v.copy(std::move(new_args)));
                 } else {
                     // The current function is a prod(). Partition its
                     // arguments according to fpart.
@@ -875,7 +875,7 @@ expression prod_to_div_impl(funcptr_map<expression> &func_map, const expression 
 
                     if (it == new_args.end()) {
                         // There are no small negative powers in the prod, just make a copy.
-                        retval.emplace(v.copy(new_args));
+                        retval.emplace(v.copy(std::move(new_args)));
                     } else {
                         // There are some small negative powers in the prod.
                         // Group them into a divisor, negate the exponents, and transform

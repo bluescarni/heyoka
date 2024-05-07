@@ -147,34 +147,13 @@ HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
 namespace detail
 {
 
-// NOTE: these need to go here because
+// NOTE: some member functions of func_iface_impl need to go here because
 // the definition of expression must be available.
 template <typename Base, typename Holder, typename T>
     requires is_udf<T>
-inline expression func_iface_impl<Base, Holder, T>::diff(funcptr_map<expression> &func_map, const std::string &s) const
+inline void func_iface_impl<Base, Holder, T>::replace_args(std::vector<expression> new_args)
 {
-    if constexpr (func_has_diff_var<T>) {
-        return getval<Holder>(this).diff(func_map, s);
-    }
-
-    // LCOV_EXCL_START
-    assert(false);
-    throw;
-    // LCOV_EXCL_STOP
-}
-
-template <typename Base, typename Holder, typename T>
-    requires is_udf<T>
-inline expression func_iface_impl<Base, Holder, T>::diff(funcptr_map<expression> &func_map, const param &p) const
-{
-    if constexpr (func_has_diff_par<T>) {
-        return getval<Holder>(this).diff(func_map, p);
-    }
-
-    // LCOV_EXCL_START
-    assert(false);
-    throw;
-    // LCOV_EXCL_STOP
+    return static_cast<func_base &>(getval<Holder>(this)).replace_args(std::move(new_args));
 }
 
 struct HEYOKA_DLL_PUBLIC prime_wrapper {

@@ -26,7 +26,6 @@
 
 #endif
 
-#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -38,21 +37,23 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+// NOTE: this is the trivariate function DE=DE(s0, c0, DM) implicitly defined
+// by the trascendental equation:
+//
+// DM = DE + s0 * (1 - cos(DE)) - c0 * sin(DE)
+//
+// Where s0**2 + c0**2 < 1.
 class HEYOKA_DLL_PUBLIC kepDE_impl : public func_base
 {
     friend class boost::serialization::access;
     template <typename Archive>
     HEYOKA_DLL_LOCAL void serialize(Archive &, unsigned);
 
-    template <typename T>
-    HEYOKA_DLL_LOCAL expression diff_impl(funcptr_map<expression> &, const T &) const;
-
 public:
     kepDE_impl();
     explicit kepDE_impl(expression, expression, expression);
 
-    expression diff(funcptr_map<expression> &, const std::string &) const;
-    expression diff(funcptr_map<expression> &, const param &) const;
+    [[nodiscard]] std::vector<expression> gradient() const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
