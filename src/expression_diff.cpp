@@ -401,20 +401,57 @@ auto diff_make_adj_dep(const std::vector<expression> &dc, std::vector<expression
         subs_map.emplace(fmt::format("u_{}", i), dc[i]);
     }
 
+    // NOTE: this map is used in the next loop (see comments there).
+    // NOTE: as usual, use a sorted map (instead of a hash map) in order
+    // to avoid non-deterministic ordering of operations.
+    std::map<std::string, std::vector<expression>> grad_map;
+
     // Elementary subexpressions.
     for (idx_t i = nvars; i < dc.size() - nouts; ++i) {
-        // The elementary subexpressions must all be functions.
-        assert(std::holds_alternative<func>(dc[i].value()));
+        // Reset grad_map.
+        grad_map.clear();
 
+        // Fetch references to the current dict of adjoints
+        // and the direct deps vector.
         auto &cur_adj_dict = adj[i];
         auto &cur_dep = dep[i];
 
+        // The elementary subexpressions must all be functions.
+        assert(std::holds_alternative<func>(dc[i].value()));
+        const auto &fn = std::get<func>(dc[i].value());
+
+        // Fetch the gradient of the subexpression wrt its arguments.
+        auto grad = fn.gradient();
+        assert(grad.size() == fn.args().size());
+
+        // Fill in grad_map: for each variable in the arguments of the subexpression,
+        // compute the list of associated partial derivatives. For instance, if the subexpression
+        // is something like f(u_0, 1.0, u_0, u_1), there will be two partial derivatives
+        // for the variable u_0: one containing the derivative of f wrt the first argument,
+        // the other containing the derivative wrt the third argument.
+        // NOTE: we are doing all this in order to compute (in the next loop) the total
+        // derivatives of the subexpression wrt its variables. However, instead of just using
+        // diff() for this, we are re-implementing manually the total derivative calculation
+        // in an effort to avoid quadratic complexity in case of functions with many arguments.
+        for (decltype(grad.size()) arg_idx = 0; arg_idx < grad.size(); ++arg_idx) {
+            const auto &arg = fn.args()[arg_idx];
+
+            if (const auto *var_ptr = std::get_if<variable>(&arg.value())) {
+                // The argument is a variable.
+                grad_map[var_ptr->name()].push_back(std::move(grad[arg_idx]));
+            } else {
+                // The only other possibility is that the argument is a number.
+                assert(std::holds_alternative<number>(arg.value()));
+            }
+        }
+
         // Fill in the adjoints and the direct/reverse dependencies.
-        for (const auto &var : get_variables(dc[i])) {
+        for (auto &[var, pdiffs] : grad_map) {
             const auto idx = uname_to_index(var);
 
-            assert(cur_adj_dict.count(idx) == 0u);
-            cur_adj_dict[idx] = diff(dc[i], var);
+            // NOTE: this is the computation of the total derivative.
+            assert(!cur_adj_dict.contains(idx));
+            cur_adj_dict[idx] = sum(std::move(pdiffs));
 
             assert(idx < revdep.size());
             revdep[idx].push_back(boost::numeric_cast<std::uint32_t>(i));
