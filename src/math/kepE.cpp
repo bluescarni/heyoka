@@ -12,7 +12,6 @@
 #include <cstdint>
 #include <initializer_list>
 #include <stdexcept>
-#include <string>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -43,7 +42,6 @@
 
 #endif
 
-#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -53,9 +51,9 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepE.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
@@ -69,28 +67,17 @@ kepE_impl::kepE_impl() : kepE_impl(0_dbl, 0_dbl) {}
 
 kepE_impl::kepE_impl(expression e, expression M) : func_base("kepE", std::vector{std::move(e), std::move(M)}) {}
 
-expression kepE_impl::diff(funcptr_map<expression> &func_map, const std::string &s) const
+std::vector<expression> kepE_impl::gradient() const
 {
     assert(args().size() == 2u);
 
     const auto &e = args()[0];
-    const auto &M = args()[1];
 
     const expression E{func{*this}};
 
-    return (detail::diff(func_map, e, s) * sin(E) + detail::diff(func_map, M, s)) / (1_dbl - e * cos(E));
-}
+    const auto den = pow(1_dbl - e * cos(E), -1_dbl);
 
-expression kepE_impl::diff(funcptr_map<expression> &func_map, const param &p) const
-{
-    assert(args().size() == 2u);
-
-    const auto &e = args()[0];
-    const auto &M = args()[1];
-
-    const expression E{func{*this}};
-
-    return (detail::diff(func_map, e, p) * sin(E) + detail::diff(func_map, M, p)) / (1_dbl - e * cos(E));
+    return {sin(E) * den, den};
 }
 
 namespace

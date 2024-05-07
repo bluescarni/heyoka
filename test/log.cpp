@@ -40,6 +40,7 @@
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/log.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -98,10 +99,10 @@ TEST_CASE("log diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(log(x * x - y), x) == (x + x) / (x * x - y));
+    REQUIRE(diff(log(x * x - y), x) == pow(x * x - y, -1_dbl) * (x + x));
     REQUIRE(diff(log(x * x - y), y) == -1_dbl / (x * x - y));
 
-    REQUIRE(diff(log(par[0] * par[0] - y), par[0]) == (par[0] + par[0]) / (par[0] * par[0] - y));
+    REQUIRE(diff(log(par[0] * par[0] - y), par[0]) == pow(par[0] * par[0] - y, -1_dbl) * (par[0] + par[0]));
     REQUIRE(diff(log(x * x - par[1]), par[1]) == -1_dbl / (x * x - par[1]));
 }
 

@@ -82,11 +82,12 @@ TEST_CASE("atan diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(atan(square_wrapper(x) - y), x) == (2_dbl * x) / (1. + square_wrapper(square_wrapper(x) - y)));
+    REQUIRE(diff(atan(square_wrapper(x) - y), x)
+            == pow(1. + square_wrapper(square_wrapper(x) - y), -1_dbl) * (2_dbl * x));
     REQUIRE(diff(atan(square_wrapper(x) + y), y) == 1. / (1. + square_wrapper(square_wrapper(x) + y)));
 
     REQUIRE(diff(atan(square_wrapper(par[0]) - y), par[0])
-            == (2_dbl * par[0]) / (1. + square_wrapper(square_wrapper(par[0]) - y)));
+            == pow(1. + square_wrapper(square_wrapper(par[0]) - y), -1_dbl) * (2_dbl * par[0]));
     REQUIRE(diff(atan(square_wrapper(x) + par[1]), par[1]) == 1. / (1. + square_wrapper(square_wrapper(x) + par[1])));
 }
 

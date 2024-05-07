@@ -13,7 +13,6 @@
 #include <cstdint>
 #include <initializer_list>
 #include <stdexcept>
-#include <string>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -38,7 +37,6 @@
 
 #endif
 
-#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
@@ -63,16 +61,9 @@ atanh_impl::atanh_impl(expression e) : func_base("atanh", std::vector{std::move(
 
 atanh_impl::atanh_impl() : atanh_impl(0_dbl) {}
 
-expression atanh_impl::diff(funcptr_map<expression> &func_map, const std::string &s) const
+std::vector<expression> atanh_impl::gradient() const
 {
-    assert(args().size() == 1u);
-    return detail::diff(func_map, args()[0], s) / (1_dbl - pow(args()[0], 2_dbl));
-}
-
-expression atanh_impl::diff(funcptr_map<expression> &func_map, const param &p) const
-{
-    assert(args().size() == 1u);
-    return detail::diff(func_map, args()[0], p) / (1_dbl - pow(args()[0], 2_dbl));
+    return {pow(1_dbl - pow(args()[0], 2_dbl), -1_dbl)};
 }
 
 llvm::Value *atanh_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const std::vector<llvm::Value *> &eval_arr,

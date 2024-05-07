@@ -119,16 +119,10 @@ TEST_CASE("kepE diff")
         REQUIRE(diff(kepE(x, y), x) == sin(kepE(x, y)) / (1_dbl - x * cos(kepE(x, y))));
         REQUIRE(diff(kepE(x, y), y) == 1_dbl / (1_dbl - x * cos(kepE(x, y))));
         auto E = kepE(x * x, x * y);
-        REQUIRE(diff(E, x) == ((x + x) * sin(E) + y) / (1_dbl - x * x * cos(E)));
-        REQUIRE(diff(E, y) == x / (1_dbl - x * x * cos(E)));
-    }
-
-    {
-        REQUIRE(diff(kepE(par[0], y), par[0]) == sin(kepE(par[0], y)) / (1_dbl - par[0] * cos(kepE(par[0], y))));
-        REQUIRE(diff(kepE(x, par[1]), par[1]) == 1_dbl / (1_dbl - x * cos(kepE(x, par[1]))));
-        auto E = kepE(par[0] * par[0], par[0] * par[1]);
-        REQUIRE(diff(E, par[0]) == ((par[0] + par[0]) * sin(E) + par[1]) / (1_dbl - par[0] * par[0] * cos(E)));
-        REQUIRE(diff(E, par[1]) == par[0] / (1_dbl - par[0] * par[0] * cos(E)));
+        REQUIRE(diff(E, x)
+                == sin(E) * pow((1_dbl - x * x * cos(E)), -1_dbl) * (x + x)
+                       + pow((1_dbl - x * x * cos(E)), -1_dbl) * y);
+        REQUIRE(diff(E, y) == pow(1_dbl - x * x * cos(E), -1_dbl) * x);
     }
 }
 

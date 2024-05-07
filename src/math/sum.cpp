@@ -568,7 +568,7 @@ expression sum_to_sub_impl(funcptr_map<expression> &func_map, const expression &
                 if (v.template extract<sum_impl>() == nullptr) {
                     // The current function is not a sum(). Just create
                     // a copy of it with the new args.
-                    retval.emplace(v.copy(new_args));
+                    retval.emplace(v.copy(std::move(new_args)));
                 } else {
                     // The current function is a sum(). Partition its
                     // arguments so that those in the form -1 * a * ...
@@ -587,7 +587,7 @@ expression sum_to_sub_impl(funcptr_map<expression> &func_map, const expression &
 
                     if (it == new_args.end()) {
                         // There are no negations in the sum, just make a copy.
-                        retval.emplace(v.copy(new_args));
+                        retval.emplace(v.copy(std::move(new_args)));
                     } else {
                         // There are some negations in the sum.
                         // Group them into a subtrahend, negate, and transform

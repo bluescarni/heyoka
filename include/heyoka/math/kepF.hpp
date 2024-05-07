@@ -12,7 +12,6 @@
 #include <heyoka/config.hpp>
 
 #include <cstdint>
-#include <string>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -27,7 +26,6 @@
 
 #endif
 
-#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -45,15 +43,11 @@ class HEYOKA_DLL_PUBLIC kepF_impl : public func_base
     template <typename Archive>
     HEYOKA_DLL_LOCAL void serialize(Archive &, unsigned);
 
-    template <typename T>
-    HEYOKA_DLL_LOCAL expression diff_impl(funcptr_map<expression> &, const T &) const;
-
 public:
     kepF_impl();
     explicit kepF_impl(expression, expression, expression);
 
-    expression diff(funcptr_map<expression> &, const std::string &) const;
-    expression diff(funcptr_map<expression> &, const param &) const;
+    [[nodiscard]] std::vector<expression> gradient() const;
 
     [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
                                          llvm::Value *, llvm::Value *, std::uint32_t, bool) const;

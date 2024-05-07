@@ -72,13 +72,11 @@ TEST_CASE("func minimal")
 
     detail::funcptr_map<expression> func_map;
     REQUIRE_THROWS_MATCHES(f.diff(func_map, ""), not_implemented_error,
-                           Message("Cannot compute the derivative of the function 'f' with respect to a variable, "
-                                   "because the function does not provide "
-                                   "neither a diff() nor a gradient() member function"));
+                           Message("Cannot compute derivatives for the function 'f', because "
+                                   "the function does not provide a gradient() member function"));
     REQUIRE_THROWS_MATCHES(f.diff(func_map, std::get<param>(par[0].value())), not_implemented_error,
-                           Message("Cannot compute the derivative of the function 'f' with respect to a parameter, "
-                                   "because the function does not provide "
-                                   "neither a diff() nor a gradient() member function"));
+                           Message("Cannot compute derivatives for the function 'f', because "
+                                   "the function does not provide a gradient() member function"));
     REQUIRE_THROWS_MATCHES(f.llvm_eval(s, fp_t, {}, nullptr, nullptr, nullptr, 1, false), not_implemented_error,
                            Message("llvm_eval() is not implemented for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.llvm_c_eval_func(s, fp_t, 1, false), not_implemented_error,
@@ -145,9 +143,9 @@ struct func_05 : func_base {
     func_05() : func_base("f", {}) {}
     explicit func_05(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    expression diff(detail::funcptr_map<expression> &, const std::string &) const
+    std::vector<expression> gradient() const
     {
-        return 42_dbl;
+        return std::vector<expression>(args().size(), 2_dbl);
     }
 };
 
@@ -161,28 +159,14 @@ struct func_05a : func_base {
     }
 };
 
-struct func_05b : func_base {
-    func_05b() : func_base("f", {}) {}
-    explicit func_05b(std::vector<expression> args) : func_base("f", std::move(args)) {}
-
-    expression diff(detail::funcptr_map<expression> &, const param &) const
-    {
-        return -42_dbl;
-    }
-};
-
 TEST_CASE("func diff")
 {
     using Catch::Matchers::Message;
 
-    auto f = func(func_05{});
-
     detail::funcptr_map<expression> func_map;
-    REQUIRE(f.diff(func_map, "x") == 42_dbl);
     REQUIRE_THROWS_MATCHES(func(func_05a{{"x"_var}}).diff(func_map, "x"), std::invalid_argument,
                            Message("Inconsistent gradient returned by the function 'f': a vector of 1 elements was "
                                    "expected, but the number of elements is 0 instead"));
-    REQUIRE(func(func_05b{{"x"_var}}).diff(func_map, std::get<param>(par[0].value())) == -42_dbl);
 }
 
 struct func_10 : func_base {
@@ -417,19 +401,17 @@ TEST_CASE("func diff free func")
 {
     using Catch::Matchers::Message;
 
-    auto f1 = func(func_05{{}});
+    auto f1 = func(func_05{{"x"_var, "y"_var}});
 
-    REQUIRE(diff(expression{f1}, "x") == 42_dbl);
+    REQUIRE(diff(expression{f1}, "x") == 2_dbl);
 
     f1 = func(func_00{});
     REQUIRE_THROWS_MATCHES(diff(expression{f1}, ""), not_implemented_error,
-                           Message("Cannot compute the derivative of the function 'f' with respect to a variable, "
-                                   "because the function does not provide "
-                                   "neither a diff() nor a gradient() member function"));
+                           Message("Cannot compute derivatives for the function 'f', because "
+                                   "the function does not provide a gradient() member function"));
     REQUIRE_THROWS_MATCHES(diff(expression{f1}, par[0]), not_implemented_error,
-                           Message("Cannot compute the derivative of the function 'f' with respect to a parameter, "
-                                   "because the function does not provide "
-                                   "neither a diff() nor a gradient() member function"));
+                           Message("Cannot compute derivatives for the function 'f', because "
+                                   "the function does not provide a gradient() member function"));
 }
 
 struct func_15 : func_base {
