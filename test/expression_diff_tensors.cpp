@@ -825,3 +825,19 @@ TEST_CASE("grad_map")
     REQUIRE(dt.get_derivatives(2, 1)[0].second == (x + x) * (c + c));
     REQUIRE(dt.get_derivatives(2, 1)[1].second == -(y + y) * (c + c));
 }
+
+// A test case with a trivial function whose outputs
+// consist of variable, parameters and numbers.
+TEST_CASE("trivial_func")
+{
+    auto dt = diff_tensors({"x"_var, par[1], 42_dbl}, diff_args::all, kw::diff_order = 1u);
+
+    REQUIRE(dt.get_derivatives(0, 1)[0].second == 1_dbl);
+    REQUIRE(dt.get_derivatives(0, 1)[1].second == 0_dbl);
+
+    REQUIRE(dt.get_derivatives(1, 1)[0].second == 0_dbl);
+    REQUIRE(dt.get_derivatives(1, 1)[1].second == 1_dbl);
+
+    REQUIRE(dt.get_derivatives(2, 1)[0].second == 0_dbl);
+    REQUIRE(dt.get_derivatives(2, 1)[1].second == 0_dbl);
+}
