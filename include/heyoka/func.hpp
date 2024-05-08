@@ -91,6 +91,7 @@ private:
 
 public:
     explicit shared_func_base(std::string, std::vector<expression>);
+    explicit shared_func_base(std::string, args_ptr_t);
 
     shared_func_base(const shared_func_base &);
     shared_func_base(shared_func_base &&) noexcept;

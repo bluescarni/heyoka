@@ -46,9 +46,10 @@ struct func_00 : func_base {
 };
 
 struct func_00_s : shared_func_base {
-    func_00_s() : shared_func_base("f", {}) {}
-    func_00_s(const std::string &name) : shared_func_base(name, {}) {}
+    func_00_s() : shared_func_base("f", std::vector<expression>{}) {}
+    func_00_s(const std::string &name) : shared_func_base(name, std::vector<expression>{}) {}
     explicit func_00_s(std::vector<expression> args) : shared_func_base("f", std::move(args)) {}
+    explicit func_00_s(shared_func_base::args_ptr_t args) : shared_func_base("f", std::move(args)) {}
 };
 
 struct func_01 {
@@ -779,6 +780,19 @@ TEST_CASE("func lt")
     REQUIRE(func{func_20{"aaa", {1_dbl}}} < func{func_20{"aaa", {2_dbl}}});
     REQUIRE(!(func{func_20{"aaa", {1_dbl}}} < func{func_20{"aaa", {1_dbl}}}));
     REQUIRE(!(func{func_20{"aaa", {3_dbl}}} < func{func_20{"aaa", {2_dbl}}}));
+}
+
+TEST_CASE("shared_func_base cmp")
+{
+    func_00_s a{{"x"_var, "y"_var}}, b{a.get_args_ptr()};
+
+    func f_s0(std::move(a));
+    func f_s1(std::move(b));
+
+    REQUIRE(!(f_s0 < f_s1));
+    REQUIRE(!(f_s1 < f_s0));
+    REQUIRE(f_s0 == f_s1);
+    REQUIRE(!(f_s0 != f_s1));
 }
 
 #if defined(__GNUC__)

@@ -124,6 +124,20 @@ shared_func_base::shared_func_base(std::string name, std::vector<expression> arg
     }
 }
 
+// NOTE: this ctor requires a non-null pointer.
+shared_func_base::shared_func_base(std::string name, args_ptr_t args) : m_name(std::move(name)), m_args(std::move(args))
+{
+    // LCOV_EXCL_START
+    if (m_args == nullptr) [[unlikely]] {
+        throw std::invalid_argument("Cannot create a shared_func_base from a null pointer to the arguments");
+    }
+    // LCOV_EXCL_STOP
+
+    if (m_name.empty()) [[unlikely]] {
+        throw std::invalid_argument("Cannot create a function with no name");
+    }
+}
+
 shared_func_base::shared_func_base(const shared_func_base &) = default;
 
 shared_func_base::shared_func_base(shared_func_base &&) noexcept = default;
@@ -621,7 +635,18 @@ bool operator==(const func &a, const func &b) noexcept
     }
 
     // NOTE: the comparison considers the function name and the arguments.
-    return a.get_name() == b.get_name() && a.args() == b.args();
+    if (a.get_name() != b.get_name()) {
+        return false;
+    }
+
+    // Check if the vectors of arguments are the same object - this
+    // could happen when the UDF derives from shared_func_base.
+    if (&a.args() == &b.args()) {
+        return true;
+    }
+
+    // Compare the arguments.
+    return a.args() == b.args();
 }
 
 bool operator!=(const func &a, const func &b) noexcept
@@ -654,6 +679,14 @@ bool operator<(const func &a, const func &b)
     assert(a.get_name() == b.get_name());
 
     // The names are equal, check the arguments next.
+
+    // First we check if the vectors of arguments are the same object - this
+    // could happen when the UDF derives from shared_func_base.
+    if (&a.args() == &b.args()) {
+        return false;
+    }
+
+    // Run a lexicographical compare.
     if (std::lexicographical_compare(a.args().begin(), a.args().end(), b.args().begin(), b.args().end(),
                                      std::less<expression>{})) {
         return true;
