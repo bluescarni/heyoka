@@ -106,6 +106,8 @@ public:
 
     void replace_args(std::vector<expression>);
 
+    // NOTE: this will return a new shared reference to the
+    // internal vector of arguments.
     [[nodiscard]] args_ptr_t get_args_ptr() const noexcept;
 };
 
