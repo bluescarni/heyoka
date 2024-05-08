@@ -50,6 +50,10 @@ struct func_00_s : shared_func_base {
     func_00_s(const std::string &name) : shared_func_base(name, std::vector<expression>{}) {}
     explicit func_00_s(std::vector<expression> args) : shared_func_base("f", std::move(args)) {}
     explicit func_00_s(shared_func_base::args_ptr_t args) : shared_func_base("f", std::move(args)) {}
+    explicit func_00_s(const std::string &name, shared_func_base::args_ptr_t args)
+        : shared_func_base(name, std::move(args))
+    {
+    }
 };
 
 struct func_01 {
@@ -784,6 +788,8 @@ TEST_CASE("func lt")
 
 TEST_CASE("shared_func_base cmp")
 {
+    using Catch::Matchers::Message;
+
     func_00_s a{{"x"_var, "y"_var}}, b{a.get_args_ptr()};
 
     func f_s0(std::move(a));
@@ -793,6 +799,11 @@ TEST_CASE("shared_func_base cmp")
     REQUIRE(!(f_s1 < f_s0));
     REQUIRE(f_s0 == f_s1);
     REQUIRE(!(f_s0 != f_s1));
+
+    // Check throwing for the ctor from args ptr.
+    func_00_s c{{"x"_var, "y"_var}};
+    REQUIRE_THROWS_MATCHES((func{func_00_s{"", c.get_args_ptr()}}), std::invalid_argument,
+                           Message("Cannot create a function with no name"));
 }
 
 #if defined(__GNUC__)
