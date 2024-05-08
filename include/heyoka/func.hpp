@@ -113,7 +113,7 @@ public:
 
 // UDF concept.
 template <typename T>
-concept is_udf = std::default_initializable<T> && std::movable<T> && std::copyable<T>
+concept is_udf = std::default_initializable<T> && std::copyable<T>
                  && (std::derived_from<T, func_base> || std::derived_from<T, shared_func_base>);
 
 namespace detail
