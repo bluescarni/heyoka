@@ -115,7 +115,7 @@ The :cpp:class:`~heyoka::func` class
 Concepts
 --------
 
-.. cpp:concept:: template <typename T> is_udf = std::default_initializable<T> && std::movable<T> && std::copyable<T> && std::derived_from<T, func_base>
+.. cpp:concept:: template <typename T> is_udf = std::default_initializable<T> && std::copyable<T> && std::derived_from<T, func_base>
 
    User-defined function concept.
 
