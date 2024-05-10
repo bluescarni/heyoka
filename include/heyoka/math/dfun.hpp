@@ -10,6 +10,7 @@
 #define HEYOKA_MATH_DFUN_HPP
 
 #include <cstdint>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -26,33 +27,39 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC dfun_impl : public func_base
+class HEYOKA_DLL_PUBLIC dfun_impl : public shared_func_base
 {
-    std::string m_v_name;
+    std::string m_id_name;
     std::vector<std::pair<std::uint32_t, std::uint32_t>> m_didx;
 
     friend class boost::serialization::access;
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
-        ar &boost::serialization::base_object<func_base>(*this);
-        ar & m_v_name;
+        ar &boost::serialization::base_object<shared_func_base>(*this);
+        ar & m_id_name;
         ar & m_didx;
     }
 
+    // A private ctor used only in the implementation of gradient().
+    explicit dfun_impl(std::string, std::string, std::shared_ptr<const std::vector<expression>>,
+                       std::vector<std::pair<std::uint32_t, std::uint32_t>>);
+
 public:
     dfun_impl();
-    explicit dfun_impl(const expression &, std::vector<expression>,
-                       std::vector<std::pair<std::uint32_t, std::uint32_t>>);
+    explicit dfun_impl(std::string, std::vector<expression>, std::vector<std::pair<std::uint32_t, std::uint32_t>>);
+
+    [[nodiscard]] const std::string &get_id_name() const;
+    [[nodiscard]] const std::vector<std::pair<std::uint32_t, std::uint32_t>> &get_didx() const;
 
     void to_stream(std::ostringstream &) const;
 
-    //[[nodiscard]] std::vector<expression> gradient() const;
+    [[nodiscard]] std::vector<expression> gradient() const;
 };
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression dfun(const expression &, std::vector<expression>,
+HEYOKA_DLL_PUBLIC expression dfun(std::string, std::vector<expression>,
                                   std::vector<std::pair<std::uint32_t, std::uint32_t>> = {});
 
 HEYOKA_END_NAMESPACE

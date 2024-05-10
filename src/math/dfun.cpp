@@ -6,83 +6,47 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <algorithm>
-#include <cassert>
+#include <memory>
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
-#include <unordered_set>
 #include <utility>
-#include <variant>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/core.h>
-#include <fmt/ranges.h>
 
 #include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/math/dfun.hpp>
-#include <heyoka/param.hpp>
-#include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
 {
 
-dfun_impl::dfun_impl() : dfun_impl("x"_var, {}, {}) {}
+dfun_impl::dfun_impl() : dfun_impl("x", {}, {}) {}
 
 namespace
 {
 
 // Helper to validate the construction arguments of a dfun and assemble
-// the function name.
-auto make_dfun_name(const expression &v, std::vector<expression> args,
+// the full function name.
+auto make_dfun_name(const std::string &id_name, std::vector<expression> args,
                     const std::vector<std::pair<std::uint32_t, std::uint32_t>> &didx)
 {
-    using su32_t = boost::safe_numerics::safe<std::uint32_t>;
+    // Init the name.
+    std::string full_name = "dfun_";
 
-    // v must be a variable.
-    if (!std::holds_alternative<variable>(v.value())) [[unlikely]] {
-        throw std::invalid_argument(fmt::format(
-            "dfuns can be created only from a variable, but the input expression '{}' is not a variable", v));
-    }
-
-    // All expressions in args must be either variables or parameters.
-    if (std::ranges::any_of(args, [](const auto &e) {
-            return !std::holds_alternative<variable>(e.value()) && !std::holds_alternative<param>(e.value());
-        })) [[unlikely]] {
-        throw std::invalid_argument(
-            fmt::format("All arguments to a dfun must be either variables or parameters, but one or more non-variable "
-                        "and non-parameter were detected in the arguments list '{}'",
-                        args));
-    }
-
-    // Check for duplicates in args.
-    if (std::unordered_set(args.begin(), args.end()).size() != args.size()) [[unlikely]] {
-        throw std::invalid_argument(
-            fmt::format("Duplicate expressions where detected when constructing a dfun from the arguments '{}'", args));
-    }
-
-    // args must not contain v.
-    if (std::ranges::any_of(args, [&v](const auto &e) { return e == v; })) [[unlikely]] {
-        throw std::invalid_argument(fmt::format(
-            "A dfun constructed from the variable '{}' cannot contain the same variable within the arguments", v));
-    }
-
-    // Validate didx.
+    // Validate didx and build up the full name.
     if (!didx.empty()) {
-        // Make sure we can compute the total diff order via std::uint32_t.
-        su32_t tot_diff_order = 0;
-
-        // Helper to validate an element in didx.
-        auto validate_p = [&args, &tot_diff_order](const auto &p) {
+        // Helper to validate an element in didx and update full_name.
+        auto validate_p = [&args, &full_name](const auto &p) {
             const auto [idx, order] = p;
 
             if (idx >= args.size()) [[unlikely]] {
@@ -97,8 +61,8 @@ auto make_dfun_name(const expression &v, std::vector<expression> args,
                                             "the constructor of a dfun: all derivative orders must be positive");
             }
 
-            // Update tot_diff_order.
-            tot_diff_order += order;
+            // Update full_name.
+            full_name += fmt::format("{},{} ", idx, order);
         };
 
         // Validate the first element.
@@ -116,46 +80,54 @@ auto make_dfun_name(const expression &v, std::vector<expression> args,
         }
     }
 
-    // Create the name,
-    std::string retval = "dfun_";
+    // Finalise full_name.
+    full_name += "_";
+    full_name += id_name;
 
-    for (auto it = didx.begin(); it != didx.end(); ++it) {
-        const auto [idx, order] = *it;
-        retval += fmt::format("{},{}", idx, order);
-
-        if (it + 1 != didx.end()) {
-            retval += " ";
-        }
-    }
-
-    retval += "_";
-    retval += std::get<variable>(v.value()).name();
-
-    return std::make_tuple(std::move(retval), std::move(args));
+    return std::make_tuple(std::move(full_name), std::move(args));
 }
 
 } // namespace
 
-dfun_impl::dfun_impl(const expression &v, std::vector<expression> args,
+dfun_impl::dfun_impl(std::string id_name, std::vector<expression> args,
                      std::vector<std::pair<std::uint32_t, std::uint32_t>> didx)
-    : func_base(make_dfun_name(v, std::move(args), didx)), m_v_name(std::get<variable>(v.value()).name()),
-      m_didx(std::move(didx))
+    : shared_func_base(std::make_from_tuple<shared_func_base>(make_dfun_name(id_name, std::move(args), didx))),
+      m_id_name(std::move(id_name)), m_didx(std::move(didx))
 {
+}
+
+// NOTE: private ctor used in the implementation of gradient().
+dfun_impl::dfun_impl(std::string full_name, std::string id_name, std::shared_ptr<const std::vector<expression>> args,
+                     std::vector<std::pair<std::uint32_t, std::uint32_t>> didx)
+    : shared_func_base(std::move(full_name), std::move(args)), m_id_name(std::move(id_name)), m_didx(std::move(didx))
+{
+}
+
+const std::string &dfun_impl::get_id_name() const
+{
+    return m_id_name;
+}
+
+const std::vector<std::pair<std::uint32_t, std::uint32_t>> &dfun_impl::get_didx() const
+{
+    return m_didx;
 }
 
 void dfun_impl::to_stream(std::ostringstream &oss) const
 {
     // Compute the total diff order.
-    const auto diff_order = std::accumulate(m_didx.begin(), m_didx.end(), static_cast<std::uint32_t>(0),
-                                            [](auto acc, const auto &p) { return acc + p.second; });
+    // NOTE: use unsigned long long for the calculation in order
+    // to minimise the risk of overflow. If we overflow, it does not
+    // matter too much as this is only the screen output.
+    const auto diff_order = std::accumulate(m_didx.begin(), m_didx.end(), 0ull, [](auto acc, const auto &p) {
+        return acc + static_cast<unsigned long long>(p.second);
+    });
 
     if (diff_order == 1u) {
-        oss << fmt::format("(d{})", m_v_name);
+        oss << fmt::format("(d{})", m_id_name);
     } else {
-        oss << fmt::format("(d^{} {})", diff_order, m_v_name);
+        oss << fmt::format("(d^{} {})", diff_order, m_id_name);
     }
-
-    assert(diff_order > 0u || m_didx.empty());
 
     if (!m_didx.empty()) {
         oss << "/(";
@@ -163,8 +135,7 @@ void dfun_impl::to_stream(std::ostringstream &oss) const
         for (auto it = m_didx.begin(); it != m_didx.end(); ++it) {
             const auto [idx, order] = *it;
 
-            oss << "d";
-            stream_expression(oss, args()[idx]);
+            oss << fmt::format("da{}", idx);
             if (order > 1u) {
                 oss << fmt::format("^{}", order);
             }
@@ -178,12 +149,83 @@ void dfun_impl::to_stream(std::ostringstream &oss) const
     }
 }
 
+std::vector<expression> dfun_impl::gradient() const
+{
+    using su32_t = boost::safe_numerics::safe<std::uint32_t>;
+
+    // Prepare the return value.
+    std::vector<expression> retval;
+    retval.reserve(args().size());
+
+    for (decltype(args().size()) arg_idx = 0; arg_idx < args().size(); ++arg_idx) {
+        // Prepare the new vector of indices, reserving one slot more for (potentially) an extra derivative.
+        std::vector<std::pair<std::uint32_t, std::uint32_t>> new_didx;
+        new_didx.reserve(boost::safe_numerics::safe<decltype(new_didx.size())>(new_didx.size()) + 1u);
+
+        // Prepare the new function name.
+        std::string new_name = "dfun_";
+
+        // Helper to update new_name with last pair added to new_didx.
+        auto update_new_name = [&new_name, &new_didx]() {
+            assert(!new_didx.empty());
+            new_name += fmt::format("{},{} ", new_didx.back().first, new_didx.back().second);
+        };
+
+        // Flag to indicate we included the new derivative in new_didx.
+        bool done = false;
+
+        for (const auto &[idx, order] : m_didx) {
+            if (idx == arg_idx) {
+                // A nonzero derivative for arg_idx already exists in m_didx, bump
+                // it up by one and add it to new_didx.
+                new_didx.emplace_back(idx, su32_t(order) + 1);
+                done = true;
+                update_new_name();
+            } else if (idx < arg_idx) {
+                // We are still before arg_idx in m_didx, copy
+                // over the current derivative.
+                new_didx.emplace_back(idx, order);
+                update_new_name();
+            } else {
+                // We are past arg_idx in m_didx. If we haven't added
+                // the new derivative yet, do it and then mark it as done.
+                if (!done) {
+                    assert(new_didx.empty() || new_didx.back().first < arg_idx);
+                    new_didx.emplace_back(boost::numeric_cast<std::uint32_t>(arg_idx), 1);
+                    done = true;
+                    update_new_name();
+                }
+
+                // Add the current derivative from m_didx.
+                new_didx.emplace_back(idx, order);
+                update_new_name();
+            }
+        }
+
+        if (!done) {
+            // All indices in new_idx are less than arg_idx. Add the new derivative.
+            assert(new_didx.empty() || new_didx.back().first < arg_idx);
+            new_didx.emplace_back(boost::numeric_cast<std::uint32_t>(arg_idx), 1);
+            update_new_name();
+        }
+
+        // Finish building the new name.
+        new_name += "_";
+        new_name += m_id_name;
+
+        // Build and add the gradient component.
+        retval.emplace_back(func{dfun_impl{std::move(new_name), m_id_name, get_args_ptr(), std::move(new_didx)}});
+    }
+
+    return retval;
+}
+
 } // namespace detail
 
-expression dfun(const expression &v, std::vector<expression> args,
+expression dfun(std::string id_name, std::vector<expression> args,
                 std::vector<std::pair<std::uint32_t, std::uint32_t>> didx)
 {
-    return expression{func{detail::dfun_impl{v, std::move(args), std::move(didx)}}};
+    return expression{func{detail::dfun_impl{std::move(id_name), std::move(args), std::move(didx)}}};
 }
 
 HEYOKA_END_NAMESPACE

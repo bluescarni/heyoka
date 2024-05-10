@@ -16,7 +16,6 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <tuple>
 #include <typeindex>
 #include <utility>
 #include <variant>
@@ -70,11 +69,6 @@ func_base::func_base(std::string name, std::vector<expression> args) : m_name(st
     if (m_name.empty()) [[unlikely]] {
         throw std::invalid_argument("Cannot create a function with no name");
     }
-}
-
-func_base::func_base(std::tuple<std::string, std::vector<expression>> tup)
-    : func_base(std::move(std::get<0>(tup)), std::move(std::get<1>(tup)))
-{
 }
 
 func_base::func_base(const func_base &) = default;
