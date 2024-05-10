@@ -101,6 +101,30 @@ dfun_impl::dfun_impl(std::string full_name, std::string id_name, std::shared_ptr
                      std::vector<std::pair<std::uint32_t, std::uint32_t>> didx)
     : shared_func_base(std::move(full_name), std::move(args)), m_id_name(std::move(id_name)), m_didx(std::move(didx))
 {
+#if !defined(NDEBUG)
+
+    // Run some checks on m_didx in debug mode.
+    if (!m_didx.empty()) {
+        // Helper to validate an element in m_didx and update full_name.
+        auto validate_p = [this](const auto &p) {
+            const auto [idx, order] = p;
+            assert(idx < this->args().size());
+            assert(order != 0u);
+        };
+
+        // Validate the first element.
+        validate_p(m_didx[0]);
+
+        // Validate the remaining elements
+        for (auto it = m_didx.begin() + 1; it != m_didx.end(); ++it) {
+            validate_p(*it);
+
+            // Check that m_didx is sorted according to the index.
+            assert(it->first > (it - 1)->first);
+        }
+    }
+
+#endif
 }
 
 const std::string &dfun_impl::get_id_name() const
