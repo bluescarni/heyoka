@@ -175,18 +175,22 @@ std::vector<expression> dfun_impl::gradient() const
         bool done = false;
 
         for (const auto &[idx, order] : m_didx) {
-            if (idx == arg_idx) {
+            assert(order > 0u);
+
+            if (idx < arg_idx) {
+                // We are before arg_idx in m_didx, copy
+                // over the current derivative.
+                new_didx.emplace_back(idx, order);
+                update_new_name();
+            } else if (idx == arg_idx) {
                 // A nonzero derivative for arg_idx already exists in m_didx, bump
                 // it up by one and add it to new_didx.
                 new_didx.emplace_back(idx, su32_t(order) + 1);
                 done = true;
                 update_new_name();
-            } else if (idx < arg_idx) {
-                // We are still before arg_idx in m_didx, copy
-                // over the current derivative.
-                new_didx.emplace_back(idx, order);
-                update_new_name();
             } else {
+                assert(idx > arg_idx);
+
                 // We are past arg_idx in m_didx. If we haven't added
                 // the new derivative yet, do it and then mark it as done.
                 if (!done) {
@@ -196,14 +200,14 @@ std::vector<expression> dfun_impl::gradient() const
                     update_new_name();
                 }
 
-                // Add the current derivative from m_didx.
+                // Copy over the current derivative from m_didx.
                 new_didx.emplace_back(idx, order);
                 update_new_name();
             }
         }
 
         if (!done) {
-            // All indices in new_idx are less than arg_idx. Add the new derivative.
+            // All indices in new_didx are less than arg_idx. Add the new derivative.
             assert(new_didx.empty() || new_didx.back().first < arg_idx);
             new_didx.emplace_back(boost::numeric_cast<std::uint32_t>(arg_idx), 1);
             update_new_name();

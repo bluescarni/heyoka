@@ -129,3 +129,124 @@ TEST_CASE("sin s11n")
 
     REQUIRE(ex == dfun("x", {y, z}, {{1, 3}}));
 }
+
+TEST_CASE("gradient")
+{
+    auto [y, z, s, t] = make_vars("y", "z", "s", "t");
+
+    auto df = expression{func{detail::dfun_impl{}}};
+    auto grad = std::get<func>(df.value()).extract<detail::dfun_impl>()->gradient();
+
+    REQUIRE(grad.empty());
+
+    df = dfun("x", {y, z});
+    grad = std::get<func>(df.value()).extract<detail::dfun_impl>()->gradient();
+
+    REQUIRE(grad.size() == 2u);
+
+    REQUIRE(grad[0] == dfun("x", {y, z}, {{0, 1}}));
+    REQUIRE(std::get<func>(grad[0].value()).extract<detail::dfun_impl>()->get_id_name() == "x");
+    REQUIRE(std::get<func>(grad[0].value()).extract<detail::dfun_impl>()->get_didx() == didx_t{{0, 1}});
+    REQUIRE(std::get<func>(grad[0].value()).get_name() == "dfun_0,1 _x");
+    REQUIRE(std::get<func>(grad[0].value()).args() == std::vector{y, z});
+    REQUIRE(&std::get<func>(grad[0].value()).args() == &std::get<func>(df.value()).args());
+    REQUIRE(fmt::format("{}", grad[0]) == "(dx)/(da0)");
+
+    REQUIRE(grad[1] == dfun("x", {y, z}, {{1, 1}}));
+    REQUIRE(std::get<func>(grad[1].value()).extract<detail::dfun_impl>()->get_id_name() == "x");
+    REQUIRE(std::get<func>(grad[1].value()).extract<detail::dfun_impl>()->get_didx() == didx_t{{1, 1}});
+    REQUIRE(std::get<func>(grad[1].value()).get_name() == "dfun_1,1 _x");
+    REQUIRE(std::get<func>(grad[1].value()).args() == std::vector{y, z});
+    REQUIRE(&std::get<func>(grad[1].value()).args() == &std::get<func>(df.value()).args());
+    REQUIRE(fmt::format("{}", grad[1]) == "(dx)/(da1)");
+
+    df = dfun("x", {y, z}, {{0, 2}, {1, 3}});
+    grad = std::get<func>(df.value()).extract<detail::dfun_impl>()->gradient();
+
+    REQUIRE(grad.size() == 2u);
+
+    REQUIRE(grad[0] == dfun("x", {y, z}, {{0, 3}, {1, 3}}));
+    REQUIRE(std::get<func>(grad[0].value()).extract<detail::dfun_impl>()->get_id_name() == "x");
+    REQUIRE(std::get<func>(grad[0].value()).extract<detail::dfun_impl>()->get_didx() == didx_t{{0, 3}, {1, 3}});
+    REQUIRE(std::get<func>(grad[0].value()).get_name() == "dfun_0,3 1,3 _x");
+    REQUIRE(std::get<func>(grad[0].value()).args() == std::vector{y, z});
+    REQUIRE(&std::get<func>(grad[0].value()).args() == &std::get<func>(df.value()).args());
+    REQUIRE(fmt::format("{}", grad[0]) == "(d^6 x)/(da0^3 da1^3)");
+
+    REQUIRE(grad[1] == dfun("x", {y, z}, {{0, 2}, {1, 4}}));
+    REQUIRE(std::get<func>(grad[1].value()).extract<detail::dfun_impl>()->get_id_name() == "x");
+    REQUIRE(std::get<func>(grad[1].value()).extract<detail::dfun_impl>()->get_didx() == didx_t{{0, 2}, {1, 4}});
+    REQUIRE(std::get<func>(grad[1].value()).get_name() == "dfun_0,2 1,4 _x");
+    REQUIRE(std::get<func>(grad[1].value()).args() == std::vector{y, z});
+    REQUIRE(&std::get<func>(grad[1].value()).args() == &std::get<func>(df.value()).args());
+    REQUIRE(fmt::format("{}", grad[1]) == "(d^6 x)/(da0^2 da1^4)");
+
+    df = dfun("x", {y, z, s}, {{0, 2}, {2, 3}});
+
+    grad = std::get<func>(df.value()).extract<detail::dfun_impl>()->gradient();
+
+    REQUIRE(grad.size() == 3u);
+
+    REQUIRE(grad[0] == dfun("x", {y, z, s}, {{0, 3}, {2, 3}}));
+    REQUIRE(std::get<func>(grad[0].value()).extract<detail::dfun_impl>()->get_id_name() == "x");
+    REQUIRE(std::get<func>(grad[0].value()).extract<detail::dfun_impl>()->get_didx() == didx_t{{0, 3}, {2, 3}});
+    REQUIRE(std::get<func>(grad[0].value()).get_name() == "dfun_0,3 2,3 _x");
+    REQUIRE(std::get<func>(grad[0].value()).args() == std::vector{y, z, s});
+    REQUIRE(&std::get<func>(grad[0].value()).args() == &std::get<func>(df.value()).args());
+    REQUIRE(fmt::format("{}", grad[0]) == "(d^6 x)/(da0^3 da2^3)");
+
+    REQUIRE(grad[1] == dfun("x", {y, z, s}, {{0, 2}, {1, 1}, {2, 3}}));
+    REQUIRE(std::get<func>(grad[1].value()).extract<detail::dfun_impl>()->get_id_name() == "x");
+    REQUIRE(std::get<func>(grad[1].value()).extract<detail::dfun_impl>()->get_didx() == didx_t{{0, 2}, {1, 1}, {2, 3}});
+    REQUIRE(std::get<func>(grad[1].value()).get_name() == "dfun_0,2 1,1 2,3 _x");
+    REQUIRE(std::get<func>(grad[1].value()).args() == std::vector{y, z, s});
+    REQUIRE(&std::get<func>(grad[1].value()).args() == &std::get<func>(df.value()).args());
+    REQUIRE(fmt::format("{}", grad[1]) == "(d^6 x)/(da0^2 da1 da2^3)");
+
+    REQUIRE(grad[2] == dfun("x", {y, z, s}, {{0, 2}, {2, 4}}));
+    REQUIRE(std::get<func>(grad[2].value()).extract<detail::dfun_impl>()->get_id_name() == "x");
+    REQUIRE(std::get<func>(grad[2].value()).extract<detail::dfun_impl>()->get_didx() == didx_t{{0, 2}, {2, 4}});
+    REQUIRE(std::get<func>(grad[2].value()).get_name() == "dfun_0,2 2,4 _x");
+    REQUIRE(std::get<func>(grad[2].value()).args() == std::vector{y, z, s});
+    REQUIRE(&std::get<func>(grad[2].value()).args() == &std::get<func>(df.value()).args());
+    REQUIRE(fmt::format("{}", grad[2]) == "(d^6 x)/(da0^2 da2^4)");
+
+    df = dfun("x", {y, z, s, t}, {{0, 2}, {2, 3}, {3, 1}});
+
+    grad = std::get<func>(df.value()).extract<detail::dfun_impl>()->gradient();
+
+    REQUIRE(grad.size() == 4u);
+
+    REQUIRE(grad[0] == dfun("x", {y, z, s, t}, {{0, 3}, {2, 3}, {3, 1}}));
+    REQUIRE(std::get<func>(grad[0].value()).extract<detail::dfun_impl>()->get_id_name() == "x");
+    REQUIRE(std::get<func>(grad[0].value()).extract<detail::dfun_impl>()->get_didx() == didx_t{{0, 3}, {2, 3}, {3, 1}});
+    REQUIRE(std::get<func>(grad[0].value()).get_name() == "dfun_0,3 2,3 3,1 _x");
+    REQUIRE(std::get<func>(grad[0].value()).args() == std::vector{y, z, s, t});
+    REQUIRE(&std::get<func>(grad[0].value()).args() == &std::get<func>(df.value()).args());
+    REQUIRE(fmt::format("{}", grad[0]) == "(d^7 x)/(da0^3 da2^3 da3)");
+
+    REQUIRE(grad[1] == dfun("x", {y, z, s, t}, {{0, 2}, {1, 1}, {2, 3}, {3, 1}}));
+    REQUIRE(std::get<func>(grad[1].value()).extract<detail::dfun_impl>()->get_id_name() == "x");
+    REQUIRE(std::get<func>(grad[1].value()).extract<detail::dfun_impl>()->get_didx()
+            == didx_t{{0, 2}, {1, 1}, {2, 3}, {3, 1}});
+    REQUIRE(std::get<func>(grad[1].value()).get_name() == "dfun_0,2 1,1 2,3 3,1 _x");
+    REQUIRE(std::get<func>(grad[1].value()).args() == std::vector{y, z, s, t});
+    REQUIRE(&std::get<func>(grad[1].value()).args() == &std::get<func>(df.value()).args());
+    REQUIRE(fmt::format("{}", grad[1]) == "(d^7 x)/(da0^2 da1 da2^3 da3)");
+
+    REQUIRE(grad[2] == dfun("x", {y, z, s, t}, {{0, 2}, {2, 4}, {3, 1}}));
+    REQUIRE(std::get<func>(grad[2].value()).extract<detail::dfun_impl>()->get_id_name() == "x");
+    REQUIRE(std::get<func>(grad[2].value()).extract<detail::dfun_impl>()->get_didx() == didx_t{{0, 2}, {2, 4}, {3, 1}});
+    REQUIRE(std::get<func>(grad[2].value()).get_name() == "dfun_0,2 2,4 3,1 _x");
+    REQUIRE(std::get<func>(grad[2].value()).args() == std::vector{y, z, s, t});
+    REQUIRE(&std::get<func>(grad[2].value()).args() == &std::get<func>(df.value()).args());
+    REQUIRE(fmt::format("{}", grad[2]) == "(d^7 x)/(da0^2 da2^4 da3)");
+
+    REQUIRE(grad[3] == dfun("x", {y, z, s, t}, {{0, 2}, {2, 3}, {3, 2}}));
+    REQUIRE(std::get<func>(grad[3].value()).extract<detail::dfun_impl>()->get_id_name() == "x");
+    REQUIRE(std::get<func>(grad[3].value()).extract<detail::dfun_impl>()->get_didx() == didx_t{{0, 2}, {2, 3}, {3, 2}});
+    REQUIRE(std::get<func>(grad[3].value()).get_name() == "dfun_0,2 2,3 3,2 _x");
+    REQUIRE(std::get<func>(grad[3].value()).args() == std::vector{y, z, s, t});
+    REQUIRE(&std::get<func>(grad[3].value()).args() == &std::get<func>(df.value()).args());
+    REQUIRE(fmt::format("{}", grad[3]) == "(d^7 x)/(da0^2 da2^3 da3^2)");
+}
