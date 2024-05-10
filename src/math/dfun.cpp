@@ -174,6 +174,12 @@ std::vector<expression> dfun_impl::gradient() const
         // Flag to indicate we included the new derivative in new_didx.
         bool done = false;
 
+        // NOTE: the logic here is the following:
+        // - copy over all elements from m_didx for which the index is less than idx;
+        // - if m_didx contains arg_idx in its indices, bump up the derivative order by one
+        //   and copy the remaining elements of m_didx; otherwise,
+        // - add a first-order derivative when we identify the first index in m_didx
+        //   which is greater than arg_idx, then copy the remaining elements.
         for (const auto &[idx, order] : m_didx) {
             assert(order > 0u);
 
