@@ -34,18 +34,34 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-dfun_impl::dfun_impl() : dfun_impl("x", {}, {}) {}
+dfun_impl::dfun_impl() : dfun_impl("x", std::vector<expression>{}, {}) {}
 
 namespace
 {
 
 // Helper to validate the construction arguments of a dfun and assemble
 // the full function name.
-auto make_dfun_name(const std::string &id_name, std::vector<expression> args,
+// NOTE: Args can be either a vector of arguments or a shared pointer to
+// a vector of arguments.
+template <typename Args>
+auto make_dfun_name(const std::string &id_name, Args args_,
                     const std::vector<std::pair<std::uint32_t, std::uint32_t>> &didx)
 {
     // Init the name.
     std::string full_name = "dfun_";
+
+    // Fetch a reference to the arguments.
+    const auto &args = [&args_]() -> const auto & {
+        if constexpr (std::same_as<Args, std::vector<expression>>) {
+            return args_;
+        } else {
+            if (args_ == nullptr) [[unlikely]] {
+                throw std::invalid_argument("Cannot construct a dfun from a null shared pointer to its arguments");
+            }
+
+            return *args_;
+        }
+    }();
 
     // Validate didx and build up the full name.
     if (!didx.empty()) {
@@ -88,12 +104,19 @@ auto make_dfun_name(const std::string &id_name, std::vector<expression> args,
     full_name += "_";
     full_name += id_name;
 
-    return std::make_tuple(std::move(full_name), std::move(args));
+    return std::make_tuple(std::move(full_name), std::move(args_));
 }
 
 } // namespace
 
 dfun_impl::dfun_impl(std::string id_name, std::vector<expression> args,
+                     std::vector<std::pair<std::uint32_t, std::uint32_t>> didx)
+    : shared_func_base(std::make_from_tuple<shared_func_base>(make_dfun_name(id_name, std::move(args), didx))),
+      m_id_name(std::move(id_name)), m_didx(std::move(didx))
+{
+}
+
+dfun_impl::dfun_impl(std::string id_name, std::shared_ptr<const std::vector<expression>> args,
                      std::vector<std::pair<std::uint32_t, std::uint32_t>> didx)
     : shared_func_base(std::make_from_tuple<shared_func_base>(make_dfun_name(id_name, std::move(args), didx))),
       m_id_name(std::move(id_name)), m_didx(std::move(didx))
@@ -375,6 +398,12 @@ std::set<expression> get_dfuns(const std::vector<expression> &v_ex)
 } // namespace detail
 
 expression dfun(std::string id_name, std::vector<expression> args,
+                std::vector<std::pair<std::uint32_t, std::uint32_t>> didx)
+{
+    return expression{func{detail::dfun_impl{std::move(id_name), std::move(args), std::move(didx)}}};
+}
+
+expression dfun(std::string id_name, std::shared_ptr<const std::vector<expression>> args,
                 std::vector<std::pair<std::uint32_t, std::uint32_t>> didx)
 {
     return expression{func{detail::dfun_impl{std::move(id_name), std::move(args), std::move(didx)}}};

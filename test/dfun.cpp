@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -43,7 +44,7 @@ TEST_CASE("basic")
     REQUIRE(std::get<func>(df_def.value()).args().empty());
     REQUIRE(fmt::format("{}", df_def) == "(d^0 x)");
 
-    auto df = dfun("x", {});
+    auto df = dfun("x", std::vector<expression>{});
     REQUIRE(df == df_def);
     REQUIRE(!std::less<expression>{}(df, df_def));
     REQUIRE(!std::less<expression>{}(df_def, df));
@@ -105,6 +106,9 @@ TEST_CASE("basic")
     REQUIRE_THROWS_MATCHES((dfun("x", {y, z}, {{1, 1}, {0, 1}})), std::invalid_argument,
                            Message("The indices in the indices vector passed to "
                                    "the constructor of a dfun must be sorted in strictly ascending order"));
+    REQUIRE_THROWS_MATCHES((dfun("x", std::shared_ptr<const std::vector<expression>>{}, {{0, 1}})),
+                           std::invalid_argument,
+                           Message("Cannot construct a dfun from a null shared pointer to its arguments"));
 }
 
 TEST_CASE("sin s11n")
