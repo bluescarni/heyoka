@@ -96,7 +96,8 @@ TEST_CASE("basic")
     REQUIRE(fmt::format("{}", df4) == "(d^3 x)/(da1^3)");
 
     // Test with the overload from shared_ptr.
-    df4 = dfun("x", std::make_shared<const std::vector<expression>>(std::vector{y, z}), {{1, 3}});
+    auto sptr = std::make_shared<const std::vector<expression>>(std::vector{y, z});
+    df4 = dfun("x", sptr, {{1, 3}});
     REQUIRE(df4 != df3);
     REQUIRE((std::less<expression>{}(df3, df4) || std::less<expression>{}(df4, df3)));
     REQUIRE(std::holds_alternative<func>(df4.value()));
@@ -104,6 +105,7 @@ TEST_CASE("basic")
     REQUIRE(std::get<func>(df4.value()).extract<detail::dfun_impl>()->get_didx() == didx_t{{1, 3}});
     REQUIRE(std::get<func>(df4.value()).get_name() == "dfun_1,3 _x");
     REQUIRE(std::get<func>(df4.value()).args() == std::vector{y, z});
+    REQUIRE(&std::get<func>(df4.value()).args() == sptr.get());
     REQUIRE(fmt::format("{}", df4) == "(d^3 x)/(da1^3)");
 
     // Error modes.
