@@ -74,7 +74,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
                                                   std::vector<T> state, std::uint32_t batch_size, std::vector<T> time,
                                                   std::optional<T> tol, bool high_accuracy, bool compact_mode,
                                                   std::vector<T> pars, std::vector<t_event_t> tes,
-                                                  std::vector<nt_event_t> ntes, bool parallel_mode)
+                                                  std::vector<nt_event_t> ntes, bool parallel_mode,
+                                                  taylor_ad_mode ad_mode)
 {
     // NOTE: this must hold because tol == 0 is interpreted
     // as undefined in finalise_ctor().
@@ -96,6 +97,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_high_accuracy);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_compact_mode);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tol);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_ad_mode);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dim);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_llvm);
@@ -158,14 +160,15 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
                         m_time_hi.size(), m_batch_size));
     }
 
+    // Check the consistency of parallel vs compact mode.
+    if (parallel_mode && !compact_mode) {
+        throw std::invalid_argument("Parallel mode can be activated only in conjunction with compact mode");
+    }
+
     if (tol && (!isfinite(*tol) || *tol < 0)) {
         throw std::invalid_argument(fmt::format(
             "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead",
             detail::fp_to_string(*tol)));
-    }
-
-    if (parallel_mode && !compact_mode) {
-        throw std::invalid_argument("Parallel mode can be activated only in conjunction with compact mode");
     }
 
     // Store the tolerance.
@@ -175,6 +178,12 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
         m_tol = std::numeric_limits<T>::epsilon();
     }
 
+    // Validate and store the AD mode.
+    if (ad_mode < taylor_ad_mode::classic || ad_mode > taylor_ad_mode::tseries) [[unlikely]] {
+        throw std::invalid_argument("An invalid enumerator was specified for the 'ad_mode' keyword argument");
+    }
+    m_ad_mode = ad_mode;
+
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
 
@@ -182,7 +191,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
     const auto with_events = !tes.empty() || !ntes.empty();
 
     // Determine the order from the tolerance.
-    m_order = detail::taylor_order_from_tol(m_tol);
+    m_order = detail::taylor_order_from_tol(m_tol, m_ad_mode);
 
     // Determine the external fp type.
     auto *ext_fp_t = detail::to_llvm_type<T>(m_llvm.context());
@@ -1957,6 +1966,12 @@ template <typename T>
 std::uint32_t taylor_adaptive_batch<T>::get_dim() const
 {
     return m_i_data->m_dim;
+}
+
+template <typename T>
+taylor_ad_mode taylor_adaptive_batch<T>::get_ad_mode() const
+{
+    return m_i_data->m_ad_mode;
 }
 
 template <typename T>

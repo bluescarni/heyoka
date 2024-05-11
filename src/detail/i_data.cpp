@@ -97,6 +97,7 @@ void taylor_adaptive<T>::i_data::save(boost::archive::binary_oarchive &ar, unsig
     ar << m_dc;
     ar << m_order;
     ar << m_tol;
+    ar << m_ad_mode;
     ar << m_high_accuracy;
     ar << m_compact_mode;
     ar << m_pars;
@@ -117,6 +118,7 @@ void taylor_adaptive<T>::i_data::load(boost::archive::binary_iarchive &ar, unsig
     ar >> m_dc;
     ar >> m_order;
     ar >> m_tol;
+    ar >> m_ad_mode;
     ar >> m_high_accuracy;
     ar >> m_compact_mode;
     ar >> m_pars;
@@ -138,7 +140,7 @@ taylor_adaptive<T>::i_data::i_data(llvm_state s) : m_llvm(std::move(s))
 template <typename T>
 taylor_adaptive<T>::i_data::i_data(const i_data &other)
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
-      m_order(other.m_order), m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy),
+      m_order(other.m_order), m_tol(other.m_tol), m_ad_mode(other.m_ad_mode), m_high_accuracy(other.m_high_accuracy),
       m_compact_mode(other.m_compact_mode), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h),
       m_d_out(other.m_d_out), m_state_vars(other.m_state_vars), m_rhs(other.m_rhs)
 {
@@ -184,6 +186,7 @@ void taylor_adaptive_batch<T>::i_data::save(boost::archive::binary_oarchive &ar,
     ar << m_dc;
     ar << m_order;
     ar << m_tol;
+    ar << m_ad_mode;
     ar << m_high_accuracy;
     ar << m_compact_mode;
     ar << m_pars;
@@ -222,6 +225,7 @@ void taylor_adaptive_batch<T>::i_data::load(boost::archive::binary_iarchive &ar,
     ar >> m_dc;
     ar >> m_order;
     ar >> m_tol;
+    ar >> m_ad_mode;
     ar >> m_high_accuracy;
     ar >> m_compact_mode;
     ar >> m_pars;
@@ -260,9 +264,9 @@ template <typename T>
 taylor_adaptive_batch<T>::i_data::i_data(const i_data &other)
     : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time_hi(other.m_time_hi), m_time_lo(other.m_time_lo),
       m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_tol(other.m_tol),
-      m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode), m_pars(other.m_pars),
-      m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
-      m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
+      m_ad_mode(other.m_ad_mode), m_high_accuracy(other.m_high_accuracy), m_compact_mode(other.m_compact_mode),
+      m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf),
+      m_minf(other.m_minf), m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
       m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
       m_rem_time(other.m_rem_time), m_time_copy_hi(other.m_time_copy_hi), m_time_copy_lo(other.m_time_copy_lo),

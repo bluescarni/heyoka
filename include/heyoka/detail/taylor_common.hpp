@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <concepts>
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -165,14 +166,32 @@ inline llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, llvm::Type *fp_t
 // precision due to the way precision propagation works in mp++. I don't
 // think there's any negative consequence here.
 template <typename T>
-std::uint32_t taylor_order_from_tol(T tol)
+std::uint32_t taylor_order_from_tol(T tol, taylor_ad_mode ad_mode)
 {
     using std::ceil;
     using std::isfinite;
     using std::log;
+    using std::log2;
+
+    assert(ad_mode == taylor_ad_mode::classic || ad_mode == taylor_ad_mode::tseries);
 
     // Determine the order from the tolerance.
-    auto order_f = ceil(-log(tol) / 2 + 1);
+    auto order_f = [&]() {
+        if (ad_mode == taylor_ad_mode::classic) {
+            return ceil(-log(tol) / 2 + 1);
+        } else {
+#if defined(HEYOKA_HAVE_REAL)
+            if constexpr (std::same_as<T, mppp::real>) {
+                return ceil(-log(tol) / log2(mppp::real(3, tol.get_prec())) + 1);
+            } else {
+#endif
+                return ceil(-log(tol) / log2(static_cast<T>(3)) + 1);
+#if defined(HEYOKA_HAVE_REAL)
+            }
+#endif
+        }
+    }();
+
     // LCOV_EXCL_START
     if (!isfinite(order_f)) {
         throw std::invalid_argument(

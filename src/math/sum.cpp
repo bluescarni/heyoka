@@ -18,6 +18,8 @@
 #include <variant>
 #include <vector>
 
+#include <boost/safe_numerics/safe_integer.hpp>
+
 #include <fmt/core.h>
 
 #include <llvm/IR/Attributes.h>
@@ -46,6 +48,7 @@
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
+#include <heyoka/tseries.hpp>
 #include <heyoka/variable.hpp>
 
 #include <heyoka/detail/logging_impl.hpp>
@@ -402,6 +405,34 @@ llvm::Function *sum_impl::taylor_c_diff_func(llvm_state &s, llvm::Type *fp_t, st
                                              std::uint32_t batch_size, bool) const
 {
     return sum_taylor_c_diff_func_impl(s, fp_t, *this, n_uvars, batch_size);
+}
+
+tseries sum_impl::to_tseries(detail::funcptr_map<tseries> &m, std::uint32_t order) const
+{
+    using su32_t = boost::safe_numerics::safe<std::uint32_t>;
+
+    // Convert the arguments to tseries.
+    std::vector<tseries> tseries_args;
+    tseries_args.reserve(args().size());
+
+    for (const auto &arg : args()) {
+        tseries_args.push_back(to_tseries_impl(m, arg, order));
+    }
+
+    // Compute the coefficients of the output tseries.
+    std::vector<expression> tseries_cfs, tmp;
+    tseries_cfs.reserve(su32_t(order) + 1);
+    for (su32_t i = 0; i <= order; ++i) {
+        tmp.clear();
+
+        for (decltype(args().size()) arg_idx = 0; arg_idx < args().size(); ++arg_idx) {
+            tmp.push_back(tseries_args[arg_idx].get_cfs()[i]);
+        }
+
+        tseries_cfs.push_back(sum(tmp));
+    }
+
+    return tseries(std::move(tseries_cfs));
 }
 
 // Helper to split the input sum 'e' into nested sums, each

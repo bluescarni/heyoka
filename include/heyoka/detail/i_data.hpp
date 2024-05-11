@@ -43,6 +43,8 @@ struct taylor_adaptive<T>::i_data {
     std::uint32_t m_order{};
     // Tolerance.
     T m_tol{};
+    // AD mode.
+    taylor_ad_mode m_ad_mode = taylor_ad_mode::classic;
     // High accuracy.
     bool m_high_accuracy{};
     // Compact mode.
@@ -105,6 +107,8 @@ struct taylor_adaptive_batch<T>::i_data {
     std::uint32_t m_order{};
     // Tolerance.
     T m_tol{};
+    // AD mode.
+    taylor_ad_mode m_ad_mode = taylor_ad_mode::classic;
     // High accuracy.
     bool m_high_accuracy{};
     // Compact mode.

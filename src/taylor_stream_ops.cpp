@@ -259,4 +259,20 @@ std::ostream &operator<<(std::ostream &os, taylor_outcome oc)
 
 #undef HEYOKA_TAYLOR_ENUM_STREAM_CASE
 
+std::ostream &operator<<(std::ostream &os, taylor_ad_mode m)
+{
+    switch (m) {
+        case taylor_ad_mode::classic:
+            os << "classic";
+            break;
+        case taylor_ad_mode::tseries:
+            os << "tseries";
+            break;
+        default:
+            os << "invalid";
+    }
+
+    return os;
+}
+
 HEYOKA_END_NAMESPACE

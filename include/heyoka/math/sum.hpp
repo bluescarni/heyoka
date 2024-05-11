@@ -14,11 +14,13 @@
 #include <vector>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/tseries.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -52,6 +54,8 @@ public:
                              std::uint32_t, std::uint32_t, std::uint32_t, bool) const;
 
     llvm::Function *taylor_c_diff_func(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, bool) const;
+
+    tseries to_tseries(detail::funcptr_map<tseries> &, std::uint32_t) const;
 };
 
 HEYOKA_DLL_PUBLIC expression sum_split(const expression &, std::uint32_t);

@@ -145,14 +145,23 @@ enum class taylor_outcome : std::int64_t {
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
 
+// Enum to represent the automatic differentiation mode used by Taylor integrators.
+enum class taylor_ad_mode { classic, tseries };
+
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_ad_mode);
+
 HEYOKA_END_NAMESPACE
 
-// fmt formatter for taylor_outcome, implemented on top of the streaming operator.
+// fmt formatters for taylor_outcome and taylor_ad_mode, implemented on top of the streaming operators.
 namespace fmt
 {
 
 template <>
 struct formatter<heyoka::taylor_outcome> : fmt::ostream_formatter {
+};
+
+template <>
+struct formatter<heyoka::taylor_ad_mode> : fmt::ostream_formatter {
 };
 
 } // namespace fmt
@@ -227,7 +236,20 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
         }
     }();
 
-    return std::tuple{high_accuracy, std::move(tol), compact_mode, std::move(pars), parallel_mode};
+    // AD mode (defaults to classic).
+    auto ad_mode = [&p]() -> taylor_ad_mode {
+        if constexpr (p.has(kw::ad_mode)) {
+            if constexpr (std::same_as<std::remove_cvref_t<decltype(p(kw::ad_mode))>, taylor_ad_mode>) {
+                return p(kw::ad_mode);
+            } else {
+                static_assert(always_false_v<T>, "Invalid type for the 'ad_mode' keyword argument.");
+            }
+        } else {
+            return taylor_ad_mode::classic;
+        }
+    }();
+
+    return std::tuple{high_accuracy, std::move(tol), compact_mode, std::move(pars), parallel_mode, ad_mode};
 }
 
 // Small helper to construct a default value for the max_delta_t
@@ -433,7 +455,7 @@ private:
     // Private implementation-detail constructor machinery.
     void finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &, std::vector<T>, std::optional<T>,
                             std::optional<T>, bool, bool, std::vector<T>, std::vector<t_event_t>,
-                            std::vector<nt_event_t>, bool, std::optional<long long>);
+                            std::vector<nt_event_t>, bool, std::optional<long long>, taylor_ad_mode);
     template <typename... KwArgs>
     void finalise_ctor(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
                        const KwArgs &...kw_args)
@@ -454,7 +476,7 @@ private:
                 }
             }();
 
-            auto [high_accuracy, tol, compact_mode, pars, parallel_mode]
+            auto [high_accuracy, tol, compact_mode, pars, parallel_mode, ad_mode]
                 = detail::taylor_adaptive_common_ops<T>(kw_args...);
 
             // Extract the terminal events, if any.
@@ -489,7 +511,8 @@ private:
             }();
 
             finalise_ctor_impl(sys, std::move(state), std::move(tm), std::move(tol), high_accuracy, compact_mode,
-                               std::move(pars), std::move(tes), std::move(ntes), parallel_mode, std::move(prec));
+                               std::move(pars), std::move(tes), std::move(ntes), parallel_mode, std::move(prec),
+                               ad_mode);
         }
     }
 
@@ -533,6 +556,7 @@ public:
     [[nodiscard]] bool get_high_accuracy() const;
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] std::uint32_t get_dim() const;
+    [[nodiscard]] taylor_ad_mode get_ad_mode() const;
 
     [[nodiscard]] T get_time() const;
     void set_time(T);
@@ -806,7 +830,7 @@ private:
     // Private implementation-detail constructor machinery.
     void finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &, std::vector<T>, std::uint32_t,
                             std::vector<T>, std::optional<T>, bool, bool, std::vector<T>, std::vector<t_event_t>,
-                            std::vector<nt_event_t>, bool);
+                            std::vector<nt_event_t>, bool, taylor_ad_mode);
     template <typename... KwArgs>
     void finalise_ctor(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
                        std::uint32_t batch_size, const KwArgs &...kw_args)
@@ -829,7 +853,7 @@ private:
                 }
             }();
 
-            auto [high_accuracy, tol, compact_mode, pars, parallel_mode]
+            auto [high_accuracy, tol, compact_mode, pars, parallel_mode, ad_mode]
                 = detail::taylor_adaptive_common_ops<T>(kw_args...);
 
             // Extract the terminal events, if any.
@@ -851,7 +875,7 @@ private:
             }();
 
             finalise_ctor_impl(sys, std::move(state), batch_size, std::move(tm), std::move(tol), high_accuracy,
-                               compact_mode, std::move(pars), std::move(tes), std::move(ntes), parallel_mode);
+                               compact_mode, std::move(pars), std::move(tes), std::move(ntes), parallel_mode, ad_mode);
         }
     }
 
@@ -896,6 +920,7 @@ public:
     [[nodiscard]] bool get_high_accuracy() const;
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] std::uint32_t get_dim() const;
+    [[nodiscard]] taylor_ad_mode get_ad_mode() const;
 
     [[nodiscard]] const std::vector<T> &get_time() const;
     [[nodiscard]] const T *get_time_data() const;
@@ -1103,14 +1128,16 @@ namespace detail
 // - 3: removed the mr flag from the terminal event callback siganture,
 //      which resulted also in changes in the event detection data structure.
 // - 4: switched to pimpl implementation for i_data.
-inline constexpr int taylor_adaptive_s11n_version = 4;
+// - 5: added the m_ad_mode member to i_data.
+inline constexpr int taylor_adaptive_s11n_version = 5;
 
 // Boost s11n class version history for taylor_adaptive_batch:
 // - 1: added the m_state_vars and m_rhs members.
 // - 2: removed the mr flag from the terminal event callback siganture,
 //      which resulted also in changes in the event detection data structure.
 // - 3: switched to pimpl implementation for i_data.
-inline constexpr int taylor_adaptive_batch_s11n_version = 3;
+// - 4: added the m_ad_mode member to i_data.
+inline constexpr int taylor_adaptive_batch_s11n_version = 4;
 
 } // namespace detail
 
