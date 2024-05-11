@@ -325,6 +325,9 @@ TEST_CASE("dtens basics")
     REQUIRE(dt2.find(dtens::v_idx_t{0, 1}) == dt2.end());
     REQUIRE(dt2.find({0, 3, 0}) == dt2.end());
     REQUIRE(dt2.find({0, {{0, 3}}}) == dt2.end());
+    REQUIRE(dt2.find({0, {{0, 1}}}) != dt2.end());
+    REQUIRE(dt2.find({0, {{0, 1}, {1, 0}}}) == dt2.end());
+    REQUIRE(dt2.find({0, {{0, 1}, {1, 1}, {2, 0}}}) == dt2.end());
     REQUIRE(dt2.index_of(dt2.begin()) == 0u);
     REQUIRE(dt2.index_of(dt2.begin() + 1) == 1u);
     REQUIRE(dt2.index_of(dt2.end()) == dt2.size());
