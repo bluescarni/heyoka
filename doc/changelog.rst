@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- Introduce the ability to represent unknown functions
+  and their derivatives in the expression system
+  (`#416 <https://github.com/bluescarni/heyoka/pull/416>`__).
 - Add a vectorised implementation for ``diff()``
   (`#411 <https://github.com/bluescarni/heyoka/pull/411>`__).
 - Add mutable ranges getters for the state and pars data of the adaptive
