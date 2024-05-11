@@ -6,13 +6,16 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <concepts>
 #include <memory>
 #include <numeric>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -21,6 +24,7 @@
 #include <fmt/core.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/func_cache.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/math/dfun.hpp>
@@ -249,6 +253,120 @@ std::vector<expression> dfun_impl::gradient() const
 
         // Build and add the gradient component.
         retval.emplace_back(func{dfun_impl{std::move(new_name), m_id_name, get_args_ptr(), std::move(new_didx)}});
+    }
+
+    return retval;
+}
+
+namespace
+{
+
+// NOLINTNEXTLINE(misc-no-recursion)
+bool contains_dfun_impl(funcptr_set &func_set, const expression &ex)
+{
+    return std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
+        [&func_set]<typename T>(const T &v) {
+            if constexpr (std::same_as<T, func>) {
+                const auto f_id = v.get_ptr();
+
+                // Did we already determine that v is not a dfun and none of its
+                // arguments contains a dfun?
+                if (func_set.contains(f_id)) {
+                    return false;
+                }
+
+                // Check if v is a dfun.
+                if (v.template extract<dfun_impl>() != nullptr) {
+                    return true;
+                }
+
+                // v is not a dfun. check if any of its arguments contains a dfun.
+                for (const auto &a : v.args()) {
+                    if (contains_dfun_impl(func_set, a)) {
+                        return true;
+                    }
+                }
+
+                // Update the cache.
+                [[maybe_unused]] const auto [_, flag] = func_set.emplace(f_id);
+
+                // An expression cannot contain itself.
+                assert(flag);
+
+                return false;
+            } else {
+                return false;
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+// Helper to detect whether any expression in v_ex contains at least one dfun.
+bool contains_dfun(const std::vector<expression> &v_ex)
+{
+    // NOTE: this set will contain subexpressions which are not a dfun
+    // and which do not contain any dfun in the arguments.
+    funcptr_set func_set;
+
+    for (const auto &ex : v_ex) {
+        if (contains_dfun_impl(func_set, ex)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+namespace
+{
+
+// NOLINTNEXTLINE(misc-no-recursion)
+void get_dfuns_impl(funcptr_set &func_set, std::set<expression> &retval, const expression &ex)
+{
+    std::visit(
+        // NOLINTNEXTLINE(misc-no-recursion)
+        [&func_set, &retval, &ex]<typename T>(const T &arg) {
+            if constexpr (std::same_as<T, func>) {
+                const auto f_id = arg.get_ptr();
+
+                if (func_set.contains(f_id)) {
+                    // We already got the dfuns from the current function, exit.
+                    return;
+                }
+
+                // Get the dfuns for each function argument.
+                for (const auto &farg : arg.args()) {
+                    get_dfuns_impl(func_set, retval, farg);
+                }
+
+                // If the current function is a dfun, add it to retval.
+                if (arg.template extract<dfun_impl>() != nullptr) {
+                    retval.insert(ex);
+                }
+
+                // Add the id of f to the set.
+                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+// Helper to fetch the set of all dfuns contained in v_ex.
+std::set<expression> get_dfuns(const std::vector<expression> &v_ex)
+{
+    funcptr_set func_set;
+
+    std::set<expression> retval;
+
+    for (const auto &ex : v_ex) {
+        get_dfuns_impl(func_set, retval, ex);
     }
 
     return retval;

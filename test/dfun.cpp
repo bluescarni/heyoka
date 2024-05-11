@@ -18,7 +18,9 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/math/cos.hpp>
 #include <heyoka/math/dfun.hpp>
+#include <heyoka/math/sin.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -375,4 +377,49 @@ TEST_CASE("gradient")
     REQUIRE(std::get<func>(grad[3].value()).args() == std::vector{y, z, s, t});
     REQUIRE(&std::get<func>(grad[3].value()).args() == &std::get<func>(df.value()).args());
     REQUIRE(fmt::format("{}", grad[3]) == "(d^2 x)/(da3^2)");
+}
+
+TEST_CASE("contains_dfun")
+{
+    auto [y, z] = make_vars("y", "z");
+
+    REQUIRE(!detail::contains_dfun({y}));
+    REQUIRE(!detail::contains_dfun({y, z}));
+    REQUIRE(!detail::contains_dfun({y + z, 2_dbl * z - 1_dbl}));
+
+    auto ex = y + z;
+
+    REQUIRE(!detail::contains_dfun({cos(ex + 1_dbl), sin(ex)}));
+
+    ex = dfun("x", {y, z}, {{0, 1}});
+
+    REQUIRE(detail::contains_dfun({cos(ex + 1_dbl), sin(ex)}));
+    REQUIRE(detail::contains_dfun({cos("x"_var + 1_dbl), sin(ex)}));
+}
+
+TEST_CASE("get_dfuns")
+{
+    auto [y, z] = make_vars("y", "z");
+
+    REQUIRE(detail::get_dfuns({y}).empty());
+    REQUIRE(detail::get_dfuns({y, z}).empty());
+    REQUIRE(detail::get_dfuns({y + z, 2_dbl * z - 1_dbl}).empty());
+
+    auto ex = y + z;
+
+    REQUIRE(detail::get_dfuns({cos(ex + 1_dbl), sin(ex)}).empty());
+
+    ex = dfun("x", {y, z}, {{0, 1}});
+
+    REQUIRE(detail::get_dfuns({cos(ex + 1_dbl), sin(ex)}).size() == 1u);
+    REQUIRE(*detail::get_dfuns({cos(ex + 1_dbl), sin(ex)}).begin() == ex);
+    REQUIRE(detail::get_dfuns({cos("x"_var + 1_dbl), sin(ex)}).size() == 1u);
+    REQUIRE(*detail::get_dfuns({cos("x"_var + 1_dbl), sin(ex)}).begin() == ex);
+
+    auto ex2 = dfun("z", {y, ex}, {{1, 1}});
+
+    auto ds = detail::get_dfuns({cos(ex2 + 1_dbl), sin(ex)});
+    REQUIRE(ds.size() == 2u);
+    REQUIRE(ds.contains(ex));
+    REQUIRE(ds.contains(ex2));
 }

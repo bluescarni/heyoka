@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -56,6 +57,10 @@ public:
 
     [[nodiscard]] std::vector<expression> gradient() const;
 };
+
+HEYOKA_DLL_PUBLIC bool contains_dfun(const std::vector<expression> &);
+
+HEYOKA_DLL_PUBLIC std::set<expression> get_dfuns(const std::vector<expression> &);
 
 } // namespace detail
 
