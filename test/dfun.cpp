@@ -95,6 +95,17 @@ TEST_CASE("basic")
     REQUIRE(std::get<func>(df4.value()).args() == std::vector{y, z});
     REQUIRE(fmt::format("{}", df4) == "(d^3 x)/(da1^3)");
 
+    // Test with the overload from shared_ptr.
+    df4 = dfun("x", std::make_shared<const std::vector<expression>>(std::vector{y, z}), {{1, 3}});
+    REQUIRE(df4 != df3);
+    REQUIRE((std::less<expression>{}(df3, df4) || std::less<expression>{}(df4, df3)));
+    REQUIRE(std::holds_alternative<func>(df4.value()));
+    REQUIRE(std::get<func>(df4.value()).extract<detail::dfun_impl>()->get_id_name() == "x");
+    REQUIRE(std::get<func>(df4.value()).extract<detail::dfun_impl>()->get_didx() == didx_t{{1, 3}});
+    REQUIRE(std::get<func>(df4.value()).get_name() == "dfun_1,3 _x");
+    REQUIRE(std::get<func>(df4.value()).args() == std::vector{y, z});
+    REQUIRE(fmt::format("{}", df4) == "(d^3 x)/(da1^3)");
+
     // Error modes.
     REQUIRE_THROWS_MATCHES(
         (dfun("x", {y, z}, {{2, 3}})), std::invalid_argument,
