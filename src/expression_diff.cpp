@@ -1120,21 +1120,27 @@ void diff_tensors_reverse_impl(
 // Utility function to check that a dtens_sv_idx_t is well-formed.
 bool sv_sanity_check(const dtens_sv_idx_t &v)
 {
-    // Check sorting according to the derivative indices.
-    auto cmp = [](const auto &p1, const auto &p2) { return p1.first < p2.first; };
-    if (!std::ranges::is_sorted(v.second, cmp)) {
-        return false;
+    if (!v.second.empty()) {
+        // Check nonzero order for the first element of v.second.
+        if (v.second[0].second == 0u) [[unlikely]] {
+            return false;
+        }
+
+        // Check the remaining elements.
+        for (auto it = v.second.begin() + 1; it != v.second.end(); ++it) {
+            // Check that the indices as sorted in strictly ascending order.
+            if (!(it->first > (it - 1)->first)) [[unlikely]] {
+                return false;
+            }
+
+            // Check nonzero order.
+            if (it->second == 0u) [[unlikely]] {
+                return false;
+            }
+        }
     }
 
-    // Check no duplicate derivative indices.
-    auto no_dup = [](const auto &p1, const auto &p2) { return p1.first == p2.first; };
-    if (std::ranges::adjacent_find(v.second, no_dup) != v.second.end()) {
-        return false;
-    }
-
-    // Check no zero derivative orders.
-    auto nz_order = [](const auto &p) { return p.second != 0u; };
-    return std::ranges::all_of(v.second, nz_order);
+    return true;
 }
 
 } // namespace detail
