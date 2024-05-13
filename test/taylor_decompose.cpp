@@ -39,7 +39,7 @@ TEST_CASE("decompose sys")
     using sys_t = std::vector<std::pair<expression, expression>>;
 
     REQUIRE_THROWS_MATCHES(taylor_decompose(sys_t{}, {}), std::invalid_argument,
-                           Message("Cannot decompose a system of zero equations"));
+                           Message("Cannot integrate a system of zero equations"));
 
     REQUIRE_THROWS_MATCHES(taylor_decompose(sys_t{prime(x) = y, prime(x) = y}, {}), std::invalid_argument,
                            Message("Error in the Taylor decomposition of a system of equations: the variable 'x' "

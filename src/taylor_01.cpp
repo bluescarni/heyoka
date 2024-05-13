@@ -784,8 +784,8 @@ void taylor_decompose_replace_numbers(taylor_dc_t &dc, std::vector<expression>::
 std::pair<taylor_dc_t, std::vector<std::uint32_t>>
 taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, const std::vector<expression> &sv_funcs_)
 {
-    if (sys_.empty()) {
-        throw std::invalid_argument("Cannot decompose a system of zero equations");
+    if (sys_.empty()) [[unlikely]] {
+        throw std::invalid_argument("Cannot integrate a system of zero equations");
     }
 
     // Store in a separate vector the rhs.
