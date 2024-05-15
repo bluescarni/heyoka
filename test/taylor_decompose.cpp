@@ -39,18 +39,18 @@ TEST_CASE("decompose sys")
     using sys_t = std::vector<std::pair<expression, expression>>;
 
     REQUIRE_THROWS_MATCHES(taylor_decompose(sys_t{}, {}), std::invalid_argument,
-                           Message("Cannot decompose a system of zero equations"));
+                           Message("Cannot integrate a system of zero equations"));
 
     REQUIRE_THROWS_MATCHES(taylor_decompose(sys_t{prime(x) = y, prime(x) = y}, {}), std::invalid_argument,
-                           Message("Error in the Taylor decomposition of a system of equations: the variable 'x' "
+                           Message("Invalid system of differential equations detected: the variable 'x' "
                                    "appears in the left-hand side twice"));
 
     REQUIRE_THROWS_MATCHES(taylor_decompose(sys_t{{par[0], x}}, {}), std::invalid_argument,
-                           Message("Error in the Taylor decomposition of a system of equations: the "
+                           Message("Invalid system of differential equations detected: the "
                                    "left-hand side contains the expression 'p0', which is not a variable"));
 
     REQUIRE_THROWS_MATCHES(taylor_decompose(sys_t{prime(x) = y}, {}), std::invalid_argument,
-                           Message("Error in the Taylor decomposition of a system of equations: the variable 'y' "
+                           Message("Invalid system of differential equations detected: the variable 'y' "
                                    "appears in the right-hand side but not in the left-hand side"));
 
     REQUIRE_THROWS_MATCHES(taylor_decompose(sys_t{prime(x) = x}, {y}), std::invalid_argument,

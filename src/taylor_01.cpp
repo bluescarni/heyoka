@@ -784,8 +784,8 @@ void taylor_decompose_replace_numbers(taylor_dc_t &dc, std::vector<expression>::
 std::pair<taylor_dc_t, std::vector<std::uint32_t>>
 taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, const std::vector<expression> &sv_funcs_)
 {
-    if (sys_.empty()) {
-        throw std::invalid_argument("Cannot decompose a system of zero equations");
+    if (sys_.empty()) [[unlikely]] {
+        throw std::invalid_argument("Cannot integrate a system of zero equations");
     }
 
     // Store in a separate vector the rhs.
@@ -817,19 +817,19 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
             [&lhs, &lhs_vars, &lhs_vars_set](const auto &v) {
                 if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
                     // Check if this is a duplicate variable.
-                    if (auto res = lhs_vars_set.emplace(v.name()); res.second) {
+                    if (const auto res = lhs_vars_set.emplace(v.name()); res.second) [[likely]] {
                         // Not a duplicate, add it to lhs_vars.
                         lhs_vars.push_back(v.name());
                     } else {
                         // Duplicate, error out.
                         throw std::invalid_argument(
-                            fmt::format("Error in the Taylor decomposition of a system of equations: the variable '{}' "
+                            fmt::format("Invalid system of differential equations detected: the variable '{}' "
                                         "appears in the left-hand side twice",
                                         v.name()));
                     }
                 } else {
                     throw std::invalid_argument(
-                        fmt::format("Error in the Taylor decomposition of a system of equations: the "
+                        fmt::format("Invalid system of differential equations detected: the "
                                     "left-hand side contains the expression '{}', which is not a variable",
                                     lhs));
                 }
@@ -837,14 +837,14 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
             lhs.value());
     }
 
-    // Compute the set of variables in the rhs.
+    // Fetch the set of variables in the rhs.
     const auto rhs_vars_set = get_variables(sys_rhs);
 
     // Check that all variables in the rhs appear in the lhs.
     for (const auto &var : rhs_vars_set) {
-        if (lhs_vars_set.find(var) == lhs_vars_set.end()) {
+        if (!lhs_vars_set.contains(var)) [[unlikely]] {
             throw std::invalid_argument(
-                fmt::format("Error in the Taylor decomposition of a system of equations: the variable '{}' "
+                fmt::format("Invalid system of differential equations detected: the variable '{}' "
                             "appears in the right-hand side but not in the left-hand side",
                             var));
         }

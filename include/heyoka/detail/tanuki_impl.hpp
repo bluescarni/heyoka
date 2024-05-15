@@ -287,7 +287,7 @@ struct TANUKI_VISIBLE value_iface : public IFace, value_iface_base {
         assert(false);
         return typeid(void);
     }
-    [[nodiscard]] virtual bool _tanuki_is_reference() const noexcept
+    [[nodiscard]] virtual bool _tanuki_value_is_reference() const noexcept
     {
         unreachable();
         assert(false);
@@ -295,13 +295,13 @@ struct TANUKI_VISIBLE value_iface : public IFace, value_iface_base {
     }
 
     // Methods to implement virtual copy/move primitives for the holder class.
-    [[nodiscard]] virtual value_iface *_tanuki_clone() const
+    [[nodiscard]] virtual value_iface *_tanuki_clone_holder() const
     {
         unreachable();
         assert(false);
         return {};
     }
-    [[nodiscard]] virtual std::shared_ptr<value_iface> _tanuki_shared_clone() const
+    [[nodiscard]] virtual std::shared_ptr<value_iface> _tanuki_shared_clone_holder() const
     {
         unreachable();
         assert(false);
@@ -626,15 +626,17 @@ private:
         return std::addressof(m_value);
     }
 
-    [[nodiscard]] bool _tanuki_is_reference() const noexcept final
+    [[nodiscard]] bool _tanuki_value_is_reference() const noexcept final
     {
         return detail::is_reference_wrapper_v<T>;
     }
 
     // Clone this, and cast the result to the value interface.
-    [[nodiscard]] detail::value_iface<IFace, Sem> *_tanuki_clone() const final
+    [[nodiscard]] detail::value_iface<IFace, Sem> *_tanuki_clone_holder() const final
     {
-        if constexpr (std::copy_constructible<T>) {
+        // NOTE: don't use std::copy_constructible as that requires
+        // the ability to move-construct.
+        if constexpr (std::is_copy_constructible_v<T>) {
             // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
             return new holder(m_value);
         } else {
@@ -642,19 +644,19 @@ private:
         }
     }
     // Same as above, but return a shared ptr.
-    [[nodiscard]] std::shared_ptr<detail::value_iface<IFace, Sem>> _tanuki_shared_clone() const final
+    [[nodiscard]] std::shared_ptr<detail::value_iface<IFace, Sem>> _tanuki_shared_clone_holder() const final
     {
-        if constexpr (std::copy_constructible<T>) {
+        if constexpr (std::is_copy_constructible_v<T>) {
             return std::make_shared<holder>(m_value);
         } else {
             throw std::invalid_argument("Attempting to clone a non-copyable value type");
         }
     }
-    // Copy-init a new holder into the storage beginning at ptr.
+    // Copy-init a new holder from this into the storage beginning at ptr.
     // Then cast the result to the value interface and return.
     [[nodiscard]] detail::value_iface<IFace, Sem> *_tanuki_copy_init_holder(void *ptr) const final
     {
-        if constexpr (std::copy_constructible<T>) {
+        if constexpr (std::is_copy_constructible_v<T>) {
 #if defined(TANUKI_WITH_BOOST_S11N)
             assert(boost::alignment::is_aligned(ptr, alignof(T)));
 #endif
@@ -665,13 +667,13 @@ private:
             throw std::invalid_argument("Attempting to copy-construct a non-copyable value type");
         }
     }
-    // Move-init a new holder into the storage beginning at ptr.
+    // Move-init a new holder from this into the storage beginning at ptr.
     // Then cast the result to the value interface and return.
     [[nodiscard]] detail::value_iface<IFace, Sem> *
     // NOLINTNEXTLINE(bugprone-exception-escape)
     _tanuki_move_init_holder(void *ptr) && noexcept final
     {
-        if constexpr (std::move_constructible<T>) {
+        if constexpr (std::is_move_constructible_v<T>) {
 #if defined(TANUKI_WITH_BOOST_S11N)
             assert(boost::alignment::is_aligned(ptr, alignof(T)));
 #endif
@@ -1139,7 +1141,7 @@ using get_ref_iface_t = typename get_ref_iface<cfg_ref_t<Cfg>, Wrap>::type;
 
 // The wrap class.
 template <typename IFace, auto Cfg = default_config>
-    requires std::is_polymorphic_v<IFace> && std::has_virtual_destructor_v<IFace> && valid_config<Cfg>
+    requires valid_config<Cfg>
 class TANUKI_VISIBLE wrap : private detail::wrap_storage<IFace, Cfg.static_size, Cfg.static_align, Cfg.semantics>,
                             // NOTE: the reference interface is not supposed to hold any data: it will always
                             // be def-inited (even when copying/moving a wrap object), its assignment operators
@@ -1436,14 +1438,14 @@ public:
         if constexpr (Cfg.semantics == wrap_semantics::value) {
             if constexpr (Cfg.static_size == 0u) {
                 // Static storage disabled.
-                this->m_pv_iface = other.m_pv_iface->_tanuki_clone();
+                this->m_pv_iface = other.m_pv_iface->_tanuki_clone_holder();
             } else {
                 if (other.stype()) {
                     // Other has static storage.
                     this->m_pv_iface = other.m_pv_iface->_tanuki_copy_init_holder(this->static_storage);
                 } else {
                     // Other has dynamic storage.
-                    this->m_pv_iface = other.m_pv_iface->_tanuki_clone();
+                    this->m_pv_iface = other.m_pv_iface->_tanuki_clone_holder();
                 }
             }
         } else {
@@ -1864,7 +1866,7 @@ public:
 
     [[nodiscard]] friend bool contains_reference(const wrap &w) noexcept
     {
-        return w.m_pv_iface->_tanuki_is_reference();
+        return w.m_pv_iface->_tanuki_value_is_reference();
     }
 
     // Specific functions for reference semantics.
@@ -1874,7 +1876,7 @@ public:
         requires(Cfg.semantics == wrap_semantics::reference)
     {
         wrap retval(invalid_wrap);
-        retval.m_pv_iface = w.m_pv_iface->_tanuki_shared_clone();
+        retval.m_pv_iface = w.m_pv_iface->_tanuki_shared_clone_holder();
         return retval;
     }
 
@@ -1961,6 +1963,13 @@ template <typename Holder, typename U>
     } else {
         return val;
     }
+}
+
+template <typename Holder, typename U>
+    requires any_holder<Holder> && std::derived_from<Holder, U>
+[[nodiscard]] auto &getval(U &h) noexcept(noexcept(getval<Holder>(&h)))
+{
+    return getval<Holder>(&h);
 }
 
 template <typename IFace, auto Cfg>
