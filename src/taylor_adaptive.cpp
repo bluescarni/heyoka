@@ -164,7 +164,9 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
                                             std::optional<T> time, std::optional<T> tol, bool high_accuracy,
                                             bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
                                             std::vector<nt_event_t> ntes, bool parallel_mode,
-                                            [[maybe_unused]] std::optional<long long> prec)
+                                            [[maybe_unused]] std::optional<long long> prec,
+                                            std::variant<diff_args, std::vector<expression>> jt_args,
+                                            std::uint32_t jt_order)
 {
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_step_f);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
@@ -181,6 +183,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_jt_data);
 
     // NOTE: this must hold because tol == 0 is interpreted
     // as undefined in finalise_ctor().
@@ -200,6 +203,13 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
     // e.g., we can immediately infer the precision if T == mppp::real.
     if (state.empty()) {
         throw std::invalid_argument("Cannot initialise an adaptive integrator with an empty state vector");
+    }
+
+    // Are we performing jet transport?
+    const auto with_jt = jt_order > 0u;
+    if (with_jt) {
+        // Jet transport is enabled, init the corresponding data.
+        m_jt_data.emplace(sys, std::move(jt_args));
     }
 
     // Assign the state.

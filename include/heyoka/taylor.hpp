@@ -162,6 +162,11 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+// Concept to detect if R is an input range from whose reference type
+// instances of T can be constructed.
+template <typename R, typename T>
+concept input_rangeT = std::ranges::input_range<R> && std::constructible_from<T, std::ranges::range_reference_t<R>>;
+
 // Helper for parsing common options when constructing Taylor integrators.
 template <typename T, typename... KwArgs>
 auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
@@ -227,18 +232,61 @@ auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
         }
     }();
 
-    return std::tuple{high_accuracy, std::move(tol), compact_mode, std::move(pars), parallel_mode};
+    // Jet transport arguments (defaults to selecting all state variables).
+    auto jt_args = [&p]() -> std::variant<diff_args, std::vector<expression>> {
+        if constexpr (p.has(kw::jt_args)) {
+            using type = decltype(p(kw::jt_args));
+
+            if constexpr (std::same_as<diff_args, std::remove_cvref_t<type>>) {
+                return p(kw::jt_args);
+            } else if constexpr (input_rangeT<type, expression>) {
+                std::vector<expression> vec_ex;
+                for (auto &&x : p(kw::jt_args)) {
+                    vec_ex.emplace_back(std::forward<decltype(x)>(x));
+                }
+
+                return vec_ex;
+            } else {
+                // LCOV_EXCL_START
+                static_assert(detail::always_false_v<type>, "A 'jt_args' keyword argument of an invalid type was "
+                                                            "passed to the constructor of a Taylor integrator.");
+
+                throw;
+                // LCOV_EXCL_STOP
+            }
+        } else {
+            return diff_args::vars;
+        }
+    }();
+
+    // Jet transport order (defaults to zero, which means disabled).
+    auto jt_order = [&p]() -> std::uint32_t {
+        if constexpr (p.has(kw::jt_order)) {
+            using type = std::remove_cvref_t<decltype(p(kw::jt_order))>;
+
+            if constexpr (std::integral<type>) {
+                return boost::numeric_cast<std::uint32_t>(p(kw::jt_order));
+            } else {
+                // LCOV_EXCL_START
+                static_assert(detail::always_false_v<type>, "A 'jt_order' keyword argument of an invalid type was "
+                                                            "passed to the constructor of a Taylor integrator.");
+
+                throw;
+                // LCOV_EXCL_STOP
+            }
+        } else {
+            return 0;
+        }
+    }();
+
+    return std::tuple{high_accuracy, std::move(tol),     compact_mode, std::move(pars),
+                      parallel_mode, std::move(jt_args), jt_order};
 }
 
 // Small helper to construct a default value for the max_delta_t
 // keyword argument.
 template <typename T>
 HEYOKA_DLL_PUBLIC T taylor_default_max_delta_t();
-
-// Concept to detect if R is an input range from whose reference type
-// instances of T can be constructed.
-template <typename R, typename T>
-concept input_rangeT = std::ranges::input_range<R> && std::constructible_from<T, std::ranges::range_reference_t<R>>;
 
 // Logic for parsing a step callback argument in a propagate_*() function.
 // The default return value is an empty callback. If an object that can be used to construct
@@ -389,6 +437,10 @@ public:
 template <typename TA, typename U>
 void taylor_adaptive_setup_sv_rhs(TA &, const U &);
 
+// Struct storing the jet transport data in a Taylor integrator.
+// TODO does this need to be public?
+struct HEYOKA_DLL_PUBLIC jt_data;
+
 } // namespace detail
 
 template <typename T>
@@ -433,7 +485,8 @@ private:
     // Private implementation-detail constructor machinery.
     void finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &, std::vector<T>, std::optional<T>,
                             std::optional<T>, bool, bool, std::vector<T>, std::vector<t_event_t>,
-                            std::vector<nt_event_t>, bool, std::optional<long long>);
+                            std::vector<nt_event_t>, bool, std::optional<long long>,
+                            std::variant<diff_args, std::vector<expression>>, std::uint32_t);
     template <typename... KwArgs>
     void finalise_ctor(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
                        const KwArgs &...kw_args)
@@ -454,7 +507,7 @@ private:
                 }
             }();
 
-            auto [high_accuracy, tol, compact_mode, pars, parallel_mode]
+            auto [high_accuracy, tol, compact_mode, pars, parallel_mode, jt_args, jt_order]
                 = detail::taylor_adaptive_common_ops<T>(kw_args...);
 
             // Extract the terminal events, if any.
@@ -489,7 +542,8 @@ private:
             }();
 
             finalise_ctor_impl(sys, std::move(state), std::move(tm), std::move(tol), high_accuracy, compact_mode,
-                               std::move(pars), std::move(tes), std::move(ntes), parallel_mode, std::move(prec));
+                               std::move(pars), std::move(tes), std::move(ntes), parallel_mode, std::move(prec),
+                               std::move(jt_args), jt_order);
         }
     }
 
@@ -829,7 +883,7 @@ private:
                 }
             }();
 
-            auto [high_accuracy, tol, compact_mode, pars, parallel_mode]
+            auto [high_accuracy, tol, compact_mode, pars, parallel_mode, jt_args, jt_order]
                 = detail::taylor_adaptive_common_ops<T>(kw_args...);
 
             // Extract the terminal events, if any.
@@ -1103,7 +1157,8 @@ namespace detail
 // - 3: removed the mr flag from the terminal event callback siganture,
 //      which resulted also in changes in the event detection data structure.
 // - 4: switched to pimpl implementation for i_data.
-inline constexpr int taylor_adaptive_s11n_version = 4;
+// - 5: added the jet transport data.
+inline constexpr int taylor_adaptive_s11n_version = 5;
 
 // Boost s11n class version history for taylor_adaptive_batch:
 // - 1: added the m_state_vars and m_rhs members.

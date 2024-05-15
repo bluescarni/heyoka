@@ -25,6 +25,7 @@
 #endif
 
 #include <heyoka/detail/i_data.hpp>
+#include <heyoka/detail/optional_s11n.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -105,6 +106,7 @@ void taylor_adaptive<T>::i_data::save(boost::archive::binary_oarchive &ar, unsig
     ar << m_d_out;
     ar << m_state_vars;
     ar << m_rhs;
+    ar << m_jt_data;
 }
 
 template <typename T>
@@ -125,6 +127,7 @@ void taylor_adaptive<T>::i_data::load(boost::archive::binary_iarchive &ar, unsig
     ar >> m_d_out;
     ar >> m_state_vars;
     ar >> m_rhs;
+    ar >> m_jt_data;
 
     // Recover the function pointers.
     m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
@@ -140,7 +143,7 @@ taylor_adaptive<T>::i_data::i_data(const i_data &other)
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
       m_order(other.m_order), m_tol(other.m_tol), m_high_accuracy(other.m_high_accuracy),
       m_compact_mode(other.m_compact_mode), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h),
-      m_d_out(other.m_d_out), m_state_vars(other.m_state_vars), m_rhs(other.m_rhs)
+      m_d_out(other.m_d_out), m_state_vars(other.m_state_vars), m_rhs(other.m_rhs), m_jt_data(other.m_jt_data)
 {
     m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
 }

@@ -16,16 +16,43 @@
 #endif
 
 #include <cstdint>
+#include <optional>
+#include <utility>
 #include <variant>
 #include <vector>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/dfloat.hpp>
+#include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
+{
+
+struct jt_data {
+private:
+    // Serialisation.
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+
+public:
+    jt_data();
+    explicit jt_data(const std::vector<std::pair<expression, expression>> &,
+                     std::variant<diff_args, std::vector<expression>>);
+    jt_data(const jt_data &);
+    jt_data(jt_data &&) noexcept;
+    jt_data &operator=(const jt_data &);
+    jt_data &operator=(jt_data &&) noexcept;
+    ~jt_data();
+};
+
+} // namespace detail
 
 template <typename T>
 struct taylor_adaptive<T>::i_data {
@@ -64,6 +91,8 @@ struct taylor_adaptive<T>::i_data {
     std::vector<T> m_d_out;
     // The state variables and the rhs.
     std::vector<expression> m_state_vars, m_rhs;
+    // The jet transport data.
+    std::optional<detail::jt_data> m_jt_data;
 
 private:
     // Serialisation.
