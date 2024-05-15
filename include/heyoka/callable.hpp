@@ -126,7 +126,6 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface_impl<Base, Holder, empty_ca
 template <typename R, typename... Args>
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_iface {
-    virtual ~callable_iface() = default;
     virtual R operator()(Args... args) = 0;
     virtual explicit operator bool() const noexcept = 0;
 
