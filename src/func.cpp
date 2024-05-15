@@ -57,13 +57,6 @@
 
 HEYOKA_BEGIN_NAMESPACE
 
-namespace detail
-{
-
-func_iface::~func_iface() = default;
-
-} // namespace detail
-
 func_base::func_base(std::string name, std::vector<expression> args) : m_name(std::move(name)), m_args(std::move(args))
 {
     if (m_name.empty()) [[unlikely]] {
