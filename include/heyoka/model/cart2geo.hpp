@@ -68,7 +68,7 @@ auto cart2geo_common_opts(const KwArgs &...kw_args)
     return std::tuple{std::move(xyz), ecc2, R_eq, n_iters};
 }
 
-// This c++ function returns the symbolic expressions of the geodetic coordinates as a function of the Cartesian
+// This c++ function returns the symbolic expressions of the geodetic coordinates (h,lat,lon) as a function of the Cartesian
 // coordinates in the ECRF (Earth Centered Reference Frame)
 HEYOKA_DLL_PUBLIC std::vector<expression> cart2geo_impl(const std::vector<expression> &, double, double, unsigned);
 } // namespace detail

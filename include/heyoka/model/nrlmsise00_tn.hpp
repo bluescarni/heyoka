@@ -6,8 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MODEL_NRLMSISE00_TN__HPP
-#define HEYOKA_MODEL_NRLMSISE00_TN__HPP
+#ifndef HEYOKA_MODEL_NRLMSISE00_TN_HPP
+#define HEYOKA_MODEL_NRLMSISE00_TN_HPP
 
 #include <array>
 #include <cstdint>
@@ -90,7 +90,7 @@ auto nrlmsise00_tn_common_opts(const KwArgs &...kw_args)
 
 // This c++ function returns the symbolic expressions of the thermospheric density at a certain geodetic coordinate,
 // having the f107a, f107, ap indexes and from a time expression returning the days elapsed since mjd2000.
-HEYOKA_DLL_PUBLIC expression nrlmsise00_tn_impl(std::vector<expression>, const expression&, const expression&, const expression&,
+HEYOKA_DLL_PUBLIC expression nrlmsise00_tn_impl(const std::vector<expression>&, const expression&, const expression&, const expression&,
                                                 const expression&);
 
 } // namespace detail

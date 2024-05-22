@@ -432,7 +432,7 @@ expression nrlmsise00_tn_impl(const std::vector<expression> &geodetic, const exp
     in.push_back(sin(geodetic[2])); // sin(lon)
     in.push_back(cos(geodetic[2])); // cos(lon)
     in.push_back(normalize_min_max(geodetic[1], -boost::math::constants::two_div_pi<double>(),
-                                   boost::math::constants::two_div_pi<double>())); // latitude
+                                   boost::math::constants::two_div_pi<double>())); // geodetic latitude
     in.push_back(sin(sid));
     in.push_back(cos(sid));
     in.push_back(sin(doy));
