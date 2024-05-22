@@ -25,7 +25,7 @@ namespace detail
 {
 
 template <typename... KwArgs>
-auto ffnn_common_opts(const KwArgs &...kw_args)
+auto cart2geo_common_opts(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
@@ -63,18 +63,18 @@ auto ffnn_common_opts(const KwArgs &...kw_args)
     // Number of iterations. Optional. Defaults to 4 (guarantees that in the thermosphere the error is below cm)
     unsigned n_iters = 4u;
     if constexpr (p.has(kw::n_iters)) {
-        n_iters = p(kw::n_iters);
+        n_iters = boost::numeric_cast<unsigned>(p(kw::n_iters));
     }
     return std::tuple{std::move(xyz), ecc2, R_eq, n_iters};
 }
 
 // This c++ function returns the symbolic expressions of the geodetic coordinates as a function of the Cartesian
-// coordinates
+// coordinates in the ECRF (Earth Centered Reference Frame)
 HEYOKA_DLL_PUBLIC std::vector<expression> cart2geo_impl(const std::vector<expression> &, double, double, unsigned);
 } // namespace detail
 
 inline constexpr auto cart2geo = [](const auto &...kw_args) -> std::vector<expression> {
-    return std::apply(detail::cart2geo_impl, detail::ffnn_common_opts(kw_args...));
+    return std::apply(detail::cart2geo_impl, detail::cart2geo_common_opts(kw_args...));
 };
 
 } // namespace model
