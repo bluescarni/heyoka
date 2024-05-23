@@ -14,6 +14,7 @@
 #include <heyoka/math/atan.hpp>
 #include <heyoka/math/atan2.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/model/cart2geo.hpp>
@@ -22,6 +23,7 @@ HEYOKA_BEGIN_NAMESPACE
 
 namespace model::detail
 {
+
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::vector<expression> cart2geo_impl(const std::vector<expression> &xyz, double ecc2, double R_eq, unsigned n_iters)
 {
@@ -40,14 +42,14 @@ std::vector<expression> cart2geo_impl(const std::vector<expression> &xyz, double
     }
 
     const expression lon = atan2(xyz[1], xyz[0]);
-    const expression p = sqrt(xyz[0] * xyz[0] + xyz[1] * xyz[1]);
-    expression phi = atan(xyz[2] / p / (1 - ecc2));
+    const expression p = sqrt(pow(xyz[0], 2.) + pow(xyz[1], 2.));
+    expression phi = atan(xyz[2] / (p * (1. - ecc2)));
     expression h, N;
     // we iterate to improve the solution
-    for (unsigned i = 0u; i < n_iters; ++i) {
-        N = R_eq / sqrt(1. - ecc2 * sin(phi) * sin(phi));
+    for (auto i = 0u; i < n_iters; ++i) {
+        N = R_eq * pow(1. - ecc2 * pow(sin(phi), 2.), -.5);
         h = p / cos(phi) - N;
-        phi = atan(xyz[2] / p / (1. - ecc2 * N / (N + h)));
+        phi = atan(xyz[2] / (p * (1. - ecc2 * N / (N + h))));
     }
     return {h, phi, lon};
 }

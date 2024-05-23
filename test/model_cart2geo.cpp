@@ -6,19 +6,12 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <cstdint>
-#include <functional>
-#include <limits>
+#include <array>
 #include <stdexcept>
-#include <system_error>
+#include <vector>
 
-#include <fmt/core.h>
-#include <fmt/ranges.h>
-
-#include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/math.hpp>
 #include <heyoka/model/cart2geo.hpp>
 
 #include "catch.hpp"
@@ -56,7 +49,7 @@ TEST_CASE("impl")
     // Then we test that for a few cases the numerical values are correct (approximately)
     // Init the symbolic variables.
     auto [x, y, z] = make_vars("x", "y", "z");
-    auto geodetic_lph = model::cart2geo(kw::xyz = {x, y, z});
+    auto geodetic_lph = model::cart2geo({x, y, z});
     cfunc<double> h_cf{{geodetic_lph[0]}, {x, y, z}};
     cfunc<double> phi_cf{{geodetic_lph[1]}, {x, y, z}};
     cfunc<double> lon_cf{{geodetic_lph[2]}, {x, y, z}};
@@ -87,7 +80,7 @@ TEST_CASE("impl")
     // And we repeat checking the n_iter and ecc2 values being not default
     // Case 1
     {
-        geodetic_lph = model::cart2geo(kw::xyz = {x, y, z}, kw::ecc2 = 0.13, kw::R_eq = 60, kw::n_iters = 1);
+        geodetic_lph = model::cart2geo({x, y, z}, kw::ecc2 = 0.13, kw::R_eq = 60, kw::n_iters = 1);
         h_cf = cfunc<double>{{geodetic_lph[0]}, {x, y, z}};
         phi_cf = cfunc<double>{{geodetic_lph[1]}, {x, y, z}};
         lon_cf = cfunc<double>{{geodetic_lph[2]}, {x, y, z}};
@@ -103,7 +96,7 @@ TEST_CASE("impl")
     }
     // Case 2
     {
-        geodetic_lph = model::cart2geo(kw::xyz = {x, y, z}, kw::ecc2 = 0.13, kw::R_eq = 60, kw::n_iters = 3);
+        geodetic_lph = model::cart2geo(std::vector{x, y, z}, kw::ecc2 = 0.13, kw::R_eq = 60, kw::n_iters = 3);
         h_cf = cfunc<double>{{geodetic_lph[0]}, {x, y, z}};
         phi_cf = cfunc<double>{{geodetic_lph[1]}, {x, y, z}};
         lon_cf = cfunc<double>{{geodetic_lph[2]}, {x, y, z}};
@@ -123,7 +116,7 @@ TEST_CASE("igor_iface")
 {
     auto [x, y, z] = make_vars("x", "y", "z");
     {
-        auto igor_v = model::cart2geo(kw::xyz = {x, y, z}, kw::ecc2 = 12.12, kw::R_eq = 13.13, kw::n_iters = 3u);
+        auto igor_v = model::cart2geo({x, y, z}, kw::ecc2 = 12.12, kw::R_eq = 13.13, kw::n_iters = 3u);
         auto vanilla_v = model::detail::cart2geo_impl({x, y, z}, 12.12, 13.13, 3u);
         REQUIRE(igor_v == vanilla_v);
     }
