@@ -45,6 +45,16 @@ auto nrlmsise00_tn_common_opts(const KwArgs &...kw_args)
                           "The 'geodetic' keyword argument is necessary but it was not provided");
     }
 
+    // f107 index. Mandatory.
+    auto f107 = [&p]() -> expression {
+        if constexpr (p.has(kw::f107)) {
+            return p(kw::f107);
+        } else {
+            static_assert(heyoka::detail::always_false_v<KwArgs...>,
+                          "The 'f107' keyword argument is necessary but it was not provided");
+        }
+    }();
+
     // f107a index. Mandatory.
     auto f107a = [&p]() -> expression {
         if constexpr (p.has(kw::f107a)) {
@@ -52,16 +62,6 @@ auto nrlmsise00_tn_common_opts(const KwArgs &...kw_args)
         } else {
             static_assert(heyoka::detail::always_false_v<KwArgs...>,
                           "The 'f107a' keyword argument is necessary but it was not provided");
-        }
-    }();
-
-    // f107a index. Mandatory.
-    auto f107 = [&p]() -> expression {
-        if constexpr (p.has(kw::f107)) {
-            return p(kw::f107);
-        } else {
-            static_assert(heyoka::detail::always_false_v<KwArgs...>,
-                          "The 'f107' keyword argument is necessary but it was not provided");
         }
     }();
 
@@ -86,7 +86,7 @@ auto nrlmsise00_tn_common_opts(const KwArgs &...kw_args)
         }
     }();
 
-    return std::tuple{std::move(geodetic), std::move(f107a), std::move(f107), std::move(ap), std::move(doy_expr)};
+    return std::tuple{std::move(geodetic), std::move(f107), std::move(f107a), std::move(ap), std::move(doy_expr)};
 }
 
 // This c++ function returns the symbolic expressions of the thermospheric density at a certain geodetic coordinate,
