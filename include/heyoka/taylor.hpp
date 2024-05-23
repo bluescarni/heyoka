@@ -162,7 +162,7 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// Helper for parsing common options for the Taylor integrators.
+// Helper for parsing common options when constructing Taylor integrators.
 template <typename T, typename... KwArgs>
 auto taylor_adaptive_common_ops(const KwArgs &...kw_args)
 {

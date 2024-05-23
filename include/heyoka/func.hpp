@@ -274,9 +274,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface_impl : public Base {
 
 // The function interface.
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
-struct HEYOKA_DLL_PUBLIC func_iface {
-    virtual ~func_iface();
-
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_iface {
     [[nodiscard]] virtual const std::string &get_name() const = 0;
 
     virtual void to_stream(std::ostringstream &) const = 0;
