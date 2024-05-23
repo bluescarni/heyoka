@@ -32,6 +32,7 @@
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/safe_numerics/safe_integer.hpp>
 
 #include <fmt/core.h>
 
@@ -263,6 +264,32 @@ void dtime_checks(const T &hi, const T &lo)
                         "coordinate ({}) must not be smaller in magnitude than the second component ({})",
                         detail::fp_to_string(hi), detail::fp_to_string(lo)));
     }
+}
+
+// Helper to compute the total number of parameters in an ODE sys, including
+// terminal and non-terminal event functions.
+template <typename TEvent, typename NTEvent>
+std::uint32_t tot_n_pars_in_ode_sys(const std::vector<std::pair<expression, expression>> &sys,
+                                    const std::vector<TEvent> &tes, const std::vector<NTEvent> &ntes)
+{
+    // Bring rhs and all event functions into a single vector function.
+    std::vector<expression> tot_func;
+    tot_func.reserve(boost::safe_numerics::safe<decltype(tot_func.size())>(sys.size()) + tes.size() + ntes.size());
+
+    for (const auto &[lhs, rhs] : sys) {
+        tot_func.push_back(rhs);
+    }
+
+    for (const auto &ev : tes) {
+        tot_func.push_back(ev.get_expression());
+    }
+
+    for (const auto &ev : ntes) {
+        tot_func.push_back(ev.get_expression());
+    }
+
+    // Fetch and return the number of params in tot_func.
+    return get_param_size(tot_func);
 }
 
 } // namespace detail

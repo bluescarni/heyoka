@@ -251,7 +251,7 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, llvm::Type *fp_t, con
     auto *ext_fp_t = llvm_ext_type(fp_t);
 
     // Fetch the pointer into par_ptr.
-    // NOTE: the overflow check is done in taylor_compute_jet().
+    // NOTE: the overflow check is done when constructing the integrator.
     auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, par_ptr, builder.CreateMul(p, builder.getInt32(batch_size)));
 
     return ext_load_vector_from_memory(s, fp_t, ptr, batch_size);

@@ -178,6 +178,22 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
 
+    // Compute the total number of params, including the rhs and the event functions.
+    const auto tot_n_pars = detail::tot_n_pars_in_ode_sys(sys, tes, ntes);
+    // In compact mode, we need to ensure that we can index into the array of parameter values
+    // using std::uint32_t.
+    // NOTE: in default mode the check is done inside taylor_codegen_numparam()
+    // during the construction of the IR code.
+    // In compact mode we cannot do that, as the determination of the index into
+    // par_ptr is done *within* the IR code (compare taylor_codegen_numparam()
+    // to taylor_c_diff_numparam_codegen()).
+    // LCOV_EXCL_START
+    if (m_compact_mode && tot_n_pars > std::numeric_limits<std::uint32_t>::max() / m_batch_size) {
+        throw std::overflow_error(
+            "An overflow condition was detected in the computation of a jet of Taylor derivatives in compact mode");
+    }
+    // LCOV_EXCL_STOP
+
     // Do we have events?
     const auto with_events = !tes.empty() || !ntes.empty();
 
@@ -209,22 +225,16 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
     }
 
     // Fix m_pars' size, if necessary.
-    const auto npars = detail::n_pars_in_dc(m_dc);
-    // LCOV_EXCL_START
-    if (npars > std::numeric_limits<std::uint32_t>::max() / m_batch_size) {
-        throw std::overflow_error("Overflow detected when computing the size of the parameter array in an adaptive "
-                                  "Taylor integrator in batch mode");
-    }
-    // LCOV_EXCL_STOP
-    if (m_pars.size() < npars * m_batch_size) {
-        m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars * m_batch_size));
-    } else if (m_pars.size() > npars * m_batch_size) {
+    using su32_t = boost::safe_numerics::safe<std::uint32_t>;
+    const auto pars_req_size = su32_t(tot_n_pars) * m_batch_size;
+    if (m_pars.size() < pars_req_size) {
+        m_pars.resize(pars_req_size);
+    } else if (m_pars.size() > pars_req_size) {
         throw std::invalid_argument(
             fmt::format("Excessive number of parameter values passed to the constructor of an adaptive "
                         "Taylor integrator in batch mode: {} parameter value(s) were passed, but the ODE "
-                        "system contains only {} parameter(s) "
-                        "(in batches of {})",
-                        m_pars.size(), npars, m_batch_size));
+                        "system contains only {} parameter(s) (in batches of {})",
+                        m_pars.size(), tot_n_pars, m_batch_size));
     }
 
     // Log runtimes in trace mode.
@@ -256,7 +266,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
     // Setup the vector for the Taylor coefficients.
     // NOTE: the size of m_state.size() already takes
     // into account the batch size.
-    m_tc.resize(m_state.size() * (boost::safe_numerics::safe<std::uint32_t>(m_order) + 1));
+    m_tc.resize(m_state.size() * (su32_t(m_order) + 1));
 
     // Setup m_last_h.
     m_last_h.resize(boost::numeric_cast<decltype(m_last_h.size())>(batch_size));
