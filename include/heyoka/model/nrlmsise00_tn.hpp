@@ -35,14 +35,15 @@ auto nrlmsise00_tn_common_opts(const KwArgs &...kw_args)
     igor::parser p{kw_args...};
 
     // Geodetic coordinates. Mandatory.
-    auto geodetic = [&p]() -> expression {
-        if constexpr (p.has(kw::geodetic)) {
-            return p(kw::geodetic);
-        } else {
-            static_assert(heyoka::detail::always_false_v<KwArgs...>,
-                          "The 'geodetic' keyword argument is necessary but it was not provided");
+    std::vector<expression> geodetic;
+    if constexpr (p.has(kw::geodetic)) {
+        for (const auto &val : p(kw::geodetic)) {
+            geodetic.emplace_back(val);
         }
-    }();
+    } else {
+        static_assert(heyoka::detail::always_false_v<KwArgs...>,
+                          "The 'geodetic' keyword argument is necessary but it was not provided");
+    }
 
     // f107a index. Mandatory.
     auto f107a = [&p]() -> expression {
@@ -85,17 +86,17 @@ auto nrlmsise00_tn_common_opts(const KwArgs &...kw_args)
         }
     }();
 
-    return std::tuple{std::move(doy_expr), std::move(geodetic), std::move(f107a), std::move(f107), std::move(ap)};
+    return std::tuple{std::move(geodetic), std::move(f107a), std::move(f107), std::move(ap), std::move(doy_expr)};
 }
 
 // This c++ function returns the symbolic expressions of the thermospheric density at a certain geodetic coordinate,
-// having the f107a, f107, ap indexes and from a time expression returning the days elapsed since mjd2000.
+// having the f107a, f107, ap indexes and from a time expression returning the days elapsed since the last 1st of January 00:00:00.
 HEYOKA_DLL_PUBLIC expression nrlmsise00_tn_impl(const std::vector<expression>&, const expression&, const expression&, const expression&,
                                                 const expression&);
 
 } // namespace detail
 
-inline constexpr auto nrlmsise00_tn = [](const auto &...kw_args) -> std::vector<expression> {
+inline constexpr auto nrlmsise00_tn = [](const auto &...kw_args) -> expression {
     return std::apply(detail::nrlmsise00_tn_impl, detail::nrlmsise00_tn_common_opts(kw_args...));
 };
 

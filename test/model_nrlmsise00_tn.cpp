@@ -29,12 +29,48 @@ using namespace heyoka_test;
 
 TEST_CASE("impl")
 {
+
+    using Catch::Matchers::Message;
     auto [h, lat, lon, f107a, f107, ap] = make_vars("h", "lat", "lon", "f107a", "f107", "ap");
-    auto rho
-        = model::detail::nrlmsise00_tn_impl({h, lat, lon}, f107a, f107, ap, heyoka::time / 60_dbl / 60_dbl / 24_dbl);
-    cfunc<double> rho_cf{{rho}, {h, lat, lon, f107a, f107, ap}};
-    std::array<double, 6> in{600, 1.2, 3.9, 12.2, 21.2, 22.};
-    std::array<double, 1> out{};
-    rho_cf(out, in, kw::time = 0.);
-    fmt::print("{}", out);
+
+    // First, we test malformed cases and their throws.
+    // 1 - Size of the Geodetic coordinates is wrong
+    REQUIRE_THROWS_AS(model::detail::nrlmsise00_tn_impl({h, lat, lon, h}, f107a, f107, ap, heyoka::time / 86400_dbl),
+                      std::invalid_argument);
+
+    // Then we test the numerical output
+    // Construct the expression for the thermospheric density
+    auto rho = model::detail::nrlmsise00_tn_impl({h, lat, lon}, f107a, f107, ap, heyoka::time / 86400_dbl);
+    // Case 1 - 1st January 00:00:00
+    {
+        // Prepare the input-output buffers.
+        std::array<double, 6> in{600, 1.2, 3.9, 12.2, 21.2, 22.};
+        std::array<double, 1> out{};
+        // Produce the compiled function
+        cfunc<double> rho_cf{{rho}, {h, lat, lon, f107a, f107, ap}};
+        // Call the model
+        rho_cf(out, in, kw::time = 0.);
+        REQUIRE(out[0] == approximately(9.599548606663777e-15));
+    }
+    // Case 2 - 123.23 days later (different alts etc....)
+    {
+        // Prepare the input-output buffers.
+        std::array<double, 6> in{234, 4.5, 1.02, 3, 4, 5};
+        std::array<double, 1> out{};
+        // Produce the compiled function
+        cfunc<double> rho_cf{{rho}, {h, lat, lon, f107a, f107, ap}};
+        // Call the model
+        rho_cf(out, in, kw::time = 123.23 * 86400.);
+        REQUIRE(out[0] == approximately(3.549961466488851e-11));
+    }
+}
+
+TEST_CASE("igor_iface")
+{
+    auto [h, lat, lon, f107a, f107, ap] = make_vars("h", "lat", "lon", "f107a", "f107", "ap");
+    {
+        auto igor_v = model::nrlmsise00_tn(kw::geodetic = {h, lat, lon}, kw::f107a = f107a, kw::f107 = f107, kw::ap = ap, kw::time = heyoka::time / 86400_dbl);
+        auto vanilla_v = model::detail::nrlmsise00_tn_impl({h, lat, lon}, f107a, f107, ap, heyoka::time / 86400_dbl);
+        REQUIRE(igor_v == vanilla_v);
+    }
 }
