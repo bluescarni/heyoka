@@ -194,6 +194,9 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
 
     using std::isfinite;
 
+    // Validate the ode sys.
+    validate_ode_sys(sys, tes, ntes);
+
     // Run an immediate check on state. This is a bit redundant with other checks
     // later (e.g., state.size() must be consistent with the ODE definition, which in
     // turn cannot consist of zero equations), but it's handy to do it here so that,

@@ -191,6 +191,7 @@ set(HEYOKA_SRC_FILES
     # NOTE: this will be an empty file in case we are not
     # building with support for real.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/validate_ode_sys.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ensemble_propagate.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/func.cpp"

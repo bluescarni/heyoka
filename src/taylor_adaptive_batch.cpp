@@ -88,6 +88,9 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
 
     using std::isfinite;
 
+    // Validate the ode sys.
+    validate_ode_sys(sys, tes, ntes);
+
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_state);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_hi);

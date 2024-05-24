@@ -590,7 +590,7 @@ taylor_dc_t taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *ext_
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
 
     // Decompose the system of equations.
-    auto [dc, ev_dc] = taylor_decompose(sys, evs);
+    auto [dc, ev_dc] = taylor_decompose_sys(sys, evs);
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
@@ -705,7 +705,7 @@ taylor_dc_t taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::
 
     // Decompose the system of equations.
     // NOTE: no sv_funcs needed for this stepper.
-    auto [dc, sv_funcs_dc] = taylor_decompose(sys, {});
+    auto [dc, sv_funcs_dc] = taylor_decompose_sys(sys, {});
 
     assert(sv_funcs_dc.empty());
 
