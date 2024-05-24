@@ -6,17 +6,19 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include "heyoka/kw.hpp"
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
 
 #include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/exp.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/math/tanh.hpp>
 #include <heyoka/model/ffnn.hpp>
 #include <heyoka/model/nrlmsise00_tn.hpp>
@@ -24,6 +26,9 @@
 HEYOKA_BEGIN_NAMESPACE
 
 namespace model::detail
+{
+
+namespace
 {
 
 const double best_global_fit[12]
@@ -402,12 +407,17 @@ expression normalize_min_max(const expression &data, double min_val, double max_
 
 expression rho_approximation(const expression &h, const std::vector<expression> &params)
 {
-    expression retval = 0_dbl;
-    for (auto i = 0u; i < 4ul; ++i) {
-        retval += params[i] * exp(-(h - params[i + 8]) * params[i + 4]);
+    std::vector<expression> terms;
+    terms.reserve(4);
+
+    for (auto i = 0u; i < 4u; ++i) {
+        terms.emplace_back(params[i] * exp(-(h - params[i + 8u]) * params[i + 4u]));
     }
-    return retval;
+
+    return sum(std::move(terms));
 }
+
+} // namespace
 
 // NOTE: geodetic coordinates in the order [h, lat, lon]
 // NOTE: doy_expr is the number of days elapsed since the last 1st of january as a function of heyoka::time.
@@ -427,7 +437,7 @@ expression nrlmsise00_tn_impl(const std::vector<expression> &geodetic, const exp
     const expression sid = doy_expr * boost::math::constants::two_pi<double>();
     // The expression for the fraction of the orbit made by the Earth since the last 1st of January 00:00:00 UTC. (day
     // of year)
-    const expression doy = doy_expr / 365.25 * boost::math::constants::two_pi<double>();
+    const expression doy = doy_expr * (boost::math::constants::two_pi<double>() / 365.25);
 
     // Preparing the input expressions to the ffnn
     std::vector<expression> in;
@@ -455,7 +465,7 @@ expression nrlmsise00_tn_impl(const std::vector<expression> &geodetic, const exp
     // We create an alias as to reflect the semantic change of the values stored by the variable that the for loop will
     // introduce.
     auto &params = delta_params;
-    for (decltype(delta_params.size()) i = 0u; i < delta_params.size(); ++i) {
+    for (decltype(delta_params.size()) i = 0; i < delta_params.size(); ++i) {
         params[i] = (best_global_fit[i] * (1_dbl + delta_params[i]));
     }
 
