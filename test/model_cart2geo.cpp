@@ -38,12 +38,14 @@ TEST_CASE("impl")
                                      a_earth, 4u),
         std::invalid_argument);
     // 3 - Negative planet equatorial radius
-    REQUIRE_THROWS_AS(model::detail::cart2geo_impl(std::vector<expression>{expression("x"), expression("y")}, ecc2,
-                                                   -23233234.3423, 4u),
-                      std::invalid_argument);
+    REQUIRE_THROWS_AS(
+        model::detail::cart2geo_impl(std::vector<expression>{expression("x"), expression("y"), expression("z")}, ecc2,
+                                     -23233234.3423, 4u),
+        std::invalid_argument);
     // 4 - No iterations
     REQUIRE_THROWS_AS(
-        model::detail::cart2geo_impl(std::vector<expression>{expression("x"), expression("y")}, ecc2, a_earth, 0u),
+        model::detail::cart2geo_impl(std::vector<expression>{expression("x"), expression("y"), expression("z")}, ecc2,
+                                     a_earth, 0u),
         std::invalid_argument);
 
     // Then we test that for a few cases the numerical values are correct (approximately)

@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cmath>
 #include <stdexcept>
 #include <vector>
 
@@ -31,11 +32,11 @@ std::vector<expression> cart2geo_impl(const std::vector<expression> &xyz, double
     if (xyz.size() != 3u) {
         throw std::invalid_argument("The xyz argument value must have exactly the size 3");
     }
-    if (ecc2 < 0.) {
-        throw std::invalid_argument("The ecc2 argument must be positive");
+    if (!std::isfinite(ecc2) || ecc2 < 0.) {
+        throw std::invalid_argument("The ecc2 argument must be finite and positive");
     }
-    if (R_eq < 0.) {
-        throw std::invalid_argument("The R_eq argument must be positive");
+    if (!std::isfinite(R_eq) || R_eq < 0.) {
+        throw std::invalid_argument("The R_eq argument must be finite and positive");
     }
     if (n_iters == 0u) {
         throw std::invalid_argument("The n_iters argument must be strictly positive");
