@@ -21,7 +21,6 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/math/time.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
