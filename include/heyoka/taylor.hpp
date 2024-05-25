@@ -96,8 +96,6 @@ HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_load_diff(llvm_state &, llvm::Type *, ll
 HEYOKA_DLL_PUBLIC void taylor_c_store_diff(llvm_state &, llvm::Type *, llvm::Value *, std::uint32_t, llvm::Value *,
                                            llvm::Value *, llvm::Value *);
 
-std::uint32_t n_pars_in_dc(const taylor_dc_t &);
-
 taylor_dc_t taylor_add_adaptive_step_with_events(llvm_state &, llvm::Type *, llvm::Type *, const std::string &,
                                                  const std::vector<std::pair<expression, expression>> &, std::uint32_t,
                                                  bool, const std::vector<expression> &, bool, bool, std::uint32_t);
@@ -122,10 +120,14 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &, llvm::Type *, const std::strin
 void taylor_add_d_out_function(llvm_state &, llvm::Type *, std::uint32_t, std::uint32_t, std::uint32_t, bool,
                                bool = true);
 
+template <typename TEvent, typename NTEvent>
+void validate_ode_sys(const std::vector<std::pair<expression, expression>> &, const std::vector<TEvent> &,
+                      const std::vector<NTEvent> &);
+
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>>
-taylor_decompose(const std::vector<std::pair<expression, expression>> &, const std::vector<expression> &);
+taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &, const std::vector<expression> &);
 
 // Enum to represent the outcome of a stepping/propagate function.
 enum class taylor_outcome : std::int64_t {

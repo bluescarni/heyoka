@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -921,22 +922,22 @@ std::uint32_t get_param_size(detail::funcptr_set &func_set, const expression &ex
 
     std::visit(
         // NOLINTNEXTLINE(misc-no-recursion)
-        [&retval, &func_set](const auto &v) {
-            using type = uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, param>) {
-                using safe_uint32_t = boost::safe_numerics::safe<std::uint32_t>;
-
-                retval = std::max(static_cast<std::uint32_t>(v.idx() + safe_uint32_t(1)), retval);
-            } else if constexpr (std::is_same_v<type, func>) {
+        [&retval, &func_set]<typename T>(const T &v) {
+            if constexpr (std::same_as<T, param>) {
+                retval = v.idx() + boost::safe_numerics::safe<std::uint32_t>(1);
+            } else if constexpr (std::same_as<T, func>) {
                 const auto f_id = v.get_ptr();
 
-                if (auto it = func_set.find(f_id); it != func_set.end()) {
+                if (func_set.contains(f_id)) {
                     // We already computed the number of params for the current
                     // function, exit.
+                    // NOTE: we will be end up returning 0 as retval. This is ok
+                    // because the number of params for the current function was
+                    // already considered in the calculation.
                     return;
                 }
 
+                // Recursively fetch the number of params from the function arguments.
                 for (const auto &a : v.args()) {
                     retval = std::max(get_param_size(func_set, a), retval);
                 }

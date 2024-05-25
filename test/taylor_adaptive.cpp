@@ -2453,3 +2453,40 @@ TEST_CASE("taylor sum_to_sub")
                 == 1);
     }
 }
+
+TEST_CASE("ode validate")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    REQUIRE_THROWS_MATCHES((taylor_adaptive<double>{{}, {0.05, 0.025}}), std::invalid_argument,
+                           Message("Cannot integrate a system of zero equations"));
+    REQUIRE_THROWS_MATCHES((taylor_adaptive<double>{{prime("__foo"_var) = 5_dbl}, {0.05, 0.025}}),
+                           std::invalid_argument,
+                           Message("Invalid system of differential equations detected: the variable '__foo' "
+                                   "appears in the left-hand side, but variables beginning with '__' are reserved "
+                                   "for internal use"));
+    REQUIRE_THROWS_MATCHES((taylor_adaptive<double>{{prime(x) = 5_dbl, prime(x) = 5_dbl}, {0.05, 0.025}}),
+                           std::invalid_argument,
+                           Message("Invalid system of differential equations detected: the variable 'x' "
+                                   "appears in the left-hand side twice"));
+    REQUIRE_THROWS_MATCHES((taylor_adaptive<double>{{{par[0], 5_dbl}, prime(x) = 5_dbl}, {0.05, 0.025}}),
+                           std::invalid_argument,
+                           Message("Invalid system of differential equations detected: the "
+                                   "left-hand side contains the expression 'p0', which is not a variable"));
+    REQUIRE_THROWS_MATCHES((taylor_adaptive<double>{{prime(x) = v}, {0.05, 0.025}}), std::invalid_argument,
+                           Message("Invalid system of differential equations detected: the variable 'v' "
+                                   "appears in the right-hand side but not in the left-hand side"));
+    REQUIRE_THROWS_MATCHES(
+        (taylor_adaptive<double>{
+            {prime(x) = 3_dbl}, {0.05, 0.025}, kw::nt_events = {nt_event<double>{v, [](auto &&...) {}}}}),
+        std::invalid_argument,
+        Message("Invalid system of differential equations detected: an event function contains the variable 'v', "
+                "which is not a state variable"));
+    REQUIRE_THROWS_MATCHES(
+        (taylor_adaptive<double>{{prime(x) = 3_dbl}, {0.05, 0.025}, kw::t_events = {t_event<double>{v}}}),
+        std::invalid_argument,
+        Message("Invalid system of differential equations detected: an event function contains the variable 'v', "
+                "which is not a state variable"));
+}
