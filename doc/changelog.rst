@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- Add thermonets: neural, differentiable, high-performance
+  models for the Earth's thermosphere density
+  (`#421 <https://github.com/bluescarni/heyoka/pull/421>`__).
 - Introduce the ability to represent unknown functions
   and their derivatives in the expression system
   (`#416 <https://github.com/bluescarni/heyoka/pull/416>`__).
