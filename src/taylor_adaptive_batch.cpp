@@ -191,7 +191,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
     // par_ptr is done *within* the IR code (compare taylor_codegen_numparam()
     // to taylor_c_diff_numparam_codegen()).
     // LCOV_EXCL_START
-    if (m_compact_mode && tot_n_pars > std::numeric_limits<std::uint32_t>::max() / m_batch_size) {
+    if (m_compact_mode && tot_n_pars > std::numeric_limits<std::uint32_t>::max() / m_batch_size) [[unlikely]] {
         throw std::overflow_error(
             "An overflow condition was detected in the computation of a jet of Taylor derivatives in compact mode");
     }

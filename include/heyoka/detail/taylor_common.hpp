@@ -22,6 +22,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -73,9 +74,9 @@ namespace detail
 // arguments starting at numpar_begin, either splatting the number argument or loading the parameter from the parameter
 // array (see the implementation of taylor_c_diff_numparam_codegen()).
 template <typename Tup, typename ArgIter, std::size_t... I>
-inline std::vector<llvm::Value *>
-taylor_c_diff_func_numpar_codegen_impl(llvm_state &s, llvm::Type *fp_t, const Tup &np_tup, ArgIter numpar_begin,
-                                       llvm::Value *par_ptr, std::uint32_t batch_size, std::index_sequence<I...>)
+std::vector<llvm::Value *> taylor_c_diff_func_numpar_codegen_impl(llvm_state &s, llvm::Type *fp_t, const Tup &np_tup,
+                                                                  ArgIter numpar_begin, llvm::Value *par_ptr,
+                                                                  std::uint32_t batch_size, std::index_sequence<I...>)
 {
     return {taylor_c_diff_numparam_codegen(s, fp_t, std::get<I>(np_tup), numpar_begin + I, par_ptr, batch_size)...};
 }
@@ -85,9 +86,9 @@ taylor_c_diff_func_numpar_codegen_impl(llvm_state &s, llvm::Type *fp_t, const Tu
 // unless the order is 0 (in which case it will return the result of applying the functor cgen
 // to the number(s)/param(s) arguments).
 template <typename F, typename... NumPars>
-inline llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
-                                                 std::uint32_t batch_size, const std::string &name,
-                                                 std::uint32_t n_hidden_deps, const F &cgen, const NumPars &...np)
+llvm::Function *taylor_c_diff_func_numpar(llvm_state &s, llvm::Type *fp_t, std::uint32_t n_uvars,
+                                          std::uint32_t batch_size, const std::string &name,
+                                          std::uint32_t n_hidden_deps, const F &cgen, const NumPars &...np)
 {
     static_assert(sizeof...(np) > 0u);
     static_assert(std::conjunction_v<std::disjunction<std::is_same<NumPars, number>, std::is_same<NumPars, param>>...>);
@@ -276,17 +277,9 @@ std::uint32_t tot_n_pars_in_ode_sys(const std::vector<std::pair<expression, expr
     std::vector<expression> tot_func;
     tot_func.reserve(boost::safe_numerics::safe<decltype(tot_func.size())>(sys.size()) + tes.size() + ntes.size());
 
-    for (const auto &[lhs, rhs] : sys) {
-        tot_func.push_back(rhs);
-    }
-
-    for (const auto &ev : tes) {
-        tot_func.push_back(ev.get_expression());
-    }
-
-    for (const auto &ev : ntes) {
-        tot_func.push_back(ev.get_expression());
-    }
+    std::ranges::transform(sys, std::back_inserter(tot_func), &std::pair<expression, expression>::second);
+    std::ranges::transform(tes, std::back_inserter(tot_func), &TEvent::get_expression);
+    std::ranges::transform(ntes, std::back_inserter(tot_func), &NTEvent::get_expression);
 
     // Fetch and return the number of params in tot_func.
     return get_param_size(tot_func);
