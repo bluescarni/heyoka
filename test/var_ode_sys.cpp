@@ -122,6 +122,7 @@ TEST_CASE("s11n")
     auto [x, v] = make_vars("x", "v");
 
     auto sys = var_ode_sys({prime(x) = v, prime(v) = -x}, var_args::vars);
+    auto sys_copy(sys);
 
     {
         boost::archive::binary_oarchive oa(ss);
@@ -129,8 +130,7 @@ TEST_CASE("s11n")
         oa << sys;
     }
 
-    sys = var_ode_sys({prime(x) = v, prime(v) = -x}, std::vector{x});
-    REQUIRE(sys.get_vargs() != std::vector{x, v});
+    sys = var_ode_sys({prime(x) = x}, std::vector{x});
 
     {
         boost::archive::binary_iarchive ia(ss);
@@ -138,5 +138,6 @@ TEST_CASE("s11n")
         ia >> sys;
     }
 
-    REQUIRE(sys.get_vargs() == std::vector{x, v});
+    REQUIRE(sys.get_sys() == sys_copy.get_sys());
+    REQUIRE(sys.get_vargs() == sys_copy.get_vargs());
 }
