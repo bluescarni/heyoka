@@ -14,10 +14,12 @@
 #include <vector>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/taylor.hpp>
 #include <heyoka/var_ode_sys.hpp>
 
 #include "catch.hpp"
@@ -170,6 +172,8 @@ TEST_CASE("vareqs")
 
         REQUIRE(vsys.get_sys()[5].first == v_v0);
         REQUIRE(vsys.get_sys()[5].second == -(((v_v0 * x) + (x_v0 * v)) * cos((x * v))));
+
+        auto ta = taylor_adaptive<double>{vsys.get_sys(), std::vector<double>(6, 0.), kw::tol = 1e-3};
     }
 
     {
@@ -186,6 +190,8 @@ TEST_CASE("vareqs")
 
         REQUIRE(vsys.get_sys()[3].first == v_v0);
         REQUIRE(vsys.get_sys()[3].second == -(((v_v0 * x) + (x_v0 * v)) * cos((x * v))));
+
+        auto ta = taylor_adaptive<double>{vsys.get_sys(), std::vector<double>(4, 0.), kw::tol = 1e-3};
     }
 
     {
@@ -236,5 +242,126 @@ TEST_CASE("vareqs")
         REQUIRE(vsys.get_sys()[11].second
                 == -(((((x_v0 * v) + (v_v0 * x)) * -sin((x * v))) * ((v_v0 * x) + (x_v0 * v)))
                      + ((((v_v0_v0 * x) + (x_v0 * v_v0)) + ((x_v0_v0 * v) + (v_v0 * x_v0))) * cos((x * v)))));
+
+        auto ta = taylor_adaptive<double>{vsys.get_sys(), std::vector<double>(12, 0.), kw::tol = 1e-3};
+    }
+
+    {
+        auto orig_sys = std::vector{prime(x) = v + x, prime(v) = -sin(x * v)};
+        auto vsys = var_ode_sys(orig_sys, std::vector{v}, 2);
+        REQUIRE(
+            std::ranges::equal(orig_sys, std::ranges::subrange(vsys.get_sys().begin(), vsys.get_sys().begin() + 2)));
+        REQUIRE(vsys.get_sys().size() == 6u);
+
+        auto [x_v0, v_v0] = make_vars("∂[(0, 1)]x", "∂[(0, 1)]v");
+        auto [x_v0_v0, v_v0_v0] = make_vars("∂[(0, 2)]x", "∂[(0, 2)]v");
+
+        REQUIRE(vsys.get_sys()[2].first == x_v0);
+        REQUIRE(vsys.get_sys()[2].second == diff(orig_sys[0].second, v) * v_v0 + diff(orig_sys[0].second, x) * x_v0);
+
+        REQUIRE(vsys.get_sys()[3].first == v_v0);
+        REQUIRE(vsys.get_sys()[3].second == -(((v_v0 * x) + (x_v0 * v)) * cos((x * v))));
+
+        REQUIRE(vsys.get_sys()[4].first == x_v0_v0);
+        REQUIRE(vsys.get_sys()[4].second == v_v0_v0 + x_v0_v0);
+
+        REQUIRE(vsys.get_sys()[5].first == v_v0_v0);
+        REQUIRE(vsys.get_sys()[5].second
+                == -(((((x_v0 * v) + (v_v0 * x)) * -sin((x * v))) * ((v_v0 * x) + (x_v0 * v)))
+                     + ((((v_v0_v0 * x) + (x_v0 * v_v0)) + ((x_v0_v0 * v) + (v_v0 * x_v0))) * cos((x * v)))));
+
+        auto ta = taylor_adaptive<double>{vsys.get_sys(), std::vector<double>(6, 0.), kw::tol = 1e-3};
+    }
+
+    // Test with params.
+    {
+        auto orig_sys = std::vector{prime(x) = v + x + par[2], prime(v) = -sin(x * v * par[2])};
+        auto vsys = var_ode_sys(orig_sys, std::vector{v, par[2]});
+
+        REQUIRE(
+            std::ranges::equal(orig_sys, std::ranges::subrange(vsys.get_sys().begin(), vsys.get_sys().begin() + 2)));
+        REQUIRE(vsys.get_sys().size() == 6u);
+
+        auto [x_v0, x_p2, v_v0, v_p2] = make_vars("∂[(0, 1)]x", "∂[(1, 1)]x", "∂[(0, 1)]v", "∂[(1, 1)]v");
+
+        REQUIRE(vsys.get_sys()[2].first == x_v0);
+        REQUIRE(vsys.get_sys()[2].second == (v_v0 + x_v0));
+
+        REQUIRE(vsys.get_sys()[3].first == x_p2);
+        REQUIRE(vsys.get_sys()[3].second == 1_dbl + (v_p2 + x_p2));
+
+        REQUIRE(vsys.get_sys()[4].first == v_v0);
+        REQUIRE(vsys.get_sys()[4].second == -((((v_v0 * x) + (x_v0 * v)) * par[2]) * cos(((x * v) * par[2]))));
+
+        REQUIRE(vsys.get_sys()[5].first == v_p2);
+        REQUIRE(vsys.get_sys()[5].second
+                == -(((x * v) + (((v_p2 * x) + (x_p2 * v)) * par[2])) * cos(((x * v) * par[2]))));
+
+        auto ta = taylor_adaptive<double>{vsys.get_sys(), std::vector<double>(6, 0.), kw::tol = 1e-3};
+    }
+
+    // Test with time.
+    {
+        auto orig_sys = std::vector{prime(x) = v + x + par[2], prime(v) = -sin(x * v * par[2])};
+        auto vsys = var_ode_sys(orig_sys, std::vector{heyoka::time, par[2]});
+
+        REQUIRE(
+            std::ranges::equal(orig_sys, std::ranges::subrange(vsys.get_sys().begin(), vsys.get_sys().begin() + 2)));
+        REQUIRE(vsys.get_sys().size() == 6u);
+
+        auto [x_t0, x_p2, v_t0, v_p2] = make_vars("∂[(0, 1)]x", "∂[(1, 1)]x", "∂[(0, 1)]v", "∂[(1, 1)]v");
+
+        REQUIRE(vsys.get_sys()[2].first == x_t0);
+        REQUIRE(vsys.get_sys()[2].second == (v_t0 + x_t0));
+
+        REQUIRE(vsys.get_sys()[3].first == x_p2);
+        REQUIRE(vsys.get_sys()[3].second == 1_dbl + (v_p2 + x_p2));
+
+        REQUIRE(vsys.get_sys()[4].first == v_t0);
+        REQUIRE(vsys.get_sys()[4].second == -((((v_t0 * x) + (x_t0 * v)) * par[2]) * cos(((x * v) * par[2]))));
+
+        REQUIRE(vsys.get_sys()[5].first == v_p2);
+        REQUIRE(vsys.get_sys()[5].second
+                == -(((x * v) + (((v_p2 * x) + (x_p2 * v)) * par[2])) * cos(((x * v) * par[2]))));
+
+        auto ta = taylor_adaptive<double>{
+            vsys.get_sys(), {.1, .2, 0., 0., 0., 0.}, kw::pars = {1., 1., .3}, kw::tol = 1e-3};
+
+        ta.step();
+
+        REQUIRE(ta.get_state()[2] == 0.);
+        REQUIRE(ta.get_state()[4] == 0.);
+    }
+
+    // Test with par not showing up in the dynamics.
+    {
+        auto orig_sys = std::vector{prime(x) = v + x + par[2], prime(v) = -sin(x * v * par[2])};
+        auto vsys = var_ode_sys(orig_sys, std::vector{v, par[3]});
+
+        REQUIRE(
+            std::ranges::equal(orig_sys, std::ranges::subrange(vsys.get_sys().begin(), vsys.get_sys().begin() + 2)));
+        REQUIRE(vsys.get_sys().size() == 6u);
+
+        auto [x_v0, x_p3, v_v0, v_p3] = make_vars("∂[(0, 1)]x", "∂[(1, 1)]x", "∂[(0, 1)]v", "∂[(1, 1)]v");
+
+        REQUIRE(vsys.get_sys()[2].first == x_v0);
+        REQUIRE(vsys.get_sys()[2].second == (v_v0 + x_v0));
+
+        REQUIRE(vsys.get_sys()[3].first == x_p3);
+        REQUIRE(vsys.get_sys()[3].second == v_p3 + x_p3);
+
+        REQUIRE(vsys.get_sys()[4].first == v_v0);
+        REQUIRE(vsys.get_sys()[4].second == -((((v_v0 * x) + (x_v0 * v)) * par[2]) * cos(((x * v) * par[2]))));
+
+        REQUIRE(vsys.get_sys()[5].first == v_p3);
+        REQUIRE(vsys.get_sys()[5].second == -((((v_p3 * x) + (x_p3 * v)) * par[2]) * cos(((x * v) * par[2]))));
+
+        auto ta = taylor_adaptive<double>{
+            vsys.get_sys(), {.1, .2, 0., 0., 1., 0.}, kw::pars = {1., 1., .3}, kw::tol = 1e-3};
+
+        ta.step();
+
+        REQUIRE(ta.get_state()[3] == 0.);
+        REQUIRE(ta.get_state()[5] == 0.);
     }
 }
