@@ -6,12 +6,16 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <algorithm>
+#include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
 #include <vector>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/math/cos.hpp>
+#include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/var_ode_sys.hpp>
@@ -140,4 +144,97 @@ TEST_CASE("s11n")
 
     REQUIRE(sys.get_sys() == sys_copy.get_sys());
     REQUIRE(sys.get_vargs() == sys_copy.get_vargs());
+}
+
+TEST_CASE("vareqs")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    {
+        auto orig_sys = std::vector{prime(x) = v + x, prime(v) = -sin(x * v)};
+        auto vsys = var_ode_sys(orig_sys, var_args::vars);
+        REQUIRE(
+            std::ranges::equal(orig_sys, std::ranges::subrange(vsys.get_sys().begin(), vsys.get_sys().begin() + 2)));
+        REQUIRE(vsys.get_sys().size() == 6u);
+
+        auto [x_x0, x_v0, v_x0, v_v0] = make_vars("∂[(0, 1)]x", "∂[(1, 1)]x", "∂[(0, 1)]v", "∂[(1, 1)]v");
+
+        REQUIRE(vsys.get_sys()[2].first == x_x0);
+        REQUIRE(vsys.get_sys()[2].second == diff(orig_sys[0].second, v) * v_x0 + diff(orig_sys[0].second, x) * x_x0);
+
+        REQUIRE(vsys.get_sys()[3].first == x_v0);
+        REQUIRE(vsys.get_sys()[3].second == diff(orig_sys[0].second, v) * v_v0 + diff(orig_sys[0].second, x) * x_v0);
+
+        REQUIRE(vsys.get_sys()[4].first == v_x0);
+        REQUIRE(vsys.get_sys()[4].second == -(((v_x0 * x) + (x_x0 * v)) * cos((x * v))));
+
+        REQUIRE(vsys.get_sys()[5].first == v_v0);
+        REQUIRE(vsys.get_sys()[5].second == -(((v_v0 * x) + (x_v0 * v)) * cos((x * v))));
+    }
+
+    {
+        auto orig_sys = std::vector{prime(x) = v + x, prime(v) = -sin(x * v)};
+        auto vsys = var_ode_sys(orig_sys, std::vector{v});
+        REQUIRE(
+            std::ranges::equal(orig_sys, std::ranges::subrange(vsys.get_sys().begin(), vsys.get_sys().begin() + 2)));
+        REQUIRE(vsys.get_sys().size() == 4u);
+
+        auto [x_v0, v_v0] = make_vars("∂[(0, 1)]x", "∂[(0, 1)]v");
+
+        REQUIRE(vsys.get_sys()[2].first == x_v0);
+        REQUIRE(vsys.get_sys()[2].second == diff(orig_sys[0].second, v) * v_v0 + diff(orig_sys[0].second, x) * x_v0);
+
+        REQUIRE(vsys.get_sys()[3].first == v_v0);
+        REQUIRE(vsys.get_sys()[3].second == -(((v_v0 * x) + (x_v0 * v)) * cos((x * v))));
+    }
+
+    {
+        auto orig_sys = std::vector{prime(x) = v + x, prime(v) = -sin(x * v)};
+        auto vsys = var_ode_sys(orig_sys, var_args::vars, 2);
+        REQUIRE(
+            std::ranges::equal(orig_sys, std::ranges::subrange(vsys.get_sys().begin(), vsys.get_sys().begin() + 2)));
+        REQUIRE(vsys.get_sys().size() == 12u);
+
+        auto [x_x0, x_v0, v_x0, v_v0] = make_vars("∂[(0, 1)]x", "∂[(1, 1)]x", "∂[(0, 1)]v", "∂[(1, 1)]v");
+        auto [x_x0_x0, x_x0_v0] = make_vars("∂[(0, 2)]x", "∂[(0, 1), (1, 1)]x");
+        auto x_v0_v0 = make_vars("∂[(1, 2)]x");
+        auto [v_x0_x0, v_x0_v0] = make_vars("∂[(0, 2)]v", "∂[(0, 1), (1, 1)]v");
+        auto v_v0_v0 = make_vars("∂[(1, 2)]v");
+
+        REQUIRE(vsys.get_sys()[2].first == x_x0);
+        REQUIRE(vsys.get_sys()[2].second == diff(orig_sys[0].second, v) * v_x0 + diff(orig_sys[0].second, x) * x_x0);
+
+        REQUIRE(vsys.get_sys()[3].first == x_v0);
+        REQUIRE(vsys.get_sys()[3].second == diff(orig_sys[0].second, v) * v_v0 + diff(orig_sys[0].second, x) * x_v0);
+
+        REQUIRE(vsys.get_sys()[4].first == v_x0);
+        REQUIRE(vsys.get_sys()[4].second == -(((v_x0 * x) + (x_x0 * v)) * cos((x * v))));
+
+        REQUIRE(vsys.get_sys()[5].first == v_v0);
+        REQUIRE(vsys.get_sys()[5].second == -(((v_v0 * x) + (x_v0 * v)) * cos((x * v))));
+
+        REQUIRE(vsys.get_sys()[6].first == x_x0_x0);
+        REQUIRE(vsys.get_sys()[6].second == v_x0_x0 + x_x0_x0);
+
+        REQUIRE(vsys.get_sys()[7].first == x_x0_v0);
+        REQUIRE(vsys.get_sys()[7].second == v_x0_v0 + x_x0_v0);
+
+        REQUIRE(vsys.get_sys()[8].first == x_v0_v0);
+        REQUIRE(vsys.get_sys()[8].second == v_v0_v0 + x_v0_v0);
+
+        REQUIRE(vsys.get_sys()[9].first == v_x0_x0);
+        REQUIRE(vsys.get_sys()[9].second
+                == -(((((v_x0_x0 * x) + (x_x0 * v_x0)) + ((x_x0_x0 * v) + (v_x0 * x_x0))) * cos((x * v)))
+                     + ((((x_x0 * v) + (v_x0 * x)) * -sin((x * v))) * ((v_x0 * x) + (x_x0 * v)))));
+
+        REQUIRE(vsys.get_sys()[10].first == v_x0_v0);
+        REQUIRE(vsys.get_sys()[10].second
+                == -(((((x_x0 * v) + (v_x0 * x)) * -sin((x * v))) * ((v_v0 * x) + (x_v0 * v)))
+                     + ((((v_x0_v0 * x) + (x_x0 * v_v0)) + ((x_x0_v0 * v) + (v_x0 * x_v0))) * cos((x * v)))));
+
+        REQUIRE(vsys.get_sys()[11].first == v_v0_v0);
+        REQUIRE(vsys.get_sys()[11].second
+                == -(((((x_v0 * v) + (v_v0 * x)) * -sin((x * v))) * ((v_v0 * x) + (x_v0 * v)))
+                     + ((((v_v0_v0 * x) + (x_v0 * v_v0)) + ((x_v0_v0 * v) + (v_v0 * x_v0))) * cos((x * v)))));
+    }
 }
