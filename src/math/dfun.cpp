@@ -175,9 +175,9 @@ void dfun_impl::to_stream(std::ostringstream &oss) const
     });
 
     if (diff_order == 1u) {
-        oss << fmt::format("(d{})", m_id_name);
+        oss << fmt::format("(∂{})", m_id_name);
     } else {
-        oss << fmt::format("(d^{} {})", diff_order, m_id_name);
+        oss << fmt::format("(∂^{} {})", diff_order, m_id_name);
     }
 
     if (!m_didx.empty()) {
@@ -186,7 +186,7 @@ void dfun_impl::to_stream(std::ostringstream &oss) const
         for (auto it = m_didx.begin(); it != m_didx.end(); ++it) {
             const auto [idx, order] = *it;
 
-            oss << fmt::format("da{}", idx);
+            oss << fmt::format("∂a{}", idx);
             if (order > 1u) {
                 oss << fmt::format("^{}", order);
             }
