@@ -155,6 +155,11 @@ void validate_ode_sys(const std::vector<std::pair<expression, expression>> &sys,
     validate_ode_sys_impl(sys, t_funcs, nt_funcs);
 }
 
+void validate_ode_sys(const std::vector<std::pair<expression, expression>> &sys)
+{
+    validate_ode_sys_impl(sys, {}, {});
+}
+
 // Explicit instantiations.
 #define HEYOKA_VALIDATE_ODE_SYS_INST(T)                                                                                \
     template void validate_ode_sys<t_event_impl<T, false>, nt_event_impl<T, false>>(                                   \

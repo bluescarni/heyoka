@@ -123,6 +123,7 @@ void taylor_add_d_out_function(llvm_state &, llvm::Type *, std::uint32_t, std::u
 template <typename TEvent, typename NTEvent>
 void validate_ode_sys(const std::vector<std::pair<expression, expression>> &, const std::vector<TEvent> &,
                       const std::vector<NTEvent> &);
+void validate_ode_sys(const std::vector<std::pair<expression, expression>> &);
 
 } // namespace detail
 
