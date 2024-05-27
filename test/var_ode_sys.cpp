@@ -6,12 +6,14 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <sstream>
 #include <stdexcept>
 #include <utility>
 #include <vector>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/var_ode_sys.hpp>
 
 #include "catch.hpp"
@@ -111,4 +113,30 @@ TEST_CASE("basic")
     vsys2 = std::move(vsys4);
     REQUIRE(vsys.get_sys() == vsys2.get_sys());
     REQUIRE(vsys.get_vargs() == vsys2.get_vargs());
+}
+
+TEST_CASE("s11n")
+{
+    std::stringstream ss;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto sys = var_ode_sys({prime(x) = v, prime(v) = -x}, var_args::vars);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << sys;
+    }
+
+    sys = var_ode_sys({prime(x) = v, prime(v) = -x}, std::vector{x});
+    REQUIRE(sys.get_vargs() != std::vector{x, v});
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> sys;
+    }
+
+    REQUIRE(sys.get_vargs() == std::vector{x, v});
 }
