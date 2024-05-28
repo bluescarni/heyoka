@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <algorithm>
+#include <cmath>
 #include <ranges>
 #include <sstream>
 #include <stdexcept>
@@ -23,8 +24,10 @@
 #include <heyoka/var_ode_sys.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
 
 TEST_CASE("basic")
 {
@@ -364,4 +367,69 @@ TEST_CASE("vareqs")
         REQUIRE(ta.get_state()[3] == 0.);
         REQUIRE(ta.get_state()[5] == 0.);
     }
+}
+
+// Test on a non-autonomous system with parameters.
+TEST_CASE("nonauto sys")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    // The original ODEs.
+    auto orig_sys = {prime(x) = v, prime(v) = cos(heyoka::time) - par[0] * v - sin(x)};
+
+    // The variational ODEs.
+    auto vsys = var_ode_sys(orig_sys, var_args::all);
+
+    REQUIRE(vsys.get_sys().size() == 10u);
+
+    const auto ic_x = .2, ic_v = .3, ic_tm = .5, ic_par = .4;
+
+    auto ta = taylor_adaptive<double>{vsys.get_sys(),
+                                      {ic_x, ic_v,
+                                       // dx/...
+                                       1., 0., 0., -ic_v,
+                                       // dv/...
+                                       0., 1., 0., -(std::cos(ic_tm) - ic_par * ic_v - std::sin(ic_x))},
+                                      kw::pars = {ic_par},
+                                      kw::time = ic_tm};
+
+    ta.propagate_until(3.);
+
+    // First try: variation on the ics of the state variables.
+    const auto delta_x = 1e-8, delta_v = 2e-8;
+    auto ta_orig
+        = taylor_adaptive<double>{orig_sys, {ic_x + delta_x, ic_v + delta_v}, kw::pars = {ic_par}, kw::time = ic_tm};
+
+    ta_orig.propagate_until(3.);
+
+    REQUIRE(ta_orig.get_state()[0]
+            == approximately(ta.get_state()[0] + ta.get_state()[2] * delta_x + ta.get_state()[3] * delta_v));
+    REQUIRE(ta_orig.get_state()[1]
+            == approximately(ta.get_state()[1] + ta.get_state()[6] * delta_x + ta.get_state()[7] * delta_v));
+
+    // Second try: variation on the ic of x and the parameter.
+    const auto delta_par = 3e-8;
+
+    ta_orig
+        = taylor_adaptive<double>{orig_sys, {ic_x + delta_x, ic_v}, kw::pars = {ic_par + delta_par}, kw::time = ic_tm};
+
+    ta_orig.propagate_until(3.);
+
+    REQUIRE(ta_orig.get_state()[0]
+            == approximately(ta.get_state()[0] + ta.get_state()[2] * delta_x + ta.get_state()[4] * delta_par));
+    REQUIRE(ta_orig.get_state()[1]
+            == approximately(ta.get_state()[1] + ta.get_state()[6] * delta_x + ta.get_state()[8] * delta_par));
+
+    // Third try: variation on the ic of the parameter and time.
+    const auto delta_tm = 4e-8;
+
+    ta_orig
+        = taylor_adaptive<double>{orig_sys, {ic_x, ic_v}, kw::pars = {ic_par + delta_par}, kw::time = ic_tm + delta_tm};
+
+    ta_orig.propagate_until(3.);
+
+    REQUIRE(ta_orig.get_state()[0]
+            == approximately(ta.get_state()[0] + ta.get_state()[4] * delta_par + ta.get_state()[5] * delta_tm));
+    REQUIRE(ta_orig.get_state()[1]
+            == approximately(ta.get_state()[1] + ta.get_state()[8] * delta_par + ta.get_state()[9] * delta_tm));
 }
