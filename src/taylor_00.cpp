@@ -572,24 +572,6 @@ void taylor_write_tc(
 
 } // namespace
 
-// Small helper to deduce the number of parameters
-// present in the Taylor decomposition of an ODE system.
-// NOTE: this will also include the functions of state variables,
-// as they are part of the decomposition.
-// NOTE: the first few entries in the decomposition are the mapping
-// u variables -> state variables. These never contain any param
-// by construction.
-std::uint32_t n_pars_in_dc(const taylor_dc_t &dc)
-{
-    std::uint32_t retval = 0;
-
-    for (const auto &p : dc) {
-        retval = std::max(retval, get_param_size(p.first));
-    }
-
-    return retval;
-}
-
 // Add to s an adaptive timestepper function with support for events. This timestepper will *not*
 // propagate the state of the system. Instead, its output will be the jet of derivatives
 // of all state variables and event equations, and the deduced timestep value(s).
@@ -608,7 +590,7 @@ taylor_dc_t taylor_add_adaptive_step_with_events(llvm_state &s, llvm::Type *ext_
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
 
     // Decompose the system of equations.
-    auto [dc, ev_dc] = taylor_decompose(sys, evs);
+    auto [dc, ev_dc] = taylor_decompose_sys(sys, evs);
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
@@ -723,7 +705,7 @@ taylor_dc_t taylor_add_adaptive_step(llvm_state &s, llvm::Type *ext_fp_t, llvm::
 
     // Decompose the system of equations.
     // NOTE: no sv_funcs needed for this stepper.
-    auto [dc, sv_funcs_dc] = taylor_decompose(sys, {});
+    auto [dc, sv_funcs_dc] = taylor_decompose_sys(sys, {});
 
     assert(sv_funcs_dc.empty());
 

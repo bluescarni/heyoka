@@ -18,7 +18,6 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -251,7 +250,7 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, llvm::Type *fp_t, con
     auto *ext_fp_t = llvm_ext_type(fp_t);
 
     // Fetch the pointer into par_ptr.
-    // NOTE: the overflow check is done in taylor_compute_jet().
+    // NOTE: the overflow check is done when constructing the integrator.
     auto *ptr = builder.CreateInBoundsGEP(ext_fp_t, par_ptr, builder.CreateMul(p, builder.getInt32(batch_size)));
 
     return ext_load_vector_from_memory(s, fp_t, ptr, batch_size);
@@ -782,102 +781,26 @@ void taylor_decompose_replace_numbers(taylor_dc_t &dc, std::vector<expression>::
 // Taylor decomposition from lhs and rhs
 // of a system of equations.
 std::pair<taylor_dc_t, std::vector<std::uint32_t>>
-taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, const std::vector<expression> &sv_funcs_)
+taylor_decompose_sys(const std::vector<std::pair<expression, expression>> &sys_,
+                     const std::vector<expression> &sv_funcs_)
 {
-    if (sys_.empty()) [[unlikely]] {
-        throw std::invalid_argument("Cannot integrate a system of zero equations");
-    }
-
-    // Store in a separate vector the rhs.
-    std::vector<expression> sys_rhs;
-    sys_rhs.reserve(sys_.size());
-    std::transform(sys_.begin(), sys_.end(), std::back_inserter(sys_rhs), [](const auto &p) { return p.second; });
-
-    // Determine the variables in the system of equations
-    // from the lhs of the equations. We need to ensure that:
-    // - all the lhs expressions are variables
-    //   and there are no duplicates,
-    // - all the variables in the rhs expressions
-    //   appear in the lhs expressions.
-    // Note that not all variables in the lhs
-    // need to appear in the rhs: that is, not all variables
-    // need to appear in the ODEs.
-
-    // This will eventually contain the list
-    // of all variables in the system.
-    std::vector<std::string> lhs_vars;
-    // Maintain a set as well to check for duplicates.
-    std::unordered_set<std::string> lhs_vars_set;
-
-    for (const auto &p : sys_) {
-        const auto &lhs = p.first;
-
-        // Infer the variable from the current lhs.
-        std::visit(
-            [&lhs, &lhs_vars, &lhs_vars_set](const auto &v) {
-                if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
-                    // Check if this is a duplicate variable.
-                    if (const auto res = lhs_vars_set.emplace(v.name()); res.second) [[likely]] {
-                        // Not a duplicate, add it to lhs_vars.
-                        lhs_vars.push_back(v.name());
-                    } else {
-                        // Duplicate, error out.
-                        throw std::invalid_argument(
-                            fmt::format("Invalid system of differential equations detected: the variable '{}' "
-                                        "appears in the left-hand side twice",
-                                        v.name()));
-                    }
-                } else {
-                    throw std::invalid_argument(
-                        fmt::format("Invalid system of differential equations detected: the "
-                                    "left-hand side contains the expression '{}', which is not a variable",
-                                    lhs));
-                }
-            },
-            lhs.value());
-    }
-
-    // Fetch the set of variables in the rhs.
-    const auto rhs_vars_set = get_variables(sys_rhs);
-
-    // Check that all variables in the rhs appear in the lhs.
-    for (const auto &var : rhs_vars_set) {
-        if (!lhs_vars_set.contains(var)) [[unlikely]] {
-            throw std::invalid_argument(
-                fmt::format("Invalid system of differential equations detected: the variable '{}' "
-                            "appears in the right-hand side but not in the left-hand side",
-                            var));
-        }
-    }
-
-    // Check that the expressions in sv_funcs_ contain only
-    // state variables.
-    const auto sv_funcs_vars = get_variables(sv_funcs_);
-    for (const auto &sv_func_var : sv_funcs_vars) {
-        if (lhs_vars_set.find(sv_func_var) == lhs_vars_set.end()) {
-            throw std::invalid_argument(
-                fmt::format("The extra functions in a Taylor decomposition contain the variable '{}', "
-                            "which is not a state variable",
-                            sv_func_var));
-        }
-    }
-
     // Cache the number of equations/variables.
     const auto n_eq = sys_.size();
-    assert(n_eq == lhs_vars.size());
 
     // Create the map for renaming the variables to u_i.
     // The renaming will be done following the order of the lhs
     // variables.
     std::unordered_map<std::string, std::string> repl_map;
-    for (decltype(lhs_vars.size()) i = 0; i < lhs_vars.size(); ++i) {
-        [[maybe_unused]] const auto eres = repl_map.emplace(lhs_vars[i], fmt::format("u_{}", i));
+    for (decltype(sys_.size()) i = 0; i < sys_.size(); ++i) {
+        [[maybe_unused]] const auto eres
+            = repl_map.emplace(std::get<variable>(sys_[i].first.value()).name(), fmt::format("u_{}", i));
         assert(eres.second);
     }
 
-    // Store in a single vector of expressions both the rhs
-    // and the sv_funcs.
-    auto all_ex = sys_rhs;
+    // Store in a single vector of expressions both the rhs and the sv_funcs.
+    std::vector<expression> all_ex;
+    all_ex.reserve(sys_.size());
+    std::ranges::transform(sys_, std::back_inserter(all_ex), &std::pair<expression, expression>::second);
     all_ex.insert(all_ex.end(), sv_funcs_.begin(), sv_funcs_.end());
 
     // Transform sums into subs.
@@ -900,8 +823,8 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 #if !defined(NDEBUG)
 
     // Save copies for checking in debug mode.
-    const auto sys_rhs_verify = std::vector(all_ex.data(), all_ex.data() + sys_rhs.size());
-    const auto sv_funcs_verify = std::vector(all_ex.data() + sys_rhs.size(), all_ex.data() + all_ex.size());
+    const auto sys_rhs_verify = std::vector(all_ex.data(), all_ex.data() + sys_.size());
+    const auto sv_funcs_verify = std::vector(all_ex.data() + sys_.size(), all_ex.data() + all_ex.size());
 
 #endif
 
@@ -911,9 +834,9 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
     // Init the decomposition. It begins with a list
     // of the original lhs variables of the system.
     taylor_dc_t u_vars_defs;
-    u_vars_defs.reserve(lhs_vars.size());
-    for (const auto &var : lhs_vars) {
-        u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
+    u_vars_defs.reserve(sys_.size());
+    for (const auto &[lhs, rhs] : sys_) {
+        u_vars_defs.emplace_back(variable{std::get<variable>(lhs.value()).name()}, std::vector<std::uint32_t>{});
     }
 
     // Prepare the outputs vector.

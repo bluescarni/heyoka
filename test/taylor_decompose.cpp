@@ -7,7 +7,6 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <initializer_list>
-#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -32,42 +31,18 @@ auto square_wrapper(const expression &x)
 
 TEST_CASE("decompose sys")
 {
-    using Catch::Matchers::Message;
-
     auto [x, y] = make_vars("x", "y");
 
     using sys_t = std::vector<std::pair<expression, expression>>;
 
-    REQUIRE_THROWS_MATCHES(taylor_decompose(sys_t{}, {}), std::invalid_argument,
-                           Message("Cannot integrate a system of zero equations"));
-
-    REQUIRE_THROWS_MATCHES(taylor_decompose(sys_t{prime(x) = y, prime(x) = y}, {}), std::invalid_argument,
-                           Message("Invalid system of differential equations detected: the variable 'x' "
-                                   "appears in the left-hand side twice"));
-
-    REQUIRE_THROWS_MATCHES(taylor_decompose(sys_t{{par[0], x}}, {}), std::invalid_argument,
-                           Message("Invalid system of differential equations detected: the "
-                                   "left-hand side contains the expression 'p0', which is not a variable"));
-
-    REQUIRE_THROWS_MATCHES(taylor_decompose(sys_t{prime(x) = y}, {}), std::invalid_argument,
-                           Message("Invalid system of differential equations detected: the variable 'y' "
-                                   "appears in the right-hand side but not in the left-hand side"));
-
-    REQUIRE_THROWS_MATCHES(taylor_decompose(sys_t{prime(x) = x}, {y}), std::invalid_argument,
-                           Message("The extra functions in a Taylor decomposition contain the variable 'y', "
-                                   "which is not a state variable"));
-
-    REQUIRE_THROWS_MATCHES(taylor_decompose(sys_t{prime(x) = x}, {1_dbl}), std::invalid_argument,
-                           Message("The extra functions in a Taylor decomposition cannot be constants or parameters"));
-
-    auto [dc, sv_funcs_dc] = taylor_decompose(sys_t{prime(x) = x}, std::vector<expression>{x + 1.});
+    auto [dc, sv_funcs_dc] = taylor_decompose_sys(sys_t{prime(x) = x}, std::vector<expression>{x + 1.});
 
     REQUIRE(dc.size() == 3u);
     REQUIRE(sv_funcs_dc.size() == 1u);
     REQUIRE(sv_funcs_dc[0] == 1u);
 
     std::tie(dc, sv_funcs_dc)
-        = taylor_decompose(sys_t{prime(y) = x + y, prime(x) = x - y}, std::vector<expression>{x, x * y});
+        = taylor_decompose_sys(sys_t{prime(y) = x + y, prime(x) = x - y}, std::vector<expression>{x, x * y});
 
     REQUIRE(dc.size() == 7u);
     REQUIRE(sv_funcs_dc.size() == 2u);
@@ -75,7 +50,7 @@ TEST_CASE("decompose sys")
     REQUIRE(sv_funcs_dc[1] == 4u);
 
     std::tie(dc, sv_funcs_dc)
-        = taylor_decompose(sys_t{prime(y) = x + y, prime(x) = x - y}, std::vector<expression>{x, x, y, y});
+        = taylor_decompose_sys(sys_t{prime(y) = x + y, prime(x) = x - y}, std::vector<expression>{x, x, y, y});
 
     REQUIRE(dc.size() == 6u);
     REQUIRE(sv_funcs_dc.size() == 4u);
@@ -85,7 +60,7 @@ TEST_CASE("decompose sys")
     REQUIRE(sv_funcs_dc[3] == 0u);
 
     std::tie(dc, sv_funcs_dc)
-        = taylor_decompose(sys_t{prime(y) = x + y, prime(x) = x - y}, std::vector<expression>{x + y, x, y, x - y});
+        = taylor_decompose_sys(sys_t{prime(y) = x + y, prime(x) = x - y}, std::vector<expression>{x + y, x, y, x - y});
 
     REQUIRE(dc.size() == 6u);
     REQUIRE(sv_funcs_dc.size() == 4u);
@@ -122,6 +97,6 @@ TEST_CASE("decompose sys")
         }
     }
 
-    // Let the internal assertions of taylor_decompose do the job.
-    std::tie(dc, sv_funcs_dc) = taylor_decompose(sys, sv_funcs);
+    // Let the internal assertions of taylor_decompose_sys do the job.
+    std::tie(dc, sv_funcs_dc) = taylor_decompose_sys(sys, sv_funcs);
 }

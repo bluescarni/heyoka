@@ -197,6 +197,9 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
 
     using std::isfinite;
 
+    // Validate the ode sys.
+    validate_ode_sys(sys, tes, ntes);
+
     // Run an immediate check on state. This is a bit redundant with other checks
     // later (e.g., state.size() must be consistent with the ODE definition, which in
     // turn cannot consist of zero equations), but it's handy to do it here so that,
@@ -337,6 +340,9 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
 
+    // Compute the total number of params, including the rhs and the event functions.
+    const auto tot_n_pars = detail::tot_n_pars_in_ode_sys(sys, tes, ntes);
+
     // Do we have events?
     const auto with_events = !tes.empty() || !ntes.empty();
 
@@ -370,25 +376,24 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
     }
 
     // Fix m_pars' size, if necessary.
-    const auto npars = detail::n_pars_in_dc(m_dc);
-    if (m_pars.size() < npars) {
+    if (m_pars.size() < tot_n_pars) {
 #if defined(HEYOKA_HAVE_REAL)
         if constexpr (std::is_same_v<T, mppp::real>) {
             // For mppp::real, ensure that the appended parameter
             // values all have the inferred precision.
-            m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars),
+            m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(tot_n_pars),
                           mppp::real{mppp::real_kind::zero, this->get_prec()});
         } else {
 #endif
-            m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
+            m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(tot_n_pars));
 #if defined(HEYOKA_HAVE_REAL)
         }
 #endif
-    } else if (m_pars.size() > npars) {
+    } else if (m_pars.size() > tot_n_pars) {
         throw std::invalid_argument(fmt::format(
             "Excessive number of parameter values passed to the constructor of an adaptive "
             "Taylor integrator: {} parameter value(s) were passed, but the ODE system contains only {} parameter(s)",
-            m_pars.size(), npars));
+            m_pars.size(), tot_n_pars));
     }
 
     // Log runtimes in trace mode.
@@ -418,15 +423,15 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
     m_d_out_f = reinterpret_cast<i_data::d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
 
     // Setup the vector for the Taylor coefficients.
+    using su32_t = boost::safe_numerics::safe<std::uint32_t>;
 #if defined(HEYOKA_HAVE_REAL)
     if constexpr (std::is_same_v<T, mppp::real>) {
         // NOTE: ensure the Taylor coefficients are all generated
         // with the inferred precision.
-        m_tc.resize(m_state.size() * (boost::safe_numerics::safe<std::uint32_t>(m_order) + 1),
-                    mppp::real{mppp::real_kind::zero, this->get_prec()});
+        m_tc.resize(m_state.size() * (su32_t(m_order) + 1), mppp::real{mppp::real_kind::zero, this->get_prec()});
     } else {
 #endif
-        m_tc.resize(m_state.size() * (boost::safe_numerics::safe<std::uint32_t>(m_order) + 1));
+        m_tc.resize(m_state.size() * (su32_t(m_order) + 1));
 #if defined(HEYOKA_HAVE_REAL)
     }
 #endif
