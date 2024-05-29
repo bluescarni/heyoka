@@ -16,6 +16,7 @@
 #endif
 
 #include <cstdint>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -62,8 +63,8 @@ struct taylor_adaptive<T>::i_data {
     d_out_f_t m_d_out_f{};
     // The vector for the dense output.
     std::vector<T> m_d_out;
-    // The state variables and the rhs.
-    std::vector<expression> m_state_vars, m_rhs;
+    // The ODE sys.
+    std::vector<std::pair<expression, expression>> m_sys;
 
 private:
     // Serialisation.
@@ -146,8 +147,8 @@ struct taylor_adaptive_batch<T>::i_data {
     std::vector<int> m_nf_detected;
     // Temporary vector used in the dense output implementation.
     std::vector<T> m_d_out_time;
-    // The state variables and the rhs.
-    std::vector<expression> m_state_vars, m_rhs;
+    // The ODE sys.
+    std::vector<std::pair<expression, expression>> m_sys;
 
 private:
     // Serialisation.
