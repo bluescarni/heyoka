@@ -70,7 +70,7 @@ taylor_adaptive_batch<T>::taylor_adaptive_batch(private_ctor_t, llvm_state s)
 }
 
 template <typename T>
-void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &sys,
+void taylor_adaptive_batch<T>::finalise_ctor_impl(std::vector<std::pair<expression, expression>> sys,
                                                   std::vector<T> state, std::uint32_t batch_size, std::vector<T> time,
                                                   std::optional<T> tol, bool high_accuracy, bool compact_mode,
                                                   std::vector<T> pars, std::vector<t_event_t> tes,
@@ -124,6 +124,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_lo);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_nf_detected);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_time);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_sys);
 
     // Init the data members.
     m_batch_size = batch_size;
@@ -320,8 +321,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(const std::vector<std::pair<ex
                                               m_batch_size);
     }
 
-    // Setup the state variables and the rhs.
-    detail::taylor_adaptive_setup_sv_rhs(*this, sys);
+    // Move sys in.
+    m_sys = std::move(sys);
 }
 
 template <typename T>
@@ -2099,15 +2100,9 @@ const std::vector<typename taylor_adaptive_batch<T>::nt_event_t> &taylor_adaptiv
 }
 
 template <typename T>
-const std::vector<expression> &taylor_adaptive_batch<T>::get_state_vars() const
+const std::vector<std::pair<expression, expression>> &taylor_adaptive_batch<T>::get_sys() const noexcept
 {
-    return m_i_data->m_state_vars;
-}
-
-template <typename T>
-const std::vector<expression> &taylor_adaptive_batch<T>::get_rhs() const
-{
-    return m_i_data->m_rhs;
+    return m_i_data->m_sys;
 }
 
 template <typename T>

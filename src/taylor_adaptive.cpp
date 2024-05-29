@@ -158,8 +158,7 @@ taylor_adaptive<T>::taylor_adaptive(private_ctor_t, llvm_state s) : m_i_data(std
 }
 
 template <typename T>
-void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &sys,
-                                            std::vector<T> state,
+void taylor_adaptive<T>::finalise_ctor_impl(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
                                             // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                             std::optional<T> time, std::optional<T> tol, bool high_accuracy,
                                             bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
@@ -181,6 +180,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_sys);
 
     // NOTE: this must hold because tol == 0 is interpreted
     // as undefined in finalise_ctor().
@@ -464,8 +464,8 @@ void taylor_adaptive<T>::finalise_ctor_impl(const std::vector<std::pair<expressi
 
 #endif
 
-    // Setup the state variables and the rhs.
-    detail::taylor_adaptive_setup_sv_rhs(*this, sys);
+    // Move sys in.
+    m_sys = std::move(sys);
 }
 
 template <typename T>
@@ -1736,15 +1736,9 @@ const std::vector<typename taylor_adaptive<T>::nt_event_t> &taylor_adaptive<T>::
 }
 
 template <typename T>
-const std::vector<expression> &taylor_adaptive<T>::get_state_vars() const
+const std::vector<std::pair<expression, expression>> &taylor_adaptive<T>::get_sys() const noexcept
 {
-    return m_i_data->m_state_vars;
-}
-
-template <typename T>
-const std::vector<expression> &taylor_adaptive<T>::get_rhs() const
-{
-    return m_i_data->m_rhs;
+    return m_i_data->m_sys;
 }
 
 template <typename T>
