@@ -162,8 +162,8 @@ void angle_reducer::pre_hook_impl(TA &ta)
     const auto &var_set = m_impl->m_var_set;
 
     ind_v.clear();
-    for (decltype(ta.get_state_vars().size()) i = 0; i < ta.get_state_vars().size(); ++i) {
-        const auto &ex = ta.get_state_vars()[i];
+    for (decltype(ta.get_sys().size()) i = 0; i < ta.get_sys().size(); ++i) {
+        const auto &ex = ta.get_sys()[i].first;
 
         assert(std::holds_alternative<variable>(ex.value()));
 
@@ -247,11 +247,11 @@ bool angle_reducer::operator()(taylor_adaptive<T> &ta)
     // Validate m_ind against the integrator object.
     const auto &ind_v = m_impl->m_ind;
     assert(std::ranges::is_sorted(ind_v));
-    if (!ind_v.empty() && ind_v.back() >= ta.get_state_vars().size()) {
+    if (!ind_v.empty() && ind_v.back() >= ta.get_sys().size()) {
         throw std::invalid_argument(
             fmt::format("Inconsistent state detected in angle_reducer: the last index in the indices vector has a "
                         "value of {}, but the number of state variables is only {}",
-                        ind_v.back(), ta.get_state_vars().size()));
+                        ind_v.back(), ta.get_sys().size()));
     }
 
     // Fetch the 2pi constant.
@@ -277,11 +277,11 @@ bool angle_reducer::operator()(taylor_adaptive_batch<T> &ta)
     // Validate m_ind against the integrator object.
     const auto &ind_v = m_impl->m_ind;
     assert(std::ranges::is_sorted(ind_v));
-    if (!ind_v.empty() && ind_v.back() >= ta.get_state_vars().size()) {
+    if (!ind_v.empty() && ind_v.back() >= ta.get_sys().size()) {
         throw std::invalid_argument(
             fmt::format("Inconsistent state detected in angle_reducer: the last index in the indices vector has a "
                         "value of {}, but the number of state variables is only {}",
-                        ind_v.back(), ta.get_state_vars().size()));
+                        ind_v.back(), ta.get_sys().size()));
     }
 
     // Fetch the 2pi constant.

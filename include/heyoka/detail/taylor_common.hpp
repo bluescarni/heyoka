@@ -195,20 +195,6 @@ std::uint32_t taylor_order_from_tol(T tol)
     return static_cast<std::uint32_t>(order_f);
 }
 
-// Small helper to set up the m_state_vars and m_rhs members
-// of an integrator. Shared among scalar and batch integrators.
-template <typename TA, typename U>
-void taylor_adaptive_setup_sv_rhs(TA &ta, const U &sys)
-{
-    for (std::uint32_t i = 0; i < ta.m_i_data->m_dim; ++i) {
-        // NOTE: take the state variables from the
-        // decomposition.
-        assert(std::holds_alternative<variable>(ta.m_i_data->m_dc[i].first.value()));
-        ta.m_i_data->m_state_vars.push_back(ta.m_i_data->m_dc[i].first);
-        ta.m_i_data->m_rhs.push_back(sys[i].second);
-    }
-}
-
 // Small helper to compare the absolute
 // values of two input values.
 template <typename T>

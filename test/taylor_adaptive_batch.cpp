@@ -1087,8 +1087,7 @@ void s11n_test_impl()
         REQUIRE(ta.get_step_res() == ta_copy.get_step_res());
         REQUIRE(ta.get_propagate_res() == ta_copy.get_propagate_res());
 
-        REQUIRE(ta.get_state_vars() == ta_copy.get_state_vars());
-        REQUIRE(ta.get_rhs() == ta_copy.get_rhs());
+        REQUIRE(ta.get_sys() == ta_copy.get_sys());
 
         // Take a step in ta and in ta_copy.
         ta.step(true);
@@ -2100,26 +2099,20 @@ TEST_CASE("state_vars rhs")
 
     auto ta = taylor_adaptive_batch<double>{{prime(x) = rhs_x, prime(v) = rhs_v}, std::vector<double>(4u, 0.), 2u};
 
-    REQUIRE(ta.get_state_vars() == std::vector{x, v});
-    REQUIRE(ta.get_rhs() == std::vector{rhs_x, rhs_v});
-
     // Check that the rhs has been shallow-copied.
-    REQUIRE(std::get<func>(rhs_v.value()).get_ptr() == std::get<func>(ta.get_rhs()[1].value()).get_ptr());
+    REQUIRE(std::get<func>(rhs_v.value()).get_ptr() == std::get<func>(ta.get_sys()[1].second.value()).get_ptr());
 
     // Test with copy too.
     auto ta2 = ta;
 
-    REQUIRE(ta.get_state_vars() == ta2.get_state_vars());
-    REQUIRE(ta.get_rhs() == ta2.get_rhs());
+    REQUIRE(ta.get_sys() == ta2.get_sys());
 
-    REQUIRE(std::get<func>(ta2.get_rhs()[1].value()).get_ptr() == std::get<func>(ta.get_rhs()[1].value()).get_ptr());
+    REQUIRE(std::get<func>(ta2.get_sys()[1].second.value()).get_ptr()
+            == std::get<func>(ta.get_sys()[1].second.value()).get_ptr());
 
     auto ta3 = taylor_adaptive_batch<double>{{{v, rhs_v}, {x, rhs_x}}, std::vector<double>(4u, 0.), 2u};
 
-    REQUIRE(ta3.get_state_vars() == std::vector{v, x});
-    REQUIRE(ta3.get_rhs() == std::vector{rhs_v, rhs_x});
-
-    REQUIRE(std::get<func>(rhs_v.value()).get_ptr() == std::get<func>(ta3.get_rhs()[0].value()).get_ptr());
+    REQUIRE(std::get<func>(rhs_v.value()).get_ptr() == std::get<func>(ta3.get_sys()[0].second.value()).get_ptr());
 }
 
 #if defined(HEYOKA_WITH_SLEEF)

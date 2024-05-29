@@ -388,9 +388,6 @@ public:
 
 #endif
 
-template <typename TA, typename U>
-void taylor_adaptive_setup_sv_rhs(TA &, const U &);
-
 } // namespace detail
 
 template <typename T>
@@ -399,8 +396,6 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive : public detail::taylor_ada
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
     friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
     using base_t = detail::taylor_adaptive_base<T, taylor_adaptive<T>>;
-    template <typename TA, typename U>
-    friend void detail::taylor_adaptive_setup_sv_rhs(TA &, const U &);
 
 public:
     using value_type = T;
@@ -433,11 +428,11 @@ private:
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
     // Private implementation-detail constructor machinery.
-    void finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &, std::vector<T>, std::optional<T>,
+    void finalise_ctor_impl(std::vector<std::pair<expression, expression>>, std::vector<T>, std::optional<T>,
                             std::optional<T>, bool, bool, std::vector<T>, std::vector<t_event_t>,
                             std::vector<nt_event_t>, bool, std::optional<long long>);
     template <typename... KwArgs>
-    void finalise_ctor(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
+    void finalise_ctor(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
                        const KwArgs &...kw_args)
     {
         igor::parser p{kw_args...};
@@ -490,8 +485,9 @@ private:
                 return {};
             }();
 
-            finalise_ctor_impl(sys, std::move(state), std::move(tm), std::move(tol), high_accuracy, compact_mode,
-                               std::move(pars), std::move(tes), std::move(ntes), parallel_mode, std::move(prec));
+            finalise_ctor_impl(std::move(sys), std::move(state), std::move(tm), std::move(tol), high_accuracy,
+                               compact_mode, std::move(pars), std::move(tes), std::move(ntes), parallel_mode,
+                               std::move(prec));
         }
     }
 
@@ -505,16 +501,16 @@ public:
     taylor_adaptive();
 
     template <typename... KwArgs>
-    explicit taylor_adaptive(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
+    explicit taylor_adaptive(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
                              const KwArgs &...kw_args)
         : taylor_adaptive(private_ctor_t{}, llvm_state(kw_args...))
     {
-        finalise_ctor(sys, std::move(state), kw_args...);
+        finalise_ctor(std::move(sys), std::move(state), kw_args...);
     }
     template <typename... KwArgs>
-    explicit taylor_adaptive(const std::vector<std::pair<expression, expression>> &sys, std::initializer_list<T> state,
+    explicit taylor_adaptive(std::vector<std::pair<expression, expression>> sys, std::initializer_list<T> state,
                              const KwArgs &...kw_args)
-        : taylor_adaptive(sys, std::vector<T>(state), kw_args...)
+        : taylor_adaptive(std::move(sys), std::vector<T>(state), kw_args...)
     {
     }
 
@@ -566,8 +562,7 @@ public:
     [[nodiscard]] const std::vector<std::optional<std::pair<T, T>>> &get_te_cooldowns() const;
     [[nodiscard]] const std::vector<nt_event_t> &get_nt_events() const;
 
-    [[nodiscard]] const std::vector<expression> &get_state_vars() const;
-    [[nodiscard]] const std::vector<expression> &get_rhs() const;
+    [[nodiscard]] const std::vector<std::pair<expression, expression>> &get_sys() const noexcept;
 
     std::tuple<taylor_outcome, T> step(bool = false);
     std::tuple<taylor_outcome, T> step_backward(bool = false);
@@ -772,9 +767,6 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_batch
 {
     static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
 
-    template <typename TA, typename U>
-    friend void detail::taylor_adaptive_setup_sv_rhs(TA &, const U &);
-
 public:
     using value_type = T;
 
@@ -806,11 +798,11 @@ private:
     HEYOKA_DLL_LOCAL void step_impl(const std::vector<T> &, bool);
 
     // Private implementation-detail constructor machinery.
-    void finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &, std::vector<T>, std::uint32_t,
+    void finalise_ctor_impl(std::vector<std::pair<expression, expression>>, std::vector<T>, std::uint32_t,
                             std::vector<T>, std::optional<T>, bool, bool, std::vector<T>, std::vector<t_event_t>,
                             std::vector<nt_event_t>, bool);
     template <typename... KwArgs>
-    void finalise_ctor(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
+    void finalise_ctor(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
                        std::uint32_t batch_size, const KwArgs &...kw_args)
     {
         igor::parser p{kw_args...};
@@ -852,8 +844,9 @@ private:
                 }
             }();
 
-            finalise_ctor_impl(sys, std::move(state), batch_size, std::move(tm), std::move(tol), high_accuracy,
-                               compact_mode, std::move(pars), std::move(tes), std::move(ntes), parallel_mode);
+            finalise_ctor_impl(std::move(sys), std::move(state), batch_size, std::move(tm), std::move(tol),
+                               high_accuracy, compact_mode, std::move(pars), std::move(tes), std::move(ntes),
+                               parallel_mode);
         }
     }
 
@@ -867,16 +860,16 @@ public:
     taylor_adaptive_batch();
 
     template <typename... KwArgs>
-    explicit taylor_adaptive_batch(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
+    explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
                                    std::uint32_t batch_size, const KwArgs &...kw_args)
         : taylor_adaptive_batch(private_ctor_t{}, llvm_state(kw_args...))
     {
-        finalise_ctor(sys, std::move(state), batch_size, kw_args...);
+        finalise_ctor(std::move(sys), std::move(state), batch_size, kw_args...);
     }
     template <typename... KwArgs>
-    explicit taylor_adaptive_batch(const std::vector<std::pair<expression, expression>> &sys,
-                                   std::initializer_list<T> state, std::uint32_t batch_size, const KwArgs &...kw_args)
-        : taylor_adaptive_batch(sys, std::vector<T>(state), batch_size, kw_args...)
+    explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>> sys, std::initializer_list<T> state,
+                                   std::uint32_t batch_size, const KwArgs &...kw_args)
+        : taylor_adaptive_batch(std::move(sys), std::vector<T>(state), batch_size, kw_args...)
     {
     }
 
@@ -935,8 +928,7 @@ public:
     [[nodiscard]] const std::vector<std::vector<std::optional<std::pair<T, T>>>> &get_te_cooldowns() const;
     [[nodiscard]] const std::vector<nt_event_t> &get_nt_events() const;
 
-    [[nodiscard]] const std::vector<expression> &get_state_vars() const;
-    [[nodiscard]] const std::vector<expression> &get_rhs() const;
+    [[nodiscard]] const std::vector<std::pair<expression, expression>> &get_sys() const noexcept;
 
     void step(bool = false);
     void step_backward(bool = false);
@@ -1105,14 +1097,16 @@ namespace detail
 // - 3: removed the mr flag from the terminal event callback siganture,
 //      which resulted also in changes in the event detection data structure.
 // - 4: switched to pimpl implementation for i_data.
-inline constexpr int taylor_adaptive_s11n_version = 4;
+// - 5: replaced the m_state_vars and m_rhs members with m_sys.
+inline constexpr int taylor_adaptive_s11n_version = 5;
 
 // Boost s11n class version history for taylor_adaptive_batch:
 // - 1: added the m_state_vars and m_rhs members.
 // - 2: removed the mr flag from the terminal event callback siganture,
 //      which resulted also in changes in the event detection data structure.
 // - 3: switched to pimpl implementation for i_data.
-inline constexpr int taylor_adaptive_batch_s11n_version = 3;
+// - 4: replaced the m_state_vars and m_rhs members with m_sys.
+inline constexpr int taylor_adaptive_batch_s11n_version = 4;
 
 } // namespace detail
 
