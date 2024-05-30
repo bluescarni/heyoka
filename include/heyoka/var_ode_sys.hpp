@@ -50,6 +50,7 @@ public:
     [[nodiscard]] const std::vector<std::pair<expression, expression>> &get_sys() const noexcept;
     [[nodiscard]] const std::vector<expression> &get_vargs() const noexcept;
     [[nodiscard]] std::uint32_t get_n_orig_sv() const noexcept;
+    [[nodiscard]] std::uint32_t get_order() const noexcept;
 };
 
 HEYOKA_END_NAMESPACE

@@ -67,6 +67,7 @@ TEST_CASE("basic")
     auto vsys = var_ode_sys({prime(x) = v, prime(v) = -x}, var_args::vars);
     REQUIRE(vsys.get_vargs() == std::vector{x, v});
     REQUIRE(vsys.get_n_orig_sv() == 2u);
+    REQUIRE(vsys.get_order() == 1u);
     vsys = var_ode_sys({prime(v) = -x, prime(x) = v}, var_args::vars);
     REQUIRE(vsys.get_vargs() == std::vector{v, x});
     vsys = var_ode_sys({prime(v) = -x, prime(x) = v + par[2]}, var_args::params);
@@ -165,6 +166,7 @@ TEST_CASE("vareqs")
         REQUIRE(
             std::ranges::equal(orig_sys, std::ranges::subrange(vsys.get_sys().begin(), vsys.get_sys().begin() + 2)));
         REQUIRE(vsys.get_sys().size() == 6u);
+        REQUIRE(vsys.get_order() == 1u);
 
         auto [x_x0, x_v0, v_x0, v_v0] = make_vars("∂[(0, 1)]x", "∂[(1, 1)]x", "∂[(0, 1)]v", "∂[(1, 1)]v");
 
@@ -189,6 +191,7 @@ TEST_CASE("vareqs")
         REQUIRE(
             std::ranges::equal(orig_sys, std::ranges::subrange(vsys.get_sys().begin(), vsys.get_sys().begin() + 2)));
         REQUIRE(vsys.get_sys().size() == 4u);
+        REQUIRE(vsys.get_order() == 1u);
 
         auto [x_v0, v_v0] = make_vars("∂[(0, 1)]x", "∂[(0, 1)]v");
 
@@ -207,6 +210,7 @@ TEST_CASE("vareqs")
         REQUIRE(
             std::ranges::equal(orig_sys, std::ranges::subrange(vsys.get_sys().begin(), vsys.get_sys().begin() + 2)));
         REQUIRE(vsys.get_sys().size() == 12u);
+        REQUIRE(vsys.get_order() == 2u);
 
         auto [x_x0, x_v0, v_x0, v_v0] = make_vars("∂[(0, 1)]x", "∂[(1, 1)]x", "∂[(0, 1)]v", "∂[(1, 1)]v");
         auto [x_x0_x0, x_x0_v0] = make_vars("∂[(0, 2)]x", "∂[(0, 1), (1, 1)]x");

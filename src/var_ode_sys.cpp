@@ -334,4 +334,9 @@ std::uint32_t var_ode_sys::get_n_orig_sv() const noexcept
     return m_impl->dt.get_nouts();
 }
 
+std::uint32_t var_ode_sys::get_order() const noexcept
+{
+    return m_impl->dt.get_order();
+}
+
 HEYOKA_END_NAMESPACE
