@@ -66,6 +66,7 @@ TEST_CASE("basic")
     // Check the deduction of variational args.
     auto vsys = var_ode_sys({prime(x) = v, prime(v) = -x}, var_args::vars);
     REQUIRE(vsys.get_vargs() == std::vector{x, v});
+    REQUIRE(vsys.get_n_orig_sv() == 2u);
     vsys = var_ode_sys({prime(v) = -x, prime(x) = v}, var_args::vars);
     REQUIRE(vsys.get_vargs() == std::vector{v, x});
     vsys = var_ode_sys({prime(v) = -x, prime(x) = v + par[2]}, var_args::params);
@@ -89,6 +90,7 @@ TEST_CASE("basic")
     // Check explicit specification.
     vsys = var_ode_sys({prime(x) = v, prime(v) = -x}, std::vector{x});
     REQUIRE(vsys.get_vargs() == std::vector{x});
+    REQUIRE(vsys.get_n_orig_sv() == 2u);
     vsys = var_ode_sys({prime(x) = v, prime(v) = -x}, std::vector{x, v});
     REQUIRE(vsys.get_vargs() == std::vector{x, v});
     vsys = var_ode_sys({prime(x) = v, prime(v) = -x}, std::vector{v, x});
@@ -103,6 +105,7 @@ TEST_CASE("basic")
     auto vsys2 = vsys;
     REQUIRE(vsys.get_sys() == vsys2.get_sys());
     REQUIRE(vsys.get_vargs() == vsys2.get_vargs());
+    REQUIRE(vsys2.get_n_orig_sv() == 2u);
 
     auto vsys3 = std::move(vsys2);
     REQUIRE(vsys.get_sys() == vsys3.get_sys());
@@ -149,6 +152,7 @@ TEST_CASE("s11n")
 
     REQUIRE(sys.get_sys() == sys_copy.get_sys());
     REQUIRE(sys.get_vargs() == sys_copy.get_vargs());
+    REQUIRE(sys.get_n_orig_sv() == 2u);
 }
 
 TEST_CASE("vareqs")

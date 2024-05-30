@@ -329,4 +329,9 @@ const std::vector<expression> &var_ode_sys::get_vargs() const noexcept
     return m_impl->vargs;
 }
 
+std::uint32_t var_ode_sys::get_n_orig_sv() const noexcept
+{
+    return m_impl->dt.get_nouts();
+}
+
 HEYOKA_END_NAMESPACE
