@@ -100,6 +100,8 @@ TEST_CASE("basic")
     REQUIRE(vsys.get_vargs() == std::vector{par[2], v, x});
     vsys = var_ode_sys({prime(x) = v, prime(v) = -x}, std::vector{par[2], v, heyoka::time, x});
     REQUIRE(vsys.get_vargs() == std::vector{par[2], v, heyoka::time, x});
+    vsys = var_ode_sys({prime(x) = v, prime(v) = -x}, {par[2], v, heyoka::time, x});
+    REQUIRE(vsys.get_vargs() == std::vector{par[2], v, heyoka::time, x});
 
     // Copy/move semantics.
     vsys = var_ode_sys({prime(x) = v, prime(v) = -x}, std::vector{x});

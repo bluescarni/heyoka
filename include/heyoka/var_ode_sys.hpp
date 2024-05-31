@@ -10,6 +10,7 @@
 #define HEYOKA_VAR_ODE_SYS_HPP
 
 #include <cstdint>
+#include <initializer_list>
 #include <memory>
 #include <utility>
 #include <variant>
@@ -41,6 +42,8 @@ class HEYOKA_DLL_PUBLIC var_ode_sys
 public:
     explicit var_ode_sys(const std::vector<std::pair<expression, expression>> &,
                          const std::variant<var_args, std::vector<expression>> &, std::uint32_t = 1);
+    explicit var_ode_sys(const std::vector<std::pair<expression, expression>> &, std::initializer_list<expression>,
+                         std::uint32_t = 1);
     var_ode_sys(const var_ode_sys &);
     var_ode_sys(var_ode_sys &&) noexcept;
     var_ode_sys &operator=(const var_ode_sys &);

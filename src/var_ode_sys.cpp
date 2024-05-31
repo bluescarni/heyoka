@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <iterator>
 #include <map>
 #include <memory>
@@ -97,6 +98,12 @@ void var_ode_sys::load(boost::archive::binary_iarchive &ar, unsigned)
         throw;
     }
     // LCOV_EXCL_STOP
+}
+
+var_ode_sys::var_ode_sys(const std::vector<std::pair<expression, expression>> &sys,
+                         std::initializer_list<expression> args, std::uint32_t order)
+    : var_ode_sys(sys, std::vector(args), order)
+{
 }
 
 var_ode_sys::var_ode_sys(const std::vector<std::pair<expression, expression>> &sys,
