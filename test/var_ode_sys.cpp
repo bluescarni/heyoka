@@ -443,3 +443,57 @@ TEST_CASE("nonauto sys")
     REQUIRE(ta_orig.get_state()[1]
             == approximately(ta.get_state()[1] + ta.get_state()[8] * delta_par + ta.get_state()[9] * delta_tm));
 }
+
+// An order-2 test.
+TEST_CASE("nonauto sys order 2")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    // The original ODEs.
+    auto orig_sys = {prime(x) = v, prime(v) = cos(heyoka::time) - par[0] * v - sin(x)};
+
+    // The variational ODEs.
+    auto vsys = var_ode_sys(orig_sys, {x, par[0]}, 2);
+
+    REQUIRE(vsys.get_sys().size() == 12u);
+
+    const auto ic_x = .2, ic_v = .3, ic_tm = .5, ic_par = .4;
+
+    auto ta = taylor_adaptive<double>{vsys.get_sys(),
+                                      {ic_x, ic_v,
+                                       // dx/...
+                                       1., 0.,
+                                       // dv/...
+                                       0., 0.,
+                                       // d2x/...
+                                       0., 0., 0.,
+                                       // d2v/...
+                                       0., 0., 0.},
+                                      kw::pars = {ic_par},
+                                      kw::time = ic_tm};
+
+    ta.propagate_until(3.);
+
+    const auto delta_x = 1e-5;
+    const auto delta_par = 2e-5;
+    auto ta_orig
+        = taylor_adaptive<double>{orig_sys, {ic_x + delta_x, ic_v}, kw::pars = {ic_par + delta_par}, kw::time = ic_tm};
+
+    ta_orig.propagate_until(3.);
+
+    REQUIRE(ta_orig.get_state()[0]
+            == approximately(ta.get_state()[0] + ta.get_state()[2] * delta_x + ta.get_state()[3] * delta_par
+                                 + 0.5
+                                       * (ta.get_state()[6] * delta_x * delta_x
+                                          + 2 * ta.get_state()[7] * delta_x * delta_par
+                                          + ta.get_state()[8] * delta_par * delta_par),
+                             1000.));
+
+    REQUIRE(ta_orig.get_state()[1]
+            == approximately(ta.get_state()[1] + ta.get_state()[4] * delta_x + ta.get_state()[5] * delta_par
+                                 + 0.5
+                                       * (ta.get_state()[9] * delta_x * delta_x
+                                          + 2 * ta.get_state()[10] * delta_x * delta_par
+                                          + ta.get_state()[11] * delta_par * delta_par),
+                             1000.));
+}
