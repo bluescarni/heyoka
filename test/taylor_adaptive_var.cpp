@@ -52,7 +52,8 @@ TEST_CASE("auto ic setup")
         REQUIRE(ta.get_state()[4] == 0);
         REQUIRE(ta.get_state()[5] == 1);
         // All the rest must be zero.
-        REQUIRE(std::all_of(ta.get_state().begin() + 6, ta.get_state().end(), [](const auto &x) { return x == 0; }));
+        REQUIRE(
+            std::all_of(ta.get_state().begin() + 6, ta.get_state().end(), [](const auto &val) { return val == 0; }));
     }
 
     // IC test, swap the variables around.
@@ -70,7 +71,8 @@ TEST_CASE("auto ic setup")
         REQUIRE(ta.get_state()[4] == 1);
         REQUIRE(ta.get_state()[5] == 0);
         // All the rest must be zero.
-        REQUIRE(std::all_of(ta.get_state().begin() + 6, ta.get_state().end(), [](const auto &x) { return x == 0; }));
+        REQUIRE(
+            std::all_of(ta.get_state().begin() + 6, ta.get_state().end(), [](const auto &val) { return val == 0; }));
     }
 
     // par test.
@@ -82,7 +84,8 @@ TEST_CASE("auto ic setup")
         REQUIRE(ta.get_state()[0] == .2);
         REQUIRE(ta.get_state()[1] == .3);
         // All the rest must be zero.
-        REQUIRE(std::all_of(ta.get_state().begin() + 2, ta.get_state().end(), [](const auto &x) { return x == 0; }));
+        REQUIRE(
+            std::all_of(ta.get_state().begin() + 2, ta.get_state().end(), [](const auto &val) { return val == 0; }));
     }
 
     // par+var test.
@@ -102,7 +105,8 @@ TEST_CASE("auto ic setup")
         REQUIRE(ta.get_state()[6] == 1);
         REQUIRE(ta.get_state()[7] == 0);
         // All the rest must be zero.
-        REQUIRE(std::all_of(ta.get_state().begin() + 8, ta.get_state().end(), [](const auto &x) { return x == 0; }));
+        REQUIRE(
+            std::all_of(ta.get_state().begin() + 8, ta.get_state().end(), [](const auto &val) { return val == 0; }));
     }
 
     // Single par, single var, mixed up order.
@@ -120,7 +124,8 @@ TEST_CASE("auto ic setup")
         REQUIRE(ta.get_state()[4] == 0);
         REQUIRE(ta.get_state()[5] == 1);
         // All the rest must be zero.
-        REQUIRE(std::all_of(ta.get_state().begin() + 6, ta.get_state().end(), [](const auto &x) { return x == 0; }));
+        REQUIRE(
+            std::all_of(ta.get_state().begin() + 6, ta.get_state().end(), [](const auto &val) { return val == 0; }));
     }
 
     // Invalid state size passed to the ctor.
@@ -164,7 +169,8 @@ TEST_CASE("auto ic setup")
         REQUIRE(ta.get_state()[4] == 0);
         REQUIRE(ta.get_state()[5] == 1);
         // All the rest must be zero.
-        REQUIRE(std::all_of(ta.get_state().begin() + 6, ta.get_state().end(), [](const auto &x) { return x == 0; }));
+        REQUIRE(
+            std::all_of(ta.get_state().begin() + 6, ta.get_state().end(), [](const auto &val) { return val == 0; }));
 
         REQUIRE(std::ranges::all_of(ta.get_state(), [prec](const auto &r) { return r.get_prec() == prec; }));
     }
@@ -202,7 +208,8 @@ TEST_CASE("auto ic setup batch")
         REQUIRE(ta.get_state()[10] == 1);
         REQUIRE(ta.get_state()[11] == 1);
         // All the rest must be zero.
-        REQUIRE(std::all_of(ta.get_state().begin() + 12, ta.get_state().end(), [](const auto &x) { return x == 0; }));
+        REQUIRE(
+            std::all_of(ta.get_state().begin() + 12, ta.get_state().end(), [](const auto &val) { return val == 0; }));
     }
 
     // IC test, swap the variables around.
@@ -226,7 +233,8 @@ TEST_CASE("auto ic setup batch")
         REQUIRE(ta.get_state()[10] == 0);
         REQUIRE(ta.get_state()[11] == 0);
         // All the rest must be zero.
-        REQUIRE(std::all_of(ta.get_state().begin() + 12, ta.get_state().end(), [](const auto &x) { return x == 0; }));
+        REQUIRE(
+            std::all_of(ta.get_state().begin() + 12, ta.get_state().end(), [](const auto &val) { return val == 0; }));
     }
 
     // par test.
@@ -240,7 +248,8 @@ TEST_CASE("auto ic setup batch")
         REQUIRE(ta.get_state()[2] == .3);
         REQUIRE(ta.get_state()[3] == .31);
         // All the rest must be zero.
-        REQUIRE(std::all_of(ta.get_state().begin() + 4, ta.get_state().end(), [](const auto &x) { return x == 0; }));
+        REQUIRE(
+            std::all_of(ta.get_state().begin() + 4, ta.get_state().end(), [](const auto &val) { return val == 0; }));
     }
 
     // par+var test.
@@ -268,7 +277,8 @@ TEST_CASE("auto ic setup batch")
         REQUIRE(ta.get_state()[14] == 0);
         REQUIRE(ta.get_state()[15] == 0);
         // All the rest must be zero.
-        REQUIRE(std::all_of(ta.get_state().begin() + 16, ta.get_state().end(), [](const auto &x) { return x == 0; }));
+        REQUIRE(
+            std::all_of(ta.get_state().begin() + 16, ta.get_state().end(), [](const auto &val) { return val == 0; }));
     }
 
     // Single par, single var, mixed up order.
@@ -292,7 +302,8 @@ TEST_CASE("auto ic setup batch")
         REQUIRE(ta.get_state()[10] == 1);
         REQUIRE(ta.get_state()[11] == 1);
         // All the rest must be zero.
-        REQUIRE(std::all_of(ta.get_state().begin() + 12, ta.get_state().end(), [](const auto &x) { return x == 0; }));
+        REQUIRE(
+            std::all_of(ta.get_state().begin() + 12, ta.get_state().end(), [](const auto &val) { return val == 0; }));
     }
 
     // Invalid state size passed to the ctor.
