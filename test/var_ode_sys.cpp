@@ -497,3 +497,53 @@ TEST_CASE("nonauto sys order 2")
                                           + ta.get_state()[11] * delta_par * delta_par),
                              1000.));
 }
+
+// An order-2 test wrt initial time.
+TEST_CASE("nonauto sys order 2 t0")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    // The original ODEs.
+    auto orig_sys = {prime(x) = v, prime(v) = cos(heyoka::time) - par[0] * v - sin(x)};
+
+    // The variational ODEs.
+    auto vsys = var_ode_sys(orig_sys, {heyoka::time}, 2);
+
+    REQUIRE(vsys.get_sys().size() == 6u);
+
+    const auto ic_x = .2, ic_v = .3, ic_tm = .5, ic_par = .4;
+
+    const auto acc0 = std::cos(ic_tm) - ic_par * ic_v - std::sin(ic_x);
+    const auto jerk0 = -std::sin(ic_tm) - ic_par * acc0 - std::cos(ic_x) * ic_v;
+    const auto dxdt0 = -ic_v;
+    const auto dvdt0 = -acc0;
+
+    auto ta = taylor_adaptive<double>{vsys.get_sys(),
+                                      {ic_x, ic_v,
+                                       // dx/...
+                                       dxdt0,
+                                       // dv/...
+                                       dvdt0,
+                                       // d2x/...
+                                       -acc0 - 2 * dvdt0,
+                                       // d2v/...
+                                       -jerk0 - 2 * (-ic_par * dvdt0 - std::cos(ic_x) * dxdt0)},
+                                      kw::pars = {ic_par},
+                                      kw::time = ic_tm};
+
+    ta.propagate_until(3.);
+
+    const auto delta_t0 = 1e-5;
+    auto ta_orig = taylor_adaptive<double>{orig_sys, {ic_x, ic_v}, kw::pars = {ic_par}, kw::time = ic_tm + delta_t0};
+
+    ta_orig.propagate_until(3.);
+
+    REQUIRE(ta_orig.get_state()[0]
+            == approximately(ta.get_state()[0] + ta.get_state()[2] * delta_t0
+                                 + 0.5 * ta.get_state()[4] * delta_t0 * delta_t0,
+                             1000.));
+    REQUIRE(ta_orig.get_state()[1]
+            == approximately(ta.get_state()[1] + ta.get_state()[3] * delta_t0
+                                 + 0.5 * ta.get_state()[5] * delta_t0 * delta_t0,
+                             1000.));
+}
