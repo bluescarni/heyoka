@@ -12,13 +12,14 @@
 #include <cstdint>
 #include <initializer_list>
 #include <memory>
+#include <ranges>
 #include <utility>
 #include <variant>
 #include <vector>
 
 #include <heyoka/config.hpp>
-#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/expression.hpp>
 #include <heyoka/s11n.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -39,6 +40,8 @@ class HEYOKA_DLL_PUBLIC var_ode_sys
     void load(boost::archive::binary_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
+    [[nodiscard]] const dtens &get_dtens() const noexcept;
+
 public:
     explicit var_ode_sys(const std::vector<std::pair<expression, expression>> &,
                          const std::variant<var_args, std::vector<expression>> &, std::uint32_t = 1);
@@ -54,6 +57,11 @@ public:
     [[nodiscard]] const std::vector<expression> &get_vargs() const noexcept;
     [[nodiscard]] std::uint32_t get_n_orig_sv() const noexcept;
     [[nodiscard]] std::uint32_t get_order() const noexcept;
+
+    [[nodiscard]] std::ranges::random_access_range auto get_didx_range() const noexcept
+    {
+        return get_dtens() | std::ranges::views::transform([](const auto &p) -> const auto & { return p.first; });
+    }
 };
 
 HEYOKA_END_NAMESPACE

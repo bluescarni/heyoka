@@ -61,6 +61,7 @@
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/step_callback.hpp>
+#include <heyoka/var_ode_sys.hpp>
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -389,6 +390,9 @@ public:
 
 #endif
 
+template <typename T>
+void setup_variational_ics_varpar(std::vector<T> &, const var_ode_sys &, std::uint32_t);
+
 } // namespace detail
 
 template <typename T>
@@ -429,12 +433,11 @@ private:
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
     // Private implementation-detail constructor machinery.
-    void finalise_ctor_impl(std::vector<std::pair<expression, expression>>, std::vector<T>, std::optional<T>,
-                            std::optional<T>, bool, bool, std::vector<T>, std::vector<t_event_t>,
-                            std::vector<nt_event_t>, bool, std::optional<long long>);
+    using sys_t = std::variant<std::vector<std::pair<expression, expression>>, var_ode_sys>;
+    void finalise_ctor_impl(sys_t, std::vector<T>, std::optional<T>, std::optional<T>, bool, bool, std::vector<T>,
+                            std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);
     template <typename... KwArgs>
-    void finalise_ctor(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
-                       const KwArgs &...kw_args)
+    void finalise_ctor(sys_t sys, std::vector<T> state, const KwArgs &...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -511,6 +514,17 @@ public:
     template <typename... KwArgs>
     explicit taylor_adaptive(std::vector<std::pair<expression, expression>> sys, std::initializer_list<T> state,
                              const KwArgs &...kw_args)
+        : taylor_adaptive(std::move(sys), std::vector<T>(state), kw_args...)
+    {
+    }
+    template <typename... KwArgs>
+    explicit taylor_adaptive(var_ode_sys sys, std::vector<T> state, const KwArgs &...kw_args)
+        : taylor_adaptive(private_ctor_t{}, llvm_state(kw_args...))
+    {
+        finalise_ctor(std::move(sys), std::move(state), kw_args...);
+    }
+    template <typename... KwArgs>
+    explicit taylor_adaptive(var_ode_sys sys, std::initializer_list<T> state, const KwArgs &...kw_args)
         : taylor_adaptive(std::move(sys), std::vector<T>(state), kw_args...)
     {
     }
@@ -799,12 +813,11 @@ private:
     HEYOKA_DLL_LOCAL void step_impl(const std::vector<T> &, bool);
 
     // Private implementation-detail constructor machinery.
-    void finalise_ctor_impl(std::vector<std::pair<expression, expression>>, std::vector<T>, std::uint32_t,
-                            std::vector<T>, std::optional<T>, bool, bool, std::vector<T>, std::vector<t_event_t>,
-                            std::vector<nt_event_t>, bool);
+    using sys_t = std::variant<std::vector<std::pair<expression, expression>>, var_ode_sys>;
+    void finalise_ctor_impl(sys_t, std::vector<T>, std::uint32_t, std::vector<T>, std::optional<T>, bool, bool,
+                            std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
     template <typename... KwArgs>
-    void finalise_ctor(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
-                       std::uint32_t batch_size, const KwArgs &...kw_args)
+    void finalise_ctor(sys_t sys, std::vector<T> state, std::uint32_t batch_size, const KwArgs &...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -870,6 +883,19 @@ public:
     template <typename... KwArgs>
     explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>> sys, std::initializer_list<T> state,
                                    std::uint32_t batch_size, const KwArgs &...kw_args)
+        : taylor_adaptive_batch(std::move(sys), std::vector<T>(state), batch_size, kw_args...)
+    {
+    }
+    template <typename... KwArgs>
+    explicit taylor_adaptive_batch(var_ode_sys sys, std::vector<T> state, std::uint32_t batch_size,
+                                   const KwArgs &...kw_args)
+        : taylor_adaptive_batch(private_ctor_t{}, llvm_state(kw_args...))
+    {
+        finalise_ctor(std::move(sys), std::move(state), batch_size, kw_args...);
+    }
+    template <typename... KwArgs>
+    explicit taylor_adaptive_batch(var_ode_sys sys, std::initializer_list<T> state, std::uint32_t batch_size,
+                                   const KwArgs &...kw_args)
         : taylor_adaptive_batch(std::move(sys), std::vector<T>(state), batch_size, kw_args...)
     {
     }

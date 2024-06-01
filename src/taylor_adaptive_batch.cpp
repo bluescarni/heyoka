@@ -70,10 +70,9 @@ taylor_adaptive_batch<T>::taylor_adaptive_batch(private_ctor_t, llvm_state s)
 }
 
 template <typename T>
-void taylor_adaptive_batch<T>::finalise_ctor_impl(std::vector<std::pair<expression, expression>> sys,
-                                                  std::vector<T> state, std::uint32_t batch_size, std::vector<T> time,
-                                                  std::optional<T> tol, bool high_accuracy, bool compact_mode,
-                                                  std::vector<T> pars, std::vector<t_event_t> tes,
+void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state, std::uint32_t batch_size,
+                                                  std::vector<T> time, std::optional<T> tol, bool high_accuracy,
+                                                  bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
                                                   std::vector<nt_event_t> ntes, bool parallel_mode)
 {
     // NOTE: this must hold because tol == 0 is interpreted
@@ -88,7 +87,19 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(std::vector<std::pair<expressi
 
     using std::isfinite;
 
-    // Validate the ode sys.
+    // Are we constructing a variational integrator?
+    const auto is_variational = (vsys.index() == 1u);
+
+    // Fetch the ODE system.
+    const auto &sys = is_variational ? std::get<1>(vsys).get_sys() : std::get<0>(vsys);
+
+    // Validate it.
+    // NOTE: in a variational ODE sys, we already validated the original equations,
+    // and the variational equations should not be in need of validation.
+    // However, *in principle*, something could have gone wrong during the computation of the
+    // variational equations (i.e., a malformed gradient() implementation somewhere in a
+    // user-defined function injecting variables whose names begin with "∂"). Hence,
+    // just re-validate for peace of mind.
     validate_ode_sys(sys, tes, ntes);
 
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
@@ -148,11 +159,30 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(std::vector<std::pair<expressi
     }
 
     if (m_state.size() / m_batch_size != sys.size()) {
-        throw std::invalid_argument(
-            fmt::format("Inconsistent sizes detected in the initialization of an adaptive Taylor "
-                        "integrator: the state vector has a dimension of {} and a batch size of {}, "
-                        "while the number of equations is {}",
-                        m_state.size() / m_batch_size, m_batch_size, sys.size()));
+        if (is_variational) {
+            // Fetch the original number of equations/state variables.
+            const auto n_orig_sv = std::get<1>(vsys).get_n_orig_sv();
+
+            if (m_state.size() / m_batch_size == n_orig_sv) [[likely]] {
+                // Automatic setup of the initial conditions for the derivatives wrt
+                // variables and parameters.
+                detail::setup_variational_ics_varpar(m_state, std::get<1>(vsys), m_batch_size);
+            } else {
+                throw std::invalid_argument(fmt::format(
+                    "Inconsistent sizes detected in the initialization of a variational adaptive Taylor "
+                    "integrator in batch mode: the state vector has a dimension of {} (in batches of {}), while the "
+                    "total number of equations is {}. The size of the state vector must be "
+                    "equal either to the total number of equations times the batch size, or to the number of original "
+                    "(i.e., non-variational) equations, which for this system is {}, times the batch size",
+                    m_state.size(), m_batch_size, sys.size(), n_orig_sv));
+            }
+        } else [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("Inconsistent sizes detected in the initialization of an adaptive Taylor "
+                            "integrator: the state vector has a dimension of {} and a batch size of {}, "
+                            "while the number of equations is {}",
+                            m_state.size() / m_batch_size, m_batch_size, sys.size()));
+        }
     }
 
     if (m_time_hi.size() != m_batch_size) {

@@ -346,4 +346,9 @@ std::uint32_t var_ode_sys::get_order() const noexcept
     return m_impl->dt.get_order();
 }
 
+const dtens &var_ode_sys::get_dtens() const noexcept
+{
+    return m_impl->dt;
+}
+
 HEYOKA_END_NAMESPACE
