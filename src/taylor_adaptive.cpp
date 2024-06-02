@@ -548,6 +548,18 @@ taylor_adaptive<T> &taylor_adaptive<T>::operator=(taylor_adaptive &&) noexcept =
 template <typename T>
 taylor_adaptive<T>::~taylor_adaptive() = default;
 
+template <typename T>
+bool taylor_adaptive<T>::is_variational() const noexcept
+{
+    return m_i_data->m_vsys.index() == 1u;
+}
+
+template <typename T>
+std::uint32_t taylor_adaptive<T>::get_n_orig_sv() const noexcept
+{
+    return is_variational() ? std::get<1>(m_i_data->m_vsys).get_n_orig_sv() : m_i_data->m_dim;
+}
+
 // NOTE: the save/load patterns mimic the copy constructor logic.
 template <typename T>
 template <typename Archive>

@@ -541,6 +541,10 @@ public:
 
     ~taylor_adaptive();
 
+    [[nodiscard]] bool is_variational() const noexcept;
+
+    [[nodiscard]] std::uint32_t get_n_orig_sv() const noexcept;
+
     [[nodiscard]] const llvm_state &get_llvm_state() const;
 
     [[nodiscard]] const taylor_dc_t &get_decomposition() const;
@@ -911,6 +915,10 @@ public:
     taylor_adaptive_batch &operator=(taylor_adaptive_batch &&) noexcept;
 
     ~taylor_adaptive_batch();
+
+    [[nodiscard]] bool is_variational() const noexcept;
+
+    [[nodiscard]] std::uint32_t get_n_orig_sv() const noexcept;
 
     [[nodiscard]] const llvm_state &get_llvm_state() const;
 

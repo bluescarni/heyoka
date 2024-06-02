@@ -501,6 +501,10 @@ TEST_CASE("comp test")
 
         REQUIRE(ta.get_sys().size() == 10u);
         REQUIRE(ta_orig.get_sys().size() == 2u);
+        REQUIRE(ta.is_variational());
+        REQUIRE(!ta_orig.is_variational());
+        REQUIRE(ta.get_n_orig_sv() == 2u);
+        REQUIRE(ta_orig.get_n_orig_sv() == 2u);
 
         ta.propagate_until(3.);
         ta_orig.propagate_until(3.);
@@ -533,6 +537,10 @@ TEST_CASE("comp test")
 
         REQUIRE(ta.get_sys().size() == 10u);
         REQUIRE(ta_orig.get_sys().size() == 2u);
+        REQUIRE(ta.is_variational());
+        REQUIRE(!ta_orig.is_variational());
+        REQUIRE(ta.get_n_orig_sv() == 2u);
+        REQUIRE(ta_orig.get_n_orig_sv() == 2u);
 
         ta.propagate_until(3.);
         ta_orig.propagate_until(3.);
