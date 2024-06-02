@@ -102,7 +102,7 @@ mpfr_prec_t taylor_adaptive_base<mppp::real, Derived>::get_prec() const
 }
 
 // Helper to check that the integrator data is consistent with
-// the precision. To be used at the end of construciton or before using
+// the precision. To be used at the end of construction or before using
 // the integrator data (e.g., in step(), propagate(), etc.).
 template <typename Derived>
 void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
