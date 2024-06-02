@@ -158,6 +158,11 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
                         m_state.size(), m_batch_size));
     }
 
+    // NOTE: keep track of whether or not we need to automatically setup the initial
+    // conditions in a variational integrator. This is needed because we need
+    // to delay the automatic ic setup for the derivatives wrt the initial time until
+    // after we have correctly set up state, pars and time in the integrator.
+    bool auto_ic_setup = false;
     if (m_state.size() / m_batch_size != sys.size()) {
         if (is_variational) {
             // Fetch the original number of equations/state variables.
@@ -167,6 +172,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
                 // Automatic setup of the initial conditions for the derivatives wrt
                 // variables and parameters.
                 detail::setup_variational_ics_varpar(m_state, std::get<1>(vsys), m_batch_size);
+                auto_ic_setup = true;
             } else {
                 throw std::invalid_argument(fmt::format(
                     "Inconsistent sizes detected in the initialization of a variational adaptive Taylor "
@@ -349,6 +355,13 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     if (with_events) {
         m_ed_data = std::make_unique<ed_data>(m_llvm.make_similar(), std::move(tes), std::move(ntes), m_order, m_dim,
                                               m_batch_size);
+    }
+
+    if (auto_ic_setup) {
+        // Finish the automatic setup of the ics for a variational
+        // integrator.
+        detail::setup_variational_ics_t0(m_llvm, m_state, m_pars, m_time_hi.data(), std::get<1>(vsys), m_batch_size,
+                                         m_high_accuracy, m_compact_mode);
     }
 
     // Move sys in.

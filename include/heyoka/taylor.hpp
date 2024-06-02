@@ -393,6 +393,10 @@ public:
 template <typename T>
 void setup_variational_ics_varpar(std::vector<T> &, const var_ode_sys &, std::uint32_t);
 
+template <typename T>
+void setup_variational_ics_t0(const llvm_state &, std::vector<T> &, const std::vector<T> &, const T *,
+                              const var_ode_sys &, std::uint32_t, bool, bool);
+
 } // namespace detail
 
 template <typename T>
