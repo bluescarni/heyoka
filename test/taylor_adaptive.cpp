@@ -2483,3 +2483,15 @@ TEST_CASE("ode validate")
         Message("Invalid system of differential equations detected: an event function contains the variable 'v', "
                 "which is not a state variable"));
 }
+
+TEST_CASE("invalid initial state")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    REQUIRE_THROWS_MATCHES(
+        (taylor_adaptive<double>{{prime(x) = v, prime(v) = -x}, {0.05}}), std::invalid_argument,
+        Message("Inconsistent sizes detected in the initialization of an adaptive Taylor "
+                "integrator: the state vector has a dimension of 1, while the number of equations is 2"));
+}

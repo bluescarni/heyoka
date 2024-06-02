@@ -44,11 +44,13 @@ void setup_variational_ics_varpar(std::vector<T> &state, const var_ode_sys &vsys
 {
     const auto &sys = vsys.get_sys();
 
+    // LCOV_EXCL_START
     assert(!state.empty());
     assert(batch_size > 0u);
     assert(state.size() % batch_size == 0u);
     assert(state.size() / batch_size == vsys.get_n_orig_sv());
     assert(sys.size() > state.size() / batch_size);
+    // LCOV_EXCL_STOP
 
     // Prepare the state vector.
     // NOTE: the appended items will all be zeroes.
@@ -87,7 +89,7 @@ void setup_variational_ics_varpar(std::vector<T> &state, const var_ode_sys &vsys
 
         // Fetch the state variable the current multiindex refers to.
         const auto &cur_sv = sys[cur_didx.first].first;
-        assert(std::holds_alternative<variable>(cur_sv.value()));
+        assert(std::holds_alternative<variable>(cur_sv.value())); // LCOV_EXCL_LINE
 
         // If the diff order is greater than 1 or the derivative is not with respect
         // to the current state variable, move on.
