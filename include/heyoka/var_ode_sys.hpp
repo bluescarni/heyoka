@@ -43,6 +43,7 @@ class HEYOKA_DLL_PUBLIC var_ode_sys
     [[nodiscard]] const dtens &get_dtens() const noexcept;
 
 public:
+    var_ode_sys() noexcept;
     explicit var_ode_sys(const std::vector<std::pair<expression, expression>> &,
                          const std::variant<var_args, std::vector<expression>> &, std::uint32_t = 1);
     explicit var_ode_sys(const std::vector<std::pair<expression, expression>> &, std::initializer_list<expression>,

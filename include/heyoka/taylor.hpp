@@ -1128,7 +1128,7 @@ namespace detail
 // - 3: removed the mr flag from the terminal event callback siganture,
 //      which resulted also in changes in the event detection data structure.
 // - 4: switched to pimpl implementation for i_data.
-// - 5: replaced the m_state_vars and m_rhs members with m_sys.
+// - 5: removed m_state_vars/m_rhs, variational ODE data.
 inline constexpr int taylor_adaptive_s11n_version = 5;
 
 // Boost s11n class version history for taylor_adaptive_batch:
@@ -1136,7 +1136,7 @@ inline constexpr int taylor_adaptive_s11n_version = 5;
 // - 2: removed the mr flag from the terminal event callback siganture,
 //      which resulted also in changes in the event detection data structure.
 // - 3: switched to pimpl implementation for i_data.
-// - 4: replaced the m_state_vars and m_rhs members with m_sys.
+// - 4: removed m_state_vars/m_rhs, variational ODE data.
 inline constexpr int taylor_adaptive_batch_s11n_version = 4;
 
 } // namespace detail

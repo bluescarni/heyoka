@@ -132,30 +132,55 @@ TEST_CASE("basic")
 
 TEST_CASE("s11n")
 {
-    std::stringstream ss;
-
-    auto [x, v] = make_vars("x", "v");
-
-    auto sys = var_ode_sys({prime(x) = v, prime(v) = -x}, var_args::vars);
-    auto sys_copy(sys);
-
     {
-        boost::archive::binary_oarchive oa(ss);
+        std::stringstream ss;
 
-        oa << sys;
+        auto [x, v] = make_vars("x", "v");
+
+        auto sys = var_ode_sys({prime(x) = v, prime(v) = -x}, var_args::vars);
+        auto sys_copy(sys);
+
+        {
+            boost::archive::binary_oarchive oa(ss);
+
+            oa << sys;
+        }
+
+        sys = var_ode_sys({prime(x) = x}, std::vector{x});
+
+        {
+            boost::archive::binary_iarchive ia(ss);
+
+            ia >> sys;
+        }
+
+        REQUIRE(sys.get_sys() == sys_copy.get_sys());
+        REQUIRE(sys.get_vargs() == sys_copy.get_vargs());
+        REQUIRE(sys.get_n_orig_sv() == 2u);
     }
 
-    sys = var_ode_sys({prime(x) = x}, std::vector{x});
-
+    // Try also with def cted object.
     {
-        boost::archive::binary_iarchive ia(ss);
+        std::stringstream ss;
 
-        ia >> sys;
+        auto [x, v] = make_vars("x", "v");
+
+        var_ode_sys sys;
+
+        {
+            boost::archive::binary_oarchive oa(ss);
+
+            oa << sys;
+        }
+
+        sys = var_ode_sys({prime(x) = x}, std::vector{x});
+
+        {
+            boost::archive::binary_iarchive ia(ss);
+
+            ia >> sys;
+        }
     }
-
-    REQUIRE(sys.get_sys() == sys_copy.get_sys());
-    REQUIRE(sys.get_vargs() == sys_copy.get_vargs());
-    REQUIRE(sys.get_n_orig_sv() == 2u);
 }
 
 TEST_CASE("vareqs")

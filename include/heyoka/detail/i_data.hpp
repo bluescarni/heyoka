@@ -64,7 +64,7 @@ struct taylor_adaptive<T>::i_data {
     // The vector for the dense output.
     std::vector<T> m_d_out;
     // The ODE sys.
-    std::vector<std::pair<expression, expression>> m_sys;
+    sys_t m_vsys;
 
 private:
     // Serialisation.
@@ -148,7 +148,7 @@ struct taylor_adaptive_batch<T>::i_data {
     // Temporary vector used in the dense output implementation.
     std::vector<T> m_d_out_time;
     // The ODE sys.
-    std::vector<std::pair<expression, expression>> m_sys;
+    sys_t m_vsys;
 
 private:
     // Serialisation.

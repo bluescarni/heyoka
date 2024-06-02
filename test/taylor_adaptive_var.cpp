@@ -57,6 +57,8 @@ TEST_CASE("auto ic setup")
         // All the rest must be zero.
         REQUIRE(
             std::all_of(ta.get_state().begin() + 6, ta.get_state().end(), [](const auto &val) { return val == 0; }));
+
+        REQUIRE(ta.get_sys().size() == 12u);
     }
 
     // IC test, swap the variables around.
@@ -298,6 +300,8 @@ TEST_CASE("auto ic setup batch")
         // All the rest must be zero.
         REQUIRE(
             std::all_of(ta.get_state().begin() + 12, ta.get_state().end(), [](const auto &val) { return val == 0; }));
+
+        REQUIRE(ta.get_sys().size() == 12u);
     }
 
     // IC test, swap the variables around.
@@ -493,7 +497,10 @@ TEST_CASE("comp test")
         const auto delta_x = 1e-8, delta_v = -2e-8, delta_tm = 3e-8, delta_par = -4e-8;
 
         auto ta_orig = taylor_adaptive{
-            vsys, {ic_x + delta_x, ic_v + delta_v}, kw::pars = {ic_par + delta_par}, kw::time = ic_tm + delta_tm};
+            orig_sys, {ic_x + delta_x, ic_v + delta_v}, kw::pars = {ic_par + delta_par}, kw::time = ic_tm + delta_tm};
+
+        REQUIRE(ta.get_sys().size() == 10u);
+        REQUIRE(ta_orig.get_sys().size() == 2u);
 
         ta.propagate_until(3.);
         ta_orig.propagate_until(3.);
@@ -518,11 +525,14 @@ TEST_CASE("comp test")
         const auto delta_x = 1e-8, delta_v = -2e-8, delta_tm = 3e-8, delta_par = -4e-8;
 
         auto ta_orig
-            = taylor_adaptive_batch{vsys,
+            = taylor_adaptive_batch{orig_sys,
                                     {ic_x + delta_x, ic_x + 0.01 + delta_x, ic_v + delta_v, ic_v + 0.02 + delta_v},
                                     2,
                                     kw::pars = {ic_par + delta_par, ic_par + 0.03 + delta_par},
                                     kw::time = {ic_tm + delta_tm, ic_tm + 0.04 + delta_tm}};
+
+        REQUIRE(ta.get_sys().size() == 10u);
+        REQUIRE(ta_orig.get_sys().size() == 2u);
 
         ta.propagate_until(3.);
         ta_orig.propagate_until(3.);

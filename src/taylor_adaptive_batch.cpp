@@ -135,7 +135,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_lo);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_nf_detected);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_time);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_sys);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_vsys);
 
     // Init the data members.
     m_batch_size = batch_size;
@@ -364,8 +364,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
                                          m_high_accuracy, m_compact_mode);
     }
 
-    // Move sys in.
-    m_sys = std::move(sys);
+    // Move vsys in.
+    m_vsys = std::move(vsys);
 }
 
 template <typename T>
@@ -2145,7 +2145,7 @@ const std::vector<typename taylor_adaptive_batch<T>::nt_event_t> &taylor_adaptiv
 template <typename T>
 const std::vector<std::pair<expression, expression>> &taylor_adaptive_batch<T>::get_sys() const noexcept
 {
-    return m_i_data->m_sys;
+    return (m_i_data->m_vsys.index() == 0) ? std::get<0>(m_i_data->m_vsys) : std::get<1>(m_i_data->m_vsys).get_sys();
 }
 
 template <typename T>

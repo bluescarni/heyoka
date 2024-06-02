@@ -2453,8 +2453,8 @@ TEST_CASE("ode validate")
 
     auto [x, v] = make_vars("x", "v");
 
-    REQUIRE_THROWS_MATCHES((taylor_adaptive<double>{{}, {0.05, 0.025}}), std::invalid_argument,
-                           Message("Cannot integrate a system of zero equations"));
+    REQUIRE_THROWS_MATCHES((taylor_adaptive<double>{std::vector<std::pair<expression, expression>>{}, {0.05, 0.025}}),
+                           std::invalid_argument, Message("Cannot integrate a system of zero equations"));
     REQUIRE_THROWS_MATCHES((taylor_adaptive<double>{{prime("__foo"_var) = 5_dbl}, {0.05, 0.025}}),
                            std::invalid_argument,
                            Message("Invalid system of differential equations detected: the variable '__foo' "

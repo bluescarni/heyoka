@@ -180,7 +180,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_sys);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_vsys);
 
     // NOTE: this must hold because tol == 0 is interpreted
     // as undefined in finalise_ctor().
@@ -507,8 +507,8 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
 
 #endif
 
-    // Move sys in.
-    m_sys = std::move(sys);
+    // Move vsys in.
+    m_vsys = std::move(vsys);
 }
 
 template <typename T>
@@ -1781,7 +1781,7 @@ const std::vector<typename taylor_adaptive<T>::nt_event_t> &taylor_adaptive<T>::
 template <typename T>
 const std::vector<std::pair<expression, expression>> &taylor_adaptive<T>::get_sys() const noexcept
 {
-    return m_i_data->m_sys;
+    return (m_i_data->m_vsys.index() == 0) ? std::get<0>(m_i_data->m_vsys) : std::get<1>(m_i_data->m_vsys).get_sys();
 }
 
 template <typename T>

@@ -100,6 +100,10 @@ void var_ode_sys::load(boost::archive::binary_iarchive &ar, unsigned)
     // LCOV_EXCL_STOP
 }
 
+// NOTE: this initialises into the moved-from state, this needs
+// to be documented properly.
+var_ode_sys::var_ode_sys() noexcept = default;
+
 var_ode_sys::var_ode_sys(const std::vector<std::pair<expression, expression>> &sys,
                          std::initializer_list<expression> args, std::uint32_t order)
     : var_ode_sys(sys, std::vector(args), order)
