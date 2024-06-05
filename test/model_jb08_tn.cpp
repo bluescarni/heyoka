@@ -53,7 +53,7 @@ TEST_CASE("impl")
         std::array<double, 12> in{600, 1.2, 3.9, 3, 4, 5, 6, 7, 8, 9, 10, 11};
         std::array<double, 1> out{};
         // Call the compiled function
-        rho_cf(out, in, kw::time_expr = 0.);
+        rho_cf(out, in, kw::time = 0.);
         REQUIRE(out[0] == approximately(6.805408788157112e-15));
     }
     // Case 2 - 123.23 days later (different alts etc....)
@@ -62,7 +62,7 @@ TEST_CASE("impl")
         std::array<double, 12> in{234, 4.5, 1.02, 11, 10, 9, 8, 7, 6, 5, 4, 3};
         std::array<double, 1> out{};
         // Call the model
-        rho_cf(out, in, kw::time_expr = 123.23 * 86400.);
+        rho_cf(out, in, kw::time = 123.23 * 86400.);
         REQUIRE(out[0] == approximately(1.3364825974582714e-11));
     }
     // Case 2 - 2300.92 days later (different alts etc....)
@@ -71,7 +71,7 @@ TEST_CASE("impl")
         std::array<double, 12> in{90., 2., 1., 3.1,4.1,5.1,6.1,7.1,8.1,9.1,10.1,11.1};
         std::array<double, 1> out{};
         // Call the model
-        rho_cf(out, in, kw::time_expr = 2300.92 * 86400.);
+        rho_cf(out, in, kw::time = 2300.92 * 86400.);
         REQUIRE(out[0] == approximately(5.173701008824741e-08));
     }
 }

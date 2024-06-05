@@ -49,7 +49,7 @@ TEST_CASE("impl")
         // Produce the compiled function
         cfunc<double> rho_cf{{rho}, {h, lat, lon, f107, f107a, ap}};
         // Call the model
-        rho_cf(out, in, kw::time_expr = 0.);
+        rho_cf(out, in, kw::time = 0.);
         REQUIRE(out[0] == approximately(9.599548606663777e-15));
     }
     // Case 2 - 123.23 days later (different alts etc....)
@@ -60,7 +60,7 @@ TEST_CASE("impl")
         // Produce the compiled function
         cfunc<double> rho_cf{{rho}, {h, lat, lon, f107, f107a, ap}};
         // Call the model
-        rho_cf(out, in, kw::time_expr = 123.23 * 86400.);
+        rho_cf(out, in, kw::time = 123.23 * 86400.);
         REQUIRE(out[0] == approximately(3.549961466488851e-11));
     }
 }
