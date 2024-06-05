@@ -83,7 +83,7 @@ TEST_CASE("igor_iface")
     {
         auto igor_v = model::jb08_tn(kw::geodetic = {h, lat, lon}, kw::f107 = f107, kw::f107a = f107a, kw::s107 = s107,
                                      kw::s107a = s107a, kw::m107 = m107, kw::m107a = m107a, kw::y107 = y107,
-                                     kw::y107a = y107a, kw::dDstdT = dDstdT, kw::time = heyoka::time / 86400_dbl);
+                                     kw::y107a = y107a, kw::dDstdT = dDstdT, kw::time_expr = heyoka::time / 86400_dbl);
         auto vanilla_v = model::detail::jb08_tn_impl({h, lat, lon}, f107a, f107, s107a, s107, m107a, m107, y107a, y107,
                                                      dDstdT, heyoka::time / 86400_dbl);
         REQUIRE(igor_v == vanilla_v);

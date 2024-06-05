@@ -85,11 +85,11 @@ auto jb08_tn_common_opts(const KwArgs &...kw_args)
     HEYOKA_MODEL_JB08_KWARG(dDstdT);
     // NOTE: the time in this case is the fractional number of days elapsed since the last 1st of January
     // 00:00:00 UTC)
-    HEYOKA_MODEL_JB08_KWARG(time);
+    HEYOKA_MODEL_JB08_KWARG(time_expr);
 
     return std::tuple{std::move(geodetic), std::move(f107a),  std::move(f107), std::move(s107a),
                       std::move(s107),     std::move(m107a),  std::move(m107), std::move(y107a),
-                      std::move(y107),     std::move(dDstdT), std::move(time)};
+                      std::move(y107),     std::move(dDstdT), std::move(time_expr)};
 }
 
 #undef HEYOKA_MODEL_JB08_KWARG
