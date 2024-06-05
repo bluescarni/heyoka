@@ -49,7 +49,7 @@ TEST_CASE("impl")
         // Produce the compiled function
         cfunc<double> rho_cf{{rho}, {h, lat, lon, f107, f107a, ap}};
         // Call the model
-        rho_cf(out, in, kw::time = 0.);
+        rho_cf(out, in, kw::time_expr = 0.);
         REQUIRE(out[0] == approximately(9.599548606663777e-15));
     }
     // Case 2 - 123.23 days later (different alts etc....)
@@ -60,7 +60,7 @@ TEST_CASE("impl")
         // Produce the compiled function
         cfunc<double> rho_cf{{rho}, {h, lat, lon, f107, f107a, ap}};
         // Call the model
-        rho_cf(out, in, kw::time = 123.23 * 86400.);
+        rho_cf(out, in, kw::time_expr = 123.23 * 86400.);
         REQUIRE(out[0] == approximately(3.549961466488851e-11));
     }
 }
@@ -69,7 +69,7 @@ TEST_CASE("igor_iface")
 {
     auto [h, lat, lon, f107, f107a, ap] = make_vars("h", "lat", "lon", "f107", "f107a", "ap");
     {
-        auto igor_v = model::nrlmsise00_tn(kw::geodetic = {h, lat, lon}, kw::f107 = f107, kw::f107a = f107a, kw::ap = ap, kw::time = heyoka::time / 86400_dbl);
+        auto igor_v = model::nrlmsise00_tn(kw::geodetic = {h, lat, lon}, kw::f107 = f107, kw::f107a = f107a, kw::ap = ap, kw::time_expr = heyoka::time / 86400_dbl);
         auto vanilla_v = model::detail::nrlmsise00_tn_impl({h, lat, lon}, f107, f107a, ap, heyoka::time / 86400_dbl);
         REQUIRE(igor_v == vanilla_v);
     }

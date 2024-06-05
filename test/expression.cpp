@@ -1454,8 +1454,8 @@ TEST_CASE("cfunc vsop2013")
 
     const auto [x, y, z, t] = make_vars("x", "y", "z", "t");
 
-    const auto venus_sol1 = model::vsop2013_cartesian_icrf(2, kw::time = par[0], kw::thresh = thr);
-    const auto venus_sol2 = model::vsop2013_cartesian_icrf(2, kw::time = t, kw::thresh = thr);
+    const auto venus_sol1 = model::vsop2013_cartesian_icrf(2, kw::time_expr = par[0], kw::thresh = thr);
+    const auto venus_sol2 = model::vsop2013_cartesian_icrf(2, kw::time_expr = t, kw::thresh = thr);
 
     auto ta = taylor_adaptive<double>({prime(x) = venus_sol1[0], prime(y) = venus_sol1[1], prime(z) = venus_sol1[2]},
                                       {0., 0., 0.}, kw::compact_mode = true);

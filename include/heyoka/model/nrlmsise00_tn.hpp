@@ -79,9 +79,9 @@ auto nrlmsise00_tn_common_opts(const KwArgs &...kw_args)
     HEYOKA_MODEL_NRLMSISE00_KWARG(ap);
     // NOTE: the time in this case is the fractional number of days elapsed since the last 1st of January
     // 00:00:00 UTC)
-    HEYOKA_MODEL_NRLMSISE00_KWARG(time);
+    HEYOKA_MODEL_NRLMSISE00_KWARG(time_expr);
 
-    return std::tuple{std::move(geodetic), std::move(f107), std::move(f107a), std::move(ap), std::move(time)};
+    return std::tuple{std::move(geodetic), std::move(f107), std::move(f107a), std::move(ap), std::move(time_expr)};
 }
 
 #undef HEYOKA_MODEL_NRLMSISE00_KWARG
