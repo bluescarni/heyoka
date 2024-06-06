@@ -6,11 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <cstdint>
-#include <functional>
-#include <limits>
 #include <stdexcept>
-#include <system_error>
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -68,7 +64,7 @@ TEST_CASE("impl")
     // Case 2 - 2300.92 days later (different alts etc....)
     {
         // Prepare the input-output buffers.
-        std::array<double, 12> in{90., 2., 1., 3.1,4.1,5.1,6.1,7.1,8.1,9.1,10.1,11.1};
+        std::array<double, 12> in{90., 2., 1., 3.1, 4.1, 5.1, 6.1, 7.1, 8.1, 9.1, 10.1, 11.1};
         std::array<double, 1> out{};
         // Call the model
         rho_cf(out, in, kw::time = 2300.92 * 86400.);

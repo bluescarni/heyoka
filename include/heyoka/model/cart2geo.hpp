@@ -105,13 +105,7 @@ struct cart2geo_functor {
         requires std::constructible_from<expression, const T &>
     auto operator()(std::initializer_list<T> r, const KwArgs &...kw_args) const
     {
-        std::vector<expression> xyz;
-        xyz.reserve(3);
-        for (const auto &val : r) {
-            xyz.emplace_back(val);
-        }
-
-        return std::apply(cart2geo_impl, std::tuple_cat(std::tuple{std::move(xyz)}, cart2geo_common_opts(kw_args...)));
+        return operator()(std::ranges::subrange(r.begin(), r.end()), kw_args...);
     }
 };
 
