@@ -12,9 +12,6 @@
 #include <stdexcept>
 #include <system_error>
 
-#include <fmt/core.h>
-#include <fmt/ranges.h>
-
 #include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
