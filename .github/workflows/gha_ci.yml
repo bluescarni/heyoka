@@ -36,8 +36,6 @@ jobs:
           channels: conda-forge
           channel-priority: strict
       - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          toolset: 14.39
       - name: Build
         shell: pwsh
         run: |
