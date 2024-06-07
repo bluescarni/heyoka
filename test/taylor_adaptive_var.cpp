@@ -12,6 +12,8 @@
 #include <cmath>
 #include <stdexcept>
 
+#include <fmt/ranges.h>
+
 #if defined(HEYOKA_HAVE_REAL)
 
 #include <mp++/real.hpp>
@@ -562,5 +564,90 @@ TEST_CASE("comp test")
                 == approximately(ta.get_state()[3] + ta.get_state()[13] * delta_x + ta.get_state()[15] * delta_v
                                      + ta.get_state()[17] * delta_par + ta.get_state()[19] * delta_tm,
                                  1000.));
+    }
+}
+
+TEST_CASE("jtransport")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    // The original ODEs.
+    auto orig_sys = {prime(x) = v, prime(v) = cos(heyoka::time) - par[0] * v - sin(x)};
+
+    {
+        auto vsys = var_ode_sys(orig_sys, var_args::vars, 3);
+        auto ta = taylor_adaptive{vsys, {.2, .3}, kw::compact_mode = true};
+
+        const auto dx = 1e-4, dv = 2e-4;
+        auto ta_nv = taylor_adaptive{orig_sys, {.2 + dx, .3 + dv}, kw::compact_mode = true};
+
+        ta.propagate_until(3.);
+        ta_nv.propagate_until(3.);
+
+        ta.compute_jtransport({0., 0.});
+
+        REQUIRE(ta.get_jtransport().size() == 2u);
+        REQUIRE(ta.get_jtransport()[0] == ta.get_state()[0]);
+        REQUIRE(ta.get_jtransport()[1] == ta.get_state()[1]);
+
+        ta.compute_jtransport({dx, dv});
+
+        REQUIRE(ta.get_jtransport()[0] == approximately(ta_nv.get_state()[0]));
+        REQUIRE(ta.get_jtransport()[1] == approximately(ta_nv.get_state()[1]));
+    }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    {
+        const auto prec = 14;
+
+        auto vsys = var_ode_sys(orig_sys, var_args::vars, 3);
+        auto ta = taylor_adaptive{vsys, {mppp::real{.2, prec}, mppp::real{.3, prec}}, kw::compact_mode = true};
+
+        const auto dx = mppp::real{1e-4, prec}, dv = mppp::real{2e-4, prec};
+        auto ta_nv = taylor_adaptive{
+            orig_sys, {mppp::real{.2, prec} + dx, mppp::real{.3, prec} + dv}, kw::compact_mode = true};
+
+        ta.propagate_until(mppp::real{3, prec});
+        ta_nv.propagate_until(mppp::real{3, prec});
+
+        ta.compute_jtransport({mppp::real{0., prec}, mppp::real{0., prec}});
+
+        REQUIRE(ta.get_jtransport().size() == 2u);
+        REQUIRE(ta.get_jtransport()[0] == ta.get_state()[0]);
+        REQUIRE(ta.get_jtransport()[1] == ta.get_state()[1]);
+
+        ta.compute_jtransport({dx, dv});
+
+        REQUIRE(ta.get_jtransport()[0] == approximately(ta_nv.get_state()[0]));
+        REQUIRE(ta.get_jtransport()[1] == approximately(ta_nv.get_state()[1]));
+    }
+
+#endif
+}
+
+TEST_CASE("jtransport batch")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    // The original ODEs.
+    auto orig_sys = {prime(x) = v, prime(v) = cos(heyoka::time) - par[0] * v - sin(x)};
+
+    {
+        auto vsys = var_ode_sys(orig_sys, var_args::vars, 3);
+
+        auto ta = taylor_adaptive_batch{vsys, {.2, .21, .3, .31}, 2, kw::compact_mode = true};
+
+        ta.propagate_until(3.);
+
+        // ta.compute_jtransport({0., 0.});
+
+        // REQUIRE(ta.get_jtransport().size() == 2u);
+        // REQUIRE(ta.get_jtransport()[0] == .2);
+        // REQUIRE(ta.get_jtransport()[1] == .3);
     }
 }

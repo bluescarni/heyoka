@@ -57,6 +57,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
@@ -505,6 +506,12 @@ private:
     };
     explicit taylor_adaptive(private_ctor_t, llvm_state);
 
+    HEYOKA_DLL_LOCAL void check_variational(const char *) const;
+
+    // Input type for jet transport computation.
+    using jt_input_t = mdspan<const T, dextents<std::uint32_t, 1>>;
+    const std::vector<T> &compute_jtransport_impl(jt_input_t);
+
 public:
     taylor_adaptive();
 
@@ -541,10 +548,6 @@ public:
 
     ~taylor_adaptive();
 
-    [[nodiscard]] bool is_variational() const noexcept;
-
-    [[nodiscard]] std::uint32_t get_n_orig_sv() const noexcept;
-
     [[nodiscard]] const llvm_state &get_llvm_state() const;
 
     [[nodiscard]] const taylor_dc_t &get_decomposition() const;
@@ -554,6 +557,7 @@ public:
     [[nodiscard]] bool get_high_accuracy() const;
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] std::uint32_t get_dim() const;
+    [[nodiscard]] std::uint32_t get_n_orig_sv() const noexcept;
 
     [[nodiscard]] T get_time() const;
     void set_time(T);
@@ -590,6 +594,23 @@ public:
     std::tuple<taylor_outcome, T> step(bool = false);
     std::tuple<taylor_outcome, T> step_backward(bool = false);
     std::tuple<taylor_outcome, T> step(T, bool = false);
+
+    [[nodiscard]] bool is_variational() const noexcept;
+    [[nodiscard]] const std::vector<expression> &get_vargs() const;
+
+    template <typename R>
+        requires std::ranges::contiguous_range<R>
+                 && std::same_as<T, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
+                 && std::integral<std::ranges::range_size_t<R>>
+    const std::vector<T> &compute_jtransport(R &&r)
+    {
+        // Turn r into a span.
+        jt_input_t s(std::ranges::data(r), boost::numeric_cast<std::uint32_t>(std::ranges::size(r)));
+
+        return compute_jtransport_impl(s);
+    }
+    const std::vector<T> &compute_jtransport(std::initializer_list<T>);
+    [[nodiscard]] const std::vector<T> &get_jtransport() const;
 
 private:
     // Implementations of the propagate_*() functions.

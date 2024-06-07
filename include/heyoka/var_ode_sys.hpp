@@ -18,6 +18,7 @@
 #include <vector>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/s11n.hpp>
@@ -31,6 +32,9 @@ enum class var_args : unsigned { vars = 0b001, params = 0b010, time = 0b100, all
 
 class HEYOKA_DLL_PUBLIC var_ode_sys
 {
+    template <typename>
+    friend struct detail::jt_data;
+
     struct impl;
     std::unique_ptr<impl> m_impl;
 

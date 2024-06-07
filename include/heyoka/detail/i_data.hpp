@@ -16,17 +16,49 @@
 #endif
 
 #include <cstdint>
-#include <utility>
+#include <optional>
 #include <variant>
 #include <vector>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/dfloat.hpp>
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
+#include <heyoka/var_ode_sys.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
+{
+
+// Data for jet transport computation.
+template <typename T>
+struct jt_data {
+    using jt_func_t = void (*)(T *, const T *, const T *) noexcept;
+    llvm_state m_state;
+    jt_func_t m_jt_func{};
+    std::vector<T> m_output;
+
+    // NOTE: this is used only for serialisation.
+    jt_data();
+    explicit jt_data(const var_ode_sys &, long long, const llvm_state &, std::uint32_t);
+    jt_data(const jt_data &);
+    // NOTE: need move ctor and move assignment due to how
+    // optional s11n is implemented.
+    jt_data(jt_data &&) noexcept;
+    jt_data &operator=(const jt_data &) = delete;
+    jt_data &operator=(jt_data &&) noexcept;
+    ~jt_data();
+
+    // Serialisation.
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+};
+
+} // namespace detail
 
 template <typename T>
 struct taylor_adaptive<T>::i_data {
@@ -65,6 +97,8 @@ struct taylor_adaptive<T>::i_data {
     std::vector<T> m_d_out;
     // The ODE sys.
     sys_t m_vsys;
+    // Jet transport data.
+    std::optional<detail::jt_data<T>> m_jt_data;
 
 private:
     // Serialisation.
@@ -149,6 +183,8 @@ struct taylor_adaptive_batch<T>::i_data {
     std::vector<T> m_d_out_time;
     // The ODE sys.
     sys_t m_vsys;
+    // Jet transport data.
+    std::optional<detail::jt_data<T>> m_jt_data;
 
 private:
     // Serialisation.

@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -181,6 +182,7 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_vsys);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_jt_data);
 
     // NOTE: this must hold because tol == 0 is interpreted
     // as undefined in finalise_ctor().
@@ -487,6 +489,18 @@ void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
         // integrator.
         detail::setup_variational_ics_t0(m_llvm, m_state, m_pars, &m_time.hi, std::get<1>(vsys), 1, m_high_accuracy,
                                          m_compact_mode);
+    }
+
+    if (is_variational) {
+#if defined(HEYOKA_HAVE_REAL)
+        if constexpr (std::is_same_v<T, mppp::real>) {
+            m_jt_data.emplace(std::get<1>(vsys), static_cast<long long>(this->get_prec()), m_llvm, 1);
+        } else {
+#endif
+            m_jt_data.emplace(std::get<1>(vsys), 0, m_llvm, 1);
+#if defined(HEYOKA_HAVE_REAL)
+        }
+#endif
     }
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -1857,6 +1871,78 @@ const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
     }
 
     return m_i_data->m_d_out;
+}
+
+template <typename T>
+void taylor_adaptive<T>::check_variational(const char *fname) const
+{
+    if (!is_variational()) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("The function '{}()' cannot be invoked on non-variational integrators", fname));
+    }
+}
+
+template <typename T>
+const std::vector<expression> &taylor_adaptive<T>::get_vargs() const
+{
+    check_variational(__func__);
+
+    return std::get<1>(m_i_data->m_vsys).get_vargs();
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive<T>::compute_jtransport_impl(jt_input_t s)
+{
+    check_variational("compute_jtransport");
+
+    // Cache the number of variational arguments.
+    const auto nvargs = std::get<1>(m_i_data->m_vsys).get_vargs().size();
+
+    if (s.extent(0) != nvargs) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Unable to compute jet transport: the input range of values has a "
+                                                "size of {}, but the number of variational arguments is {}",
+                                                s.extent(0), nvargs));
+    }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        for (std::uint32_t i = 0; i < s.extent(0); ++i) {
+            if (s(i).get_prec() != this->get_prec()) [[unlikely]] {
+                throw std::invalid_argument(
+                    fmt::format("Unable to compute jet transport: the input value at index {} has a precision of "
+                                "{}, but the expected precision instead is {}",
+                                i, s(i).get_prec(), this->get_prec()));
+            }
+        }
+
+        // Run the data precision check, as we will need to read
+        // from the state vector.
+        this->data_prec_check();
+    }
+
+#endif
+
+    // Run the compiled function.
+    assert(m_i_data->m_jt_data);
+    auto &jt_data = *m_i_data->m_jt_data;
+    jt_data.m_jt_func(jt_data.m_output.data(), s.data_handle(), m_i_data->m_state.data());
+
+    return jt_data.m_output;
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive<T>::compute_jtransport(std::initializer_list<T> il)
+{
+    return compute_jtransport(std::ranges::subrange(il.begin(), il.end()));
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive<T>::get_jtransport() const
+{
+    check_variational(__func__);
+
+    return m_i_data->m_jt_data->m_output;
 }
 
 // Explicit instantiations
