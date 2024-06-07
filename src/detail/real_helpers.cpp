@@ -63,6 +63,8 @@ static_assert(std::is_signed_v<mpfr_prec_t>);
 static_assert(std::is_signed_v<mpfr_sign_t>);
 static_assert(std::is_signed_v<mpfr_exp_t>);
 static_assert(std::is_signed_v<real_rnd_t>);
+// NOTE: we want to make extra sure long long can represent any mpfr_prec_t.
+static_assert(std::numeric_limits<mpfr_prec_t>::max() <= std::numeric_limits<long long>::max());
 
 // Helper to generate the function attributes list to
 // be used when invoking MPFR primitives.
