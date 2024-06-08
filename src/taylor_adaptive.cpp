@@ -1932,7 +1932,7 @@ const std::vector<T> &taylor_adaptive<T>::eval_taylor_map_impl(tm_input_t s)
 #endif
 
     // Run the compiled function.
-    assert(m_i_data->m_tm_data);
+    assert(m_i_data->m_tm_data); // LCOV_EXCL_LINE
     auto &tm_data = *m_i_data->m_tm_data;
     tm_data.m_tm_func(tm_data.m_output.data(), s.data_handle(), m_i_data->m_state.data());
 

@@ -48,6 +48,8 @@ TEST_CASE("auto ic setup")
 
         auto ta = taylor_adaptive{vsys, {.2, .3}, kw::tol = 1e-3};
 
+        REQUIRE(ta.get_vargs() == std::vector{x, v});
+
         REQUIRE(ta.get_state()[0] == .2);
         REQUIRE(ta.get_state()[1] == .3);
         // dx/...
@@ -69,6 +71,8 @@ TEST_CASE("auto ic setup")
 
         auto ta = taylor_adaptive{vsys, {.2, .3}, kw::tol = 1e-3};
 
+        REQUIRE(ta.get_vargs() == std::vector{v, x});
+
         REQUIRE(ta.get_state()[0] == .2);
         REQUIRE(ta.get_state()[1] == .3);
         // dx/...
@@ -87,6 +91,8 @@ TEST_CASE("auto ic setup")
         auto vsys = var_ode_sys(orig_sys, var_args::params, 2);
 
         auto ta = taylor_adaptive{vsys, {.2, .3}, kw::tol = 1e-3};
+
+        REQUIRE(ta.get_vargs() == std::vector{par[0]});
 
         REQUIRE(ta.get_state()[0] == .2);
         REQUIRE(ta.get_state()[1] == .3);
@@ -285,6 +291,8 @@ TEST_CASE("auto ic setup batch")
 
         auto ta = taylor_adaptive_batch{vsys, {.2, .21, .3, .31}, 2, kw::tol = 1e-3};
 
+        REQUIRE(ta.get_vargs() == std::vector{x, v});
+
         REQUIRE(ta.get_state()[0] == .2);
         REQUIRE(ta.get_state()[1] == .21);
         REQUIRE(ta.get_state()[2] == .3);
@@ -312,6 +320,8 @@ TEST_CASE("auto ic setup batch")
 
         auto ta = taylor_adaptive_batch{vsys, {.2, .21, .3, .31}, 2, kw::tol = 1e-3};
 
+        REQUIRE(ta.get_vargs() == std::vector{v, x});
+
         REQUIRE(ta.get_state()[0] == .2);
         REQUIRE(ta.get_state()[1] == .21);
         REQUIRE(ta.get_state()[2] == .3);
@@ -336,6 +346,8 @@ TEST_CASE("auto ic setup batch")
         auto vsys = var_ode_sys(orig_sys, var_args::params, 2);
 
         auto ta = taylor_adaptive_batch{vsys, {.2, .21, .3, .31}, 2, kw::tol = 1e-3};
+
+        REQUIRE(ta.get_vargs() == std::vector{par[0]});
 
         REQUIRE(ta.get_state()[0] == .2);
         REQUIRE(ta.get_state()[1] == .21);
@@ -632,7 +644,7 @@ TEST_CASE("taylor map")
         REQUIRE(ta_copy.get_tstate()[0] == approximately(ta_nv.get_state()[0]));
         REQUIRE(ta_copy.get_tstate()[1] == approximately(ta_nv.get_state()[1]));
 
-        // S11n test.
+        // s11n test.
         std::stringstream ss;
 
         {
@@ -782,12 +794,95 @@ TEST_CASE("taylor map batch")
 
         auto ta = taylor_adaptive_batch{vsys, {.2, .21, .3, .31}, 2, kw::compact_mode = true};
 
+        const auto dx = 1e-4, dv = 2e-4;
+        auto ta_nv = taylor_adaptive_batch{
+            orig_sys, {.2 + dx, .21 + 2 * dx, .3 + dv, .31 + 2 * dv}, 2, kw::compact_mode = true};
+
         ta.propagate_until(3.);
+        ta_nv.propagate_until(3.);
 
-        // ta.compute_jtransport({0., 0.});
+        ta.eval_taylor_map({0., 0., 0., 0.});
 
-        // REQUIRE(ta.get_jtransport().size() == 2u);
-        // REQUIRE(ta.get_jtransport()[0] == .2);
-        // REQUIRE(ta.get_jtransport()[1] == .3);
+        REQUIRE(ta.get_tstate().size() == 4u);
+        REQUIRE(ta.get_tstate()[0] == ta.get_state()[0]);
+        REQUIRE(ta.get_tstate()[1] == ta.get_state()[1]);
+        REQUIRE(ta.get_tstate()[2] == ta.get_state()[2]);
+        REQUIRE(ta.get_tstate()[3] == ta.get_state()[3]);
+
+        ta.eval_taylor_map({dx, 2 * dx, dv, 2 * dv});
+
+        REQUIRE(ta.get_tstate()[0] == approximately(ta_nv.get_state()[0], 1000.));
+        REQUIRE(ta.get_tstate()[1] == approximately(ta_nv.get_state()[1], 1000.));
+        REQUIRE(ta.get_tstate()[2] == approximately(ta_nv.get_state()[2], 1000.));
+        REQUIRE(ta.get_tstate()[3] == approximately(ta_nv.get_state()[3], 1000.));
+
+        REQUIRE(ta_nv.get_n_orig_sv() == 2u);
+        REQUIRE(ta_nv.get_dim() == 2u);
+
+        REQUIRE(ta.get_n_orig_sv() == 2u);
+        REQUIRE(ta.get_dim() > 2u);
+
+        // Check error throwing on non-variational integrators.
+        REQUIRE_THROWS_MATCHES(
+            ta_nv.get_tstate(), std::invalid_argument,
+            Message("The function 'get_tstate()' cannot be invoked on non-variational batch integrators"));
+        REQUIRE_THROWS_MATCHES(
+            ta_nv.get_vargs(), std::invalid_argument,
+            Message("The function 'get_vargs()' cannot be invoked on non-variational batch integrators"));
+        REQUIRE_THROWS_MATCHES(
+            ta_nv.eval_taylor_map({0., 0.}), std::invalid_argument,
+            Message("The function 'eval_taylor_map()' cannot be invoked on non-variational batch integrators"));
+
+        // Check error conditions on invalid input to eval_taylor_map().
+        REQUIRE_THROWS_MATCHES(ta.eval_taylor_map({0.}), std::invalid_argument,
+                               Message("Unable to compute the Taylor map: the input range of values has a "
+                                       "size of 1, which is not a multiple of the batch size 2"));
+        REQUIRE_THROWS_MATCHES(ta.eval_taylor_map({0., 0.}), std::invalid_argument,
+                               Message("Unable to compute the Taylor map: the input range of values has a "
+                                       "size of 1 (in batches of 2), but the number of variational arguments is 2"));
+        REQUIRE_THROWS_MATCHES(ta.eval_taylor_map({0., 0., 0., 0., 0., 0.}), std::invalid_argument,
+                               Message("Unable to compute the Taylor map: the input range of values has a "
+                                       "size of 3 (in batches of 2), but the number of variational arguments is 2"));
+
+        // Check that the Taylor map machinery keeps on working after copy/s11n.
+        auto ta_copy = ta;
+
+        // Check that the internal tstate is properly copied.
+        REQUIRE(ta_copy.get_tstate() == ta.get_tstate());
+
+        // Test the internal compiled function/LLVM state is properly set up in the copy.
+        ta_copy.eval_taylor_map({dx, 2 * dx, dv, 2 * dv});
+
+        REQUIRE(ta_copy.get_tstate()[0] == approximately(ta_nv.get_state()[0], 1000.));
+        REQUIRE(ta_copy.get_tstate()[1] == approximately(ta_nv.get_state()[1], 1000.));
+        REQUIRE(ta_copy.get_tstate()[2] == approximately(ta_nv.get_state()[2], 1000.));
+        REQUIRE(ta_copy.get_tstate()[3] == approximately(ta_nv.get_state()[3], 1000.));
+
+        // s11n test.
+        std::stringstream ss;
+
+        {
+            boost::archive::binary_oarchive oa(ss);
+
+            oa << ta_copy;
+        }
+
+        ta_copy = ta_nv;
+
+        REQUIRE(!ta_copy.is_variational());
+
+        {
+            boost::archive::binary_iarchive ia(ss);
+
+            ia >> ta_copy;
+        }
+
+        REQUIRE(ta_copy.is_variational());
+        REQUIRE(ta_copy.get_tstate() == ta.get_tstate());
+        ta_copy.eval_taylor_map({dx, 2 * dx, dv, 2 * dv});
+        REQUIRE(ta_copy.get_tstate()[0] == approximately(ta_nv.get_state()[0], 1000.));
+        REQUIRE(ta_copy.get_tstate()[1] == approximately(ta_nv.get_state()[1], 1000.));
+        REQUIRE(ta_copy.get_tstate()[2] == approximately(ta_nv.get_state()[2], 1000.));
+        REQUIRE(ta_copy.get_tstate()[3] == approximately(ta_nv.get_state()[3], 1000.));
     }
 }

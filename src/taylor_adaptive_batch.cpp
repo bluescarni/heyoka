@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <exception>
 #include <functional>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -136,6 +137,7 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_nf_detected);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_time);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_vsys);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tm_data);
 
     // Init the data members.
     m_batch_size = batch_size;
@@ -362,6 +364,10 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> sta
         // integrator.
         detail::setup_variational_ics_t0(m_llvm, m_state, m_pars, m_time_hi.data(), std::get<1>(vsys), m_batch_size,
                                          m_high_accuracy, m_compact_mode);
+    }
+
+    if (is_variational) {
+        m_tm_data.emplace(std::get<1>(vsys), 0, m_llvm, m_batch_size);
     }
 
     // Move vsys in.
@@ -2275,6 +2281,69 @@ void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
     for (auto &cd : m_ed_data->m_te_cooldowns[i]) {
         cd.reset();
     }
+}
+
+template <typename T>
+void taylor_adaptive_batch<T>::check_variational(const char *fname) const
+{
+    if (!is_variational()) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("The function '{}()' cannot be invoked on non-variational batch integrators", fname));
+    }
+}
+
+template <typename T>
+const std::vector<expression> &taylor_adaptive_batch<T>::get_vargs() const
+{
+    check_variational(__func__);
+
+    return std::get<1>(m_i_data->m_vsys).get_vargs();
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::eval_taylor_map_impl(tm_input_t s)
+{
+    check_variational("eval_taylor_map");
+
+    // Cache the number of variational arguments.
+    const auto nvargs = std::get<1>(m_i_data->m_vsys).get_vargs().size();
+
+    // Cache the batch size.
+    const auto batch_size = m_i_data->m_batch_size;
+
+    if (s.extent(0) % batch_size != 0u) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Unable to compute the Taylor map: the input range of values has a "
+                                                "size of {}, which is not a multiple of the batch size {}",
+                                                s.extent(0), batch_size));
+    }
+
+    if (s.extent(0) / batch_size != nvargs) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to compute the Taylor map: the input range of values has a "
+                        "size of {} (in batches of {}), but the number of variational arguments is {}",
+                        s.extent(0) / batch_size, batch_size, nvargs));
+    }
+
+    // Run the compiled function.
+    assert(m_i_data->m_tm_data); // LCOV_EXCL_LINE
+    auto &tm_data = *m_i_data->m_tm_data;
+    tm_data.m_tm_func(tm_data.m_output.data(), s.data_handle(), m_i_data->m_state.data());
+
+    return tm_data.m_output;
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::eval_taylor_map(std::initializer_list<T> il)
+{
+    return eval_taylor_map(std::ranges::subrange(il.begin(), il.end()));
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::get_tstate() const
+{
+    check_variational(__func__);
+
+    return m_i_data->m_tm_data->m_output;
 }
 
 // Explicit instantiations.

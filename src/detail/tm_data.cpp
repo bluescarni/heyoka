@@ -107,7 +107,7 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
     auto &md = st.module();
 
     // Fetch the internal and external floating-point types.
-    assert(!state.empty());
+    assert(!state.empty()); // LCOV_EXCL_LINE
     // NOTE: 'state' has been set up with the correct precision
     // in the ctor.
     auto *fp_t = detail::llvm_type_like(st, state[0]);
@@ -171,11 +171,11 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
 
     // Cache the diff order.
     const auto order = dt.get_order();
-    assert(order > 0u);
+    assert(order > 0u); // LCOV_EXCL_LINE
 
     // Cache the number of state variables.
     const auto n_orig_sv = sys.get_n_orig_sv();
-    assert(n_orig_sv > 0u);
+    assert(n_orig_sv > 0u); // LCOV_EXCL_LINE
 
     // NOTE: there is a lot of literature about efficient multivariate polynomial evaluation.
     // Here we are adopting the simple approach of proceeding order by order and iteratively
@@ -234,7 +234,7 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
         for (std::uint32_t sv_idx = 0; sv_idx < n_orig_sv; ++sv_idx) {
             // Fetch the subrange of multiindices for the current order and state variable.
             const auto mrng = dt.get_derivatives(sv_idx, cur_order);
-            assert(!mrng.empty());
+            assert(!mrng.empty()); // LCOV_EXCL_LINE
 
             // Iterate over the subrange and compute the Taylor series terms
             // for the current state variable and order. The terms will be stored
@@ -245,20 +245,20 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
                 const auto &[key, ex] = *m_it;
 
                 const auto &[comp, sv] = key;
-                assert(comp == sv_idx);
-                assert(!sv.empty());
+                assert(comp == sv_idx); // LCOV_EXCL_LINE
+                assert(!sv.empty());    // LCOV_EXCL_LINE
 
                 // Iterate over sv to compute the divisor and the product
                 // of input powers.
                 auto div = factorial<T>(sv[0].second, prec);
-                assert(sv[0].first < in_pows.size());
-                assert(sv[0].second - 1u < in_pows[sv[0].first].size());
+                assert(sv[0].first < in_pows.size());                    // LCOV_EXCL_LINE
+                assert(sv[0].second - 1u < in_pows[sv[0].first].size()); // LCOV_EXCL_LINE
                 std::vector<llvm::Value *> prod_terms{in_pows[sv[0].first][sv[0].second - 1u]};
 
                 for (auto it = sv.begin() + 1; it != sv.end(); ++it) {
                     div *= factorial<T>(it->second, prec);
-                    assert(it->first < in_pows.size());
-                    assert(it->second - 1u < in_pows[it->first].size());
+                    assert(it->first < in_pows.size());                  // LCOV_EXCL_LINE
+                    assert(it->second - 1u < in_pows[it->first].size()); // LCOV_EXCL_LINE
                     prod_terms.push_back(in_pows[it->first][it->second - 1u]);
                 }
 
@@ -290,7 +290,7 @@ void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
             }
 
             // Sum the components in terms and add the result to t_terms.
-            assert(sv_idx < t_terms.size());
+            assert(sv_idx < t_terms.size()); // LCOV_EXCL_LINE
             t_terms[sv_idx].push_back(pairwise_sum(st, terms));
         }
     }

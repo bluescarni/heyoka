@@ -899,6 +899,12 @@ private:
     };
     explicit taylor_adaptive_batch(private_ctor_t, llvm_state);
 
+    HEYOKA_DLL_LOCAL void check_variational(const char *) const;
+
+    // Input type for Taylor map computation.
+    using tm_input_t = mdspan<const T, dextents<std::uint32_t, 1>>;
+    const std::vector<T> &eval_taylor_map_impl(tm_input_t);
+
 public:
     taylor_adaptive_batch();
 
@@ -937,10 +943,6 @@ public:
 
     ~taylor_adaptive_batch();
 
-    [[nodiscard]] bool is_variational() const noexcept;
-
-    [[nodiscard]] std::uint32_t get_n_orig_sv() const noexcept;
-
     [[nodiscard]] const llvm_state &get_llvm_state() const;
 
     [[nodiscard]] const taylor_dc_t &get_decomposition() const;
@@ -951,6 +953,7 @@ public:
     [[nodiscard]] bool get_high_accuracy() const;
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] std::uint32_t get_dim() const;
+    [[nodiscard]] std::uint32_t get_n_orig_sv() const noexcept;
 
     [[nodiscard]] const std::vector<T> &get_time() const;
     [[nodiscard]] const T *get_time_data() const;
@@ -994,6 +997,23 @@ public:
     void step_backward(bool = false);
     void step(const std::vector<T> &, bool = false);
     [[nodiscard]] const std::vector<std::tuple<taylor_outcome, T>> &get_step_res() const;
+
+    [[nodiscard]] bool is_variational() const noexcept;
+    [[nodiscard]] const std::vector<expression> &get_vargs() const;
+
+    template <typename R>
+        requires std::ranges::contiguous_range<R>
+                 && std::same_as<T, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
+                 && std::integral<std::ranges::range_size_t<R>>
+    const std::vector<T> &eval_taylor_map(R &&r)
+    {
+        // Turn r into a span.
+        tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::uint32_t>(std::ranges::size(r)));
+
+        return eval_taylor_map_impl(s);
+    }
+    const std::vector<T> &eval_taylor_map(std::initializer_list<T>);
+    [[nodiscard]] const std::vector<T> &get_tstate() const;
 
 private:
     // Implementations of the propagate_*() functions.
