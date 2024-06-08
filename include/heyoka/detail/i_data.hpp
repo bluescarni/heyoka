@@ -45,11 +45,9 @@ struct tm_data {
     tm_data();
     explicit tm_data(const var_ode_sys &, long long, const llvm_state &, std::uint32_t);
     tm_data(const tm_data &);
-    // NOTE: need move ctor and move assignment due to how
-    // optional s11n is implemented.
-    tm_data(tm_data &&) noexcept;
+    tm_data(tm_data &&) noexcept = delete;
     tm_data &operator=(const tm_data &) = delete;
-    tm_data &operator=(tm_data &&) noexcept;
+    tm_data &operator=(tm_data &&) noexcept = delete;
     ~tm_data();
 
     // Serialisation.

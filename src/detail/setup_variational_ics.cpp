@@ -163,7 +163,7 @@ void setup_variational_ics_t0(const llvm_state &s, std::vector<T> &state, const 
     std::vector<expression> v_ex, orig_sv;
     v_ex.reserve(n_orig_sv);
     orig_sv.reserve(n_orig_sv);
-    for (decltype(vsys.get_n_orig_sv()) i = 0; i < n_orig_sv; ++i) {
+    for (std::uint32_t i = 0; i < n_orig_sv; ++i) {
         orig_sv.push_back(sys[i].first);
         v_ex.push_back(-sys[i].second);
     }
@@ -208,7 +208,7 @@ void setup_variational_ics_t0(const llvm_state &s, std::vector<T> &state, const 
     fptr(out.data(), state.data(), pars.data(), time);
 
     // Write the result into state.
-    for (decltype(vsys.get_n_orig_sv()) i = 0; i < n_orig_sv; ++i) {
+    for (std::uint32_t i = 0; i < n_orig_sv; ++i) {
         // Compute the index for writing into state.
         const auto state_idx =
             // Initial offset for the original state variables.

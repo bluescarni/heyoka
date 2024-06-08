@@ -371,12 +371,6 @@ tm_data<T>::tm_data(const tm_data &other) : m_state(other.m_state), m_output(oth
 }
 
 template <typename T>
-tm_data<T>::tm_data(tm_data &&) noexcept = default;
-
-template <typename T>
-tm_data<T> &tm_data<T>::operator=(tm_data &&) noexcept = default;
-
-template <typename T>
 tm_data<T>::~tm_data() = default;
 
 template <typename T>

@@ -10,9 +10,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <sstream>
 #include <stdexcept>
-
-#include <fmt/ranges.h>
 
 #if defined(HEYOKA_HAVE_REAL)
 
@@ -24,6 +23,7 @@
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/var_ode_sys.hpp>
 
@@ -596,6 +596,133 @@ TEST_CASE("taylor map")
 
         REQUIRE(ta.get_tstate()[0] == approximately(ta_nv.get_state()[0]));
         REQUIRE(ta.get_tstate()[1] == approximately(ta_nv.get_state()[1]));
+
+        REQUIRE(ta_nv.get_n_orig_sv() == 2u);
+        REQUIRE(ta_nv.get_dim() == 2u);
+
+        REQUIRE(ta.get_n_orig_sv() == 2u);
+        REQUIRE(ta.get_dim() > 2u);
+
+        // Check error throwing on non-variational integrators.
+        REQUIRE_THROWS_MATCHES(ta_nv.get_tstate(), std::invalid_argument,
+                               Message("The function 'get_tstate()' cannot be invoked on non-variational integrators"));
+        REQUIRE_THROWS_MATCHES(ta_nv.get_vargs(), std::invalid_argument,
+                               Message("The function 'get_vargs()' cannot be invoked on non-variational integrators"));
+        REQUIRE_THROWS_MATCHES(
+            ta_nv.eval_taylor_map({0., 0.}), std::invalid_argument,
+            Message("The function 'eval_taylor_map()' cannot be invoked on non-variational integrators"));
+
+        // Check error conditions on invalid input to eval_taylor_map().
+        REQUIRE_THROWS_MATCHES(ta.eval_taylor_map({0.}), std::invalid_argument,
+                               Message("Unable to compute the Taylor map: the input range of values has a "
+                                       "size of 1, but the number of variational arguments is 2"));
+        REQUIRE_THROWS_MATCHES(ta.eval_taylor_map({0., 0., 0.}), std::invalid_argument,
+                               Message("Unable to compute the Taylor map: the input range of values has a "
+                                       "size of 3, but the number of variational arguments is 2"));
+
+        // Check that the Taylor map machinery keeps on working after copy/s11n.
+        auto ta_copy = ta;
+
+        // Check that the internal tstate is properly copied.
+        REQUIRE(ta_copy.get_tstate() == ta.get_tstate());
+
+        // Test the internal compiled function/LLVM state is properly set up in the copy.
+        ta_copy.eval_taylor_map({dx, dv});
+
+        REQUIRE(ta_copy.get_tstate()[0] == approximately(ta_nv.get_state()[0]));
+        REQUIRE(ta_copy.get_tstate()[1] == approximately(ta_nv.get_state()[1]));
+
+        // S11n test.
+        std::stringstream ss;
+
+        {
+            boost::archive::binary_oarchive oa(ss);
+
+            oa << ta_copy;
+        }
+
+        ta_copy = ta_nv;
+
+        REQUIRE(!ta_copy.is_variational());
+
+        {
+            boost::archive::binary_iarchive ia(ss);
+
+            ia >> ta_copy;
+        }
+
+        REQUIRE(ta_copy.is_variational());
+        REQUIRE(ta_copy.get_tstate() == ta.get_tstate());
+        ta_copy.eval_taylor_map({dx, dv});
+        REQUIRE(ta_copy.get_tstate()[0] == approximately(ta_nv.get_state()[0]));
+        REQUIRE(ta_copy.get_tstate()[1] == approximately(ta_nv.get_state()[1]));
+    }
+
+    {
+        auto vsys = var_ode_sys(orig_sys, {v, x}, 3);
+        auto ta = taylor_adaptive{vsys, {.2, .3}, kw::compact_mode = true};
+
+        const auto dx = 1e-4, dv = 2e-4;
+        auto ta_nv = taylor_adaptive{orig_sys, {.2 + dx, .3 + dv}, kw::compact_mode = true};
+
+        ta.propagate_until(3.);
+        ta_nv.propagate_until(3.);
+
+        ta.eval_taylor_map({0., 0.});
+
+        REQUIRE(ta.get_tstate().size() == 2u);
+        REQUIRE(ta.get_tstate()[0] == ta.get_state()[0]);
+        REQUIRE(ta.get_tstate()[1] == ta.get_state()[1]);
+
+        ta.eval_taylor_map({dv, dx});
+
+        REQUIRE(ta.get_tstate()[0] == approximately(ta_nv.get_state()[0]));
+        REQUIRE(ta.get_tstate()[1] == approximately(ta_nv.get_state()[1]));
+    }
+
+    {
+        auto vsys = var_ode_sys(orig_sys, var_args::params | var_args::vars, 4);
+        auto ta = taylor_adaptive{vsys, {.2, .3}, kw::pars = {.4}, kw::compact_mode = true};
+
+        const auto dx = 1e-4, dv = -2e-4, dp = 3e-4;
+        auto ta_nv = taylor_adaptive{orig_sys, {.2 + dx, .3 + dv}, kw::pars = {.4 + dp}, kw::compact_mode = true};
+
+        ta.propagate_until(3.);
+        ta_nv.propagate_until(3.);
+
+        ta.eval_taylor_map({0., 0., 0.});
+
+        REQUIRE(ta.get_tstate().size() == 2u);
+        REQUIRE(ta.get_tstate()[0] == ta.get_state()[0]);
+        REQUIRE(ta.get_tstate()[1] == ta.get_state()[1]);
+
+        ta.eval_taylor_map({dx, dv, dp});
+
+        REQUIRE(ta.get_tstate()[0] == approximately(ta_nv.get_state()[0]));
+        REQUIRE(ta.get_tstate()[1] == approximately(ta_nv.get_state()[1]));
+    }
+
+    {
+        auto vsys = var_ode_sys(orig_sys, {v, heyoka::time, par[0]}, 1);
+        auto ta = taylor_adaptive{vsys, {.2, .3}, kw::pars = {.4}, kw::time = .5, kw::compact_mode = true};
+
+        const auto dv = -2e-8, dp = 3e-8, dt = -4e-8;
+        auto ta_nv = taylor_adaptive{
+            orig_sys, {.2, .3 + dv}, kw::pars = {.4 + dp}, kw::time = .5 + dt, kw::compact_mode = true};
+
+        ta.propagate_until(3.);
+        ta_nv.propagate_until(3.);
+
+        ta.eval_taylor_map({0., 0., 0.});
+
+        REQUIRE(ta.get_tstate().size() == 2u);
+        REQUIRE(ta.get_tstate()[0] == ta.get_state()[0]);
+        REQUIRE(ta.get_tstate()[1] == ta.get_state()[1]);
+
+        ta.eval_taylor_map({dv, dt, dp});
+
+        REQUIRE(ta.get_tstate()[0] == approximately(ta_nv.get_state()[0], 1000.));
+        REQUIRE(ta.get_tstate()[1] == approximately(ta_nv.get_state()[1], 1000.));
     }
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -623,6 +750,19 @@ TEST_CASE("taylor map")
 
         REQUIRE(ta.get_tstate()[0] == approximately(ta_nv.get_state()[0]));
         REQUIRE(ta.get_tstate()[1] == approximately(ta_nv.get_state()[1]));
+
+        REQUIRE_THROWS_MATCHES(
+            ta.eval_taylor_map({dx, mppp::real{1e-4, prec + 1}}), std::invalid_argument,
+            Message("Unable to compute the Taylor map: the input value at index 1 has a precision of "
+                    "15, but the expected precision instead is 14"));
+
+        // Check that changing the precision of a derivative in the state vector
+        // correctly triggers an error during the evaluation of a Taylor map.
+        ta.get_state_data()[2].prec_round(21);
+
+        REQUIRE_THROWS_MATCHES(ta.eval_taylor_map({dx, dv}), std::invalid_argument,
+                               Message("A state variable with precision 21 was detected in the state vector: this is "
+                                       "incompatible with the integrator precision of 14"));
     }
 
 #endif

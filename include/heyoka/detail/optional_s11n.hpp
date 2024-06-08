@@ -54,7 +54,7 @@ void load(Archive &ar, std::optional<T> &opt, unsigned)
     if (!opt) {
         // opt is currently empty, reset it
         // to the def-cted value.
-        opt = T{};
+        opt.emplace();
     }
 
     // Deserialise the value.
