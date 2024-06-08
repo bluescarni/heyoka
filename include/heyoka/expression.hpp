@@ -460,9 +460,9 @@ public:
     [[nodiscard]] size_type index_of(const sv_idx_t &) const;
     [[nodiscard]] size_type index_of(const iterator &) const;
 
-    [[nodiscard]] auto get_derivatives(std::uint32_t order) const -> decltype(std::ranges::subrange(begin(), end()));
-    [[nodiscard]] auto get_derivatives(std::uint32_t component,
-                                       std::uint32_t order) const -> decltype(std::ranges::subrange(begin(), end()));
+    [[nodiscard]] auto get_derivatives(std::uint32_t) const -> decltype(std::ranges::subrange(begin(), end()));
+    [[nodiscard]] auto get_derivatives(std::uint32_t,
+                                       std::uint32_t) const -> decltype(std::ranges::subrange(begin(), end()));
     [[nodiscard]] std::vector<expression> get_gradient() const;
     [[nodiscard]] std::vector<expression> get_jacobian() const;
     [[nodiscard]] std::vector<expression> get_hessian(std::uint32_t) const;
