@@ -36,8 +36,8 @@ auto vsop2013_common_opts(double def_thresh, const KwArgs &...kw_args)
 
     // Time expression (defaults to heyoka::time).
     auto time_expr = [&p]() -> expression {
-        if constexpr (p.has(kw::time)) {
-            return p(kw::time);
+        if constexpr (p.has(kw::time_expr)) {
+            return p(kw::time_expr);
         } else {
             return heyoka::time;
         }
