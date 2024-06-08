@@ -885,4 +885,93 @@ TEST_CASE("taylor map batch")
         REQUIRE(ta_copy.get_tstate()[2] == approximately(ta_nv.get_state()[2], 1000.));
         REQUIRE(ta_copy.get_tstate()[3] == approximately(ta_nv.get_state()[3], 1000.));
     }
+
+    {
+        auto vsys = var_ode_sys(orig_sys, {v, x}, 3);
+        auto ta = taylor_adaptive_batch{vsys, {.2, .21, .3, .31}, 2, kw::compact_mode = true};
+
+        const auto dx = 1e-4, dv = 2e-4;
+        auto ta_nv = taylor_adaptive_batch{
+            orig_sys, {.2 + dx, .21 + 2 * dx, .3 + dv, .31 + 2 * dv}, 2, kw::compact_mode = true};
+
+        ta.propagate_until(3.);
+        ta_nv.propagate_until(3.);
+
+        ta.eval_taylor_map({0., 0., 0., 0.});
+
+        REQUIRE(ta.get_tstate().size() == 4u);
+        REQUIRE(ta.get_tstate()[0] == ta.get_state()[0]);
+        REQUIRE(ta.get_tstate()[1] == ta.get_state()[1]);
+        REQUIRE(ta.get_tstate()[2] == ta.get_state()[2]);
+        REQUIRE(ta.get_tstate()[3] == ta.get_state()[3]);
+
+        ta.eval_taylor_map({dv, 2 * dv, dx, 2 * dx});
+
+        REQUIRE(ta.get_tstate()[0] == approximately(ta_nv.get_state()[0], 1000.));
+        REQUIRE(ta.get_tstate()[1] == approximately(ta_nv.get_state()[1], 1000.));
+        REQUIRE(ta.get_tstate()[2] == approximately(ta_nv.get_state()[2], 1000.));
+        REQUIRE(ta.get_tstate()[3] == approximately(ta_nv.get_state()[3], 1000.));
+    }
+
+    {
+        auto vsys = var_ode_sys(orig_sys, var_args::params | var_args::vars, 4);
+        auto ta = taylor_adaptive_batch{vsys, {.2, .21, .3, .31}, 2, kw::pars = {.4, .41}, kw::compact_mode = true};
+
+        const auto dx = 1e-4, dv = -2e-4, dp = 3e-4;
+        auto ta_nv = taylor_adaptive_batch{orig_sys,
+                                           {.2 + dx, .21 + 2 * dx, .3 + dv, .31 + 2 * dv},
+                                           2,
+                                           kw::pars = {.4 + dp, .41 + 2 * dp},
+                                           kw::compact_mode = true};
+
+        ta.propagate_until(3.);
+        ta_nv.propagate_until(3.);
+
+        ta.eval_taylor_map({0., 0., 0., 0., 0., 0.});
+
+        REQUIRE(ta.get_tstate().size() == 4u);
+        REQUIRE(ta.get_tstate()[0] == ta.get_state()[0]);
+        REQUIRE(ta.get_tstate()[1] == ta.get_state()[1]);
+        REQUIRE(ta.get_tstate()[2] == ta.get_state()[2]);
+        REQUIRE(ta.get_tstate()[3] == ta.get_state()[3]);
+
+        ta.eval_taylor_map({dx, 2 * dx, dv, 2 * dv, dp, 2 * dp});
+
+        REQUIRE(ta.get_tstate()[0] == approximately(ta_nv.get_state()[0]));
+        REQUIRE(ta.get_tstate()[1] == approximately(ta_nv.get_state()[1]));
+        REQUIRE(ta.get_tstate()[2] == approximately(ta_nv.get_state()[2]));
+        REQUIRE(ta.get_tstate()[3] == approximately(ta_nv.get_state()[3]));
+    }
+
+    {
+        auto vsys = var_ode_sys(orig_sys, {v, heyoka::time, par[0]}, 1);
+        auto ta = taylor_adaptive_batch{
+            vsys, {.2, .21, .3, .31}, 2, kw::pars = {.4, .41}, kw::time = {.5, .51}, kw::compact_mode = true};
+
+        const auto dv = -2e-8, dp = 3e-8, dt = -4e-8;
+        auto ta_nv = taylor_adaptive_batch{orig_sys,
+                                           {.2, .21, .3 + dv, .31 + 2 * dv},
+                                           2,
+                                           kw::pars = {.4 + dp, .41 + 2 * dp},
+                                           kw::time = {.5 + dt, .51 + 2 * dt},
+                                           kw::compact_mode = true};
+
+        ta.propagate_until(3.);
+        ta_nv.propagate_until(3.);
+
+        ta.eval_taylor_map({0., 0., 0., 0., 0., 0.});
+
+        REQUIRE(ta.get_tstate().size() == 4u);
+        REQUIRE(ta.get_tstate()[0] == ta.get_state()[0]);
+        REQUIRE(ta.get_tstate()[1] == ta.get_state()[1]);
+        REQUIRE(ta.get_tstate()[2] == ta.get_state()[2]);
+        REQUIRE(ta.get_tstate()[3] == ta.get_state()[3]);
+
+        ta.eval_taylor_map({dv, 2 * dv, dt, 2 * dt, dp, 2 * dp});
+
+        REQUIRE(ta.get_tstate()[0] == approximately(ta_nv.get_state()[0], 1000.));
+        REQUIRE(ta.get_tstate()[1] == approximately(ta_nv.get_state()[1], 1000.));
+        REQUIRE(ta.get_tstate()[2] == approximately(ta_nv.get_state()[2], 1000.));
+        REQUIRE(ta.get_tstate()[3] == approximately(ta_nv.get_state()[3], 1000.));
+    }
 }
