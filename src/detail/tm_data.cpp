@@ -59,7 +59,7 @@ namespace detail
 {
 
 template <typename T>
-jt_data<T>::jt_data() = default;
+tm_data<T>::tm_data() = default;
 
 namespace
 {
@@ -94,10 +94,10 @@ mppp::real factorial<mppp::real>(std::uint32_t n, long long prec)
 
 #endif
 
-// Non-compact mode implementation of the function for the computation
-// of jet transport.
+// Non-compact mode implementation of the function for the evaluation
+// of the Taylor map.
 template <typename T>
-void add_jt_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_ode_sys &sys, const dtens &dt,
+void add_tm_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_ode_sys &sys, const dtens &dt,
                          std::uint32_t batch_size)
 {
     using su32_t = boost::safe_numerics::safe<std::uint32_t>;
@@ -140,8 +140,8 @@ void add_jt_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
     assert(ft != nullptr); // LCOV_EXCL_LINE
 
     // Now create the function.
-    auto *f = detail::llvm_func_create(ft, llvm::Function::ExternalLinkage, "jt_func", &md);
-    // NOTE: a jet transport function cannot call itself.
+    auto *f = detail::llvm_func_create(ft, llvm::Function::ExternalLinkage, "tm_func", &md);
+    // NOTE: a Taylor map eval function cannot call itself.
     f->addFnAttr(llvm::Attribute::NoRecurse);
 
     // Set the names/attributes of the function arguments.
@@ -317,7 +317,7 @@ void add_jt_func_nc_mode(llvm_state &st, const std::vector<T> &state, const var_
 } // namespace
 
 template <typename T>
-jt_data<T>::jt_data(const var_ode_sys &sys, [[maybe_unused]] long long prec, const llvm_state &orig_s,
+tm_data<T>::tm_data(const var_ode_sys &sys, [[maybe_unused]] long long prec, const llvm_state &orig_s,
                     std::uint32_t batch_size)
 {
     // Fetch the dtens from sys.
@@ -329,7 +329,7 @@ jt_data<T>::jt_data(const var_ode_sys &sys, [[maybe_unused]] long long prec, con
     // LCOV_EXCL_START
     if (dt.get_order() == std::numeric_limits<std::uint32_t>::max()) [[unlikely]] {
         throw std::overflow_error(
-            "An overflow condition was detected while setting up the data for the computation of jet transport");
+            "An overflow condition was detected while setting up the data for the evaluation of a Taylor map");
     }
     // LCOV_EXCL_STOP
 
@@ -351,64 +351,64 @@ jt_data<T>::jt_data(const var_ode_sys &sys, [[maybe_unused]] long long prec, con
     // Create a new llvm state similar to orig_s.
     auto st = orig_s.make_similar();
 
-    // Add the jet transport function.
-    add_jt_func_nc_mode(st, m_output, sys, dt, batch_size);
+    // Add the Taylor map function.
+    add_tm_func_nc_mode(st, m_output, sys, dt, batch_size);
 
     // Compile.
     st.compile();
 
     // Fetch the function.
-    m_jt_func = reinterpret_cast<jt_func_t>(st.jit_lookup("jt_func"));
+    m_tm_func = reinterpret_cast<tm_func_t>(st.jit_lookup("tm_func"));
 
     // Move in the state.
     m_state = std::move(st);
 }
 
 template <typename T>
-jt_data<T>::jt_data(const jt_data &other) : m_state(other.m_state), m_output(other.m_output)
+tm_data<T>::tm_data(const tm_data &other) : m_state(other.m_state), m_output(other.m_output)
 {
-    m_jt_func = reinterpret_cast<jt_func_t>(m_state.jit_lookup("jt_func"));
+    m_tm_func = reinterpret_cast<tm_func_t>(m_state.jit_lookup("tm_func"));
 }
 
 template <typename T>
-jt_data<T>::jt_data(jt_data &&) noexcept = default;
+tm_data<T>::tm_data(tm_data &&) noexcept = default;
 
 template <typename T>
-jt_data<T> &jt_data<T>::operator=(jt_data &&) noexcept = default;
+tm_data<T> &tm_data<T>::operator=(tm_data &&) noexcept = default;
 
 template <typename T>
-jt_data<T>::~jt_data() = default;
+tm_data<T>::~tm_data() = default;
 
 template <typename T>
-void jt_data<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
+void tm_data<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
     ar << m_state;
     ar << m_output;
 }
 
 template <typename T>
-void jt_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
+void tm_data<T>::load(boost::archive::binary_iarchive &ar, unsigned)
 {
     ar >> m_state;
     ar >> m_output;
 
-    m_jt_func = reinterpret_cast<jt_func_t>(m_state.jit_lookup("jt_func"));
+    m_tm_func = reinterpret_cast<tm_func_t>(m_state.jit_lookup("tm_func"));
 }
 
 // Explicit instantiations.
-template struct jt_data<float>;
-template struct jt_data<double>;
-template struct jt_data<long double>;
+template struct tm_data<float>;
+template struct tm_data<double>;
+template struct tm_data<long double>;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template struct jt_data<mppp::real128>;
+template struct tm_data<mppp::real128>;
 
 #endif
 
 #if defined(HEYOKA_HAVE_REAL)
 
-template struct jt_data<mppp::real>;
+template struct tm_data<mppp::real>;
 
 #endif
 

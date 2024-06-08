@@ -508,9 +508,9 @@ private:
 
     HEYOKA_DLL_LOCAL void check_variational(const char *) const;
 
-    // Input type for jet transport computation.
-    using jt_input_t = mdspan<const T, dextents<std::uint32_t, 1>>;
-    const std::vector<T> &compute_jtransport_impl(jt_input_t);
+    // Input type for Taylor map computation.
+    using tm_input_t = mdspan<const T, dextents<std::uint32_t, 1>>;
+    const std::vector<T> &eval_taylor_map_impl(tm_input_t);
 
 public:
     taylor_adaptive();
@@ -602,15 +602,15 @@ public:
         requires std::ranges::contiguous_range<R>
                  && std::same_as<T, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
                  && std::integral<std::ranges::range_size_t<R>>
-    const std::vector<T> &compute_jtransport(R &&r)
+    const std::vector<T> &eval_taylor_map(R &&r)
     {
         // Turn r into a span.
-        jt_input_t s(std::ranges::data(r), boost::numeric_cast<std::uint32_t>(std::ranges::size(r)));
+        tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::uint32_t>(std::ranges::size(r)));
 
-        return compute_jtransport_impl(s);
+        return eval_taylor_map_impl(s);
     }
-    const std::vector<T> &compute_jtransport(std::initializer_list<T>);
-    [[nodiscard]] const std::vector<T> &get_jtransport() const;
+    const std::vector<T> &eval_taylor_map(std::initializer_list<T>);
+    [[nodiscard]] const std::vector<T> &get_tstate() const;
 
 private:
     // Implementations of the propagate_*() functions.

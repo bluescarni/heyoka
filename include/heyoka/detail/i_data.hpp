@@ -33,24 +33,24 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
-// Data for jet transport computation.
+// Data for Taylor map computation.
 template <typename T>
-struct jt_data {
-    using jt_func_t = void (*)(T *, const T *, const T *) noexcept;
+struct tm_data {
+    using tm_func_t = void (*)(T *, const T *, const T *) noexcept;
     llvm_state m_state;
-    jt_func_t m_jt_func{};
+    tm_func_t m_tm_func{};
     std::vector<T> m_output;
 
     // NOTE: this is used only for serialisation.
-    jt_data();
-    explicit jt_data(const var_ode_sys &, long long, const llvm_state &, std::uint32_t);
-    jt_data(const jt_data &);
+    tm_data();
+    explicit tm_data(const var_ode_sys &, long long, const llvm_state &, std::uint32_t);
+    tm_data(const tm_data &);
     // NOTE: need move ctor and move assignment due to how
     // optional s11n is implemented.
-    jt_data(jt_data &&) noexcept;
-    jt_data &operator=(const jt_data &) = delete;
-    jt_data &operator=(jt_data &&) noexcept;
-    ~jt_data();
+    tm_data(tm_data &&) noexcept;
+    tm_data &operator=(const tm_data &) = delete;
+    tm_data &operator=(tm_data &&) noexcept;
+    ~tm_data();
 
     // Serialisation.
     void save(boost::archive::binary_oarchive &, unsigned) const;
@@ -97,8 +97,8 @@ struct taylor_adaptive<T>::i_data {
     std::vector<T> m_d_out;
     // The ODE sys.
     sys_t m_vsys;
-    // Jet transport data.
-    std::optional<detail::jt_data<T>> m_jt_data;
+    // Taylor map data.
+    std::optional<detail::tm_data<T>> m_tm_data;
 
 private:
     // Serialisation.
@@ -183,8 +183,8 @@ struct taylor_adaptive_batch<T>::i_data {
     std::vector<T> m_d_out_time;
     // The ODE sys.
     sys_t m_vsys;
-    // Jet transport data.
-    std::optional<detail::jt_data<T>> m_jt_data;
+    // Taylor map data.
+    std::optional<detail::tm_data<T>> m_tm_data;
 
 private:
     // Serialisation.

@@ -33,7 +33,7 @@ enum class var_args : unsigned { vars = 0b001, params = 0b010, time = 0b100, all
 class HEYOKA_DLL_PUBLIC var_ode_sys
 {
     template <typename>
-    friend struct detail::jt_data;
+    friend struct detail::tm_data;
 
     struct impl;
     std::unique_ptr<impl> m_impl;

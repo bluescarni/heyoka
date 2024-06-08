@@ -567,7 +567,7 @@ TEST_CASE("comp test")
     }
 }
 
-TEST_CASE("jtransport")
+TEST_CASE("taylor map")
 {
     using Catch::Matchers::Message;
 
@@ -586,16 +586,16 @@ TEST_CASE("jtransport")
         ta.propagate_until(3.);
         ta_nv.propagate_until(3.);
 
-        ta.compute_jtransport({0., 0.});
+        ta.eval_taylor_map({0., 0.});
 
-        REQUIRE(ta.get_jtransport().size() == 2u);
-        REQUIRE(ta.get_jtransport()[0] == ta.get_state()[0]);
-        REQUIRE(ta.get_jtransport()[1] == ta.get_state()[1]);
+        REQUIRE(ta.get_tstate().size() == 2u);
+        REQUIRE(ta.get_tstate()[0] == ta.get_state()[0]);
+        REQUIRE(ta.get_tstate()[1] == ta.get_state()[1]);
 
-        ta.compute_jtransport({dx, dv});
+        ta.eval_taylor_map({dx, dv});
 
-        REQUIRE(ta.get_jtransport()[0] == approximately(ta_nv.get_state()[0]));
-        REQUIRE(ta.get_jtransport()[1] == approximately(ta_nv.get_state()[1]));
+        REQUIRE(ta.get_tstate()[0] == approximately(ta_nv.get_state()[0]));
+        REQUIRE(ta.get_tstate()[1] == approximately(ta_nv.get_state()[1]));
     }
 
 #if defined(HEYOKA_HAVE_REAL)
@@ -613,22 +613,22 @@ TEST_CASE("jtransport")
         ta.propagate_until(mppp::real{3, prec});
         ta_nv.propagate_until(mppp::real{3, prec});
 
-        ta.compute_jtransport({mppp::real{0., prec}, mppp::real{0., prec}});
+        ta.eval_taylor_map({mppp::real{0., prec}, mppp::real{0., prec}});
 
-        REQUIRE(ta.get_jtransport().size() == 2u);
-        REQUIRE(ta.get_jtransport()[0] == ta.get_state()[0]);
-        REQUIRE(ta.get_jtransport()[1] == ta.get_state()[1]);
+        REQUIRE(ta.get_tstate().size() == 2u);
+        REQUIRE(ta.get_tstate()[0] == ta.get_state()[0]);
+        REQUIRE(ta.get_tstate()[1] == ta.get_state()[1]);
 
-        ta.compute_jtransport({dx, dv});
+        ta.eval_taylor_map({dx, dv});
 
-        REQUIRE(ta.get_jtransport()[0] == approximately(ta_nv.get_state()[0]));
-        REQUIRE(ta.get_jtransport()[1] == approximately(ta_nv.get_state()[1]));
+        REQUIRE(ta.get_tstate()[0] == approximately(ta_nv.get_state()[0]));
+        REQUIRE(ta.get_tstate()[1] == approximately(ta_nv.get_state()[1]));
     }
 
 #endif
 }
 
-TEST_CASE("jtransport batch")
+TEST_CASE("taylor map batch")
 {
     using Catch::Matchers::Message;
 

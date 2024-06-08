@@ -62,7 +62,7 @@ namespace detail
 {
 
 template <typename>
-struct jt_data;
+struct tm_data;
 
 }
 
