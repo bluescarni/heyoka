@@ -35,6 +35,12 @@ class HEYOKA_DLL_PUBLIC var_ode_sys
     template <typename>
     friend struct detail::tm_data;
 
+    template <typename>
+    friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive;
+
+    template <typename>
+    friend class HEYOKA_DLL_PUBLIC_INLINE_CLASS taylor_adaptive_batch;
+
     struct impl;
     std::unique_ptr<impl> m_impl;
 

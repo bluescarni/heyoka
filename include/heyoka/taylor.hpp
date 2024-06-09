@@ -612,6 +612,10 @@ public:
     const std::vector<T> &eval_taylor_map(std::initializer_list<T>);
     [[nodiscard]] const std::vector<T> &get_tstate() const;
 
+    [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> get_vslice(std::uint32_t) const;
+    [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> get_vslice(std::uint32_t, std::uint32_t) const;
+    [[nodiscard]] const dtens::sv_idx_t &get_mindex(std::uint32_t) const;
+
 private:
     // Implementations of the propagate_*() functions.
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>, step_callback<T>>
@@ -1014,6 +1018,10 @@ public:
     }
     const std::vector<T> &eval_taylor_map(std::initializer_list<T>);
     [[nodiscard]] const std::vector<T> &get_tstate() const;
+
+    [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> get_vslice(std::uint32_t) const;
+    [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> get_vslice(std::uint32_t, std::uint32_t) const;
+    [[nodiscard]] const dtens::sv_idx_t &get_mindex(std::uint32_t) const;
 
 private:
     // Implementations of the propagate_*() functions.

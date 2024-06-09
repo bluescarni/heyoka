@@ -975,3 +975,174 @@ TEST_CASE("taylor map batch")
         REQUIRE(ta.get_tstate()[3] == approximately(ta_nv.get_state()[3], 1000.));
     }
 }
+
+TEST_CASE("vslice mindex")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    // The original ODEs.
+    auto orig_sys = {prime(x) = v, prime(v) = cos(heyoka::time) - par[0] * v - sin(x)};
+
+    auto vsys = var_ode_sys(orig_sys, var_args::vars, 3);
+
+    {
+        auto ta = taylor_adaptive{vsys, {.2, .3}, kw::compact_mode = true};
+        auto ta_nv = taylor_adaptive{orig_sys, {.2, .3}, kw::compact_mode = true};
+
+        auto sl = ta.get_vslice(0);
+        REQUIRE(sl.first == 0u);
+        REQUIRE(sl.second == 2u);
+
+        REQUIRE(ta.get_mindex(0).first == 0u);
+        REQUIRE(ta.get_mindex(0).second.empty());
+
+        REQUIRE(ta.get_mindex(1).first == 1u);
+        REQUIRE(ta.get_mindex(1).second.empty());
+
+        sl = ta.get_vslice(1);
+        REQUIRE(sl.first == 2u);
+        REQUIRE(sl.second == 6u);
+
+        REQUIRE(ta.get_mindex(2).first == 0u);
+        REQUIRE(ta.get_mindex(2).second.size() == 1u);
+        REQUIRE(ta.get_mindex(2).second[0].first == 0);
+        REQUIRE(ta.get_mindex(2).second[0].second == 1);
+
+        REQUIRE(ta.get_mindex(3).first == 0u);
+        REQUIRE(ta.get_mindex(3).second.size() == 1u);
+        REQUIRE(ta.get_mindex(3).second[0].first == 1);
+        REQUIRE(ta.get_mindex(3).second[0].second == 1);
+
+        REQUIRE(ta.get_mindex(4).first == 1u);
+        REQUIRE(ta.get_mindex(4).second.size() == 1u);
+        REQUIRE(ta.get_mindex(4).second[0].first == 0);
+        REQUIRE(ta.get_mindex(4).second[0].second == 1);
+
+        REQUIRE(ta.get_mindex(5).first == 1u);
+        REQUIRE(ta.get_mindex(5).second.size() == 1u);
+        REQUIRE(ta.get_mindex(5).second[0].first == 1);
+        REQUIRE(ta.get_mindex(5).second[0].second == 1);
+
+        sl = ta.get_vslice(0, 0);
+        REQUIRE(sl.first == 0u);
+        REQUIRE(sl.second == 1u);
+
+        sl = ta.get_vslice(1, 0);
+        REQUIRE(sl.first == 1u);
+        REQUIRE(sl.second == 2u);
+
+        sl = ta.get_vslice(0, 1);
+        REQUIRE(sl.first == 2u);
+        REQUIRE(sl.second == 4u);
+
+        sl = ta.get_vslice(1, 1);
+        REQUIRE(sl.first == 4u);
+        REQUIRE(sl.second == 6u);
+
+        sl = ta.get_vslice(10);
+        REQUIRE(sl.first == ta.get_state().size());
+        REQUIRE(sl.second == ta.get_state().size());
+
+        sl = ta.get_vslice(2, 0);
+        REQUIRE(sl.first == ta.get_state().size());
+        REQUIRE(sl.second == ta.get_state().size());
+
+        sl = ta.get_vslice(0, 10);
+        REQUIRE(sl.first == ta.get_state().size());
+        REQUIRE(sl.second == ta.get_state().size());
+
+        // Error throwing.
+        REQUIRE_THROWS_MATCHES(ta_nv.get_vslice(0), std::invalid_argument,
+                               Message("The function 'get_vslice()' cannot be invoked on non-variational integrators"));
+        REQUIRE_THROWS_MATCHES(ta_nv.get_vslice(0, 0), std::invalid_argument,
+                               Message("The function 'get_vslice()' cannot be invoked on non-variational integrators"));
+        REQUIRE_THROWS_MATCHES(ta_nv.get_mindex(0), std::invalid_argument,
+                               Message("The function 'get_mindex()' cannot be invoked on non-variational integrators"));
+        REQUIRE_THROWS_MATCHES(ta.get_mindex(100), std::invalid_argument,
+                               Message("Cannot fetch the multiindex of the derivative at index 100: the index "
+                                       "is not less than the total number of derivatives (20)"));
+    }
+
+    {
+        auto ta = taylor_adaptive_batch{vsys, {.2, .21, .3, .31}, 2, kw::compact_mode = true};
+        auto ta_nv = taylor_adaptive_batch{orig_sys, {.2, .21, .3, .31}, 2, kw::compact_mode = true};
+
+        auto sl = ta.get_vslice(0);
+        REQUIRE(sl.first == 0u);
+        REQUIRE(sl.second == 2u);
+
+        REQUIRE(ta.get_mindex(0).first == 0u);
+        REQUIRE(ta.get_mindex(0).second.empty());
+
+        REQUIRE(ta.get_mindex(1).first == 1u);
+        REQUIRE(ta.get_mindex(1).second.empty());
+
+        sl = ta.get_vslice(1);
+        REQUIRE(sl.first == 2u);
+        REQUIRE(sl.second == 6u);
+
+        REQUIRE(ta.get_mindex(2).first == 0u);
+        REQUIRE(ta.get_mindex(2).second.size() == 1u);
+        REQUIRE(ta.get_mindex(2).second[0].first == 0);
+        REQUIRE(ta.get_mindex(2).second[0].second == 1);
+
+        REQUIRE(ta.get_mindex(3).first == 0u);
+        REQUIRE(ta.get_mindex(3).second.size() == 1u);
+        REQUIRE(ta.get_mindex(3).second[0].first == 1);
+        REQUIRE(ta.get_mindex(3).second[0].second == 1);
+
+        REQUIRE(ta.get_mindex(4).first == 1u);
+        REQUIRE(ta.get_mindex(4).second.size() == 1u);
+        REQUIRE(ta.get_mindex(4).second[0].first == 0);
+        REQUIRE(ta.get_mindex(4).second[0].second == 1);
+
+        REQUIRE(ta.get_mindex(5).first == 1u);
+        REQUIRE(ta.get_mindex(5).second.size() == 1u);
+        REQUIRE(ta.get_mindex(5).second[0].first == 1);
+        REQUIRE(ta.get_mindex(5).second[0].second == 1);
+
+        sl = ta.get_vslice(0, 0);
+        REQUIRE(sl.first == 0u);
+        REQUIRE(sl.second == 1u);
+
+        sl = ta.get_vslice(1, 0);
+        REQUIRE(sl.first == 1u);
+        REQUIRE(sl.second == 2u);
+
+        sl = ta.get_vslice(0, 1);
+        REQUIRE(sl.first == 2u);
+        REQUIRE(sl.second == 4u);
+
+        sl = ta.get_vslice(1, 1);
+        REQUIRE(sl.first == 4u);
+        REQUIRE(sl.second == 6u);
+
+        sl = ta.get_vslice(10);
+        REQUIRE(sl.first == ta.get_state().size() / 2u);
+        REQUIRE(sl.second == ta.get_state().size() / 2u);
+
+        sl = ta.get_vslice(2, 0);
+        REQUIRE(sl.first == ta.get_state().size() / 2u);
+        REQUIRE(sl.second == ta.get_state().size() / 2u);
+
+        sl = ta.get_vslice(0, 10);
+        REQUIRE(sl.first == ta.get_state().size() / 2u);
+        REQUIRE(sl.second == ta.get_state().size() / 2u);
+
+        // Error throwing.
+        REQUIRE_THROWS_MATCHES(
+            ta_nv.get_vslice(0), std::invalid_argument,
+            Message("The function 'get_vslice()' cannot be invoked on non-variational batch integrators"));
+        REQUIRE_THROWS_MATCHES(
+            ta_nv.get_vslice(0, 0), std::invalid_argument,
+            Message("The function 'get_vslice()' cannot be invoked on non-variational batch integrators"));
+        REQUIRE_THROWS_MATCHES(
+            ta_nv.get_mindex(0), std::invalid_argument,
+            Message("The function 'get_mindex()' cannot be invoked on non-variational batch integrators"));
+        REQUIRE_THROWS_MATCHES(ta.get_mindex(100), std::invalid_argument,
+                               Message("Cannot fetch the multiindex of the derivative at index 100: the index "
+                                       "is not less than the total number of derivatives (20)"));
+    }
+}

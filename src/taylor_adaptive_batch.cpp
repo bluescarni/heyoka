@@ -2346,6 +2346,49 @@ const std::vector<T> &taylor_adaptive_batch<T>::get_tstate() const
     return m_i_data->m_tm_data->m_output;
 }
 
+template <typename T>
+std::pair<std::uint32_t, std::uint32_t> taylor_adaptive_batch<T>::get_vslice(std::uint32_t order) const
+{
+    check_variational(__func__);
+
+    const auto &dt = std::get<1>(m_i_data->m_vsys).get_dtens();
+
+    const auto rng = dt.get_derivatives(order);
+
+    return {boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
+            boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end()))};
+}
+
+template <typename T>
+std::pair<std::uint32_t, std::uint32_t> taylor_adaptive_batch<T>::get_vslice(std::uint32_t component,
+                                                                             std::uint32_t order) const
+{
+    check_variational(__func__);
+
+    const auto &dt = std::get<1>(m_i_data->m_vsys).get_dtens();
+
+    const auto rng = dt.get_derivatives(component, order);
+
+    return {boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
+            boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end()))};
+}
+
+template <typename T>
+const dtens::sv_idx_t &taylor_adaptive_batch<T>::get_mindex(std::uint32_t i) const
+{
+    check_variational(__func__);
+
+    const auto &dt = std::get<1>(m_i_data->m_vsys).get_dtens();
+
+    if (i >= dt.size()) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Cannot fetch the multiindex of the derivative at index {}: the index "
+                                                "is not less than the total number of derivatives ({})",
+                                                i, dt.size()));
+    }
+
+    return (dt.begin() + boost::numeric_cast<decltype(dt.begin() - dt.begin())>(i))->first;
+}
+
 // Explicit instantiations.
 #define HEYOKA_TAYLOR_ADAPTIVE_BATCH_INST(F) template class HEYOKA_DLL_PUBLIC taylor_adaptive_batch<F>;
 
