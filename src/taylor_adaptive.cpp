@@ -1899,6 +1899,14 @@ const std::vector<expression> &taylor_adaptive<T>::get_vargs() const
 }
 
 template <typename T>
+std::uint32_t taylor_adaptive<T>::get_vorder() const
+{
+    check_variational(__func__);
+
+    return std::get<1>(m_i_data->m_vsys).get_order();
+}
+
+template <typename T>
 const std::vector<T> &taylor_adaptive<T>::eval_taylor_map_impl(tm_input_t s)
 {
     check_variational("eval_taylor_map");

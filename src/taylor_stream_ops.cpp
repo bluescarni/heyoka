@@ -98,6 +98,10 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
         }
     }
 
+    if (ta.is_variational()) {
+        oss << "Variational order       : " << ta.get_vorder() << '\n';
+    }
+
     return os << oss.str();
 }
 
@@ -153,6 +157,10 @@ std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_a
         if (!ta.get_nt_events().empty()) {
             oss << "N of non-terminal events: " << ta.get_nt_events().size() << '\n';
         }
+    }
+
+    if (ta.is_variational()) {
+        oss << "Variational order       : " << ta.get_vorder() << '\n';
     }
 
     return os << oss.str();

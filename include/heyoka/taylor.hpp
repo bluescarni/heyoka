@@ -597,6 +597,7 @@ public:
 
     [[nodiscard]] bool is_variational() const noexcept;
     [[nodiscard]] const std::vector<expression> &get_vargs() const;
+    [[nodiscard]] std::uint32_t get_vorder() const;
 
     template <typename R>
         requires std::ranges::contiguous_range<R>
@@ -1004,6 +1005,7 @@ public:
 
     [[nodiscard]] bool is_variational() const noexcept;
     [[nodiscard]] const std::vector<expression> &get_vargs() const;
+    [[nodiscard]] std::uint32_t get_vorder() const;
 
     template <typename R>
         requires std::ranges::contiguous_range<R>

@@ -13,6 +13,8 @@
 #include <sstream>
 #include <stdexcept>
 
+#include <boost/algorithm/string/predicate.hpp>
+
 #if defined(HEYOKA_HAVE_REAL)
 
 #include <mp++/real.hpp>
@@ -63,6 +65,12 @@ TEST_CASE("auto ic setup")
             std::all_of(ta.get_state().begin() + 6, ta.get_state().end(), [](const auto &val) { return val == 0; }));
 
         REQUIRE(ta.get_sys().size() == 12u);
+
+        REQUIRE(ta.get_vorder() == 2u);
+
+        std::ostringstream oss;
+        oss << ta;
+        REQUIRE(boost::contains(oss.str(), "Variational order"));
     }
 
     // IC test, swap the variables around.
@@ -312,6 +320,12 @@ TEST_CASE("auto ic setup batch")
             std::all_of(ta.get_state().begin() + 12, ta.get_state().end(), [](const auto &val) { return val == 0; }));
 
         REQUIRE(ta.get_sys().size() == 12u);
+
+        REQUIRE(ta.get_vorder() == 2u);
+
+        std::ostringstream oss;
+        oss << ta;
+        REQUIRE(boost::contains(oss.str(), "Variational order"));
     }
 
     // IC test, swap the variables around.
@@ -623,6 +637,8 @@ TEST_CASE("taylor map")
         REQUIRE_THROWS_MATCHES(
             ta_nv.eval_taylor_map({0., 0.}), std::invalid_argument,
             Message("The function 'eval_taylor_map()' cannot be invoked on non-variational integrators"));
+        REQUIRE_THROWS_MATCHES(ta_nv.get_vorder(), std::invalid_argument,
+                               Message("The function 'get_vorder()' cannot be invoked on non-variational integrators"));
 
         // Check error conditions on invalid input to eval_taylor_map().
         REQUIRE_THROWS_MATCHES(ta.eval_taylor_map({0.}), std::invalid_argument,
@@ -832,6 +848,9 @@ TEST_CASE("taylor map batch")
         REQUIRE_THROWS_MATCHES(
             ta_nv.eval_taylor_map({0., 0.}), std::invalid_argument,
             Message("The function 'eval_taylor_map()' cannot be invoked on non-variational batch integrators"));
+        REQUIRE_THROWS_MATCHES(
+            ta_nv.get_vorder(), std::invalid_argument,
+            Message("The function 'get_vorder()' cannot be invoked on non-variational batch integrators"));
 
         // Check error conditions on invalid input to eval_taylor_map().
         REQUIRE_THROWS_MATCHES(ta.eval_taylor_map({0.}), std::invalid_argument,
