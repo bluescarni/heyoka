@@ -46,6 +46,8 @@ compilation via [LLVM](https://llvm.org/). Notable features include:
 * accurate and reliable event detection,
 * builtin support for analytical mechanics - bring your own Lagrangians/Hamiltonians
   and let heyoka formulate and solve the equations of motion,
+* builtin support for high-order variational equations - compute not only the solution,
+  but also its partial derivatives,
 * builtin support for machine learning applications via neural network models,
 * the ability to maintain machine precision accuracy over
   tens of billions of timesteps,
