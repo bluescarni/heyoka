@@ -661,7 +661,7 @@ void diff_tensors_forward_impl(
     const Adj &adj,
     // The total number of variables in dc (this accounts also
     // for params, as they are turned into variables during the
-    // construciton of the decomposition).
+    // construction of the decomposition).
     const std::vector<expression>::size_type nvars,
     // The diff arguments.
     const std::vector<expression> &args,
@@ -893,7 +893,7 @@ void diff_tensors_reverse_impl(
     const Adj &adj,
     // The total number of variables in dc (this accounts also
     // for params, as they are turned into variables during the
-    // construciton of the decomposition).
+    // construction of the decomposition).
     const std::vector<expression>::size_type nvars,
     // The diff arguments.
     const std::vector<expression> &args,

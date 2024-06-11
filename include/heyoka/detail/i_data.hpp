@@ -16,17 +16,47 @@
 #endif
 
 #include <cstdint>
-#include <utility>
+#include <optional>
 #include <variant>
 #include <vector>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/dfloat.hpp>
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
+#include <heyoka/var_ode_sys.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
+
+namespace detail
+{
+
+// Data for Taylor map computation.
+template <typename T>
+struct tm_data {
+    using tm_func_t = void (*)(T *, const T *, const T *) noexcept;
+    llvm_state m_state;
+    tm_func_t m_tm_func{};
+    std::vector<T> m_output;
+
+    // NOTE: this is used only for serialisation.
+    tm_data();
+    explicit tm_data(const var_ode_sys &, long long, const llvm_state &, std::uint32_t);
+    tm_data(const tm_data &);
+    tm_data(tm_data &&) noexcept = delete;
+    tm_data &operator=(const tm_data &) = delete;
+    tm_data &operator=(tm_data &&) noexcept = delete;
+    ~tm_data();
+
+    // Serialisation.
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+};
+
+} // namespace detail
 
 template <typename T>
 struct taylor_adaptive<T>::i_data {
@@ -64,7 +94,9 @@ struct taylor_adaptive<T>::i_data {
     // The vector for the dense output.
     std::vector<T> m_d_out;
     // The ODE sys.
-    std::vector<std::pair<expression, expression>> m_sys;
+    sys_t m_vsys;
+    // Taylor map data.
+    std::optional<detail::tm_data<T>> m_tm_data;
 
 private:
     // Serialisation.
@@ -148,7 +180,9 @@ struct taylor_adaptive_batch<T>::i_data {
     // Temporary vector used in the dense output implementation.
     std::vector<T> m_d_out_time;
     // The ODE sys.
-    std::vector<std::pair<expression, expression>> m_sys;
+    sys_t m_vsys;
+    // Taylor map data.
+    std::optional<detail::tm_data<T>> m_tm_data;
 
 private:
     // Serialisation.

@@ -57,10 +57,12 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/mdspan.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/step_callback.hpp>
+#include <heyoka/var_ode_sys.hpp>
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -123,6 +125,7 @@ void taylor_add_d_out_function(llvm_state &, llvm::Type *, std::uint32_t, std::u
 template <typename TEvent, typename NTEvent>
 void validate_ode_sys(const std::vector<std::pair<expression, expression>> &, const std::vector<TEvent> &,
                       const std::vector<NTEvent> &);
+void validate_ode_sys(const std::vector<std::pair<expression, expression>> &);
 
 } // namespace detail
 
@@ -388,6 +391,13 @@ public:
 
 #endif
 
+template <typename T>
+void setup_variational_ics_varpar(std::vector<T> &, const var_ode_sys &, std::uint32_t);
+
+template <typename T>
+void setup_variational_ics_t0(const llvm_state &, std::vector<T> &, const std::vector<T> &, const T *,
+                              const var_ode_sys &, std::uint32_t, bool, bool);
+
 } // namespace detail
 
 template <typename T>
@@ -428,12 +438,11 @@ private:
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
     // Private implementation-detail constructor machinery.
-    void finalise_ctor_impl(std::vector<std::pair<expression, expression>>, std::vector<T>, std::optional<T>,
-                            std::optional<T>, bool, bool, std::vector<T>, std::vector<t_event_t>,
-                            std::vector<nt_event_t>, bool, std::optional<long long>);
+    using sys_t = std::variant<std::vector<std::pair<expression, expression>>, var_ode_sys>;
+    void finalise_ctor_impl(sys_t, std::vector<T>, std::optional<T>, std::optional<T>, bool, bool, std::vector<T>,
+                            std::vector<t_event_t>, std::vector<nt_event_t>, bool, std::optional<long long>);
     template <typename... KwArgs>
-    void finalise_ctor(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
-                       const KwArgs &...kw_args)
+    void finalise_ctor(sys_t sys, std::vector<T> state, const KwArgs &...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -497,6 +506,12 @@ private:
     };
     explicit taylor_adaptive(private_ctor_t, llvm_state);
 
+    HEYOKA_DLL_LOCAL void check_variational(const char *) const;
+
+    // Input type for Taylor map computation.
+    using tm_input_t = mdspan<const T, dextents<std::uint32_t, 1>>;
+    const std::vector<T> &eval_taylor_map_impl(tm_input_t);
+
 public:
     taylor_adaptive();
 
@@ -510,6 +525,17 @@ public:
     template <typename... KwArgs>
     explicit taylor_adaptive(std::vector<std::pair<expression, expression>> sys, std::initializer_list<T> state,
                              const KwArgs &...kw_args)
+        : taylor_adaptive(std::move(sys), std::vector<T>(state), kw_args...)
+    {
+    }
+    template <typename... KwArgs>
+    explicit taylor_adaptive(var_ode_sys sys, std::vector<T> state, const KwArgs &...kw_args)
+        : taylor_adaptive(private_ctor_t{}, llvm_state(kw_args...))
+    {
+        finalise_ctor(std::move(sys), std::move(state), kw_args...);
+    }
+    template <typename... KwArgs>
+    explicit taylor_adaptive(var_ode_sys sys, std::initializer_list<T> state, const KwArgs &...kw_args)
         : taylor_adaptive(std::move(sys), std::vector<T>(state), kw_args...)
     {
     }
@@ -531,6 +557,7 @@ public:
     [[nodiscard]] bool get_high_accuracy() const;
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] std::uint32_t get_dim() const;
+    [[nodiscard]] std::uint32_t get_n_orig_sv() const noexcept;
 
     [[nodiscard]] T get_time() const;
     void set_time(T);
@@ -567,6 +594,28 @@ public:
     std::tuple<taylor_outcome, T> step(bool = false);
     std::tuple<taylor_outcome, T> step_backward(bool = false);
     std::tuple<taylor_outcome, T> step(T, bool = false);
+
+    [[nodiscard]] bool is_variational() const noexcept;
+    [[nodiscard]] const std::vector<expression> &get_vargs() const;
+    [[nodiscard]] std::uint32_t get_vorder() const;
+
+    template <typename R>
+        requires std::ranges::contiguous_range<R>
+                 && std::same_as<T, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
+                 && std::integral<std::ranges::range_size_t<R>>
+    const std::vector<T> &eval_taylor_map(R &&r)
+    {
+        // Turn r into a span.
+        tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::uint32_t>(std::ranges::size(r)));
+
+        return eval_taylor_map_impl(s);
+    }
+    const std::vector<T> &eval_taylor_map(std::initializer_list<T>);
+    [[nodiscard]] const std::vector<T> &get_tstate() const;
+
+    [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> get_vslice(std::uint32_t) const;
+    [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> get_vslice(std::uint32_t, std::uint32_t) const;
+    [[nodiscard]] const dtens::sv_idx_t &get_mindex(std::uint32_t) const;
 
 private:
     // Implementations of the propagate_*() functions.
@@ -798,12 +847,11 @@ private:
     HEYOKA_DLL_LOCAL void step_impl(const std::vector<T> &, bool);
 
     // Private implementation-detail constructor machinery.
-    void finalise_ctor_impl(std::vector<std::pair<expression, expression>>, std::vector<T>, std::uint32_t,
-                            std::vector<T>, std::optional<T>, bool, bool, std::vector<T>, std::vector<t_event_t>,
-                            std::vector<nt_event_t>, bool);
+    using sys_t = std::variant<std::vector<std::pair<expression, expression>>, var_ode_sys>;
+    void finalise_ctor_impl(sys_t, std::vector<T>, std::uint32_t, std::vector<T>, std::optional<T>, bool, bool,
+                            std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
     template <typename... KwArgs>
-    void finalise_ctor(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
-                       std::uint32_t batch_size, const KwArgs &...kw_args)
+    void finalise_ctor(sys_t sys, std::vector<T> state, std::uint32_t batch_size, const KwArgs &...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -856,6 +904,12 @@ private:
     };
     explicit taylor_adaptive_batch(private_ctor_t, llvm_state);
 
+    HEYOKA_DLL_LOCAL void check_variational(const char *) const;
+
+    // Input type for Taylor map computation.
+    using tm_input_t = mdspan<const T, dextents<std::uint32_t, 1>>;
+    const std::vector<T> &eval_taylor_map_impl(tm_input_t);
+
 public:
     taylor_adaptive_batch();
 
@@ -869,6 +923,19 @@ public:
     template <typename... KwArgs>
     explicit taylor_adaptive_batch(std::vector<std::pair<expression, expression>> sys, std::initializer_list<T> state,
                                    std::uint32_t batch_size, const KwArgs &...kw_args)
+        : taylor_adaptive_batch(std::move(sys), std::vector<T>(state), batch_size, kw_args...)
+    {
+    }
+    template <typename... KwArgs>
+    explicit taylor_adaptive_batch(var_ode_sys sys, std::vector<T> state, std::uint32_t batch_size,
+                                   const KwArgs &...kw_args)
+        : taylor_adaptive_batch(private_ctor_t{}, llvm_state(kw_args...))
+    {
+        finalise_ctor(std::move(sys), std::move(state), batch_size, kw_args...);
+    }
+    template <typename... KwArgs>
+    explicit taylor_adaptive_batch(var_ode_sys sys, std::initializer_list<T> state, std::uint32_t batch_size,
+                                   const KwArgs &...kw_args)
         : taylor_adaptive_batch(std::move(sys), std::vector<T>(state), batch_size, kw_args...)
     {
     }
@@ -891,6 +958,7 @@ public:
     [[nodiscard]] bool get_high_accuracy() const;
     [[nodiscard]] bool get_compact_mode() const;
     [[nodiscard]] std::uint32_t get_dim() const;
+    [[nodiscard]] std::uint32_t get_n_orig_sv() const noexcept;
 
     [[nodiscard]] const std::vector<T> &get_time() const;
     [[nodiscard]] const T *get_time_data() const;
@@ -934,6 +1002,28 @@ public:
     void step_backward(bool = false);
     void step(const std::vector<T> &, bool = false);
     [[nodiscard]] const std::vector<std::tuple<taylor_outcome, T>> &get_step_res() const;
+
+    [[nodiscard]] bool is_variational() const noexcept;
+    [[nodiscard]] const std::vector<expression> &get_vargs() const;
+    [[nodiscard]] std::uint32_t get_vorder() const;
+
+    template <typename R>
+        requires std::ranges::contiguous_range<R>
+                 && std::same_as<T, std::remove_cvref_t<std::ranges::range_reference_t<R>>>
+                 && std::integral<std::ranges::range_size_t<R>>
+    const std::vector<T> &eval_taylor_map(R &&r)
+    {
+        // Turn r into a span.
+        tm_input_t s(std::ranges::data(r), boost::numeric_cast<std::uint32_t>(std::ranges::size(r)));
+
+        return eval_taylor_map_impl(s);
+    }
+    const std::vector<T> &eval_taylor_map(std::initializer_list<T>);
+    [[nodiscard]] const std::vector<T> &get_tstate() const;
+
+    [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> get_vslice(std::uint32_t) const;
+    [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> get_vslice(std::uint32_t, std::uint32_t) const;
+    [[nodiscard]] const dtens::sv_idx_t &get_mindex(std::uint32_t) const;
 
 private:
     // Implementations of the propagate_*() functions.
@@ -1097,7 +1187,7 @@ namespace detail
 // - 3: removed the mr flag from the terminal event callback siganture,
 //      which resulted also in changes in the event detection data structure.
 // - 4: switched to pimpl implementation for i_data.
-// - 5: replaced the m_state_vars and m_rhs members with m_sys.
+// - 5: removed m_state_vars/m_rhs, variational ODE data.
 inline constexpr int taylor_adaptive_s11n_version = 5;
 
 // Boost s11n class version history for taylor_adaptive_batch:
@@ -1105,7 +1195,7 @@ inline constexpr int taylor_adaptive_s11n_version = 5;
 // - 2: removed the mr flag from the terminal event callback siganture,
 //      which resulted also in changes in the event detection data structure.
 // - 3: switched to pimpl implementation for i_data.
-// - 4: replaced the m_state_vars and m_rhs members with m_sys.
+// - 4: removed m_state_vars/m_rhs, variational ODE data.
 inline constexpr int taylor_adaptive_batch_s11n_version = 4;
 
 } // namespace detail

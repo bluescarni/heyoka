@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <exception>
 #include <functional>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -70,10 +71,9 @@ taylor_adaptive_batch<T>::taylor_adaptive_batch(private_ctor_t, llvm_state s)
 }
 
 template <typename T>
-void taylor_adaptive_batch<T>::finalise_ctor_impl(std::vector<std::pair<expression, expression>> sys,
-                                                  std::vector<T> state, std::uint32_t batch_size, std::vector<T> time,
-                                                  std::optional<T> tol, bool high_accuracy, bool compact_mode,
-                                                  std::vector<T> pars, std::vector<t_event_t> tes,
+void taylor_adaptive_batch<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state, std::uint32_t batch_size,
+                                                  std::vector<T> time, std::optional<T> tol, bool high_accuracy,
+                                                  bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
                                                   std::vector<nt_event_t> ntes, bool parallel_mode)
 {
     // NOTE: this must hold because tol == 0 is interpreted
@@ -88,7 +88,19 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(std::vector<std::pair<expressi
 
     using std::isfinite;
 
-    // Validate the ode sys.
+    // Are we constructing a variational integrator?
+    const auto is_variational = (vsys.index() == 1u);
+
+    // Fetch the ODE system.
+    const auto &sys = is_variational ? std::get<1>(vsys).get_sys() : std::get<0>(vsys);
+
+    // Validate it.
+    // NOTE: in a variational ODE sys, we already validated the original equations,
+    // and the variational equations should not be in need of validation.
+    // However, *in principle*, something could have gone wrong during the computation of the
+    // variational equations (i.e., a malformed gradient() implementation somewhere in a
+    // user-defined function injecting variables whose names begin with "∂"). Hence,
+    // just re-validate for peace of mind.
     validate_ode_sys(sys, tes, ntes);
 
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_batch_size);
@@ -124,7 +136,8 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(std::vector<std::pair<expressi
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_time_copy_lo);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_nf_detected);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_time);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_sys);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_vsys);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tm_data);
 
     // Init the data members.
     m_batch_size = batch_size;
@@ -147,12 +160,37 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(std::vector<std::pair<expressi
                         m_state.size(), m_batch_size));
     }
 
+    // NOTE: keep track of whether or not we need to automatically setup the initial
+    // conditions in a variational integrator. This is needed because we need
+    // to delay the automatic ic setup for the derivatives wrt the initial time until
+    // after we have correctly set up state, pars and time in the integrator.
+    bool auto_ic_setup = false;
     if (m_state.size() / m_batch_size != sys.size()) {
-        throw std::invalid_argument(
-            fmt::format("Inconsistent sizes detected in the initialization of an adaptive Taylor "
-                        "integrator: the state vector has a dimension of {} and a batch size of {}, "
-                        "while the number of equations is {}",
-                        m_state.size() / m_batch_size, m_batch_size, sys.size()));
+        if (is_variational) {
+            // Fetch the original number of equations/state variables.
+            const auto n_orig_sv = std::get<1>(vsys).get_n_orig_sv();
+
+            if (m_state.size() / m_batch_size == n_orig_sv) [[likely]] {
+                // Automatic setup of the initial conditions for the derivatives wrt
+                // variables and parameters.
+                detail::setup_variational_ics_varpar(m_state, std::get<1>(vsys), m_batch_size);
+                auto_ic_setup = true;
+            } else {
+                throw std::invalid_argument(fmt::format(
+                    "Inconsistent sizes detected in the initialization of a variational adaptive Taylor "
+                    "integrator in batch mode: the state vector has a dimension of {} (in batches of {}), while the "
+                    "total number of equations is {}. The size of the state vector must be "
+                    "equal either to the total number of equations times the batch size, or to the number of original "
+                    "(i.e., non-variational) equations, which for this system is {}, times the batch size",
+                    m_state.size(), m_batch_size, sys.size(), n_orig_sv));
+            }
+        } else [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("Inconsistent sizes detected in the initialization of an adaptive Taylor "
+                            "integrator: the state vector has a dimension of {} and a batch size of {}, "
+                            "while the number of equations is {}",
+                            m_state.size() / m_batch_size, m_batch_size, sys.size()));
+        }
     }
 
     if (m_time_hi.size() != m_batch_size) {
@@ -321,8 +359,19 @@ void taylor_adaptive_batch<T>::finalise_ctor_impl(std::vector<std::pair<expressi
                                               m_batch_size);
     }
 
-    // Move sys in.
-    m_sys = std::move(sys);
+    if (auto_ic_setup) {
+        // Finish the automatic setup of the ics for a variational
+        // integrator.
+        detail::setup_variational_ics_t0(m_llvm, m_state, m_pars, m_time_hi.data(), std::get<1>(vsys), m_batch_size,
+                                         m_high_accuracy, m_compact_mode);
+    }
+
+    if (is_variational) {
+        m_tm_data.emplace(std::get<1>(vsys), 0, m_llvm, m_batch_size);
+    }
+
+    // Move vsys in.
+    m_vsys = std::move(vsys);
 }
 
 template <typename T>
@@ -361,6 +410,18 @@ taylor_adaptive_batch<T> &taylor_adaptive_batch<T>::operator=(taylor_adaptive_ba
 
 template <typename T>
 taylor_adaptive_batch<T>::~taylor_adaptive_batch() = default;
+
+template <typename T>
+bool taylor_adaptive_batch<T>::is_variational() const noexcept
+{
+    return m_i_data->m_vsys.index() == 1u;
+}
+
+template <typename T>
+std::uint32_t taylor_adaptive_batch<T>::get_n_orig_sv() const noexcept
+{
+    return is_variational() ? std::get<1>(m_i_data->m_vsys).get_n_orig_sv() : m_i_data->m_dim;
+}
 
 // NOTE: the save/load patterns mimic the copy constructor logic.
 template <typename T>
@@ -2102,7 +2163,7 @@ const std::vector<typename taylor_adaptive_batch<T>::nt_event_t> &taylor_adaptiv
 template <typename T>
 const std::vector<std::pair<expression, expression>> &taylor_adaptive_batch<T>::get_sys() const noexcept
 {
-    return m_i_data->m_sys;
+    return (m_i_data->m_vsys.index() == 0) ? std::get<0>(m_i_data->m_vsys) : std::get<1>(m_i_data->m_vsys).get_sys();
 }
 
 template <typename T>
@@ -2220,6 +2281,120 @@ void taylor_adaptive_batch<T>::reset_cooldowns(std::uint32_t i)
     for (auto &cd : m_ed_data->m_te_cooldowns[i]) {
         cd.reset();
     }
+}
+
+template <typename T>
+void taylor_adaptive_batch<T>::check_variational(const char *fname) const
+{
+    if (!is_variational()) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("The function '{}()' cannot be invoked on non-variational batch integrators", fname));
+    }
+}
+
+template <typename T>
+const std::vector<expression> &taylor_adaptive_batch<T>::get_vargs() const
+{
+    check_variational(__func__);
+
+    return std::get<1>(m_i_data->m_vsys).get_vargs();
+}
+
+template <typename T>
+std::uint32_t taylor_adaptive_batch<T>::get_vorder() const
+{
+    check_variational(__func__);
+
+    return std::get<1>(m_i_data->m_vsys).get_order();
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::eval_taylor_map_impl(tm_input_t s)
+{
+    check_variational("eval_taylor_map");
+
+    // Cache the number of variational arguments.
+    const auto nvargs = std::get<1>(m_i_data->m_vsys).get_vargs().size();
+
+    // Cache the batch size.
+    const auto batch_size = m_i_data->m_batch_size;
+
+    if (s.extent(0) % batch_size != 0u) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Unable to compute the Taylor map: the input range of values has a "
+                                                "size of {}, which is not a multiple of the batch size {}",
+                                                s.extent(0), batch_size));
+    }
+
+    if (s.extent(0) / batch_size != nvargs) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Unable to compute the Taylor map: the input range of values has a "
+                        "size of {} (in batches of {}), but the number of variational arguments is {}",
+                        s.extent(0) / batch_size, batch_size, nvargs));
+    }
+
+    // Run the compiled function.
+    assert(m_i_data->m_tm_data); // LCOV_EXCL_LINE
+    auto &tm_data = *m_i_data->m_tm_data;
+    tm_data.m_tm_func(tm_data.m_output.data(), s.data_handle(), m_i_data->m_state.data());
+
+    return tm_data.m_output;
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::eval_taylor_map(std::initializer_list<T> il)
+{
+    return eval_taylor_map(std::ranges::subrange(il.begin(), il.end()));
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch<T>::get_tstate() const
+{
+    check_variational(__func__);
+
+    return m_i_data->m_tm_data->m_output;
+}
+
+template <typename T>
+std::pair<std::uint32_t, std::uint32_t> taylor_adaptive_batch<T>::get_vslice(std::uint32_t order) const
+{
+    check_variational(__func__);
+
+    const auto &dt = std::get<1>(m_i_data->m_vsys).get_dtens();
+
+    const auto rng = dt.get_derivatives(order);
+
+    return {boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
+            boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end()))};
+}
+
+template <typename T>
+std::pair<std::uint32_t, std::uint32_t> taylor_adaptive_batch<T>::get_vslice(std::uint32_t component,
+                                                                             std::uint32_t order) const
+{
+    check_variational(__func__);
+
+    const auto &dt = std::get<1>(m_i_data->m_vsys).get_dtens();
+
+    const auto rng = dt.get_derivatives(component, order);
+
+    return {boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
+            boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end()))};
+}
+
+template <typename T>
+const dtens::sv_idx_t &taylor_adaptive_batch<T>::get_mindex(std::uint32_t i) const
+{
+    check_variational(__func__);
+
+    const auto &dt = std::get<1>(m_i_data->m_vsys).get_dtens();
+
+    if (i >= dt.size()) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Cannot fetch the multiindex of the derivative at index {}: the index "
+                                                "is not less than the total number of derivatives ({})",
+                                                i, dt.size()));
+    }
+
+    return (dt.begin() + boost::numeric_cast<decltype(dt.begin() - dt.begin())>(i))->first;
 }
 
 // Explicit instantiations.

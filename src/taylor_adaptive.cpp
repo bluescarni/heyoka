@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -102,7 +103,7 @@ mpfr_prec_t taylor_adaptive_base<mppp::real, Derived>::get_prec() const
 }
 
 // Helper to check that the integrator data is consistent with
-// the precision. To be used at the end of construciton or before using
+// the precision. To be used at the end of construction or before using
 // the integrator data (e.g., in step(), propagate(), etc.).
 template <typename Derived>
 void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
@@ -122,12 +123,20 @@ void taylor_adaptive_base<mppp::real, Derived>::data_prec_check() const
     assert(std::all_of(dthis->m_i_data->m_d_out.begin(), dthis->m_i_data->m_d_out.end(),
                        [prec](const auto &x) { return x.get_prec() == prec; }));
 
-    // Same goes for the event detection jet data, if present.
 #if !defined(NDEBUG)
+
+    // The data in tm_data is supposed to be set up correctly once and for all.
+    if (dthis->is_variational()) {
+        assert(std::ranges::all_of(dthis->m_i_data->m_tm_data->m_output,
+                                   [prec](const auto &x) { return x.get_prec() == prec; }));
+    }
+
+    // Same goes for the event detection jet data, if present.
     if (dthis->m_ed_data) {
         assert(std::all_of(dthis->m_ed_data->m_ev_jet.begin(), dthis->m_ed_data->m_ev_jet.end(),
                            [prec](const auto &x) { return x.get_prec() == prec; }));
     }
+
 #endif
 
     // State, pars can be changed by the user and thus need to be checked.
@@ -158,7 +167,7 @@ taylor_adaptive<T>::taylor_adaptive(private_ctor_t, llvm_state s) : m_i_data(std
 }
 
 template <typename T>
-void taylor_adaptive<T>::finalise_ctor_impl(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
+void taylor_adaptive<T>::finalise_ctor_impl(sys_t vsys, std::vector<T> state,
                                             // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
                                             std::optional<T> time, std::optional<T> tol, bool high_accuracy,
                                             bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
@@ -180,7 +189,8 @@ void taylor_adaptive<T>::finalise_ctor_impl(std::vector<std::pair<expression, ex
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_dc);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_order);
     HEYOKA_TAYLOR_REF_FROM_I_DATA(m_d_out_f);
-    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_sys);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_vsys);
+    HEYOKA_TAYLOR_REF_FROM_I_DATA(m_tm_data);
 
     // NOTE: this must hold because tol == 0 is interpreted
     // as undefined in finalise_ctor().
@@ -194,7 +204,19 @@ void taylor_adaptive<T>::finalise_ctor_impl(std::vector<std::pair<expression, ex
 
     using std::isfinite;
 
-    // Validate the ode sys.
+    // Are we constructing a variational integrator?
+    const auto is_variational = (vsys.index() == 1u);
+
+    // Fetch the ODE system.
+    const auto &sys = is_variational ? std::get<1>(vsys).get_sys() : std::get<0>(vsys);
+
+    // Validate it.
+    // NOTE: in a variational ODE sys, we already validated the original equations,
+    // and the variational equations should not be in need of validation.
+    // However, *in principle*, something could have gone wrong during the computation of the
+    // variational equations (i.e., a malformed gradient() implementation somewhere in a
+    // user-defined function injecting variables whose names begin with "∂"). Hence,
+    // just re-validate for peace of mind.
     validate_ode_sys(sys, tes, ntes);
 
     // Run an immediate check on state. This is a bit redundant with other checks
@@ -247,6 +269,38 @@ void taylor_adaptive<T>::finalise_ctor_impl(std::vector<std::pair<expression, ex
 
 #endif
 
+    // Check the input state size.
+    // NOTE: keep track of whether or not we need to automatically setup the initial
+    // conditions in a variational integrator. This is needed because we need
+    // to delay the automatic ic setup for the derivatives wrt the initial time until
+    // after we have correctly set up state, pars and time in the integrator.
+    bool auto_ic_setup = false;
+    if (m_state.size() != sys.size()) {
+        if (is_variational) {
+            // Fetch the original number of equations/state variables.
+            const auto n_orig_sv = std::get<1>(vsys).get_n_orig_sv();
+
+            if (m_state.size() == n_orig_sv) [[likely]] {
+                // Automatic setup of the initial conditions for the derivatives wrt
+                // variables and parameters.
+                detail::setup_variational_ics_varpar(m_state, std::get<1>(vsys), 1);
+                auto_ic_setup = true;
+            } else {
+                throw std::invalid_argument(fmt::format(
+                    "Inconsistent sizes detected in the initialization of a variational adaptive Taylor "
+                    "integrator: the state vector has a dimension of {}, while the total number of equations is {}. "
+                    "The size of the state vector must be equal either to the total number of equations, or to the "
+                    "number of original (i.e., non-variational) equations, which for this system is {}",
+                    m_state.size(), sys.size(), n_orig_sv));
+            }
+        } else [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("Inconsistent sizes detected in the initialization of an adaptive Taylor "
+                            "integrator: the state vector has a dimension of {}, while the number of equations is {}",
+                            m_state.size(), sys.size()));
+        }
+    }
+
     // Init the time.
     if (time) {
 #if defined(HEYOKA_HAVE_REAL)
@@ -288,14 +342,6 @@ void taylor_adaptive<T>::finalise_ctor_impl(std::vector<std::pair<expression, ex
     // High accuracy and compact mode flags.
     m_high_accuracy = high_accuracy;
     m_compact_mode = compact_mode;
-
-    // Check the input state.
-    if (m_state.size() != sys.size()) {
-        throw std::invalid_argument(
-            fmt::format("Inconsistent sizes detected in the initialization of an adaptive Taylor "
-                        "integrator: the state vector has a dimension of {}, while the number of equations is {}",
-                        m_state.size(), sys.size()));
-    }
 
     // Check the tolerance value.
     if (tol && (!isfinite(*tol) || *tol < 0)) {
@@ -446,6 +492,25 @@ void taylor_adaptive<T>::finalise_ctor_impl(std::vector<std::pair<expression, ex
                                               m_state[0]);
     }
 
+    if (auto_ic_setup) {
+        // Finish the automatic setup of the ics for a variational
+        // integrator.
+        detail::setup_variational_ics_t0(m_llvm, m_state, m_pars, &m_time.hi, std::get<1>(vsys), 1, m_high_accuracy,
+                                         m_compact_mode);
+    }
+
+    if (is_variational) {
+#if defined(HEYOKA_HAVE_REAL)
+        if constexpr (std::is_same_v<T, mppp::real>) {
+            m_tm_data.emplace(std::get<1>(vsys), static_cast<long long>(this->get_prec()), m_llvm, 1);
+        } else {
+#endif
+            m_tm_data.emplace(std::get<1>(vsys), 0, m_llvm, 1);
+#if defined(HEYOKA_HAVE_REAL)
+        }
+#endif
+    }
+
 #if defined(HEYOKA_HAVE_REAL)
 
     if constexpr (std::is_same_v<T, mppp::real>) {
@@ -464,8 +529,8 @@ void taylor_adaptive<T>::finalise_ctor_impl(std::vector<std::pair<expression, ex
 
 #endif
 
-    // Move sys in.
-    m_sys = std::move(sys);
+    // Move vsys in.
+    m_vsys = std::move(vsys);
 }
 
 template <typename T>
@@ -504,6 +569,18 @@ taylor_adaptive<T> &taylor_adaptive<T>::operator=(taylor_adaptive &&) noexcept =
 
 template <typename T>
 taylor_adaptive<T>::~taylor_adaptive() = default;
+
+template <typename T>
+bool taylor_adaptive<T>::is_variational() const noexcept
+{
+    return m_i_data->m_vsys.index() == 1u;
+}
+
+template <typename T>
+std::uint32_t taylor_adaptive<T>::get_n_orig_sv() const noexcept
+{
+    return is_variational() ? std::get<1>(m_i_data->m_vsys).get_n_orig_sv() : m_i_data->m_dim;
+}
 
 // NOTE: the save/load patterns mimic the copy constructor logic.
 template <typename T>
@@ -1738,7 +1815,7 @@ const std::vector<typename taylor_adaptive<T>::nt_event_t> &taylor_adaptive<T>::
 template <typename T>
 const std::vector<std::pair<expression, expression>> &taylor_adaptive<T>::get_sys() const noexcept
 {
-    return m_i_data->m_sys;
+    return (m_i_data->m_vsys.index() == 0) ? std::get<0>(m_i_data->m_vsys) : std::get<1>(m_i_data->m_vsys).get_sys();
 }
 
 template <typename T>
@@ -1802,6 +1879,129 @@ const std::vector<T> &taylor_adaptive<T>::update_d_output(T time, bool rel_time)
     }
 
     return m_i_data->m_d_out;
+}
+
+template <typename T>
+void taylor_adaptive<T>::check_variational(const char *fname) const
+{
+    if (!is_variational()) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("The function '{}()' cannot be invoked on non-variational integrators", fname));
+    }
+}
+
+template <typename T>
+const std::vector<expression> &taylor_adaptive<T>::get_vargs() const
+{
+    check_variational(__func__);
+
+    return std::get<1>(m_i_data->m_vsys).get_vargs();
+}
+
+template <typename T>
+std::uint32_t taylor_adaptive<T>::get_vorder() const
+{
+    check_variational(__func__);
+
+    return std::get<1>(m_i_data->m_vsys).get_order();
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive<T>::eval_taylor_map_impl(tm_input_t s)
+{
+    check_variational("eval_taylor_map");
+
+    // Cache the number of variational arguments.
+    const auto nvargs = std::get<1>(m_i_data->m_vsys).get_vargs().size();
+
+    if (s.extent(0) != nvargs) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Unable to compute the Taylor map: the input range of values has a "
+                                                "size of {}, but the number of variational arguments is {}",
+                                                s.extent(0), nvargs));
+    }
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    if constexpr (std::is_same_v<T, mppp::real>) {
+        for (std::uint32_t i = 0; i < s.extent(0); ++i) {
+            if (s(i).get_prec() != this->get_prec()) [[unlikely]] {
+                throw std::invalid_argument(
+                    fmt::format("Unable to compute the Taylor map: the input value at index {} has a precision of "
+                                "{}, but the expected precision instead is {}",
+                                i, s(i).get_prec(), this->get_prec()));
+            }
+        }
+
+        // Run the data precision check, as we will need to read
+        // from the state vector.
+        this->data_prec_check();
+    }
+
+#endif
+
+    // Run the compiled function.
+    assert(m_i_data->m_tm_data); // LCOV_EXCL_LINE
+    auto &tm_data = *m_i_data->m_tm_data;
+    tm_data.m_tm_func(tm_data.m_output.data(), s.data_handle(), m_i_data->m_state.data());
+
+    return tm_data.m_output;
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive<T>::eval_taylor_map(std::initializer_list<T> il)
+{
+    return eval_taylor_map(std::ranges::subrange(il.begin(), il.end()));
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive<T>::get_tstate() const
+{
+    check_variational(__func__);
+
+    return m_i_data->m_tm_data->m_output;
+}
+
+template <typename T>
+std::pair<std::uint32_t, std::uint32_t> taylor_adaptive<T>::get_vslice(std::uint32_t order) const
+{
+    check_variational(__func__);
+
+    const auto &dt = std::get<1>(m_i_data->m_vsys).get_dtens();
+
+    const auto rng = dt.get_derivatives(order);
+
+    return {boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
+            boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end()))};
+}
+
+template <typename T>
+std::pair<std::uint32_t, std::uint32_t> taylor_adaptive<T>::get_vslice(std::uint32_t component,
+                                                                       std::uint32_t order) const
+{
+    check_variational(__func__);
+
+    const auto &dt = std::get<1>(m_i_data->m_vsys).get_dtens();
+
+    const auto rng = dt.get_derivatives(component, order);
+
+    return {boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
+            boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end()))};
+}
+
+template <typename T>
+const dtens::sv_idx_t &taylor_adaptive<T>::get_mindex(std::uint32_t i) const
+{
+    check_variational(__func__);
+
+    const auto &dt = std::get<1>(m_i_data->m_vsys).get_dtens();
+
+    if (i >= dt.size()) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Cannot fetch the multiindex of the derivative at index {}: the index "
+                                                "is not less than the total number of derivatives ({})",
+                                                i, dt.size()));
+    }
+
+    return (dt.begin() + boost::numeric_cast<decltype(dt.begin() - dt.begin())>(i))->first;
 }
 
 // Explicit instantiations

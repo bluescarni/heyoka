@@ -58,6 +58,14 @@ enum class event_direction { negative = -1, any = 0, positive = 1 };
 // Type representing a Taylor decomposition.
 using taylor_dc_t = std::vector<std::pair<expression, std::vector<std::uint32_t>>>;
 
+namespace detail
+{
+
+template <typename>
+struct tm_data;
+
+}
+
 HEYOKA_END_NAMESPACE
 
 #endif

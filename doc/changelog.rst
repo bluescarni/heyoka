@@ -10,6 +10,8 @@ New
 - Add thermonets: neural, differentiable, high-performance
   models for the Earth's thermosphere density
   (`#425 <https://github.com/bluescarni/heyoka/pull/425>`__).
+- Add support for variational ODE systems and Taylor map computation
+  (`#422 <https://github.com/bluescarni/heyoka/pull/422>`__).
 - Introduce the ability to represent unknown functions
   and their derivatives in the expression system
   (`#416 <https://github.com/bluescarni/heyoka/pull/416>`__).
