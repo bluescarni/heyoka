@@ -434,12 +434,13 @@ batch mode can lead to an increase in floating-point throughput up to a factor o
 <p>It is important to emphasise that batch mode does not reduce
 the CPU time required to integrate a system of ODEs. Rather, as a fine-grained
 form of data parallelism, batch mode allows to integrate multiple ODE systems in parallel
-at no additional cost, and it is thus most useful when the need arise
+at (almost) no additional cost, and it is thus most useful when the need arise
 to integrate the same ODE system with different initial conditions and parameters.</p>
-<p>Although batch mode can in principle be used with all floating-point types supported
+<p>Although batch mode can in principle be used with all the fundamental C++ floating-point types supported
 by heyoka, in practice at this time no CPU provides SIMD instructions for extended-precision
 datatypes. Thus, here we will consider the application of batch mode only to
-standard <code class="docutils literal notranslate"><span class="pre">double</span></code> precision computations.</p>
+standard <code class="docutils literal notranslate"><span class="pre">double</span></code> precision computations (keeping in mind that batch mode is also supported
+for single-precision <code class="docutils literal notranslate"><span class="pre">float</span></code> computations).</p>
 <p>The value of the batch size <span class="math notranslate nohighlight">\(n\)</span> can be freely chosen by the user. In order
 to achieve optimal performance, however, <span class="math notranslate nohighlight">\(n\)</span> should match the SIMD width of the
 processor in use. Because at this time the most widespread SIMD instruction set is
