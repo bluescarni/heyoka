@@ -1,6 +1,18 @@
 Changelog
 =========
 
+5.0.1 (unreleased)
+------------------
+
+Fix
+~~~
+
+- Fix compilation on PPC64
+  (`#428 <https://github.com/bluescarni/heyoka/pull/428>`__).
+- Relax several tolerances in order to fix test failures reported
+  on FreeBSD
+  (`#428 <https://github.com/bluescarni/heyoka/pull/428>`__).
+
 5.0.0 (2024-06-13)
 ------------------
 
