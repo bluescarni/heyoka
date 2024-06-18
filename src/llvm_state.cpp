@@ -150,6 +150,26 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
+// NOTE: logging here lhames' instructions on how to set up LLJIT
+// for parallel compilation of multiple modules.
+//
+//   auto J = LLJITBuilder()
+//              .setNumCompileThreads(<N>)
+//              .create();
+//   if (!J) { /* bail on error */ }
+//   (*J)->getIRTransformLayer().setTransform(
+//     [](ThreadSafeModule TSM, MaterializationResponsibility &R) -> Expected<ThreadSafeModule> {
+//       TSM.withModuleDo([](Module &M) {
+//         /* Apply your IR optimizations here */
+//       });
+//       return std::move(TSM);
+//     });
+//
+// Note that the optimisation passes in this approach are moved into the
+// transform layer. References:
+// https://discord.com/channels/636084430946959380/687692371038830597/1252428080648163328
+// https://discord.com/channels/636084430946959380/687692371038830597/1252118666187640892
+
 HEYOKA_BEGIN_NAMESPACE
 
 namespace detail
