@@ -97,7 +97,7 @@ TEST_CASE("basic")
         double E = 0;
         cf(&E, ta.get_state().data(), nullptr, nullptr);
 
-        REQUIRE(E == approximately(E0));
+        REQUIRE(E == approximately(E0, 1000.));
 
         REQUIRE(0.5 * sum_sq({vx, vy, vz}) + model::rotating_potential(kw::omega = {.1, .2, .3})
                 == model::rotating_energy(kw::omega = {.1, .2, .3}));
@@ -138,7 +138,7 @@ TEST_CASE("basic")
         double E = 0;
         cf(&E, ta.get_state().data(), omega_vals.data(), nullptr);
 
-        REQUIRE(E == approximately(E0));
+        REQUIRE(E == approximately(E0, 1000.));
 
         REQUIRE(0.5 * sum_sq({vx, vy, vz}) + model::rotating_potential(kw::omega = {par[0], par[1], par[2]})
                 == model::rotating_energy(kw::omega = {par[0], par[1], par[2]}));

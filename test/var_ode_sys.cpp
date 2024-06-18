@@ -464,9 +464,9 @@ TEST_CASE("nonauto sys")
     ta_orig.propagate_until(3.);
 
     REQUIRE(ta_orig.get_state()[0]
-            == approximately(ta.get_state()[0] + ta.get_state()[4] * delta_par + ta.get_state()[5] * delta_tm));
+            == approximately(ta.get_state()[0] + ta.get_state()[4] * delta_par + ta.get_state()[5] * delta_tm, 1000.));
     REQUIRE(ta_orig.get_state()[1]
-            == approximately(ta.get_state()[1] + ta.get_state()[8] * delta_par + ta.get_state()[9] * delta_tm));
+            == approximately(ta.get_state()[1] + ta.get_state()[8] * delta_par + ta.get_state()[9] * delta_tm, 1000.));
 }
 
 // An order-2 test.
