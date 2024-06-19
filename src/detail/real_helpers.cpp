@@ -591,6 +591,15 @@ llvm::Value *llvm_real_fcmp_oeq(llvm_state &s, llvm::Value *a, llvm::Value *b)
     return s.builder().CreateCall(f, {a, b});
 }
 
+llvm::Value *llvm_real_fcmp_one(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // Compute a == b.
+    auto *ret = llvm_real_fcmp_oeq(s, a, b);
+
+    // NOTE: this creates a logical NOT.
+    return s.builder().CreateICmpEQ(ret, llvm::ConstantInt::getNullValue(ret->getType()));
+}
+
 // Convert the input unsigned integral value n to the real type fp_t.
 llvm::Value *llvm_real_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
 {
