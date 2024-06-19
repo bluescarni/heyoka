@@ -3223,16 +3223,24 @@ llvm::Type *llvm_ext_type(llvm::Type *fp_t)
     // LCOV_EXCL_STOP
 }
 
-// Convert the input unsigned integral value n to the floating-point type fp_t.
-// Vector types/values are not supported.
+// Convert the input unsigned integral value(s) n to the floating-point type fp_t.
+// If n is a scalar/vector, then fp_t must also be a scalar/vector type.
 llvm::Value *llvm_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
 {
     assert(n != nullptr);
     assert(fp_t != nullptr);
-    assert(!n->getType()->isVectorTy());
-    assert(!fp_t->isVectorTy());
 
-    if (fp_t->isFloatingPointTy()) {
+#if !defined(NDEBUG)
+    if (n->getType()->isVectorTy()) {
+        assert(fp_t->isVectorTy());
+        assert(llvm::cast<llvm_vector_type>(n->getType())->getNumElements()
+               == llvm::cast<llvm_vector_type>(fp_t)->getNumElements());
+    } else {
+        assert(!fp_t->isVectorTy());
+    }
+#endif
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
         return s.builder().CreateUIToFP(n, fp_t);
 #if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {
