@@ -375,9 +375,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
     auto *ecc_is_gte1 = llvm_fcmp_oge(s, ecc_arg, llvm_constantfp(s, tp, 1.));
 
     // Is the eccentricity NaN or out of range?
-    // NOTE: this is a logical OR.
-    auto *ecc_invalid = builder.CreateSelect(
-        ecc_is_nan_or_neg, llvm::ConstantInt::getAllOnesValue(ecc_is_nan_or_neg->getType()), ecc_is_gte1);
+    auto *ecc_invalid = builder.CreateLogicalOr(ecc_is_nan_or_neg, ecc_is_gte1);
 
     // Replace invalid eccentricity values with quiet NaNs.
     auto *ecc
@@ -537,8 +535,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         auto *tol2_check = llvm_fcmp_ogt(s, bsize, tol);
 
         // Put them together with a logical AND.
-        auto *tol_check
-            = builder.CreateSelect(tol1_check, tol2_check, llvm::ConstantInt::get(tol2_check->getType(), 0u));
+        auto *tol_check = builder.CreateLogicalAnd(tol1_check, tol2_check);
         // NOTE: we need OR reduction in batch mode: continue if *any* element of the batch
         // needs more iterations.
         auto *tol_cond = (batch_size == 1u) ? tol_check : builder.CreateOrReduce(tol_check);
@@ -550,7 +547,7 @@ llvm::Function *llvm_add_inv_kep_E(llvm_state &s, llvm::Type *fp_t, std::uint32_
         auto *c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
 
         // Combine tolerance check and number of iterations check with a logical AND.
-        return builder.CreateSelect(c_cond, tol_cond, llvm::ConstantInt::get(tol_cond->getType(), 0u));
+        return builder.CreateLogicalAnd(c_cond, tol_cond);
     };
 
     // Run the loop.
@@ -919,8 +916,7 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
         auto *tol2_check = llvm_fcmp_ogt(s, bsize, tol);
 
         // Put them together with a logical AND.
-        auto *tol_check
-            = builder.CreateSelect(tol1_check, tol2_check, llvm::ConstantInt::get(tol2_check->getType(), 0u));
+        auto *tol_check = builder.CreateLogicalAnd(tol1_check, tol2_check);
         // NOTE: we need OR reduction in batch mode: continue if *any* element of the batch
         // needs more iterations.
         auto *tol_cond = (batch_size == 1u) ? tol_check : builder.CreateOrReduce(tol_check);
@@ -932,7 +928,7 @@ llvm::Function *llvm_add_inv_kep_F(llvm_state &s, llvm::Type *fp_t, std::uint32_
         auto *c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
 
         // Combine tolerance check and number of iterations check with a logical AND.
-        return builder.CreateSelect(c_cond, tol_cond, llvm::ConstantInt::get(tol_cond->getType(), 0u));
+        return builder.CreateLogicalAnd(c_cond, tol_cond);
     };
 
     // Run the loop.
@@ -1235,8 +1231,7 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32
         auto *tol2_check = llvm_fcmp_ogt(s, bsize, tol);
 
         // Put them together with a logical AND.
-        auto *tol_check
-            = builder.CreateSelect(tol1_check, tol2_check, llvm::ConstantInt::get(tol2_check->getType(), 0u));
+        auto *tol_check = builder.CreateLogicalAnd(tol1_check, tol2_check);
         // NOTE: we need OR reduction in batch mode: continue if *any* element of the batch
         // needs more iterations.
         auto *tol_cond = (batch_size == 1u) ? tol_check : builder.CreateOrReduce(tol_check);
@@ -1248,7 +1243,7 @@ llvm::Function *llvm_add_inv_kep_DE(llvm_state &s, llvm::Type *fp_t, std::uint32
         auto *c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
 
         // Combine tolerance check and number of iterations check with a logical AND.
-        return builder.CreateSelect(c_cond, tol_cond, llvm::ConstantInt::get(tol_cond->getType(), 0u));
+        return builder.CreateLogicalAnd(c_cond, tol_cond);
     };
 
     // Run the loop.

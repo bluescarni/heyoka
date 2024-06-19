@@ -2948,10 +2948,8 @@ llvm::Value *llvm_dl_lt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
     auto *cond1 = llvm_fcmp_olt(state, x_hi, y_hi);
     auto *cond2 = llvm_fcmp_oeq(state, x_hi, y_hi);
     auto *cond3 = llvm_fcmp_olt(state, x_lo, y_lo);
-    // NOTE: this is a logical AND.
-    auto *cond4 = builder.CreateSelect(cond2, cond3, llvm::ConstantInt::getNullValue(cond3->getType()));
-    // NOTE: this is a logical OR.
-    auto *cond = builder.CreateSelect(cond1, llvm::ConstantInt::getAllOnesValue(cond4->getType()), cond4);
+    auto *cond4 = builder.CreateLogicalAnd(cond2, cond3);
+    auto *cond = builder.CreateLogicalOr(cond1, cond4);
 
     return cond;
 }
@@ -2968,10 +2966,8 @@ llvm::Value *llvm_dl_gt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
     auto *cond1 = llvm_fcmp_ogt(state, x_hi, y_hi);
     auto *cond2 = llvm_fcmp_oeq(state, x_hi, y_hi);
     auto *cond3 = llvm_fcmp_ogt(state, x_lo, y_lo);
-    // NOTE: this is a logical AND.
-    auto *cond4 = builder.CreateSelect(cond2, cond3, llvm::ConstantInt::getNullValue(cond3->getType()));
-    // NOTE: this is a logical OR.
-    auto *cond = builder.CreateSelect(cond1, llvm::ConstantInt::getAllOnesValue(cond4->getType()), cond4);
+    auto *cond4 = builder.CreateLogicalAnd(cond2, cond3);
+    auto *cond = builder.CreateLogicalOr(cond1, cond4);
 
     return cond;
 }
