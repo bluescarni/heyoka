@@ -73,6 +73,11 @@ TEST_CASE("basic")
     auto [x, y] = make_vars("x", "y");
 
     REQUIRE(expression{func{detail::rel_impl{}}} == eq(1_dbl, 1_dbl));
+
+    REQUIRE(eq(x, y) == eq(x, y));
+    REQUIRE(eq(x, y) != neq(x, y));
+    REQUIRE(lte(x, y) != gte(x, y));
+    REQUIRE(lte(x, y) == lte(x, y));
 }
 
 TEST_CASE("stream")
