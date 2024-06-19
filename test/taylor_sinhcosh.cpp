@@ -352,7 +352,7 @@ TEST_CASE("taylor sinhcosh")
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>(
                 {prime(x) = sinh(expression{number{fp_t{2}}}) + cosh(expression{number{fp_t{3}}}), prime(y) = x + y},
-                opt_level, high_accuracy, compact_mode, rng, -10.f, 10.f);
+                opt_level, high_accuracy, compact_mode, rng, -10.f, 10.f, fp_t(10000));
         }
 
         // Variable tests.
@@ -507,7 +507,7 @@ TEST_CASE("taylor sinhcosh")
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>({prime(x) = sinh(y), prime(y) = cosh(x)}, opt_level, high_accuracy, compact_mode,
-                                       rng, -10.f, 10.f);
+                                       rng, -10.f, 10.f, fp_t(10000));
         }
     };
 
