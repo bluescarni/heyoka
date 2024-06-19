@@ -3230,6 +3230,8 @@ llvm::Value *llvm_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
     assert(n != nullptr);
     assert(fp_t != nullptr);
 
+    assert(n->getType()->getScalarType()->isIntegerTy());
+
 #if !defined(NDEBUG)
     if (n->getType()->isVectorTy()) {
         assert(fp_t->isVectorTy());
