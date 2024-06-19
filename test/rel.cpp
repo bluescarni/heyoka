@@ -33,6 +33,7 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/relational.hpp>
@@ -65,6 +66,13 @@ constexpr bool skip_batch_ld =
     false
 #endif
     ;
+
+TEST_CASE("basic")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(expression{func{detail::rel_impl{}}} == eq(1_dbl, 1_dbl));
+}
 
 TEST_CASE("stream")
 {
