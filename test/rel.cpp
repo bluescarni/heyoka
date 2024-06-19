@@ -14,6 +14,7 @@
 #include <sstream>
 #include <tuple>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -129,7 +130,7 @@ TEST_CASE("s11n")
 
     auto [x, y] = make_vars("x", "y");
 
-    auto ex = eq(x, y);
+    auto ex = lt(x, y);
 
     {
         boost::archive::binary_oarchive oa(ss);
@@ -145,7 +146,8 @@ TEST_CASE("s11n")
         ia >> ex;
     }
 
-    REQUIRE(ex == eq(x, y));
+    REQUIRE(ex == lt(x, y));
+    REQUIRE(std::get<func>(ex.value()).extract<detail::rel_impl>()->get_op() == detail::rel_op::lt);
 }
 
 TEST_CASE("cfunc")

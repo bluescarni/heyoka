@@ -43,6 +43,8 @@ public:
     rel_impl();
     explicit rel_impl(rel_op, expression, expression);
 
+    [[nodiscard]] rel_op get_op() const noexcept;
+
     void to_stream(std::ostringstream &) const;
 
     [[nodiscard]] std::vector<expression> gradient() const;

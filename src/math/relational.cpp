@@ -73,6 +73,11 @@ rel_impl::rel_impl(rel_op op, expression a, expression b)
 {
 }
 
+rel_op rel_impl::get_op() const noexcept
+{
+    return m_op;
+}
+
 void rel_impl::to_stream(std::ostringstream &oss) const
 {
     assert(args().size() == 2u);
