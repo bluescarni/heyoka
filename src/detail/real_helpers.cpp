@@ -600,6 +600,22 @@ llvm::Value *llvm_real_fcmp_one(llvm_state &s, llvm::Value *a, llvm::Value *b)
     return s.builder().CreateICmpEQ(ret, llvm::ConstantInt::getNullValue(ret->getType()));
 }
 
+llvm::Value *llvm_real_fnz(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    // Check if x is zero.
+    auto *f = real_nary_cmp(s, x->getType(), "mpfr_zero_p", 1u);
+    auto *ret = builder.CreateCall(f, x);
+
+    // NOTE: this creates a logical NOT.
+    return builder.CreateICmpEQ(ret, llvm::ConstantInt::getNullValue(ret->getType()));
+}
+
 // Convert the input unsigned integral value n to the real type fp_t.
 llvm::Value *llvm_real_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
 {
