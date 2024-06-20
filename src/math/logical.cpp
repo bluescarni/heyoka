@@ -6,8 +6,10 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <iterator>
 #include <utility>
 #include <vector>
 
@@ -44,27 +46,27 @@ std::vector<expression> logical_and_impl::gradient() const
 namespace
 {
 
-// NOTE: perhaps it could be worth it to implement this via a pairwise reduction. We cannot
-// do this right now because we need to transform args via llvm_fnz() before performing the
-// reduction and pairwise_reduce() does not support this pre-transform.
-template <bool IsAnd>
-llvm::Value *logical_andor_eval_impl(llvm_state &s, const std::vector<llvm::Value *> &args)
+llvm::Value *logical_andor_eval_impl(llvm_state &s, const std::vector<llvm::Value *> &args, bool is_and)
 {
     assert(!args.empty());
 
     auto &builder = s.builder();
 
-    auto *ret = llvm_fnz(s, args[0]);
+    // Convert the values in args into booleans.
+    std::vector<llvm::Value *> tmp;
+    tmp.reserve(args.size());
+    std::ranges::transform(args, std::back_inserter(tmp), [&s](auto *v) { return llvm_fnz(s, v); });
 
-    for (decltype(args.size()) i = 1; i < args.size(); ++i) {
-        auto *tmp = llvm_fnz(s, args[i]);
-        if constexpr (IsAnd) {
-            ret = builder.CreateLogicalAnd(ret, tmp);
+    // Run a pairwise AND/OR reduction on the transformed values.
+    auto *ret = pairwise_reduce(tmp, [&builder, is_and](auto *a, auto *b) {
+        if (is_and) {
+            return builder.CreateLogicalAnd(a, b);
         } else {
-            ret = builder.CreateLogicalOr(ret, tmp);
+            return builder.CreateLogicalOr(a, b);
         }
-    }
+    });
 
+    // Convert back to floating-point.
     return llvm_ui_to_fp(s, ret, args[0]->getType());
 }
 
@@ -75,7 +77,7 @@ llvm::Value *logical_and_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const 
                                          std::uint32_t batch_size, bool high_accuracy) const
 {
     return llvm_eval_helper(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return logical_andor_eval_impl<true>(s, args); }, *this, s,
+        [&s](const std::vector<llvm::Value *> &args, bool) { return logical_andor_eval_impl(s, args, true); }, *this, s,
         fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
@@ -84,7 +86,7 @@ llvm::Function *logical_and_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp
 {
     return llvm_c_eval_func_helper(
         "logical_and",
-        [&s](const std::vector<llvm::Value *> &args, bool) { return logical_andor_eval_impl<true>(s, args); }, *this, s,
+        [&s](const std::vector<llvm::Value *> &args, bool) { return logical_andor_eval_impl(s, args, true); }, *this, s,
         fp_t, batch_size, high_accuracy);
 }
 
@@ -105,7 +107,7 @@ llvm::Value *logical_or_impl::llvm_eval(llvm_state &s, llvm::Type *fp_t, const s
                                         std::uint32_t batch_size, bool high_accuracy) const
 {
     return llvm_eval_helper(
-        [&s](const std::vector<llvm::Value *> &args, bool) { return logical_andor_eval_impl<false>(s, args); }, *this,
+        [&s](const std::vector<llvm::Value *> &args, bool) { return logical_andor_eval_impl(s, args, false); }, *this,
         s, fp_t, eval_arr, par_ptr, stride, batch_size, high_accuracy);
 }
 
@@ -114,7 +116,7 @@ llvm::Function *logical_or_impl::llvm_c_eval_func(llvm_state &s, llvm::Type *fp_
 {
     return llvm_c_eval_func_helper(
         "logical_or",
-        [&s](const std::vector<llvm::Value *> &args, bool) { return logical_andor_eval_impl<false>(s, args); }, *this,
+        [&s](const std::vector<llvm::Value *> &args, bool) { return logical_andor_eval_impl(s, args, false); }, *this,
         s, fp_t, batch_size, high_accuracy);
 }
 
