@@ -31,6 +31,7 @@
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/relational.hpp>
 #include <heyoka/math/relu.hpp>
+#include <heyoka/math/select.hpp>
 #include <heyoka/math/sigmoid.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sinh.hpp>
