@@ -314,6 +314,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/constants.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/dfun.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/relational.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/logical.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/logging_impl.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/step_callback.cpp"

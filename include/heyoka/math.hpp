@@ -26,6 +26,7 @@
 #include <heyoka/math/kepE.hpp>
 #include <heyoka/math/kepF.hpp>
 #include <heyoka/math/log.hpp>
+#include <heyoka/math/logical.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/prod.hpp>
 #include <heyoka/math/relational.hpp>
