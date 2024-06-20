@@ -45,12 +45,35 @@ public:
     [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
 };
 
+class HEYOKA_DLL_PUBLIC logical_or_impl : public func_base
+{
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+    }
+
+public:
+    logical_or_impl();
+    explicit logical_or_impl(std::vector<expression>);
+
+    [[nodiscard]] std::vector<expression> gradient() const;
+
+    [[nodiscard]] llvm::Value *llvm_eval(llvm_state &, llvm::Type *, const std::vector<llvm::Value *> &, llvm::Value *,
+                                         llvm::Value *, llvm::Value *, std::uint32_t, bool) const;
+
+    [[nodiscard]] llvm::Function *llvm_c_eval_func(llvm_state &, llvm::Type *, std::uint32_t, bool) const;
+};
+
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression logical_and(std::vector<expression>);
+HEYOKA_DLL_PUBLIC expression logical_or(std::vector<expression>);
 
 HEYOKA_END_NAMESPACE
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::logical_and_impl)
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::logical_or_impl)
 
 #endif
