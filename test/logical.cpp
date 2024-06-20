@@ -67,6 +67,13 @@ constexpr bool skip_batch_ld =
 #endif
     ;
 
+#if defined(__GNUC__) || defined(__clang__)
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-conversion"
+
+#endif
+
 TEST_CASE("basic")
 {
     auto x = make_vars("x");
@@ -431,5 +438,11 @@ TEST_CASE("cfunc logical_or mp")
 
     REQUIRE(outs[0] == 1);
 }
+
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+
+#pragma GCC diagnostic pop
 
 #endif
