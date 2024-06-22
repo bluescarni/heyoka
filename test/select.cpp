@@ -39,8 +39,10 @@
 #include <heyoka/math/logical.hpp>
 #include <heyoka/math/relational.hpp>
 #include <heyoka/math/select.hpp>
+#include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
 #include "test_utils.hpp"
@@ -233,3 +235,150 @@ TEST_CASE("cfunc mp")
 }
 
 #endif
+
+TEST_CASE("taylor_adaptive")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto cm : {false, true}) {
+            auto ta1 = taylor_adaptive{
+                {prime(x) = v, prime(v) = -sin(x)}, {1.23, 0.}, kw::compact_mode = cm, kw::opt_level = opt_level};
+
+            auto ta2 = taylor_adaptive{
+                {prime(x) = v, prime(v) = -(1. + select(gt(x, 1.24_dbl), 1. - par[0], 0_dbl)) * sin(x)},
+                {1.23, 0.},
+                kw::compact_mode = cm,
+                kw::opt_level = opt_level};
+
+            if (opt_level == 0u && cm) {
+                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.select.var_var_num."));
+            }
+
+            ta1.propagate_until(5.);
+            ta2.propagate_until(5.);
+
+            REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
+            REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
+
+            ta1 = taylor_adaptive{
+                {prime(x) = v, prime(v) = -2. * sin(x)}, {1.23, 0.}, kw::compact_mode = cm, kw::opt_level = opt_level};
+            ta2 = taylor_adaptive{{prime(x) = v, prime(v) = -(1. + select(lt(x, 1.24_dbl), par[0], 0_dbl)) * sin(x)},
+                                  {1.23, 0.},
+                                  kw::compact_mode = cm,
+                                  kw::opt_level = opt_level,
+                                  kw::pars = {1.}};
+
+            if (opt_level == 0u && cm) {
+                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.select.var_par_num."));
+            }
+
+            ta1.propagate_until(5.);
+            ta2.propagate_until(5.);
+
+            REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
+            REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
+
+            ta1 = taylor_adaptive{
+                {prime(x) = v, prime(v) = -2. * sin(x)}, {1.23, 0.}, kw::compact_mode = cm, kw::opt_level = opt_level};
+            ta2 = taylor_adaptive{{prime(x) = v, prime(v) = -(1. + select(par[0], par[0], 0_dbl)) * sin(x)},
+                                  {1.23, 0.},
+                                  kw::compact_mode = cm,
+                                  kw::opt_level = opt_level,
+                                  kw::pars = {1.}};
+
+            if (opt_level == 0u && cm) {
+                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.select.par_par_num."));
+            }
+
+            ta1.propagate_until(5.);
+            ta2.propagate_until(5.);
+
+            REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
+            REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
+        }
+    }
+}
+
+TEST_CASE("taylor_adaptive_batch")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto cm : {false, true}) {
+            auto ta1 = taylor_adaptive_batch{{prime(x) = v, prime(v) = -sin(x)},
+                                             {1.23, 1.22, 0., 0.},
+                                             2u,
+                                             kw::compact_mode = cm,
+                                             kw::opt_level = opt_level};
+
+            auto ta2 = taylor_adaptive_batch{
+                {prime(x) = v, prime(v) = -(1. + select(gt(x, 1.24_dbl), 1. - par[0], 0_dbl)) * sin(x)},
+                {1.23, 1.22, 0., 0.},
+                2u,
+                kw::compact_mode = cm,
+                kw::opt_level = opt_level};
+
+            if (opt_level == 0u && cm) {
+                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.select.var_var_num."));
+            }
+
+            ta1.propagate_until(5.);
+            ta2.propagate_until(5.);
+
+            REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
+            REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
+            REQUIRE(ta1.get_state()[2] == approximately(ta2.get_state()[2]));
+            REQUIRE(ta1.get_state()[3] == approximately(ta2.get_state()[3]));
+
+            ta1 = taylor_adaptive_batch{{prime(x) = v, prime(v) = -2. * sin(x)},
+                                        {1.23, 1.22, 0., 0.},
+                                        2u,
+                                        kw::compact_mode = cm,
+                                        kw::opt_level = opt_level};
+            ta2 = taylor_adaptive_batch{
+                {prime(x) = v, prime(v) = -(1. + select(lt(x, 1.24_dbl), par[0], 0_dbl)) * sin(x)},
+                {1.23, 1.22, 0., 0.},
+                2u,
+                kw::compact_mode = cm,
+                kw::opt_level = opt_level,
+                kw::pars = {1., 1.}};
+
+            if (opt_level == 0u && cm) {
+                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.select.var_par_num."));
+            }
+
+            ta1.propagate_until(5.);
+            ta2.propagate_until(5.);
+
+            REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
+            REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
+            REQUIRE(ta1.get_state()[2] == approximately(ta2.get_state()[2]));
+            REQUIRE(ta1.get_state()[3] == approximately(ta2.get_state()[3]));
+
+            ta1 = taylor_adaptive_batch{{prime(x) = v, prime(v) = -2. * sin(x)},
+                                        {1.23, 1.22, 0., 0.},
+                                        2u,
+                                        kw::compact_mode = cm,
+                                        kw::opt_level = opt_level};
+            ta2 = taylor_adaptive_batch{{prime(x) = v, prime(v) = -(1. + select(par[0], par[0], 0_dbl)) * sin(x)},
+                                        {1.23, 1.22, 0., 0.},
+                                        2u,
+                                        kw::compact_mode = cm,
+                                        kw::opt_level = opt_level,
+                                        kw::pars = {1., 1.}};
+
+            if (opt_level == 0u && cm) {
+                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.select.par_par_num."));
+            }
+
+            ta1.propagate_until(5.);
+            ta2.propagate_until(5.);
+
+            REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
+            REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
+            REQUIRE(ta1.get_state()[2] == approximately(ta2.get_state()[2]));
+            REQUIRE(ta1.get_state()[3] == approximately(ta2.get_state()[3]));
+        }
+    }
+}
