@@ -494,6 +494,68 @@ TEST_CASE("taylor_adaptive")
     }
 }
 
+TEST_CASE("taylor_adaptive_batch")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto cm : {false, true}) {
+            auto ta1 = taylor_adaptive_batch{{prime(x) = v, prime(v) = -sin(x)},
+                                             {1.23, 1.22, 0., 0.},
+                                             2u,
+                                             kw::compact_mode = cm,
+                                             kw::opt_level = opt_level};
+
+            auto ta2 = taylor_adaptive_batch{
+                {prime(x) = v, prime(v) = -(1. + logical_and({lt(x, 1.24_dbl), gt(x, 1.24_dbl), 0_dbl})) * sin(x)},
+                {1.23, 1.22, 0., 0.},
+                2u,
+                kw::compact_mode = cm,
+                kw::opt_level = opt_level};
+
+            if (opt_level == 0u && cm) {
+                REQUIRE(
+                    boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_and.var_var_num."));
+                REQUIRE(!boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_or"));
+            }
+
+            ta1.propagate_until(5.);
+            ta2.propagate_until(5.);
+
+            REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
+            REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
+            REQUIRE(ta1.get_state()[2] == approximately(ta2.get_state()[2]));
+            REQUIRE(ta1.get_state()[3] == approximately(ta2.get_state()[3]));
+
+            ta1 = taylor_adaptive_batch{{prime(x) = v, prime(v) = -2. * sin(x)},
+                                        {1.23, 1.22, 0., 0.},
+                                        2u,
+                                        kw::compact_mode = cm,
+                                        kw::opt_level = opt_level};
+            ta2 = taylor_adaptive_batch{
+                {prime(x) = v, prime(v) = -(1. + logical_or({lt(x, par[0]), gte(x, par[0]), par[0]})) * sin(x)},
+                {1.23, 1.22, 0., 0.},
+                2u,
+                kw::compact_mode = cm,
+                kw::opt_level = opt_level,
+                kw::pars = {1.24, 1.25}};
+
+            if (opt_level == 0u && cm) {
+                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_or.var_var_par."));
+                REQUIRE(!boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_and"));
+            }
+
+            ta1.propagate_until(5.);
+            ta2.propagate_until(5.);
+
+            REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
+            REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
+            REQUIRE(ta1.get_state()[2] == approximately(ta2.get_state()[2]));
+            REQUIRE(ta1.get_state()[3] == approximately(ta2.get_state()[3]));
+        }
+    }
+}
+
 #if defined(__GNUC__) || defined(__clang__)
 
 #pragma GCC diagnostic pop
