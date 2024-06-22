@@ -80,6 +80,22 @@ TEST_CASE("basic")
     REQUIRE(eq(x, y) != neq(x, y));
     REQUIRE(lte(x, y) != gte(x, y));
     REQUIRE(lte(x, y) == lte(x, y));
+
+    // Test a couple of numerical overloads too.
+    REQUIRE(eq(x, 1.) == eq(x, 1_dbl));
+    REQUIRE(lte(1.l, par[0]) == lte(1_ldbl, par[0]));
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    REQUIRE(lte(mppp::real128{"1.1"}, par[0]) == lte(1.1_f128, par[0]));
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(lte(mppp::real{"1.1", 14}, par[0]) == lte(expression{mppp::real{"1.1", 14}}, par[0]));
+
+#endif
 }
 
 TEST_CASE("stream")

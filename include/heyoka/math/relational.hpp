@@ -9,11 +9,24 @@
 #ifndef HEYOKA_MATH_RELATIONAL_HPP
 #define HEYOKA_MATH_RELATIONAL_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cstdint>
 #include <sstream>
 #include <vector>
 
-#include <heyoka/config.hpp>
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -70,6 +83,38 @@ HEYOKA_DLL_PUBLIC expression lt(expression, expression);
 HEYOKA_DLL_PUBLIC expression gt(expression, expression);
 HEYOKA_DLL_PUBLIC expression lte(expression, expression);
 HEYOKA_DLL_PUBLIC expression gte(expression, expression);
+
+#define HEYOKA_DECLARE_REL_OVERLOADS(type)                                                                             \
+    HEYOKA_DLL_PUBLIC expression eq(expression, type);                                                                 \
+    HEYOKA_DLL_PUBLIC expression eq(type, expression);                                                                 \
+    HEYOKA_DLL_PUBLIC expression neq(expression, type);                                                                \
+    HEYOKA_DLL_PUBLIC expression neq(type, expression);                                                                \
+    HEYOKA_DLL_PUBLIC expression lt(expression, type);                                                                 \
+    HEYOKA_DLL_PUBLIC expression lt(type, expression);                                                                 \
+    HEYOKA_DLL_PUBLIC expression gt(expression, type);                                                                 \
+    HEYOKA_DLL_PUBLIC expression gt(type, expression);                                                                 \
+    HEYOKA_DLL_PUBLIC expression lte(expression, type);                                                                \
+    HEYOKA_DLL_PUBLIC expression lte(type, expression);                                                                \
+    HEYOKA_DLL_PUBLIC expression gte(expression, type);                                                                \
+    HEYOKA_DLL_PUBLIC expression gte(type, expression);
+
+HEYOKA_DECLARE_REL_OVERLOADS(float);
+HEYOKA_DECLARE_REL_OVERLOADS(double);
+HEYOKA_DECLARE_REL_OVERLOADS(long double);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DECLARE_REL_OVERLOADS(mppp::real128);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_DECLARE_REL_OVERLOADS(mppp::real);
+
+#endif
+
+#undef HEYOKA_DECLARE_REL_OVERLOADS
 
 HEYOKA_END_NAMESPACE
 

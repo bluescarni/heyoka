@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <concepts>
 #include <cstdint>
@@ -26,7 +28,18 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
-#include <heyoka/config.hpp>
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
@@ -354,6 +367,76 @@ HEYOKA_MATH_REL_IMPL(lte)
 HEYOKA_MATH_REL_IMPL(gte)
 
 #undef HEYOKA_MATH_REL_IMPL
+
+// NOTE: this macro was copy-pasted from the kepE() overloads, hence
+// the weird (but inconsequential) naming of the function arguments.
+#define HEYOKA_DEFINE_REL_OVERLOADS(type)                                                                              \
+    expression eq(expression e, type M)                                                                                \
+    {                                                                                                                  \
+        return eq(std::move(e), expression{std::move(M)});                                                             \
+    }                                                                                                                  \
+    expression eq(type e, expression M)                                                                                \
+    {                                                                                                                  \
+        return eq(expression{std::move(e)}, std::move(M));                                                             \
+    }                                                                                                                  \
+    expression neq(expression e, type M)                                                                               \
+    {                                                                                                                  \
+        return neq(std::move(e), expression{std::move(M)});                                                            \
+    }                                                                                                                  \
+    expression neq(type e, expression M)                                                                               \
+    {                                                                                                                  \
+        return neq(expression{std::move(e)}, std::move(M));                                                            \
+    }                                                                                                                  \
+    expression lt(expression e, type M)                                                                                \
+    {                                                                                                                  \
+        return lt(std::move(e), expression{std::move(M)});                                                             \
+    }                                                                                                                  \
+    expression lt(type e, expression M)                                                                                \
+    {                                                                                                                  \
+        return lt(expression{std::move(e)}, std::move(M));                                                             \
+    }                                                                                                                  \
+    expression gt(expression e, type M)                                                                                \
+    {                                                                                                                  \
+        return gt(std::move(e), expression{std::move(M)});                                                             \
+    }                                                                                                                  \
+    expression gt(type e, expression M)                                                                                \
+    {                                                                                                                  \
+        return gt(expression{std::move(e)}, std::move(M));                                                             \
+    }                                                                                                                  \
+    expression lte(expression e, type M)                                                                               \
+    {                                                                                                                  \
+        return lte(std::move(e), expression{std::move(M)});                                                            \
+    }                                                                                                                  \
+    expression lte(type e, expression M)                                                                               \
+    {                                                                                                                  \
+        return lte(expression{std::move(e)}, std::move(M));                                                            \
+    }                                                                                                                  \
+    expression gte(expression e, type M)                                                                               \
+    {                                                                                                                  \
+        return gte(std::move(e), expression{std::move(M)});                                                            \
+    }                                                                                                                  \
+    expression gte(type e, expression M)                                                                               \
+    {                                                                                                                  \
+        return gte(expression{std::move(e)}, std::move(M));                                                            \
+    }
+
+HEYOKA_DEFINE_REL_OVERLOADS(float)
+HEYOKA_DEFINE_REL_OVERLOADS(double)
+HEYOKA_DEFINE_REL_OVERLOADS(long double)
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DEFINE_REL_OVERLOADS(mppp::real128);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_DEFINE_REL_OVERLOADS(mppp::real);
+
+#endif
+
+#undef HEYOKA_DEFINE_REL_OVERLOADS
 
 HEYOKA_END_NAMESPACE
 

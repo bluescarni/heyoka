@@ -9,10 +9,23 @@
 #ifndef HEYOKA_MATH_SELECT_HPP
 #define HEYOKA_MATH_SELECT_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cstdint>
 #include <vector>
 
-#include <heyoka/config.hpp>
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -55,6 +68,32 @@ public:
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression select(expression, expression, expression);
+
+#define HEYOKA_DECLARE_SELECT_OVERLOADS(type)                                                                          \
+    HEYOKA_DLL_PUBLIC expression select(expression, type, type);                                                       \
+    HEYOKA_DLL_PUBLIC expression select(type, expression, type);                                                       \
+    HEYOKA_DLL_PUBLIC expression select(type, type, expression);                                                       \
+    HEYOKA_DLL_PUBLIC expression select(expression, expression, type);                                                 \
+    HEYOKA_DLL_PUBLIC expression select(expression, type, expression);                                                 \
+    HEYOKA_DLL_PUBLIC expression select(type, expression, expression)
+
+HEYOKA_DECLARE_SELECT_OVERLOADS(float);
+HEYOKA_DECLARE_SELECT_OVERLOADS(double);
+HEYOKA_DECLARE_SELECT_OVERLOADS(long double);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DECLARE_SELECT_OVERLOADS(mppp::real128);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_DECLARE_SELECT_OVERLOADS(mppp::real);
+
+#endif
+
+#undef HEYOKA_DECLARE_SELECT_OVERLOADS
 
 HEYOKA_END_NAMESPACE
 

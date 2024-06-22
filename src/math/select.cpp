@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <concepts>
 #include <cstdint>
@@ -23,7 +25,18 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
-#include <heyoka/config.hpp>
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+#include <mp++/real.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
@@ -267,6 +280,52 @@ expression select(expression cond, expression t, expression f)
 {
     return expression{func{detail::select_impl{std::move(cond), std::move(t), std::move(f)}}};
 }
+
+// NOTE: this macro was copy-pasted from the kepDE() overloads, hence
+// the weird (but inconsequential) naming of the function arguments.
+#define HEYOKA_DEFINE_SELECT_OVERLOADS(type)                                                                           \
+    expression select(expression s0, type c0, type DM)                                                                 \
+    {                                                                                                                  \
+        return select(std::move(s0), expression{std::move(c0)}, expression{std::move(DM)});                            \
+    }                                                                                                                  \
+    expression select(type s0, expression c0, type DM)                                                                 \
+    {                                                                                                                  \
+        return select(expression{std::move(s0)}, std::move(c0), expression{std::move(DM)});                            \
+    }                                                                                                                  \
+    expression select(type s0, type c0, expression DM)                                                                 \
+    {                                                                                                                  \
+        return select(expression{std::move(s0)}, expression{std::move(c0)}, std::move(DM));                            \
+    }                                                                                                                  \
+    expression select(expression s0, expression c0, type DM)                                                           \
+    {                                                                                                                  \
+        return select(std::move(s0), std::move(c0), expression{std::move(DM)});                                        \
+    }                                                                                                                  \
+    expression select(expression s0, type c0, expression DM)                                                           \
+    {                                                                                                                  \
+        return select(std::move(s0), expression{std::move(c0)}, std::move(DM));                                        \
+    }                                                                                                                  \
+    expression select(type s0, expression c0, expression DM)                                                           \
+    {                                                                                                                  \
+        return select(expression{std::move(s0)}, std::move(c0), std::move(DM));                                        \
+    }
+
+HEYOKA_DEFINE_SELECT_OVERLOADS(float)
+HEYOKA_DEFINE_SELECT_OVERLOADS(double)
+HEYOKA_DEFINE_SELECT_OVERLOADS(long double)
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DEFINE_SELECT_OVERLOADS(mppp::real128);
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+HEYOKA_DEFINE_SELECT_OVERLOADS(mppp::real);
+
+#endif
+
+#undef HEYOKA_DEFINE_SELECT_OVERLOADS
 
 HEYOKA_END_NAMESPACE
 

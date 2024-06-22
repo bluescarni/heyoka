@@ -76,6 +76,23 @@ TEST_CASE("basic")
     auto [x, y, z] = make_vars("x", "y", "z");
 
     REQUIRE(expression{func{detail::select_impl{}}} == expression{func{detail::select_impl{0_dbl, 0_dbl, 0_dbl}}});
+
+    // A couple of tests for the numeric overloads.
+    REQUIRE(select(1., x, 2.) == select(1_dbl, x, 2_dbl));
+    REQUIRE(select(x, par[0], 2.f) == select(x, par[0], 2_flt));
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    REQUIRE(select(mppp::real128{"3.1"}, x, mppp::real128{"2.1"}) == select(3.1_f128, x, 2.1_f128));
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL)
+
+    REQUIRE(select(mppp::real{"3.1", 14}, x, mppp::real{"2.1", 14})
+            == select(expression{mppp::real{"3.1", 14}}, x, expression{mppp::real{"2.1", 14}}));
+
+#endif
 }
 
 TEST_CASE("stream")
