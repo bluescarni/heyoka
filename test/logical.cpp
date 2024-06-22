@@ -37,8 +37,11 @@
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/logical.hpp>
+#include <heyoka/math/relational.hpp>
+#include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
 #include "test_utils.hpp"
@@ -440,6 +443,56 @@ TEST_CASE("cfunc logical_or mp")
 }
 
 #endif
+
+TEST_CASE("taylor_adaptive")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    for (auto opt_level : {0u, 3u}) {
+        for (auto cm : {false, true}) {
+            auto ta1 = taylor_adaptive{
+                {prime(x) = v, prime(v) = -sin(x)}, {1.23, 0.}, kw::compact_mode = cm, kw::opt_level = opt_level};
+
+            auto ta2 = taylor_adaptive{
+                {prime(x) = v, prime(v) = -(1. + logical_and({lt(x, 1.24_dbl), gt(x, 1.24_dbl), 0_dbl})) * sin(x)},
+                {1.23, 0.},
+                kw::compact_mode = cm,
+                kw::opt_level = opt_level};
+
+            if (opt_level == 0u && cm) {
+                REQUIRE(
+                    boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_and.var_var_num."));
+                REQUIRE(!boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_or"));
+            }
+
+            ta1.propagate_until(5.);
+            ta2.propagate_until(5.);
+
+            REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
+            REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
+
+            ta1 = taylor_adaptive{
+                {prime(x) = v, prime(v) = -2. * sin(x)}, {1.23, 0.}, kw::compact_mode = cm, kw::opt_level = opt_level};
+            ta2 = taylor_adaptive{
+                {prime(x) = v, prime(v) = -(1. + logical_or({lt(x, par[0]), gte(x, par[0]), par[0]})) * sin(x)},
+                {1.23, 0.},
+                kw::compact_mode = cm,
+                kw::opt_level = opt_level,
+                kw::pars = {1.24}};
+
+            if (opt_level == 0u && cm) {
+                REQUIRE(boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_or.var_var_par."));
+                REQUIRE(!boost::contains(ta2.get_llvm_state().get_ir(), "heyoka.taylor_c_diff.logical_and"));
+            }
+
+            ta1.propagate_until(5.);
+            ta2.propagate_until(5.);
+
+            REQUIRE(ta1.get_state()[0] == approximately(ta2.get_state()[0]));
+            REQUIRE(ta1.get_state()[1] == approximately(ta2.get_state()[1]));
+        }
+    }
+}
 
 #if defined(__GNUC__) || defined(__clang__)
 
