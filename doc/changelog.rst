@@ -1,6 +1,17 @@
 Changelog
 =========
 
+5.1.0 (unreleased)
+------------------
+
+New
+~~~
+
+- Add the ``select()`` primitive to the expression system
+  (`#432 <https://github.com/bluescarni/heyoka/pull/432>`__).
+- Add relational and logical operators to the expression system
+  (`#432 <https://github.com/bluescarni/heyoka/pull/432>`__).
+
 5.0.0 (2024-06-13)
 ------------------
 
