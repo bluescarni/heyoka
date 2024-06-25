@@ -374,7 +374,7 @@ TEST_CASE("taylor acosh")
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>({prime(x) = acosh(expression{number{fp_t{1.625}}}), prime(y) = x + y}, opt_level,
-                                       high_accuracy, compact_mode, rng, 1.3f, 5.1f);
+                                       high_accuracy, compact_mode, rng, 1.2f, 5.1f, fp_t(10000));
         }
 
         // Variable tests.
@@ -536,7 +536,7 @@ TEST_CASE("taylor acosh")
         if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             // Do the batch/scalar comparison.
             compare_batch_scalar<fp_t>({prime(x) = acosh(y), prime(y) = acosh(x)}, opt_level, high_accuracy,
-                                       compact_mode, rng, 1.3f, 5.1f);
+                                       compact_mode, rng, 1.2f, 5.1f, fp_t(10000));
         }
     };
 

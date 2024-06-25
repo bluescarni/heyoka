@@ -748,9 +748,7 @@ llvm::Function *llvm_add_fex_check(llvm_state &s, llvm::Type *fp_t, std::uint32_
     // Check if the signs are equal and the low sign is nonzero.
     auto *cmp1 = builder.CreateICmpEQ(s_lo, s_hi);
     auto *cmp2 = builder.CreateICmpNE(s_lo, llvm::ConstantInt::get(s_lo->getType(), 0u));
-    // NOTE: this is a way of creating a logical AND between cmp1 and cmp2. LLVM 13 has a specific
-    // function for this.
-    auto *cmp = builder.CreateSelect(cmp1, cmp2, llvm::ConstantInt::get(cmp1->getType(), 0u));
+    auto *cmp = builder.CreateLogicalAnd(cmp1, cmp2);
     // Extend cmp to int32_t.
     auto *retval = builder.CreateZExt(cmp, make_vector_type(builder.getInt32Ty(), batch_size));
 

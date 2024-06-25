@@ -2041,6 +2041,57 @@ llvm::Value *llvm_fcmp_oeq(llvm_state &s, llvm::Value *a, llvm::Value *b)
     }
 }
 
+llvm::Value *llvm_fcmp_one(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    auto *fp_t = a->getType();
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return builder.CreateFCmpONE(a, b);
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm_real_fcmp_one(s, a, b);
+#endif
+    } else {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(fmt::format("Unable to fcmp_one values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
+    }
+}
+
+// Check if the input floating-point value(s) x is anything other
+// than zero (including NaN).
+llvm::Value *llvm_fnz(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    auto *fp_t = x->getType();
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
+        return builder.CreateFCmpUNE(x, llvm::ConstantFP::get(x->getType(), 0.));
+#if defined(HEYOKA_HAVE_REAL)
+    } else if (llvm_is_real(fp_t) != 0) {
+        return llvm_real_fnz(s, x);
+#endif
+    } else {
+        // LCOV_EXCL_START
+        throw std::invalid_argument(
+            fmt::format("Unable to invoke llvm_fnz() on values of type '{}'", llvm_type_name(fp_t)));
+        // LCOV_EXCL_STOP
+    }
+}
+
 // Helper to compute sin and cos simultaneously.
 // NOTE: although there exists a SLEEF function for computing sin/cos
 // at the same time, we cannot use it directly because it returns a pair
@@ -2923,10 +2974,8 @@ llvm::Value *llvm_dl_lt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
     auto *cond1 = llvm_fcmp_olt(state, x_hi, y_hi);
     auto *cond2 = llvm_fcmp_oeq(state, x_hi, y_hi);
     auto *cond3 = llvm_fcmp_olt(state, x_lo, y_lo);
-    // NOTE: this is a logical AND.
-    auto *cond4 = builder.CreateSelect(cond2, cond3, llvm::ConstantInt::getNullValue(cond3->getType()));
-    // NOTE: this is a logical OR.
-    auto *cond = builder.CreateSelect(cond1, llvm::ConstantInt::getAllOnesValue(cond4->getType()), cond4);
+    auto *cond4 = builder.CreateLogicalAnd(cond2, cond3);
+    auto *cond = builder.CreateLogicalOr(cond1, cond4);
 
     return cond;
 }
@@ -2943,10 +2992,8 @@ llvm::Value *llvm_dl_gt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
     auto *cond1 = llvm_fcmp_ogt(state, x_hi, y_hi);
     auto *cond2 = llvm_fcmp_oeq(state, x_hi, y_hi);
     auto *cond3 = llvm_fcmp_ogt(state, x_lo, y_lo);
-    // NOTE: this is a logical AND.
-    auto *cond4 = builder.CreateSelect(cond2, cond3, llvm::ConstantInt::getNullValue(cond3->getType()));
-    // NOTE: this is a logical OR.
-    auto *cond = builder.CreateSelect(cond1, llvm::ConstantInt::getAllOnesValue(cond4->getType()), cond4);
+    auto *cond4 = builder.CreateLogicalAnd(cond2, cond3);
+    auto *cond = builder.CreateLogicalOr(cond1, cond4);
 
     return cond;
 }
@@ -3198,16 +3245,26 @@ llvm::Type *llvm_ext_type(llvm::Type *fp_t)
     // LCOV_EXCL_STOP
 }
 
-// Convert the input unsigned integral value n to the floating-point type fp_t.
-// Vector types/values are not supported.
+// Convert the input unsigned integral value(s) n to the floating-point type fp_t.
+// If n is a scalar/vector, then fp_t must also be a scalar/vector type.
 llvm::Value *llvm_ui_to_fp(llvm_state &s, llvm::Value *n, llvm::Type *fp_t)
 {
     assert(n != nullptr);
     assert(fp_t != nullptr);
-    assert(!n->getType()->isVectorTy());
-    assert(!fp_t->isVectorTy());
 
-    if (fp_t->isFloatingPointTy()) {
+    assert(n->getType()->getScalarType()->isIntegerTy());
+
+#if !defined(NDEBUG)
+    if (n->getType()->isVectorTy()) {
+        assert(fp_t->isVectorTy());
+        assert(llvm::cast<llvm_vector_type>(n->getType())->getNumElements()
+               == llvm::cast<llvm_vector_type>(fp_t)->getNumElements());
+    } else {
+        assert(!fp_t->isVectorTy());
+    }
+#endif
+
+    if (fp_t->getScalarType()->isFloatingPointTy()) {
         return s.builder().CreateUIToFP(n, fp_t);
 #if defined(HEYOKA_HAVE_REAL)
     } else if (llvm_is_real(fp_t) != 0) {

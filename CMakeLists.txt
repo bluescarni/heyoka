@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 5.0.0 LANGUAGES CXX C)
+project(heyoka VERSION 5.1.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -313,6 +313,9 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/prod.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/constants.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/dfun.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/relational.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/logical.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/select.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/logging_impl.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/step_callback.cpp"
@@ -329,7 +332,7 @@ if(HEYOKA_WITH_SLEEF)
 endif()
 
 # Setup the heyoka ABI version number.
-set(HEYOKA_ABI_VERSION 28)
+set(HEYOKA_ABI_VERSION 29)
 
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.
