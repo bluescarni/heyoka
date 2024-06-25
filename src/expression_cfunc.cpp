@@ -62,6 +62,7 @@
 #endif
 
 #include <heyoka/detail/cm_utils.hpp>
+#include <heyoka/detail/debug.hpp>
 #include <heyoka/detail/fast_unordered.hpp>
 #include <heyoka/detail/func_cache.hpp>
 #include <heyoka/detail/llvm_func_create.hpp>
@@ -174,11 +175,15 @@ void verify_function_dec(const std::vector<expression> &orig, const std::vector<
             dc[i].value());
     }
 
-    std::unordered_map<std::string, expression> subs_map;
+    // NOTE: the next check can be quite heavy, skip it if requested.
+    if (!edb_enabled()) {
+        return;
+    }
 
     // For each u variable, expand its definition
     // in terms of the original variables or other u variables,
     // and store it in subs_map.
+    std::unordered_map<std::string, expression> subs_map;
     for (idx_t i = 0; i < dc.size() - nouts; ++i) {
         subs_map.emplace(fmt::format("u_{}", i), subs(dc[i], subs_map));
     }

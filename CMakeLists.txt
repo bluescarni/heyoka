@@ -191,6 +191,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/empty_callable_s11n.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/setup_variational_ics.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/tm_data.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/debug.cpp"
     # NOTE: this will be an empty file in case we are not
     # building with support for real.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/real_helpers.cpp"
