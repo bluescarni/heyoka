@@ -37,6 +37,20 @@ namespace model
 // https://aim.hamptonu.edu/archive/cips/documentation/software/common/astron_lib/
 //
 // (which is easier to read because it avoids GOTOs).
+//
+// Several numerical evaluations of this model have been compared to the
+// results from the Python sgp4 implementation:
+//
+// https://pypi.org/project/sgp4/
+//
+// Agreement seems ok, with a positional error which starts at <1mm for TSINCE=0,
+// somehow increasing to the 1cm level after 1 day of propagation (at least for some test
+// cases). This is far less than the expected 1-3km/day error by which the satellites
+// deviate from the ideal orbits described in TLE files. In any case, in the future and
+// if needed, we can always refer to the "official" code on celestrak (on which the Python
+// sgp4 module is based):
+//
+// https://celestrak.org/software/vallado-sw.php
 std::pair<std::vector<expression>, std::vector<expression>> sgp4()
 {
     // Several math wrappers used in the original fortran code.
@@ -176,9 +190,9 @@ std::pair<std::vector<expression>, std::vector<expression>> sgp4()
     const auto AYN = AYCOF / AB + E * sin(OMEGA);
 
     // Solve Kepler's equation.
-    // NOTE: the original report (on page 13) say that this step is about solving
+    // NOTE: the original report (on page 13) says that this step is about solving
     // Kepler's equations for E + omega. This is a quantity similar to the eccentric
-    // longitude F=F(h, k, lambda), implemented in heyoka as kepF():
+    // longitude F = F(h, k, lambda), implemented in heyoka as kepF():
     //
     // https://articles.adsabs.harvard.edu//full/1972CeMec...5..303B/0000309.000.html
     //

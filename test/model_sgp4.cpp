@@ -52,8 +52,6 @@ TEST_CASE("basic")
         REQUIRE(outs[5] == approximately(-5.265040553027974));
     }
 
-    // [N0, E0, I0, NODE0, OMEGA0, M0, BSTAR, TSINCE]
-
     {
         std::vector<double> ins = {revday2radmin(16.05824518), 0.0086731,         deg2rad(72.8435), deg2rad(115.9689),
                                    deg2rad(52.6988),           deg2rad(110.5714), .66816e-4,        0.},
@@ -67,5 +65,68 @@ TEST_CASE("basic")
         REQUIRE(outs[3] == approximately(2.912073280385506));
         REQUIRE(outs[4] == approximately(-0.9834179555026153));
         REQUIRE(outs[5] == approximately(-7.090816207952735));
+    }
+
+    {
+        std::vector<double> ins = {revday2radmin(13.75091047972192),
+                                   0.0024963,
+                                   deg2rad(90.2039),
+                                   deg2rad(55.5633),
+                                   deg2rad(320.5956),
+                                   deg2rad(91.4738),
+                                   0.75863e-3,
+                                   0.},
+                            outs(6u);
+
+        sgp4_cf(outs, ins);
+
+        REQUIRE(outs[0] == approximately(2561.2236598772));
+        REQUIRE(outs[1] == approximately(3698.7971429615));
+        REQUIRE(outs[2] == approximately(5818.7722139807));
+        REQUIRE(outs[3] == approximately(-3.2761425126425463));
+        REQUIRE(outs[4] == approximately(-4.806489081397908));
+        REQUIRE(outs[5] == approximately(4.511134500293972));
+    }
+
+    {
+        std::vector<double> ins = {revday2radmin(13.75091047972192),
+                                   0.0024963,
+                                   deg2rad(90.2039),
+                                   deg2rad(55.5633),
+                                   deg2rad(320.5956),
+                                   deg2rad(91.4738),
+                                   0.75863e-3,
+                                   70.},
+                            outs(6u);
+
+        sgp4_cf(outs, ins);
+
+        REQUIRE(outs[0] == approximately(1562.7283773281774));
+        REQUIRE(outs[1] == approximately(2322.0639519617216));
+        REQUIRE(outs[2] == approximately(-6796.866223211695));
+        REQUIRE(outs[3] == approximately(3.8565580810018645));
+        REQUIRE(outs[4] == approximately(5.607159620567683));
+        REQUIRE(outs[5] == approximately(2.8124612700451466));
+    }
+
+    {
+        std::vector<double> ins = {revday2radmin(13.75091047972192),
+                                   0.0024963,
+                                   deg2rad(90.2039),
+                                   deg2rad(55.5633),
+                                   deg2rad(320.5956),
+                                   deg2rad(91.4738),
+                                   0.75863e-3,
+                                   1440.},
+                            outs(6u);
+
+        sgp4_cf(outs, ins);
+
+        REQUIRE(outs[0] == approximately(3134.2015610758267));
+        REQUIRE(outs[1] == approximately(4604.9636618367485));
+        REQUIRE(outs[2] == approximately(-4791.661125321369));
+        REQUIRE(outs[3] == approximately(2.7320346123307453));
+        REQUIRE(outs[4] == approximately(3.9525897763872484));
+        REQUIRE(outs[5] == approximately(5.588906719554344));
     }
 }
