@@ -180,7 +180,7 @@ std::pair<std::vector<expression>, std::vector<expression>> sgp4()
     TEMPA = TEMPA - select(gte(PERIGE, SIMPHT), (D2 + (D3 + D4 * TSINCE) * TSINCE) * pow(TSINCE, 2.), 0.);
     TEMPL = TEMPL + select(gte(PERIGE, SIMPHT), (T3COF + (T4COF + T5COF * TSINCE) * TSINCE) * TSINCE, 0.);
     const auto A = A0DP * pow(TEMPA, 2.);
-    const auto N = KE / sqrt(pow(A, 3.));
+    const auto N = KE / pow(A, 3. / 2);
     const auto E = E0 - TEMPE * BSTAR;
     TEMPL = TEMPL * pow(TSINCE, 2.);
 
