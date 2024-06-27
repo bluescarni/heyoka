@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cassert>
+
 #include <heyoka/config.hpp>
 #include <heyoka/detail/debug.hpp>
 
@@ -18,9 +19,12 @@ namespace detail
 namespace
 {
 
+// Global flag to signal whether or not to enable
+// expensive debug checks. This is just used to avoid
+// excessive runtime in certain unit tests.
 bool edb_is_enabled = true;
 
-}
+} // namespace
 
 edb_disabler::edb_disabler()
 {

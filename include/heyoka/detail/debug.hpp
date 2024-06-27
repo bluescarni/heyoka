@@ -17,6 +17,7 @@ HEYOKA_BEGIN_NAMESPACE
 namespace detail
 {
 
+// RAII-style disabler of expensive debug checks.
 struct HEYOKA_DLL_PUBLIC edb_disabler {
     edb_disabler();
     ~edb_disabler();
@@ -27,6 +28,7 @@ struct HEYOKA_DLL_PUBLIC edb_disabler {
     edb_disabler &operator=(edb_disabler &&) = delete;
 };
 
+// Are expensive debug checks enabled?
 [[nodiscard]] HEYOKA_DLL_PUBLIC bool edb_enabled();
 
 } // namespace detail
