@@ -21,12 +21,9 @@ The :cpp:class:`cfunc` class
    class is available.
 
    .. cpp:type:: in_1d = mdspan<const T, dextents<std::size_t, 1>>
-
-   .. cpp:type:: out_1d = mdspan<T, dextents<std::size_t, 1>>
-
-   .. cpp:type:: in_2d = mdspan<const T, dextents<std::size_t, 2>>
-
-   .. cpp:type:: out_2d = mdspan<T, dextents<std::size_t, 2>>
+                 out_1d = mdspan<T, dextents<std::size_t, 1>>
+                 in_2d = mdspan<const T, dextents<std::size_t, 2>>
+                 out_2d = mdspan<T, dextents<std::size_t, 2>>
 
       Views over 1D and 2D input/output arrays.
 
