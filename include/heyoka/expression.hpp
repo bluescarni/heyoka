@@ -11,6 +11,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <concepts>
@@ -823,12 +824,28 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
 
     HEYOKA_DLL_LOCAL void check_valid(const char *) const;
 
+    // Small helper to turn an input range into a vector of expressions.
+    template <typename R>
+    static auto rng_to_vecex(R &&r)
+    {
+        auto tv = r | std::views::transform([]<typename U>(U &&x) { return expression{std::forward<U>(x)}; });
+
+        return std::vector(std::ranges::begin(tv), std::ranges::end(tv));
+    }
+
 public:
     cfunc() noexcept;
     template <typename... KwArgs>
         requires(!igor::has_unnamed_arguments<KwArgs...>())
     explicit cfunc(std::vector<expression> fn, std::vector<expression> vars, const KwArgs &...kw_args)
         : cfunc(std::move(fn), std::move(vars), parse_ctor_opts(kw_args...))
+    {
+    }
+    template <typename R, typename... KwArgs>
+        requires(!igor::has_unnamed_arguments<KwArgs...>())
+                && std::ranges::input_range<R> && std::constructible_from<expression, std::ranges::range_reference_t<R>>
+    explicit cfunc(std::vector<expression> fn, R &&rng, const KwArgs &...kw_args)
+        : cfunc(std::move(fn), rng_to_vecex(std::forward<R>(rng)), kw_args...)
     {
     }
     cfunc(const cfunc &);
