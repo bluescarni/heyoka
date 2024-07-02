@@ -27,7 +27,7 @@ namespace detail
 {
 
 template <typename... KwArgs>
-auto cr3bp_common_opts(KwArgs &&...kw_args)
+auto cr3bp_common_opts(const KwArgs &...kw_args)
 {
     igor::parser p{kw_args...};
 
@@ -49,13 +49,12 @@ HEYOKA_DLL_PUBLIC expression cr3bp_jacobi_impl(const expression &);
 
 // NOTE: non-dimensional c3bp dynamics in the usual rotating (synodic) reference frame.
 // Expressed in terms of canonical state variables.
-inline constexpr auto cr3bp = [](auto &&...kw_args) -> std::vector<std::pair<expression, expression>> {
-    return std::apply(detail::cr3bp_impl, detail::cr3bp_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
+inline constexpr auto cr3bp = [](const auto &...kw_args) -> std::vector<std::pair<expression, expression>> {
+    return std::apply(detail::cr3bp_impl, detail::cr3bp_common_opts(kw_args...));
 };
 
-inline constexpr auto cr3bp_jacobi = [](auto &&...kw_args) -> expression {
-    return std::apply(detail::cr3bp_jacobi_impl,
-                      detail::cr3bp_common_opts(std::forward<decltype(kw_args)>(kw_args)...));
+inline constexpr auto cr3bp_jacobi = [](const auto &...kw_args) -> expression {
+    return std::apply(detail::cr3bp_jacobi_impl, detail::cr3bp_common_opts(kw_args...));
 };
 
 } // namespace model
