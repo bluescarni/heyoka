@@ -64,9 +64,32 @@ namespace
 {
 
 // Constants.
+//
+// NOTE: here we are using the values from the wgs72 model,
+// taken from the C++ source code at:
+//
+// https://celestrak.org/software/vallado-sw.php
+//
+// Note that the original celestrak report #3, where sgp4
+// was first introduced, uses constants which are very slighly
+// different from the wgs72 model constants (specifically,
+// the KE constant differs). See the 'gravconsttype' enum
+// and the getgravconst() function in the C++ source code.
+//
+// According to the sgp4 Python documentation here
+//
+// https://pypi.org/project/sgp4/
+//
+// for optimal compatibility with existing tools, TLEs, etc.,
+// it is better to keep on using the wgs72 model constants,
+// even if using the newer wgs84 model constants could in
+// principle lead to slightly more accurate predictions.
+//
+// If needed, in the future we can implement the ability to select
+// the constants to use upon construction of the propagator class.
 constexpr auto KMPER = 6378.135;
 constexpr auto SIMPHT = 220. / KMPER;
-constexpr auto KE = 0.743669161e-1;
+constexpr auto KE = 0.07436691613317342;
 constexpr auto TOTHRD = 2 / 3.;
 constexpr auto J2 = 1.082616e-3;
 constexpr auto CK2 = .5 * J2;
@@ -75,16 +98,7 @@ constexpr auto S1 = 78. / KMPER;
 constexpr auto Q0 = 120. / KMPER;
 constexpr auto J3 = -0.253881e-5;
 constexpr auto A3OVK2 = -J3 / CK2;
-// NOTE: not sure if this is a mistake in the original code
-// or what else, but this constant (and this constant only)
-// was defined in single precision, rather than double.
-// Defining this constant directly in double precision
-// (rather than going through the cast) results
-// in subtle differences in several intermediate quantities computed
-// in the implementation. It probably does not matter too much in the
-// end as this is just the J4 coefficient and its overall effect on
-// the dynamics is miniscule, but still... why?
-constexpr auto J4 = static_cast<double>(-1.65597e-6f);
+constexpr auto J4 = -0.00000165597;
 constexpr auto CK4 = -.375 * J4;
 
 // NOTE: this is the first half of the SGP4 algorithm, which does not depend on
@@ -307,19 +321,13 @@ std::vector<expression> sgp4_time_prop(const auto &s, const expression &TSINCE =
 //
 // (which is easier to read because it avoids GOTOs).
 //
-// Several numerical evaluations of this model have been compared to the
-// results from the Python sgp4 implementation:
-//
-// https://pypi.org/project/sgp4/
-//
-// Agreement seems ok, with a positional error which starts at <1mm for TSINCE=0,
-// somehow increasing to the 1cm level after 1 day of propagation (at least for some test
-// cases). This is far less than the expected 1-3km/day error by which the satellites
-// deviate from the ideal orbits described in TLE files. In any case, in the future and
-// if needed, we can always refer to the "official" code on celestrak (on which the Python
-// sgp4 module is based):
+// In the unit tests, we are comparing a few propagations with those produced
+// by the 'official' C++ code:
 //
 // https://celestrak.org/software/vallado-sw.php
+//
+// The agreement seems fairly good, with the positional error always
+// well below the mm range.
 std::vector<expression> sgp4()
 {
     const auto init = sgp4_init();
