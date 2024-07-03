@@ -11,7 +11,6 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <array>
 #include <cassert>
 #include <concepts>
