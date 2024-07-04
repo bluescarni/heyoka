@@ -840,11 +840,13 @@ public:
         : cfunc(std::move(fn), std::move(vars), parse_ctor_opts(kw_args...))
     {
     }
-    template <typename R, typename... KwArgs>
-        requires(!igor::has_unnamed_arguments<KwArgs...>())
-                && std::ranges::input_range<R> && std::constructible_from<expression, std::ranges::range_reference_t<R>>
-    explicit cfunc(std::vector<expression> fn, R &&rng, const KwArgs &...kw_args)
-        : cfunc(std::move(fn), rng_to_vecex(std::forward<R>(rng)), kw_args...)
+    template <typename R1, typename R2, typename... KwArgs>
+        requires(!igor::has_unnamed_arguments<KwArgs...>()) && std::ranges::input_range<R1>
+                && std::constructible_from<expression, std::ranges::range_reference_t<R1>>
+                && std::ranges::input_range<R2>
+                && std::constructible_from<expression, std::ranges::range_reference_t<R2>>
+    explicit cfunc(R1 &&rng1, R2 &&rng2, const KwArgs &...kw_args)
+        : cfunc(rng_to_vecex(std::forward<R1>(rng1)), rng_to_vecex(std::forward<R2>(rng2)), kw_args...)
     {
     }
     cfunc(const cfunc &);
