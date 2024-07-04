@@ -73,10 +73,10 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
             throw std::invalid_argument("Cannot initialise an sgp4_propagator with an empty list of satellites");
         }
 
-        // Make own copy of the TLE elements + bstar for each satellite.
+        // Make own copy of the TLE elements + bstar + epoch for each satellite.
         std::vector<T> sat_buffer;
-        sat_buffer.reserve(boost::safe_numerics::safe<decltype(sat_buffer.size())>(in.extent(1)) * 7);
-        for (auto i = 0u; i < 7u; ++i) {
+        sat_buffer.reserve(boost::safe_numerics::safe<decltype(sat_buffer.size())>(in.extent(1)) * 9);
+        for (auto i = 0u; i < 9u; ++i) {
             for (std::size_t j = 0u; j < in.extent(1); ++j) {
                 sat_buffer.push_back(in(i, j));
             }
@@ -121,11 +121,17 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
     explicit sgp4_propagator(ptag, std::tuple<std::vector<T>, cfunc<T>, cfunc<T>, std::optional<dtens>>);
 
 public:
+    // Julian date with fractional correction.
+    struct date {
+        T jd = 0;
+        T frac = 0;
+    };
+
     sgp4_propagator() noexcept;
     template <typename LayoutPolicy, typename AccessorPolicy, typename... KwArgs>
         requires(!igor::has_unnamed_arguments<KwArgs...>())
     explicit sgp4_propagator(
-        mdspan<const T, extents<std::size_t, 7, std::dynamic_extent>, LayoutPolicy, AccessorPolicy> sat_list,
+        mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>, LayoutPolicy, AccessorPolicy> sat_list,
         const KwArgs &...kw_args)
         : sgp4_propagator(ptag{}, parse_ctor_args(sat_list, kw_args...))
     {
@@ -138,12 +144,16 @@ public:
 
     [[nodiscard]] std::uint32_t get_n_sats() const;
 
-    using in_1d = mdspan<const T, dextents<std::size_t, 1>>;
-    using in_2d = mdspan<const T, dextents<std::size_t, 2>>;
+    template <typename U>
+    using in_1d = mdspan<const U, dextents<std::size_t, 1>>;
+    template <typename U>
+    using in_2d = mdspan<const U, dextents<std::size_t, 2>>;
     using out_2d = mdspan<T, dextents<std::size_t, 2>>;
     using out_3d = mdspan<T, dextents<std::size_t, 3>>;
-    void operator()(out_2d, in_1d);
-    void operator()(out_3d, in_2d);
+    void operator()(out_2d, in_1d<T>);
+    void operator()(out_2d, in_1d<date>);
+    void operator()(out_3d, in_2d<T>);
+    void operator()(out_3d, in_2d<date>);
 };
 
 // Prevent implicit instantiations.

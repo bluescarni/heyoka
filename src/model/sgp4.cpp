@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cmath>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -31,6 +32,7 @@
 #include <fmt/ranges.h>
 
 #include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/blocked_range2d.h>
 #include <oneapi/tbb/cache_aligned_allocator.h>
 #include <oneapi/tbb/enumerable_thread_specific.h>
 #include <oneapi/tbb/parallel_for.h>
@@ -38,6 +40,7 @@
 #include <oneapi/tbb/task_arena.h>
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -485,8 +488,8 @@ sgp4_propagator<T>::sgp4_propagator(ptag, std::tuple<std::vector<T>, cfunc<T>, c
 {
     auto &[sat_buffer, cf_init, cf_tprop, dt] = tup;
 
-    assert(sat_buffer.size() % 7u == 0u);
-    const auto n_sats = sat_buffer.size() / 7u;
+    assert(sat_buffer.size() % 9u == 0u);
+    const auto n_sats = sat_buffer.size() / 9u;
 
     // Prepare the init buffer - this will contain the values of the intermediate quantities
     // for all satellites, and their derivatives (if requested).
@@ -494,9 +497,12 @@ sgp4_propagator<T>::sgp4_propagator(ptag, std::tuple<std::vector<T>, cfunc<T>, c
     init_buffer.resize(boost::safe_numerics::safe<decltype(init_buffer.size())>(n_sats) * cf_init.get_nouts());
 
     // Prepare the in/out spans for invocation of cf_init.
-    typename cfunc<T>::in_2d init_input(sat_buffer.data(), 7u, boost::numeric_cast<std::size_t>(n_sats));
-    typename cfunc<T>::out_2d init_output(init_buffer.data(), boost::numeric_cast<std::size_t>(cf_init.get_nouts()),
-                                          boost::numeric_cast<std::size_t>(n_sats));
+    // NOTE: for initialisation we only need to read the elements and the bstars from sat_buffer,
+    // the epochs do not matter. Hence, 7 rows instead of 9.
+    const typename cfunc<T>::in_2d init_input(sat_buffer.data(), 7, boost::numeric_cast<std::size_t>(n_sats));
+    const typename cfunc<T>::out_2d init_output(init_buffer.data(),
+                                                boost::numeric_cast<std::size_t>(cf_init.get_nouts()),
+                                                boost::numeric_cast<std::size_t>(n_sats));
 
     // Evaluate the intermediate quantities and their derivatives.
     cf_init(init_output, init_input);
@@ -539,12 +545,12 @@ template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
 std::uint32_t sgp4_propagator<T>::get_n_sats() const
 {
-    return boost::numeric_cast<std::uint32_t>(m_impl->m_sat_buffer.size() / 7u);
+    return boost::numeric_cast<std::uint32_t>(m_impl->m_sat_buffer.size() / 9u);
 }
 
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
-void sgp4_propagator<T>::operator()(out_2d out, in_1d tms)
+void sgp4_propagator<T>::operator()(out_2d out, in_1d<T> tms)
 {
     const auto n_sats = get_n_sats();
     assert(n_sats != 0u);
@@ -559,9 +565,106 @@ void sgp4_propagator<T>::operator()(out_2d out, in_1d tms)
     m_impl->m_cf_tprop(out, init_span, kw::time = tms);
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// Helper to convert a Julian date into a time delta suitable for use in the SGP4 algorithm.
+// The reference epochs for all satellites are stored in sat_buffer, the dates are passed in
+// via the 'dates' argument, n_sats is the total number of satellites and i is the index
+// of the satellite on which we are operating. The conversion is done in double-length arithmetic,
+// using the fractional parts of the date and epochs as lower halves of the double-length
+// numbers.
+template <typename SizeType, typename Dates, typename T>
+T sgp4_date_to_tdelta(SizeType i, Dates dates, const std::vector<T> &sat_buffer, std::uint32_t n_sats)
+{
+    using std::abs;
+    using dfloat = heyoka::detail::dfloat<T>;
+
+    // Load the reference epoch for the i-th satellite.
+    const auto epoch_hi = sat_buffer[static_cast<SizeType>(7) * n_sats + i];
+    const auto epoch_lo = sat_buffer[static_cast<SizeType>(8) * n_sats + i];
+
+    // NOTE: the magnitude of the high half cannot be less than the magnitude
+    // of the low half in order to use double-length arithmetic.
+    if (!(abs(epoch_hi) >= abs(epoch_lo))) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Invalid reference epoch detected for the satellite at index {}: the magnitude of the Julian "
+                        "date ({}) is less than the magnitude of the fractional correction ({})",
+                        i, epoch_hi, epoch_lo));
+    }
+
+    // Normalise it into a double-length number.
+    const auto epoch = normalise(dfloat(epoch_hi, epoch_lo));
+
+    if (!(abs(dates(i).jd) >= abs(dates(i).frac))) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Invalid propagation date detected for the satellite at index {}: the magnitude of the Julian "
+                        "date ({}) is less than the magnitude of the fractional correction ({})",
+                        i, dates(i).jd, dates(i).frac));
+    }
+
+    // Normalise the propagation date into a double-length number.
+    const auto date = normalise(dfloat(dates(i).jd, dates(i).frac));
+
+    // Compute the time delta in double-length arithmetic, truncate to a single-length
+    // number and convert to minutes.
+    return static_cast<T>(date - epoch) * 1440;
+}
+
+} // namespace
+
+} // namespace detail
+
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
-void sgp4_propagator<T>::operator()(out_3d out, in_2d tms)
+void sgp4_propagator<T>::operator()(out_2d out, in_1d<date> dates)
+{
+    // Check the dates array.
+    const auto n_sats = get_n_sats();
+    if (dates.extent(0) != n_sats) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("Invalid array of dates passed to the call operator of an sgp4_propagator: the number of "
+                        "satellites is {}, while the number of dates is {}",
+                        n_sats, dates.extent(0)));
+    }
+
+    // We need to convert the dates into time deltas suitable for use in the other call operator overload.
+
+    // Prepare the memory buffer.
+    std::vector<T> tms_vec;
+    using tms_vec_size_t = decltype(tms_vec.size());
+    tms_vec.resize(boost::numeric_cast<tms_vec_size_t>(dates.extent(0)));
+
+    // NOTE: we have a rough estimate of <~50 flops for a single execution of sgp4_date_to_tdelta().
+    // Taking the usual figure of ~10'000 clock cycles as minimum threshold to parallelise, we enable
+    // parallelisation if we have 200 satellites or more.
+    if (n_sats >= 200u) {
+        oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<tms_vec_size_t>(0, tms_vec.size()),
+                                  [&tms_vec, dates, this, n_sats](const auto &range) {
+                                      for (auto i = range.begin(); i != range.end(); ++i) {
+                                          tms_vec[i]
+                                              = detail::sgp4_date_to_tdelta(i, dates, m_impl->m_sat_buffer, n_sats);
+                                      }
+                                  });
+    } else {
+        for (tms_vec_size_t i = 0; i < tms_vec.size(); ++i) {
+            tms_vec[i] = detail::sgp4_date_to_tdelta(i, dates, m_impl->m_sat_buffer, n_sats);
+        }
+    }
+
+    // Create the view.
+    const in_1d<T> tms(tms_vec.data(), dates.extent(0));
+
+    // Call the other overload.
+    this->operator()(out, tms);
+}
+
+template <typename T>
+    requires std::same_as<T, double> || std::same_as<T, float>
+void sgp4_propagator<T>::operator()(out_3d out, in_2d<T> tms)
 {
     // Check the dimensionalities of out and tms.
     const auto n_evals = out.extent(0);
@@ -624,6 +727,62 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d tms)
         oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::size_t>(0, n_evals),
                                   [&par_iter, this](const auto &range) { par_iter(m_impl->m_cf_tprop, range); });
     }
+}
+
+template <typename T>
+    requires std::same_as<T, double> || std::same_as<T, float>
+void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates)
+{
+    // Check the dates array.
+    const auto n_sats = get_n_sats();
+    if (dates.extent(1) != n_sats) [[unlikely]] {
+        throw std::invalid_argument(fmt::format(
+            "Invalid array of dates passed to the batch-mode call operator of an sgp4_propagator: the number of "
+            "satellites is {}, while the number of dates is per evaluation is {}",
+            n_sats, dates.extent(1)));
+    }
+
+    // We need to convert the dates into time deltas suitable for use in the other call operator overload.
+
+    // Prepare the memory buffer.
+    const auto n_evals = dates.extent(0);
+    std::vector<T> tms_vec;
+    using tms_vec_size_t = decltype(tms_vec.size());
+    tms_vec.resize(boost::safe_numerics::safe<tms_vec_size_t>(n_evals) * dates.extent(1));
+
+    // NOTE: we have a rough estimate of <~50 flops for a single execution of sgp4_date_to_tdelta().
+    // Taking the usual figure of ~10'000 clock cycles as minimum threshold to parallelise, we enable
+    // parallelisation if tms_vec.size() (i.e., n_evals * n_sats) is 200 or more.
+    if (tms_vec.size() >= 200u) {
+        oneapi::tbb::parallel_for(
+            oneapi::tbb::blocked_range2d<std::size_t>(0, dates.extent(0), 0, dates.extent(1)),
+            [&tms_vec, dates, this, n_sats](const auto &range) {
+                for (auto i = range.rows().begin(); i != range.rows().end(); ++i) {
+                    const auto cur_dates = std::experimental::submdspan(dates, i, std::experimental::full_extent);
+
+                    for (auto j = range.cols().begin(); j != range.cols().end(); ++j) {
+                        tms_vec[static_cast<tms_vec_size_t>(i) * n_sats + j] = detail::sgp4_date_to_tdelta(
+                            static_cast<tms_vec_size_t>(j), cur_dates, m_impl->m_sat_buffer, n_sats);
+                    }
+                }
+            });
+
+    } else {
+        for (std::size_t i = 0; i < dates.extent(0); ++i) {
+            const auto cur_dates = std::experimental::submdspan(dates, i, std::experimental::full_extent);
+
+            for (std::size_t j = 0; j < dates.extent(1); ++j) {
+                tms_vec[static_cast<tms_vec_size_t>(i) * n_sats + j] = detail::sgp4_date_to_tdelta(
+                    static_cast<tms_vec_size_t>(j), cur_dates, m_impl->m_sat_buffer, n_sats);
+            }
+        }
+    }
+
+    // Create the view.
+    const in_2d<T> tms(tms_vec.data(), dates.extent(0), dates.extent(1));
+
+    // Call the other overload.
+    this->operator()(out, tms);
 }
 
 // Explicit instantiations.
