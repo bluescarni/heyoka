@@ -609,16 +609,6 @@ T sgp4_date_to_tdelta(SizeType i, Dates dates, const std::vector<T> &sat_buffer,
     using std::abs;
     using dfloat = heyoka::detail::dfloat<T>;
 
-    // Load the reference epoch for the i-th satellite.
-    const auto epoch_hi = sat_buffer[static_cast<SizeType>(7) * n_sats + i];
-    const auto epoch_lo = sat_buffer[static_cast<SizeType>(8) * n_sats + i];
-
-    // NOTE: this has been checked during construction.
-    assert(abs(epoch_hi) >= abs(epoch_lo)); // LCOV_EXCL_LINE
-
-    // Normalise it into a double-length number.
-    const auto epoch = normalise(dfloat(epoch_hi, epoch_lo));
-
     if (!(abs(dates(i).jd) >= abs(dates(i).frac))) [[unlikely]] {
         throw std::invalid_argument(
             fmt::format("Invalid propagation date detected for the satellite at index {}: the magnitude of the Julian "
@@ -628,6 +618,16 @@ T sgp4_date_to_tdelta(SizeType i, Dates dates, const std::vector<T> &sat_buffer,
 
     // Normalise the propagation date into a double-length number.
     const auto date = normalise(dfloat(dates(i).jd, dates(i).frac));
+
+    // Load the reference epoch for the i-th satellite.
+    const auto epoch_hi = sat_buffer[static_cast<SizeType>(7) * n_sats + i];
+    const auto epoch_lo = sat_buffer[static_cast<SizeType>(8) * n_sats + i];
+
+    // NOTE: this has been checked during construction.
+    assert(abs(epoch_hi) >= abs(epoch_lo)); // LCOV_EXCL_LINE
+
+    // Normalise it into a double-length number.
+    const auto epoch = normalise(dfloat(epoch_hi, epoch_lo));
 
     // Compute the time delta in double-length arithmetic, truncate to a single-length
     // number and convert to minutes.
@@ -643,6 +643,9 @@ template <typename T>
 void sgp4_propagator<T>::operator()(out_2d out, in_1d<date> dates)
 {
     // Check the dates array.
+    if (dates.data_handle() == nullptr) [[unlikely]] {
+        throw std::invalid_argument("A null array of dates was passed to the call operator of an sgp4_propagator");
+    }
     const auto n_sats = get_n_sats();
     if (dates.extent(0) != n_sats) [[unlikely]] {
         throw std::invalid_argument(
@@ -686,6 +689,23 @@ template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
 void sgp4_propagator<T>::operator()(out_3d out, in_2d<T> tms)
 {
+    // NOTE: need to check for nullptr input spans. In the non-batch overload
+    // we do not need the explicit check because we don't do anything with 'out'
+    // and 'tms' apart from forwarding them to the cfunc, which does the nullptr check.
+    // Here however we need to take subspans of 'out' and 'tms' and thus we need to
+    // pre-check for nullptr in order to avoid undefined behaviour - see the docs for
+    // the def ctor of mdspan:
+    //
+    // https://en.cppreference.com/w/cpp/container/mdspan/mdspan
+    if (out.data_handle() == nullptr) [[unlikely]] {
+        throw std::invalid_argument(
+            "A null output array was passed to the batch-mode call operator of an sgp4_propagator");
+    }
+    if (tms.data_handle() == nullptr) [[unlikely]] {
+        throw std::invalid_argument(
+            "A null times array was passed to the batch-mode call operator of an sgp4_propagator");
+    }
+
     // Check the dimensionalities of out and tms.
     const auto n_evals = out.extent(0);
     if (n_evals != tms.extent(0)) [[unlikely]] {
@@ -707,7 +727,7 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<T> tms)
 
     // NOTE: here we are unconditionally enabling parallel operations, even though in principle with very
     // few satellites or n_evals we could have some unnecessary overhead. Coming up with a cost model for when
-    // to enable parallel operations is not easy, as I do not see a reliable way of estimating the propagation
+    // to enable parallel operations is not easy, as I do not see an easy way of estimating the propagation
     // cost in the presence of derivatives. Probably it does not matter too much as a single sgp4 propagation
     // without derivatives is most likely already in the ~1000 flops range.
 
@@ -760,6 +780,10 @@ template <typename T>
 void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates)
 {
     // Check the dates array.
+    if (dates.data_handle() == nullptr) [[unlikely]] {
+        throw std::invalid_argument(
+            "A null array of dates was passed to the batch-mode call operator of an sgp4_propagator");
+    }
     const auto n_sats = get_n_sats();
     if (dates.extent(1) != n_sats) [[unlikely]] {
         throw std::invalid_argument(fmt::format(

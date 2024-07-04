@@ -244,12 +244,20 @@ TEST_CASE("propagator single")
         REQUIRE(out(3, 1) == approximately(5.810229142351453, 10000.));
         REQUIRE(out(4, 1) == approximately(4.802261184784617, 10000.));
         REQUIRE(out(5, 1) == approximately(-1.388280333072693, 10000.));
+
+        // Try with several bogus input spans.
+        REQUIRE_THROWS_AS(prop(prop_t::out_2d{nullptr, 6, 2}, date_in), std::invalid_argument);
+        REQUIRE_THROWS_AS(prop(prop_t::out_2d{outs.data(), 5, 2}, date_in), std::invalid_argument);
+        REQUIRE_THROWS_AS(prop(out, prop_t::in_1d<double>{nullptr, 2}), std::invalid_argument);
+        REQUIRE_THROWS_AS(prop(out, prop_t::in_1d<double>{ins.data(), 1}), std::invalid_argument);
     }
 }
 
 TEST_CASE("propagator batch")
 {
     detail::edb_disabler ed;
+
+    using Catch::Matchers::Message;
 
     using prop_t = model::sgp4_propagator<double>;
 
@@ -342,6 +350,21 @@ TEST_CASE("propagator batch")
         REQUIRE(out(1, 3, 1) == approximately(-5.927709516654264, 10000.));
         REQUIRE(out(1, 4, 1) == approximately(-4.496384419253211, 10000.));
         REQUIRE(out(1, 5, 1) == approximately(1.785277174529374, 10000.));
+
+        // Check that nothing bad happens with zero evals.
+        prop(prop_t::out_3d{outs.data(), 0, 6, 2}, prop_t::in_2d<double>{tm.data(), 0, 2});
+
+        // Try with several bogus input spans.
+        REQUIRE_THROWS_MATCHES(
+            prop(prop_t::out_3d{nullptr, 2, 6, 2}, date_in), std::invalid_argument,
+            Message("A null output array was passed to the batch-mode call operator of an sgp4_propagator"));
+        REQUIRE_THROWS_AS(prop(prop_t::out_3d{outs.data(), 2, 5, 2}, date_in), std::invalid_argument);
+        REQUIRE_THROWS_AS(prop(prop_t::out_3d{outs.data(), 2, 4, 1}, date_in), std::invalid_argument);
+        REQUIRE_THROWS_MATCHES(
+            prop(out, prop_t::in_2d<double>{nullptr, 2, 2}), std::invalid_argument,
+            Message("A null times array was passed to the batch-mode call operator of an sgp4_propagator"));
+        REQUIRE_THROWS_AS(prop(out, prop_t::in_2d<double>{ins.data(), 2, 1}), std::invalid_argument);
+        REQUIRE_THROWS_AS(prop(out, prop_t::in_2d<double>{ins.data(), 2, 0}), std::invalid_argument);
     }
 }
 
@@ -419,6 +442,9 @@ TEST_CASE("error handling")
         Message("Invalid propagation date detected for the satellite at index 1: the magnitude of the Julian "
                 "date (0) is less than the magnitude of the fractional correction (1)"));
 
+    REQUIRE_THROWS_MATCHES(prop(out, prop_t::in_1d<prop_t::date>{nullptr, 2}), std::invalid_argument,
+                           Message("A null array of dates was passed to the call operator of an sgp4_propagator"));
+
     prop_t::in_1d<prop_t::date> date_in2{dates.data(), 1};
 
     REQUIRE_THROWS_MATCHES(
@@ -440,6 +466,10 @@ TEST_CASE("error handling")
         Message("Invalid dimensions detected in batch-mode sgp4 propagation: the number of evaluations "
                 "inferred from the output array is 2, which is not consistent with the number of evaluations "
                 "inferred from the times array (1)"));
+
+    REQUIRE_THROWS_MATCHES(
+        prop(out_batch, prop_t::in_2d<prop_t::date>{nullptr, 1, 2}), std::invalid_argument,
+        Message("A null array of dates was passed to the batch-mode call operator of an sgp4_propagator"));
 
     date_b = prop_t::in_2d<prop_t::date>{dates_batch.data(), 1, 1};
 
