@@ -178,6 +178,8 @@ public:
     using in_2d = mdspan<const U, dextents<std::size_t, 2>>;
     using out_2d = mdspan<T, dextents<std::size_t, 2>>;
     using out_3d = mdspan<T, dextents<std::size_t, 3>>;
+    // NOTE: it is important to document properly the non-overlapping
+    // memory requirement for the input arguments.
     void operator()(out_2d, in_1d<T>);
     void operator()(out_2d, in_1d<date>);
     void operator()(out_3d, in_2d<T>);

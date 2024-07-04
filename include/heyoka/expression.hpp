@@ -766,7 +766,7 @@ concept cfunc_in_range_1d = requires(R &r) {
 template <typename T>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS cfunc
 {
-    struct HEYOKA_DLL_PUBLIC impl;
+    struct impl;
 
     std::unique_ptr<impl> m_impl;
 
