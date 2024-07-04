@@ -685,6 +685,12 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<T> tms)
     const typename cfunc<T>::in_2d init_span(m_impl->m_init_buffer.data(), n_init_rows,
                                              boost::numeric_cast<std::size_t>(n_sats));
 
+    // NOTE: here we are unconditionally enabling parallel operations, even though in principle with very
+    // few satellites or n_evals we could have some unnecessary overhead. Coming up with a cost model for when
+    // to enable parallel operations is not easy, as I do not see a reliable way of estimating the propagation
+    // cost in the presence of derivatives. Probably it does not matter too much as a single sgp4 propagation
+    // without derivatives is most likely already in the ~1000 flops range.
+
     // The functor to be run in the parallel loop below.
     auto par_iter = [out, tms, init_span](cfunc<T> &cf, const auto &range) {
         for (auto i = range.begin(); i != range.end(); ++i) {
