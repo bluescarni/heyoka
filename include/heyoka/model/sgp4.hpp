@@ -77,7 +77,7 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
         std::vector<T> sat_buffer;
         sat_buffer.reserve(boost::safe_numerics::safe<decltype(sat_buffer.size())>(in.extent(1)) * 9);
         for (auto i = 0u; i < 9u; ++i) {
-            for (std::size_t j = 0u; j < in.extent(1); ++j) {
+            for (std::size_t j = 0; j < in.extent(1); ++j) {
                 sat_buffer.push_back(in(i, j));
             }
         }
@@ -99,13 +99,13 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
         auto funcs = detail::sgp4_build_funcs(order);
 
         // Compile them.
-        // NOTE: it is important here to use as_const_kwarg() so that we don't end up with moved-from
-        // keyword arguments the second time we use kw_args.
         // NOTE: in order to perform parallel compilation, we need to use the sgp4_compile_funcs() helper
         // because we want to avoid having TBB in the public interface.
         cfunc<T> cf_init, cf_prop;
         detail::sgp4_compile_funcs(
             [&]() {
+                // NOTE: it is important here to use as_const_kwarg() so that we don't end up with moved-from
+                // keyword arguments the second time we use kw_args.
                 cf_init = cfunc<T>(std::move(funcs.init.first), std::move(funcs.init.second),
                                    igor::as_const_kwarg(kw_args)...);
             },

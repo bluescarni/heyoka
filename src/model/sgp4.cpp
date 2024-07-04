@@ -488,7 +488,7 @@ sgp4_propagator<T>::sgp4_propagator(ptag, std::tuple<std::vector<T>, cfunc<T>, c
 {
     auto &[sat_buffer, cf_init, cf_tprop, dt] = tup;
 
-    assert(sat_buffer.size() % 9u == 0u);
+    assert(sat_buffer.size() % 9u == 0u); // LCOV_EXCL_LINE
     const auto n_sats = sat_buffer.size() / 9u;
 
     // Prepare the init buffer - this will contain the values of the intermediate quantities
@@ -553,10 +553,10 @@ template <typename T>
 void sgp4_propagator<T>::operator()(out_2d out, in_1d<T> tms)
 {
     const auto n_sats = get_n_sats();
-    assert(n_sats != 0u);
+    assert(n_sats != 0u); // LCOV_EXCL_LINE
 
     // Prepare the init buffer span.
-    assert(m_impl->m_init_buffer.size() % n_sats == 0u);
+    assert(m_impl->m_init_buffer.size() % n_sats == 0u); // LCOV_EXCL_LINE
     const auto n_init_rows = boost::numeric_cast<std::size_t>(m_impl->m_init_buffer.size() / n_sats);
     const typename cfunc<T>::in_2d init_span(m_impl->m_init_buffer.data(), n_init_rows,
                                              boost::numeric_cast<std::size_t>(n_sats));
@@ -677,10 +677,10 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<T> tms)
     }
 
     const auto n_sats = get_n_sats();
-    assert(n_sats != 0u);
+    assert(n_sats != 0u); // LCOV_EXCL_LINE
 
     // Prepare the init buffer span.
-    assert(m_impl->m_init_buffer.size() % n_sats == 0u);
+    assert(m_impl->m_init_buffer.size() % n_sats == 0u); // LCOV_EXCL_LINE
     const auto n_init_rows = boost::numeric_cast<std::size_t>(m_impl->m_init_buffer.size() / n_sats);
     const typename cfunc<T>::in_2d init_span(m_impl->m_init_buffer.data(), n_init_rows,
                                              boost::numeric_cast<std::size_t>(n_sats));
@@ -772,7 +772,6 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates)
                     }
                 }
             });
-
     } else {
         for (std::size_t i = 0; i < dates.extent(0); ++i) {
             const auto cur_dates = std::experimental::submdspan(dates, i, std::experimental::full_extent);
