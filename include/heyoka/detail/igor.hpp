@@ -51,7 +51,7 @@ struct tagged_container {
 // Helper to turn a tagged container into another tagged container
 // containing a const reference to the original reference.
 template <typename Tag, typename T>
-auto as_const_kwarg(detail::tagged_container<Tag, T> tc)
+auto as_const_kwarg(const detail::tagged_container<Tag, T> &tc)
 {
     return detail::tagged_container<Tag, decltype(std::as_const(tc.value))>{std::as_const(tc.value)};
 }
