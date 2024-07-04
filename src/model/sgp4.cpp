@@ -614,7 +614,7 @@ T sgp4_date_to_tdelta(SizeType i, Dates dates, const std::vector<T> &sat_buffer,
     const auto epoch_lo = sat_buffer[static_cast<SizeType>(8) * n_sats + i];
 
     // NOTE: this has been checked during construction.
-    assert(abs(epoch_hi) >= abs(epoch_lo));
+    assert(abs(epoch_hi) >= abs(epoch_lo)); // LCOV_EXCL_LINE
 
     // Normalise it into a double-length number.
     const auto epoch = normalise(dfloat(epoch_hi, epoch_lo));

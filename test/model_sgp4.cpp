@@ -440,6 +440,13 @@ TEST_CASE("error handling")
         Message("Invalid dimensions detected in batch-mode sgp4 propagation: the number of evaluations "
                 "inferred from the output array is 2, which is not consistent with the number of evaluations "
                 "inferred from the times array (1)"));
+
+    date_b = prop_t::in_2d<prop_t::date>{dates_batch.data(), 1, 1};
+
+    REQUIRE_THROWS_MATCHES(
+        prop(out_batch, date_b), std::invalid_argument,
+        Message("Invalid array of dates passed to the batch-mode call operator of an sgp4_propagator: the number of "
+                "satellites is 2, while the number of dates is per evaluation is 1"));
 }
 
 TEST_CASE("derivatives")
