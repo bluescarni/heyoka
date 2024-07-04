@@ -32,6 +32,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/mdspan.hpp>
+#include <heyoka/s11n.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
 
@@ -66,6 +67,12 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
     struct impl;
 
     std::unique_ptr<impl> m_impl;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     template <typename Input, typename... KwArgs>
     static auto parse_ctor_args(const Input &in, const KwArgs &...kw_args)

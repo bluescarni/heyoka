@@ -41,6 +41,7 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/dfloat.hpp>
+#include <heyoka/detail/optional_s11n.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
@@ -56,6 +57,7 @@
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/model/sgp4.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
 HEYOKA_BEGIN_NAMESPACE
@@ -476,7 +478,31 @@ struct sgp4_propagator<T>::impl {
     std::vector<T> m_init_buffer;
     cfunc<T> m_cf_tprop;
     std::optional<dtens> m_dtens;
+
+    // Serialization.
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar & m_sat_buffer;
+        ar & m_init_buffer;
+        ar & m_cf_tprop;
+        ar & m_dtens;
+    }
 };
+
+template <typename T>
+    requires std::same_as<T, double> || std::same_as<T, float>
+void sgp4_propagator<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << m_impl;
+}
+
+template <typename T>
+    requires std::same_as<T, double> || std::same_as<T, float>
+void sgp4_propagator<T>::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> m_impl;
+}
 
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>

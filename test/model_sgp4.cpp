@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <ranges>
+#include <sstream>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -18,6 +19,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/model/sgp4.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 #include "test_utils.hpp"
@@ -507,62 +509,111 @@ TEST_CASE("derivatives")
 TEST_CASE("large")
 {
     const auto tot_N = 1000;
+    const auto n_evals = 100;
 
     detail::edb_disabler ed;
 
     using md_input_t = mdspan<double, extents<std::size_t, 9, std::dynamic_extent>>;
     using prop_t = model::sgp4_propagator<double>;
 
-    std::vector<double> ins;
-    ins.resize(tot_N * 9);
-    md_input_t in(ins.data(), tot_N);
-    for (auto i = 0; i < tot_N; ++i) {
-        in(0, i) = revday2radmin(13.75091047972192);
-        in(1, i) = 0.0024963;
-        in(2, i) = deg2rad(90.2039);
-        in(3, i) = deg2rad(55.5633);
-        in(4, i) = deg2rad(320.5956);
-        in(5, i) = deg2rad(91.4738);
-        in(6, i) = 0.75863e-3;
-        in(7, i) = 2460486.5;
-        in(8, i) = 0.6478633000000116;
-    }
+    for (auto cm : {false, true}) {
+        std::vector<double> ins;
+        ins.resize(tot_N * 9);
+        md_input_t in(ins.data(), tot_N);
+        for (auto i = 0; i < tot_N; ++i) {
+            in(0, i) = revday2radmin(13.75091047972192);
+            in(1, i) = 0.0024963;
+            in(2, i) = deg2rad(90.2039);
+            in(3, i) = deg2rad(55.5633);
+            in(4, i) = deg2rad(320.5956);
+            in(5, i) = deg2rad(91.4738);
+            in(6, i) = 0.75863e-3;
+            in(7, i) = 2460486.5;
+            in(8, i) = 0.6478633000000116;
+        }
 
-    prop_t prop{mdspan<const double, extents<std::size_t, 9, std::dynamic_extent>>{ins.data(), tot_N}};
+        prop_t prop{mdspan<const double, extents<std::size_t, 9, std::dynamic_extent>>{ins.data(), tot_N},
+                    kw::compact_mode = cm};
 
-    std::vector<prop_t::date> times;
-    times.resize(tot_N, prop_t::date{2460486.5, 0.6478633000000116});
+        std::vector<prop_t::date> times;
+        times.resize(tot_N, prop_t::date{2460486.5, 0.6478633000000116});
 
-    std::vector<double> outs;
-    outs.resize(tot_N * 6);
-    prop_t::out_2d out_span{outs.data(), 6, tot_N};
+        std::vector<double> outs;
+        outs.resize(tot_N * 6);
+        prop_t::out_2d out_span{outs.data(), 6, tot_N};
 
-    prop(out_span, prop_t::in_1d<prop_t::date>{times.data(), tot_N});
+        prop(out_span, prop_t::in_1d<prop_t::date>{times.data(), tot_N});
 
-    for (auto i = 0; i < tot_N; ++i) {
-        REQUIRE(out_span(0, i) == approximately(2561.223660636298, 10000.));
-        REQUIRE(out_span(1, i) == approximately(3698.797144057697, 10000.));
-        REQUIRE(out_span(2, i) == approximately(5818.772215708888, 10000.));
-        REQUIRE(out_span(3, i) == approximately(-3.276142513618007, 10000.));
-        REQUIRE(out_span(4, i) == approximately(-4.806489082829041, 10000.));
-        REQUIRE(out_span(5, i) == approximately(4.511134501638151, 10000.));
-    }
+        for (auto i = 0; i < tot_N; ++i) {
+            REQUIRE(out_span(0, i) == approximately(2561.223660636298, 10000.));
+            REQUIRE(out_span(1, i) == approximately(3698.797144057697, 10000.));
+            REQUIRE(out_span(2, i) == approximately(5818.772215708888, 10000.));
+            REQUIRE(out_span(3, i) == approximately(-3.276142513618007, 10000.));
+            REQUIRE(out_span(4, i) == approximately(-4.806489082829041, 10000.));
+            REQUIRE(out_span(5, i) == approximately(4.511134501638151, 10000.));
+        }
 
-    const auto n_evals = 100;
-    times.resize(tot_N * n_evals, prop_t::date{2460486.5, 0.6478633000000116});
-    outs.resize(tot_N * 6 * n_evals);
-    prop_t::out_3d out_span_batch{outs.data(), n_evals, 6, tot_N};
+        times.resize(tot_N * n_evals, prop_t::date{2460486.5, 0.6478633000000116});
+        outs.resize(tot_N * 6 * n_evals);
+        prop_t::out_3d out_span_batch{outs.data(), n_evals, 6, tot_N};
 
-    prop(out_span_batch, prop_t::in_2d<prop_t::date>{times.data(), n_evals, tot_N});
+        prop(out_span_batch, prop_t::in_2d<prop_t::date>{times.data(), n_evals, tot_N});
 
-    for (auto i = 0; i < tot_N; ++i) {
-        for (auto k = 0; k < n_evals; ++k) {
-            REQUIRE(out_span_batch(k, 0, i) == approximately(2561.223660636298, 10000.));
-            REQUIRE(out_span_batch(k, 1, i) == approximately(3698.797144057697, 10000.));
-            REQUIRE(out_span_batch(k, 2, i) == approximately(5818.772215708888, 10000.));
-            REQUIRE(out_span_batch(k, 3, i) == approximately(-3.276142513618007, 10000.));
-            REQUIRE(out_span_batch(k, 4, i) == approximately(-4.806489082829041, 10000.));
-            REQUIRE(out_span_batch(k, 5, i) == approximately(4.511134501638151, 10000.));
+        for (auto i = 0; i < tot_N; ++i) {
+            for (auto k = 0; k < n_evals; ++k) {
+                REQUIRE(out_span_batch(k, 0, i) == approximately(2561.223660636298, 10000.));
+                REQUIRE(out_span_batch(k, 1, i) == approximately(3698.797144057697, 10000.));
+                REQUIRE(out_span_batch(k, 2, i) == approximately(5818.772215708888, 10000.));
+                REQUIRE(out_span_batch(k, 3, i) == approximately(-3.276142513618007, 10000.));
+                REQUIRE(out_span_batch(k, 4, i) == approximately(-4.806489082829041, 10000.));
+                REQUIRE(out_span_batch(k, 5, i) == approximately(4.511134501638151, 10000.));
+            }
         }
     }
+}
+
+TEST_CASE("s11n")
+{
+    detail::edb_disabler ed;
+
+    using prop_t = model::sgp4_propagator<double>;
+
+    using md_input_t = mdspan<const double, extents<std::size_t, 9, std::dynamic_extent>>;
+
+    const std::vector<double> ins = {revday2radmin(13.75091047972192),
+                                     revday2radmin(15.50103472202482),
+                                     0.0024963,
+                                     0.0007417,
+                                     deg2rad(90.2039),
+                                     deg2rad(51.6439),
+                                     deg2rad(55.5633),
+                                     deg2rad(211.2001),
+                                     deg2rad(320.5956),
+                                     deg2rad(17.6667),
+                                     deg2rad(91.4738),
+                                     deg2rad(85.6398),
+                                     0.75863e-3,
+                                     .38792e-4,
+                                     2460486.5,
+                                     2458826.5,
+                                     0.6478633000000116,
+                                     0.6933954099999937};
+
+    prop_t prop{md_input_t{ins.data(), 2}};
+
+    std::stringstream ss;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+        oa << prop;
+    }
+
+    prop = prop_t{};
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+        ia >> prop;
+    }
+
+    REQUIRE(prop.get_n_sats() == 2u);
 }
