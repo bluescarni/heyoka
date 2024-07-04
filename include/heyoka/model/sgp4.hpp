@@ -9,6 +9,7 @@
 #ifndef HEYOKA_MODEL_SGP4_HPP
 #define HEYOKA_MODEL_SGP4_HPP
 
+#include <cmath>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -83,6 +84,22 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
         for (auto i = 0u; i < 9u; ++i) {
             for (std::size_t j = 0; j < in.extent(1); ++j) {
                 sat_buffer.push_back(in(i, j));
+
+                if (i == 7u) {
+                    using std::abs;
+
+                    const auto epoch_hi = in(7, j);
+                    const auto epoch_lo = in(8, j);
+
+                    // NOTE: the magnitude of the high half of the epoch cannot be less than the magnitude
+                    // of the low half in order to use double-length arithmetic.
+                    if (!(abs(epoch_hi) >= abs(epoch_lo))) [[unlikely]] {
+                        throw std::invalid_argument(fmt::format(
+                            "Invalid reference epoch detected for the satellite at index {}: the magnitude "
+                            "of the Julian date ({}) is less than the magnitude of the fractional correction ({})",
+                            j, epoch_hi, epoch_lo));
+                    }
+                }
             }
         }
 

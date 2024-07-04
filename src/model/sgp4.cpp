@@ -587,14 +587,8 @@ T sgp4_date_to_tdelta(SizeType i, Dates dates, const std::vector<T> &sat_buffer,
     const auto epoch_hi = sat_buffer[static_cast<SizeType>(7) * n_sats + i];
     const auto epoch_lo = sat_buffer[static_cast<SizeType>(8) * n_sats + i];
 
-    // NOTE: the magnitude of the high half cannot be less than the magnitude
-    // of the low half in order to use double-length arithmetic.
-    if (!(abs(epoch_hi) >= abs(epoch_lo))) [[unlikely]] {
-        throw std::invalid_argument(
-            fmt::format("Invalid reference epoch detected for the satellite at index {}: the magnitude of the Julian "
-                        "date ({}) is less than the magnitude of the fractional correction ({})",
-                        i, epoch_hi, epoch_lo));
-    }
+    // NOTE: this has been checked during construction.
+    assert(abs(epoch_hi) >= abs(epoch_lo));
 
     // Normalise it into a double-length number.
     const auto epoch = normalise(dfloat(epoch_hi, epoch_lo));
