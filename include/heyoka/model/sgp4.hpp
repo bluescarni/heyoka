@@ -91,6 +91,7 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
             for (std::size_t j = 0; j < in.extent(1); ++j) {
                 sat_buffer.push_back(in(i, j));
 
+                // Checks on the epochs.
                 if (i == 7u) {
                     using std::abs;
 

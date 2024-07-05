@@ -71,7 +71,7 @@ namespace
 // Constants.
 //
 // NOTE: here we are using the values from the wgs72 model,
-// taken from the C++ source code at:
+// taken from the official C++ source code at:
 //
 // https://celestrak.org/software/vallado-sw.php
 //
@@ -79,7 +79,7 @@ namespace
 // was first introduced, uses constants which are very slighly
 // different from the wgs72 model constants (specifically,
 // the KE constant differs). See the 'gravconsttype' enum
-// and the getgravconst() function in the C++ source code.
+// and the getgravconst() function in the official C++ source code.
 //
 // According to the sgp4 Python documentation here
 //
@@ -242,14 +242,16 @@ std::vector<expression> sgp4_time_prop(const auto &s, const expression &TSINCE =
     const auto AYN = AYCOF / AB + E * sin(OMEGA);
 
     // Solve Kepler's equation.
-    // NOTE: the original report (on page 13) says that this step is about solving
+    // NOTE: the original celestrak report #3 (on page 13) says that this step is about solving
     // Kepler's equations for E + omega. This is a quantity similar to the eccentric
     // longitude F = F(h, k, lambda), implemented in heyoka as kepF():
     //
     // https://articles.adsabs.harvard.edu//full/1972CeMec...5..303B/0000309.000.html
     //
     // Indeed, the numerical iteration proposed in the report is nothing but a
-    // Newton-Raphson step for the computation of F(h=AYN, k=AXN, lambda=CAPU). Thus, we avoid
+    // Newton-Raphson step for the computation of F(h=AYN, k=AXN, lambda=CAPU). Also, it can
+    // be shown that E + omega satisfies the same Kepler-like equation as F does, with
+    // k replaced by e*cos(omega) and h replaced by e*sin(omega). Thus, we avoid
     // here the proposed iteration and compute F using directly the heyoka function.
     const auto CAPU = LCOF * AXN / AB + MP + OMEGA + N0DP * TEMPL;
     const auto EPWNEW = kepF(AYN, AXN, CAPU);
@@ -657,6 +659,9 @@ void sgp4_propagator<T>::operator()(out_2d out, in_1d<date> dates)
     // We need to convert the dates into time deltas suitable for use in the other call operator overload.
 
     // Prepare the memory buffer.
+    // NOTE: this could also be an internal buffer to be re-used across different
+    // invocations of the call operators. Like this, we would avoid a memory allocation
+    // for each call operator invocation. Worth it?
     std::vector<T> tms_vec;
     using tms_vec_size_t = decltype(tms_vec.size());
     tms_vec.resize(boost::numeric_cast<tms_vec_size_t>(dates.extent(0)));
