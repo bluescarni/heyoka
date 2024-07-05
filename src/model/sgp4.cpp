@@ -25,6 +25,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/math/constants/constants.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 #include <boost/safe_numerics/safe_integer.hpp>
 
@@ -510,11 +511,77 @@ template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
 sgp4_propagator<T>::sgp4_propagator() noexcept = default;
 
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+void sgp4_check_input_satbuf(const std::vector<T> &sat_buffer)
+{
+    using std::abs;
+    using std::cos;
+    using std::pow;
+    using std::sqrt;
+
+    assert(sat_buffer.size() % 9u == 0u); // LCOV_EXCL_LINE
+    const auto n_sats = sat_buffer.size() / 9u;
+
+    // Create view for ease of indexing.
+    const typename cfunc<T>::in_2d sat_view(sat_buffer.data(), 9, boost::numeric_cast<std::size_t>(n_sats));
+
+    for (std::size_t i = 0; i < n_sats; ++i) {
+        // Check the epoch.
+        const auto epoch_hi = sat_view(7, i);
+        const auto epoch_lo = sat_view(8, i);
+
+        // NOTE: the magnitude of the high half of the epoch cannot be less than the magnitude
+        // of the low half in order to use double-length arithmetic.
+        if (!(abs(epoch_hi) >= abs(epoch_lo))) [[unlikely]] {
+            throw std::invalid_argument(
+                fmt::format("Invalid reference epoch detected for the satellite at index {}: the magnitude "
+                            "of the Julian date ({}) is less than the magnitude of the fractional correction ({})",
+                            i, epoch_hi, epoch_lo));
+        }
+
+        // Check that we are not in deep space.
+        // NOTE: this chunk of code is taken from the official C++ source.
+        const auto no_kozai = sat_view(0, i);
+        const auto ecco = sat_view(1, i);
+        const auto inclo = sat_view(2, i);
+        const auto cosio = cos(inclo);
+        const auto cosio2 = cosio * cosio;
+        const auto eccsq = ecco * ecco;
+        const auto omeosq = 1 - eccsq;
+        const auto rteosq = sqrt(omeosq);
+        const auto d1 = static_cast<T>(0.75) * static_cast<T>(J2) * (3 * cosio2 - 1) / (rteosq * omeosq);
+        const auto ak = pow(static_cast<T>(KE) / no_kozai, static_cast<T>(2) / 3);
+        auto del = d1 / (ak * ak);
+        const auto adel = ak * (1 - del * del - del * (static_cast<T>(1) / 3 + 134 * del * del / 81));
+        del = d1 / (adel * adel);
+        const auto no_unkozai = no_kozai / (1 + del);
+
+        if (2 * boost::math::constants::pi<T>() / no_unkozai >= 225) [[unlikely]] {
+            throw std::invalid_argument(fmt::format("The satellite at index {} has an orbital period above 225 "
+                                                    "minutes, but deep-space propagation is currently not supported",
+                                                    i));
+        }
+    }
+}
+
+} // namespace
+
+} // namespace detail
+
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
 sgp4_propagator<T>::sgp4_propagator(ptag, std::tuple<std::vector<T>, cfunc<T>, cfunc<T>, std::optional<dtens>> tup)
 {
     auto &[sat_buffer, cf_init, cf_tprop, dt] = tup;
+
+    // Check the satellite data.
+    detail::sgp4_check_input_satbuf(sat_buffer);
 
     assert(sat_buffer.size() % 9u == 0u); // LCOV_EXCL_LINE
     const auto n_sats = sat_buffer.size() / 9u;

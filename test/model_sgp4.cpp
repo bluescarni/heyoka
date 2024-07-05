@@ -477,6 +477,13 @@ TEST_CASE("error handling")
         prop(out_batch, date_b), std::invalid_argument,
         Message("Invalid array of dates passed to the batch-mode call operator of an sgp4_propagator: the number of "
                 "satellites is 2, while the number of dates is per evaluation is 1"));
+
+    // Deep space satellite.
+    ins[1] = revday2radmin(6.);
+
+    REQUIRE_THROWS_MATCHES((prop_t{md_input_t{ins.data(), 2}}), std::invalid_argument,
+                           Message("The satellite at index 1 has an orbital period above 225 "
+                                   "minutes, but deep-space propagation is currently not supported"));
 }
 
 TEST_CASE("derivatives")
