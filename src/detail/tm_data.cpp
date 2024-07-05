@@ -64,12 +64,24 @@ tm_data<T>::tm_data() = default;
 namespace
 {
 
+// LCOV_EXCL_START
+
 // Factorial implementations.
 template <typename F>
-F factorial(std::uint32_t n, long long)
+F factorial([[maybe_unused]] std::uint32_t n, long long)
 {
-    return boost::math::factorial<F>(boost::numeric_cast<unsigned>(n));
+#if defined(HEYOKA_ARCH_PPC)
+    if constexpr (std::same_as<F, long double>) {
+        throw std::invalid_argument("'long double' computations are not supported on this platform");
+    } else {
+#endif
+        return boost::math::factorial<F>(boost::numeric_cast<unsigned>(n));
+#if defined(HEYOKA_ARCH_PPC)
+    }
+#endif
 }
+
+// LCOV_EXCL_STOP
 
 #if defined(HEYOKA_HAVE_REAL128)
 

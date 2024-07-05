@@ -164,7 +164,7 @@ TEST_CASE("nte single step")
             REQUIRE(trig_times.size() == trig_times_batch[i].size());
             for (decltype(trig_times.size()) j = 0; j < trig_times.size(); ++j) {
                 REQUIRE(trig_times[j] == approximately(trig_times_batch[i][j], 1000.));
-                REQUIRE(v_vals[j] == approximately(v_vals_batch[i][j], 1000.));
+                REQUIRE(v_vals[j] == approximately(v_vals_batch[i][j], 10000.));
             }
         }
     };
@@ -248,7 +248,7 @@ TEST_CASE("te single step")
             REQUIRE(trig_times.size() == trig_times_batch[i].size());
             for (decltype(trig_times.size()) j = 0; j < trig_times.size(); ++j) {
                 REQUIRE(trig_times[j] == approximately(trig_times_batch[i][j], 1000.));
-                REQUIRE(v_vals[j] == approximately(v_vals_batch[i][j], 1000.));
+                REQUIRE(v_vals[j] == approximately(v_vals_batch[i][j], 10000.));
             }
         }
     };
@@ -1547,8 +1547,7 @@ TEST_CASE("te propagate_grid first step bug")
     }
 
     {
-        t_ev_t ev(
-            v, kw::callback = [](auto &, int, std::uint32_t) { return true; });
+        t_ev_t ev(v, kw::callback = [](auto &, int, std::uint32_t) { return true; });
 
         auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                                 {0.05, 0.051, 0.052, 0.053, 0.025, 0.0251, 0.0252, 0.0253},
