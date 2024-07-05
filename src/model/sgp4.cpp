@@ -645,6 +645,69 @@ std::uint32_t sgp4_propagator<T>::get_n_sats() const
 
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
+void sgp4_propagator<T>::check_with_diff(const char *fname) const
+{
+    if (get_diff_order() == 0u) [[unlikely]] {
+        throw std::invalid_argument(
+            fmt::format("The function '{}()' cannot be invoked on an sgp4 propagator without derivatives", fname));
+    }
+}
+
+template <typename T>
+    requires std::same_as<T, double> || std::same_as<T, float>
+std::uint32_t sgp4_propagator<T>::get_diff_order() const noexcept
+{
+    return m_impl->m_dtens ? m_impl->m_dtens->get_order() : static_cast<std::uint32_t>(0);
+}
+
+template <typename T>
+    requires std::same_as<T, double> || std::same_as<T, float>
+std::pair<std::uint32_t, std::uint32_t> sgp4_propagator<T>::get_dslice(std::uint32_t order) const
+{
+    check_with_diff(__func__);
+
+    const auto &dt = *m_impl->m_dtens;
+
+    const auto rng = dt.get_derivatives(order);
+
+    return {boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
+            boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end()))};
+}
+
+template <typename T>
+    requires std::same_as<T, double> || std::same_as<T, float>
+std::pair<std::uint32_t, std::uint32_t> sgp4_propagator<T>::get_dslice(std::uint32_t component,
+                                                                       std::uint32_t order) const
+{
+    check_with_diff(__func__);
+
+    const auto &dt = *m_impl->m_dtens;
+
+    const auto rng = dt.get_derivatives(component, order);
+
+    return {boost::numeric_cast<std::uint32_t>(dt.index_of(rng.begin())),
+            boost::numeric_cast<std::uint32_t>(dt.index_of(rng.end()))};
+}
+
+template <typename T>
+    requires std::same_as<T, double> || std::same_as<T, float>
+const dtens::sv_idx_t &sgp4_propagator<T>::get_mindex(std::uint32_t i) const
+{
+    check_with_diff(__func__);
+
+    const auto &dt = *m_impl->m_dtens;
+
+    if (i >= dt.size()) [[unlikely]] {
+        throw std::invalid_argument(fmt::format("Cannot fetch the multiindex of the derivative at index {}: the index "
+                                                "is not less than the total number of derivatives ({})",
+                                                i, dt.size()));
+    }
+
+    return (dt.begin() + boost::numeric_cast<decltype(dt.begin() - dt.begin())>(i))->first;
+}
+
+template <typename T>
+    requires std::same_as<T, double> || std::same_as<T, float>
 void sgp4_propagator<T>::operator()(out_2d out, in_1d<T> tms)
 {
     const auto n_sats = get_n_sats();

@@ -158,6 +158,7 @@ TEST_CASE("propagator basics")
     const prop_t::in_1d<double> tm_in{tm.data(), 2};
 
     prop_t prop{md_input_t{ins.data(), 2}};
+    REQUIRE(prop.get_diff_order() == 0u);
     auto prop2 = prop;
     REQUIRE(prop2.get_n_sats() == 2u);
 
@@ -484,10 +485,24 @@ TEST_CASE("error handling")
     REQUIRE_THROWS_MATCHES((prop_t{md_input_t{ins.data(), 2}}), std::invalid_argument,
                            Message("The satellite at index 1 has an orbital period above 225 "
                                    "minutes, but deep-space propagation is currently not supported"));
+
+    // Check that requesting diff information throws on a propagator
+    // which was constructed without derivatives.
+    REQUIRE_THROWS_MATCHES(
+        prop.get_dslice(0), std::invalid_argument,
+        Message("The function 'get_dslice()' cannot be invoked on an sgp4 propagator without derivatives"));
+    REQUIRE_THROWS_MATCHES(
+        prop.get_dslice(0, 0), std::invalid_argument,
+        Message("The function 'get_dslice()' cannot be invoked on an sgp4 propagator without derivatives"));
+    REQUIRE_THROWS_MATCHES(
+        prop.get_mindex(0), std::invalid_argument,
+        Message("The function 'get_mindex()' cannot be invoked on an sgp4 propagator without derivatives"));
 }
 
 TEST_CASE("derivatives")
 {
+    using Catch::Matchers::Message;
+
     detail::edb_disabler ed;
 
     using md_input_t = mdspan<const double, extents<std::size_t, 9, std::dynamic_extent>>;
@@ -525,6 +540,18 @@ TEST_CASE("derivatives")
     const prop_t::in_1d<double> tm_in{tm.data(), 2};
 
     prop_t prop{md_input_t{ins.data(), 2}, kw::diff_order = 2};
+
+    REQUIRE(prop.get_diff_order() == 2u);
+    auto sl = prop.get_dslice(1);
+    REQUIRE(sl.first == 6u);
+    REQUIRE(sl.second == 6u + 6u * 6u);
+    sl = prop.get_dslice(3, 1);
+    REQUIRE(sl.first == 6u + 3u * 6u);
+    REQUIRE(sl.second == 6u + 4u * 6u);
+    REQUIRE(prop.get_mindex(6u + 4u * 6u) == dtens::sv_idx_t{4, {{0, 1}}});
+    REQUIRE_THROWS_MATCHES(prop.get_mindex(1000u), std::invalid_argument,
+                           Message("Cannot fetch the multiindex of the derivative at index 1000: the index "
+                                   "is not less than the total number of derivatives (168)"));
 
     // Prepare the input buffer for the cfunc.
     std::vector<double> cf_in(ins.begin(), ins.begin() + 14);

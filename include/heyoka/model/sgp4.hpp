@@ -130,6 +130,8 @@ class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
     };
     explicit sgp4_propagator(ptag, std::tuple<std::vector<T>, cfunc<T>, cfunc<T>, std::optional<dtens>>);
 
+    HEYOKA_DLL_LOCAL void check_with_diff(const char *) const;
+
 public:
     // Julian date with fractional correction.
     struct date {
@@ -153,6 +155,11 @@ public:
     ~sgp4_propagator();
 
     [[nodiscard]] std::uint32_t get_n_sats() const;
+
+    [[nodiscard]] std::uint32_t get_diff_order() const noexcept;
+    [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> get_dslice(std::uint32_t) const;
+    [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> get_dslice(std::uint32_t, std::uint32_t) const;
+    [[nodiscard]] const dtens::sv_idx_t &get_mindex(std::uint32_t) const;
 
     template <typename U>
     using in_1d = mdspan<const U, dextents<std::size_t, 1>>;
