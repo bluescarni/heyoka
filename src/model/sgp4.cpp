@@ -662,6 +662,15 @@ std::uint32_t sgp4_propagator<T>::get_diff_order() const noexcept
 
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
+const std::vector<expression> &sgp4_propagator<T>::get_diff_args() const
+{
+    check_with_diff(__func__);
+
+    return m_impl->m_dtens->get_args();
+}
+
+template <typename T>
+    requires std::same_as<T, double> || std::same_as<T, float>
 std::pair<std::uint32_t, std::uint32_t> sgp4_propagator<T>::get_dslice(std::uint32_t order) const
 {
     check_with_diff(__func__);

@@ -157,6 +157,7 @@ public:
     [[nodiscard]] std::uint32_t get_n_sats() const;
 
     [[nodiscard]] std::uint32_t get_diff_order() const noexcept;
+    [[nodiscard]] const std::vector<expression> &get_diff_args() const;
     [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> get_dslice(std::uint32_t) const;
     [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> get_dslice(std::uint32_t, std::uint32_t) const;
     [[nodiscard]] const dtens::sv_idx_t &get_mindex(std::uint32_t) const;

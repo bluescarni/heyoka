@@ -497,6 +497,9 @@ TEST_CASE("error handling")
     REQUIRE_THROWS_MATCHES(
         prop.get_mindex(0), std::invalid_argument,
         Message("The function 'get_mindex()' cannot be invoked on an sgp4 propagator without derivatives"));
+    REQUIRE_THROWS_MATCHES(
+        prop.get_diff_args(), std::invalid_argument,
+        Message("The function 'get_diff_args()' cannot be invoked on an sgp4 propagator without derivatives"));
 }
 
 TEST_CASE("derivatives")
@@ -552,6 +555,7 @@ TEST_CASE("derivatives")
     REQUIRE_THROWS_MATCHES(prop.get_mindex(1000u), std::invalid_argument,
                            Message("Cannot fetch the multiindex of the derivative at index 1000: the index "
                                    "is not less than the total number of derivatives (168)"));
+    REQUIRE(prop.get_diff_args() == std::vector(inputs.begin(), inputs.begin() + 6));
 
     // Prepare the input buffer for the cfunc.
     std::vector<double> cf_in(ins.begin(), ins.begin() + 14);
