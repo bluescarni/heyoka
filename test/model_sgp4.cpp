@@ -160,20 +160,20 @@ TEST_CASE("propagator basics")
     prop_t prop{md_input_t{ins.data(), 2}};
     REQUIRE(prop.get_diff_order() == 0u);
     auto prop2 = prop;
-    REQUIRE(prop2.get_n_sats() == 2u);
+    REQUIRE(prop2.get_nsats() == 2u);
 
     // Move construction.
     auto prop3 = std::move(prop2);
-    REQUIRE(prop3.get_n_sats() == 2u);
+    REQUIRE(prop3.get_nsats() == 2u);
 
     // Revive prop2 via copy assignment.
     prop2 = prop3;
-    REQUIRE(prop2.get_n_sats() == 2u);
+    REQUIRE(prop2.get_nsats() == 2u);
 
     // Revive via move assignment.
     prop_t prop4;
     prop4 = std::move(prop2);
-    REQUIRE(prop4.get_n_sats() == 2u);
+    REQUIRE(prop4.get_nsats() == 2u);
 }
 
 TEST_CASE("propagator single")
@@ -208,6 +208,7 @@ TEST_CASE("propagator single")
 
     for (auto cm : {false, true}) {
         prop_t prop{md_input_t{ins.data(), 2}, kw::compact_mode = cm};
+        REQUIRE(prop.get_nouts() == 6u);
 
         std::vector<double> outs(12u);
         prop_t::out_2d out{outs.data(), 6, 2};
@@ -544,6 +545,7 @@ TEST_CASE("derivatives")
 
     prop_t prop{md_input_t{ins.data(), 2}, kw::diff_order = 2};
 
+    REQUIRE(prop.get_nouts() == 168u);
     REQUIRE(prop.get_diff_order() == 2u);
     auto sl = prop.get_dslice(1);
     REQUIRE(sl.first == 6u);
@@ -690,5 +692,5 @@ TEST_CASE("s11n")
         ia >> prop;
     }
 
-    REQUIRE(prop.get_n_sats() == 2u);
+    REQUIRE(prop.get_nsats() == 2u);
 }

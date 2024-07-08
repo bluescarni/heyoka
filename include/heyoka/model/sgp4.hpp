@@ -154,7 +154,8 @@ public:
     sgp4_propagator &operator=(sgp4_propagator &&) noexcept;
     ~sgp4_propagator();
 
-    [[nodiscard]] std::uint32_t get_n_sats() const;
+    [[nodiscard]] std::uint32_t get_nsats() const;
+    [[nodiscard]] std::uint32_t get_nouts() const noexcept;
 
     [[nodiscard]] std::uint32_t get_diff_order() const noexcept;
     [[nodiscard]] const std::vector<expression> &get_diff_args() const;

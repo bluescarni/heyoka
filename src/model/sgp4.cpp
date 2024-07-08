@@ -638,9 +638,16 @@ sgp4_propagator<T>::~sgp4_propagator() = default;
 
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
-std::uint32_t sgp4_propagator<T>::get_n_sats() const
+std::uint32_t sgp4_propagator<T>::get_nsats() const
 {
     return boost::numeric_cast<std::uint32_t>(m_impl->m_sat_buffer.size() / 9u);
+}
+
+template <typename T>
+    requires std::same_as<T, double> || std::same_as<T, float>
+std::uint32_t sgp4_propagator<T>::get_nouts() const noexcept
+{
+    return m_impl->m_cf_tprop.get_nouts();
 }
 
 template <typename T>
@@ -719,7 +726,7 @@ template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
 void sgp4_propagator<T>::operator()(out_2d out, in_1d<T> tms)
 {
-    const auto n_sats = get_n_sats();
+    const auto n_sats = get_nsats();
     assert(n_sats != 0u); // LCOV_EXCL_LINE
 
     // Prepare the init buffer span.
@@ -787,7 +794,7 @@ void sgp4_propagator<T>::operator()(out_2d out, in_1d<date> dates)
     if (dates.data_handle() == nullptr) [[unlikely]] {
         throw std::invalid_argument("A null array of dates was passed to the call operator of an sgp4_propagator");
     }
-    const auto n_sats = get_n_sats();
+    const auto n_sats = get_nsats();
     if (dates.extent(0) != n_sats) [[unlikely]] {
         throw std::invalid_argument(
             fmt::format("Invalid array of dates passed to the call operator of an sgp4_propagator: the number of "
@@ -860,7 +867,7 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<T> tms)
                         n_evals, tms.extent(0)));
     }
 
-    const auto n_sats = get_n_sats();
+    const auto n_sats = get_nsats();
     assert(n_sats != 0u); // LCOV_EXCL_LINE
 
     // Prepare the init buffer span.
@@ -928,7 +935,7 @@ void sgp4_propagator<T>::operator()(out_3d out, in_2d<date> dates)
         throw std::invalid_argument(
             "A null array of dates was passed to the batch-mode call operator of an sgp4_propagator");
     }
-    const auto n_sats = get_n_sats();
+    const auto n_sats = get_nsats();
     if (dates.extent(1) != n_sats) [[unlikely]] {
         throw std::invalid_argument(fmt::format(
             "Invalid array of dates passed to the batch-mode call operator of an sgp4_propagator: the number of "
