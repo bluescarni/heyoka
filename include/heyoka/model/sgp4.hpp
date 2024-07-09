@@ -60,6 +60,16 @@ HEYOKA_DLL_PUBLIC void sgp4_compile_funcs(const std::function<void()> &, const s
 
 } // namespace detail
 
+// NOTE: a couple of ideas for performance improvements:
+// - simultaneous computation of sin/cos for SLEEF,
+// - partitioning of the satellite list into simplified
+//   (perigee < 220km) and non-simplified dynamics. This would
+//   allow to get rid of the select() calls in the time propagation
+//   function, as we would then have 2 different functions for the simplified
+//   and non-simplified tprop. Getting rid of the select()s would allow
+//   to avoid unnecessary computations. The issue with this approach
+//   is that we would need to alter the original ordering of the satellites.
+//   Perhaps a similar approach could work for the deep space part too?
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS sgp4_propagator
