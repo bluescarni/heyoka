@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <ranges>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
