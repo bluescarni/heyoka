@@ -162,6 +162,12 @@ TEST_CASE("propagator basics")
     REQUIRE(prop.get_diff_order() == 0u);
     auto prop2 = prop;
     REQUIRE(prop2.get_nsats() == 2u);
+    REQUIRE(prop.get_sat_data().extent(0) == 9u);
+    REQUIRE(prop.get_sat_data().extent(1) == 2u);
+    REQUIRE(prop.get_sat_data()(0, 0) == revday2radmin(13.75091047972192));
+    REQUIRE(prop.get_sat_data()(0, 1) == revday2radmin(15.50103472202482));
+    REQUIRE(prop.get_sat_data()(1, 0) == 0.0024963);
+    REQUIRE(prop.get_sat_data()(1, 1) == 0.0007417);
 
     // Move construction.
     auto prop3 = std::move(prop2);

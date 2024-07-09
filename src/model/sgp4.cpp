@@ -652,6 +652,14 @@ std::uint32_t sgp4_propagator<T>::get_nouts() const noexcept
 
 template <typename T>
     requires std::same_as<T, double> || std::same_as<T, float>
+mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>> sgp4_propagator<T>::get_sat_data() const
+{
+    return mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>>{
+        m_impl->m_sat_buffer.data(), boost::numeric_cast<std::size_t>(m_impl->m_sat_buffer.size() / 9u)};
+}
+
+template <typename T>
+    requires std::same_as<T, double> || std::same_as<T, float>
 void sgp4_propagator<T>::check_with_diff(const char *fname) const
 {
     if (get_diff_order() == 0u) [[unlikely]] {

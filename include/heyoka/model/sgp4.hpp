@@ -167,6 +167,7 @@ public:
 
     [[nodiscard]] std::uint32_t get_nsats() const;
     [[nodiscard]] std::uint32_t get_nouts() const noexcept;
+    [[nodiscard]] mdspan<const T, extents<std::size_t, 9, std::dynamic_extent>> get_sat_data() const;
 
     [[nodiscard]] std::uint32_t get_diff_order() const noexcept;
     [[nodiscard]] const std::vector<expression> &get_diff_args() const;
