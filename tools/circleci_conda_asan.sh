@@ -16,7 +16,7 @@ export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 mamba create -y -p $deps_dir c-compiler cxx-compiler cmake \
     llvmdev tbb-devel tbb libboost-devel 'mppp=1.*' sleef xtensor \
-    xtensor-blas blas blas-devel fmt spdlog ninja \
+    xtensor-blas blas blas-devel 'fmt<11' spdlog ninja \
     'sphinxcontrib-bibtex=2.6.*' 'sphinx=7.*' 'sphinx-book-theme=1.*'
 source activate $deps_dir
 
