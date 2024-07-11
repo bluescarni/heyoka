@@ -51,6 +51,7 @@
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/dfun.hpp>
 #include <heyoka/math/kepF.hpp>
+#include <heyoka/math/logical.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/relational.hpp>
 #include <heyoka/math/select.hpp>
@@ -231,6 +232,9 @@ std::vector<expression> sgp4_time_prop(const auto &s, const expression &TSINCE =
                  T3COF, T4COF, T5COF, A0DP, AYCOF, LCOF, N0DP, X3THM1, X1MTH2, X7THM1, COSI0, SINI0]
         = s;
 
+    // First error code check: un-Kozaied mean motion is not positive.
+    auto ERROR = select(lte(N0DP, 0.), 2., 0.);
+
     // Update for secular gravity and atmospheric drag.
     auto MP = M0 + MDOT * TSINCE;
     auto OMEGA = OMEGA0 + OMGDOT * TSINCE;
@@ -248,6 +252,10 @@ std::vector<expression> sgp4_time_prop(const auto &s, const expression &TSINCE =
     const auto A = A0DP * pow(TEMPA, 2.);
     const auto N = KE / pow(A, 3. / 2);
     auto E = E0 - TEMPE * BSTAR;
+
+    // Second error code check: invalid eccentricity.
+    ERROR = select(eq(ERROR, 0.), select(logical_or({gte(E, 1.), lt(E, -0.001)}), 1., 0.), ERROR);
+
     // NOTE: fix for low eccentricity.
     E = select(lt(E, 1e-6), 1e-6, E);
     TEMPL = TEMPL * pow(TSINCE, 2.);
@@ -280,6 +288,10 @@ std::vector<expression> sgp4_time_prop(const auto &s, const expression &TSINCE =
     const auto ELSQ = pow(AXN, 2.) + pow(AYN, 2.);
     const auto TEMPS = 1. - ELSQ;
     const auto PL = A * TEMPS;
+
+    // Third error code check: pl < 0.
+    ERROR = select(eq(ERROR, 0.), select(lt(PL, 0.), 4., 0.), ERROR);
+
     const auto R = A * (1. - ECOSE);
     const auto RDOT = KE * sqrt(A) * ESINE / R;
     const auto RFDOT = KE * sqrt(PL) / R;
@@ -328,7 +340,10 @@ std::vector<expression> sgp4_time_prop(const auto &s, const expression &TSINCE =
     // Rescaling factor for the Cartesian velocities.
     const auto vel_fac = KMPER / 60.;
 
-    return {PV1 * KMPER, PV2 * KMPER, PV3 * KMPER, PV4 * vel_fac, PV5 * vel_fac, PV6 * vel_fac};
+    // Last error check: RK < 1.0.
+    ERROR = select(eq(ERROR, 0.), select(lt(RK, 1.0), 6., 0.), ERROR);
+
+    return {PV1 * KMPER, PV2 * KMPER, PV3 * KMPER, PV4 * vel_fac, PV5 * vel_fac, PV6 * vel_fac, ERROR};
 }
 
 } // namespace

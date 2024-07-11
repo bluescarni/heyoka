@@ -49,7 +49,7 @@ TEST_CASE("model expression")
                                    deg2rad(85.6398),
                                    .38792e-4,
                                    0.},
-                            outs(6u);
+                            outs(7u);
 
         sgp4_cf(outs, ins);
 
@@ -59,6 +59,7 @@ TEST_CASE("model expression")
         REQUIRE(outs[3] == approximately(5.810229142351453, 10000.));
         REQUIRE(outs[4] == approximately(4.802261184784617, 10000.));
         REQUIRE(outs[5] == approximately(-1.388280333072693, 10000.));
+        REQUIRE(outs[6] == 0.);
     }
 
     {
@@ -70,7 +71,7 @@ TEST_CASE("model expression")
                                    deg2rad(85.6398),
                                    .38792e-4,
                                    1440.},
-                            outs(6u);
+                            outs(7u);
 
         sgp4_cf(outs, ins);
 
@@ -80,6 +81,7 @@ TEST_CASE("model expression")
         REQUIRE(outs[3] == approximately(-5.927709516654264, 10000.));
         REQUIRE(outs[4] == approximately(-4.496384419253211, 10000.));
         REQUIRE(outs[5] == approximately(1.785277174529374, 10000.));
+        REQUIRE(outs[6] == 0.);
     }
 
     {
@@ -91,7 +93,7 @@ TEST_CASE("model expression")
                                    deg2rad(91.4738),
                                    0.75863e-3,
                                    0.},
-                            outs(6u);
+                            outs(7u);
 
         sgp4_cf(outs, ins);
 
@@ -101,6 +103,7 @@ TEST_CASE("model expression")
         REQUIRE(outs[3] == approximately(-3.276142513618007, 10000.));
         REQUIRE(outs[4] == approximately(-4.806489082829041, 10000.));
         REQUIRE(outs[5] == approximately(4.511134501638151, 10000.));
+        REQUIRE(outs[6] == 0.);
     }
 
     {
@@ -112,7 +115,7 @@ TEST_CASE("model expression")
                                    deg2rad(91.4738),
                                    0.75863e-3,
                                    1440.},
-                            outs(6u);
+                            outs(7u);
 
         sgp4_cf(outs, ins);
 
@@ -122,6 +125,7 @@ TEST_CASE("model expression")
         REQUIRE(outs[3] == approximately(2.732034613044249, 10000.));
         REQUIRE(outs[4] == approximately(3.952589777415254, 10000.));
         REQUIRE(outs[5] == approximately(5.588906721377138, 10000.));
+        REQUIRE(outs[6] == 0.);
     }
 }
 
@@ -215,10 +219,10 @@ TEST_CASE("propagator single")
 
     for (auto cm : {false, true}) {
         prop_t prop{md_input_t{ins.data(), 2}, kw::compact_mode = cm};
-        REQUIRE(prop.get_nouts() == 6u);
+        REQUIRE(prop.get_nouts() == 7u);
 
-        std::vector<double> outs(12u);
-        prop_t::out_2d out{outs.data(), 6, 2};
+        std::vector<double> outs(14u);
+        prop_t::out_2d out{outs.data(), 7, 2};
 
         prop(out, tm_in);
 
@@ -228,12 +232,14 @@ TEST_CASE("propagator single")
         REQUIRE(out(3, 0) == approximately(2.732034613044249, 10000.));
         REQUIRE(out(4, 0) == approximately(3.952589777415254, 10000.));
         REQUIRE(out(5, 0) == approximately(5.588906721377138, 10000.));
+        REQUIRE(out(6, 0) == 0.);
         REQUIRE(out(0, 1) == approximately(3469.947984145807, 10000.));
         REQUIRE(out(1, 1) == approximately(-2690.388430131083, 10000.));
         REQUIRE(out(2, 1) == approximately(5175.831924199492, 10000.));
         REQUIRE(out(3, 1) == approximately(5.810229142351453, 10000.));
         REQUIRE(out(4, 1) == approximately(4.802261184784617, 10000.));
         REQUIRE(out(5, 1) == approximately(-1.388280333072693, 10000.));
+        REQUIRE(out(6, 1) == 0.);
 
         auto dates
             = std::array<prop_t::date, 2>{{{2460486.5 + 1, 0.6478633000000116}, {2458826.5, 0.6933954099999937}}};
@@ -247,15 +253,17 @@ TEST_CASE("propagator single")
         REQUIRE(out(3, 0) == approximately(2.732034613044249, 10000.));
         REQUIRE(out(4, 0) == approximately(3.952589777415254, 10000.));
         REQUIRE(out(5, 0) == approximately(5.588906721377138, 10000.));
+        REQUIRE(out(6, 0) == 0.);
         REQUIRE(out(0, 1) == approximately(3469.947984145807, 10000.));
         REQUIRE(out(1, 1) == approximately(-2690.388430131083, 10000.));
         REQUIRE(out(2, 1) == approximately(5175.831924199492, 10000.));
         REQUIRE(out(3, 1) == approximately(5.810229142351453, 10000.));
         REQUIRE(out(4, 1) == approximately(4.802261184784617, 10000.));
         REQUIRE(out(5, 1) == approximately(-1.388280333072693, 10000.));
+        REQUIRE(out(6, 1) == 0.);
 
         // Try with several bogus input spans.
-        REQUIRE_THROWS_AS(prop(prop_t::out_2d{nullptr, 6, 2}, date_in), std::invalid_argument);
+        REQUIRE_THROWS_AS(prop(prop_t::out_2d{nullptr, 7, 2}, date_in), std::invalid_argument);
         REQUIRE_THROWS_AS(prop(prop_t::out_2d{outs.data(), 5, 2}, date_in), std::invalid_argument);
         REQUIRE_THROWS_AS(prop(out, prop_t::in_1d<double>{nullptr, 2}), std::invalid_argument);
         REQUIRE_THROWS_AS(prop(out, prop_t::in_1d<double>{ins.data(), 1}), std::invalid_argument);
@@ -297,8 +305,8 @@ TEST_CASE("propagator batch")
     for (auto cm : {false, true}) {
         prop_t prop{md_input_t{ins.data(), 2}, kw::compact_mode = cm};
 
-        std::vector<double> outs(24u);
-        prop_t::out_3d out{outs.data(), 2, 6, 2};
+        std::vector<double> outs(28u);
+        prop_t::out_3d out{outs.data(), 2, 7, 2};
 
         prop(out, tm_in);
 
@@ -308,24 +316,28 @@ TEST_CASE("propagator batch")
         REQUIRE(out(0, 3, 0) == approximately(2.732034613044249, 10000.));
         REQUIRE(out(0, 4, 0) == approximately(3.952589777415254, 10000.));
         REQUIRE(out(0, 5, 0) == approximately(5.588906721377138, 10000.));
+        REQUIRE(out(0, 6, 0) == 0.);
         REQUIRE(out(0, 0, 1) == approximately(3469.947984145807, 10000.));
         REQUIRE(out(0, 1, 1) == approximately(-2690.388430131083, 10000.));
         REQUIRE(out(0, 2, 1) == approximately(5175.831924199492, 10000.));
         REQUIRE(out(0, 3, 1) == approximately(5.810229142351453, 10000.));
         REQUIRE(out(0, 4, 1) == approximately(4.802261184784617, 10000.));
         REQUIRE(out(0, 5, 1) == approximately(-1.388280333072693, 10000.));
+        REQUIRE(out(0, 6, 1) == 0.);
         REQUIRE(out(1, 0, 0) == approximately(2561.223660636298, 10000.));
         REQUIRE(out(1, 1, 0) == approximately(3698.797144057697, 10000.));
         REQUIRE(out(1, 2, 0) == approximately(5818.772215708888, 10000.));
         REQUIRE(out(1, 3, 0) == approximately(-3.276142513618007, 10000.));
         REQUIRE(out(1, 4, 0) == approximately(-4.806489082829041, 10000.));
         REQUIRE(out(1, 5, 0) == approximately(4.511134501638151, 10000.));
+        REQUIRE(out(1, 6, 0) == 0.);
         REQUIRE(out(1, 0, 1) == approximately(-3591.82683131782, 10000.));
         REQUIRE(out(1, 1, 1) == approximately(2723.666407193435, 10000.));
         REQUIRE(out(1, 2, 1) == approximately(-5090.448264983512, 10000.));
         REQUIRE(out(1, 3, 1) == approximately(-5.927709516654264, 10000.));
         REQUIRE(out(1, 4, 1) == approximately(-4.496384419253211, 10000.));
         REQUIRE(out(1, 5, 1) == approximately(1.785277174529374, 10000.));
+        REQUIRE(out(1, 6, 1) == 0.);
 
         auto dates = std::array<prop_t::date, 4>{{{2460486.5 + 1, 0.6478633000000116},
                                                   {2458826.5, 0.6933954099999937},
@@ -341,31 +353,35 @@ TEST_CASE("propagator batch")
         REQUIRE(out(0, 3, 0) == approximately(2.732034613044249, 10000.));
         REQUIRE(out(0, 4, 0) == approximately(3.952589777415254, 10000.));
         REQUIRE(out(0, 5, 0) == approximately(5.588906721377138, 10000.));
+        REQUIRE(out(0, 6, 0) == 0.);
         REQUIRE(out(0, 0, 1) == approximately(3469.947984145807, 10000.));
         REQUIRE(out(0, 1, 1) == approximately(-2690.388430131083, 10000.));
         REQUIRE(out(0, 2, 1) == approximately(5175.831924199492, 10000.));
         REQUIRE(out(0, 3, 1) == approximately(5.810229142351453, 10000.));
         REQUIRE(out(0, 4, 1) == approximately(4.802261184784617, 10000.));
         REQUIRE(out(0, 5, 1) == approximately(-1.388280333072693, 10000.));
+        REQUIRE(out(0, 6, 1) == 0.);
         REQUIRE(out(1, 0, 0) == approximately(2561.223660636298, 10000.));
         REQUIRE(out(1, 1, 0) == approximately(3698.797144057697, 10000.));
         REQUIRE(out(1, 2, 0) == approximately(5818.772215708888, 10000.));
         REQUIRE(out(1, 3, 0) == approximately(-3.276142513618007, 10000.));
         REQUIRE(out(1, 4, 0) == approximately(-4.806489082829041, 10000.));
         REQUIRE(out(1, 5, 0) == approximately(4.511134501638151, 10000.));
+        REQUIRE(out(1, 6, 0) == 0.);
         REQUIRE(out(1, 0, 1) == approximately(-3591.82683131782, 10000.));
         REQUIRE(out(1, 1, 1) == approximately(2723.666407193435, 10000.));
         REQUIRE(out(1, 2, 1) == approximately(-5090.448264983512, 10000.));
         REQUIRE(out(1, 3, 1) == approximately(-5.927709516654264, 10000.));
         REQUIRE(out(1, 4, 1) == approximately(-4.496384419253211, 10000.));
         REQUIRE(out(1, 5, 1) == approximately(1.785277174529374, 10000.));
+        REQUIRE(out(1, 6, 1) == 0.);
 
         // Check that nothing bad happens with zero evals.
-        prop(prop_t::out_3d{outs.data(), 0, 6, 2}, prop_t::in_2d<double>{tm.data(), 0, 2});
+        prop(prop_t::out_3d{outs.data(), 0, 7, 2}, prop_t::in_2d<double>{tm.data(), 0, 2});
 
         // Try with several bogus input spans.
         REQUIRE_THROWS_MATCHES(
-            prop(prop_t::out_3d{nullptr, 2, 6, 2}, date_in), std::invalid_argument,
+            prop(prop_t::out_3d{nullptr, 2, 7, 2}, date_in), std::invalid_argument,
             Message("A null output array was passed to the batch-mode call operator of an sgp4_propagator"));
         REQUIRE_THROWS_AS(prop(prop_t::out_3d{outs.data(), 2, 5, 2}, date_in), std::invalid_argument);
         REQUIRE_THROWS_AS(prop(prop_t::out_3d{outs.data(), 2, 4, 1}, date_in), std::invalid_argument);
@@ -444,7 +460,7 @@ TEST_CASE("error handling")
     prop_t::in_1d<prop_t::date> date_in{dates.data(), 2};
 
     std::vector<double> outs(12u);
-    prop_t::out_2d out{outs.data(), 6, 2};
+    prop_t::out_2d out{outs.data(), 7, 2};
 
     REQUIRE_THROWS_MATCHES(
         prop(out, date_in), std::invalid_argument,
@@ -468,7 +484,7 @@ TEST_CASE("error handling")
     prop_t::in_2d<prop_t::date> date_b{dates_batch.data(), 1, 2};
 
     std::vector<double> outs_batch(24u);
-    prop_t::out_3d out_batch{outs.data(), 2, 6, 2};
+    prop_t::out_3d out_batch{outs.data(), 2, 7, 2};
 
     REQUIRE_THROWS_MATCHES(
         prop(out_batch, date_b), std::invalid_argument,
@@ -552,18 +568,18 @@ TEST_CASE("derivatives")
 
     prop_t prop{md_input_t{ins.data(), 2}, kw::diff_order = 2};
 
-    REQUIRE(prop.get_nouts() == 168u);
+    REQUIRE(prop.get_nouts() == 196u);
     REQUIRE(prop.get_diff_order() == 2u);
     auto sl = prop.get_dslice(1);
-    REQUIRE(sl.first == 6u);
-    REQUIRE(sl.second == 6u + 6u * 6u);
+    REQUIRE(sl.first == 7u);
+    REQUIRE(sl.second == 7u + 7u * 6u);
     sl = prop.get_dslice(3, 1);
-    REQUIRE(sl.first == 6u + 3u * 6u);
-    REQUIRE(sl.second == 6u + 4u * 6u);
-    REQUIRE(prop.get_mindex(6u + 4u * 6u) == dtens::sv_idx_t{4, {{0, 1}}});
+    REQUIRE(sl.first == 7u + 3u * 6u);
+    REQUIRE(sl.second == 7u + 4u * 6u);
+    REQUIRE(prop.get_mindex(7u + 4u * 6u) == dtens::sv_idx_t{4, {{0, 1}}});
     REQUIRE_THROWS_MATCHES(prop.get_mindex(1000u), std::invalid_argument,
                            Message("Cannot fetch the multiindex of the derivative at index 1000: the index "
-                                   "is not less than the total number of derivatives (168)"));
+                                   "is not less than the total number of derivatives (196)"));
     REQUIRE(prop.get_diff_args() == std::vector(inputs.begin(), inputs.begin() + 6));
 
     // Prepare the input buffer for the cfunc.
@@ -623,8 +639,8 @@ TEST_CASE("large")
         times.resize(tot_N, prop_t::date{2460486.5, 0.6478633000000116});
 
         std::vector<double> outs;
-        outs.resize(tot_N * 6);
-        prop_t::out_2d out_span{outs.data(), 6, tot_N};
+        outs.resize(tot_N * 7);
+        prop_t::out_2d out_span{outs.data(), 7, tot_N};
 
         prop(out_span, prop_t::in_1d<prop_t::date>{times.data(), tot_N});
 
@@ -635,11 +651,12 @@ TEST_CASE("large")
             REQUIRE(out_span(3, i) == approximately(-3.276142513618007, 10000.));
             REQUIRE(out_span(4, i) == approximately(-4.806489082829041, 10000.));
             REQUIRE(out_span(5, i) == approximately(4.511134501638151, 10000.));
+            REQUIRE(out_span(6, i) == 0.);
         }
 
         times.resize(tot_N * n_evals, prop_t::date{2460486.5, 0.6478633000000116});
-        outs.resize(tot_N * 6 * n_evals);
-        prop_t::out_3d out_span_batch{outs.data(), n_evals, 6, tot_N};
+        outs.resize(tot_N * 7 * n_evals);
+        prop_t::out_3d out_span_batch{outs.data(), n_evals, 7, tot_N};
 
         prop(out_span_batch, prop_t::in_2d<prop_t::date>{times.data(), n_evals, tot_N});
 
@@ -651,6 +668,7 @@ TEST_CASE("large")
                 REQUIRE(out_span_batch(k, 3, i) == approximately(-3.276142513618007, 10000.));
                 REQUIRE(out_span_batch(k, 4, i) == approximately(-4.806489082829041, 10000.));
                 REQUIRE(out_span_batch(k, 5, i) == approximately(4.511134501638151, 10000.));
+                REQUIRE(out_span_batch(k, 6, i) == 0.);
             }
         }
     }
@@ -685,6 +703,9 @@ TEST_CASE("s11n")
 
     prop_t prop{md_input_t{ins.data(), 2}};
 
+    const std::vector sat_data(prop.get_sat_data().data_handle(),
+                               prop.get_sat_data().data_handle() + prop.get_sat_data().size());
+
     std::stringstream ss;
 
     {
@@ -699,5 +720,9 @@ TEST_CASE("s11n")
         ia >> prop;
     }
 
+    const std::vector new_sat_data(prop.get_sat_data().data_handle(),
+                                   prop.get_sat_data().data_handle() + prop.get_sat_data().size());
+
     REQUIRE(prop.get_nsats() == 2u);
+    REQUIRE(sat_data == new_sat_data);
 }
