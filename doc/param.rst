@@ -38,10 +38,10 @@ The :cpp:class:`~heyoka::param` class
       :param idx: the index value for the parameter.
 
    .. cpp:function:: param(const param &) noexcept
-   .. cpp:function:: param(param &&) noexcept
-   .. cpp:function:: param &operator=(const param &) noexcept
-   .. cpp:function:: param &operator=(param &&) noexcept
-   .. cpp:function:: ~param()
+                     param(param &&) noexcept
+                     param &operator=(const param &) noexcept
+                     param &operator=(param &&) noexcept
+                     ~param()
 
       Parameters are copy/move constructible, copy/move assignable and destructible.
 
@@ -78,7 +78,7 @@ Operators
 ---------
 
 .. cpp:function:: bool operator==(const param &a, const param &b) noexcept
-.. cpp:function:: bool operator!=(const param &a, const param &b) noexcept
+                  bool operator!=(const param &a, const param &b) noexcept
 
    Equality comparison operators.
 

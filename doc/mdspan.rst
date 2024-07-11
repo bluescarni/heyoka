@@ -1,5 +1,5 @@
-mdspan
-======
+Multidimensional array views
+============================
 
 .. cpp:namespace-push:: heyoka
 
