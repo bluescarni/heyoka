@@ -233,7 +233,7 @@ std::vector<expression> sgp4_time_prop(const auto &s, const expression &TSINCE =
         = s;
 
     // First error code check: un-Kozaied mean motion is not positive.
-    auto ERROR = select(lte(N0DP, 0.), 2., 0.);
+    auto ERRORCODE = select(lte(N0DP, 0.), 2., 0.);
 
     // Update for secular gravity and atmospheric drag.
     auto MP = M0 + MDOT * TSINCE;
@@ -254,7 +254,7 @@ std::vector<expression> sgp4_time_prop(const auto &s, const expression &TSINCE =
     auto E = E0 - TEMPE * BSTAR;
 
     // Second error code check: invalid eccentricity.
-    ERROR = select(eq(ERROR, 0.), select(logical_or({gte(E, 1.), lt(E, -0.001)}), 1., 0.), ERROR);
+    ERRORCODE = select(eq(ERRORCODE, 0.), select(logical_or({gte(E, 1.), lt(E, -0.001)}), 1., 0.), ERRORCODE);
 
     // NOTE: fix for low eccentricity.
     E = select(lt(E, 1e-6), 1e-6, E);
@@ -290,7 +290,7 @@ std::vector<expression> sgp4_time_prop(const auto &s, const expression &TSINCE =
     const auto PL = A * TEMPS;
 
     // Third error code check: pl < 0.
-    ERROR = select(eq(ERROR, 0.), select(lt(PL, 0.), 4., 0.), ERROR);
+    ERRORCODE = select(eq(ERRORCODE, 0.), select(lt(PL, 0.), 4., 0.), ERRORCODE);
 
     const auto R = A * (1. - ECOSE);
     const auto RDOT = KE * sqrt(A) * ESINE / R;
@@ -341,9 +341,9 @@ std::vector<expression> sgp4_time_prop(const auto &s, const expression &TSINCE =
     const auto vel_fac = KMPER / 60.;
 
     // Last error check: RK < 1.0.
-    ERROR = select(eq(ERROR, 0.), select(lt(RK, 1.0), 6., 0.), ERROR);
+    ERRORCODE = select(eq(ERRORCODE, 0.), select(lt(RK, 1.0), 6., 0.), ERRORCODE);
 
-    return {PV1 * KMPER, PV2 * KMPER, PV3 * KMPER, PV4 * vel_fac, PV5 * vel_fac, PV6 * vel_fac, ERROR};
+    return {PV1 * KMPER, PV2 * KMPER, PV3 * KMPER, PV4 * vel_fac, PV5 * vel_fac, PV6 * vel_fac, ERRORCODE};
 }
 
 } // namespace
